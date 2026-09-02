@@ -308,7 +308,10 @@ public static class ArchitectureChangeReports
             .Concat(report.ExistingFindings)
             .Concat(report.ResolvedFindings))
         {
-            if (string.IsNullOrWhiteSpace(finding.Identity)
+            if (finding is null
+                || string.IsNullOrWhiteSpace(finding.Identity)
+                || string.IsNullOrWhiteSpace(finding.Kind)
+                || string.IsNullOrWhiteSpace(finding.Display)
                 || !findingIdentities.Add(finding.Identity))
             {
                 throw new ArgumentException(
@@ -316,6 +319,9 @@ public static class ArchitectureChangeReports
                     nameof(report));
             }
         }
+
+        ValidateEntries(report.Added.Concat(report.Removed), nameof(report));
+        ValidateBaselineDebt(report.BaselineDebt, nameof(report));
     }
 
     private static void Validate(ArchitectureChangeSnapshot snapshot)
@@ -335,15 +341,54 @@ public static class ArchitectureChangeReports
             throw new ArgumentException("Architecture change snapshots must record their condition set.");
         }
 
-        EnsureUnique(snapshot.Entries.Select(Key), "entry");
-        EnsureUnique(snapshot.Findings.Select(static finding => finding.Identity), "finding");
+        ValidateEntries(snapshot.Entries, nameof(snapshot), requireUnique: true);
+        ValidateFindings(snapshot.Findings, nameof(snapshot), requireUnique: true);
+        ValidateBaselineDebt(snapshot.BaselineDebt, nameof(snapshot));
     }
 
-    private static void EnsureUnique(IEnumerable<string> values, string itemName)
+    private static void ValidateEntries(
+        IEnumerable<ArchitectureChangeEntry> entries,
+        string parameterName,
+        bool requireUnique = false)
     {
-        if (values.Any(static value => string.IsNullOrWhiteSpace(value)) || values.Distinct(StringComparer.Ordinal).Count() != values.Count())
+        HashSet<string>? identities = requireUnique ? new(StringComparer.Ordinal) : null;
+        foreach (ArchitectureChangeEntry entry in entries)
         {
-            throw new ArgumentException($"Architecture change snapshot contains duplicate or empty {itemName} identities.");
+            if (entry is null
+                || string.IsNullOrWhiteSpace(entry.Kind)
+                || string.IsNullOrWhiteSpace(entry.Identity)
+                || string.IsNullOrWhiteSpace(entry.Display)
+                || (identities is not null && !identities.Add(Key(entry))))
+            {
+                throw new ArgumentException("Architecture change artifact contains an invalid entry.", parameterName);
+            }
+        }
+    }
+
+    private static void ValidateFindings(
+        IEnumerable<ArchitectureChangeFinding> findings,
+        string parameterName,
+        bool requireUnique)
+    {
+        HashSet<string>? identities = requireUnique ? new(StringComparer.Ordinal) : null;
+        foreach (ArchitectureChangeFinding finding in findings)
+        {
+            if (finding is null
+                || string.IsNullOrWhiteSpace(finding.Identity)
+                || string.IsNullOrWhiteSpace(finding.Kind)
+                || string.IsNullOrWhiteSpace(finding.Display)
+                || (identities is not null && !identities.Add(finding.Identity)))
+            {
+                throw new ArgumentException("Architecture change artifact contains an invalid finding.", parameterName);
+            }
+        }
+    }
+
+    private static void ValidateBaselineDebt(IEnumerable<string> identities, string parameterName)
+    {
+        if (identities.Any(static identity => string.IsNullOrWhiteSpace(identity)))
+        {
+            throw new ArgumentException("Architecture change artifact contains an invalid baseline-debt identity.", parameterName);
         }
     }
 

@@ -48,7 +48,7 @@ internal static class PrReportMarkdownFormatter
 
     internal static string ExistingDebtHeadline(ArchitecturePrReportProjection projection)
     {
-        int count = projection.Evidence?.DebtGate.PersistentDebt.Entries.Count ?? 0;
+        int count = projection.Evidence is null ? 0 : ExistingBaselineDebt(projection.Evidence).Count;
         return projection.Evidence is null ? "`unavailable`" : $"`{count}` baseline entries";
     }
 
@@ -60,10 +60,21 @@ internal static class PrReportMarkdownFormatter
         }
 
         int count = projection.Evidence.DebtGate.PersistentDebt.Entries.Count(item =>
-            string.Equals(item.Status, "new", StringComparison.Ordinal)
-            || string.Equals(item.Disposition, "new", StringComparison.Ordinal));
+            string.Equals(item.Status, BaselineEntryLifecycleNames.New, StringComparison.Ordinal));
         return $"`{count}` new baseline entries";
     }
+
+    internal static IReadOnlyList<ArchitecturePrReportBaselineEntry> ExistingBaselineDebt(
+        ArchitecturePrReportEvidence evidence) =>
+        evidence.DebtGate.PersistentDebt.Entries
+            .Where(item => string.Equals(item.Status, BaselineEntryLifecycleNames.Matched, StringComparison.Ordinal))
+            .ToArray();
+
+    internal static IReadOnlyList<ArchitecturePrReportBaselineEntry> BlockingBaselineLifecycle(
+        ArchitecturePrReportEvidence evidence) =>
+        evidence.DebtGate.PersistentDebt.Entries
+            .Where(item => !string.Equals(item.Status, BaselineEntryLifecycleNames.Matched, StringComparison.Ordinal))
+            .ToArray();
 
     internal static string PolicyWeakeningHeadline(ArchitecturePrReportProjection projection)
     {

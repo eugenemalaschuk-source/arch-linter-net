@@ -113,8 +113,10 @@ coverage dimension, while `warn` retains the finding as non-blocking degrading e
 ## Architecture pull-request report output
 
 `arch-linter-net report pr --health <architecture-health.json> --change <architecture-change.json>` renders deterministic Markdown from two canonical local artifacts. The
-Health input is an `architecture-health/v1` document with additive canonical reporting evidence; the
-change input is the canonical architecture-change report. The command consumes those artifacts only:
+Health input is an `architecture-health/v1` document with versioned canonical reporting evidence;
+the change input is the versioned architecture-change report. Both must carry the same non-empty
+workflow execution identifier and condition-set scope; legacy, incomplete, or incompatible artifacts
+fail closed. The command consumes those artifacts only:
 it does not rerun or recreate analysis, reopen snapshots, inspect GitHub, or publish a pull-request
 comment. Use `--output <architecture-pr-report.md>` to write the Markdown file; otherwise it is
 written to standard output.

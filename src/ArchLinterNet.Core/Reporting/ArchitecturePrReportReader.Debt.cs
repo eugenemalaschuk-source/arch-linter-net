@@ -9,6 +9,7 @@ internal static class ArchitecturePrReportDebtReceiptParser
 {
     internal static ArchitecturePrReportFinding ReadFinding(JsonElement element)
     {
+        RequireObject(element, "A report finding");
         JsonElement? sourceLocation = element.TryGetProperty("source_location", out JsonElement source)
             && source.ValueKind != JsonValueKind.Null
             ? source
@@ -106,10 +107,26 @@ internal static class ArchitecturePrReportDebtReceiptParser
             Required(element, "configuration_violations", JsonValueKind.Array).EnumerateArray()
                 .Select(ReadFinding).ToArray());
 
-    private static ArchitecturePrReportBaselineEntry ReadBaselineEntry(JsonElement element) =>
-        new(
-            RequiredString(element, "status"),
-            RequiredString(element, "disposition"),
+    private static ArchitecturePrReportBaselineEntry ReadBaselineEntry(JsonElement element)
+    {
+        string status = RequiredString(element, "status");
+        if (!BaselineEntryLifecycleNames.All.Contains(status, StringComparer.Ordinal))
+        {
+            throw InvalidArtifact($"Unsupported baseline lifecycle status '{status}'.");
+        }
+
+        string disposition = RequiredString(element, "disposition");
+        if (disposition is not (BaselineEntryDispositionNames.Reported
+            or BaselineEntryDispositionNames.Added
+            or BaselineEntryDispositionNames.Retained
+            or BaselineEntryDispositionNames.Removed))
+        {
+            throw InvalidArtifact($"Unsupported baseline entry disposition '{disposition}'.");
+        }
+
+        return new ArchitecturePrReportBaselineEntry(
+            status,
+            disposition,
             RequiredString(element, "contract_group"),
             RequiredString(element, "contract_id"),
             RequiredString(element, "source_type"),
@@ -118,6 +135,7 @@ internal static class ArchitecturePrReportDebtReceiptParser
             OptionalString(element, "issue"),
             OptionalString(element, "current_forbidden_reference"),
             OptionalString(element, "identity"));
+    }
 
     private static ArchitecturePrReportPolicyWeakening? ReadPolicyWeakening(JsonElement element)
     {

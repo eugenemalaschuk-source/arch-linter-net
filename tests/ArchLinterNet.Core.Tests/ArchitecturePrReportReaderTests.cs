@@ -39,22 +39,14 @@ public sealed class ArchitecturePrReportReaderTests
     }
 
     [Test]
-    public void ReadAndProject_LegacySummaryWithoutEvidencePreservesGateAndMarksUnavailable()
+    public void Read_RejectsLegacyHealthSummaryWithoutCorrelatableReportEvidence()
     {
         ArchitectureHealthOutcome outcome = CreateOutcome();
         ArchitectureChangeReport change = ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1");
 
-        ArchitecturePrReportProjection projection = ArchitecturePrReportProjector.ReadAndProject(
+        Assert.That(() => ArchitecturePrReportProjector.ReadAndProject(
             ArchitectureHealthProjector.FormatAsJson(outcome.Summary),
-            ArchitectureChangeReports.FormatJson(change));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(projection.Evidence, Is.Null);
-            Assert.That(projection.Availability, Is.EqualTo(ArchitecturePrReportAvailability.Unavailable));
-            Assert.That(projection.Headline.Gate, Is.EqualTo(outcome.Summary.Gate));
-            Assert.That(projection.Headline.Health, Is.EqualTo(outcome.Summary.Health));
-        });
+            ArchitectureChangeReports.FormatJson(change)), Throws.ArgumentException);
     }
 
     [Test]
@@ -120,6 +112,24 @@ public sealed class ArchitecturePrReportReaderTests
             Assert.That(() => ArchitecturePrReportReader.Read(missingPayload.ToJsonString(), changeJson), Throws.ArgumentException);
             Assert.That(() => ArchitecturePrReportReader.Read(unknownKey.ToJsonString(), changeJson), Throws.ArgumentException);
             Assert.That(() => ArchitecturePrReportReader.Read(unknownValue.ToJsonString(), changeJson), Throws.ArgumentException);
+        });
+    }
+
+    [Test]
+    public void Read_RejectsNullArrayElementsAsInvalidArtifacts()
+    {
+        string changeJson = ArchitectureChangeReports.FormatJson(
+            ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1"));
+        JsonNode nullFinding = JsonNode.Parse(ArchitectureHealthProjector.FormatAsJson(CreateOutcome()))!;
+        nullFinding["report_evidence"]!["validation_outcomes"]![0]!["findings"] = new JsonArray((JsonNode?)null);
+
+        JsonNode nullBaselineEntry = JsonNode.Parse(ArchitectureHealthProjector.FormatAsJson(CreateOutcome()))!;
+        nullBaselineEntry["report_evidence"]!["debt_gate"]!["persistent_debt"]!["entries"] = new JsonArray((JsonNode?)null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(() => ArchitecturePrReportReader.Read(nullFinding.ToJsonString(), changeJson), Throws.ArgumentException);
+            Assert.That(() => ArchitecturePrReportReader.Read(nullBaselineEntry.ToJsonString(), changeJson), Throws.ArgumentException);
         });
     }
 

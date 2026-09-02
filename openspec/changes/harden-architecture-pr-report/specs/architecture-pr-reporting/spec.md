@@ -22,6 +22,11 @@ mixed artifacts.
   canonical Health validation receipt in the same execution context
 - **THEN** PR-report generation fails closed without rendering Markdown
 
+#### Scenario: Legacy Health cannot bypass correlation
+- **WHEN** the Health input lacks the versioned reporting-evidence envelope
+- **THEN** PR-report generation rejects the artifact rather than pairing its
+  headline with a change report from an unproven execution
+
 ### Requirement: PR report evidence is a closed authority payload contract
 The projection SHALL validate each reporting receipt's availability map against
 the complete known authority-key set and its allowed wire values.  Every
@@ -62,6 +67,12 @@ empty bounded sections SHALL not emit `Showing 0 of 0` detail text.
   debt
 - **THEN** the Markdown contains neither blocker nor debt drill-down headings
   and no empty bounded-detail indicator
+
+#### Scenario: Baseline lifecycle remains distinct from accepted debt
+- **WHEN** a debt-gate receipt contains matched and non-matched baseline
+  lifecycle entries
+- **THEN** only matched entries render as non-blocking existing debt, while
+  non-matched lifecycle states remain blocking baseline-integrity evidence
 
 ### Requirement: Blockers preserve their canonical authority semantics
 The renderer SHALL select blockers from the owning canonical strict receipt,

@@ -23,7 +23,9 @@ public static class ArchitecturePrReportReader
             ArchitecturePrReportInput health = ReadHealth(healthDocument.RootElement);
             ArchitectureChangeReport change = ArchitectureChangeReports.DeserializeReport(changeJson);
             ArchitecturePrReportChange reportChange = ReadChange(change);
-            ValidateCompatibleContext(health.Evidence, reportChange);
+            ArchitecturePrReportEvidence evidence = health.Evidence
+                ?? throw InvalidArtifact("The Health artifact requires report evidence for PR-report correlation.");
+            ValidateCompatibleContext(evidence, reportChange);
             return health with { Change = reportChange };
         }
         catch (JsonException exception)
@@ -58,9 +60,9 @@ public static class ArchitecturePrReportReader
             .ToArray();
         var summary = new ArchitectureHealthSummary(schemaId, gate, health, parsedDimensions);
 
-        ArchitecturePrReportEvidence? evidence = root.TryGetProperty("report_evidence", out JsonElement evidenceElement)
+        ArchitecturePrReportEvidence evidence = root.TryGetProperty("report_evidence", out JsonElement evidenceElement)
             ? ReadEvidence(evidenceElement, gate, health)
-            : null;
+            : throw InvalidArtifact("The Health artifact requires report_evidence for PR-report correlation.");
         return new ArchitecturePrReportInput(summary, evidence, null!);
     }
 
@@ -255,14 +257,9 @@ public static class ArchitecturePrReportReader
     }
 
     private static void ValidateCompatibleContext(
-        ArchitecturePrReportEvidence? evidence,
+        ArchitecturePrReportEvidence evidence,
         ArchitecturePrReportChange change)
     {
-        if (evidence is null)
-        {
-            return;
-        }
-
         ArchitecturePrReportExecutionContext health = evidence.ExecutionContext
             ?? throw InvalidArtifact("The Health report evidence requires execution context.");
         if (!string.Equals(health.ExecutionId, change.ExecutionContext.ExecutionId, StringComparison.Ordinal)
@@ -347,12 +344,22 @@ public static class ArchitecturePrReportReader
 
     internal static JsonElement Required(JsonElement parent, string name, JsonValueKind kind)
     {
-        if (!parent.TryGetProperty(name, out JsonElement value) || value.ValueKind != kind)
+        if (parent.ValueKind != JsonValueKind.Object
+            || !parent.TryGetProperty(name, out JsonElement value)
+            || value.ValueKind != kind)
         {
             throw InvalidArtifact($"The Health report artifact requires '{name}' as {kind}.");
         }
 
         return value;
+    }
+
+    internal static void RequireObject(JsonElement element, string description)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            throw InvalidArtifact($"{description} must be a JSON object.");
+        }
     }
 
     internal static string RequiredString(JsonElement parent, string name)

@@ -71,7 +71,7 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 <!-- cli-command: change report -->
 
-| `arch-linter-net change report --base <path> --current <path>` | Compare two architecture snapshots. |
+| `arch-linter-net change report --base <path> --current <path> --execution-context <id>` | Compare two architecture snapshots into a correlatable report artifact. |
 
 <!-- cli-command: coverage -->
 
@@ -322,9 +322,31 @@ architecture-only: it reads the supplied artifacts, does not run or recreate ana
 inspect or call GitHub.
 
 The Health input must be an `architecture-health/v1` document from a supported CLI, including its
-additive canonical reporting evidence. The change input is the canonical architecture-change JSON
-report, which carries the supplied added, continuing, and resolved finding evidence. The command
-does not reopen snapshots or compare them again.
+versioned canonical reporting evidence and non-empty execution context. The change input is the
+versioned canonical architecture-change JSON report with the same execution context. `report pr`
+rejects legacy Health or change artifacts and any pair whose execution identifier, condition set, or
+mode receipt does not correlate. The command does not reopen snapshots or compare them again.
+
+Create the pair from the real producers using one workflow-owned identifier:
+
+```bash
+# Base and candidate checkouts/worktrees, respectively
+arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output base-snapshot.json
+arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output current-snapshot.json
+
+arch-linter-net change report \
+  --base base-snapshot.json \
+  --current current-snapshot.json \
+  --execution-context pr-123 \
+  --format json \
+  --output architecture-change.json
+
+arch-linter-net health \
+  --policy architecture/arch.yml \
+  --format json \
+  --execution-context pr-123 \
+  > architecture-health.json
+```
 
 The report headline repeats direct Health/projection facts such as `gate` and `health`; it is not a
 score, percentage, grade, or compensating quality calculation. Rule/effective-control counts,
@@ -354,6 +376,7 @@ arch-linter-net change snapshot \
 arch-linter-net change report \
   --base base-snapshot.json \
   --current current-snapshot.json \
+  --execution-context local-review \
   --format human
 ```
 

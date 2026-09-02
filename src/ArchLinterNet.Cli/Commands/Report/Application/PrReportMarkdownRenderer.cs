@@ -82,6 +82,16 @@ internal static class PrReportMarkdownRenderer
         ArchitecturePrReportEvidence? evidence = projection.Evidence;
         if (evidence is not null)
         {
+            if (!evidence.DebtGate.PersistentDebt.InSync)
+            {
+                foreach (ArchitecturePrReportBaselineEntry entry in BlockingBaselineLifecycle(evidence)
+                    .OrderBy(item => item.Identity ?? item.ContractId, StringComparer.Ordinal)
+                    .ThenBy(item => item.Status, StringComparer.Ordinal))
+                {
+                    blockers.Add($"baseline lifecycle `{Inline(entry.Status)}`: {FormatBaseline(entry)}");
+                }
+            }
+
             ArchitecturePrReportPolicyWeakening? weakening = evidence.DebtGate.PolicyWeakening;
             if (weakening is { HasBlockingFindings: true }
                 && evidence.DebtGate.Succeeded
@@ -168,7 +178,7 @@ internal static class PrReportMarkdownRenderer
             .Select(FormatWaiver)
             .ToList();
 
-        List<string> baseline = evidence.DebtGate.PersistentDebt.Entries
+        List<string> baseline = ExistingBaselineDebt(evidence)
             .OrderBy(item => item.Identity ?? item.ContractId, StringComparer.Ordinal)
             .ThenBy(item => item.Status, StringComparer.Ordinal)
             .Select(FormatBaseline)

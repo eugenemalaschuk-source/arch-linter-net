@@ -38,6 +38,7 @@ internal static class ArchitecturePrReportReceiptParser
 
     private static ArchitectureWaiverLifecycleRecord ReadWaiver(JsonElement element)
     {
+        RequireObject(element, "A waiver lifecycle record");
         return new ArchitectureWaiverLifecycleRecord(
             RequiredString(element, "id"),
             RequiredString(element, "state"),
@@ -118,6 +119,7 @@ internal static class ArchitecturePrReportReceiptParser
 
     private static ArchitecturePrReportApplicabilityControl ReadApplicabilityControl(JsonElement element)
     {
+        RequireObject(element, "An applicability control");
         ArchitecturePrReportApplicabilityExpected? expected = element.TryGetProperty("expected", out JsonElement expectedElement)
             ? ReadApplicabilityExpected(expectedElement)
             : null;
@@ -209,6 +211,7 @@ internal static class ArchitecturePrReportReceiptParser
 
     private static ArchitecturePrReportExternalRequirement ReadExternalRequirement(JsonElement element)
     {
+        RequireObject(element, "An external-evidence requirement");
         ArchitecturePrReportDiagnosticFilter? filter = element.TryGetProperty("diagnostic_filter", out JsonElement filterElement)
             ? new ArchitecturePrReportDiagnosticFilter(
                 ReadStringArray(Required(filterElement, "rule_ids", JsonValueKind.Array)),
@@ -226,9 +229,12 @@ internal static class ArchitecturePrReportReceiptParser
             RequiredBool(element, "require_scope"), filter);
     }
 
-    private static ArchitecturePrReportProvenanceReference ReadProvenanceReference(JsonElement element) =>
-        new(OptionalString(element, "family"), OptionalString(element, "control_identity"),
+    private static ArchitecturePrReportProvenanceReference ReadProvenanceReference(JsonElement element)
+    {
+        RequireObject(element, "A provenance reference");
+        return new(OptionalString(element, "family"), OptionalString(element, "control_identity"),
             OptionalString(element, "policy_identity"), OptionalString(element, "evidence_identity"));
+    }
 
     internal static ArchitecturePrReportProvenance ReadProvenance(JsonElement element) =>
         new(RequiredString(element, "repository_root"),

@@ -167,6 +167,7 @@ arch-linter-net change snapshot \
 arch-linter-net change report \
   --base ../base.architecture-change.json \
   --current current.architecture-change.json \
+  --execution-context pr-123 \
   --format json
 ```
 

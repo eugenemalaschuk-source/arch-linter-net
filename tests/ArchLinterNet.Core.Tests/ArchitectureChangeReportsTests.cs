@@ -167,6 +167,21 @@ public sealed class ArchitectureChangeReportsTests
         Assert.That(() => ArchitectureChangeReports.DeserializeReport(Report), Throws.ArgumentException);
     }
 
+    [Test]
+    public void DeserializeArtifacts_RejectsNullArrayElements()
+    {
+        const string Snapshot =
+            "{\"snapshot_kind\":\"architecture-change-snapshot\",\"schema_version\":2,\"mode\":\"strict\",\"condition_set_name\":\"\",\"entries\":[null],\"findings\":[],\"baseline_debt\":[]}";
+        const string Report =
+            "{\"kind\":\"architecture-change-report\",\"schema_version\":2,\"execution_context\":{\"execution_id\":\"run\",\"mode\":\"strict\",\"condition_set\":\"\"},\"added\":[null],\"removed\":[],\"new_findings\":[],\"existing_findings\":[],\"resolved_findings\":[],\"baseline_debt\":[]}";
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(() => ArchitectureChangeReports.DeserializeSnapshot(Snapshot), Throws.ArgumentException);
+            Assert.That(() => ArchitectureChangeReports.DeserializeReport(Report), Throws.ArgumentException);
+        });
+    }
+
     [TestCase("{\"snapshot_kind\":\"architecture-change-snapshot\",\"schema_version\":2,\"mode\":\"strict\",\"condition_set_name\":\"\",\"findings\":[],\"baseline_debt\":[]}")]
     [TestCase("{\"snapshot_kind\":\"architecture-change-snapshot\",\"schema_version\":2,\"mode\":\"strict\",\"condition_set_name\":\"\",\"entries\":[],\"baseline_debt\":[]}")]
     [TestCase("{\"snapshot_kind\":\"architecture-change-snapshot\",\"schema_version\":2,\"mode\":\"strict\",\"condition_set_name\":\"\",\"entries\":[],\"findings\":[]}")]

@@ -71,7 +71,7 @@ public sealed class ReportCommandHandlerTests
     }
 
     [Test]
-    public void Execute_LegacyHealthAndCanonicalChange_WritesRequestedOutput()
+    public void Execute_LegacyHealthAndCanonicalChange_FailsClosed()
     {
         const string Health =
             "{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\",\"dimensions\":[]}";
@@ -85,15 +85,15 @@ public sealed class ReportCommandHandlerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.Output, Is.Empty);
-            Assert.That(fileSystem.Written["report.md"], Does.Contain("# Architecture PR report"));
-            Assert.That(fileSystem.Written["report.md"], Does.Contain("Report availability: `unavailable`"));
+            Assert.That(fileSystem.Written.ContainsKey("report.md"), Is.False);
+            Assert.That(console.ErrorOutput, Does.Contain("report_evidence"));
         });
     }
 
     [Test]
-    public void Definition_PrSubcommand_ParsesCanonicalArtifactOptions()
+    public void Definition_PrSubcommand_ParsesOptionsBeforeRejectingLegacyHealth()
     {
         const string Health =
             "{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\",\"dimensions\":[]}";
@@ -109,8 +109,8 @@ public sealed class ReportCommandHandlerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
-            Assert.That(console.Output, Does.Contain("# Architecture PR report"));
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorOutput, Does.Contain("report_evidence"));
         });
     }
 

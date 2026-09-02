@@ -51,6 +51,32 @@ internal static class PrReportMarkdownEscaping
             }
         }
 
+        return NeutralizeBareAutolinks(builder.ToString());
+    }
+
+    private static string NeutralizeBareAutolinks(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        for (int index = 0; index < value.Length; index++)
+        {
+            if (value.AsSpan(index).StartsWith("://", StringComparison.Ordinal))
+            {
+                builder.Append("\\://");
+                index += 2;
+                continue;
+            }
+
+            if (value.AsSpan(index).StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.Append(value, index, 3);
+                builder.Append("&#46;");
+                index += 3;
+                continue;
+            }
+
+            builder.Append(value[index]);
+        }
+
         return builder.ToString();
     }
 

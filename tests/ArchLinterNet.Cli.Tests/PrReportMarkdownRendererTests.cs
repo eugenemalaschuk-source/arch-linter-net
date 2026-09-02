@@ -144,6 +144,62 @@ public sealed class PrReportMarkdownRendererTests
     }
 
     [Test]
+    public void BareGfmAutolinksInPlainTextAreNeutralized()
+    {
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(change: Change(
+            [new ArchitectureChangeEntry("surface", "identity", "https://invalid.example/path and www.invalid.example")])));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Not.Contain("https://invalid.example/path"));
+            Assert.That(markdown, Does.Not.Contain("www.invalid.example"));
+            Assert.That(markdown, Does.Contain("https\\://invalid.example/path"));
+            Assert.That(markdown, Does.Contain("www&#46;invalid.example"));
+        });
+    }
+
+    [Test]
+    public void BaselineLifecycleIntegrityIsBlockingWhileOnlyMatchedDebtIsNonBlocking()
+    {
+        ArchitecturePrReportEvidence evidence = Evidence(baseline:
+        [
+            Baseline("new", "baseline-new"),
+            Baseline("matched", "baseline-matched"),
+            Baseline("resolved", "baseline-resolved"),
+            Baseline("stale", "baseline-stale"),
+            Baseline("changed", "baseline-changed"),
+            Baseline("ambiguous", "baseline-ambiguous"),
+            Baseline("configuration-error", "baseline-configuration"),
+        ]);
+        evidence = evidence with
+        {
+            DebtGate = evidence.DebtGate with
+            {
+                Passed = false,
+                PersistentDebt = evidence.DebtGate.PersistentDebt with { InSync = false },
+            },
+        };
+
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(evidence: evidence));
+        string blockers = markdown[..markdown.IndexOf("## Non-blocking debt", StringComparison.Ordinal)];
+        int debtEnd = markdown.IndexOf("## Completeness and evidence", StringComparison.Ordinal);
+        string debt = markdown[markdown.IndexOf("## Non-blocking debt", StringComparison.Ordinal)..debtEnd];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("Existing finding debt: `1` baseline entries"));
+            Assert.That(markdown, Does.Contain("New architecture debt: `1` new baseline entries"));
+            Assert.That(blockers, Does.Contain("baseline lifecycle `resolved`"));
+            Assert.That(blockers, Does.Contain("baseline lifecycle `stale`"));
+            Assert.That(blockers, Does.Contain("baseline lifecycle `configuration-error`"));
+            Assert.That(debt, Does.Contain("baseline-matched"));
+            Assert.That(debt, Does.Not.Contain("baseline-resolved"));
+            Assert.That(debt, Does.Not.Contain("baseline-stale"));
+            Assert.That(debt, Does.Not.Contain("baseline-configuration"));
+        });
+    }
+
+    [Test]
     public void LifecycleStates_PreserveExpiredAndStaleMetadata()
     {
         ArchitectureWaiverLifecycleRecord expired = Waiver("waiver-expired", "expired") with
