@@ -314,18 +314,24 @@ jobs:
             echo ".NET coverage shards still ran and their reports were aggregated without those secrets."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  architecture_coverage:
+  architecture_pr_report_producer:
     name: Architecture Coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # This builds the head, materializes a base snapshot, then emits health/change/report artifacts.
+    timeout-minutes: 30
     permissions:
       contents: read
-      pull-requests: write
+    env:
+      ARCHITECTURE_REPORT_DIRECTORY: architecture-pr-report
+      ARCHITECTURE_REPORT_ARTIFACT_DIRECTORY: architecture-pr-report-artifact
+    outputs:
+      strict_coverage_outcome: ${{ steps.architecture_coverage.outcome }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -373,6 +379,154 @@ jobs:
           fi
           make architecture-coverage-ci DIFF_STATUS="$DIFF_STATUS"
 
+      - name: Create architecture report base worktree
+        id: architecture_report_base
+        if: always()
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_WORKTREE: ${{ runner.temp }}/archlinter-base-${{ github.run_id }}-${{ github.run_attempt }}
+        shell: bash
+        run: |
+          mkdir -p "$ARCHITECTURE_REPORT_DIRECTORY"
+          git worktree add --detach "$BASE_WORKTREE" "$BASE_SHA"
+          echo "path=$BASE_WORKTREE" >> "$GITHUB_OUTPUT"
+
+      - name: Generate canonical architecture PR report inputs
+        id: architecture_report_inputs
+        if: always() && steps.architecture_report_base.outcome == 'success'
+        continue-on-error: true
+        env:
+          BASE_WORKTREE: ${{ steps.architecture_report_base.outputs.path }}
+          EXECUTION_CONTEXT: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          cli_project="$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj"
+          output_directory="$GITHUB_WORKSPACE/$ARCHITECTURE_REPORT_DIRECTORY"
+
+          snapshot() {
+            local snapshot_output="$1"
+            local snapshot_args=(
+              --policy architecture/dependencies.arch.yml
+              --mode strict
+              --ensure-built
+            )
+            if [[ -f architecture/baseline.arch.yml ]]; then
+              snapshot_args+=(--baseline architecture/baseline.arch.yml)
+            fi
+            dotnet run --no-build --project "$cli_project" -- change snapshot \
+              "${snapshot_args[@]}" \
+              --output "$snapshot_output"
+          }
+
+          pushd "$BASE_WORKTREE"
+          snapshot "$output_directory/base-architecture-change-snapshot.json"
+          popd
+
+          snapshot "$output_directory/current-architecture-change-snapshot.json"
+
+          dotnet run --no-build --project "$cli_project" -- change report \
+            --base "$output_directory/base-architecture-change-snapshot.json" \
+            --current "$output_directory/current-architecture-change-snapshot.json" \
+            --execution-context "$EXECUTION_CONTEXT" \
+            --format json \
+            --output "$output_directory/architecture-change.json"
+
+          health_args=(
+            --policy architecture/dependencies.arch.yml
+            --mode strict
+            --ensure-built
+          )
+          if [[ -f architecture/baseline.arch.yml ]]; then
+            health_args+=(--baseline architecture/baseline.arch.yml)
+          else
+            empty_baseline="$RUNNER_TEMP/arch-linter-net-empty-baseline-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.arch.yml"
+            printf '%s\n' 'version: 3' 'baseline: {}' 'metric_baselines: []' > "$empty_baseline"
+            health_args+=(--baseline "$empty_baseline")
+          fi
+          set +e
+          dotnet run --no-build --project "$cli_project" -- health \
+            "${health_args[@]}" \
+            --format json \
+            --execution-context "$EXECUTION_CONTEXT" \
+            > "$output_directory/architecture-health.json"
+          health_exit=$?
+          set -e
+          if [ "$health_exit" -ne 0 ] && [ ! -s "$output_directory/architecture-health.json" ]; then
+            exit "$health_exit"
+          fi
+          if ! python3 - "$output_directory/architecture-health.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          try:
+              document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+              raise SystemExit(f"Architecture Health output is not valid JSON: {error}")
+
+          if not isinstance(document, dict) or document.get("schema_id") != "architecture-health/v1":
+              raise SystemExit("Architecture Health output must use schema_id architecture-health/v1.")
+          PY
+          then
+            if [ "$health_exit" -eq 0 ]; then
+              exit 2
+            fi
+            exit "$health_exit"
+          fi
+
+          dotnet run --no-build --project "$cli_project" -- report pr \
+            --health "$output_directory/architecture-health.json" \
+            --change "$output_directory/architecture-change.json" \
+            --output "$output_directory/architecture-pr-report.md" \
+            --max-details 20
+
+      - name: Create bound architecture PR report manifest
+        id: architecture_report_manifest
+        if: always() && steps.architecture_report_inputs.outcome == 'success'
+        continue-on-error: true
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          report_path="$ARCHITECTURE_REPORT_DIRECTORY/architecture-pr-report.md"
+          artifact_directory="$ARCHITECTURE_REPORT_ARTIFACT_DIRECTORY"
+          mkdir -p "$artifact_directory"
+          cp "$report_path" "$artifact_directory/architecture-pr-report.md"
+          export report_path="$artifact_directory/architecture-pr-report.md"
+          export manifest_path="$artifact_directory/architecture-pr-report.manifest.json"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path(os.environ["report_path"])
+          report_bytes = report_path.read_bytes()
+          manifest = {
+              "schema": "architecture-pr-report-publication/v1",
+              "kind": "architecture-pr-report",
+              "marker": "arch-linter-net-pr-report:v1",
+              "context": {
+                  "repository": os.environ["GITHUB_REPOSITORY"],
+                  "pr_number": os.environ["PR_NUMBER"],
+                  "head_sha": os.environ["PR_HEAD_SHA"],
+                  "run_id": os.environ["GITHUB_RUN_ID"],
+                  "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              },
+              "report": {
+                  "path": "architecture-pr-report.md",
+                  "bytes": len(report_bytes),
+                  "sha256": hashlib.sha256(report_bytes).hexdigest(),
+              },
+          }
+          Path(os.environ["manifest_path"]).write_text(
+              json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
       - name: Upload strict diagnostics
         if: always() && hashFiles('architecture-strict.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -394,43 +548,61 @@ jobs:
           name: architecture-coverage-report
           path: architecture-coverage.md
 
-      - name: Comment architecture coverage on pull request
-        if: github.event_name == 'pull_request' && always() && hashFiles('architecture-coverage-comment.md') != ''
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+      - name: Upload architecture Health artifact
+        if: always() && hashFiles('architecture-pr-report/architecture-health.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          script: |
-            const fs = require('fs');
-            const marker = '<!-- architecture-coverage-report -->';
-            const artifactsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts`;
-            const detailLink = `[View the full architecture coverage report and strict diagnostics](${artifactsUrl})`;
-            const body = `${marker}\n${fs.readFileSync('architecture-coverage-comment.md', 'utf8')}\n${detailLink}`;
+          name: architecture-health
+          path: architecture-pr-report/architecture-health.json
 
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
+      - name: Upload architecture change artifact
+        if: always() && hashFiles('architecture-pr-report/architecture-change.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: architecture-change
+          path: architecture-pr-report/architecture-change.json
 
-            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
+      - name: Upload bound architecture PR report
+        if: always() && hashFiles('architecture-pr-report-artifact/architecture-pr-report.md') != '' && hashFiles('architecture-pr-report-artifact/architecture-pr-report.manifest.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: architecture-pr-report-v1
+          path: |
+            architecture-pr-report-artifact/architecture-pr-report.md
+            architecture-pr-report-artifact/architecture-pr-report.manifest.json
+          if-no-files-found: error
 
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
+      - name: Remove architecture report base worktree
+        if: always() && steps.architecture_report_base.outcome == 'success'
+        env:
+          BASE_WORKTREE: ${{ steps.architecture_report_base.outputs.path }}
+        shell: bash
+        run: git worktree remove --force "$BASE_WORKTREE"
+
+      - name: Fail if architecture PR report inputs are unavailable
+        if: always() && steps.architecture_report_inputs.outcome != 'success'
+        run: exit 1
+
+      - name: Fail if architecture PR report manifest is unavailable
+        if: always() && steps.architecture_report_manifest.outcome != 'success'
+        run: exit 1
+
+  architecture_pr_report_gate:
+    name: Architecture PR Report Gate
+    needs: architecture_pr_report_producer
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+
+    steps:
+      - name: Fail if architecture report producer is unavailable
+        if: needs.architecture_pr_report_producer.result != 'success'
+        run: exit 1
 
       - name: Fail if strict architecture coverage failed
-        if: steps.architecture_coverage.outcome == 'failure'
+        if: needs.architecture_pr_report_producer.outputs.strict_coverage_outcome == 'failure'
         run: exit 1
 
   tooling_support_tests:

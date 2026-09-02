@@ -403,7 +403,9 @@ rendered as unavailable or unassessable, never as zero or pass. Canonical identi
 are retained where supplied so reviewers can drill back to the source artifacts.
 
 This command only renders the local report. GitHub comment publication, workflow/event orchestration,
-security permissions, and related integration remain outside this command's boundary in #681.
+security permissions, and related integration remain outside this command's boundary. The
+repository's separate completed-CI publisher consumes the rendered file after transport validation;
+the command itself never calls GitHub.
 
 ## Change snapshots
 

@@ -49,35 +49,6 @@ signals.
 - **AND** it links to documentation explaining the distinct CI, architecture
   policy, architecture coverage, and SonarCloud quality signals
 
-### Requirement: Architecture coverage analysis runs in the existing CI workflow
-
-The architecture coverage analysis steps (strict/audit JSON artifacts, report generation) SHALL
-run inside a dedicated `ci.yml` architecture-coverage job that is independently schedulable from
-repository lint, coverage/Sonar, and the other pull-request validation jobs. Because this job does
-not share a runner or checkout with any job that builds the CLI/Testing projects, it SHALL build
-those projects itself before invoking the CLI in `--no-build` mode.
-
-#### Scenario: Coverage steps run after acceptance in the same job
-
-- **WHEN** the architecture-coverage job runs
-- **THEN** it builds `ArchLinterNet.Cli` and `ArchLinterNet.Testing` itself before running the
-  strict/audit JSON generation steps
-- **AND** it does not depend on a build performed by the repository-lint job or any other job
-
-### Requirement: PR comment posting is a stage of the single validate job
-
-Posting the architecture coverage PR comment SHALL run as a step inside the architecture-coverage
-job, alongside the strict/audit analysis and artifact uploads it reports on, rather than in a
-separate job or workflow.
-
-#### Scenario: A single job runs the whole pipeline
-
-- **WHEN** `ci.yml` is inspected
-- **THEN** the architecture-coverage job includes the strict/audit architecture coverage analysis,
-  artifact upload steps, and the PR comment step
-- **AND** that job's `permissions` include `pull-requests: write` so the comment step can run
-  without a second job
-
 ### Requirement: SonarCloud analysis consumes isolated coverage artifacts
 
 SonarCloud analysis SHALL run inside `ci.yml`'s coverage/Sonar job. The coverage/Sonar job SHALL
@@ -139,12 +110,12 @@ dependency boundaries instead of one monolithic job, so unrelated checks can sta
 and fail independently. At minimum the workflow SHALL provide: a workflow-quality job (actionlint,
 zizmor, workflow Prettier check), a repository-lint job (`make lint`), independently schedulable
 .NET coverage shard jobs, a coverage/Sonar aggregation job (SonarCloud begin/build/end lifecycle,
-Python tooling coverage, coverage artifact import, Codecov upload), an architecture-coverage job
-(strict/audit architecture coverage analysis, artifact uploads, PR comment), and a
-tooling/support-tests job (the architecture-coverage-report-generator and release-evidence-
-aggregator Python test suites). `needs:` SHALL be used only along genuine artifact/result
-boundaries; specifically the coverage/Sonar aggregation job MAY depend on the .NET coverage shard
-jobs whose reports it consumes, while unrelated validation jobs remain schedulable at PR start.
+Python tooling coverage, coverage artifact import, Codecov upload), an architecture PR-report
+producer job (strict/audit coverage analysis and immutable report artifact upload), and a
+tooling/support-tests job (the workflow-contract and release-evidence Python test suites).
+`needs:` SHALL be used only along genuine artifact/result boundaries; specifically the
+coverage/Sonar aggregation job MAY depend on the .NET coverage shard jobs whose reports it
+consumes, while unrelated validation jobs remain schedulable at PR start.
 
 #### Scenario: Workflow quality fails without waiting for .NET restore
 
@@ -167,18 +138,18 @@ jobs whose reports it consumes, while unrelated validation jobs remain schedulab
 - **AND** it does not invoke the E2E or packed-artifact test buckets
 - **AND** it does not re-run the .NET coverage shards whose reports it consumes
 
-#### Scenario: Architecture coverage job builds what it needs independently
+#### Scenario: Architecture report producer builds what it needs independently
 
-- **WHEN** the architecture-coverage job runs on its own runner and checkout
-- **THEN** it builds the projects required by the strict/audit architecture coverage analysis
+- **WHEN** the architecture report producer job runs on its own runner and checkout
+- **THEN** it builds the projects required by strict/audit coverage and canonical report generation
   itself, rather than relying on a build performed by a different job
-- **AND** it preserves fail-closed strict-mode failure semantics even though artifact upload and
-  PR comment steps use `always()`/`continue-on-error` for report publication
+- **AND** it preserves fail-closed strict-mode semantics while artifact upload remains available
+  for completed canonical report data
 
 #### Scenario: No artificial ordering between unrelated validation jobs
 
 - **WHEN** workflow-quality, repository-lint, .NET coverage shards, coverage/Sonar aggregation,
-  architecture-coverage, and tooling/support-tests jobs are inspected
+  architecture report producer, and tooling/support-tests jobs are inspected
 - **THEN** only the coverage/Sonar aggregation job depends on .NET coverage shards because it
   genuinely consumes their artifacts
 - **AND** unrelated jobs declare no artificial `needs:` edges between each other
@@ -369,3 +340,55 @@ by the stable Windows packed-artifact fan-in check.
 - **WHEN** the packed-artifact Windows matrix runs for a pull request
 - **THEN** it invokes the dedicated Make target for the installed-tool rebuild oracle
 - **AND** the Windows fan-in fails if that shard fails or its evidence is missing
+
+### Requirement: Architecture PR report producer runs in the existing CI workflow
+
+The architecture report producer SHALL run strict/audit coverage, canonical Health/change
+artifacts, and the CLI-rendered PR report artifact inside a dedicated read-only `ci.yml`
+job that is independently schedulable from repository lint, coverage/Sonar, and the other
+pull-request validation jobs. Because this job does not share a runner or checkout with a job that
+builds the CLI/Testing projects, it SHALL build those projects itself before invoking the CLI in
+`--no-build` mode. It SHALL not have pull-request write permission or a comment-writing step.
+
+#### Scenario: Producer builds and renders independently
+
+- **WHEN** the architecture report producer job runs
+- **THEN** it builds `ArchLinterNet.Cli` and `ArchLinterNet.Testing` before it runs the coverage,
+  Health, change, and report CLI steps
+- **AND** it does not depend on a build performed by repository lint or another job
+
+### Requirement: Architecture report readiness is separate from strict gate enforcement
+
+The read-only architecture report producer SHALL expose a successful bounded artifact-production
+outcome when it has rendered and uploaded canonical report inputs, even if strict architecture
+coverage has a valid failure. A dependent Architecture PR Report Gate SHALL fail the CI for that
+strict result. The completed-CI publisher SHALL use the named producer job outcome and artifact
+protocol rather than the aggregate CI conclusion.
+
+#### Scenario: Strict failure still has a report artifact
+
+- **WHEN** canonical report production succeeds but strict architecture coverage finds a failure
+- **THEN** the producer job completes with its bounded artifact available
+- **AND** the dependent Architecture PR Report Gate fails the CI
+- **AND** the publisher can use the producer artifact without inspecting unrelated job outcomes
+
+### Requirement: Architecture report Health uses a canonical baseline and schema guard
+
+The read-only architecture report producer SHALL pass a valid baseline to the required Health CLI
+input. When the current producer worktree lacks `architecture/baseline.arch.yml`, it SHALL create a
+canonical empty version-3 baseline only in runner temporary storage and SHALL not commit or upload
+that baseline as repository state. After Health runs, the producer SHALL require a parseable
+`architecture-health/v1` document before it invokes `report pr` or uploads a report artifact.
+
+#### Scenario: No repository baseline still produces a canonical Health artifact
+
+- **WHEN** the current producer worktree has no `architecture/baseline.arch.yml`
+- **THEN** the producer supplies an ephemeral canonical empty baseline to Health
+- **AND** it can render the report from a valid `architecture-health/v1` response
+
+#### Scenario: Health command-error JSON does not become a report input
+
+- **WHEN** the Health command emits malformed JSON or a JSON envelope without
+  `schema_id: architecture-health/v1`
+- **THEN** the producer fails before it invokes `report pr`
+- **AND** it does not upload a manifest claiming a canonical report
