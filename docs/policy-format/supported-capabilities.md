@@ -36,7 +36,7 @@ The current machine inventory is rendered as the reviewed [Contract family index
 - cycles, independence, protected surfaces, reusable layer templates, and module containers;
 - project metadata, packages, framework references, and external dependencies;
 - method-body forbidden calls and Unity `.asmdef` references;
-- type placement, layout conventions, attributes, inheritance, interfaces, and composition roots;
+- type placement, layout conventions with opt-in folder applicability inventories, attributes, inheritance, interfaces, and composition roots;
 - public API snapshots/surfaces and recursive contract-surface exposure rules;
 - semantic contextual dependency/allow-only rules and port/ACL boundaries;
 - architecture coverage.

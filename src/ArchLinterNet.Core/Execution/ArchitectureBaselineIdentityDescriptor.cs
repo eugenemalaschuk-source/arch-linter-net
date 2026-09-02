@@ -44,6 +44,7 @@ internal sealed record ArchitectureBaselineIdentityDescriptor(
             "contract_surface_exposure" or "versioned_contract_surface_isolation" => common.Concat([SourceAssembly, "source-type", "source-member", "exposure-path", TargetAssembly, "target-type"]).ToArray(),
             "coverage" => common.Concat(["coverage-subject", "coverage-kind"]).ToArray(),
             "metric_budgets" => common.Concat(["metric-id", "metric-kind", "native-subject", "effective-scope", "bound", "limit"]).ToArray(),
+            "layout_convention_applicability" => common.Concat(["effective-control", "reason-code", "policy-identity"]).ToArray(),
             "project_metadata" => common.Concat(["source-project", "metadata-key", "configuration", "target-framework"]).ToArray(),
             "assembly_independence" or "assembly_dependency" or "assembly_allow_only" => common.Concat([SourceAssembly, TargetAssembly]).ToArray(),
             "external" or "external_allow_only" => common.Concat([SourceAssembly, TargetAssembly, "target-type"]).ToArray(),

@@ -33,6 +33,7 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
         new ProjectMetadataValidator(),
         new TypePlacementValidator(),
         new LayoutConventionsValidator(),
+        new LayoutConventionApplicabilityValidator(),
         new PublicApiSurfaceValidator(),
         new ContractSurfaceExposureValidator(),
         new VersionedContractSurfaceIsolationValidator(),

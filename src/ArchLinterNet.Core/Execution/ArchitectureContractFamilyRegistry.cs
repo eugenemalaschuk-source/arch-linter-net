@@ -2,7 +2,9 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Checkers;
 using ArchLinterNet.Core.Execution.Results;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Execution;
@@ -329,6 +331,13 @@ internal static class ArchitectureContractFamilyRegistry
             OwnedContractTypes = new[] { typeof(ArchitectureLayoutConventionContract) },
         },
         new(
+            "layout_convention_applicability", "strict_layout_convention_applicability", "audit_layout_convention_applicability", true,
+            g => g.StrictLayoutConventionApplicability, g => g.AuditLayoutConventionApplicability,
+            CheckLayoutConventionApplicabilityContract)
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureLayoutConventionApplicabilityContract) },
+        },
+        new(
             "public_api_surface", "strict_public_api_surface", "audit_public_api_surface", true,
             g => g.StrictPublicApiSurface, g => g.AuditPublicApiSurface,
             (session, contract) => ArchitectureHandlerResult.FromViolations(
@@ -449,4 +458,27 @@ internal static class ArchitectureContractFamilyRegistry
     // ArchitectureLayerContract instances before execution, so they run through the same checker.
     private static ArchitectureHandlerResult CheckLayerContract(ArchitectureAnalysisSession session, IArchitectureContract contract) =>
         ArchitectureHandlerResult.FromViolations(session.CheckLayerContract((ArchitectureLayerContract)contract));
+
+    private static ArchitectureHandlerResult CheckLayoutConventionApplicabilityContract(
+        ArchitectureAnalysisSession session,
+        IArchitectureContract contract)
+    {
+        var inventory = (ArchitectureLayoutConventionApplicabilityContract)contract;
+        bool strict = string.Equals(
+            session.Catalog.ResolveGroup(inventory),
+            "strict_layout_convention_applicability",
+            StringComparison.Ordinal);
+        IReadOnlyList<ArchitectureLayoutConventionContract> conventions = strict
+            ? session.Document.Contracts.StrictLayoutConventions
+            : session.Document.Contracts.AuditLayoutConventions;
+        LayoutConventionApplicabilityChecker.Result result = LayoutConventionApplicabilityChecker.Evaluate(
+            session.CheckerContext,
+            inventory,
+            conventions);
+        return new ArchitectureHandlerResult(Array.Empty<ArchitectureViolation>(), Array.Empty<string>())
+        {
+            ApplicabilityExpectedEntries = result.ExpectedEntries,
+            ApplicabilityRecords = result.Records,
+        };
+    }
 }
