@@ -23,6 +23,15 @@ internal static class TopologyCommandHelpTexts
               --platform <name>     Build platform
               --runtime <rid>       Runtime identifier
               --max-parallelism <n> Maximum analysis parallelism
+          -h, --help                Show this help message
+
+        Use --ensure-built to create the verified build receipt required for a first capture.
+        Later commands can reuse unchanged receipt-backed artifacts; a regular dotnet build alone
+        does not create that receipt.
+        """;
+
+    private const string ValidationEvidenceOptions =
+        """
               --waiver-evaluation-date <yyyy-MM-dd>
                                     Use the ordinary validation waiver evaluation date
               --external-evidence <binding>
@@ -31,11 +40,6 @@ internal static class TopologyCommandHelpTexts
               --evidence-revision <value>
               --evidence-scope <value>
                                     Ordinary validation external-evidence assessment context
-          -h, --help                Show this help message
-
-        Use --ensure-built to create the verified build receipt required for a first capture.
-        Later commands can reuse unchanged receipt-backed artifacts; a regular dotnet build alone
-        does not create that receipt.
         """;
 
     internal const string Diff =
@@ -63,6 +67,7 @@ internal static class TopologyCommandHelpTexts
               --platform <name>     Build platform
               --runtime <rid>       Runtime identifier
               --max-parallelism <n> Maximum analysis parallelism
+        """ + ValidationEvidenceOptions + """
           -h, --help                Show this help message
         """;
 

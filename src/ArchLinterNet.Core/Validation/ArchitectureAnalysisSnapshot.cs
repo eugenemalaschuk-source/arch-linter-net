@@ -315,6 +315,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             PolicyImportPaths = GetPolicyImportPaths(),
             ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
+            ConsumedInputPaths = GetConsumedInputPaths(),
             SourceExpansion = _document.SourceExpansion,
             ExternalEvidenceRequirements = _document.ExternalEvidence,
         };
@@ -565,7 +566,10 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
         return AnalysisCacheOutcomeMapper.FromCacheOutcome(
             lookup.Entry.Outcome, _repositoryRoot, policyImportPaths, GetResolvedAssemblyPaths(),
-            GetDiscoveredProjectPaths(), _document.SourceExpansion, mode, _document.ExternalEvidence);
+            GetDiscoveredProjectPaths(), _document.SourceExpansion, mode, _document.ExternalEvidence) with
+        {
+            ConsumedInputPaths = GetConsumedInputPaths(),
+        };
     }
 
     private CacheArtifactEvidence GetCacheArtifactEvidence()

@@ -35,7 +35,10 @@ internal sealed class ArchitectureTopologyCaptureService(
                 snapshot.GetCaptureResolvedAssemblyPaths(),
                 snapshot.GetCaptureDiscoveredProjectPaths(),
                 snapshot.Preflight.Diagnostics,
-                PreflightBlocked: true);
+                PreflightBlocked: true)
+            {
+                ConsumedInputPaths = snapshot.GetCaptureConsumedInputPaths(),
+            };
         }
 
         ArchitectureTopologyObservation observation =
@@ -69,7 +72,10 @@ internal sealed class ArchitectureTopologyCaptureService(
             snapshot.GetCapturePolicyImportPaths(),
             snapshot.GetCaptureResolvedAssemblyPaths(),
             snapshot.GetCaptureDiscoveredProjectPaths(),
-            snapshot.Preflight.Diagnostics);
+            snapshot.Preflight.Diagnostics)
+        {
+            ConsumedInputPaths = snapshot.GetCaptureConsumedInputPaths(),
+        };
     }
 
     private static AnalysisSnapshotRequest ToSnapshotRequest(ArchitectureTopologyCaptureRequest request) => new()

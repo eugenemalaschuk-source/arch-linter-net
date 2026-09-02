@@ -13,6 +13,8 @@ public sealed partial class ArchitectureAnalysisSnapshot
 
     internal IReadOnlyList<string> GetCaptureDiscoveredProjectPaths() => GetDiscoveredProjectPaths();
 
+    internal IReadOnlyList<string> GetCaptureConsumedInputPaths() => GetConsumedInputPaths();
+
     private List<string> GetPolicyImportPaths()
     {
         return _document.Provenance.Sources
@@ -29,4 +31,18 @@ public sealed partial class ArchitectureAnalysisSnapshot
         .Concat(GetDiscoveredProjectPaths())
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
+
+    private IReadOnlyList<string> GetConsumedInputPaths()
+    {
+        IReadOnlyList<string> sessionInputs = _setup is null
+            ? Array.Empty<string>()
+            : _setup.Runner.Session.Context.GetConsumedInputPaths()
+                .Concat(_setup.Runner.Session.SourceFileFactIndex.ConsumedSourceInputPaths)
+                .ToArray();
+        return _preflight.ConsumedInputPaths
+            .Concat(sessionInputs)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+    }
 }

@@ -5,11 +5,21 @@ namespace ArchLinterNet.Cli.Commands.Topology.Application;
 
 internal sealed record TopologyDiffReport(
     string Mode,
+    ArchitectureApplicabilityRecord Applicability,
+    ArchitectureApplicabilityMembership? Membership,
     ArchitectureTopologyMappingEvidence Evidence,
     IReadOnlyList<ArchitectureTopologySubjectEvidence> Structural,
     IReadOnlyList<ArchitectureTopologyRelationEvidence> Relational,
     IReadOnlyList<ArchitectureTopologySubjectEvidence> Unmapped,
-    IReadOnlyList<ArchitectureTopologySubjectEvidence> ReviewedOutOfScope);
+    IReadOnlyList<ArchitectureTopologySubjectEvidence> ReviewedOutOfScope)
+{
+    internal bool IsNonReviewableUnassessability =>
+        Applicability.State == ArchitectureApplicabilityRecordState.Unassessable
+        && Applicability.Reasons.Any(reason => string.Equals(
+            reason.Code,
+            ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput,
+            StringComparison.Ordinal));
+}
 
 /// <summary>Renders a projection of native topology evidence for human review.</summary>
 internal static class TopologyDiffRenderer
@@ -24,8 +34,10 @@ internal static class TopologyDiffRenderer
         {
             kind = "topology-diff",
             schema_version = 1,
+            outcome = report.IsNonReviewableUnassessability ? "unassessable" : "reviewable",
             mode = report.Mode,
             subject_kind = evidence.SubjectKind,
+            applicability = FormatApplicability(report.Applicability, report.Membership),
             structural = report.Structural.Select(FormatSubject).ToArray(),
             relational = report.Relational.Select(FormatRelationship).ToArray(),
             unmapped = report.Unmapped.Select(FormatSubject).ToArray(),
@@ -49,8 +61,10 @@ internal static class TopologyDiffRenderer
         List<string> lines =
         [
             "Topology diff (review projection)",
+            $"Outcome: {(report.IsNonReviewableUnassessability ? "unassessable" : "reviewable")}",
             $"Mode: {report.Mode}",
             $"Subject kind: {report.Evidence.SubjectKind}",
+            $"Applicability: {FormatState(report.Applicability.State)}",
             $"Structural: {report.Structural.Count}",
             $"Relational: {report.Relational.Count}",
             $"Unmapped: {report.Unmapped.Count}",
@@ -58,6 +72,17 @@ internal static class TopologyDiffRenderer
             $"Stale edges: {report.Evidence.StaleEdges.Count}",
             $"Reviewed out of scope: {report.ReviewedOutOfScope.Count}",
         ];
+
+        if (report.Membership is not null)
+        {
+            lines.Add($"Applicability membership: {FormatMembership(report.Membership.Value)}");
+        }
+
+        lines.Add($"Applicability provenance: {FormatProvenance(report.Applicability.Provenance)}");
+        foreach (ArchitectureApplicabilityReason reason in report.Applicability.Reasons)
+        {
+            lines.Add($"  applicability reason: {reason.Code} ({FormatProvenance(reason.Provenance)})");
+        }
 
         foreach (ArchitectureTopologySubjectEvidence subject in report.Structural)
         {
@@ -111,6 +136,35 @@ internal static class TopologyDiffRenderer
         witness = relationship.Witness,
         is_allowed = relationship.IsAllowed,
     };
+
+    private static object FormatApplicability(
+        ArchitectureApplicabilityRecord applicability,
+        ArchitectureApplicabilityMembership? membership) => new
+        {
+            control_identity = applicability.ControlIdentity,
+            family = applicability.Family,
+            state = FormatState(applicability.State),
+            membership = membership is null ? null : FormatMembership(membership.Value),
+            provenance = FormatProvenance(applicability.Provenance),
+            reasons = applicability.Reasons.Select(reason => new
+            {
+                code = reason.Code,
+                provenance = FormatProvenance(reason.Provenance),
+            }).ToArray(),
+        };
+
+    private static object FormatProvenance(ArchitectureApplicabilityProvenance provenance) => new
+    {
+        family = provenance.Family,
+        control_identity = provenance.ControlIdentity,
+        policy_identity = provenance.PolicyIdentity,
+    };
+
+    private static string FormatState(ArchitectureApplicabilityRecordState state) =>
+        state.ToString().ToLowerInvariant();
+
+    private static string FormatMembership(ArchitectureApplicabilityMembership membership) =>
+        membership.ToString().ToLowerInvariant();
 
     private static object FormatEvidence(ArchitectureTopologyMappingEvidence evidence) => new
     {

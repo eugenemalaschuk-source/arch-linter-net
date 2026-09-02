@@ -31,6 +31,7 @@ public static class BuildStatePreflightEvaluator
 
         Dictionary<string, BuildStatePreflightDiagnostic> diagnosticsByProjectPath = new(StringComparer.Ordinal);
         Dictionary<string, string> verifiedArtifactContentDigests = new(StringComparer.OrdinalIgnoreCase);
+        List<string> consumedInputPaths = [];
 
         // Only evaluate discovered projects that assembly resolution actually attempted to
         // resolve (present in either the resolved or the missing name set). A policy may declare
@@ -51,7 +52,9 @@ public static class BuildStatePreflightEvaluator
                 resolvedByName,
                 missing,
                 out string? verifiedArtifactPath,
-                out string? verifiedArtifactContentDigest);
+                out string? verifiedArtifactContentDigest,
+                out IReadOnlyList<string> projectInputPaths);
+            consumedInputPaths.AddRange(projectInputPaths);
             if (verifiedArtifactPath is not null && verifiedArtifactContentDigest is not null)
             {
                 verifiedArtifactContentDigests.Add(verifiedArtifactPath, verifiedArtifactContentDigest);
@@ -62,7 +65,11 @@ public static class BuildStatePreflightEvaluator
 
         return new BuildStatePreflightResult(diagnosticsByProjectPath.Values.Select(EnsureCacheEligibility).ToArray())
         {
-            VerifiedArtifactContentDigests = verifiedArtifactContentDigests
+            VerifiedArtifactContentDigests = verifiedArtifactContentDigests,
+            ConsumedInputPaths = consumedInputPaths
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToArray(),
         };
     }
 
@@ -83,17 +90,33 @@ public static class BuildStatePreflightEvaluator
         Dictionary<string, Assembly> resolvedByName,
         HashSet<string> missing,
         out string? verifiedArtifactPath,
-        out string? verifiedArtifactContentDigest)
+        out string? verifiedArtifactContentDigest,
+        out IReadOnlyList<string> consumedInputPaths)
     {
         verifiedArtifactPath = null;
         verifiedArtifactContentDigest = null;
+        BuildStatePreflightDiagnostic? cancellation = CheckCancellation(project, request);
+        if (cancellation is not null)
+        {
+            consumedInputPaths = Array.Empty<string>();
+            return cancellation;
+        }
+
+        EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(
+            project.Path,
+            request.RepositoryRoot,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier,
+            request.CancellationToken);
+        consumedInputPaths = EvaluatedBuildInputManifestCollector.ResolveFileInputPaths(manifest, request.RepositoryRoot);
         BuildStatePreflightDiagnostic? artifactPresence =
             CheckArtifactPresence(project, request, resolvedByName, missing, out string? assemblyPath);
 
-        BuildStatePreflightDiagnostic result = CheckCancellation(project, request)
-            ?? artifactPresence
+        BuildStatePreflightDiagnostic result = artifactPresence
             ?? CheckRequestedTargetFrameworkAgainstProject(project, request)
-            ?? CheckReceipt(project, request, assemblyPath!, out verifiedArtifactContentDigest);
+            ?? CheckReceipt(project, request, assemblyPath!, manifest, out verifiedArtifactContentDigest);
         if (result.State == BuildStatePreflightState.Current)
         {
             verifiedArtifactPath = assemblyPath;
@@ -185,6 +208,7 @@ public static class BuildStatePreflightEvaluator
         ArchitectureDiscoveredProject project,
         BuildStatePreflightRequest request,
         string assemblyPath,
+        EvaluatedBuildInputManifestV1 manifest,
         out string? verifiedArtifactContentDigest)
     {
         verifiedArtifactContentDigest = null;
@@ -201,7 +225,7 @@ public static class BuildStatePreflightEvaluator
 
         BuildStatePreflightDiagnostic result = CheckReceiptIdentity(project, request, assemblyPath, receipt)
             ?? CheckReceiptFreshness(project, request, assemblyPath, receipt)
-            ?? CurrentDiagnostic(project, request, assemblyPath, receipt);
+            ?? CurrentDiagnostic(project, request, assemblyPath, receipt, manifest);
         if (result.State == BuildStatePreflightState.Current)
         {
             verifiedArtifactContentDigest = receipt.AssemblyContentDigest;
@@ -326,11 +350,12 @@ public static class BuildStatePreflightEvaluator
     }
 
     private static BuildStatePreflightDiagnostic CurrentDiagnostic(
-        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request, string assemblyPath, BuildReceiptV1 receipt)
+        ArchitectureDiscoveredProject project,
+        BuildStatePreflightRequest request,
+        string assemblyPath,
+        BuildReceiptV1 receipt,
+        EvaluatedBuildInputManifestV1 manifest)
     {
-        EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(
-            project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
-            request.RequestedPlatform, request.RequestedRuntimeIdentifier, request.CancellationToken);
         EvaluatedBuildInputManifestV1 publicationCheck = EvaluatedBuildInputManifestCollector.Collect(
             project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
             request.RequestedPlatform, request.RequestedRuntimeIdentifier, request.CancellationToken);

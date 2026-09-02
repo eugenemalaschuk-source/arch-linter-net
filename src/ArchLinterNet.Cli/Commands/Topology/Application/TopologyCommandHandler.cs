@@ -118,20 +118,32 @@ internal sealed class TopologyCommandHandler(
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
-            ArchitectureTopologyMappingEvidence? evidence = FindTopologyEvidence(outcome);
-            if (evidence is null)
+            ArchitectureApplicabilityRecord? applicability = FindTopologyApplicabilityRecord(outcome);
+            if (applicability?.TopologyEvidence is null)
             {
                 return WriteError(options.Format, "no-declared-topology",
                     "Topology diff requires a declared topology in the policy.");
             }
 
-            TopologyDiffReport report = CreateDiffReport(options.Mode, evidence);
+            TopologyDiffReport report = CreateDiffReport(
+                options.Mode,
+                applicability,
+                FindTopologyMembership(outcome, applicability));
             string document = options.Format == JsonFormat
                 ? TopologyDiffRenderer.FormatJson(report)
                 : TopologyDiffRenderer.FormatHuman(report);
-            // Diff is intentionally a review projection: observed drift does not become a second
-            // success/failure criterion. Only input/runtime/output errors return code 2.
-            return Publish(document, options.OutputPath, options.Format, "topology diff");
+            int publishResult = Publish(document, options.OutputPath, options.Format, "topology diff");
+            if (publishResult != CliExitCodes.Success)
+            {
+                return publishResult;
+            }
+
+            // Diff remains a review projection when native evidence can be rendered as a review
+            // category. An empty mandatory topology input is different: ordinary validation could
+            // not assess the control, so returning success would disguise an incomplete review.
+            return report.IsNonReviewableUnassessability
+                ? CliExitCodes.InvalidArgumentsOrRuntimeError
+                : CliExitCodes.Success;
         }
         catch (OperationCanceledException)
         {
@@ -203,7 +215,10 @@ internal sealed class TopologyCommandHandler(
         }
     }
 
-    internal static ArchitectureTopologyMappingEvidence? FindTopologyEvidence(ValidationOutcome outcome)
+    internal static ArchitectureTopologyMappingEvidence? FindTopologyEvidence(ValidationOutcome outcome) =>
+        FindTopologyApplicabilityRecord(outcome)?.TopologyEvidence;
+
+    internal static ArchitectureApplicabilityRecord? FindTopologyApplicabilityRecord(ValidationOutcome outcome)
     {
         ArgumentNullException.ThrowIfNull(outcome);
         ArchitectureApplicabilityRecord[] records = outcome.ApplicabilityRecords
@@ -215,13 +230,17 @@ internal sealed class TopologyCommandHandler(
             throw new InvalidOperationException("Validation produced more than one declared-topology applicability record.");
         }
 
-        return records.SingleOrDefault()?.TopologyEvidence;
+        return records.SingleOrDefault();
     }
 
     internal static TopologyDiffReport CreateDiffReport(
         string mode,
-        ArchitectureTopologyMappingEvidence evidence)
+        ArchitectureApplicabilityRecord applicability,
+        ArchitectureApplicabilityMembership? membership)
     {
+        ArgumentNullException.ThrowIfNull(applicability);
+        ArchitectureTopologyMappingEvidence evidence = applicability.TopologyEvidence
+            ?? throw new ArgumentException("Declared-topology applicability requires topology evidence.", nameof(applicability));
         ArgumentNullException.ThrowIfNull(evidence);
         ArchitectureTopologySubjectEvidence[] structural = evidence.Subjects
             .Where(subject => string.Equals(subject.Disposition, "ambiguous", StringComparison.Ordinal))
@@ -242,7 +261,24 @@ internal sealed class TopologyCommandHandler(
             .ThenBy(relationship => relationship.TargetNode, StringComparer.Ordinal)
             .ThenBy(relationship => relationship.Witness, StringComparer.Ordinal)
             .ToArray();
-        return new TopologyDiffReport(mode, evidence, structural, relational, unmapped, reviewed);
+        return new TopologyDiffReport(mode, applicability, membership, evidence, structural, relational, unmapped, reviewed);
+    }
+
+    private static ArchitectureApplicabilityMembership? FindTopologyMembership(
+        ValidationOutcome outcome,
+        ArchitectureApplicabilityRecord applicability)
+    {
+        ArchitectureApplicabilityExpectedEntry[] entries = outcome.ApplicabilityExpectedEntries
+            .Where(entry => string.Equals(entry.ControlIdentity, applicability.ControlIdentity, StringComparison.Ordinal)
+                && string.Equals(entry.Family, applicability.Family, StringComparison.Ordinal))
+            .ToArray();
+        return entries.Length switch
+        {
+            0 => null,
+            1 => entries[0].Membership,
+            _ => throw new InvalidOperationException(
+                "Validation produced more than one declared-topology applicability membership entry."),
+        };
     }
 
     private bool TryValidateExecutionOptions(
@@ -294,6 +330,10 @@ internal sealed class TopologyCommandHandler(
             }
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception exception)
         {

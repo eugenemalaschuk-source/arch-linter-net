@@ -8,6 +8,8 @@ namespace ArchLinterNet.Core.Execution;
 public sealed class ArchitectureAnalysisContext : IDisposable
 {
     private readonly IArchitectureAssemblyLoadScope? _isolatedLoadScope;
+    private readonly HashSet<string> _consumedInputPaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _consumedInputPathsGate = new();
     private bool _disposed;
 
     public ArchitectureAnalysisContext(
@@ -116,6 +118,29 @@ public sealed class ArchitectureAnalysisContext : IDisposable
     // The session receives this one shared recorder when it creates lazily-materialized indexes.
     // ArchitectureAnalysisSnapshot projects the values through its immutable public counters.
     internal AnalysisSessionProfilingCounters ProfilingCounters { get; } = new();
+
+    internal void RecordConsumedInputPaths(IEnumerable<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        lock (_consumedInputPathsGate)
+        {
+            foreach (string path in paths)
+            {
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    _consumedInputPaths.Add(Path.GetFullPath(path));
+                }
+            }
+        }
+    }
+
+    internal IReadOnlyList<string> GetConsumedInputPaths()
+    {
+        lock (_consumedInputPathsGate)
+        {
+            return _consumedInputPaths.OrderBy(path => path, StringComparer.Ordinal).ToArray();
+        }
+    }
 
     // Set once by ArchitectureRunnerSetupService at construction time. Deep type/IL/source scanning
     // and fact-index materialization code (spread across many ArchitectureAnalysisSession partial-

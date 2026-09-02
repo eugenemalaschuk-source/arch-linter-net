@@ -127,13 +127,15 @@ public sealed class TopologyCommandHandlerTests
     {
         string policy = Path.GetFullPath("policy.yml");
         FakeConsole console = new();
+        FakeFileSystem files = new();
+        files.ExistingPaths.Add(policy);
         FakeRuntime runtime = new()
         {
             CaptureResult = new ArchitectureTopologyCaptureOutcome(
                 "assembly", [], [], "repo", [policy], ["a.dll"], ["a.csproj"], []),
         };
 
-        int exitCode = new TopologyCommandHandler(runtime, console, new FakeFileSystem())
+        int exitCode = new TopologyCommandHandler(runtime, console, files)
             .Capture(new(policy, "assembly", "json", policy, null, false));
 
         Assert.Multiple(() =>
@@ -190,7 +192,10 @@ public sealed class TopologyCommandHandlerTests
             FakeConsole console = new();
             FakeRuntime runtime = new()
             {
-                CaptureResult = new ArchitectureTopologyCaptureOutcome("assembly", [], [], root, [], [], [], []),
+                CaptureResult = new ArchitectureTopologyCaptureOutcome("assembly", [], [], root, [], [], [], [])
+                {
+                    ConsumedInputPaths = [source],
+                },
             };
 
             int exitCode = new TopologyCommandHandler(runtime, console, new FileSystem())
@@ -288,6 +293,130 @@ public sealed class TopologyCommandHandlerTests
                 .And.Contain("stale node: retired")
                 .And.Contain("stale edge: retired -> old")
                 .And.Contain("reviewed out of scope: Out"));
+        });
+    }
+
+    [Test]
+    public void Diff_UnassessableEmptyInputPreservesApplicabilityAndReturnsRuntimeError()
+    {
+        ArchitectureTopologyMappingEvidence evidence = new("exhaustive", "assembly", 0, [], [], [], []);
+        ArchitectureApplicabilityProvenance provenance = new(
+            "declared_topology", "declared-topology", "policy-v08");
+        ArchitectureApplicabilityRecord record = new(
+            "declared-topology",
+            "declared_topology",
+            ArchitectureApplicabilityRecordState.Unassessable,
+            [new ArchitectureApplicabilityReason(ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput, provenance)],
+            provenance)
+        {
+            TopologyEvidence = evidence,
+        };
+        ValidationOutcome outcome = OutcomeForRecord(record, ArchitectureApplicabilityMembership.Required, passed: false);
+        FakeConsole console = new();
+
+        int exitCode = new TopologyCommandHandler(new FakeRuntime { ValidationResult = outcome }, console, new FakeFileSystem())
+            .Diff(new("policy.yml", "strict", "json", null, null, null, [], false));
+
+        using JsonDocument document = JsonDocument.Parse(console.Output);
+        JsonElement applicability = document.RootElement.GetProperty("applicability");
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(document.RootElement.GetProperty("outcome").GetString(), Is.EqualTo("unassessable"));
+            Assert.That(applicability.GetProperty("state").GetString(), Is.EqualTo("unassessable"));
+            Assert.That(applicability.GetProperty("membership").GetString(), Is.EqualTo("required"));
+            Assert.That(applicability.GetProperty("provenance").GetProperty("policy_identity").GetString(),
+                Is.EqualTo("policy-v08"));
+            Assert.That(applicability.GetProperty("reasons")[0].GetProperty("code").GetString(),
+                Is.EqualTo(ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput));
+        });
+    }
+
+    [Test]
+    public void Diff_ProjectableUnmappedEvidenceRemainsReviewable()
+    {
+        ArchitectureTopologyMappingEvidence evidence = new(
+            "exhaustive", "assembly", 1,
+            [new("unmapped", "Project", "Assembly", "Unmapped", "unmapped")], [], [], []);
+        ArchitectureApplicabilityProvenance provenance = new("declared_topology", "declared-topology");
+        ArchitectureApplicabilityRecord record = new(
+            "declared-topology",
+            "declared_topology",
+            ArchitectureApplicabilityRecordState.Unassessable,
+            [new ArchitectureApplicabilityReason(ArchitectureApplicabilityReasonCodes.UnmappedSubject, provenance)],
+            provenance)
+        {
+            TopologyEvidence = evidence,
+        };
+        FakeConsole console = new();
+
+        int exitCode = new TopologyCommandHandler(
+                new FakeRuntime { ValidationResult = OutcomeForRecord(record, ArchitectureApplicabilityMembership.Required, false) },
+                console,
+                new FakeFileSystem())
+            .Diff(new("policy.yml", "strict", "json", null, null, null, [], false));
+
+        using JsonDocument document = JsonDocument.Parse(console.Output);
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(document.RootElement.GetProperty("outcome").GetString(), Is.EqualTo("reviewable"));
+            Assert.That(document.RootElement.GetProperty("unmapped").GetArrayLength(), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void CaptureOutput_NewFileSkipsUnrelatedUnityLikeDirectories()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"arch-linter-topology-output-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(root, "Library", "PackageCache"));
+        Directory.CreateDirectory(Path.Combine(root, "Temp", "generated"));
+        try
+        {
+            for (int index = 0; index < 32; index++)
+            {
+                File.WriteAllText(Path.Combine(root, "Library", "PackageCache", $"generated-{index}.cs"), "ignored");
+            }
+
+            string output = Path.Combine(root, "review", "capture.json");
+            int exitCode = new TopologyCommandHandler(
+                    new FakeRuntime { CaptureResult = new ArchitectureTopologyCaptureOutcome("assembly", [], [], root, [], [], [], []) },
+                    new FakeConsole(),
+                    new FileSystem())
+                .Capture(new("policy.yml", "assembly", "json", output, null, false));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+                Assert.That(File.Exists(output), Is.True);
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public void CaptureOutput_CancellationDuringPublicationIsTypedAndCleansTemporaryFile()
+    {
+        using CancellationTokenSource cancellation = new();
+        FakeFileSystem files = new() { OnWriteTemporaryFile = cancellation.Cancel };
+        FakeConsole console = new();
+
+        int exitCode = new TopologyCommandHandler(
+                new FakeRuntime { CaptureResult = new ArchitectureTopologyCaptureOutcome("assembly", [], [], "repo", [], [], [], []) },
+                console,
+                files,
+                cancellation.Token)
+            .Capture(new("policy.yml", "assembly", "json", "capture.json", null, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.Output, Does.Contain("cancelled").And.Not.Contain("output-write-failed"));
+            Assert.That(files.RenameCalls, Is.Zero);
+            Assert.That(files.DeletedPaths, Is.EqualTo(new[] { "capture.json.tmp" }));
         });
     }
 
@@ -401,6 +530,31 @@ public sealed class TopologyCommandHandlerTests
     }
 
     [Test]
+    public void TopologyHelp_AdvertisesOnlyRegisteredOptions()
+    {
+        FakeConsole console = new();
+        TopologyCommandHandler handler = new(new FakeRuntime(), console, new FakeFileSystem());
+
+        Assert.That(handler.Capture(new("policy.yml", "assembly", "human", null, null, true)),
+            Is.EqualTo(CliExitCodes.Success));
+        Assert.That(console.Output, Does.Not.Contain("--waiver-evaluation-date").And.Not.Contain("--external-evidence"));
+
+        console.Clear();
+        Assert.That(handler.Diff(new("policy.yml", "strict", "human", null, null, null, [], true)),
+            Is.EqualTo(CliExitCodes.Success));
+        Assert.That(console.Output, Does.Contain("--waiver-evaluation-date").And.Contain("--external-evidence")
+            .And.Contain("--evidence-repository").And.Contain("--evidence-revision").And.Contain("--evidence-scope"));
+
+        Command command = new TopologyCommandModule().CreateCommand(new FakeRuntime(), new FakeConsole(), new FakeFileSystem());
+        Assert.Multiple(() =>
+        {
+            Assert.That(command.Parse(["capture", "--waiver-evaluation-date", "2026-09-02"]).Errors, Is.Not.Empty);
+            Assert.That(command.Parse(["diff", .. _sharedValidationEvidenceArguments]).Errors, Is.Empty);
+            Assert.That(command.Parse(["verify", .. _sharedValidationEvidenceArguments]).Errors, Is.Empty);
+        });
+    }
+
+    [Test]
     public void DiffWithoutTopology_IsTypedInputErrorAfterOneValidation()
     {
         FakeRuntime runtime = new() { ValidationResult = Outcome(null, passed: true) };
@@ -431,9 +585,31 @@ public sealed class TopologyCommandHandlerTests
         return new ValidationOutcome(passed, [], [], [], "off", [], "off", [], "off", [], [], [])
         {
             ApplicabilityRecords = records,
+            ApplicabilityExpectedEntries = evidence is null
+                ? []
+                : [new ArchitectureApplicabilityExpectedEntry(
+                    "declared-topology",
+                    "declared_topology",
+                    ArchitectureApplicabilityMembership.Required,
+                    new ArchitectureApplicabilityProvenance(
+                        "declared_topology", "declared-topology", "declared-topology"))],
             RepositoryRoot = Path.GetFullPath("."),
         };
     }
+
+    private static ValidationOutcome OutcomeForRecord(
+        ArchitectureApplicabilityRecord record,
+        ArchitectureApplicabilityMembership membership,
+        bool passed) => new ValidationOutcome(passed, [], [], [], "off", [], "off", [], "off", [], [], [])
+        {
+            ApplicabilityRecords = [record],
+            ApplicabilityExpectedEntries = [new ArchitectureApplicabilityExpectedEntry(
+                record.ControlIdentity,
+                record.Family,
+                membership,
+                record.Provenance)],
+            RepositoryRoot = Path.GetFullPath("."),
+        };
 
     private static void CreateHardLink(string linkPath, string existingPath)
     {
@@ -516,13 +692,19 @@ public sealed class TopologyCommandHandlerTests
     private sealed class FakeFileSystem : IFileSystem
     {
         public bool ThrowOnRename { get; init; }
+        public Action? OnWriteTemporaryFile { get; init; }
         public int RenameCalls { get; private set; }
         public int DirectWrites { get; private set; }
         public List<string> DeletedPaths { get; } = [];
-        public bool FileExists(string path) => false;
+        public HashSet<string> ExistingPaths { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool FileExists(string path) => ExistingPaths.Contains(Path.GetFullPath(path));
         public string ReadAllText(string path) => string.Empty;
         public void WriteAllText(string path, string contents) => DirectWrites++;
-        public string WriteAllTextToTemp(string targetPath, string contents) => targetPath + ".tmp";
+        public string WriteAllTextToTemp(string targetPath, string contents)
+        {
+            OnWriteTemporaryFile?.Invoke();
+            return targetPath + ".tmp";
+        }
         public void RenameTempToTarget(string tempPath, string targetPath)
         {
             RenameCalls++;

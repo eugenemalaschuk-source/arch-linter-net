@@ -61,22 +61,26 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
     private static void AssertCaptureAndDiff(FixtureCase fixtureCase)
     {
         IReadOnlyList<string> hashesBefore = HashConsumedSourceInputs(fixtureCase.Fixture.Root);
+        string firstCaptureArtifact = Artifact(fixtureCase, "capture-first.json");
+        string secondCaptureArtifact = Artifact(fixtureCase, "capture-second.json");
 
         CliRun firstCapture = RunCli(fixtureCase,
             "topology", "capture", "--policy", fixtureCase.Policy("capture.arch.yml"),
-            "--subject-kind", "assembly", "--format", "json");
+            "--subject-kind", "assembly", "--format", "json", "--output", firstCaptureArtifact);
         CliRun secondCapture = RunCli(fixtureCase,
             "topology", "capture", "--policy", fixtureCase.Policy("capture.arch.yml"),
-            "--subject-kind", "assembly", "--format", "json");
+            "--subject-kind", "assembly", "--format", "json", "--output", secondCaptureArtifact);
 
         Assert.Multiple(() =>
         {
             Assert.That(firstCapture.ExitCode, Is.EqualTo(0), firstCapture.Describe());
             Assert.That(secondCapture.ExitCode, Is.EqualTo(0), secondCapture.Describe());
-            Assert.That(secondCapture.StandardOutput, Is.EqualTo(firstCapture.StandardOutput),
+            Assert.That(File.Exists(firstCaptureArtifact), Is.True, firstCapture.Describe());
+            Assert.That(File.Exists(secondCaptureArtifact), Is.True, secondCapture.Describe());
+            Assert.That(File.ReadAllText(secondCaptureArtifact), Is.EqualTo(File.ReadAllText(firstCaptureArtifact)),
                 "unchanged capture input must produce identical JSON bytes");
         });
-        using (JsonDocument captureDocument = JsonDocument.Parse(firstCapture.StandardOutput))
+        using (JsonDocument captureDocument = JsonDocument.Parse(File.ReadAllText(firstCaptureArtifact)))
         {
             Assert.Multiple(() =>
             {
@@ -88,13 +92,13 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
 
         CliRun declaredDiff = RunCli(fixtureCase,
             "topology", "diff", "--policy", fixtureCase.Policy("declared.arch.yml"),
-            "--mode", "strict", "--format", "json");
+            "--mode", "strict", "--format", "json", "--output", Artifact(fixtureCase, "declared-diff.json"));
         CliRun structuralDiff = RunCli(fixtureCase,
             "topology", "diff", "--policy", fixtureCase.Policy("declared-structural.arch.yml"),
-            "--mode", "strict", "--format", "json");
+            "--mode", "strict", "--format", "json", "--output", Artifact(fixtureCase, "structural-diff.json"));
         CliRun unmappedDiff = RunCli(fixtureCase,
             "topology", "diff", "--policy", fixtureCase.Policy("declared-unmapped.arch.yml"),
-            "--mode", "strict", "--format", "json");
+            "--mode", "strict", "--format", "json", "--output", Artifact(fixtureCase, "unmapped-diff.json"));
 
         Assert.Multiple(() =>
         {
@@ -102,12 +106,15 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
             Assert.That(structuralDiff.ExitCode, Is.EqualTo(0), structuralDiff.Describe());
             Assert.That(unmappedDiff.ExitCode, Is.EqualTo(0), unmappedDiff.Describe());
         });
-        using (JsonDocument declaredDocument = JsonDocument.Parse(declaredDiff.StandardOutput))
-        using (JsonDocument structuralDocument = JsonDocument.Parse(structuralDiff.StandardOutput))
-        using (JsonDocument unmappedDocument = JsonDocument.Parse(unmappedDiff.StandardOutput))
+        using (JsonDocument declaredDocument = JsonDocument.Parse(File.ReadAllText(Artifact(fixtureCase, "declared-diff.json"))))
+        using (JsonDocument structuralDocument = JsonDocument.Parse(File.ReadAllText(Artifact(fixtureCase, "structural-diff.json"))))
+        using (JsonDocument unmappedDocument = JsonDocument.Parse(File.ReadAllText(Artifact(fixtureCase, "unmapped-diff.json"))))
         {
             Assert.Multiple(() =>
             {
+                Assert.That(File.Exists(Artifact(fixtureCase, "declared-diff.json")), Is.True);
+                Assert.That(File.Exists(Artifact(fixtureCase, "structural-diff.json")), Is.True);
+                Assert.That(File.Exists(Artifact(fixtureCase, "unmapped-diff.json")), Is.True);
                 Assert.That(structuralDocument.RootElement.GetProperty("structural").GetArrayLength(), Is.GreaterThan(0));
                 Assert.That(declaredDocument.RootElement.GetProperty("relational").GetArrayLength(), Is.GreaterThan(0));
                 Assert.That(declaredDocument.RootElement.GetProperty("stale").GetProperty("nodes").GetArrayLength(), Is.GreaterThan(0));
@@ -134,14 +141,17 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
         CliRun ordinary = RunCli(fixtureCase,
             "--policy", policy, "--mode", mode, "--format", "json");
         CliRun topology = RunCli(fixtureCase,
-            "topology", "verify", "--policy", policy, "--mode", mode, "--format", "json");
+            "topology", "verify", "--policy", policy, "--mode", mode, "--format", "json", "--output",
+            Artifact(fixtureCase, $"verify-{mode}.json"));
+        string topologyArtifact = Artifact(fixtureCase, $"verify-{mode}.json");
 
         Assert.Multiple(() =>
         {
             Assert.That(topology.ExitCode, Is.EqualTo(ordinary.ExitCode),
                 $"topology verify must preserve ordinary {mode} exit semantics.{Environment.NewLine}" +
                 topology.Describe() + Environment.NewLine + ordinary.Describe());
-            Assert.That(topology.StandardOutput, Does.Contain("declared-topology"));
+            Assert.That(File.Exists(topologyArtifact), Is.True, topology.Describe());
+            Assert.That(File.ReadAllText(topologyArtifact), Does.Contain("declared-topology"));
         });
     }
 
@@ -225,12 +235,28 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
 
     private static string[] HashConsumedSourceInputs(string root)
     {
-        return Directory.EnumerateFiles(root, "*.yml", SearchOption.AllDirectories)
-            .Concat(Directory.EnumerateFiles(root, "*.asmdef", SearchOption.AllDirectories))
+        return Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Where(IsConsumedSourceInput)
             .OrderBy(path => path, StringComparer.Ordinal)
             .Select(path => $"{Path.GetRelativePath(root, path)}:{Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)))}")
             .ToArray();
     }
+
+    private static bool IsConsumedSourceInput(string path)
+    {
+        string extension = Path.GetExtension(path);
+        return extension.Equals(".yml", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".asmdef", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".cs", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".csproj", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".props", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".targets", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".rsp", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".slnx", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string Artifact(FixtureCase fixtureCase, string name) =>
+        Path.Combine(fixtureCase.Fixture.Root, "topology-review-artifacts", name);
 
     private static CliRun RunCli(FixtureCase fixtureCase, params string[] arguments)
     {

@@ -65,7 +65,7 @@ internal static class TopologyCommandGuards
 
         return FindOutputCollision(outputPath, fileSystem,
             CreateTrustedInputManifest(policyPath, outcome.PolicyImportPaths, outcome.ResolvedAssemblyPaths,
-                outcome.DiscoveredProjectPaths, outcome.RepositoryRoot, baselinePath: null));
+                outcome.DiscoveredProjectPaths, outcome.ConsumedInputPaths, baselinePath: null));
     }
 
     internal static string? FindValidationOutputCollision(
@@ -91,7 +91,7 @@ internal static class TopologyCommandGuards
 
         return FindOutputCollision(outputPath, fileSystem,
             CreateTrustedInputManifest(policyPath, outcome.PolicyImportPaths, outcome.ResolvedAssemblyPaths,
-                outcome.DiscoveredProjectPaths, outcome.RepositoryRoot, baselinePath, externalEvidencePaths));
+                outcome.DiscoveredProjectPaths, outcome.ConsumedInputPaths, baselinePath, externalEvidencePaths));
     }
 
     private static string? FindOutputCollision(
@@ -99,6 +99,13 @@ internal static class TopologyCommandGuards
         IFileSystem fileSystem,
         params (string Name, string? Path)[] inputPaths)
     {
+        // A hard link must name an existing filesystem entry. Avoid both costly identity probes
+        // and any source discovery when publication is going to create a new destination.
+        if (!fileSystem.FileExists(outputPath))
+        {
+            return null;
+        }
+
         foreach ((string name, string? inputPath) in inputPaths)
         {
             if (inputPath is not null && fileSystem.AreSameExistingFile(outputPath, inputPath))
@@ -117,7 +124,7 @@ internal static class TopologyCommandGuards
         IReadOnlyList<string> policyImportPaths,
         IReadOnlyList<string> resolvedAssemblyPaths,
         IReadOnlyList<string> discoveredProjectPaths,
-        string repositoryRoot,
+        IReadOnlyList<string> consumedInputPaths,
         string? baselinePath,
         IReadOnlyList<string>? externalEvidencePaths = null)
     {
@@ -134,7 +141,7 @@ internal static class TopologyCommandGuards
             ("a build receipt loaded during this run", (string?)BuildReceiptStore.ReceiptPathFor(path)),
         }));
         inputs.AddRange(discoveredProjectPaths.Select(path => ("a project file loaded during this run", (string?)path)));
-        inputs.AddRange(FindConsumedSourceInputPaths(repositoryRoot));
+        inputs.AddRange(consumedInputPaths.Select(path => ("a source input consumed during this run", (string?)path)));
         if (baselinePath is not null)
         {
             inputs.Add(("--baseline", baselinePath));
@@ -145,25 +152,6 @@ internal static class TopologyCommandGuards
 
         return inputs.ToArray();
     }
-
-    private static IEnumerable<(string Name, string? Path)> FindConsumedSourceInputPaths(string repositoryRoot)
-    {
-        if (!Directory.Exists(repositoryRoot))
-        {
-            return Array.Empty<(string Name, string? Path)>();
-        }
-
-        // Asmdef validation and Roslyn source analysis both trust-read source inputs. The exact
-        // source roots can be inherited through policy imports, so protect every repository-local
-        // candidate rather than trying to reconstruct a second, incomplete root resolver here.
-        return Directory.EnumerateFiles(repositoryRoot, "*", SearchOption.AllDirectories)
-            .Where(path => path.EndsWith(".asmdef", StringComparison.OrdinalIgnoreCase)
-                || path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-            .Select(path => path.EndsWith(".asmdef", StringComparison.OrdinalIgnoreCase)
-                ? ("an asmdef source loaded during this run", (string?)path)
-                : ("a C# source input loaded during this run", (string?)path));
-    }
-
     private const string HumanFormat = "human";
     private const string JsonFormat = "json";
 }

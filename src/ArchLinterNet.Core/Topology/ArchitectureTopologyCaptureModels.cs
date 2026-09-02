@@ -71,4 +71,7 @@ public sealed record ArchitectureTopologyCaptureOutcome(
     public const string DocumentKind = "topology-capture";
 
     public bool Succeeded => !PreflightBlocked;
+
+    /// <summary>Exact source and asmdef input paths consumed by the capture session.</summary>
+    public IReadOnlyList<string> ConsumedInputPaths { get; init; } = Array.Empty<string>();
 }

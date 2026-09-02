@@ -1,10 +1,5 @@
-# topology-review-workflow Specification
+## MODIFIED Requirements
 
-## Purpose
-
-Provide deterministic, review-only topology capture, diff, and focused verification workflows
-without bypassing or mutating the existing declared-topology validation model.
-## Requirements
 ### Requirement: Capture emits deterministic review candidates for supported subjects
 The system SHALL provide a read-only topology capture operation that accepts one supported
 first-party subject kind (`type`, `namespace`, `project`, or `assembly`) and emits a versioned,
@@ -88,22 +83,6 @@ for new outputs, and SHALL publish atomically.
   consumed analysis input
 - **THEN** diff fails before publication and leaves that input unchanged
 
-### Requirement: Focused verification uses normal topology validation semantics
-The system SHALL provide a topology verify operation that invokes normal validation once for the
-selected strict or audit mode and projects the resulting declared-topology evidence. Its pass/fail
-and applicability semantics SHALL be those of the ordinary validation outcome; it SHALL NOT
-introduce a second evaluator, a topology-specific applicability envelope, or policy mutation.
-
-#### Scenario: Strict verification matches ordinary validation
-- **WHEN** a policy has a declared topology with a forbidden observed component relationship
-- **THEN** topology verify and ordinary strict validation expose the same topology finding and
-  fail state
-
-#### Scenario: Audit verification preserves audit behavior
-- **WHEN** a policy runs topology verification in audit mode
-- **THEN** the operation uses the same evaluator and audit result semantics as ordinary audit
-  validation
-
 ### Requirement: Lifecycle fixtures prove .NET and Unity behavior
 The system SHALL provide realistic .NET server/library and Unity-style topology fixtures that
 exercise the real capture, diff, and verification command lifecycle without automatically accepting
@@ -127,43 +106,7 @@ and all other consumed fixture inputs.
   remain deterministic, strict and audit outcomes follow ordinary validation, each requested
   artifact exists, and no command rewrites a consumed fixture input
 
-### Requirement: Topology capture respects Core's protected execution boundary
-The `Topology` application surface SHALL consume a neutral topology-observation projection and
-SHALL NOT import Execution-owned evaluator, subject, dependency, or generic collection types. The
-projection SHALL preserve the ordinary evaluator's observed topology semantics without introducing a
-second evaluator.
-
-#### Scenario: Protected contract inspection includes Topology
-- **WHEN** the Core protected-contract tests inspect the `Topology` namespace and its
-  compiler-generated types
-- **THEN** no Topology importer references the protected Execution namespace while capture retains
-  the ordinary evaluator's observed subjects and relationships
-
-### Requirement: Nested topology command diagnostics identify the selected command
-The CLI SHALL derive parse-error usage hints from the full command ancestry so an error in a nested
-topology subcommand identifies `topology capture`, `topology diff`, or `topology verify` rather than
-a same-named command family.
-
-#### Scenario: Nested diff parse error
-- **WHEN** parsing fails for `topology diff`
-- **THEN** the usage hint identifies the topology diff command and not the baseline diff command
-
-#### Scenario: Nested capture or verify parse error
-- **WHEN** parsing fails for `topology capture` or `topology verify`
-- **THEN** the usage hint identifies that topology subcommand and not a public-API capture or
-  baseline verify command
-
-### Requirement: Topology validation uses ordinary execution semantics
-Topology diff and verify SHALL construct native validation through the same request mapper and
-post-native external-evidence binding seam as the ordinary validation command. They SHALL carry
-waiver evaluation date, external-evidence bindings, and external-evidence assessment context
-without introducing a partial topology-only execution request.
-
-#### Scenario: External evidence changes topology verify outcome
-- **WHEN** a topology verify invocation supplies a declared external-evidence binding that makes
-  ordinary validation fail or become unassessable
-- **THEN** topology verify returns the corresponding ordinary validation exit outcome after one
-  native validation call
+## ADDED Requirements
 
 ### Requirement: Topology help matches registered options
 The CLI SHALL advertise only options registered by the selected topology subcommand. Capture SHALL

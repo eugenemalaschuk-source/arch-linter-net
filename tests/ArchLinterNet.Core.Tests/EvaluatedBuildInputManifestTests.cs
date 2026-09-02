@@ -127,6 +127,22 @@ public sealed class EvaluatedBuildInputManifestTests
     }
 
     [Test]
+    public void ResolveFileInputPaths_ProjectsOnlyExactFileInputs()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create(string.Empty);
+
+        IReadOnlyList<string> paths = EvaluatedBuildInputManifestCollector.ResolveFileInputPaths(
+            fixture.Collect(),
+            fixture.Root);
+
+        Assert.That(paths, Is.EquivalentTo(new[]
+        {
+            Path.GetFullPath(fixture.ProjectPath),
+            Path.Combine(fixture.ProjectDirectory, "Class1.cs"),
+        }));
+    }
+
+    [Test]
     public void Collect_ExplicitMissingCompileInput_IsCacheIneligible()
     {
         using ManifestFixture fixture = ManifestFixture.Create("<ItemGroup><Compile Include=\"Missing.cs\" /></ItemGroup>");

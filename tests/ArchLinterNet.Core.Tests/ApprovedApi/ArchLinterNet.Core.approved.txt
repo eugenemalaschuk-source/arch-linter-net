@@ -6242,6 +6242,7 @@ sealed class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome : Sy
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact> Subjects {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship> Relationships {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> ConsumedInputPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths {get;init;}
@@ -7082,6 +7083,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Waivers {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> ConsumedInputPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths {get;init;}
