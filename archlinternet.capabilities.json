@@ -194,6 +194,13 @@
       "validates": "Source files selected by folder segment, namespace segment, and/or file-name prefix/suffix (files_matching, AND-combined, no regex) have their declared types checked against a required/forbidden type kind, declaration count, all-declaration kind/semantic-role/abstract-class purity, required/forbidden naming suffix/prefix, file-name-matches-primary-type-name, and/or a matching-interface counterpart for every concrete (non-abstract) class. all_declarations requires at least one permitted kind or role and applies both axes when both are given. exclude_files_matching reuses the same matcher shape and subtracts matched candidates before expectations, including its own when predicates. files_matching.when is an optional ArchLinter CEL Profile v1 predicate compiled against the same closed subject context shape as layers.<name>.selector.when, narrowing which declared types in an already-selected file are evaluated. Requires at least one files_matching selector field and at least one expectation. Record vs. class/struct classification and file/folder facts require analysis.source_roots to be configured; a contract needing that data reports a deterministic 'unavailable' diagnostic instead of silently passing when it is missing for the whole run or for an individual declared type."
     },
     {
+      "kind": "layout-convention-applicability",
+      "strictGroup": "strict_layout_convention_applicability",
+      "auditGroup": "audit_layout_convention_applicability",
+      "fields": ["name", "id", "scope", "exhaustive", "expected_folders[].id", "expected_folders[].path", "expected_folders[].convention_id", "reason"],
+      "validates": "An opt-in, source-fact-bounded inventory proves that reviewed layout-convention folders remain present and their linked selectors are assessable. Expected folders are relative to a scope under analysis.source_roots and reference same-mode layout convention ids. Missing folders, zero selector matches, exhaustive-scope unmapped subjects, and subjects mapped to multiple linked conventions become canonical applicability evidence; no repository-wide folder discovery is performed."
+    },
+    {
       "kind": "public-api-surface",
       "strictGroup": "strict_public_api_surface",
       "auditGroup": "audit_public_api_surface",

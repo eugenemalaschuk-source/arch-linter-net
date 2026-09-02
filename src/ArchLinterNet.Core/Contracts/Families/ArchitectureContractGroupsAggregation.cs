@@ -98,6 +98,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_layout_conventions")]
     public List<ArchitectureLayoutConventionContract> AuditLayoutConventions { get; set; } = new();
 
+    [YamlMember(Alias = "strict_layout_convention_applicability")]
+    public List<ArchitectureLayoutConventionApplicabilityContract> StrictLayoutConventionApplicability { get; set; } = new();
+
+    [YamlMember(Alias = "audit_layout_convention_applicability")]
+    public List<ArchitectureLayoutConventionApplicabilityContract> AuditLayoutConventionApplicability { get; set; } = new();
+
     [YamlMember(Alias = "strict_attribute_usage")]
     public List<ArchitectureAttributeUsageContract> StrictAttributeUsage { get; set; } = new();
 

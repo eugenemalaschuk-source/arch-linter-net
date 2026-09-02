@@ -623,6 +623,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditInheritance {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditInterfaceImplementation {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditLayers {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditLayoutConventionApplicability {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditMethodBody {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditMetricBudgets {get;set;}
@@ -656,6 +657,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictInheritance {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictInterfaceImplementation {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictLayers {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictLayoutConventionApplicability {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictMethodBody {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictMetricBudgets {get;set;}
@@ -1111,6 +1113,8 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract> StrictLayers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract> AuditLayerTemplates {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract> StrictLayerTemplates {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract> AuditLayoutConventionApplicability {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract> StrictLayoutConventionApplicability {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract> AuditLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract> StrictLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract> AuditMethodBody {get;set;}
@@ -1271,6 +1275,14 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateCont
   property string Name {get;set;}
   property string Reason {get;set;}
   property string? Id {get;set;}
+sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract : ArchLinterNet.Core.Contracts.IArchitectureContract
+  ctor()
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionExpectedFolder> ExpectedFolders {get;set;}
+  property bool Exhaustive {get;set;}
+  property string Name {get;set;}
+  property string Reason {get;set;}
+  property string Scope {get;set;}
+  property string? Id {get;set;}
 sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract : ArchLinterNet.Core.Contracts.IArchitectureContract
   ctor()
   property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape? AllDeclarations {get;set;}
@@ -1289,6 +1301,11 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionC
   property string RequiredNamePrefix {get;set;}
   property string RequiredNameSuffix {get;set;}
   property string? Id {get;set;}
+sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionExpectedFolder
+  ctor()
+  property string ConventionId {get;set;}
+  property string Id {get;set;}
+  property string Path {get;set;}
 sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape
   ctor()
   property System.Collections.Generic.List<string> AllowedRoles {get;set;}

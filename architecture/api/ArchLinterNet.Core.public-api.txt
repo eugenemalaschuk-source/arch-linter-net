@@ -121,7 +121,9 @@ class ArchLinterNet.Core.Contracts.Families.ArchitectureInheritanceContract [sea
 class ArchLinterNet.Core.Contracts.Families.ArchitectureInterfaceImplementationContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract [sealed]
+class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract [sealed]
+class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionExpectedFolder [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract [sealed]
@@ -913,7 +915,9 @@ ctor ArchLinterNet.Core.Contracts.Families.ArchitectureInheritanceContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureInterfaceImplementationContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract()
+ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract()
+ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionExpectedFolder()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract()
@@ -2138,6 +2142,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditIn
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditInheritance: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditInterfaceImplementation: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditLayoutConventionApplicability: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditMetricBudgets: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
@@ -2171,6 +2176,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictI
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictInheritance: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictInterfaceImplementation: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictLayoutConventionApplicability: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictMetricBudgets: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
@@ -2454,6 +2460,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditI
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditInterfaceImplementation: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureInterfaceImplementationContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditLayerTemplates: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditLayoutConventionApplicability: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditMetricBudgets: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract] [get, set]
@@ -2489,6 +2496,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.Strict
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictInterfaceImplementation: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureInterfaceImplementationContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictLayerTemplates: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictLayoutConventionApplicability: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictMetricBudgets: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract] [get, set]
@@ -2601,6 +2609,12 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract.Layers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureTemplateLayer] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract.Name: System.String [virtual, get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract.Reason: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract.Exhaustive: System.Boolean [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract.ExpectedFolders: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionExpectedFolder] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract.Id: System.String [virtual, get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract.Name: System.String [virtual, get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract.Reason: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionApplicabilityContract.Scope: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.AllDeclarations: ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.ExcludeFilesMatching: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.FilesMatching: ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher [get, set]
@@ -2617,6 +2631,9 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContr
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.RequireTypeNameMatchesFileName: System.Boolean [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.RequiredNamePrefix: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.RequiredNameSuffix: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionExpectedFolder.ConventionId: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionExpectedFolder.Id: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionExpectedFolder.Path: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape.AllowedRoles: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape.AllowedTypeKinds: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape.RequireAbstractClasses: System.Boolean [get, set]
