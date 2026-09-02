@@ -35,6 +35,35 @@ public sealed partial class LayoutConventionContractTests
     }
 
     [Test]
+    public void ApplicabilityInventory_ExpectedFolderContainingOnlyPartialType_IsNotStale()
+    {
+        ArchitectureLayoutConventionApplicabilityContract inventory = CreateInventory(
+            scope: "Elsewhere",
+            exhaustive: false,
+            new ArchitectureLayoutConventionExpectedFolder
+            {
+                Id = "partial-type",
+                Path = ".",
+                ConventionId = "elsewhere",
+            });
+        var elsewhereConvention = new ArchitectureLayoutConventionContract
+        {
+            Id = "elsewhere",
+            Name = "elsewhere",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "Elsewhere" },
+            RequireTypeKind = "class",
+        };
+
+        LayoutConventionApplicabilityChecker.Result result = EvaluateInventory(inventory, elsewhereConvention);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Records.Single().State, Is.EqualTo(ArchitectureApplicabilityRecordState.Evaluable));
+            Assert.That(result.Records.Single().Reasons, Is.Empty);
+        });
+    }
+
+    [Test]
     public void ApplicabilityInventory_ExhaustiveScope_UnmappedFolderIsUnassessable()
     {
         ArchitectureLayoutConventionApplicabilityContract inventory = CreateInventory(

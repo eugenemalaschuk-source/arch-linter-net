@@ -25,7 +25,11 @@ internal static class LayoutConventionApplicabilityChecker
             .Select(folder => conventions.Single(convention => string.Equals(
                 convention.Id, folder.ConventionId, StringComparison.Ordinal)))
             .ToArray();
-        SourceSubject[] subjects = BuildSubjects(context.SourceFileFactIndex.AllFacts, inventory.Scope);
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity = linkedConventions
+            .Any(ConventionUsesWhen)
+                ? LayoutConventionChecker.BuildTypeIdentityLookup(context)
+                : null;
+        SourceSubject[] subjects = BuildSubjects(context, inventory.Scope);
         var expectedEntries = new List<ArchitectureApplicabilityExpectedEntry>();
         var records = new List<ArchitectureApplicabilityRecord>();
 
@@ -53,7 +57,7 @@ internal static class LayoutConventionApplicabilityChecker
             }
 
             records.Add(folderSubjects.Any(subject => MatchesConvention(
-                    linkedConventions[index], subject.Fact, context))
+                    linkedConventions[index], subject.Fact, context, typesByIdentity))
                 ? Evaluable(controlIdentity, provenance)
                 : Unassessable(
                     controlIdentity,
@@ -72,7 +76,7 @@ internal static class LayoutConventionApplicabilityChecker
                     .Where(index => IsSameOrDescendant(
                         subject.DirectoryPath,
                         Combine(inventory.Scope, inventory.ExpectedFolders[index].Path))
-                        && MatchesConvention(linkedConventions[index], subject.Fact, context))
+                        && MatchesConvention(linkedConventions[index], subject.Fact, context, typesByIdentity))
                     .Select(index => linkedConventions[index].Id)
                     .Distinct(StringComparer.Ordinal)
                     .Count();
@@ -107,37 +111,51 @@ internal static class LayoutConventionApplicabilityChecker
     }
 
     private static SourceSubject[] BuildSubjects(
-        IReadOnlyList<ArchitectureDeclaredTypeFact> facts,
+        ArchitectureCheckerContext context,
         string scope)
     {
         string normalizedScope = Normalize(scope);
-        return facts
-            .Where(fact => fact.SourceFilePath is not null)
-            .Select(fact => new SourceSubject(DirectoryOf(fact.SourceFilePath!), fact))
+        return context.SourceFileFactIndex.SourceDeclarations
+            .GroupBy(declaration => (
+                declaration.AssemblyName,
+                declaration.FullTypeName,
+                declaration.SourceFilePath))
+            .Select(group => group.First())
+            .Select(declaration => context.SourceFileFactIndex.TryGetFact(
+                declaration.AssemblyName,
+                declaration.FullTypeName,
+                out ArchitectureDeclaredTypeFact fact)
+                    ? CreateSourceSubject(fact, declaration.SourceFilePath)
+                    : null)
+            .OfType<SourceSubject>()
             .Where(subject => IsSameOrDescendant(subject.DirectoryPath, normalizedScope))
             .OrderBy(subject => subject.DirectoryPath, StringComparer.Ordinal)
             .ThenBy(subject => subject.Fact.FullTypeName, StringComparer.Ordinal)
             .ThenBy(subject => subject.Fact.AssemblyName, StringComparer.Ordinal)
+            .ThenBy(subject => subject.Fact.SourceFilePath, StringComparer.Ordinal)
             .ToArray();
     }
 
     private static bool MatchesConvention(
         ArchitectureLayoutConventionContract convention,
         ArchitectureDeclaredTypeFact fact,
-        ArchitectureCheckerContext context)
+        ArchitectureCheckerContext context,
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
     {
-        if (!MatchesMatcher(convention.FilesMatching, fact, context))
+        if (!MatchesMatcher(convention.FilesMatching, fact, context, typesByIdentity))
         {
             return false;
         }
 
-        return !convention.ExcludeFilesMatching.Any(matcher => MatchesMatcher(matcher, fact, context));
+        return !convention.ExcludeFilesMatching.Any(matcher =>
+            MatchesMatcher(matcher, fact, context, typesByIdentity));
     }
 
     private static bool MatchesMatcher(
         ArchitectureLayoutFileMatcher matcher,
         ArchitectureDeclaredTypeFact fact,
-        ArchitectureCheckerContext context)
+        ArchitectureCheckerContext context,
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
     {
         if (fact.SourceFilePath is null
             || (!string.IsNullOrEmpty(matcher.FolderSegment)
@@ -154,22 +172,31 @@ internal static class LayoutConventionApplicabilityChecker
             return false;
         }
 
-        if (matcher.CompiledWhen is null)
-        {
-            return true;
-        }
-
-        Type? type = context.TypeIndex.AllTypes().FirstOrDefault(candidate =>
-            string.Equals(candidate.Assembly.GetName().Name, fact.AssemblyName, StringComparison.Ordinal)
-            && string.Equals(candidate.FullName, fact.FullTypeName, StringComparison.Ordinal));
-        return type is not null && LayoutConventionChecker.MatchesWhenForSourceType(
+        return LayoutConventionChecker.MatchesWhenForSourceType(
             matcher,
             context,
             fact.AssemblyName,
             fact.FullTypeName,
-            new Dictionary<(string AssemblyName, string FullTypeName), Type>
+            typesByIdentity);
+    }
+
+    private static bool ConventionUsesWhen(ArchitectureLayoutConventionContract convention) =>
+        convention.FilesMatching.CompiledWhen is not null
+        || convention.ExcludeFilesMatching.Any(matcher => matcher.CompiledWhen is not null);
+
+    private static SourceSubject CreateSourceSubject(
+        ArchitectureDeclaredTypeFact fact,
+        string sourceFilePath)
+    {
+        string normalizedPath = Normalize(sourceFilePath);
+        string directoryPath = DirectoryOf(normalizedPath);
+        return new SourceSubject(
+            directoryPath,
+            fact with
             {
-                [(fact.AssemblyName, fact.FullTypeName)] = type,
+                SourceFilePath = normalizedPath,
+                FileNameWithoutExtension = GetFileNameWithoutExtension(normalizedPath),
+                FolderSegments = GetFolderSegments(normalizedPath),
             });
     }
 
@@ -206,6 +233,20 @@ internal static class LayoutConventionApplicabilityChecker
     {
         int slash = sourceFilePath.LastIndexOf('/');
         return slash < 0 ? "." : sourceFilePath[..slash];
+    }
+
+    private static string GetFileNameWithoutExtension(string normalizedPath)
+    {
+        int slash = normalizedPath.LastIndexOf('/');
+        string fileName = slash < 0 ? normalizedPath : normalizedPath[(slash + 1)..];
+        int dot = fileName.LastIndexOf('.');
+        return dot > 0 ? fileName[..dot] : fileName;
+    }
+
+    private static string[] GetFolderSegments(string normalizedPath)
+    {
+        int slash = normalizedPath.LastIndexOf('/');
+        return slash <= 0 ? [] : normalizedPath[..slash].Split('/');
     }
 
     private static string Normalize(string path)

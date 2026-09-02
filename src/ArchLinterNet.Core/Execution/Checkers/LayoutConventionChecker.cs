@@ -239,7 +239,7 @@ internal static partial class LayoutConventionChecker
             && EvaluateLayoutWhen(matcher, context, type);
     }
 
-    private static Dictionary<(string AssemblyName, string FullTypeName), Type> BuildTypeIdentityLookup(
+    internal static Dictionary<(string AssemblyName, string FullTypeName), Type> BuildTypeIdentityLookup(
         ArchitectureCheckerContext context)
     {
         Dictionary<(string, string), Type> lookup = new();
