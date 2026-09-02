@@ -20,13 +20,23 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class TopologyCommandHandlerTests
 {
+    private static readonly string[] _topologySubcommandNames = ["capture", "diff", "verify"];
+    private static readonly string[] _sharedValidationEvidenceArguments =
+    [
+        "--waiver-evaluation-date", "2026-09-02",
+        "--external-evidence", "id=external.unknown,path=evidence/scan.sarif",
+        "--evidence-repository", "repo",
+        "--evidence-revision", "revision",
+        "--evidence-scope", "ci",
+    ];
+
     [Test]
     public void TopologyModule_ComposesCaptureDiffAndVerifySubcommands()
     {
         Command command = new TopologyCommandModule().CreateCommand(new FakeRuntime(), new FakeConsole(), new FakeFileSystem());
 
         Assert.That(command.Subcommands.Select(subcommand => subcommand.Name),
-            Is.EqualTo(new[] { "capture", "diff", "verify" }));
+            Is.EqualTo(_topologySubcommandNames));
     }
 
     [Test]
@@ -64,6 +74,51 @@ public sealed class TopologyCommandHandlerTests
             Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
             Assert.That(document.RootElement.GetProperty("subjects")[0].GetProperty("identity").GetString(), Is.EqualTo("a"));
             Assert.That(document.RootElement.GetProperty("policy_import_paths")[0].GetString(), Is.EqualTo("a.yml"));
+        });
+    }
+
+    [Test]
+    public void CaptureRenderers_IncludeSortedReviewFactsAndEveryPreflightState()
+    {
+        BuildStatePreflightDiagnostic[] diagnostics = Enum.GetValues<BuildStatePreflightState>()
+            .Select((state, index) => new BuildStatePreflightDiagnostic(
+                $"contract-{index:D2}", $"id-{index:D2}", state,
+                new BuildStatePreflightEvidence(
+                    "project.csproj", "Assembly", "Release", "Debug", "net10.0", "net9.0",
+                    "output.dll", ["z/path", "a/path"], "dotnet build", "detail", "cache-eligible",
+                    ["z-reason", "a-reason"])))
+            .ToArray();
+        FakeRuntime runtime = new()
+        {
+            CaptureResult = new ArchitectureTopologyCaptureOutcome(
+                "assembly", [new("b", "assembly", "B", "Project", "Assembly")],
+                [new("b", "a", "B -> A")], "repo", ["z.yml", "a.yml"], ["z.dll", "a.dll"],
+                ["z.csproj", "a.csproj"], diagnostics, true),
+        };
+        FakeConsole console = new();
+        TopologyCommandHandler handler = new(runtime, console, new FakeFileSystem());
+
+        Assert.That(handler.Capture(new("policy.yml", "assembly", "human", null, null, false)),
+            Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.Multiple(() =>
+        {
+            Assert.That(console.Output, Does.Contain("subject: B [b]").And.Contain("relationship: b -> a"));
+            Assert.That(console.Output, Does.Contain("Preflight blocked: True"));
+            Assert.That(console.Output, Does.Contain("preflight: Current contract-09"));
+        });
+
+        console.Clear();
+        Assert.That(handler.Capture(new("policy.yml", "assembly", "json", null, null, false)),
+            Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        using JsonDocument document = JsonDocument.Parse(console.Output);
+        Assert.Multiple(() =>
+        {
+            Assert.That(document.RootElement.GetProperty("preflight_diagnostics").GetArrayLength(),
+                Is.EqualTo(diagnostics.Length));
+            Assert.That(document.RootElement.GetProperty("preflight_diagnostics")[0]
+                .GetProperty("searched_paths")[0].GetString(), Is.EqualTo("a/path"));
+            Assert.That(document.RootElement.GetProperty("preflight_diagnostics")[0]
+                .GetProperty("cache_ineligibility_reasons")[0].GetString(), Is.EqualTo("a-reason"));
         });
     }
 
@@ -208,6 +263,35 @@ public sealed class TopologyCommandHandlerTests
     }
 
     [Test]
+    public void DiffHuman_ListsEveryReviewCategory()
+    {
+        ArchitectureTopologyMappingEvidence evidence = new(
+            "exhaustive", "assembly", 3,
+            [
+                new("amb", "P", "A", "Ambiguous", "ambiguous", ["one", "two"]),
+                new("unmapped", "P", "A", "Unmapped", "unmapped"),
+                new("out", "P", "A", "Out", "reviewed_out_of_scope", [], "review"),
+            ],
+            [new("one", "two", "A -> B", false)], ["retired"], [new("retired", "old")]);
+        FakeConsole console = new();
+
+        int exitCode = new TopologyCommandHandler(
+            new FakeRuntime { ValidationResult = Outcome(evidence, passed: false) }, console, new FakeFileSystem())
+            .Diff(new("policy.yml", "strict", "human", null, null, null, [], false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(console.Output, Does.Contain("structural: Ambiguous")
+                .And.Contain("relational: one -> two")
+                .And.Contain("unmapped: Unmapped")
+                .And.Contain("stale node: retired")
+                .And.Contain("stale edge: retired -> old")
+                .And.Contain("reviewed out of scope: Out"));
+        });
+    }
+
+    [Test]
     public void Verify_UsesNormalJsonEnvelopeAndPreservesAuditMode()
     {
         ArchitectureTopologyMappingEvidence evidence = new(
@@ -275,7 +359,7 @@ public sealed class TopologyCommandHandlerTests
             };
             FakeRuntime runtime = new() { ValidationResult = outcome };
             FakeConsole console = new();
-            TopologyVerifyCommandOptions options = new("policy.yml", "strict", "json", null, null, null, [], false)
+            TopologyValidationCommandOptions options = new("policy.yml", "strict", "json", null, null, null, [], false)
             {
                 WaiverEvaluationDate = "2026-09-02",
                 ExternalEvidenceArtifacts = [new SarifEvidenceArtifactReference("evidence/scan.sarif", "external.scan")],
@@ -305,14 +389,7 @@ public sealed class TopologyCommandHandlerTests
         FakeConsole console = new();
         Command command = new TopologyCommandModule().CreateCommand(runtime, console, new FakeFileSystem());
 
-        int exitCode = command.Parse([
-            subcommand,
-            "--waiver-evaluation-date", "2026-09-02",
-            "--external-evidence", "id=external.unknown,path=evidence/scan.sarif",
-            "--evidence-repository", "repo",
-            "--evidence-revision", "revision",
-            "--evidence-scope", "ci",
-        ]).Invoke();
+        int exitCode = command.Parse([subcommand, .. _sharedValidationEvidenceArguments]).Invoke();
 
         Assert.Multiple(() =>
         {

@@ -169,20 +169,6 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
         return GetUsageHint(parseResult.CommandResult.Command.Name);
     }
 
-    private static List<string> GetCommandPath(ParseResult parseResult)
-    {
-        var path = new List<string>();
-        for (SymbolResult? current = parseResult.CommandResult; current is not null; current = current.Parent)
-        {
-            if (current is CommandResult commandResult)
-            {
-                path.Add(commandResult.Command.Name);
-            }
-        }
-
-        return path;
-    }
-
     private static string? GetUsageHint(string commandName)
     {
         return commandName switch
@@ -199,4 +185,19 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
             _ => "Run with --help for usage information.",
         };
     }
+
+    private static List<string> GetCommandPath(ParseResult parseResult)
+    {
+        var path = new List<string>();
+        for (SymbolResult? current = parseResult.CommandResult; current is not null; current = current.Parent)
+        {
+            if (current is CommandResult commandResult)
+            {
+                path.Add(commandResult.Command.Name);
+            }
+        }
+
+        return path;
+    }
+
 }

@@ -54,9 +54,11 @@ internal sealed class TopologyCommandHandler(
                 return WriteError(options.Format, "output-collision", collision);
             }
 
-            string document = options.Format == JsonFormat
-                ? TopologyCaptureRenderer.FormatJson(outcome)
-                : TopologyCaptureRenderer.FormatHuman(outcome);
+            string document = TopologyCaptureRenderer.FormatHuman(outcome);
+            if (options.Format == JsonFormat)
+            {
+                document = TopologyCaptureRenderer.FormatJson(outcome);
+            }
             int writeResult = Publish(document, options.OutputPath, options.Format, "topology capture");
             return writeResult != CliExitCodes.Success
                 ? writeResult
@@ -72,7 +74,7 @@ internal sealed class TopologyCommandHandler(
         }
     }
 
-    public int Diff(TopologyDiffCommandOptions options)
+    public int Diff(TopologyValidationCommandOptions options)
     {
         if (options.ShowHelp)
         {
@@ -141,7 +143,7 @@ internal sealed class TopologyCommandHandler(
         }
     }
 
-    public int Verify(TopologyVerifyCommandOptions options)
+    public int Verify(TopologyValidationCommandOptions options)
     {
         if (options.ShowHelp)
         {
@@ -244,17 +246,13 @@ internal sealed class TopologyCommandHandler(
     }
 
     private bool TryValidateExecutionOptions(
-        IValidationExecutionOptions options,
+        TopologyValidationCommandOptions options,
         string format)
     {
-        if (options is TopologyDiffCommandOptions { ExternalEvidenceParseError: not null } diff)
+        if (options.ExternalEvidenceParseError is { } externalEvidenceParseError)
         {
-            return WriteError(format, "invalid-arguments", diff.ExternalEvidenceParseError) == CliExitCodes.Success;
-        }
-
-        if (options is TopologyVerifyCommandOptions { ExternalEvidenceParseError: not null } verify)
-        {
-            return WriteError(format, "invalid-arguments", verify.ExternalEvidenceParseError) == CliExitCodes.Success;
+            WriteError(format, "invalid-arguments", externalEvidenceParseError);
+            return false;
         }
 
         if (!ValidationExecutionSemantics.TryGetWaiverEvaluationDate(

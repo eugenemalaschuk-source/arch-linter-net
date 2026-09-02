@@ -99,7 +99,6 @@ internal static class TopologyCommandGuards
         IFileSystem fileSystem,
         params (string Name, string? Path)[] inputPaths)
     {
-        string output = Path.GetFullPath(outputPath);
         foreach ((string name, string? inputPath) in inputPaths)
         {
             if (inputPath is not null && fileSystem.AreSameExistingFile(outputPath, inputPath))

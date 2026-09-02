@@ -58,7 +58,7 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
         AssertVerify(fixtureCase);
     }
 
-    private void AssertCaptureAndDiff(FixtureCase fixtureCase)
+    private static void AssertCaptureAndDiff(FixtureCase fixtureCase)
     {
         IReadOnlyList<string> hashesBefore = HashConsumedSourceInputs(fixtureCase.Fixture.Root);
 
@@ -119,7 +119,7 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
             "capture and diff must not rewrite policies, imports, asmdefs, or source inputs");
     }
 
-    private void AssertVerify(FixtureCase fixtureCase)
+    private static void AssertVerify(FixtureCase fixtureCase)
     {
         IReadOnlyList<string> hashesBefore = HashConsumedSourceInputs(fixtureCase.Fixture.Root);
         AssertVerifyMatchesOrdinaryValidation(fixtureCase, "strict");
@@ -128,7 +128,7 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
             "verify must not rewrite policies, imports, asmdefs, or source inputs");
     }
 
-    private void AssertVerifyMatchesOrdinaryValidation(FixtureCase fixtureCase, string mode)
+    private static void AssertVerifyMatchesOrdinaryValidation(FixtureCase fixtureCase, string mode)
     {
         string policy = fixtureCase.Policy("declared.arch.yml");
         CliRun ordinary = RunCli(fixtureCase,
@@ -223,7 +223,7 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
         return outputPath;
     }
 
-    private static IReadOnlyList<string> HashConsumedSourceInputs(string root)
+    private static string[] HashConsumedSourceInputs(string root)
     {
         return Directory.EnumerateFiles(root, "*.yml", SearchOption.AllDirectories)
             .Concat(Directory.EnumerateFiles(root, "*.asmdef", SearchOption.AllDirectories))

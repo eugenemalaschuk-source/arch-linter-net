@@ -44,6 +44,17 @@ internal static partial class ArchitectureTopologyEvaluator
         Type[] types = session.TypeIndex.AllTypes()
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .ToArray();
+        (Dictionary<Type, ObservedSubject> subjectByType, IReadOnlyList<ObservedSubject> subjects) =
+            ObserveSubjects(session, subjectKind, types);
+        IReadOnlyList<ObservedDependency> dependencies = ObserveDependencies(session, types, subjectByType);
+        return (subjects, dependencies);
+    }
+
+    private static (Dictionary<Type, ObservedSubject> ByType, IReadOnlyList<ObservedSubject> Subjects) ObserveSubjects(
+        ArchitectureAnalysisSession session,
+        string subjectKind,
+        IEnumerable<Type> types)
+    {
         var subjectByType = new Dictionary<Type, ObservedSubject>();
         var subjectsByIdentity = new Dictionary<string, ObservedSubject>(StringComparer.Ordinal);
 
@@ -51,14 +62,7 @@ internal static partial class ArchitectureTopologyEvaluator
         {
             string assembly = ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty;
             string project = ResolveProject(session, assembly);
-            string subject = subjectKind switch
-            {
-                "type" => ArchitectureTypeNames.SafeFullName(type),
-                "namespace" => ArchitectureTypeNames.SafeNamespace(type),
-                "project" => project,
-                "assembly" => assembly,
-                _ => throw new InvalidOperationException($"Unsupported topology subject kind '{subjectKind}'."),
-            };
+            string subject = ResolveSubject(subjectKind, type, project, assembly);
             if (string.IsNullOrEmpty(subject))
             {
                 continue;
@@ -74,6 +78,16 @@ internal static partial class ArchitectureTopologyEvaluator
             subjectByType[type] = observed;
         }
 
+        return (
+            subjectByType,
+            subjectsByIdentity.Values.OrderBy(subject => subject.Identity, StringComparer.Ordinal).ToArray());
+    }
+
+    private static IReadOnlyList<ObservedDependency> ObserveDependencies(
+        ArchitectureAnalysisSession session,
+        IEnumerable<Type> types,
+        IReadOnlyDictionary<Type, ObservedSubject> subjectByType)
+    {
         var dependencies = new HashSet<ObservedDependency>();
         foreach (Type source in types)
         {
@@ -95,12 +109,22 @@ internal static partial class ArchitectureTopologyEvaluator
             }
         }
 
-        return (
-            subjectsByIdentity.Values.OrderBy(subject => subject.Identity, StringComparer.Ordinal).ToArray(),
-            dependencies.OrderBy(dependency => dependency.SourceIdentity, StringComparer.Ordinal)
-                .ThenBy(dependency => dependency.TargetIdentity, StringComparer.Ordinal)
-                .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
-                .ToArray());
+        return dependencies.OrderBy(dependency => dependency.SourceIdentity, StringComparer.Ordinal)
+            .ThenBy(dependency => dependency.TargetIdentity, StringComparer.Ordinal)
+            .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string ResolveSubject(string subjectKind, Type type, string project, string assembly)
+    {
+        return subjectKind switch
+        {
+            "type" => ArchitectureTypeNames.SafeFullName(type),
+            "namespace" => ArchitectureTypeNames.SafeNamespace(type),
+            "project" => project,
+            "assembly" => assembly,
+            _ => throw new InvalidOperationException($"Unsupported topology subject kind '{subjectKind}'."),
+        };
     }
 
     internal sealed record ValidationObservation(

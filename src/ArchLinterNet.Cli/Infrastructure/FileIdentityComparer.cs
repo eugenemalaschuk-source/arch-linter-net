@@ -56,7 +56,7 @@ internal static class FileIdentityComparer
         IntPtr buffer = Marshal.AllocHGlobal(StatBufferSize);
         try
         {
-            if (FStat(stream.SafeFileHandle.DangerousGetHandle().ToInt32(), buffer) != 0)
+            if (FStat(stream.SafeFileHandle, buffer) != 0)
             {
                 identity = default;
                 return false;
@@ -85,7 +85,7 @@ internal static class FileIdentityComparer
         out ByHandleFileInformation information);
 
     [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
-    private static extern int FStat(int fileDescriptor, IntPtr buffer);
+    private static extern int FStat(SafeFileHandle fileDescriptor, IntPtr buffer);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ByHandleFileInformation
