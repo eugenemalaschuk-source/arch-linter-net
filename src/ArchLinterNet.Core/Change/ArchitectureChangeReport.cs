@@ -310,8 +310,6 @@ public static class ArchitectureChangeReports
         {
             if (finding is null
                 || string.IsNullOrWhiteSpace(finding.Identity)
-                || string.IsNullOrWhiteSpace(finding.Kind)
-                || string.IsNullOrWhiteSpace(finding.Display)
                 || !findingIdentities.Add(finding.Identity))
             {
                 throw new ArgumentException(
@@ -354,10 +352,7 @@ public static class ArchitectureChangeReports
         HashSet<string>? identities = requireUnique ? new(StringComparer.Ordinal) : null;
         foreach (ArchitectureChangeEntry entry in entries)
         {
-            if (entry is null
-                || string.IsNullOrWhiteSpace(entry.Kind)
-                || string.IsNullOrWhiteSpace(entry.Identity)
-                || string.IsNullOrWhiteSpace(entry.Display))
+            if (entry is null)
             {
                 throw new ArgumentException("Architecture change artifact contains an invalid entry.", parameterName);
             }
@@ -379,15 +374,13 @@ public static class ArchitectureChangeReports
         HashSet<string>? identities = requireUnique ? new(StringComparer.Ordinal) : null;
         foreach (ArchitectureChangeFinding finding in findings)
         {
-            if (finding is null
-                || string.IsNullOrWhiteSpace(finding.Identity)
-                || string.IsNullOrWhiteSpace(finding.Kind)
-                || string.IsNullOrWhiteSpace(finding.Display))
+            if (finding is null)
             {
                 throw new ArgumentException("Architecture change artifact contains an invalid finding.", parameterName);
             }
 
-            if (identities is not null && !identities.Add(finding.Identity))
+            if (identities is not null
+                && (string.IsNullOrWhiteSpace(finding.Identity) || !identities.Add(finding.Identity)))
             {
                 throw new ArgumentException(
                     "Architecture change snapshot contains duplicate or empty finding identities.",
