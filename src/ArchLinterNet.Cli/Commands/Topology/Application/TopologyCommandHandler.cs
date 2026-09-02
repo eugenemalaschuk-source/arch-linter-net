@@ -48,7 +48,7 @@ internal sealed class TopologyCommandHandler(
             });
 
             string? collision = TopologyCommandGuards.FindCaptureOutputCollision(
-                options.OutputPath, options.PolicyPath, outcome);
+                options.OutputPath, options.PolicyPath, outcome, fileSystem);
             if (collision is not null)
             {
                 return WriteError(options.Format, "output-collision", collision);
@@ -81,17 +81,31 @@ internal sealed class TopologyCommandHandler(
         }
 
         if (!TopologyCommandGuards.TryValidateMode(console, options.Format, options.Mode)
-            || !TopologyCommandGuards.TryValidateFormat(console, options.Format, options.HasFormatConflict))
+            || !TopologyCommandGuards.TryValidateFormat(console, options.Format, options.HasFormatConflict)
+            || !TryValidateExecutionOptions(options, options.Format))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         try
         {
-            ValidationOutcome outcome = runtime.Validate(BuildValidationRequest(
-                options.PolicyPath, options.Mode, options.ConditionSetName, options.BaselinePath,
-                options.ContractIds, options.EnsureBuilt, options.NoRestore, options.Configuration,
-                options.TargetFramework, options.Platform, options.RuntimeIdentifier, options.MaxParallelism), null);
+            ValidationOutcome nativeOutcome = runtime.Validate(
+                ValidationExecutionSemantics.CreateRequest(options, options.Mode, cacheLocation: null, cancellationToken), null);
+
+            string? collision = TopologyCommandGuards.FindValidationOutputCollision(
+                options.OutputPath,
+                options.PolicyPath,
+                nativeOutcome,
+                options.BaselinePath,
+                ValidationExecutionSemantics.ResolveExternalEvidencePaths(options, nativeOutcome.RepositoryRoot),
+                fileSystem);
+            if (collision is not null)
+            {
+                return WriteError(options.Format, "output-collision", collision);
+            }
+
+            ValidationOutcome outcome = ValidationExecutionSemantics.AttachExternalEvidence(
+                options, nativeOutcome, options.Mode, cancellationToken);
 
             if (outcome.PreflightBlocked)
             {
@@ -110,13 +124,6 @@ internal sealed class TopologyCommandHandler(
             }
 
             TopologyDiffReport report = CreateDiffReport(options.Mode, evidence);
-            string? collision = TopologyCommandGuards.FindValidationOutputCollision(
-                options.OutputPath, options.PolicyPath, outcome, options.BaselinePath);
-            if (collision is not null)
-            {
-                return WriteError(options.Format, "output-collision", collision);
-            }
-
             string document = options.Format == JsonFormat
                 ? TopologyDiffRenderer.FormatJson(report)
                 : TopologyDiffRenderer.FormatHuman(report);
@@ -143,7 +150,8 @@ internal sealed class TopologyCommandHandler(
         }
 
         if (!TopologyCommandGuards.TryValidateMode(console, options.Format, options.Mode)
-            || !TopologyCommandGuards.TryValidateFormat(console, options.Format, options.HasFormatConflict))
+            || !TopologyCommandGuards.TryValidateFormat(console, options.Format, options.HasFormatConflict)
+            || !TryValidateExecutionOptions(options, options.Format))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
@@ -152,22 +160,28 @@ internal sealed class TopologyCommandHandler(
         {
             // This is the only validation call in verify. The coordinator only renders the
             // returned outcome; it never re-evaluates it or creates a topology result envelope.
-            ValidationOutcome outcome = runtime.Validate(BuildValidationRequest(
-                options.PolicyPath, options.Mode, options.ConditionSetName, options.BaselinePath,
-                options.ContractIds, options.EnsureBuilt, options.NoRestore, options.Configuration,
-                options.TargetFramework, options.Platform, options.RuntimeIdentifier, options.MaxParallelism), null);
+            ValidationOutcome nativeOutcome = runtime.Validate(
+                ValidationExecutionSemantics.CreateRequest(options, options.Mode, cacheLocation: null, cancellationToken), null);
+
+            string? collision = TopologyCommandGuards.FindValidationOutputCollision(
+                options.OutputPath,
+                options.PolicyPath,
+                nativeOutcome,
+                options.BaselinePath,
+                ValidationExecutionSemantics.ResolveExternalEvidencePaths(options, nativeOutcome.RepositoryRoot),
+                fileSystem);
+            if (collision is not null)
+            {
+                return WriteError(options.Format, "output-collision", collision);
+            }
+
+            ValidationOutcome outcome = ValidationExecutionSemantics.AttachExternalEvidence(
+                options, nativeOutcome, options.Mode, cancellationToken);
 
             if (!outcome.PreflightBlocked && FindTopologyEvidence(outcome) is null)
             {
                 return WriteError(options.Format, "no-declared-topology",
                     "Topology verify requires a declared topology in the policy.");
-            }
-
-            string? collision = TopologyCommandGuards.FindValidationOutputCollision(
-                options.OutputPath, options.PolicyPath, outcome, options.BaselinePath);
-            if (collision is not null)
-            {
-                return WriteError(options.Format, "output-collision", collision);
             }
 
             string document = new ReportCoordinator(runtime, console, fileSystem)
@@ -229,35 +243,28 @@ internal sealed class TopologyCommandHandler(
         return new TopologyDiffReport(mode, evidence, structural, relational, unmapped, reviewed);
     }
 
-    private ValidationRequest BuildValidationRequest(
-        string policyPath,
-        string mode,
-        string? conditionSetName,
-        string? baselinePath,
-        IReadOnlyList<string> contractIds,
-        bool ensureBuilt,
-        bool noRestore,
-        string? configuration,
-        string? targetFramework,
-        string? platform,
-        string? runtimeIdentifier,
-        int? maxParallelism) => new()
+    private bool TryValidateExecutionOptions(
+        IValidationExecutionOptions options,
+        string format)
+    {
+        if (options is TopologyDiffCommandOptions { ExternalEvidenceParseError: not null } diff)
         {
-            PolicyPath = policyPath,
-            Mode = mode,
-            ConditionSetName = conditionSetName,
-            BaselinePath = baselinePath,
-            ContractIds = contractIds.ToList(),
-            EnforceUnmatchedIgnoredViolationsPolicy = true,
-            PreparationMode = ensureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
-            NoRestore = noRestore,
-            RequestedConfiguration = configuration,
-            RequestedTargetFramework = targetFramework,
-            RequestedPlatform = platform,
-            RequestedRuntimeIdentifier = runtimeIdentifier,
-            MaxParallelism = maxParallelism,
-            CancellationToken = cancellationToken,
-        };
+            return WriteError(format, "invalid-arguments", diff.ExternalEvidenceParseError) == CliExitCodes.Success;
+        }
+
+        if (options is TopologyVerifyCommandOptions { ExternalEvidenceParseError: not null } verify)
+        {
+            return WriteError(format, "invalid-arguments", verify.ExternalEvidenceParseError) == CliExitCodes.Success;
+        }
+
+        if (!ValidationExecutionSemantics.TryGetWaiverEvaluationDate(
+                options.WaiverEvaluationDate, out _, out string? error))
+        {
+            return WriteError(format, "invalid-arguments", error!) == CliExitCodes.Success;
+        }
+
+        return true;
+    }
 
     private int Publish(string document, string? outputPath, string format, string operation)
     {
@@ -269,7 +276,23 @@ internal sealed class TopologyCommandHandler(
             }
             else
             {
-                fileSystem.WriteAllText(outputPath, document);
+                string? temporaryPath = null;
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    temporaryPath = fileSystem.WriteAllTextToTemp(outputPath, document);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    fileSystem.RenameTempToTarget(temporaryPath, outputPath);
+                }
+                catch
+                {
+                    if (temporaryPath is not null)
+                    {
+                        TryDeleteTemporaryFile(temporaryPath);
+                    }
+
+                    throw;
+                }
             }
 
             return CliExitCodes.Success;
@@ -277,6 +300,18 @@ internal sealed class TopologyCommandHandler(
         catch (Exception exception)
         {
             return WriteError(format, "output-write-failed", $"Could not write {operation} output: {exception.Message}");
+        }
+    }
+
+    private void TryDeleteTemporaryFile(string temporaryPath)
+    {
+        try
+        {
+            fileSystem.DeleteFile(temporaryPath);
+        }
+        catch
+        {
+            // Cleanup cannot make a failed publication successful and must not hide its cause.
         }
     }
 

@@ -23,6 +23,14 @@ internal static class TopologyCommandHelpTexts
               --platform <name>     Build platform
               --runtime <rid>       Runtime identifier
               --max-parallelism <n> Maximum analysis parallelism
+              --waiver-evaluation-date <yyyy-MM-dd>
+                                    Use the ordinary validation waiver evaluation date
+              --external-evidence <binding>
+                                    Bind ordinary validation external-evidence SARIF input
+              --evidence-repository <value>
+              --evidence-revision <value>
+              --evidence-scope <value>
+                                    Ordinary validation external-evidence assessment context
           -h, --help                Show this help message
 
         Use --ensure-built to create the verified build receipt required for a first capture.
@@ -65,7 +73,8 @@ internal static class TopologyCommandHelpTexts
         Usage:
           arch-linter-net topology verify [options]
 
-        Options are the same as topology diff. Verify preserves ordinary validation output and
+        Options are the same as topology diff, including --waiver-evaluation-date and the
+        --external-evidence/--evidence-* inputs. Verify preserves ordinary validation output and
         exit semantics; topology drift is not converted into a second success criterion.
         """;
 }

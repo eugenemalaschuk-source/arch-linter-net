@@ -1,10 +1,5 @@
-# topology-review-workflow Specification
+## MODIFIED Requirements
 
-## Purpose
-
-Provide deterministic, review-only topology capture, diff, and focused verification workflows
-without bypassing or mutating the existing declared-topology validation model.
-## Requirements
 ### Requirement: Capture emits deterministic review candidates for supported subjects
 The system SHALL provide a read-only topology capture operation that accepts one supported
 first-party subject kind (`type`, `namespace`, `project`, or `assembly`) and emits a versioned,
@@ -63,22 +58,6 @@ input.
   consumed analysis input
 - **THEN** diff fails before publication and leaves that input unchanged
 
-### Requirement: Focused verification uses normal topology validation semantics
-The system SHALL provide a topology verify operation that invokes normal validation once for the
-selected strict or audit mode and projects the resulting declared-topology evidence. Its pass/fail
-and applicability semantics SHALL be those of the ordinary validation outcome; it SHALL NOT
-introduce a second evaluator, a topology-specific applicability envelope, or policy mutation.
-
-#### Scenario: Strict verification matches ordinary validation
-- **WHEN** a policy has a declared topology with a forbidden observed component relationship
-- **THEN** topology verify and ordinary strict validation expose the same topology finding and
-  fail state
-
-#### Scenario: Audit verification preserves audit behavior
-- **WHEN** a policy runs topology verification in audit mode
-- **THEN** the operation uses the same evaluator and audit result semantics as ordinary audit
-  validation
-
 ### Requirement: Lifecycle fixtures prove .NET and Unity behavior
 The system SHALL provide realistic .NET server/library and Unity-style topology fixtures that
 exercise the real capture, diff, and verification command lifecycle without automatically accepting
@@ -99,6 +78,8 @@ import, asmdef, and all other consumed source inputs.
 - **THEN** its assembly and asmdef-oriented candidate observations and declared topology categories
   remain deterministic, strict and audit outcomes follow ordinary validation, and no command
   rewrites a consumed fixture input
+
+## ADDED Requirements
 
 ### Requirement: Topology capture respects Core's protected execution boundary
 The `Topology` application surface SHALL consume a neutral topology-observation projection and

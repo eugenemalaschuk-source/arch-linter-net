@@ -1,5 +1,6 @@
 version: 1
 name: .NET server/library topology declared review fixture
+imports: [topology-review.fragment.yml]
 layers: {}
 analysis:
   target_assemblies:
@@ -40,8 +41,6 @@ topology:
         - assembly: TopologyReview.RetiredAdapter
   allowed_edges:
     - from: application
-      to: domain
-    - from: infrastructure
       to: domain
     - from: server
       to: application

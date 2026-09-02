@@ -4,6 +4,19 @@ internal interface IFileSystem
 {
     bool FileExists(string path);
 
+    /// <summary>
+    /// Returns whether two existing paths name the same physical file. Implementations MUST follow
+    /// symbolic links and recognize hard links; callers use this fail-closed guard before replacing
+    /// a trusted input through a differently-spelled output path.
+    /// </summary>
+    bool AreSameExistingFile(string firstPath, string secondPath)
+    {
+        return string.Equals(
+            Path.GetFullPath(firstPath),
+            Path.GetFullPath(secondPath),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     string ReadAllText(string path);
 
     void WriteAllText(string path, string contents);

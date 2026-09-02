@@ -245,6 +245,25 @@ public sealed class CliHandlerCoverageTests
         Assert.That(console.ErrorText, Does.Contain("graph --help"));
     }
 
+    [TestCase("capture")]
+    [TestCase("diff")]
+    [TestCase("verify")]
+    public void Host_TopologyNestedParseErrors_UseTheFullCommandPath(string subcommand)
+    {
+        var console = new RecordingConsole();
+
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime())
+            .Run(["topology", subcommand, "--unknown"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain($"topology {subcommand} --help"));
+            Assert.That(console.ErrorText, Does.Not.Contain($"baseline {subcommand} --help"));
+            Assert.That(console.ErrorText, Does.Not.Contain("public-api capture --help"));
+        });
+    }
+
     // The legacy validate renderer only emits root help/version after a successful parse.
     // These cases exercise the value-skipping (--policy <value>), flag (--strict), unknown-token,
     // and dangling-option-value branches that leave TryHandleLegacyValidateShortCircuit without rendering.
@@ -287,6 +306,11 @@ public sealed class CliHandlerCoverageTests
         {
             var root = new RootCommand();
             root.Subcommands.Add(new Command("graph"));
+            Command topology = new("topology");
+            topology.Subcommands.Add(new Command("capture"));
+            topology.Subcommands.Add(new Command("diff"));
+            topology.Subcommands.Add(new Command("verify"));
+            root.Subcommands.Add(topology);
             return root;
         }
     }

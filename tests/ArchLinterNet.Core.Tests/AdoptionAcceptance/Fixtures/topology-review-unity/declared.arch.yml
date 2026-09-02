@@ -1,5 +1,6 @@
 version: 1
 name: Unity-style topology declared review fixture
+imports: [topology-review.fragment.yml]
 layers: {}
 analysis:
   target_assemblies:
@@ -35,8 +36,6 @@ topology:
   allowed_edges:
     - from: editor
       to: gameplay
-    - from: gameplay
-      to: runtime
     - from: runtime
       to: retired-tooling
   stale_declarations: true

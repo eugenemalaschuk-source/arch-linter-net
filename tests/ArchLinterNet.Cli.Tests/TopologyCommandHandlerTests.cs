@@ -1,7 +1,9 @@
 using System.CommandLine;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
@@ -88,6 +90,94 @@ public sealed class TopologyCommandHandlerTests
     }
 
     [Test]
+    public void CaptureOutput_RejectsHardLinkToConsumedInput()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"arch-linter-topology-hardlink-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            string policy = Path.Combine(root, "policy.yml");
+            string alias = Path.Combine(root, "capture.json");
+            File.WriteAllText(policy, "trusted policy");
+            CreateHardLink(alias, policy);
+            FakeConsole console = new();
+            FakeRuntime runtime = new()
+            {
+                CaptureResult = new ArchitectureTopologyCaptureOutcome(
+                    "assembly", [], [], root, [policy], [], [], []),
+            };
+
+            int exitCode = new TopologyCommandHandler(runtime, console, new FileSystem())
+                .Capture(new(policy, "assembly", "json", alias, null, false));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+                Assert.That(console.Output, Does.Contain("output-collision"));
+                Assert.That(File.ReadAllText(policy), Is.EqualTo("trusted policy"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public void CaptureOutput_RejectsConsumedCSharpSourceInput()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"arch-linter-topology-source-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(root, "src"));
+        try
+        {
+            string source = Path.Combine(root, "src", "Consumer.cs");
+            File.WriteAllText(source, "namespace Consumer;");
+            FakeConsole console = new();
+            FakeRuntime runtime = new()
+            {
+                CaptureResult = new ArchitectureTopologyCaptureOutcome("assembly", [], [], root, [], [], [], []),
+            };
+
+            int exitCode = new TopologyCommandHandler(runtime, console, new FileSystem())
+                .Capture(new("policy.yml", "assembly", "json", source, null, false));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+                Assert.That(console.Output, Does.Contain("output-collision"));
+                Assert.That(File.ReadAllText(source), Is.EqualTo("namespace Consumer;"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public void CaptureOutput_PublicationFailurePreservesTargetAndCleansTemporaryFile()
+    {
+        FakeConsole console = new();
+        FakeFileSystem files = new() { ThrowOnRename = true };
+        FakeRuntime runtime = new()
+        {
+            CaptureResult = new ArchitectureTopologyCaptureOutcome("assembly", [], [], "repo", [], [], [], []),
+        };
+
+        int exitCode = new TopologyCommandHandler(runtime, console, files)
+            .Capture(new("policy.yml", "assembly", "json", "capture.json", null, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.Output, Does.Contain("output-write-failed"));
+            Assert.That(files.RenameCalls, Is.EqualTo(1));
+            Assert.That(files.DeletedPaths, Is.EqualTo(new[] { "capture.json.tmp" }));
+            Assert.That(files.DirectWrites, Is.EqualTo(0));
+        });
+    }
+
+    [Test]
     public void Diff_ProjectsDistinctCategoriesAndCallsValidationOnce()
     {
         FakeConsole console = new();
@@ -143,6 +233,97 @@ public sealed class TopologyCommandHandlerTests
     }
 
     [Test]
+    public void Verify_AppliesOrdinaryExternalEvidenceAndWaiverSemantics()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"arch-linter-topology-evidence-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(root, "evidence"));
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "evidence", "scan.sarif"),
+                """
+                {"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Synthetic.Scanner","version":"1.0","rules":[{"id":"SEC100"}]}},"automationDetails":{"id":"assessment-42"},"invocations":[{"executionSuccessful":true}],"results":[{"ruleId":"SEC100","level":"error","message":{"text":"finding"}}]}]}
+                """);
+            ArchitectureTopologyMappingEvidence topology = new("partial", "assembly", 1, [], [], [], []);
+            ValidationOutcome outcome = Outcome(topology, passed: true) with
+            {
+                RepositoryRoot = root,
+                ExternalEvidenceRequirements =
+                [
+                    new ArchitectureExternalEvidenceRequirement
+                    {
+                        Id = "external.scan",
+                        Format = "sarif",
+                        Required = true,
+                        Tool = "Synthetic.Scanner",
+                        ToolVersion = "1.0",
+                        Run = "assessment-42",
+                        DiagnosticFilter = new ArchitectureExternalEvidenceDiagnosticFilter
+                        {
+                            Severity = new Dictionary<string, string> { ["error"] = "strict" },
+                        },
+                    },
+                ],
+                ApplicabilityExpectedEntries =
+                [
+                    new ArchitectureApplicabilityExpectedEntry(
+                        "declared-topology",
+                        "declared_topology",
+                        ArchitectureApplicabilityMembership.Required,
+                        new ArchitectureApplicabilityProvenance(
+                            "declared_topology", "declared-topology", "declared-topology")),
+                ],
+            };
+            FakeRuntime runtime = new() { ValidationResult = outcome };
+            FakeConsole console = new();
+            TopologyVerifyCommandOptions options = new("policy.yml", "strict", "json", null, null, null, [], false)
+            {
+                WaiverEvaluationDate = "2026-09-02",
+                ExternalEvidenceArtifacts = [new SarifEvidenceArtifactReference("evidence/scan.sarif", "external.scan")],
+            };
+
+            int exitCode = new TopologyCommandHandler(runtime, console, new FakeFileSystem()).Verify(options);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.ValidationFailure), console.Output + console.ErrorText);
+                Assert.That(runtime.LastValidationRequest!.WaiverEvaluationDate, Is.EqualTo(new DateOnly(2026, 9, 2)));
+                Assert.That(runtime.ValidateCalls, Is.EqualTo(1));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestCase("diff")]
+    [TestCase("verify")]
+    public void TopologySubcommands_ParseSharedValidationEvidenceInputs(string subcommand)
+    {
+        ArchitectureTopologyMappingEvidence topology = new("partial", "assembly", 1, [], [], [], []);
+        FakeRuntime runtime = new() { ValidationResult = Outcome(topology, passed: true) };
+        FakeConsole console = new();
+        Command command = new TopologyCommandModule().CreateCommand(runtime, console, new FakeFileSystem());
+
+        int exitCode = command.Parse([
+            subcommand,
+            "--waiver-evaluation-date", "2026-09-02",
+            "--external-evidence", "id=external.unknown,path=evidence/scan.sarif",
+            "--evidence-repository", "repo",
+            "--evidence-revision", "revision",
+            "--evidence-scope", "ci",
+        ]).Invoke();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(runtime.ValidateCalls, Is.EqualTo(1));
+            Assert.That(runtime.LastValidationRequest!.WaiverEvaluationDate, Is.EqualTo(new DateOnly(2026, 9, 2)));
+            Assert.That(console.Output + console.ErrorText, Does.Contain("does not match a declared"));
+        });
+    }
+
+    [Test]
     public void DiffWithoutTopology_IsTypedInputErrorAfterOneValidation()
     {
         FakeRuntime runtime = new() { ValidationResult = Outcome(null, passed: true) };
@@ -164,7 +345,9 @@ public sealed class TopologyCommandHandlerTests
         ArchitectureApplicabilityRecord[] records = evidence is null
             ? []
             : [new ArchitectureApplicabilityRecord("declared-topology", "declared_topology",
-                ArchitectureApplicabilityRecordState.Evaluable)
+                ArchitectureApplicabilityRecordState.Evaluable,
+                new ArchitectureApplicabilityProvenance(
+                    "declared_topology", "declared-topology", "declared-topology"))
             {
                 TopologyEvidence = evidence,
             }];
@@ -174,6 +357,24 @@ public sealed class TopologyCommandHandlerTests
             RepositoryRoot = Path.GetFullPath("."),
         };
     }
+
+    private static void CreateHardLink(string linkPath, string existingPath)
+    {
+        bool created = OperatingSystem.IsWindows()
+            ? CreateHardLinkWindows(linkPath, existingPath, IntPtr.Zero)
+            : CreateHardLinkUnix(existingPath, linkPath) == 0;
+        if (!created)
+        {
+            throw new IOException("The test host could not create a hard-link alias.");
+        }
+    }
+
+    [DllImport("kernel32.dll", EntryPoint = "CreateHardLinkW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CreateHardLinkWindows(string linkPath, string existingPath, IntPtr securityAttributes);
+
+    [DllImport("libc", EntryPoint = "link", SetLastError = true)]
+    private static extern int CreateHardLinkUnix(string existingPath, string linkPath);
 
     private sealed class FakeRuntime : ICliRuntime
     {
@@ -237,13 +438,24 @@ public sealed class TopologyCommandHandlerTests
 
     private sealed class FakeFileSystem : IFileSystem
     {
+        public bool ThrowOnRename { get; init; }
+        public int RenameCalls { get; private set; }
+        public int DirectWrites { get; private set; }
+        public List<string> DeletedPaths { get; } = [];
         public bool FileExists(string path) => false;
         public string ReadAllText(string path) => string.Empty;
-        public void WriteAllText(string path, string contents) { }
-        public string WriteAllTextToTemp(string targetPath, string contents) => targetPath;
-        public void RenameTempToTarget(string tempPath, string targetPath) { }
+        public void WriteAllText(string path, string contents) => DirectWrites++;
+        public string WriteAllTextToTemp(string targetPath, string contents) => targetPath + ".tmp";
+        public void RenameTempToTarget(string tempPath, string targetPath)
+        {
+            RenameCalls++;
+            if (ThrowOnRename)
+            {
+                throw new IOException("simulated atomic rename failure");
+            }
+        }
         public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => true;
-        public void DeleteFile(string path) { }
+        public void DeleteFile(string path) => DeletedPaths.Add(path);
         public bool TryCreateNewFile(string path) => true;
         public bool DirectoryExists(string path) => true;
         public void DeleteDirectoryIfEmpty(string path) { }

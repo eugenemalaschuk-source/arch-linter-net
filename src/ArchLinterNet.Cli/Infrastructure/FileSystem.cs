@@ -9,6 +9,25 @@ internal sealed class FileSystem : IFileSystem
         return File.Exists(path);
     }
 
+    public bool AreSameExistingFile(string firstPath, string secondPath)
+    {
+        string first = Path.GetFullPath(firstPath);
+        string second = Path.GetFullPath(secondPath);
+        if (string.Equals(first, second, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!File.Exists(first) || !File.Exists(second))
+        {
+            return false;
+        }
+
+        // A failure to inspect either existing file is treated as a collision. An output report is
+        // disposable; a policy or analysis input is not, so this direction fails closed.
+        return !FileIdentityComparer.TryAreDifferentFiles(first, second);
+    }
+
     public string ReadAllText(string path)
     {
         return File.ReadAllText(path);

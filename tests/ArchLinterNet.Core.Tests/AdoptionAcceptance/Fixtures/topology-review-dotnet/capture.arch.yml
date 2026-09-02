@@ -1,5 +1,6 @@
 version: 1
 name: .NET server/library topology capture fixture
+imports: [topology-review.fragment.yml]
 layers: {}
 analysis:
   target_assemblies:

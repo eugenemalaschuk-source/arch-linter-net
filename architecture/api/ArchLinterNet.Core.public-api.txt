@@ -457,7 +457,6 @@ class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact [sealed]
 class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome [sealed]
 class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship [sealed]
 class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest [sealed]
-class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureService [sealed]
 class ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext [sealed]
 class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest [sealed]
 class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot [sealed]
@@ -1234,7 +1233,6 @@ ctor ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact(System.String, 
 ctor ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome(System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship], System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic], System.Boolean)
 ctor ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship(System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest()
-ctor ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureService(ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService)
 ctor ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext(ArchLinterNet.Core.Caching.AnalysisCacheLocation, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String], System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.String)
 ctor ArchLinterNet.Core.Validation.AnalysisSnapshotRequest()
 ctor ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters()
@@ -1361,7 +1359,6 @@ interface ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticForma
 interface ArchLinterNet.Core.Reporting.Abstractions.IArchitectureSarifFormatter
 interface ArchLinterNet.Core.Resolution.Abstractions.IArchitectureRepositoryRootResolver
 interface ArchLinterNet.Core.Scanning.Abstractions.IArchitectureAsmdefScanner
-interface ArchLinterNet.Core.Topology.Abstractions.IArchitectureTopologyCaptureService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureHealthApplicationService
@@ -1873,8 +1870,6 @@ method ArchLinterNet.Core.Scanning.ArchitectureAttributeRoleExtractor.Extract(Sy
 method ArchLinterNet.Core.Schema.PackagedSchemaRegistry.List(): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Schema.PackagedSchemaDescriptor]
 method ArchLinterNet.Core.Schema.PackagedSchemaRegistry.TryRead(System.String, System.String&): System.Boolean [param1:out]
 method ArchLinterNet.Core.Schema.PackagedSchemaRegistry.TryValidateText(System.String, System.String, System.String&): System.Boolean [param2:out]
-method ArchLinterNet.Core.Topology.Abstractions.IArchitectureTopologyCaptureService.Capture(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest): ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome [abstract]
-method ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureService.Capture(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest): ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome [virtual]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService.Diff(ArchLinterNet.Core.Validation.BaselineDiffRequest): ArchLinterNet.Core.Validation.BaselineDiffOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService.Generate(ArchLinterNet.Core.Validation.BaselineGenerationRequest): ArchLinterNet.Core.Validation.BaselineGenerationOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService.Migrate(ArchLinterNet.Core.Validation.BaselineMigrateRequest): ArchLinterNet.Core.Validation.BaselineMigrateOutcome [abstract]

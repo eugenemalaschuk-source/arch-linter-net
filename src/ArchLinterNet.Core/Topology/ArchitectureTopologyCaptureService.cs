@@ -1,4 +1,3 @@
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Topology.Abstractions;
 using ArchLinterNet.Core.Validation;
@@ -11,7 +10,7 @@ namespace ArchLinterNet.Core.Topology;
 /// This service does not evaluate or mutate topology policy; it only exposes facts from one
 /// analysis session for review-oriented hosts.
 /// </summary>
-public sealed class ArchitectureTopologyCaptureService(
+internal sealed class ArchitectureTopologyCaptureService(
     IArchitectureValidationApplicationService validationApplicationService)
     : IArchitectureTopologyCaptureService
 {
@@ -39,7 +38,7 @@ public sealed class ArchitectureTopologyCaptureService(
                 PreflightBlocked: true);
         }
 
-        ArchitectureTopologyEvaluator.ValidationObservation observation =
+        ArchitectureTopologyObservation observation =
             snapshot.CaptureTopologyObservation(request.SubjectKind);
 
         ArchitectureTopologyCaptureFact[] subjects = observation.Subjects
@@ -70,7 +69,7 @@ public sealed class ArchitectureTopologyCaptureService(
             snapshot.GetCapturePolicyImportPaths(),
             snapshot.GetCaptureResolvedAssemblyPaths(),
             snapshot.GetCaptureDiscoveredProjectPaths(),
-            Array.Empty<BuildStatePreflightDiagnostic>());
+            snapshot.Preflight.Diagnostics);
     }
 
     private static AnalysisSnapshotRequest ToSnapshotRequest(ArchitectureTopologyCaptureRequest request) => new()

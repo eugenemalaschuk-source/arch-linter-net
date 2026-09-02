@@ -1,6 +1,10 @@
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Topology.Abstractions;
+using ArchLinterNet.Cli.Commands.Topology.Application;
+using ArchLinterNet.Cli.Commands.Validate.Application;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Cli.Commands.Topology.EntryPoint;
 
@@ -37,6 +41,11 @@ internal sealed class VerifyTopologySubcommandModule : ITopologySubcommandModule
         Option<string> platform = new("--platform");
         Option<string> runtimeOption = new("--runtime");
         Option<int?> maxParallelism = new("--max-parallelism");
+        Option<string> waiverEvaluationDate = new("--waiver-evaluation-date");
+        Option<string[]> externalEvidence = new("--external-evidence") { AllowMultipleArgumentsPerToken = true };
+        Option<string> evidenceRepository = new("--evidence-repository");
+        Option<string> evidenceRevision = new("--evidence-revision");
+        Option<string> evidenceScope = new("--evidence-scope");
         Option<bool> help = new("--help");
         help.Aliases.Add("-h");
 
@@ -57,26 +66,16 @@ internal sealed class VerifyTopologySubcommandModule : ITopologySubcommandModule
         command.Options.Add(platform);
         command.Options.Add(runtimeOption);
         command.Options.Add(maxParallelism);
+        command.Options.Add(waiverEvaluationDate);
+        command.Options.Add(externalEvidence);
+        command.Options.Add(evidenceRepository);
+        command.Options.Add(evidenceRevision);
+        command.Options.Add(evidenceScope);
         command.Options.Add(help);
-        command.SetAction(result => handler.Verify(new TopologyVerifyCommandOptions(
-            result.GetValue(policy) ?? "architecture/dependencies.arch.yml",
-            ResolveMode(result, mode, strict, audit),
-            result.GetValue(json) ? "json" : result.GetValue(format) ?? "human",
-            result.GetValue(output),
-            result.GetValue(conditionSet),
-            result.GetValue(baseline),
-            result.GetValue(contract) ?? Array.Empty<string>(),
-            result.GetValue(help),
-            result.GetValue(ensureBuilt),
-            result.GetValue(noRestore),
-            result.GetValue(configuration),
-            result.GetValue(framework),
-            result.GetValue(platform),
-            result.GetValue(runtimeOption),
-            result.GetValue(maxParallelism))
-        {
-            HasFormatConflict = result.GetValue(json) && result.GetValue(format) is not null,
-        }));
+        command.SetAction(result => handler.Verify(CreateOptions(
+            result, policy, mode, strict, audit, format, json, output, conditionSet, baseline, contract, help,
+            ensureBuilt, noRestore, configuration, framework, platform, runtimeOption, maxParallelism,
+            waiverEvaluationDate, externalEvidence, evidenceRepository, evidenceRevision, evidenceScope)));
 
         return command;
     }
@@ -107,6 +106,71 @@ internal sealed class VerifyTopologySubcommandModule : ITopologySubcommandModule
         }
 
         return selected;
+    }
+
+    private static TopologyVerifyCommandOptions CreateOptions( // NOSONAR: System.CommandLine requires individual typed option handles.
+        ParseResult result,
+        Option<string> policy,
+        Option<string> mode,
+        Option<bool> strict,
+        Option<bool> audit,
+        Option<string> format,
+        Option<bool> json,
+        Option<string> output,
+        Option<string> conditionSet,
+        Option<string> baseline,
+        Option<string[]> contract,
+        Option<bool> help,
+        Option<bool> ensureBuilt,
+        Option<bool> noRestore,
+        Option<string> configuration,
+        Option<string> framework,
+        Option<string> platform,
+        Option<string> runtimeOption,
+        Option<int?> maxParallelism,
+        Option<string> waiverEvaluationDate,
+        Option<string[]> externalEvidence,
+        Option<string> evidenceRepository,
+        Option<string> evidenceRevision,
+        Option<string> evidenceScope)
+    {
+        IReadOnlyList<SarifEvidenceArtifactReference> externalEvidenceArtifacts =
+            Array.Empty<SarifEvidenceArtifactReference>();
+        string? externalEvidenceParseError = null;
+        try
+        {
+            externalEvidenceArtifacts = ValidateCommandDefinition.ParseExternalEvidenceBindings(
+                result.GetValue(externalEvidence));
+        }
+        catch (InvalidOperationException exception)
+        {
+            externalEvidenceParseError = exception.Message;
+        }
+
+        return new TopologyVerifyCommandOptions(
+            result.GetValue(policy) ?? "architecture/dependencies.arch.yml",
+            ResolveMode(result, mode, strict, audit),
+            result.GetValue(json) ? "json" : result.GetValue(format) ?? "human",
+            result.GetValue(output),
+            result.GetValue(conditionSet),
+            result.GetValue(baseline),
+            result.GetValue(contract) ?? Array.Empty<string>(),
+            result.GetValue(help),
+            result.GetValue(ensureBuilt),
+            result.GetValue(noRestore),
+            result.GetValue(configuration),
+            result.GetValue(framework),
+            result.GetValue(platform),
+            result.GetValue(runtimeOption),
+            result.GetValue(maxParallelism))
+        {
+            HasFormatConflict = result.GetValue(json) && result.GetValue(format) is not null,
+            WaiverEvaluationDate = result.GetValue(waiverEvaluationDate),
+            ExternalEvidenceArtifacts = externalEvidenceArtifacts,
+            ExternalEvidenceAssessmentContext = ValidateCommandDefinition.ResolveExternalEvidenceAssessmentContext(
+                result.GetValue(evidenceRepository), result.GetValue(evidenceRevision), result.GetValue(evidenceScope)),
+            ExternalEvidenceParseError = externalEvidenceParseError,
+        };
     }
 
     private static Option<string> OptionWithDefault(string name, string value)

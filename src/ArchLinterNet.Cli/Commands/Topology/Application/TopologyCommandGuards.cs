@@ -54,7 +54,8 @@ internal static class TopologyCommandGuards
     internal static string? FindCaptureOutputCollision(
         string? outputPath,
         string policyPath,
-        ArchitectureTopologyCaptureOutcome outcome)
+        ArchitectureTopologyCaptureOutcome outcome,
+        IFileSystem fileSystem)
     {
         ArgumentNullException.ThrowIfNull(outcome);
         if (outputPath is null)
@@ -62,27 +63,25 @@ internal static class TopologyCommandGuards
             return null;
         }
 
-        List<(string Name, string? Path)> inputs = [("--policy", policyPath)];
-        inputs.AddRange(outcome.PolicyImportPaths.Select(path => ("an imported policy file", (string?)path)));
-        inputs.AddRange(outcome.ResolvedAssemblyPaths.SelectMany(path => new[]
-        {
-            ("a build artifact loaded during this run", (string?)path),
-            ("a build receipt loaded during this run", (string?)BuildReceiptStore.ReceiptPathFor(path)),
-        }));
-        inputs.AddRange(outcome.DiscoveredProjectPaths.Select(path => ("a project file loaded during this run", (string?)path)));
-        return FindOutputCollision(outputPath, inputs.ToArray());
+        return FindOutputCollision(outputPath, fileSystem,
+            CreateTrustedInputManifest(policyPath, outcome.PolicyImportPaths, outcome.ResolvedAssemblyPaths,
+                outcome.DiscoveredProjectPaths, outcome.RepositoryRoot, baselinePath: null));
     }
 
     internal static string? FindValidationOutputCollision(
         string? outputPath,
         ValidationOutcome outcome,
-        string? baselinePath) => FindValidationOutputCollision(outputPath, null, outcome, baselinePath);
+        string? baselinePath,
+        IFileSystem fileSystem) => FindValidationOutputCollision(
+            outputPath, null, outcome, baselinePath, Array.Empty<string>(), fileSystem);
 
     internal static string? FindValidationOutputCollision(
         string? outputPath,
         string? policyPath,
         ValidationOutcome outcome,
-        string? baselinePath)
+        string? baselinePath,
+        IReadOnlyList<string> externalEvidencePaths,
+        IFileSystem fileSystem)
     {
         ArgumentNullException.ThrowIfNull(outcome);
         if (outputPath is null)
@@ -90,42 +89,80 @@ internal static class TopologyCommandGuards
             return null;
         }
 
-        List<(string Name, string? Path)> inputs = new();
-        if (policyPath is not null)
-        {
-            inputs.Add(("--policy", policyPath));
-        }
-
-        inputs.AddRange(outcome.PolicyImportPaths.Select(path => ("an imported policy file", (string?)path)));
-        inputs.AddRange(outcome.ResolvedAssemblyPaths.SelectMany(path => new[]
-        {
-            ("a build artifact loaded during this run", (string?)path),
-            ("a build receipt loaded during this run", (string?)BuildReceiptStore.ReceiptPathFor(path)),
-        }));
-        inputs.AddRange(outcome.DiscoveredProjectPaths.Select(path => ("a project file loaded during this run", (string?)path)));
-        if (baselinePath is not null)
-        {
-            inputs.Add(("--baseline", baselinePath));
-        }
-
-        return FindOutputCollision(outputPath, inputs.ToArray());
+        return FindOutputCollision(outputPath, fileSystem,
+            CreateTrustedInputManifest(policyPath, outcome.PolicyImportPaths, outcome.ResolvedAssemblyPaths,
+                outcome.DiscoveredProjectPaths, outcome.RepositoryRoot, baselinePath, externalEvidencePaths));
     }
 
     private static string? FindOutputCollision(
         string outputPath,
+        IFileSystem fileSystem,
         params (string Name, string? Path)[] inputPaths)
     {
         string output = Path.GetFullPath(outputPath);
         foreach ((string name, string? inputPath) in inputPaths)
         {
-            if (inputPath is not null
-                && string.Equals(output, Path.GetFullPath(inputPath), StringComparison.OrdinalIgnoreCase))
+            if (inputPath is not null && fileSystem.AreSameExistingFile(outputPath, inputPath))
             {
                 return $"--output destination '{outputPath}' matches {name} input '{inputPath}'";
             }
         }
 
         return null;
+    }
+
+    // One manifest feeds every topology output guard. Keeping all trust-read inputs here prevents
+    // command-specific additions from silently escaping alias protection.
+    private static (string Name, string? Path)[] CreateTrustedInputManifest(
+        string? policyPath,
+        IReadOnlyList<string> policyImportPaths,
+        IReadOnlyList<string> resolvedAssemblyPaths,
+        IReadOnlyList<string> discoveredProjectPaths,
+        string repositoryRoot,
+        string? baselinePath,
+        IReadOnlyList<string>? externalEvidencePaths = null)
+    {
+        List<(string Name, string? Path)> inputs = new();
+        if (policyPath is not null)
+        {
+            inputs.Add(("--policy", policyPath));
+        }
+
+        inputs.AddRange(policyImportPaths.Select(path => ("an imported policy file", (string?)path)));
+        inputs.AddRange(resolvedAssemblyPaths.SelectMany(path => new[]
+        {
+            ("a build artifact loaded during this run", (string?)path),
+            ("a build receipt loaded during this run", (string?)BuildReceiptStore.ReceiptPathFor(path)),
+        }));
+        inputs.AddRange(discoveredProjectPaths.Select(path => ("a project file loaded during this run", (string?)path)));
+        inputs.AddRange(FindConsumedSourceInputPaths(repositoryRoot));
+        if (baselinePath is not null)
+        {
+            inputs.Add(("--baseline", baselinePath));
+        }
+
+        inputs.AddRange((externalEvidencePaths ?? Array.Empty<string>())
+            .Select(path => ("an --external-evidence artifact", (string?)path)));
+
+        return inputs.ToArray();
+    }
+
+    private static IEnumerable<(string Name, string? Path)> FindConsumedSourceInputPaths(string repositoryRoot)
+    {
+        if (!Directory.Exists(repositoryRoot))
+        {
+            return Array.Empty<(string Name, string? Path)>();
+        }
+
+        // Asmdef validation and Roslyn source analysis both trust-read source inputs. The exact
+        // source roots can be inherited through policy imports, so protect every repository-local
+        // candidate rather than trying to reconstruct a second, incomplete root resolver here.
+        return Directory.EnumerateFiles(repositoryRoot, "*", SearchOption.AllDirectories)
+            .Where(path => path.EndsWith(".asmdef", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+            .Select(path => path.EndsWith(".asmdef", StringComparison.OrdinalIgnoreCase)
+                ? ("an asmdef source loaded during this run", (string?)path)
+                : ("a C# source input loaded during this run", (string?)path));
     }
 
     private const string HumanFormat = "human";

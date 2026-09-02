@@ -1,3 +1,6 @@
+using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.Model;
+
 namespace ArchLinterNet.Cli.Commands.Topology.Application;
 
 internal sealed record TopologyCaptureCommandOptions(
@@ -33,9 +36,18 @@ internal sealed record TopologyDiffCommandOptions(
     string? TargetFramework = null,
     string? Platform = null,
     string? RuntimeIdentifier = null,
-    int? MaxParallelism = null)
+    int? MaxParallelism = null) : IValidationExecutionOptions
 {
     public bool HasFormatConflict { get; init; }
+
+    public string? WaiverEvaluationDate { get; init; }
+
+    public IReadOnlyList<SarifEvidenceArtifactReference> ExternalEvidenceArtifacts { get; init; } =
+        Array.Empty<SarifEvidenceArtifactReference>();
+
+    public SarifEvidenceAssessmentContext? ExternalEvidenceAssessmentContext { get; init; }
+
+    public string? ExternalEvidenceParseError { get; init; }
 }
 
 internal sealed record TopologyVerifyCommandOptions(
@@ -53,7 +65,16 @@ internal sealed record TopologyVerifyCommandOptions(
     string? TargetFramework = null,
     string? Platform = null,
     string? RuntimeIdentifier = null,
-    int? MaxParallelism = null)
+    int? MaxParallelism = null) : IValidationExecutionOptions
 {
     public bool HasFormatConflict { get; init; }
+
+    public string? WaiverEvaluationDate { get; init; }
+
+    public IReadOnlyList<SarifEvidenceArtifactReference> ExternalEvidenceArtifacts { get; init; } =
+        Array.Empty<SarifEvidenceArtifactReference>();
+
+    public SarifEvidenceAssessmentContext? ExternalEvidenceAssessmentContext { get; init; }
+
+    public string? ExternalEvidenceParseError { get; init; }
 }
