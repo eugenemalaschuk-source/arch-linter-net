@@ -64,12 +64,20 @@ jobs:
               'producer-run-attempt': workflowRun.run_attempt,
             };
 
-            if (pullRequest.head.sha !== workflowRun.head_sha) {
-              setResult('stale_head', values);
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: workflowRun.id,
+              per_page: 100,
+            });
+            const producerJobs = jobs.filter((job) => job.name === 'Architecture PR Report Producer');
+            if (producerJobs.length !== 1 || producerJobs[0].conclusion !== 'success') {
+              setResult('producer_not_success', values);
               return;
             }
-            if (workflowRun.conclusion !== 'success') {
-              setResult('producer_not_success', values);
+
+            if (pullRequest.head.sha !== workflowRun.head_sha) {
+              setResult('stale_head', values);
               return;
             }
 

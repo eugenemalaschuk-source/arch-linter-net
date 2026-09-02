@@ -314,8 +314,8 @@ jobs:
             echo ".NET coverage shards still ran and their reports were aggregated without those secrets."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  architecture_pr_report:
-    name: Architecture PR Report
+  architecture_pr_report_producer:
+    name: Architecture PR Report Producer
     runs-on: ubuntu-latest
     # This builds the head, materializes a base snapshot, then emits health/change/report artifacts.
     timeout-minutes: 30
@@ -324,6 +324,8 @@ jobs:
     env:
       ARCHITECTURE_REPORT_DIRECTORY: architecture-pr-report
       ARCHITECTURE_REPORT_ARTIFACT_DIRECTORY: architecture-pr-report-artifact
+    outputs:
+      strict_coverage_outcome: ${{ steps.architecture_coverage.outcome }}
 
     steps:
       - name: Checkout
@@ -402,21 +404,26 @@ jobs:
           cli_project="$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj"
           output_directory="$GITHUB_WORKSPACE/$ARCHITECTURE_REPORT_DIRECTORY"
 
+          snapshot() {
+            local snapshot_output="$1"
+            local snapshot_args=(
+              --policy architecture/dependencies.arch.yml
+              --mode strict
+              --ensure-built
+            )
+            if [[ -f architecture/baseline.arch.yml ]]; then
+              snapshot_args+=(--baseline architecture/baseline.arch.yml)
+            fi
+            dotnet run --no-build --project "$cli_project" -- change snapshot \
+              "${snapshot_args[@]}" \
+              --output "$snapshot_output"
+          }
+
           pushd "$BASE_WORKTREE"
-          dotnet run --no-build --project "$cli_project" -- change snapshot \
-            --policy architecture/dependencies.arch.yml \
-            --baseline architecture/baseline.arch.yml \
-            --mode strict \
-            --ensure-built \
-            --output "$output_directory/base-architecture-change-snapshot.json"
+          snapshot "$output_directory/base-architecture-change-snapshot.json"
           popd
 
-          dotnet run --no-build --project "$cli_project" -- change snapshot \
-            --policy architecture/dependencies.arch.yml \
-            --baseline architecture/baseline.arch.yml \
-            --mode strict \
-            --ensure-built \
-            --output "$output_directory/current-architecture-change-snapshot.json"
+          snapshot "$output_directory/current-architecture-change-snapshot.json"
 
           dotnet run --no-build --project "$cli_project" -- change report \
             --base "$output_directory/base-architecture-change-snapshot.json" \
@@ -425,12 +432,17 @@ jobs:
             --format json \
             --output "$output_directory/architecture-change.json"
 
+          health_args=(
+            --policy architecture/dependencies.arch.yml
+            --mode strict
+            --ensure-built
+          )
+          if [[ -f architecture/baseline.arch.yml ]]; then
+            health_args+=(--baseline architecture/baseline.arch.yml)
+          fi
           set +e
           dotnet run --no-build --project "$cli_project" -- health \
-            --policy architecture/dependencies.arch.yml \
-            --baseline architecture/baseline.arch.yml \
-            --mode strict \
-            --ensure-built \
+            "${health_args[@]}" \
             --format json \
             --execution-context "$EXECUTION_CONTEXT" \
             > "$output_directory/architecture-health.json"
@@ -552,8 +564,22 @@ jobs:
         if: always() && steps.architecture_report_manifest.outcome != 'success'
         run: exit 1
 
+  architecture_pr_report_gate:
+    name: Architecture PR Report Gate
+    needs: architecture_pr_report_producer
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+
+    steps:
+      - name: Fail if architecture report producer is unavailable
+        if: needs.architecture_pr_report_producer.result != 'success'
+        run: exit 1
+
       - name: Fail if strict architecture coverage failed
-        if: steps.architecture_coverage.outcome == 'failure'
+        if: needs.architecture_pr_report_producer.outputs.strict_coverage_outcome == 'failure'
         run: exit 1
 
   tooling_support_tests:
