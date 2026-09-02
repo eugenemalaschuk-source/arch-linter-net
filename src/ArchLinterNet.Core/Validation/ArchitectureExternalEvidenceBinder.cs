@@ -102,7 +102,10 @@ public static class ArchitectureExternalEvidenceBinder
             IReadOnlyList<ArchitectureApplicabilityRecord> records) =
             ArchitectureExternalEvidenceApplicabilityProjector.Project(requirements, reads, selection);
 
-        return new ArchitectureExternalEvidenceBindingResult(imported, expected, records);
+        return new ArchitectureExternalEvidenceBindingResult(imported, expected, records)
+        {
+            TrustReceipts = Array.AsReadOnly(reads.ToArray()),
+        };
     }
 
     /// <summary>
@@ -128,7 +131,8 @@ public static class ArchitectureExternalEvidenceBinder
 
         if (binding.ApplicabilityExpectedEntries.Count == 0
             && binding.ApplicabilityRecords.Count == 0
-            && binding.ImportedDiagnostics.Findings.Count == 0)
+            && binding.ImportedDiagnostics.Findings.Count == 0
+            && binding.TrustReceipts.Count == 0)
         {
             return outcome;
         }
@@ -152,6 +156,9 @@ public static class ArchitectureExternalEvidenceBinder
             ApplicabilityRecords = records,
             AssessmentCompletionEvidence = completion,
             ApplicabilityProjection = projection,
+            ExternalEvidenceTrustReceipts = outcome.ExternalEvidenceTrustReceipts
+                .Concat(binding.TrustReceipts)
+                .ToArray(),
         };
         return merged.WithImportedDiagnostics(binding.ImportedDiagnostics);
     }
@@ -192,6 +199,11 @@ public sealed record ArchitectureExternalEvidenceBindingResult(
     IReadOnlyList<ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries,
     IReadOnlyList<ArchitectureApplicabilityRecord> ApplicabilityRecords)
 {
+    // The public binding result pre-dates PR reporting. Keep this receipt internal to preserve
+    // that public contract while retaining the existing reader authority through Health output.
+    internal IReadOnlyList<SarifEvidenceReadResult> TrustReceipts { get; init; } =
+        Array.Empty<SarifEvidenceReadResult>();
+
     /// <summary>The result for a policy with no declared requirements and no supplied bindings.</summary>
     public static ArchitectureExternalEvidenceBindingResult Empty { get; } = new(
         ImportedExternalDiagnosticProjection.Empty,

@@ -19,4 +19,5 @@ internal sealed record ChangeReportCommandOptions(
     string CurrentPath,
     string Format,
     string? OutputPath,
-    bool ShowHelp);
+    bool ShowHelp,
+    string? ExecutionContext);

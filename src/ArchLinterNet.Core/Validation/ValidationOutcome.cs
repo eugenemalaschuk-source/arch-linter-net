@@ -224,6 +224,12 @@ public sealed record ValidationOutcome
     public IReadOnlyList<ArchitectureExternalEvidenceRequirement> ExternalEvidenceRequirements { get; init; } =
         Array.Empty<ArchitectureExternalEvidenceRequirement>();
 
+    // These are run-local authoritative results from the existing SARIF trust reader. They are
+    // intentionally excluded from the cache artifact, then attached after every fresh binding so
+    // Health can carry the exact receipt without re-reading SARIF or re-validating context.
+    internal IReadOnlyList<SarifEvidenceReadResult> ExternalEvidenceTrustReceipts { get; init; } =
+        Array.Empty<SarifEvidenceReadResult>();
+
     /// <summary>
     /// Attaches Core-projected imported diagnostics and derives the effective pass state from their
     /// governance mode. Audit diagnostics remain reportable without making the result fail.

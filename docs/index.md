@@ -70,7 +70,7 @@ The gate combines validation with no-new-debt and policy-weakening checks intend
 ```bash
 arch-linter-net change snapshot --policy architecture/arch.yml --output before.json
 arch-linter-net change snapshot --policy architecture/arch.yml --output after.json
-arch-linter-net change report --base before.json --current after.json
+arch-linter-net change report --base before.json --current after.json --execution-context local-review
 ```
 
 For dependency investigation, use `graph`, `explain`, and `history analyze`. For public API governance, use the `public-api` workflow.
