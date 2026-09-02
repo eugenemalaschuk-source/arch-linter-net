@@ -113,6 +113,30 @@ public sealed class ArchitectureChangeReportsTests
     }
 
     [Test]
+    public void LegacyCompareAndFormatters_RemainUsableWithoutExecutionContext()
+    {
+        ArchitectureChangeSnapshot baseline = Snapshot(
+            findings: [new ArchitectureChangeFinding("resolved", "dependency", "resolved finding")]);
+        ArchitectureChangeSnapshot current = Snapshot();
+
+        ArchitectureChangeReport compared = ArchitectureChangeReports.Compare(baseline, current);
+        ArchitectureChangeReport constructed = new([], [], [], [], []);
+        string comparedJson = ArchitectureChangeReports.FormatJson(compared);
+        string constructedJson = ArchitectureChangeReports.FormatJson(constructed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(compared.ExecutionContext, Is.Null);
+            Assert.That(comparedJson, Does.Not.Contain("schema_version"));
+            Assert.That(comparedJson, Does.Not.Contain("execution_context"));
+            Assert.That(comparedJson, Does.Not.Contain("resolved_findings"));
+            Assert.That(constructedJson, Does.Not.Contain("execution_context"));
+            Assert.That(ArchitectureChangeReports.FormatHuman(compared), Does.Not.Contain("Resolved findings"));
+            Assert.DoesNotThrow(() => ArchitectureChangeReports.FormatHuman(constructed));
+        });
+    }
+
+    [Test]
     public void Compare_RejectsIncompatibleModesAndInvalidInput()
     {
         ArchitectureChangeSnapshot strict = Snapshot();
@@ -135,7 +159,7 @@ public sealed class ArchitectureChangeReportsTests
     }
 
     [Test]
-    public void DeserializeReport_RejectsMissingExecutionContext()
+    public void DeserializeReport_RejectsVersionedArtifactMissingExecutionContext()
     {
         const string Report =
             "{\"kind\":\"architecture-change-report\",\"schema_version\":2,\"added\":[],\"removed\":[],\"new_findings\":[],\"existing_findings\":[],\"resolved_findings\":[],\"baseline_debt\":[]}";

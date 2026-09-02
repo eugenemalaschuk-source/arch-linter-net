@@ -116,10 +116,36 @@ public static class ArchitectureChangeReports
         };
     }
 
+    /// <summary>
+    /// Compares two snapshots using the original in-memory report contract.
+    /// </summary>
+    /// <remarks>
+    /// The returned report intentionally has no execution context and therefore formats through the
+    /// legacy report shape. Use the execution-context overload when persisting an artifact for
+    /// PR-report composition, where Core must prove artifact correlation.
+    /// </remarks>
+    public static ArchitectureChangeReport Compare(
+        ArchitectureChangeSnapshot baseline,
+        ArchitectureChangeSnapshot current) => CompareCore(baseline, current, executionId: null);
+
+    /// <summary>Compares two snapshots and binds the resulting persisted artifact to one execution.</summary>
     public static ArchitectureChangeReport Compare(
         ArchitectureChangeSnapshot baseline,
         ArchitectureChangeSnapshot current,
         string executionId)
+    {
+        if (string.IsNullOrWhiteSpace(executionId))
+        {
+            throw new ArgumentException("Architecture change reports require a non-empty execution context.", nameof(executionId));
+        }
+
+        return CompareCore(baseline, current, executionId);
+    }
+
+    private static ArchitectureChangeReport CompareCore(
+        ArchitectureChangeSnapshot baseline,
+        ArchitectureChangeSnapshot current,
+        string? executionId)
     {
         ArgumentNullException.ThrowIfNull(baseline);
         ArgumentNullException.ThrowIfNull(current);
@@ -135,11 +161,6 @@ public static class ArchitectureChangeReports
             throw new ArgumentException("Base and current snapshots must use the same condition set.");
         }
 
-        if (string.IsNullOrWhiteSpace(executionId))
-        {
-            throw new ArgumentException("Architecture change reports require a non-empty execution context.", nameof(executionId));
-        }
-
         Dictionary<string, ArchitectureChangeEntry> baseEntries = baseline.Entries.ToDictionary(Key, StringComparer.Ordinal);
         Dictionary<string, ArchitectureChangeEntry> currentEntries = current.Entries.ToDictionary(Key, StringComparer.Ordinal);
         HashSet<string> knownBaseIdentities = baseline.Findings
@@ -150,27 +171,40 @@ public static class ArchitectureChangeReports
         HashSet<string> currentFindingIdentities = current.Findings
             .Select(static finding => finding.Identity)
             .ToHashSet(StringComparer.Ordinal);
-        return new ArchitectureChangeReport(
+        ArchitectureChangeReport report = new(
             Order(currentEntries.Where(pair => !baseEntries.ContainsKey(pair.Key)).Select(static pair => pair.Value)),
             Order(baseEntries.Where(pair => !currentEntries.ContainsKey(pair.Key)).Select(static pair => pair.Value)),
             Order(current.Findings.Where(finding => !knownBaseIdentities.Contains(finding.Identity))),
             Order(current.Findings.Where(finding => knownBaseIdentities.Contains(finding.Identity))),
             current.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray())
         {
-            ExecutionContext = new ArchitectureChangeReportContext(
-                executionId,
-                current.Mode,
-                current.ConditionSetName),
             ResolvedFindings = Order(baseline.Findings.Where(finding =>
                 !currentFindingIdentities.Contains(finding.Identity)))
         };
+        return executionId is null
+            ? report
+            : report with
+            {
+                ExecutionContext = new ArchitectureChangeReportContext(
+                    executionId,
+                    current.Mode,
+                    current.ConditionSetName),
+            };
     }
 
     public static string FormatJson(ArchitectureChangeReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
         Validate(report);
-        return JsonSerializer.Serialize(OrderReport(report), _jsonOptions);
+        report = OrderReport(report);
+        return report.ExecutionContext is null
+            ? JsonSerializer.Serialize(new LegacyReportDocument(
+                report.Added,
+                report.Removed,
+                report.NewFindings,
+                report.ExistingFindings,
+                report.BaselineDebt), _jsonOptions)
+            : JsonSerializer.Serialize(report, _jsonOptions);
     }
 
     public static string FormatHuman(ArchitectureChangeReport report)
@@ -184,7 +218,10 @@ public static class ArchitectureChangeReports
         AppendEntries(builder, "Removed surfaces", report.Removed);
         AppendFindings(builder, "New findings", report.NewFindings);
         AppendFindings(builder, "Existing findings", report.ExistingFindings);
-        AppendFindings(builder, "Resolved findings", report.ResolvedFindings);
+        if (report.ExecutionContext is not null)
+        {
+            AppendFindings(builder, "Resolved findings", report.ResolvedFindings);
+        }
         builder.AppendLine($"Baseline debt: {report.BaselineDebt.Count}");
         foreach (string identity in report.BaselineDebt)
         {
@@ -221,7 +258,8 @@ public static class ArchitectureChangeReports
             || document.NewFindings is null
             || document.ExistingFindings is null
             || document.ResolvedFindings is null
-            || document.BaselineDebt is null)
+            || document.BaselineDebt is null
+            || document.ExecutionContext is null)
         {
             throw new ArgumentException("The architecture change report is incomplete or unsupported.", nameof(json));
         }
@@ -257,10 +295,10 @@ public static class ArchitectureChangeReports
             || report.ExistingFindings is null
             || report.ResolvedFindings is null
             || report.BaselineDebt is null
-            || report.ExecutionContext is null
-            || string.IsNullOrWhiteSpace(report.ExecutionContext.ExecutionId)
-            || report.ExecutionContext.Mode is not ("strict" or "audit")
-            || report.ExecutionContext.ConditionSet is null)
+            || (report.ExecutionContext is not null
+                && (string.IsNullOrWhiteSpace(report.ExecutionContext.ExecutionId)
+                    || report.ExecutionContext.Mode is not ("strict" or "audit")
+                    || report.ExecutionContext.ConditionSet is null)))
         {
             throw new ArgumentException("The architecture change report is incomplete or unsupported.", nameof(report));
         }
@@ -358,6 +396,13 @@ public static class ArchitectureChangeReports
         IReadOnlyList<ArchitectureChangeFinding>? ExistingFindings,
         IReadOnlyList<ArchitectureChangeFinding>? ResolvedFindings,
         IReadOnlyList<string>? BaselineDebt);
+
+    private sealed record LegacyReportDocument(
+        IReadOnlyList<ArchitectureChangeEntry> Added,
+        IReadOnlyList<ArchitectureChangeEntry> Removed,
+        IReadOnlyList<ArchitectureChangeFinding> NewFindings,
+        IReadOnlyList<ArchitectureChangeFinding> ExistingFindings,
+        IReadOnlyList<string> BaselineDebt);
 
     private sealed record ReportContextDocument(
         string? ExecutionId,
