@@ -36,6 +36,108 @@ contracts:
       reason: V1 contracts must not disclose newer-version or transport types.
 ```
 
+## Strict and audit migration choices
+
+Version isolation is a local grouping of the same recursive contract-surface
+evidence. It does not create API membership or a second snapshot: use
+`public_api_surface.surface_selector` and the existing capture/diff/update
+snapshot lifecycle for that. Then use this family to state which locally
+selected version or implementation surfaces are forbidden in the source
+surface. Pair it with [attribute usage](attribute-usage.md) when the marker
+used for membership must itself be confined to a location.
+
+An established v1 boundary can be strict while a v2 boundary is discovered in
+audit mode. The server-style example below uses only the supported local
+`surfaces`, `types_matching`, `source_surface`, and `forbidden_surfaces`
+fields:
+
+```yaml
+contracts:
+  strict_versioned_contract_surface_isolation:
+    - id: orders-v1-isolation
+      name: orders-v1-isolation
+      surfaces:
+        - id: v1-dtos
+          types_matching:
+            namespace: Acme.Orders.Api.Contracts.V1
+        - id: v2-dtos
+          types_matching:
+            namespace: Acme.Orders.Api.Contracts.V2
+        - id: domain-types
+          types_matching:
+            namespace: Acme.Orders.Domain
+        - id: persistence-types
+          types_matching:
+            namespace: Acme.Orders.Persistence
+      source_surface: v1-dtos
+      forbidden_surfaces: [v2-dtos, domain-types, persistence-types]
+      reason: V1 DTOs must not expose a newer contract or domain/persistence implementation types.
+
+  audit_versioned_contract_surface_isolation:
+    - id: orders-v2-isolation-migration
+      name: audit-orders-v2-isolation-before-enforcement
+      surfaces:
+        - id: v1-dtos
+          types_matching:
+            namespace: Acme.Orders.Api.Contracts.V1
+        - id: v2-dtos
+          types_matching:
+            namespace: Acme.Orders.Api.Contracts.V2
+        - id: persistence-types
+          types_matching:
+            namespace: Acme.Orders.Persistence
+      source_surface: v2-dtos
+      forbidden_surfaces: [v1-dtos, persistence-types]
+      reason: Discover reverse-version and persistence leaks before enforcing v2 isolation.
+```
+
+The source and target surface IDs above are policy-local labels. For each
+source root, the checker reuses the exposure family's recursive CLR traversal,
+including nested generic arguments, tuple elements, arrays, wrappers, and
+compiled metadata. A `Task<Envelope<Acme.Orders.Api.Contracts.V2.Customer>>`
+visible from a v1 root therefore reaches the v2 `Customer` target. Distinct
+paths and same-named types from different namespaces or assemblies remain
+distinct findings.
+
+The same pattern supports a library/runtime-editor split when the runtime
+surface must not expose editor implementation types:
+
+```yaml
+contracts:
+  strict_versioned_contract_surface_isolation:
+    - id: game-runtime-isolation
+      name: game-runtime-isolation
+      surfaces:
+        - id: runtime-contracts
+          types_matching:
+            has_attribute: Acme.Game.Runtime.PublicApiContractAttribute
+        - id: editor-implementation
+          types_matching:
+            namespace: Acme.Game.Editor
+      source_surface: runtime-contracts
+      forbidden_surfaces: [editor-implementation]
+      reason: Runtime library contracts must not expose Unity editor implementation types.
+
+  audit_versioned_contract_surface_isolation:
+    - id: game-runtime-isolation-migration
+      name: audit-runtime-editor-isolation
+      surfaces:
+        - id: runtime-contracts
+          types_matching:
+            namespace: Acme.Game.Runtime.Contracts
+        - id: editor-implementation
+          types_matching:
+            namespace: UnityEditor
+      source_surface: runtime-contracts
+      forbidden_surfaces: [editor-implementation]
+      reason: Find runtime-to-editor exposure while the Unity boundary is being migrated.
+```
+
+`PublicApiContractAttribute` in this example is user-owned and orthogonal. It
+selects membership only; it does not overwrite an existing `ValueObject`,
+`Entity`, `Controller`, or `Adapter` primary semantic role. There is no
+built-in marker package or Unity-specific magic preset.
+
 Each rule has a non-blank `id` and `name`, one local non-empty `surfaces`
 list, one `source_surface`, and one or more `forbidden_surfaces`. Every
 surface has a unique non-blank `id` and a non-empty `types_matching` selector.
@@ -113,3 +215,6 @@ This family is static contract-surface isolation only. It does not:
 
 It also does not change public-API snapshots, semantic roles, runtime
 configuration, or the behavior of generic contract-surface exposure rules.
+It does not execute runtime serialization, route endpoints, negotiate API
+versions, or perform data-flow analysis; those are outside this static,
+reflection/metadata-based family.

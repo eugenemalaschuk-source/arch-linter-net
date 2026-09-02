@@ -21,6 +21,82 @@ contracts:
       reason: ASP.NET attributes define API boundary concerns.
 ```
 
+## Compose marker placement with boundary contracts
+
+`attribute_usage` answers one deliberately low-level question: **where does a
+selected marker appear?** It does not select the published API, and it does
+not inspect what a public signature exposes. Compose it with the other
+boundary families when those questions also matter:
+
+| Question | Contract family |
+| --- | --- |
+| Is a marker present in an allowed or forbidden location? | `attribute_usage` |
+| Which exported types and members are intentional API membership, and what snapshot records them? | `public_api_surface` + `surface_selector` |
+| Does a selected contract expose a forbidden type through a recursive CLR-visible signature? | `contract_surface_exposure` |
+| May one local version group expose another version or implementation group? | `versioned_contract_surface_isolation` |
+
+For an established boundary, put the placement rule in `strict_attribute_usage`.
+During migration, put a candidate restriction in `audit_attribute_usage` so
+the same finding is discoverable without making it part of the current strict
+gate. The fields below are a complete, declarative example of both choices:
+
+```yaml
+contracts:
+  strict_attribute_usage:
+    - id: orders-api-markers
+      name: orders-api-markers-stay-at-the-api-boundary
+      attributes:
+        - Microsoft.AspNetCore.Mvc.RouteAttribute
+        - Microsoft.AspNetCore.Mvc.ApiControllerAttribute
+      allowed_only_in_namespaces:
+        - Acme.Orders.Api
+      reason: Routing and API-controller markers belong to the server API boundary.
+
+  audit_attribute_usage:
+    - id: orders-authorization-markers
+      name: find-authorization-markers-outside-the-api
+      attributes:
+        - Microsoft.AspNetCore.Authorization.AuthorizeAttribute
+      forbidden_in_namespaces:
+        - Acme.Orders.Domain
+        - Acme.Orders.Persistence
+      reason: Discover authorization markers that remain on non-API types before enforcing the boundary.
+```
+
+The same composition works for a library/runtime-editor split. A private
+Unity field is still in scope because attribute usage scans every visibility;
+the enclosing type's assembly is what the location check uses:
+
+```yaml
+contracts:
+  strict_attribute_usage:
+    - id: game-runtime-serialization-markers
+      name: unity-serialization-markers-stay-in-runtime
+      attributes:
+        - UnityEngine.SerializeField
+      allowed_only_in_assemblies:
+        - Acme.Game.Runtime
+      reason: Unity serialization markers belong to runtime-facing game types.
+
+  audit_attribute_usage:
+    - id: game-editor-markers-in-runtime
+      name: find-editor-markers-in-runtime
+      attribute_prefixes:
+        - UnityEditor.
+      forbidden_in_assemblies:
+        - Acme.Game.Runtime
+      reason: Find editor-only markers that would couple runtime code to the editor during migration.
+```
+
+The marker used by `public_api_surface.surface_selector.has_attribute` can be
+user-owned (for example, `Acme.Orders.Api.PublicApiContractAttribute`); it is
+not a built-in ArchLinterNet marker. If that marker is also checked here, this
+family only governs where it appears. It never overwrites a selected
+`ValueObject`, `Entity`, `Controller`, or `Adapter` primary semantic role.
+See [public API surface contracts](public-api-surface.md) for membership and
+[contract-surface exposure contracts](contract-surface-exposure.md) for
+recursive signature evidence.
+
 ## When to use
 
 Use attribute usage contracts when a marker attribute's *presence* should be confined to (or excluded from) a specific part of the codebase:
@@ -78,3 +154,8 @@ Violations are emitted in a deterministic order: types are sorted by fully-quali
 - **No required-marker checks.** A rule like "every controller action must carry `[Authorize]` or `[AllowAnonymous]`" — validating the *absence* of a required attribute — is explicitly **deferred to a documented follow-up** and is not implemented by this contract family. `attribute_usage` only validates the placement of markers that are actually present.
 - No regex or expression-language attribute matching — only exact fully-qualified names and prefix matching.
 - No IL/method-body scanning — attributes are discovered via reflection metadata (`GetCustomAttributesData()`), not by analyzing how a member is used.
+- No API membership, reviewed snapshot, recursive contract-surface, or
+  version-negotiation decision. For those concerns use
+  [`public_api_surface`](public-api-surface.md),
+  [`contract_surface_exposure`](contract-surface-exposure.md), and
+  [`versioned_contract_surface_isolation`](versioned-contract-surface-isolation.md).

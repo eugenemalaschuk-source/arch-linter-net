@@ -73,6 +73,96 @@ public readonly record struct Money(decimal Amount, string Currency);
 
 See [Selecting an intentional surface](#selecting-an-intentional-surface) below for the full selector vocabulary and the role-vs-membership distinction.
 
+## Composition and migration
+
+Treat this family as the owner of **API membership and its reviewed
+snapshot**, not as a general dependency rule. Use `surface_selector` to say
+which exported types belong to the compatibility contract; use
+`api_snapshot`/`declared_api` to say which signatures are reviewed. Then feed
+that selected surface to [contract-surface exposure](contract-surface-exposure.md)
+when the question is whether a visible signature leaks a domain, persistence,
+editor, or other implementation type. Ordinary dependency contracts can show
+that two namespaces or assemblies reference one another, but they do not
+replace recursive visible-signature exposure evidence.
+Pair it with [attribute usage](attribute-usage.md) when the membership marker
+itself must be confined to an allowed or forbidden location.
+
+For a server-style DTO boundary, make the current v1 contract strict and
+introduce a candidate v2 surface in audit mode while it is being reviewed:
+
+```yaml
+contracts:
+  strict_public_api_surface:
+    - id: orders-v1-api
+      name: orders-v1-reviewed-api
+      assemblies: [Acme.Orders.Api]
+      surface_selector:
+        has_attribute: Acme.Orders.Api.PublicApiContractAttribute
+      api_snapshot: architecture/api/orders-v1.public-api.txt
+      api_comparison: exact
+      reason: The v1 DTO and endpoint contract is the compatibility surface published to clients.
+
+  audit_public_api_surface:
+    - id: orders-v2-api-candidate
+      name: orders-v2-api-candidate
+      assemblies: [Acme.Orders.Api]
+      surface_selector:
+        namespace: Acme.Orders.Api.Contracts.V2
+      api_snapshot: architecture/api/orders-v2.public-api.txt
+      api_comparison: exact
+      reason: Review the v2 DTO surface before promoting it to the strict published boundary.
+```
+
+The marker in this example is orthogonal and user-owned. Marking a
+`ValueObject`, `Entity`, `Controller`, or `Adapter` for API membership does not
+overwrite that type's single winning primary semantic role. There is no
+ArchLinterNet-built-in `PublicApiContract` attribute and no second API tag or
+classification system to maintain.
+
+For a library with a Unity-style runtime/editor split, keep runtime API
+membership and recursive editor-type exposure as separate decisions:
+
+```yaml
+contracts:
+  strict_public_api_surface:
+    - id: game-runtime-api
+      name: game-runtime-reviewed-api
+      assemblies: [Acme.Game.Runtime]
+      surface_selector:
+        has_attribute: Acme.Game.Runtime.PublicApiContractAttribute
+      api_snapshot: architecture/api/game-runtime.public-api.txt
+      api_comparison: exact
+      reason: Only explicitly marked runtime types are the library compatibility surface.
+
+  strict_contract_surface_exposure:
+    - id: game-runtime-no-editor-exposure
+      name: game-runtime-api-must-not-expose-editor-types
+      source:
+        public_api_surface: game-runtime-api
+      forbidden:
+        - namespace: UnityEditor
+        - namespace: Acme.Game.Editor
+      reason: Runtime API signatures must remain usable without Unity editor assemblies.
+
+  audit_contract_surface_exposure:
+    - id: game-runtime-editor-migration
+      name: audit-runtime-editor-exposure
+      source:
+        public_api_surface: game-runtime-api
+      forbidden:
+        - namespace: UnityEditor
+      reason: Find editor leakage while the runtime/editor boundary is being migrated.
+```
+
+The selected snapshot continues through the existing `public-api capture`,
+`public-api diff`, and `public-api update --dry-run` (the update-preview
+step), followed by `public-api update`. Use `api_comparison: exact` when
+removals and normalized signature changes must be reported; it is still the
+same snapshot grammar and exact comparison, not a second snapshot lifecycle or
+API tag system. See
+[versioned contract-surface isolation](versioned-contract-surface-isolation.md)
+when v1/v2 or runtime/implementation groups need a local cross-version rule.
+
 ## When to use
 
 Use public API surface contracts for library assemblies you ship to consumers (NuGet packages, shared internal libraries), where an accidental `public` type or member is a silent breaking-change/compatibility risk:
@@ -219,3 +309,6 @@ Surface deltas carry a normalized delta record — `api_delta_kind` (`added`, `r
 - Reflection-based (like `protected` and `type_placement`), not project-aware Roslyn compilation.
 - `surface_selector` is not a new annotation/tag/classification engine and does not ship a built-in marker attribute — it reuses the existing `type_placement` matcher vocabulary and semantic role index, and a selected type keeps its single existing winning role.
 - The first-party-dependency check is one hop (a selected member's own signature), not a general recursive DTO/domain/persistence/framework/version exposure graph.
+- No runtime serialization, endpoint routing, API negotiation, or data-flow
+  analysis; those behaviors are outside this static membership and signature
+  surface contract.
