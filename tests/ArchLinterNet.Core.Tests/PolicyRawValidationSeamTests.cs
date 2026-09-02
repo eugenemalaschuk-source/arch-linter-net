@@ -34,6 +34,7 @@ public sealed partial class PolicyRawValidationSeamTests
         nameof(RawPortBoundaryNodeValidator),
         nameof(RawSemanticCoverageNodeValidator),
         nameof(RawLayoutConventionNodeValidator),
+        nameof(RawLayoutConventionApplicabilityNodeValidator),
         nameof(RawModuleContainerNodeValidator),
         nameof(RawContractSurfaceExposureNodeValidator),
         nameof(RawVersionedContractSurfaceIsolationNodeValidator),

@@ -365,6 +365,20 @@
           },
           "default": []
         },
+        "strict_layout_convention_applicability": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
+          "default": []
+        },
+        "audit_layout_convention_applicability": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
+          "default": []
+        },
         "strict_public_api_surface": {
           "type": "array",
           "items": {
@@ -729,6 +743,20 @@
           "default": []
         },
         "audit_layout_conventions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_layout_convention_applicability": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_layout_convention_applicability": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/baselineContractEntryV2"

@@ -103,6 +103,37 @@ public sealed class ArchitectureLayoutConventionContract : IArchitectureContract
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Opt-in, bounded evidence that the reviewed layout-convention folders remain observable and
+/// mapped. Ordinary layout convention contracts intentionally do not acquire this behavior unless
+/// one of these controls explicitly references them.
+/// </summary>
+public sealed class ArchitectureLayoutConventionApplicabilityContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "scope")] public string Scope { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "exhaustive")] public bool Exhaustive { get; set; }
+
+    [YamlMember(Alias = "expected_folders")]
+    public List<ArchitectureLayoutConventionExpectedFolder> ExpectedFolders { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+/// <summary>One reviewed convention folder relative to an applicability control's bounded scope.</summary>
+public sealed class ArchitectureLayoutConventionExpectedFolder
+{
+    [YamlMember(Alias = "id")] public string Id { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "path")] public string Path { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "convention_id")] public string ConventionId { get; set; } = string.Empty;
+}
+
 // Single source of truth for `require_type_kind`/`forbid_type_kind` string parsing, shared by
 // LayoutConventionsValidator (load-time) and ArchitectureAnalysisSession.LayoutConventions
 // (execution-time), so both reject the same inputs identically. Deliberately NOT Enum.TryParse:

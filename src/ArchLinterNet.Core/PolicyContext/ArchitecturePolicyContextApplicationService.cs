@@ -581,6 +581,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             ArchitectureModuleContainerContract value => value.IgnoredViolations,
             ArchitectureTypePlacementContract value => value.IgnoredViolations,
             ArchitectureLayoutConventionContract value => value.IgnoredViolations,
+            ArchitectureLayoutConventionApplicabilityContract => Array.Empty<ArchitectureIgnoredViolation>(),
             ArchitecturePublicApiSurfaceContract value => value.IgnoredViolations,
             ArchitectureAttributeUsageContract value => value.IgnoredViolations,
             ArchitectureInheritanceContract value => value.IgnoredViolations,

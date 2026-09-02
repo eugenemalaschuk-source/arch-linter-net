@@ -16,12 +16,12 @@ public sealed class ArchitectureContractFamilyBindingsTests
 {
     private static readonly string[] _value = { "layer_template" };
     [Test]
-    public void All_HasThirtyFiveUniqueFamilyIds()
+    public void All_HasThirtySixUniqueFamilyIds()
     {
         var familyIds = ArchitectureContractFamilyBindings.All.Select(b => b.FamilyId).ToList();
 
-        Assert.That(familyIds, Has.Count.EqualTo(35));
-        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(35));
+        Assert.That(familyIds, Has.Count.EqualTo(36));
+        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(36));
     }
 
     [Test]
@@ -64,6 +64,19 @@ public sealed class ArchitectureContractFamilyBindingsTests
         StrictModuleContainers =
             { new ArchitectureModuleContainerContract { Name = "n", Id = "module_container", Container = "Test.Commands", Profile = "cli_command" } },
         StrictTypePlacement = { new ArchitectureTypePlacementContract { Name = "n", Id = "type_placement" } },
+        StrictLayoutConventionApplicability =
+        {
+            new ArchitectureLayoutConventionApplicabilityContract
+            {
+                Name = "n",
+                Id = "layout_convention_applicability",
+                Scope = ".",
+                ExpectedFolders =
+                {
+                    new ArchitectureLayoutConventionExpectedFolder { Id = "root", Path = ".", ConventionId = "layout" },
+                },
+            },
+        },
         StrictPublicApiSurface =
             { new ArchitecturePublicApiSurfaceContract { Name = "n", Id = "public_api_surface" } },
         StrictContractSurfaceExposure =
@@ -116,7 +129,7 @@ public sealed class ArchitectureContractFamilyBindingsTests
 
         var strictIds = groups.AllStrict.Select(c => c.Id).ToList();
 
-        Assert.That(strictIds, Has.Count.EqualTo(29));
+        Assert.That(strictIds, Has.Count.EqualTo(30));
         Assert.That(strictIds, Does.Not.Contain("layer_template"));
     }
 

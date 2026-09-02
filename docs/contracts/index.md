@@ -83,6 +83,10 @@ Strict groups are blocking. Audit groups use the same family semantics for non-b
 
 | [Layout conventions](layout-conventions.md) | `strict_layout_conventions` / `audit_layout_conventions` | Govern source-file/declaration layout conventions. |
 
+<!-- contract-family: layout-convention-applicability -->
+
+| [Layout-convention applicability](layout-conventions.md#applicability-inventory) | `strict_layout_convention_applicability` / `audit_layout_convention_applicability` | Opt in to stale-folder, empty-selector, unmapped, and ambiguous layout evidence. |
+
 <!-- contract-family: public-api-surface -->
 
 | [Public API surface](public-api-surface.md) | `strict_public_api_surface` / `audit_public_api_surface` | Govern exported API signatures and reviewed snapshots. |

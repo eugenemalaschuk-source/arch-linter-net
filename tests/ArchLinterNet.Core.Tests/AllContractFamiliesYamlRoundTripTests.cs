@@ -55,6 +55,7 @@ layers:
     namespace: Test.Runtime
 analysis:
   target_assemblies: [Test.Core, Test.Runtime]
+  source_roots: [src]
 contracts:
   strict:
     - name: dep strict rule
@@ -225,15 +226,34 @@ contracts:
         name_suffix: Service
       must_reside_in_layers: [core]
   strict_layout_conventions:
-    - name: layout conventions strict rule
+    - id: services-convention
+      name: layout conventions strict rule
       files_matching:
         folder_segment: Services
       require_type_kind: class
   audit_layout_conventions:
-    - name: layout conventions audit rule
+    - id: audit-services-convention
+      name: layout conventions audit rule
       files_matching:
         folder_segment: Services
       require_type_kind: class
+  strict_layout_convention_applicability:
+    - id: layout-folder-inventory
+      name: layout convention applicability strict rule
+      scope: src
+      exhaustive: true
+      expected_folders:
+        - id: services
+          path: Services
+          convention_id: services-convention
+  audit_layout_convention_applicability:
+    - id: audit-layout-folder-inventory
+      name: layout convention applicability audit rule
+      scope: src
+      expected_folders:
+        - id: services
+          path: Services
+          convention_id: audit-services-convention
   strict_public_api_surface:
     - name: public api surface strict rule
       assemblies: [Test.Core]
@@ -352,6 +372,8 @@ contracts:
         Assert.That(contracts.AuditTypePlacement, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictLayoutConventions, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditLayoutConventions, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictLayoutConventionApplicability, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditLayoutConventionApplicability, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictPublicApiSurface, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditPublicApiSurface, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictContractSurfaceExposure, Has.Count.EqualTo(1));
@@ -368,8 +390,8 @@ contracts:
         Assert.That(contracts.AuditCoverage, Has.Count.EqualTo(1));
 
         // AllStrict/AllAudit must reflect the populated groups too, excluding layer_template.
-        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(29));
-        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(29));
+        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(30));
+        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(30));
     }
 
     [Test]

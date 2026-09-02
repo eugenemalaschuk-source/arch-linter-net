@@ -566,6 +566,8 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 "audit_type_placement" => _groups.AuditTypePlacement.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_layout_conventions" => _groups.StrictLayoutConventions.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_layout_conventions" => _groups.AuditLayoutConventions.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_layout_convention_applicability" => _groups.StrictLayoutConventionApplicability.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_layout_convention_applicability" => _groups.AuditLayoutConventionApplicability.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_public_api_surface" => _groups.StrictPublicApiSurface.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_public_api_surface" => _groups.AuditPublicApiSurface.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_contract_surface_exposure" => _groups.StrictContractSurfaceExposure.Select(c => (IArchitectureContract)c).ToList(),

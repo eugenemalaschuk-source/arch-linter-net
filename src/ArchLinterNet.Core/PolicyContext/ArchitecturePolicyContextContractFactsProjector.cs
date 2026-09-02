@@ -34,6 +34,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         typeof(ArchitectureExternalDependencyContract), typeof(ArchitectureExternalAllowOnlyContract),
         typeof(ArchitectureAcyclicSiblingContract), typeof(ArchitectureModuleContainerContract),
         typeof(ArchitectureTypePlacementContract), typeof(ArchitectureLayoutConventionContract),
+        typeof(ArchitectureLayoutConventionApplicabilityContract),
         typeof(ArchitecturePublicApiSurfaceContract), typeof(ArchitectureAttributeUsageContract),
         typeof(ArchitectureContractSurfaceExposureContract),
         typeof(ArchitectureVersionedContractSurfaceIsolationContract),
@@ -102,6 +103,10 @@ internal static class ArchitecturePolicyContextContractFactsProjector
             ObjectFromItems("require_matching_interface", Text("name_prefix", value.RequireMatchingInterface?.NamePrefix)),
             ObjectFromItems("all_declarations", Values("allowed_type_kinds", value.AllDeclarations?.AllowedTypeKinds),
                 Values("allowed_roles", value.AllDeclarations?.AllowedRoles), Flag("require_abstract_classes", value.AllDeclarations?.RequireAbstractClasses)))),
+        ArchitectureLayoutConventionApplicabilityContract value => Create(value.Reason, Array.Empty<ArchitectureIgnoredViolation>(), Facts(
+            Text("scope", value.Scope), Flag("exhaustive", value.Exhaustive),
+            Objects("expected_folders", value.ExpectedFolders.Select(folder => ObjectFromItems("expected_folder",
+                Text("id", folder.Id), Text("path", folder.Path), Text("convention_id", folder.ConventionId)))))),
         ArchitecturePublicApiSurfaceContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Values("assemblies", value.Assemblies), Values("declared_api", value.DeclaredApi),
             Object("surface_selector", PublicApiSelectorFacts(value.SurfaceSelector)), Text("api_snapshot", value.ApiSnapshot),

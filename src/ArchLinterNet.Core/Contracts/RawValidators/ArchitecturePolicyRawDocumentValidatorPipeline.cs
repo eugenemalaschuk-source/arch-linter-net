@@ -18,6 +18,7 @@ internal static class ArchitecturePolicyRawDocumentValidatorPipeline
         new RawPortBoundaryNodeValidator(),
         new RawSemanticCoverageNodeValidator(),
         new RawLayoutConventionNodeValidator(),
+        new RawLayoutConventionApplicabilityNodeValidator(),
         new RawModuleContainerNodeValidator(),
         new RawContractSurfaceExposureNodeValidator(),
         new RawVersionedContractSurfaceIsolationNodeValidator(),

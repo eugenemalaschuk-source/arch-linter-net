@@ -6,6 +6,8 @@ Groups:
 
 - `strict_layout_conventions`
 - `audit_layout_conventions`
+- `strict_layout_convention_applicability`
+- `audit_layout_convention_applicability`
 
 ## Example
 
@@ -102,6 +104,37 @@ Layout convention contracts read from the same deterministic source-file and dec
 
 The effective selector scope is observable in validation reports and `explain`: the included `files_matching` matcher and each exclusion are recorded independently as matched, stale, or evaluation-failed when source facts are unavailable.
 
+## Applicability inventory
+
+Ordinary layout-convention selectors stay backward compatible: a selector that matches zero files is not an error unless an applicability inventory explicitly opts into checking it. An inventory is bounded by one `scope` under `analysis.source_roots`; its `expected_folders` paths are relative to that scope and each references an `id` from a layout convention in the same strict or audit mode.
+
+```yaml
+analysis:
+  source_roots: [src]
+
+contracts:
+  strict_layout_conventions:
+    - id: services-are-concrete-classes
+      name: services-folder-must-contain-concrete-services
+      files_matching:
+        folder_segment: Services
+      require_type_kind: class
+
+  strict_layout_convention_applicability:
+    - id: source-layout-folders
+      name: source-layout-folders-remain-observable
+      scope: src
+      exhaustive: true
+      expected_folders:
+        - id: services
+          path: Services
+          convention_id: services-are-concrete-classes
+```
+
+The inventory produces normal applicability evidence, so existing CLI, JSON, SARIF, testing-adapter, and baseline views report the parent inventory ID, the stable expected-folder control ID, and reason codes. A declared folder with no observable source facts is `stale_declaration`; a declared folder whose linked selector matches none of its source facts is `unexpected_empty_input`. With `exhaustive: true`, every source subject in scope must map to exactly one distinct linked convention: missing mappings are `unmapped_subject`, and mappings to more than one convention are `ambiguous_subject`. The inventory retains one scope control for completion state, while each unmapped or ambiguous subject also emits its own path-and-type identity, so an accepted debt for one subject cannot suppress a later one.
+
+`audit_layout_convention_applicability` uses the same data model but only contributes audit-mode findings. It never changes a strict-mode result unless the corresponding strict inventory is configured.
+
 ### Violations and ignored violations
 
 Diagnostics identify the matched file, the contract, and whichever of expected/actual type kind, expected/actual name, file/type-name mismatch, or expected/actual counterpart applied. `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families.
@@ -110,7 +143,7 @@ Diagnostics identify the matched file, the contract, and whichever of expected/a
 
 - No regex or expression-language selectors beyond the bounded `when` refinement described above.
 - No runtime dependency-injection resolution.
-- No standalone "unmapped folder" discovery that scans the whole repository for folders not covered by any configured contract — declare `audit_layout_conventions` entries for the folders you want drift-checked.
+- No global filesystem or repository-folder discovery. Applicability inventories inspect only declared source roots, their explicit scope, and the source facts already available to the analysis.
 - No configurable counterpart naming beyond a single prefix — `require_matching_interface` supports `name_prefix` only.
 
 ## Worked, tested examples
