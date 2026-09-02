@@ -89,10 +89,11 @@ It returns `0` with `passing`/`brightgreen`, `1` with `failing`/`red`, and `2` w
 `unavailable`/`red`. A workflow can use its exit status as the blocking gate while a
 badge service consumes the JSON endpoint.
 
-For a pull-request coverage comment, render the strict JSON with
-`arch-linter-net coverage report --input architecture-strict.json --output architecture-coverage.md`.
-Use `--max-failure-diagnostics 3` for the compact comment and pass `--changed-files`,
-`--repo-root`, and `--diff-status failed` when applicable.
+`arch-linter-net coverage report --input architecture-strict.json --output architecture-coverage.md`
+remains the standalone coverage projection. It is useful for a coverage artifact or local review,
+but it is not the repository's pull-request comment; use `--max-failure-diagnostics 3` for a
+compact coverage view and pass `--changed-files`, `--repo-root`, and `--diff-status failed` when
+applicable.
 
 ## Strict vs audit jobs
 
@@ -197,14 +198,40 @@ uploaded as an artifact — neither writes a file.
 
 ## Baseline debt semantics in the coverage gate
 
-When architecture coverage is wired into CI as a quality gate (see the `architecture-coverage` steps in this repository's `.github/workflows/ci.yml`, which run on the protected pull-request candidate), baseline entries change how findings are reported, not whether they exist:
+When architecture coverage is wired into CI as a quality gate (the repository's read-only
+architecture report producer runs on the protected pull-request candidate), baseline entries
+change how findings are reported, not whether they exist:
 
 - **Existing accepted debt** lives in the baseline file and does not fail the pull request. The strict run still reports it in `coverage_findings`/`coverage_summary`, but a finding matched by a baseline entry is treated as known debt rather than a regression.
 - **New coverage findings** — anything not matched by an existing baseline entry — fail the pull request. This is what keeps the gate "no new debt" instead of "no debt."
 - **Resolved baseline entries** become stale: once the underlying violation no longer exists, the baseline entry has nothing left to match. Stale baseline entries should be removed during normal maintenance so the baseline file reflects only real outstanding debt.
 - **Exclusions require a `reason`.** An exclusion is a deliberate, reviewed decision to leave a unit out of coverage scope — it is not a way to silently bypass the gate. Treat the `reason` field as required documentation, not boilerplate, and review exclusions the same way you'd review a baseline entry.
 
-To inspect the same full-solution coverage report locally before pushing, run `make architecture-coverage-report`, which prints both the Markdown report (the same one posted to pull requests) and the raw JSON view.
+To inspect the full-solution coverage report locally before pushing, run
+`make architecture-coverage-report`; it prints the standalone coverage Markdown and raw JSON
+view. The unified pull-request report is a separate Core/CLI projection over compatible Health and
+architecture-change artifacts.
+
+## Secure unified Architecture PR report publication
+
+The repository renders the reviewer-facing architecture PR report with
+`arch-linter-net report pr` before any comment is written. The pull-request workflow has only
+read permission: it uploads the exact Markdown plus a bounded manifest that binds the report to
+the repository, PR number, head SHA, CI run and attempt, report schema/kind/marker, byte count,
+and SHA-256.
+
+A separate completed-CI publisher is the only job with pull-request write permission. It performs
+no checkout and treats downloaded report bytes as inert data. Before updating the one sticky
+comment it verifies the current PR head, producer run identity, exact artifact shape, bounded
+sizes, manifest fields, and report hash. It neither reconstructs Architecture Health nor adds
+build, test, quality-service, or security-service status.
+
+This separation also applies to fork and Dependabot pull requests: their producer can execute with
+read-only permissions, while the publisher never checks out or executes fork-controlled source or
+artifact content. If a report is missing, cancelled, stale, malformed, or exceeds the transport
+limit, publication fails closed and can show only a fixed integration-unavailable message. It never
+reuses an older green report as evidence for a new head. The raw strict/audit/coverage artifacts
+and the standalone coverage command remain available for drill-down.
 
 **All-zero counts can mean two different things.** If `coverage_summary` is an empty list, the policy defines no coverage contracts at all (`strict_coverage`/`audit_coverage` are absent) — the report's note line calls this out explicitly. That is different from a policy that *does* define coverage contracts and reports zero uncovered/stale/unknown items, which means real coverage contracts exist and nothing is currently failing them. This repository's own `architecture/dependencies.arch.yml` defines `assembly`-, `project`-, `namespace`-, and `rule_input`-scope `strict_coverage` contracts covering all four first-party assemblies, every discovered production project, their root namespaces, and the rule inputs of its source-sensitive strict rules, so the gate reflects real coverage rather than an empty, trivially-passing policy.
 

@@ -144,9 +144,10 @@ zero count or passing state. Input/schema incompatibility fails closed rather th
 as a clean report. Canonical family, control, policy, evidence, and navigation identities remain
 source references for drill-down; the renderer does not manufacture replacements.
 
-GitHub comment publication, workflow/event orchestration, security permissions, and related
-integration are intentionally deferred to #681. This command is the local architecture-report
-projection only.
+GitHub comment publication, workflow/event orchestration, and security permissions remain outside
+this command's boundary. This repository's separate completed-CI publisher consumes the exact
+rendered file only after validating a bounded manifest, current PR head, producer run identity,
+and report hash; the CLI itself remains the local architecture-report projection.
 
 ## Human output
 

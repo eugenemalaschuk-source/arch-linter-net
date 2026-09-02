@@ -40,12 +40,12 @@ public partial class CliIntegrationTests
     }
 
     [Test]
-    public void Health_EmptyBaseline_ProjectsNonPassState()
+    public void Health_CanonicalEmptyBaseline_ProjectsNonPassState()
     {
         string baselinePath = Path.Combine(Path.GetTempPath(), $"architecture-health-{Guid.NewGuid():N}.yml");
         try
         {
-            File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
+            File.WriteAllText(baselinePath, "version: 3\nbaseline: {}\nmetric_baselines: []\n");
 
             var (exitCode, json, error) = RunCli(
                 "health", "--policy", _graphPolicy, "--baseline", baselinePath, "--format", "json");

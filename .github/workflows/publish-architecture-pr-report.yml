@@ -1,0 +1,369 @@
+name: Publish Architecture PR Report
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers] — no checkout; bounded inert artifacts only.
+    workflows: [CI]
+    types: [completed]
+
+concurrency:
+  group: architecture-pr-report-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Resolve current PR and bound report artifact
+        id: resolve
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const workflowRun = context.payload.workflow_run;
+            const expectedRepository = `${context.repo.owner}/${context.repo.repo}`;
+            const setResult = (reason, values = {}) => {
+              core.setOutput('reason', reason);
+              for (const [key, value] of Object.entries(values)) {
+                core.setOutput(key, String(value));
+              }
+            };
+
+            if (workflowRun.repository?.full_name !== expectedRepository
+                || workflowRun.path !== '.github/workflows/ci.yml'
+                || workflowRun.event !== 'pull_request') {
+              setResult('unexpected_producer');
+              return;
+            }
+
+            const associatedPullRequests = workflowRun.pull_requests ?? [];
+            if (associatedPullRequests.length !== 1 || !Number.isInteger(associatedPullRequests[0].number)) {
+              setResult('ambiguous_pull_request');
+              return;
+            }
+
+            const prNumber = associatedPullRequests[0].number;
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const values = {
+              'pr-number': prNumber,
+              'current-head-sha': pullRequest.head.sha,
+              'producer-head-sha': workflowRun.head_sha,
+              'producer-run-id': workflowRun.id,
+              'producer-run-attempt': workflowRun.run_attempt,
+            };
+
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: workflowRun.id,
+              per_page: 100,
+            });
+            const producerJobs = jobs.filter((job) => job.name === 'Architecture Coverage');
+            if (producerJobs.length === 0) {
+              setResult('producer_missing', values);
+              return;
+            }
+            if (producerJobs.length !== 1) {
+              setResult('producer_ambiguous', values);
+              return;
+            }
+            if (producerJobs[0].conclusion !== 'success') {
+              setResult('producer_not_success', values);
+              return;
+            }
+
+            if (pullRequest.head.sha !== workflowRun.head_sha) {
+              setResult('stale_head', values);
+              return;
+            }
+
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: workflowRun.id,
+              per_page: 100,
+            });
+            const reportArtifacts = artifacts.filter((artifact) => artifact.name === 'architecture-pr-report-v1');
+            if (reportArtifacts.length !== 1) {
+              setResult(reportArtifacts.length === 0 ? 'artifact_missing' : 'artifact_ambiguous', values);
+              return;
+            }
+
+            const [artifact] = reportArtifacts;
+            if (artifact.expired) {
+              setResult('artifact_expired', values);
+              return;
+            }
+            if (!Number.isSafeInteger(artifact.size_in_bytes) || artifact.size_in_bytes > 524288) {
+              setResult('artifact_oversized', values);
+              return;
+            }
+
+            setResult('ready', { ...values, 'artifact-id': artifact.id });
+
+      - name: Download validated artifact identity
+        if: steps.resolve.outputs.artifact-id != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: ${{ steps.resolve.outputs.artifact-id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.resolve.outputs.producer-run-id }}
+          path: incoming-report
+
+      - name: Validate inert report bytes and manifest
+        id: validate
+        if: always() && steps.resolve.outputs.artifact-id != ''
+        env:
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          EXPECTED_PR_NUMBER: ${{ steps.resolve.outputs.pr-number }}
+          EXPECTED_HEAD_SHA: ${{ steps.resolve.outputs.current-head-sha }}
+          EXPECTED_RUN_ID: ${{ steps.resolve.outputs.producer-run-id }}
+          EXPECTED_RUN_ATTEMPT: ${{ steps.resolve.outputs.producer-run-attempt }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const crypto = require('crypto');
+            const fs = require('fs');
+            const path = require('path');
+            const { TextDecoder } = require('util');
+            const root = path.resolve('incoming-report');
+            const expectedFiles = ['architecture-pr-report.manifest.json', 'architecture-pr-report.md'];
+            const fail = (reason) => {
+              core.setOutput('status', 'rejected');
+              core.setOutput('reason', reason);
+            };
+
+            let names;
+            try {
+              names = fs.readdirSync(root).sort();
+            } catch {
+              fail('artifact_download_failed');
+              return;
+            }
+            if (JSON.stringify(names) !== JSON.stringify(expectedFiles)) {
+              fail('artifact_shape_invalid');
+              return;
+            }
+
+            const manifestPath = path.join(root, expectedFiles[0]);
+            const reportPath = path.join(root, expectedFiles[1]);
+            let manifestStat;
+            let reportStat;
+            try {
+              manifestStat = fs.lstatSync(manifestPath);
+              reportStat = fs.lstatSync(reportPath);
+            } catch {
+              fail('artifact_shape_invalid');
+              return;
+            }
+            if (!manifestStat.isFile() || manifestStat.isSymbolicLink() || manifestStat.size > 16384
+                || !reportStat.isFile() || reportStat.isSymbolicLink() || reportStat.size > 60000) {
+              fail('artifact_size_or_type_invalid');
+              return;
+            }
+
+            let manifest;
+            let report;
+            try {
+              manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+              report = fs.readFileSync(reportPath);
+            } catch {
+              fail('artifact_parse_failed');
+              return;
+            }
+            if (manifest === null || Array.isArray(manifest) || typeof manifest !== 'object'
+                || JSON.stringify(Object.keys(manifest).sort()) !== JSON.stringify(['context', 'kind', 'marker', 'report', 'schema'])) {
+              fail('manifest_shape_invalid');
+              return;
+            }
+            const contextFields = manifest.context;
+            const reportFields = manifest.report;
+            const hasExactKeys = (value, keys) =>
+              JSON.stringify(Object.keys(value).sort()) === JSON.stringify(keys);
+            if (contextFields === null || Array.isArray(contextFields) || typeof contextFields !== 'object'
+                || reportFields === null || Array.isArray(reportFields) || typeof reportFields !== 'object'
+                || !hasExactKeys(contextFields, ['head_sha', 'pr_number', 'repository', 'run_attempt', 'run_id'])
+                || !hasExactKeys(reportFields, ['bytes', 'path', 'sha256'])
+                || manifest.schema !== 'architecture-pr-report-publication/v1'
+                || manifest.kind !== 'architecture-pr-report'
+                || manifest.marker !== 'arch-linter-net-pr-report:v1'
+                || contextFields.repository !== process.env.EXPECTED_REPOSITORY
+                || contextFields.pr_number !== process.env.EXPECTED_PR_NUMBER
+                || contextFields.head_sha !== process.env.EXPECTED_HEAD_SHA
+                || contextFields.run_id !== process.env.EXPECTED_RUN_ID
+                || contextFields.run_attempt !== process.env.EXPECTED_RUN_ATTEMPT
+                || reportFields.path !== 'architecture-pr-report.md'
+                || !Number.isSafeInteger(reportFields.bytes)
+                || reportFields.bytes !== report.length
+                || typeof reportFields.sha256 !== 'string'
+                || !/^[a-f0-9]{64}$/.test(reportFields.sha256)) {
+              fail('manifest_binding_invalid');
+              return;
+            }
+            const hash = crypto.createHash('sha256').update(report).digest('hex');
+            if (hash !== reportFields.sha256
+                || !report.subarray(0, Buffer.byteLength('# Architecture PR report\n')).equals(Buffer.from('# Architecture PR report\n'))
+                || report.includes(Buffer.from('<!--'))) {
+              fail('report_integrity_invalid');
+              return;
+            }
+            try {
+              new TextDecoder('utf-8', { fatal: true }).decode(report);
+            } catch {
+              fail('report_encoding_invalid');
+              return;
+            }
+
+            core.setOutput('status', 'ready');
+            core.setOutput('reason', 'ready');
+            core.setOutput('report-base64', report.toString('base64'));
+
+      - name: Publish or replace one architecture report comment
+        id: comment
+        if: always() && steps.resolve.outputs.pr-number != ''
+        env:
+          PR_NUMBER: ${{ steps.resolve.outputs.pr-number }}
+          CURRENT_HEAD_SHA: ${{ steps.resolve.outputs.current-head-sha }}
+          PRODUCER_RUN_ID: ${{ steps.resolve.outputs.producer-run-id }}
+          PRODUCER_RUN_ATTEMPT: ${{ steps.resolve.outputs.producer-run-attempt }}
+          RESOLUTION_REASON: ${{ steps.resolve.outputs.reason }}
+          VALIDATION_STATUS: ${{ steps.validate.outputs.status }}
+          VALIDATION_REASON: ${{ steps.validate.outputs.reason }}
+          VALIDATED_REPORT_BASE64: ${{ steps.validate.outputs.report-base64 }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const { TextDecoder } = require('util');
+            const marker = '<!-- arch-linter-net-pr-report:v1 -->';
+            const legacyMarker = '<!-- architecture-coverage-report -->';
+            const contextMarkerFor = (headSha) =>
+              `<!-- arch-linter-net-pr-report-context:head=${headSha};run=${process.env.PRODUCER_RUN_ID};attempt=${process.env.PRODUCER_RUN_ATTEMPT} -->`;
+            const unavailableBody = (headSha, unavailableReason) =>
+              `${marker}\n${contextMarkerFor(headSha)}\n# Architecture PR report unavailable\n\nPublication integrity validation failed for the current pull-request head: \`${unavailableReason}\`.\n\nNo substitute architecture verdict was created.\n`;
+            const allowedReasons = new Set([
+              'ambiguous_pull_request', 'artifact_ambiguous', 'artifact_download_failed', 'artifact_expired',
+              'artifact_missing', 'artifact_oversized', 'artifact_parse_failed', 'artifact_shape_invalid',
+              'artifact_size_or_type_invalid', 'manifest_binding_invalid', 'manifest_shape_invalid',
+              'producer_ambiguous', 'producer_missing', 'producer_not_success', 'report_encoding_invalid',
+              'report_integrity_invalid', 'stale_head', 'unexpected_producer',
+            ]);
+            const isReady = process.env.VALIDATION_STATUS === 'ready';
+            const reason = isReady ? 'ready' : (process.env.VALIDATION_REASON || process.env.RESOLUTION_REASON);
+            if (!isReady && !allowedReasons.has(reason)) {
+              core.setOutput('status', 'rejected');
+              core.setOutput('reason', 'unexpected_publisher_state');
+              return;
+            }
+            let validatedReport;
+            if (isReady) {
+              try {
+                const reportBytes = Buffer.from(process.env.VALIDATED_REPORT_BASE64, 'base64');
+                if (reportBytes.length === 0
+                    || reportBytes.toString('base64') !== process.env.VALIDATED_REPORT_BASE64) {
+                  throw new Error('Validated report output is not canonical base64.');
+                }
+                validatedReport = new TextDecoder('utf-8', { fatal: true }).decode(reportBytes);
+              } catch {
+                core.setOutput('status', 'rejected');
+                core.setOutput('reason', 'report_encoding_invalid');
+                return;
+              }
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.PR_NUMBER),
+              per_page: 100,
+            });
+            const isPublisherBotComment = (comment, candidateMarker) =>
+              comment.user?.login === 'github-actions[bot]' && comment.body?.includes(candidateMarker);
+            const unified = comments.filter((comment) => isPublisherBotComment(comment, marker));
+            const legacy = comments.filter((comment) => isPublisherBotComment(comment, legacyMarker));
+            if (unified.length > 1 || legacy.length > 1 || (unified.length === 1 && legacy.length === 1)) {
+              core.setOutput('status', 'rejected');
+              core.setOutput('reason', 'comment_marker_ambiguous');
+              return;
+            }
+            if (!isReady && reason === 'stale_head'
+                && unified.length === 1
+                && unified[0].body.includes(`<!-- arch-linter-net-pr-report-context:head=${process.env.CURRENT_HEAD_SHA};`)) {
+              core.setOutput('status', 'rejected');
+              core.setOutput('reason', reason);
+              return;
+            }
+            if (!isReady && reason === 'producer_missing'
+                && unified.length === 1
+                && unified[0].body.includes(`<!-- arch-linter-net-pr-report-context:head=${process.env.CURRENT_HEAD_SHA};`)) {
+              core.setOutput('status', 'preserved');
+              core.setOutput('reason', reason);
+              return;
+            }
+
+            const body = isReady
+              ? `${marker}\n${contextMarkerFor(process.env.CURRENT_HEAD_SHA)}\n${validatedReport}`
+              : unavailableBody(process.env.CURRENT_HEAD_SHA, reason);
+            const existing = unified[0] ?? legacy[0];
+            const { data: beforeWritePullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(process.env.PR_NUMBER),
+            });
+            if (beforeWritePullRequest.head?.sha !== process.env.CURRENT_HEAD_SHA) {
+              core.setOutput('status', 'rejected');
+              core.setOutput('reason', 'stale_head');
+              return;
+            }
+            let commentId;
+            if (existing) {
+              commentId = existing.id;
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: commentId,
+                body,
+              });
+            } else {
+              const { data: createdComment } = await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: Number(process.env.PR_NUMBER),
+                body,
+              });
+              commentId = createdComment.id;
+            }
+            const { data: afterWritePullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(process.env.PR_NUMBER),
+            });
+            if (afterWritePullRequest.head?.sha !== process.env.CURRENT_HEAD_SHA) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: commentId,
+                body: unavailableBody(afterWritePullRequest.head.sha, 'stale_head'),
+              });
+              core.setOutput('status', 'rejected');
+              core.setOutput('reason', 'stale_head');
+              return;
+            }
+            core.setOutput('status', isReady ? 'published' : 'rejected');
+            core.setOutput('reason', reason);
+
+      - name: Fail closed when report publication is rejected
+        if: always() && steps.comment.outputs.status != 'published' && steps.comment.outputs.status != 'preserved'
+        run: exit 1

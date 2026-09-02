@@ -1,14 +1,22 @@
 # architecture-coverage-ci-reporting Specification
 
 ## Purpose
-Operationalize architecture coverage as a CI quality signal: publish strict/audit JSON artifacts, generate a Markdown coverage report (including new-code coverage), and post it as a pull request comment with minimal write-permission exposure.
+Operationalize architecture coverage as a CI quality signal: publish strict/audit JSON artifacts
+and generate a standalone Markdown coverage report (including new-code coverage), while the
+separate unified architecture PR publisher owns the repository sticky comment.
 ## Requirements
 ### Requirement: Strict and audit coverage artifacts are published
-The `validate` job in `.github/workflows/ci.yml` SHALL run ArchLinterNet against the repository's own policy in both `strict` and `audit` JSON modes and upload the resulting JSON as build artifacts on every pull request and `main` push.
+The read-only architecture report producer job in `.github/workflows/ci.yml` SHALL run
+ArchLinterNet against the repository's own policy in both `strict` and `audit` JSON modes and
+upload `architecture-strict.json` and `architecture-audit.json` as pull-request build artifacts.
+It SHALL preserve the standalone coverage-report artifacts independently of unified PR report
+publication.
 
-#### Scenario: Strict and audit artifacts are uploaded on success
-- **WHEN** the `validate` job runs for a pull request or push to `main`
-- **THEN** it uploads `architecture-strict.json` and `architecture-audit.json` as build artifacts
+#### Scenario: Strict and audit artifacts are uploaded when results are available
+- **WHEN** the architecture report producer runs for a pull request
+- **THEN** it uploads `architecture-strict.json` and `architecture-audit.json` when each has been
+  materialized
+- **AND** it retains only read permissions while doing so
 
 #### Scenario: Audit artifact is uploaded even when strict fails
 - **WHEN** the strict run reports violations or new non-baselined coverage findings
@@ -91,17 +99,6 @@ When the CI step that computes the changed-files diff fails (e.g. a `git diff`/f
 - **WHEN** the `Collect changed first-party files` step in `ci.yml` fails
 - **THEN** the step's own outcome reflects failure (it is not suppressed with `|| true`)
 - **AND** that failed outcome is passed to the report generator as `--diff-status failed`
-
-### Requirement: Sticky PR comment as a stage of the validate job
-A step in the `validate` job in `.github/workflows/ci.yml` SHALL post the generated Markdown report as a pull request comment on `pull_request` events, identifying its own prior comment via a hidden marker and updating it in place instead of creating a new comment on subsequent pushes. The workflow's top-level `permissions` SHALL include `pull-requests: write` so this step can run without a separate job.
-
-#### Scenario: First push creates a comment
-- **WHEN** the `validate` job's comment step runs for a pull request with no prior bot comment containing the marker
-- **THEN** it creates a new comment containing the marker and the report
-
-#### Scenario: Subsequent push updates the existing comment
-- **WHEN** the `validate` job's comment step runs again for the same pull request and a comment containing the marker already exists
-- **THEN** it updates that existing comment instead of creating a new one
 
 ### Requirement: Report generator is tested
 The native CLI report renderer SHALL have NUnit tests covering JSON parsing,
