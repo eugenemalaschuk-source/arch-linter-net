@@ -281,7 +281,8 @@ arch-linter-net health \
   --policy architecture/arch.yml \
   --baseline architecture/baseline.arch.yml \
   --mode all \
-  --format json
+  --format json \
+  --execution-context pr-123
 ```
 
 `health` is a read-only projection of canonical architecture-governance authorities. It reports

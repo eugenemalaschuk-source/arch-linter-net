@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text;
+using System.Text.Json.Nodes;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Change;
 using NUnit.Framework;
@@ -71,6 +72,27 @@ public sealed class ReportCommandHandlerTests
     }
 
     [Test]
+    public void Execute_NullChangeArrayElement_ReturnsInvalidArtifactErrorCode()
+    {
+        JsonNode change = JsonNode.Parse(EmptyChange())!;
+        change["added"] = new JsonArray((JsonNode?)null);
+        FakeConsole console = new();
+        FakeFileSystem fileSystem = new(
+            ("health.json", CorrelatableHealth()),
+            ("change.json", change.ToJsonString()));
+
+        int exitCode = CreateHandler(console, fileSystem).Execute(
+            new PrReportCommandOptions("health.json", "change.json", null, 20, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorOutput, Does.Contain("invalid entry"));
+            Assert.That(console.ErrorOutput, Does.Not.Contain("NullReferenceException"));
+        });
+    }
+
+    [Test]
     public void Execute_LegacyHealthAndCanonicalChange_FailsClosed()
     {
         const string Health =
@@ -122,6 +144,60 @@ public sealed class ReportCommandHandlerTests
         {
             ExecutionContext = new ArchitectureChangeReportContext("run", "strict", string.Empty),
         });
+
+    private static string CorrelatableHealth() =>
+        """
+        {
+          "schema_id": "architecture-health/v1",
+          "gate": "pass",
+          "health": "healthy",
+          "dimensions": [],
+          "report_evidence": {
+            "schema_version": 2,
+            "kind": "architecture-health-report-evidence",
+            "gate": "pass",
+            "health": "healthy",
+            "execution_context": { "execution_id": "run", "condition_set": "" },
+            "validation_outcomes": [
+              {
+                "mode": "strict",
+                "availability": {
+                  "applicability": "unavailable",
+                  "external_evidence": "not_configured",
+                  "findings": "available",
+                  "policy_inventory": "unavailable",
+                  "topology": "not_configured",
+                  "waiver_lifecycle": "unavailable"
+                },
+                "findings": [],
+                "provenance": {
+                  "repository_root": "/repo",
+                  "policy_import_paths": [],
+                  "resolved_assembly_paths": [],
+                  "discovered_project_paths": []
+                }
+              }
+            ],
+            "debt_gate": {
+              "succeeded": true,
+              "passed": true,
+              "evaluation": {
+                "completed": true,
+                "mode": "strict",
+                "reused_analysis_snapshot": true,
+                "preflight_diagnostics": []
+              },
+              "persistent_debt": {
+                "succeeded": true,
+                "in_sync": true,
+                "entries": [],
+                "configuration_violations": []
+              },
+              "policy_weakening": { "requested": false }
+            }
+          }
+        }
+        """;
 
     private sealed class FakeConsole : ICliConsole
     {

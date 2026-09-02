@@ -181,21 +181,65 @@ public sealed class PrReportMarkdownRendererTests
         };
 
         string markdown = PrReportMarkdownRenderer.Render(CreateProjection(evidence: evidence));
-        string blockers = markdown[..markdown.IndexOf("## Non-blocking debt", StringComparison.Ordinal)];
-        int debtEnd = markdown.IndexOf("## Completeness and evidence", StringComparison.Ordinal);
-        string debt = markdown[markdown.IndexOf("## Non-blocking debt", StringComparison.Ordinal)..debtEnd];
+        string blockers = Section(markdown, "## Blockers", "## Non-blocking debt");
+        string debt = Section(markdown, "## Non-blocking debt", "## Completeness and evidence");
+
+        const string ExpectedBlockers = """
+            ## Blockers
+            ### Blocking governance and findings (6)
+            Showing 6 of 6; omitted 0.
+            - baseline lifecycle `ambiguous`: `baseline-ambiguous` status=`ambiguous` layer namespace → Forbidden.Namespace
+            - baseline lifecycle `changed`: `baseline-changed` status=`changed` layer namespace → Forbidden.Namespace
+            - baseline lifecycle `configuration-error`: `baseline-configuration` status=`configuration-error` layer namespace → Forbidden.Namespace
+            - baseline lifecycle `new`: `baseline-new` status=`new` layer namespace → Forbidden.Namespace
+            - baseline lifecycle `resolved`: `baseline-resolved` status=`resolved` layer namespace → Forbidden.Namespace
+            - baseline lifecycle `stale`: `baseline-stale` status=`stale` layer namespace → Forbidden.Namespace
+            """;
+        const string ExpectedDebt = """
+            ## Non-blocking debt
+            - Explicit waiver debt: 0 total (0 active; 0 stale; 0 expired; 0 metadata-incomplete; 0 invalid)
+            ### Existing baseline/finding debt (1)
+            Showing 1 of 1; omitted 0.
+            - `baseline-matched` status=`matched` layer namespace → Forbidden.Namespace
+            """;
 
         Assert.Multiple(() =>
         {
             Assert.That(markdown, Does.Contain("Existing finding debt: `1` baseline entries"));
             Assert.That(markdown, Does.Contain("New architecture debt: `1` new baseline entries"));
-            Assert.That(blockers, Does.Contain("baseline lifecycle `resolved`"));
-            Assert.That(blockers, Does.Contain("baseline lifecycle `stale`"));
-            Assert.That(blockers, Does.Contain("baseline lifecycle `configuration-error`"));
-            Assert.That(debt, Does.Contain("baseline-matched"));
-            Assert.That(debt, Does.Not.Contain("baseline-resolved"));
-            Assert.That(debt, Does.Not.Contain("baseline-stale"));
-            Assert.That(debt, Does.Not.Contain("baseline-configuration"));
+            Assert.That(blockers, Is.EqualTo(ExpectedBlockers.ReplaceLineEndings(Environment.NewLine).TrimEnd()));
+            Assert.That(debt, Is.EqualTo(ExpectedDebt.ReplaceLineEndings(Environment.NewLine).TrimEnd()));
+        });
+    }
+
+    [Test]
+    public void ResolvedBaselineEntry_IsBlockingGateFailureRatherThanNonBlockingDebt()
+    {
+        ArchitecturePrReportEvidence evidence = Evidence(baseline: [Baseline("resolved", "baseline-resolved")]);
+        evidence = evidence with
+        {
+            DebtGate = evidence.DebtGate with
+            {
+                Passed = false,
+                PersistentDebt = evidence.DebtGate.PersistentDebt with { InSync = false },
+            },
+        };
+
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(
+            evidence: evidence,
+            gate: ArchitectureHealthGate.Fail));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("Architecture acceptance: **fail** (`gate=fail`)"));
+            Assert.That(Section(markdown, "## Blockers", "## Completeness and evidence"), Is.EqualTo(
+                """
+                ## Blockers
+                ### Blocking governance and findings (1)
+                Showing 1 of 1; omitted 0.
+                - baseline lifecycle `resolved`: `baseline-resolved` status=`resolved` layer namespace → Forbidden.Namespace
+                """.ReplaceLineEndings(Environment.NewLine).TrimEnd()));
+            Assert.That(markdown, Does.Not.Contain("## Non-blocking debt"));
         });
     }
 
@@ -337,10 +381,11 @@ public sealed class PrReportMarkdownRendererTests
         ArchitecturePolicyInventory? inventory = null,
         IReadOnlyList<ArchitecturePrReportBaselineEntry>? baseline = null,
         IReadOnlyList<ArchitectureHealthDimension>? dimensions = null,
-        ArchitecturePrReportChange? change = null) =>
+        ArchitecturePrReportChange? change = null,
+        ArchitectureHealthGate gate = ArchitectureHealthGate.Pass) =>
         new(
             new ArchitecturePrReportHeadline(
-                ArchitectureHealthGate.Pass,
+                gate,
                 ArchitectureHealthState.Healthy,
                 evidence is null && inventory is null ? ArchitecturePrReportAvailability.Unavailable : ArchitecturePrReportAvailability.Complete,
                 dimensions ?? [Dimension("applicability", ArchitectureHealthDimensionState.Pass), Dimension("topology", ArchitectureHealthDimensionState.NotConfigured), Dimension("metrics", ArchitectureHealthDimensionState.NotConfigured), Dimension("external_evidence", ArchitectureHealthDimensionState.NotConfigured)]),
@@ -416,4 +461,11 @@ public sealed class PrReportMarkdownRendererTests
 
     private static ArchitectureHealthDimension Dimension(string name, ArchitectureHealthDimensionState state) =>
         new(name, state, []);
+
+    private static string Section(string markdown, string heading, string nextHeading)
+    {
+        int start = markdown.IndexOf(heading, StringComparison.Ordinal);
+        int end = markdown.IndexOf(nextHeading, start, StringComparison.Ordinal);
+        return markdown[start..end].TrimEnd();
+    }
 }
