@@ -78,7 +78,8 @@ internal sealed class ReportCommandHandler(
             }
             else
             {
-                fileSystem.WriteAllText(options.OutputPath, markdown);
+                string tempPath = fileSystem.WriteAllTextToTemp(options.OutputPath, markdown);
+                fileSystem.RenameTempToTarget(tempPath, options.OutputPath);
             }
 
             return CliExitCodes.Success;

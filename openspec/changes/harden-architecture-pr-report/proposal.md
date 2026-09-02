@@ -48,5 +48,7 @@ None.
 Affected code is the Core change-report serializer and comparer, Health
 report-evidence projection, Core reporting reader/projector, CLI Markdown
 renderer, their tests, reviewed Core public API approval, and the active
-OpenSpec artifacts.  The JSON schemas gain required correlation metadata and
-the typed reporting boundary moves from `Core.Model` to `Core.Reporting`.
+OpenSpec artifacts. Versioned Health report evidence and change reports gain
+required correlation metadata, while older Health summaries remain explicitly
+unavailable for evidence drill-down. The typed reporting boundary moves from
+`Core.Model` to `Core.Reporting`.

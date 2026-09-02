@@ -39,14 +39,22 @@ public sealed class ArchitecturePrReportReaderTests
     }
 
     [Test]
-    public void Read_RejectsLegacyHealthSummaryWithoutCorrelatableReportEvidence()
+    public void Read_ProjectsLegacyHealthSummaryAsUnavailableReportEvidence()
     {
         ArchitectureHealthOutcome outcome = CreateOutcome();
         ArchitectureChangeReport change = ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1");
 
-        Assert.That(() => ArchitecturePrReportProjector.ReadAndProject(
+        ArchitecturePrReportProjection projection = ArchitecturePrReportProjector.ReadAndProject(
             ArchitectureHealthProjector.FormatAsJson(outcome.Summary),
-            ArchitectureChangeReports.FormatJson(change)), Throws.ArgumentException);
+            ArchitectureChangeReports.FormatJson(change));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(projection.Evidence, Is.Null);
+            Assert.That(projection.Availability, Is.EqualTo(ArchitecturePrReportAvailability.Unavailable));
+            Assert.That(projection.Headline.Gate, Is.EqualTo(outcome.Summary.Gate));
+            Assert.That(projection.Headline.Health, Is.EqualTo(outcome.Summary.Health));
+        });
     }
 
     [Test]

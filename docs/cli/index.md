@@ -322,11 +322,12 @@ retaining canonical totals and making omitted details explicit. The report is de
 architecture-only: it reads the supplied artifacts, does not run or recreate analysis, and does not
 inspect or call GitHub.
 
-The Health input must be an `architecture-health/v1` document from a supported CLI, including its
-versioned canonical reporting evidence and non-empty execution context. The change input is the
-versioned canonical architecture-change JSON report with the same execution context. `report pr`
-rejects legacy Health or change artifacts and any pair whose execution identifier, condition set, or
-mode receipt does not correlate. The command does not reopen snapshots or compare them again.
+The Health input must be an `architecture-health/v1` document from a supported CLI. When it includes
+versioned canonical reporting evidence, its non-empty execution context must match the versioned
+canonical architecture-change JSON report's context and selected mode receipt; mismatches are
+rejected. A legacy Health artifact without the reporting-evidence envelope still renders a report,
+but all evidence drill-down is explicitly `unavailable`; it is never presented as zero or pass. The
+command does not reopen snapshots or compare them again.
 
 Create the pair from the real producers using one workflow-owned identifier:
 

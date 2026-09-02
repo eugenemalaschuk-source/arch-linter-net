@@ -23,9 +23,11 @@ public static class ArchitecturePrReportReader
             ArchitecturePrReportInput health = ReadHealth(healthDocument.RootElement);
             ArchitectureChangeReport change = ArchitectureChangeReports.DeserializeReport(changeJson);
             ArchitecturePrReportChange reportChange = ReadChange(change);
-            ArchitecturePrReportEvidence evidence = health.Evidence
-                ?? throw InvalidArtifact("The Health artifact requires report evidence for PR-report correlation.");
-            ValidateCompatibleContext(evidence, reportChange);
+            if (health.Evidence is not null)
+            {
+                ValidateCompatibleContext(health.Evidence, reportChange);
+            }
+
             return health with { Change = reportChange };
         }
         catch (JsonException exception)
@@ -60,9 +62,9 @@ public static class ArchitecturePrReportReader
             .ToArray();
         var summary = new ArchitectureHealthSummary(schemaId, gate, health, parsedDimensions);
 
-        ArchitecturePrReportEvidence evidence = root.TryGetProperty("report_evidence", out JsonElement evidenceElement)
+        ArchitecturePrReportEvidence? evidence = root.TryGetProperty("report_evidence", out JsonElement evidenceElement)
             ? ReadEvidence(evidenceElement, gate, health)
-            : throw InvalidArtifact("The Health artifact requires report_evidence for PR-report correlation.");
+            : null;
         return new ArchitecturePrReportInput(summary, evidence, null!);
     }
 

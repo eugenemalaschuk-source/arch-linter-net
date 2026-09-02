@@ -1,15 +1,17 @@
 ## ADDED Requirements
 
 ### Requirement: PR report artifacts share one compatible execution context
-The PR-report projection SHALL accept a Health reporting-evidence artifact and
-an architecture-change report only when both artifacts declare the same
-non-empty execution identifier and condition-set scope.  It SHALL select a
-Health validation receipt whose canonical mode equals the change report mode.
-Different execution identifiers, condition sets, receipt modes, missing
-context fields, duplicate candidate receipts, or unsupported context versions
-SHALL be rejected as incompatible input; the projection SHALL not select a
-different receipt, infer compatibility, or render an availability state from
-mixed artifacts.
+When a Health artifact supplies reporting evidence, the PR-report projection
+SHALL accept it with an architecture-change report only when both artifacts
+declare the same non-empty execution identifier and condition-set scope. It
+SHALL select a Health validation receipt whose canonical mode equals the change
+report mode. Different execution identifiers, condition sets, receipt modes,
+missing context fields in a supplied evidence envelope, duplicate candidate
+receipts, or unsupported context versions SHALL be rejected as incompatible
+input; the projection SHALL not select a different receipt or infer
+compatibility from mixed artifacts. A Health artifact without the versioned
+reporting-evidence envelope SHALL project its report evidence as unavailable
+rather than as correlated evidence.
 
 #### Scenario: Different runs are rejected
 - **WHEN** a strict Health artifact and a strict change report have different
@@ -22,10 +24,12 @@ mixed artifacts.
   canonical Health validation receipt in the same execution context
 - **THEN** PR-report generation fails closed without rendering Markdown
 
-#### Scenario: Legacy Health cannot bypass correlation
+#### Scenario: Legacy Health remains explicitly unavailable
 - **WHEN** the Health input lacks the versioned reporting-evidence envelope
-- **THEN** PR-report generation rejects the artifact rather than pairing its
-  headline with a change report from an unproven execution
+- **THEN** PR-report generation renders the supplied Health headline with
+  report availability `unavailable`
+- **AND** it does not render fabricated zero or pass facts for missing report
+  evidence
 
 ### Requirement: PR report evidence is a closed authority payload contract
 The projection SHALL validate each reporting receipt's availability map against

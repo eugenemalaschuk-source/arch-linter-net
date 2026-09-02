@@ -93,7 +93,7 @@ public sealed class ReportCommandHandlerTests
     }
 
     [Test]
-    public void Execute_LegacyHealthAndCanonicalChange_FailsClosed()
+    public void Execute_LegacyHealthAndCanonicalChange_RendersUnavailableEvidence()
     {
         const string Health =
             "{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\",\"dimensions\":[]}";
@@ -103,19 +103,21 @@ public sealed class ReportCommandHandlerTests
             ("change.json", EmptyChange()));
 
         int exitCode = CreateHandler(console, fileSystem).Execute(
-            new PrReportCommandOptions("health.json", "change.json", "report.md", 20, false));
+            new PrReportCommandOptions("health.json", "change.json", null, 20, false));
 
         Assert.Multiple(() =>
         {
-            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(console.Output, Is.Empty);
-            Assert.That(fileSystem.Written.ContainsKey("report.md"), Is.False);
-            Assert.That(console.ErrorOutput, Does.Contain("report_evidence"));
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(console.Output, Does.Contain("Report availability: `unavailable`"));
+            Assert.That(console.Output, Does.Contain("Effective policy controls: `unavailable`"));
+            Assert.That(console.Output, Does.Contain("Explicit waiver debt: `unavailable`"));
+            Assert.That(console.Output, Does.Not.Contain("Effective policy controls: `0`"));
+            Assert.That(console.ErrorOutput, Is.Empty);
         });
     }
 
     [Test]
-    public void Definition_PrSubcommand_ParsesOptionsBeforeRejectingLegacyHealth()
+    public void Definition_PrSubcommand_ParsesOptionsForLegacyHealth()
     {
         const string Health =
             "{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\",\"dimensions\":[]}";
@@ -131,8 +133,54 @@ public sealed class ReportCommandHandlerTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(console.Output, Does.Contain("Report availability: `unavailable`"));
+            Assert.That(console.ErrorOutput, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Execute_OutputPath_StagesThenRenamesRenderedReport()
+    {
+        FakeConsole console = new();
+        FakeFileSystem fileSystem = new(
+            ("health.json", CorrelatableHealth()),
+            ("change.json", EmptyChange()));
+
+        int exitCode = CreateHandler(console, fileSystem).Execute(
+            new PrReportCommandOptions("health.json", "change.json", "report.md", 20, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(fileSystem.DirectWrites, Is.Empty);
+            Assert.That(fileSystem.Staged, Contains.Key("report.md.tmp"));
+            Assert.That(fileSystem.Renames, Is.EqualTo(new[] { ("report.md.tmp", "report.md") }));
+            Assert.That(fileSystem.Written["report.md"], Does.Contain("# Architecture PR report"));
+        });
+    }
+
+    [Test]
+    public void Execute_OutputRenameFailure_PreservesExistingTarget()
+    {
+        FakeConsole console = new();
+        FakeFileSystem fileSystem = new(
+            ("health.json", CorrelatableHealth()),
+            ("change.json", EmptyChange()))
+        {
+            ThrowOnRename = true,
+        };
+        fileSystem.Written["report.md"] = "existing report";
+
+        int exitCode = CreateHandler(console, fileSystem).Execute(
+            new PrReportCommandOptions("health.json", "change.json", "report.md", 20, false));
+
+        Assert.Multiple(() =>
+        {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(console.ErrorOutput, Does.Contain("report_evidence"));
+            Assert.That(fileSystem.DirectWrites, Is.Empty);
+            Assert.That(fileSystem.Staged, Contains.Key("report.md.tmp"));
+            Assert.That(fileSystem.Written["report.md"], Is.EqualTo("existing report"));
         });
     }
 
@@ -222,16 +270,38 @@ public sealed class ReportCommandHandlerTests
 
         public Dictionary<string, string> Written { get; } = new();
 
+        public Dictionary<string, string> DirectWrites { get; } = new();
+
+        public Dictionary<string, string> Staged { get; } = new();
+
+        public List<(string TempPath, string TargetPath)> Renames { get; } = [];
+
+        public bool ThrowOnRename { get; init; }
+
         public bool FileExists(string path) => _files.ContainsKey(path);
 
         public string ReadAllText(string path) =>
             _files.TryGetValue(path, out string? content) ? content : throw new FileNotFoundException(path);
 
-        public void WriteAllText(string path, string contents) => Written[path] = contents;
+        public void WriteAllText(string path, string contents) => DirectWrites[path] = contents;
 
-        public string WriteAllTextToTemp(string targetPath, string contents) => targetPath;
+        public string WriteAllTextToTemp(string targetPath, string contents)
+        {
+            string tempPath = targetPath + ".tmp";
+            Staged[tempPath] = contents;
+            return tempPath;
+        }
 
-        public void RenameTempToTarget(string tempPath, string targetPath) { }
+        public void RenameTempToTarget(string tempPath, string targetPath)
+        {
+            if (ThrowOnRename)
+            {
+                throw new IOException("The staged report could not be renamed.");
+            }
+
+            Renames.Add((tempPath, targetPath));
+            Written[targetPath] = Staged[tempPath];
+        }
 
         public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => true;
 
