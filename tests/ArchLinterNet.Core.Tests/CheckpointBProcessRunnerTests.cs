@@ -64,6 +64,53 @@ public sealed class CheckpointBProcessRunnerTests
         }
     }
 
+    [Test]
+    [CancelAfter(10_000)]
+    public void WindowsRootExitWithInheritedStreamHandleFailsBoundedlyAndCleansUpDescendant()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The inherited redirected-handle regression requires Windows job objects.");
+        }
+
+        string root = Path.Combine(Path.GetTempPath(), $"checkpoint-b-process-runner-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        string childPidPath = Path.Combine(root, "child.pid");
+        ProcessStartInfo startInfo = CreateRootExitWithInheritedHandle(childPidPath);
+        Stopwatch elapsed = Stopwatch.StartNew();
+
+        try
+        {
+            TimeoutException? failure = Assert.Throws<TimeoutException>(() =>
+                CheckpointBReleaseGateTests.Run(startInfo, CancellationToken.None));
+
+            Assert.That(elapsed.Elapsed, Is.LessThan(
+                    CheckpointBProcessRunner.PostExitDrainTimeout
+                    + CheckpointBProcessRunner.CleanupTimeout
+                    + TimeSpan.FromSeconds(2)),
+                "The retained-handle probe must fail within the configured runner bounds.");
+            Assert.That(failure!.Message, Does.Contain("post-exit stream drain"));
+            Assert.That(failure.Message, Does.Contain("Command:"));
+            Assert.That(failure.Message, Does.Contain("root PID:"));
+            Assert.That(failure.Message, Does.Contain("elapsed duration:"));
+            Assert.That(failure.Message, Does.Contain("stdout tail"));
+            Assert.That(failure.Message, Does.Contain("stderr tail"));
+
+            Assert.That(SpinWait.SpinUntil(
+                    () => File.Exists(childPidPath) && int.TryParse(File.ReadAllText(childPidPath).Trim(), out _),
+                    TimeSpan.FromSeconds(2)),
+                Is.True,
+                "The inherited-handle probe did not publish its descendant process id.");
+            int childPid = int.Parse(File.ReadAllText(childPidPath).Trim(), System.Globalization.CultureInfo.InvariantCulture);
+            Assert.That(SpinWait.SpinUntil(() => !IsProcessAlive(childPid), TimeSpan.FromSeconds(2)), Is.True,
+                "Closing the Windows job scope must terminate a descendant after the root exits.");
+        }
+        finally
+        {
+            DeleteDirectoryEventually(root);
+        }
+    }
+
     private static ProcessStartInfo CreateProcessTree(string childPidPath)
     {
         if (OperatingSystem.IsWindows())
@@ -95,6 +142,24 @@ public sealed class CheckpointBProcessRunnerTests
         shell.ArgumentList.Add("checkpoint-b-process-runner");
         shell.ArgumentList.Add(childPidPath);
         return shell;
+    }
+
+    private static ProcessStartInfo CreateRootExitWithInheritedHandle(string childPidPath)
+    {
+        string escapedPath = childPidPath.Replace("'", "''", StringComparison.Ordinal);
+        string childCommand = $"[System.IO.File]::WriteAllText('{escapedPath}', [string]$PID); "
+            + "[Console]::Out.WriteLine('descendant-output'); Start-Sleep -Seconds 30";
+        string command = $"start \"\" /b pwsh -NoProfile -NonInteractive -Command \"{childCommand}\" "
+            + "& echo root-output & echo root-error 1>&2";
+        var startInfo = new ProcessStartInfo("cmd.exe")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        startInfo.ArgumentList.Add("/c");
+        startInfo.ArgumentList.Add(command);
+        return startInfo;
     }
 
     private static void DeleteDirectoryEventually(string root)
