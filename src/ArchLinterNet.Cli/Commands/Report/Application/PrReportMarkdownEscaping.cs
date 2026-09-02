@@ -45,6 +45,12 @@ internal static class PrReportMarkdownEscaping
                 case '|':
                     builder.Append('\\').Append(character);
                     break;
+                case '@':
+                    builder.Append("&#64;");
+                    break;
+                case '#':
+                    builder.Append("&#35;");
+                    break;
                 default:
                     builder.Append(character);
                     break;

@@ -159,6 +159,30 @@ public sealed class PrReportMarkdownRendererTests
     }
 
     [Test]
+    public void GitHubAutolinksAndMentionsInPlainTextAreNeutralized()
+    {
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(change: Change(
+            [new ArchitectureChangeEntry(
+                "surface",
+                "identity",
+                "contact security@example.com, @user, @org/team, #123, and owner/repository#456")])));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Not.Contain("security@example.com"));
+            Assert.That(markdown, Does.Not.Contain("@user"));
+            Assert.That(markdown, Does.Not.Contain("@org/team"));
+            Assert.That(markdown, Does.Not.Contain("#123"));
+            Assert.That(markdown, Does.Not.Contain("owner/repository#456"));
+            Assert.That(markdown, Does.Contain("security&#64;example.com"));
+            Assert.That(markdown, Does.Contain("&#64;user"));
+            Assert.That(markdown, Does.Contain("&#64;org/team"));
+            Assert.That(markdown, Does.Contain("&#35;123"));
+            Assert.That(markdown, Does.Contain("owner/repository&#35;456"));
+        });
+    }
+
+    [Test]
     public void BaselineLifecycleIntegrityIsBlockingWhileOnlyMatchedDebtIsNonBlocking()
     {
         ArchitecturePrReportEvidence evidence = Evidence(baseline:

@@ -91,6 +91,13 @@ debt, and policy weakening authorities. History is explicitly `not_configured` u
 advisory-only history input is added. The command does not parse another command's output or
 recompute any dimension in the CLI.
 
+When the selected policy declares `external_evidence`, supply its repository-local SARIF inputs
+through repeatable `--external-evidence id=<id>,path=<path>` bindings and supply the current
+producer context with `--evidence-repository`, `--evidence-revision`, and, when required,
+`--evidence-scope`. Health binds those artifacts through the canonical trust authority before it
+projects JSON, so a matching zero-result SARIF receipt remains `current` rather than becoming an
+unavailable report authority.
+
 Human output is Core's readable projection. JSON is one health document with `schema_id`, `gate`,
 `health`, and ordered `dimensions`; each dimension retains ordered `reasons`. The health model is
 non-compensating and deliberately has no score, percentage, letter grade, badge, PR rendering, or
@@ -115,8 +122,11 @@ coverage dimension, while `warn` retains the finding as non-blocking degrading e
 `arch-linter-net report pr --health <architecture-health.json> --change <architecture-change.json>` renders deterministic Markdown from two canonical local artifacts. The
 Health input is an `architecture-health/v1` document with versioned canonical reporting evidence;
 the change input is the versioned architecture-change report. Both must carry the same non-empty
-workflow execution identifier and condition-set scope; legacy, incomplete, or incompatible artifacts
-fail closed. The command consumes those artifacts only:
+workflow execution identifier and condition-set scope when the Health envelope is present.
+Malformed, incomplete supplied envelopes and incompatible artifacts fail closed. A legacy Health
+artifact that has no reporting-evidence envelope remains a valid input, but the report renders its
+headline with report availability `unavailable` and no fabricated evidence detail. The command consumes
+those artifacts only:
 it does not rerun or recreate analysis, reopen snapshots, inspect GitHub, or publish a pull-request
 comment. Use `--output <architecture-pr-report.md>` to write the Markdown file; otherwise it is
 written to standard output.

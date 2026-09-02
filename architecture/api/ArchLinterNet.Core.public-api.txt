@@ -4432,6 +4432,8 @@ property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.Summary: ArchLi
 property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.ValidationOutcomes: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome] [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureHealthRequest.DebtGate: ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureHealthRequest.ExecutionContext: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthRequest.ExternalEvidenceArtifacts: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifEvidenceArtifactReference] [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthRequest.ExternalEvidenceAssessmentContext: ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome.Mode: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome.Outcome: ArchLinterNet.Core.Validation.ValidationOutcome [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.CancellationToken: System.Threading.CancellationToken [get, init]

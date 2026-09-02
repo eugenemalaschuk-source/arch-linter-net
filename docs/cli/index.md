@@ -95,7 +95,7 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 <!-- cli-command: health -->
 
-| `arch-linter-net health ...` | Project the canonical non-compensating architecture-health/v1 summary. |
+| `arch-linter-net health ...` | Project the canonical non-compensating architecture-health/v1 summary, including bound external evidence when configured. |
 
 <!-- cli-command: graph -->
 
@@ -291,6 +291,13 @@ projection is non-compensating: it has no score, percentage, letter grade, badge
 rendering, or SARIF output. A valid but unassessable result is emitted as a health document rather
 than a command-error document.
 
+For each policy-declared `external_evidence` requirement, pass one repository-local SARIF binding:
+`--external-evidence id=<id>,path=<path>`. Add `repository=<value>`, `revision=<value>`, and
+`scope=<value>` to a binding when that artifact's producer context is supplied outside SARIF. The
+current assessment context is explicit and shared by the bindings: use `--evidence-repository`,
+`--evidence-revision`, and `--evidence-scope`. Health uses the same canonical binding authority as
+validation before it writes its reporting evidence.
+
 For topology, metric budgets, and imported external diagnostics, `evaluable` means only that the
 authority could assess the control; the health dimension still reflects that authority's resulting
 strict finding or clean receipt. Each reason retains canonical family, control, policy, and evidence
@@ -345,8 +352,27 @@ arch-linter-net change report \
 
 arch-linter-net health \
   --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --mode strict \
   --format json \
   --execution-context pr-123 \
+  > architecture-health.json
+```
+
+If that policy declares required external evidence, add the producer inputs to the same Health
+invocation, for example:
+
+```bash
+arch-linter-net health \
+  --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --mode strict \
+  --format json \
+  --execution-context pr-123 \
+  --external-evidence id=security-scan,path=artifacts/security.sarif \
+  --evidence-repository example/repository \
+  --evidence-revision "$GIT_COMMIT" \
+  --evidence-scope pull-request \
   > architecture-health.json
 ```
 

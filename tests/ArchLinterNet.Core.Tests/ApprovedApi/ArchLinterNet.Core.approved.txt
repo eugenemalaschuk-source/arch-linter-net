@@ -5737,9 +5737,50 @@ sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence :
   method void Deconstruct(out string Mode, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement> Requirements, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> Findings)
   operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? right)
   operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt> TrustReceipts {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement> Requirements {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> Findings {get;init;}
+  property bool HasCompleteTrustReceipts {get;}
   property string Mode {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext>
+  ctor(string? Repository, string? Revision, string? Scope)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string? Repository, out string? Revision, out string? Scope)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext? right)
+  property string? Repository {get;init;}
+  property string? Revision {get;init;}
+  property string? Scope {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt>
+  ctor(string LogicalId, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState State, ArchLinterNet.Core.Model.SarifEvidenceTrustStatus Status, string ReasonCode, string? ArtifactPath, string? ArtifactSha256, string? RunId, int? ResultCount, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext? Context)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string LogicalId, out ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState State, out ArchLinterNet.Core.Model.SarifEvidenceTrustStatus Status, out string ReasonCode, out string? ArtifactPath, out string? ArtifactSha256, out string? RunId, out int? ResultCount, out ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext? Context)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceTrustStatus Status {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext? Context {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState State {get;init;}
+  property int? ResultCount {get;init;}
+  property string LogicalId {get;init;}
+  property string ReasonCode {get;init;}
+  property string? ArtifactPath {get;init;}
+  property string? ArtifactSha256 {get;init;}
+  property string? RunId {get;init;}
+enum ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState : int
+  enum-member Current = 0
+  enum-member Invalid = 4
+  enum-member Missing = 3
+  enum-member NotConfigured = 5
+  enum-member Stale = 1
+  enum-member WrongContext = 2
 sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement>
   ctor(string Id, string Format, bool Required, string Tool, string? ToolVersion, string Run, bool RequireRepository, bool RequireRevision, bool RequireScope, ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter? DiagnosticFilter)
   method ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement <Clone>$()
@@ -6420,7 +6461,9 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureHealthRequest : System.IE
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.ArchitectureHealthRequest? left, ArchLinterNet.Core.Validation.ArchitectureHealthRequest? right)
   operator ==(ArchLinterNet.Core.Validation.ArchitectureHealthRequest? left, ArchLinterNet.Core.Validation.ArchitectureHealthRequest? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext? ExternalEvidenceAssessmentContext {get;init;}
   property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest DebtGate {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifEvidenceArtifactReference> ExternalEvidenceArtifacts {get;init;}
   property string? ExecutionContext {get;init;}
 sealed class ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome>
   ctor(string Mode, ArchLinterNet.Core.Validation.ValidationOutcome Outcome)
