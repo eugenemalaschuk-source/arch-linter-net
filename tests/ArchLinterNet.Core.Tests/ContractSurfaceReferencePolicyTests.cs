@@ -108,6 +108,11 @@ public sealed class ContractSurfaceReferencePolicyTests
                 && violation.SourceType == typeof(Persistence.OrderRecord).FullName
                 && (violation.Payload as AttributeUsagePayload)?.MatchedAttribute ==
                 Fixtures.ContractSurfaceReferencePolicyTestFixtures.TransportMarkerName));
+            Assert.That(result.Violations, Has.Some.Matches<ArchitectureViolation>(violation =>
+                violation.ContractId == "transport-marker-placement"
+                && violation.SourceType == typeof(Domain.OrderEntity).FullName
+                && (violation.Payload as AttributeUsagePayload)?.MatchedAttribute ==
+                Fixtures.ContractSurfaceReferencePolicyTestFixtures.TransportMarkerName));
             Assert.That(EvaluableRecords(result).Select(record => record.ControlIdentity),
                 Is.EquivalentTo(["server-v1-no-internal-types", "server-v1-isolation"]));
         });

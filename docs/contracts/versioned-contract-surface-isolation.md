@@ -133,10 +133,13 @@ contracts:
       reason: Find runtime-to-editor exposure while the Unity boundary is being migrated.
 ```
 
-`PublicApiContractAttribute` in this example is user-owned and orthogonal. It
-selects membership only; it does not overwrite an existing `ValueObject`,
-`Entity`, `Controller`, or `Adapter` primary semantic role. There is no
-built-in marker package or Unity-specific magic preset.
+`PublicApiContractAttribute` in this example is user-owned selector evidence
+for the rule-local `runtime-contracts` group; it is not itself a reviewed
+public-API membership declaration. Define reviewed membership separately with
+`public_api_surface.surface_selector` when that boundary is needed. Either use
+does not overwrite an existing `ValueObject`, `Entity`, `Controller`, or
+`Adapter` primary semantic role. There is no built-in marker package or
+Unity-specific magic preset.
 
 Each rule has a non-blank `id` and `name`, one local non-empty `surfaces`
 list, one `source_surface`, and one or more `forbidden_surfaces`. Every

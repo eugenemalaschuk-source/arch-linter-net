@@ -32,7 +32,7 @@ Alternative considered: extend one existing public-API-selector or exposure unit
 
 ### Reuse current public-API snapshot evidence; test its composition rather than clone it
 
-The existing `PublicApiSurfaceSelectorTests` and packed adoption fixture already establish exact capture/diff/update-preview determinism, material snapshot reduction, unselected first-party fail-closed behavior, and whole-assembly backward compatibility. The new reference test will consume a selected public-API surface through `strict_contract_surface_exposure` and assert its role-preserving, path-rich results. It will not create a parallel snapshot grammar or duplicate a costly packed-fixture lifecycle.
+The existing `PublicApiSurfaceSelectorTests` establish selected capture semantics, material snapshot reduction, unselected first-party fail-closed behavior, and whole-assembly backward compatibility. The packed adoption fixture exercises the complete selected-surface lifecycle: exact capture/diff deltas, `public-api update --dry-run` without changing the reviewed snapshot, and ordinary update resynchronization. The new reference test consumes a selected public-API surface through `strict_contract_surface_exposure` and asserts its role-preserving, path-rich results. Together these tests avoid a parallel snapshot grammar while keeping the preview behavior observable at the CLI boundary.
 
 Alternative considered: add a second snapshot harness to the reference fixture. Rejected because duplicate lifecycle coverage would add maintenance without new semantic evidence.
 

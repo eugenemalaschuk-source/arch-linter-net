@@ -198,7 +198,11 @@ namespace ArchLinterNet.Core.Tests.ReferencePolicyFixtures.Server.Contracts.V2
 
 namespace ArchLinterNet.Core.Tests.ReferencePolicyFixtures.Server.Domain
 {
+    // A domain entity carrying a transport marker is a strict attribute_usage violation. It is
+    // intentionally separate from the recursive signature leak that makes this type observable
+    // from OrderContractV1.
     [Entity]
+    [TransportMarker]
     public sealed class OrderEntity
     {
         public Guid Id { get; init; }

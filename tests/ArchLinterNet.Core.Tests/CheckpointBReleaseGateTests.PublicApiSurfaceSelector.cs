@@ -218,8 +218,9 @@ contracts:
     }
 
     // Items 7, 8 — the exact snapshot comparison must observe an added, a removed, and a changed
-    // selected signature identically to the unselected #94 lifecycle, and `update` must restore a
-    // clean comparison.
+    // selected signature identically to the unselected #94 lifecycle. `update --dry-run` must
+    // preview that exact selected surface without writing, then `update` must restore a clean
+    // comparison.
     private static CheckpointScenarioResult AssertSurfaceSelectorExactDeltaLifecycle(
         CandidatePackageFeed candidate, AdoptionAcceptanceFixture fixture)
     {
@@ -252,6 +253,13 @@ contracts:
                 violation => violation.GetProperty("undeclared_api_signature").GetString() ?? string.Empty,
                 StringComparer.Ordinal);
 
+        string markerSnapshotPath = Path.Combine(fixture.Root, "public-api", "marker-selected-api.txt");
+        string snapshotBeforePreview = File.ReadAllText(markerSnapshotPath);
+        CommandResult preview = candidate.RunTool(fixture.Root,
+            "public-api", "update", "--policy", fixture.PolicyPath, "--contract", "marker-selected-api",
+            "--snapshot", "public-api/marker-selected-api.txt", "--ensure-built", "--format", "json", "--dry-run");
+        string snapshotAfterPreview = File.ReadAllText(markerSnapshotPath);
+
         CommandResult resynchronize = candidate.RunTool(fixture.Root,
             "public-api", "update", "--policy", fixture.PolicyPath, "--contract", "marker-selected-api",
             "--snapshot", "public-api/marker-selected-api.txt", "--ensure-built", "--format", "json");
@@ -278,6 +286,14 @@ contracts:
                 Is.EqualTo("method Synthetic.ApiSurfaceSelector.Domain.Receipt.Removed(): System.String"));
             Assert.That(deltas["changed"],
                 Is.EqualTo("method Synthetic.ApiSurfaceSelector.Domain.Receipt.Changed(System.Int32): System.Int64"));
+            Assert.That(preview.ExitCode, Is.EqualTo(0), preview.CombinedOutput);
+            using (JsonDocument previewDocument = JsonDocument.Parse(preview.StandardOutput))
+            {
+                Assert.That(previewDocument.RootElement.GetProperty("status").GetString(), Is.EqualTo("dry-run"));
+                Assert.That(previewDocument.RootElement.GetProperty("dryRun").GetBoolean(), Is.True);
+            }
+            Assert.That(snapshotAfterPreview, Is.EqualTo(snapshotBeforePreview),
+                "A selected-surface update preview must not modify the reviewed snapshot.");
             Assert.That(resynchronize.ExitCode, Is.EqualTo(0), resynchronize.CombinedOutput);
             Assert.That(reviewed.ExitCode, Is.EqualTo(0), reviewed.CombinedOutput);
             Assert.That(JsonDocument.Parse(reviewed.StandardOutput).RootElement
