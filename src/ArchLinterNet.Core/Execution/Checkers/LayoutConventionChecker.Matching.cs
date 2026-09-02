@@ -66,7 +66,12 @@ internal static partial class LayoutConventionChecker
         (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
             List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex(context);
 
-        List<LayoutFileGroup> groups = CollectFiledGroups(contract, context, byFile, tracker, out bool filedInclusionMatched);
+        List<LayoutFileGroup> groups = ProjectFiledCandidateGroups(
+            contract,
+            context,
+            byFile,
+            tracker.Matched,
+            out bool filedInclusionMatched);
         List<LayoutFileGroup> unfiledGroups = CollectUnfiledGroups(
             contract, context, matcher, unfiled, executionContext, violations, tracker);
         groups.AddRange(unfiledGroups);
@@ -109,11 +114,15 @@ internal static partial class LayoutConventionChecker
         return (byFile, unfiled);
     }
 
-    private static List<LayoutFileGroup> CollectFiledGroups(
+    // This is the authoritative projection for every source-file-backed layout selector. Both the
+    // normal layout checker and the opt-in applicability inventory consume it so a selector has
+    // exactly one file-level meaning: select the file, refine declarations by `when`, then apply
+    // file-level exclusions and their own `when` predicates.
+    internal static List<LayoutFileGroup> ProjectFiledCandidateGroups(
         ArchitectureLayoutConventionContract contract,
         ArchitectureCheckerContext context,
         Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
-        LayoutExclusionTracker tracker,
+        bool[] exclusionMatched,
         out bool inclusionMatched)
     {
         List<LayoutFileGroup> groups = new();
@@ -136,7 +145,7 @@ internal static partial class LayoutConventionChecker
             inclusionMatched = true;
 
             eligibleFacts = ApplyFiledExclusions(
-                context, entries, eligibleFacts, contract.ExcludeFilesMatching, tracker.Matched);
+                context, entries, eligibleFacts, contract.ExcludeFilesMatching, exclusionMatched);
             if (eligibleFacts.Count == 0)
             {
                 continue;

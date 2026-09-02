@@ -64,6 +64,135 @@ public sealed partial class LayoutConventionContractTests
     }
 
     [Test]
+    public void ApplicabilityInventory_FileLevelNamespaceSelection_MapsEveryDeclarationInSelectedFile()
+    {
+        var convention = new ArchitectureLayoutConventionContract
+        {
+            Id = "mixed-namespace",
+            Name = "mixed namespace",
+            FilesMatching = new ArchitectureLayoutFileMatcher { NamespaceSegment = "MixedNamespaceFile" },
+            ForbidTypeKind = "interface",
+        };
+        ArchitectureLayoutConventionApplicabilityContract inventory = CreateInventory(
+            scope: "MixedNamespaceFile",
+            exhaustive: true,
+            new ArchitectureLayoutConventionExpectedFolder
+            {
+                Id = "mixed",
+                Path = ".",
+                ConventionId = "mixed-namespace",
+            });
+
+        LayoutConventionApplicabilityChecker.Result applicability = EvaluateInventory(inventory, convention);
+        var normalRunner = new ArchitectureContractRunner(CreateContext(), CreateDocument(convention));
+        List<ArchitectureViolation> normalViolations = normalRunner.Session.CheckLayoutConventionsContract(convention);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(applicability.Records, Is.All.Matches<ArchitectureApplicabilityRecord>(record =>
+                record.State == ArchitectureApplicabilityRecordState.Evaluable));
+            Assert.That(applicability.SubjectMappings.Select(mapping => mapping.SubjectIdentity),
+                Has.Some.Contains("ServiceInMatchingNamespace"));
+            Assert.That(applicability.SubjectMappings.Select(mapping => mapping.SubjectIdentity),
+                Has.Some.Contains("IEscapingInterface"));
+            Assert.That(normalViolations.Select(violation => violation.SourceType),
+                Has.Some.Contains("IEscapingInterface"),
+                "The ordinary checker and inventory must use the same file-level candidate set.");
+        });
+    }
+
+    [Test]
+    public void ApplicabilityInventory_NamespaceExclusion_UsesFileLevelCandidateSet()
+    {
+        var convention = new ArchitectureLayoutConventionContract
+        {
+            Id = "exclude-mixed-namespace",
+            Name = "exclude mixed namespace",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "MixedNamespaceFile" },
+            ExcludeFilesMatching =
+            {
+                new ArchitectureLayoutFileMatcher { NamespaceSegment = "MixedNamespaceFileOther" },
+            },
+            ForbidTypeKind = "interface",
+        };
+        ArchitectureLayoutConventionApplicabilityContract inventory = CreateInventory(
+            scope: "MixedNamespaceFile",
+            exhaustive: false,
+            new ArchitectureLayoutConventionExpectedFolder
+            {
+                Id = "mixed",
+                Path = ".",
+                ConventionId = "exclude-mixed-namespace",
+            });
+
+        LayoutConventionApplicabilityChecker.Result applicability = EvaluateInventory(inventory, convention);
+        var normalRunner = new ArchitectureContractRunner(CreateContext(), CreateDocument(convention));
+        List<ArchitectureViolation> normalViolations = normalRunner.Session.CheckLayoutConventionsContract(convention);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(applicability.Records.Single().Reasons.Select(reason => reason.Code),
+                Does.Contain(ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput));
+            Assert.That(normalViolations, Is.Empty,
+                "A namespace exclusion selects the physical file and removes all of its declarations.");
+        });
+    }
+
+    [Test]
+    public void ApplicabilityInventory_IncludeExcludeWhen_UsesTheOrdinaryCheckerProjection()
+    {
+        string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
+        string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, $"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+              source_roots: ["."]
+            contracts:
+              strict_layout_conventions:
+                - id: mixed-with-when
+                  name: mixed with when
+                  files_matching:
+                    folder_segment: MixedNamespaceFile
+                  exclude_files_matching:
+                    - namespace_segment: MixedNamespaceFileOther
+                      when: subject.simpleName == "ServiceInMatchingNamespace"
+                  forbid_type_kind: class
+              strict_layout_convention_applicability:
+                - id: mixed-with-when-inventory
+                  name: mixed with when inventory
+                  scope: MixedNamespaceFile
+                  exhaustive: true
+                  expected_folders:
+                    - id: mixed
+                      path: .
+                      convention_id: mixed-with-when
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        ArchitectureLayoutConventionContract convention = document.Contracts.StrictLayoutConventions.Single();
+        ArchitectureLayoutConventionApplicabilityContract inventory =
+            document.Contracts.StrictLayoutConventionApplicability.Single();
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        LayoutConventionApplicabilityChecker.Result applicability = LayoutConventionApplicabilityChecker.Evaluate(
+            runner.Session.CheckerContext,
+            inventory,
+            document.Contracts.StrictLayoutConventions);
+        List<ArchitectureViolation> normalViolations = runner.Session.CheckLayoutConventionsContract(convention);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(applicability.SubjectMappings.Select(mapping => mapping.SubjectIdentity),
+                Has.Some.Contains("IEscapingInterface"));
+            Assert.That(applicability.SubjectMappings.Select(mapping => mapping.SubjectIdentity),
+                Has.None.Contains("ServiceInMatchingNamespace"));
+            Assert.That(normalViolations, Is.Empty,
+                "The exclusion's file-level namespace selector is refined by its when predicate.");
+        });
+    }
+
+    [Test]
     public void ApplicabilityInventory_ExhaustiveScope_UnmappedFolderIsUnassessable()
     {
         ArchitectureLayoutConventionApplicabilityContract inventory = CreateInventory(

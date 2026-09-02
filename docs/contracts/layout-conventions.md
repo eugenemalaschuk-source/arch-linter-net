@@ -131,7 +131,7 @@ contracts:
           convention_id: services-are-concrete-classes
 ```
 
-The inventory produces normal applicability evidence, so existing CLI, JSON, SARIF, testing-adapter, and baseline views report the parent inventory ID, the stable expected-folder control ID, and reason codes. A declared folder with no observable source facts is `stale_declaration`; a declared folder whose linked selector matches none of its source facts is `unexpected_empty_input`. With `exhaustive: true`, every source subject in scope must map to exactly one distinct linked convention: missing mappings are `unmapped_subject`, and mappings to more than one convention are `ambiguous_subject`.
+The inventory produces normal applicability evidence, so existing CLI, JSON, SARIF, testing-adapter, and baseline views report the parent inventory ID, the stable expected-folder control ID, and reason codes. A declared folder with no observable source facts is `stale_declaration`; a declared folder whose linked selector matches none of its source facts is `unexpected_empty_input`. With `exhaustive: true`, every source subject in scope must map to exactly one distinct linked convention: missing mappings are `unmapped_subject`, and mappings to more than one convention are `ambiguous_subject`. The inventory retains one scope control for completion state, while each unmapped or ambiguous subject also emits its own path-and-type identity, so an accepted debt for one subject cannot suppress a later one.
 
 `audit_layout_convention_applicability` uses the same data model but only contributes audit-mode findings. It never changes a strict-mode result unless the corresponding strict inventory is configured.
 

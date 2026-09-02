@@ -333,7 +333,7 @@ internal static class ArchitectureContractFamilyRegistry
         new(
             "layout_convention_applicability", "strict_layout_convention_applicability", "audit_layout_convention_applicability", true,
             g => g.StrictLayoutConventionApplicability, g => g.AuditLayoutConventionApplicability,
-            CheckLayoutConventionApplicabilityContract)
+            LayoutConventionApplicabilityContractHandler.Check)
         {
             OwnedContractTypes = new[] { typeof(ArchitectureLayoutConventionApplicabilityContract) },
         },
@@ -459,26 +459,4 @@ internal static class ArchitectureContractFamilyRegistry
     private static ArchitectureHandlerResult CheckLayerContract(ArchitectureAnalysisSession session, IArchitectureContract contract) =>
         ArchitectureHandlerResult.FromViolations(session.CheckLayerContract((ArchitectureLayerContract)contract));
 
-    private static ArchitectureHandlerResult CheckLayoutConventionApplicabilityContract(
-        ArchitectureAnalysisSession session,
-        IArchitectureContract contract)
-    {
-        var inventory = (ArchitectureLayoutConventionApplicabilityContract)contract;
-        bool strict = string.Equals(
-            session.Catalog.ResolveGroup(inventory),
-            "strict_layout_convention_applicability",
-            StringComparison.Ordinal);
-        IReadOnlyList<ArchitectureLayoutConventionContract> conventions = strict
-            ? session.Document.Contracts.StrictLayoutConventions
-            : session.Document.Contracts.AuditLayoutConventions;
-        LayoutConventionApplicabilityChecker.Result result = LayoutConventionApplicabilityChecker.Evaluate(
-            session.CheckerContext,
-            inventory,
-            conventions);
-        return new ArchitectureHandlerResult(Array.Empty<ArchitectureViolation>(), Array.Empty<string>())
-        {
-            ApplicabilityExpectedEntries = result.ExpectedEntries,
-            ApplicabilityRecords = result.Records,
-        };
-    }
 }

@@ -720,7 +720,7 @@ internal static partial class LayoutConventionChecker
                 $"Unrecognized type kind '{value}'. Expected one of: class, interface, struct, enum, record, delegate.");
     }
 
-    private sealed record LayoutFileGroup(
+    internal sealed record LayoutFileGroup(
         string? SourceFilePath,
         string? FileNameWithoutExtension,
         List<ArchitectureDeclaredTypeFact> Facts);

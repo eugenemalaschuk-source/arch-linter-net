@@ -25,11 +25,20 @@ internal static class LayoutConventionApplicabilityChecker
             .Select(folder => conventions.Single(convention => string.Equals(
                 convention.Id, folder.ConventionId, StringComparison.Ordinal)))
             .ToArray();
-        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity = linkedConventions
-            .Any(ConventionUsesWhen)
-                ? LayoutConventionChecker.BuildTypeIdentityLookup(context)
-                : null;
-        SourceSubject[] subjects = BuildSubjects(context, inventory.Scope);
+
+        // Built once and shared by both the source-declaration inventory and every convention
+        // projection below. A partial type can have one reflected fact but several real source
+        // declarations, so the source declaration, rather than the primary fact path, is the
+        // inventory's unit of observation.
+        Dictionary<(string AssemblyName, string FullTypeName), Type> typesByIdentity =
+            LayoutConventionChecker.BuildTypeIdentityLookup(context);
+        (SourceSubject[] subjects,
+            Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> candidatesByFile) =
+            BuildSubjects(context, inventory.Scope, typesByIdentity);
+
+        HashSet<string>[] effectiveSubjectIdentities = linkedConventions
+            .Select(convention => BuildEffectiveSubjectIdentities(convention, context, candidatesByFile))
+            .ToArray();
         var expectedEntries = new List<ArchitectureApplicabilityExpectedEntry>();
         var records = new List<ArchitectureApplicabilityRecord>();
 
@@ -56,14 +65,25 @@ internal static class LayoutConventionApplicabilityChecker
                 continue;
             }
 
-            records.Add(folderSubjects.Any(subject => MatchesConvention(
-                    linkedConventions[index], subject.Fact, context, typesByIdentity))
+            records.Add(folderSubjects.Any(subject => effectiveSubjectIdentities[index].Contains(subject.Identity))
                 ? Evaluable(controlIdentity, provenance)
                 : Unassessable(
                     controlIdentity,
                     ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput,
                     provenance));
         }
+
+        SubjectMapping[] subjectMappings = subjects
+            .SelectMany(subject => Enumerable.Range(0, inventory.ExpectedFolders.Count)
+                .Where(index => IsSameOrDescendant(
+                    subject.DirectoryPath,
+                    Combine(inventory.Scope, inventory.ExpectedFolders[index].Path))
+                    && effectiveSubjectIdentities[index].Contains(subject.Identity))
+                .Select(index => new SubjectMapping(subject.Identity, linkedConventions[index].Id!)))
+            .OrderBy(mapping => mapping.SubjectIdentity, StringComparer.Ordinal)
+            .ThenBy(mapping => mapping.ConventionId, StringComparer.Ordinal)
+            .ToArray();
+        var subjectIssues = new List<SubjectIssue>();
 
         if (inventory.Exhaustive)
         {
@@ -76,17 +96,25 @@ internal static class LayoutConventionApplicabilityChecker
                     .Where(index => IsSameOrDescendant(
                         subject.DirectoryPath,
                         Combine(inventory.Scope, inventory.ExpectedFolders[index].Path))
-                        && MatchesConvention(linkedConventions[index], subject.Fact, context, typesByIdentity))
+                        && effectiveSubjectIdentities[index].Contains(subject.Identity))
                     .Select(index => linkedConventions[index].Id)
                     .Distinct(StringComparer.Ordinal)
                     .Count();
                 if (distinctConventionMappings == 0)
                 {
                     reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
+                    subjectIssues.Add(new SubjectIssue(
+                        subject.Identity,
+                        subject.Fact.SourceFilePath!,
+                        ArchitectureApplicabilityReasonCodes.UnmappedSubject));
                 }
                 else if (distinctConventionMappings > 1)
                 {
                     reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
+                    subjectIssues.Add(new SubjectIssue(
+                        subject.Identity,
+                        subject.Fact.SourceFilePath!,
+                        ArchitectureApplicabilityReasonCodes.AmbiguousSubject));
                 }
             }
 
@@ -107,82 +135,96 @@ internal static class LayoutConventionApplicabilityChecker
                     provenance));
         }
 
-        return new Result(expectedEntries, records);
+        return new Result(
+            expectedEntries,
+            records,
+            subjectMappings,
+            subjectIssues
+                .OrderBy(issue => issue.SubjectIdentity, StringComparer.Ordinal)
+                .ThenBy(issue => issue.ReasonCode, StringComparer.Ordinal)
+                .ToArray());
     }
 
-    private static SourceSubject[] BuildSubjects(
+    private static HashSet<string> BuildEffectiveSubjectIdentities(
+        ArchitectureLayoutConventionContract convention,
         ArchitectureCheckerContext context,
-        string scope)
+        Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> candidatesByFile)
+    {
+        // ProjectFiledCandidateGroups is also consumed by LayoutConventionChecker. Keeping this
+        // projection shared prevents the inventory from proving applicability with selector
+        // semantics that the convention checker would never actually use.
+        List<LayoutConventionChecker.LayoutFileGroup> groups =
+            LayoutConventionChecker.ProjectFiledCandidateGroups(
+                convention,
+                context,
+                candidatesByFile,
+                new bool[convention.ExcludeFilesMatching.Count],
+                out _);
+        return groups
+            .SelectMany(group => group.Facts.Select(fact => BuildSubjectIdentity(group.SourceFilePath!, fact)))
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    private static (
+        SourceSubject[] Subjects,
+        Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> CandidatesByFile)
+        BuildSubjects(
+            ArchitectureCheckerContext context,
+            string scope,
+            IReadOnlyDictionary<(string AssemblyName, string FullTypeName), Type> typesByIdentity)
     {
         string normalizedScope = Normalize(scope);
-        return context.SourceFileFactIndex.SourceDeclarations
-            .GroupBy(declaration => (
-                declaration.AssemblyName,
-                declaration.FullTypeName,
-                declaration.SourceFilePath))
-            .Select(group => group.First())
-            .Select(declaration => context.SourceFileFactIndex.TryGetFact(
-                declaration.AssemblyName,
-                declaration.FullTypeName,
-                out ArchitectureDeclaredTypeFact fact)
-                    ? CreateSourceSubject(fact, declaration.SourceFilePath)
-                    : null)
-            .OfType<SourceSubject>()
-            .Where(subject => IsSameOrDescendant(subject.DirectoryPath, normalizedScope))
-            .OrderBy(subject => subject.DirectoryPath, StringComparer.Ordinal)
-            .ThenBy(subject => subject.Fact.FullTypeName, StringComparer.Ordinal)
-            .ThenBy(subject => subject.Fact.AssemblyName, StringComparer.Ordinal)
-            .ThenBy(subject => subject.Fact.SourceFilePath, StringComparer.Ordinal)
-            .ToArray();
-    }
+        var candidatesByFile = new Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>>(StringComparer.Ordinal);
+        var subjects = new List<SourceSubject>();
 
-    private static bool MatchesConvention(
-        ArchitectureLayoutConventionContract convention,
-        ArchitectureDeclaredTypeFact fact,
-        ArchitectureCheckerContext context,
-        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
-    {
-        if (!MatchesMatcher(convention.FilesMatching, fact, context, typesByIdentity))
+        foreach (ArchitectureTypeSourceDeclaration declaration in context.SourceFileFactIndex.SourceDeclarations
+                     .GroupBy(declaration => (
+                         declaration.AssemblyName,
+                         declaration.FullTypeName,
+                         declaration.SourceFilePath))
+                     .Select(group => group.First())
+                     .OrderBy(declaration => declaration.SourceFilePath, StringComparer.Ordinal)
+                     .ThenBy(declaration => declaration.FullTypeName, StringComparer.Ordinal)
+                     .ThenBy(declaration => declaration.AssemblyName, StringComparer.Ordinal))
         {
-            return false;
+            if (!context.SourceFileFactIndex.TryGetFact(
+                    declaration.AssemblyName,
+                    declaration.FullTypeName,
+                    out ArchitectureDeclaredTypeFact fact)
+                || !typesByIdentity.TryGetValue(
+                    (declaration.AssemblyName, declaration.FullTypeName),
+                    out Type? type))
+            {
+                continue;
+            }
+
+            SourceSubject subject = CreateSourceSubject(fact, declaration.SourceFilePath);
+            if (!IsSameOrDescendant(subject.DirectoryPath, normalizedScope))
+            {
+                continue;
+            }
+
+            subjects.Add(subject);
+            if (!candidatesByFile.TryGetValue(
+                    subject.Fact.SourceFilePath!,
+                    out List<(Type Type, ArchitectureDeclaredTypeFact Fact)>? entries))
+            {
+                entries = new List<(Type, ArchitectureDeclaredTypeFact)>();
+                candidatesByFile[subject.Fact.SourceFilePath!] = entries;
+            }
+
+            entries.Add((type, subject.Fact));
         }
 
-        return !convention.ExcludeFilesMatching.Any(matcher =>
-            MatchesMatcher(matcher, fact, context, typesByIdentity));
+        return (
+            subjects
+                .OrderBy(subject => subject.DirectoryPath, StringComparer.Ordinal)
+                .ThenBy(subject => subject.Fact.FullTypeName, StringComparer.Ordinal)
+                .ThenBy(subject => subject.Fact.AssemblyName, StringComparer.Ordinal)
+                .ThenBy(subject => subject.Fact.SourceFilePath, StringComparer.Ordinal)
+                .ToArray(),
+            candidatesByFile);
     }
-
-    private static bool MatchesMatcher(
-        ArchitectureLayoutFileMatcher matcher,
-        ArchitectureDeclaredTypeFact fact,
-        ArchitectureCheckerContext context,
-        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
-    {
-        if (fact.SourceFilePath is null
-            || (!string.IsNullOrEmpty(matcher.FolderSegment)
-                && !fact.FolderSegments.Contains(matcher.FolderSegment, StringComparer.Ordinal))
-            || (!string.IsNullOrEmpty(matcher.NamespaceSegment)
-                && !fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal))
-            || (!string.IsNullOrEmpty(matcher.FileNameSuffix)
-                && (fact.FileNameWithoutExtension is null
-                    || !fact.FileNameWithoutExtension.EndsWith(matcher.FileNameSuffix, StringComparison.Ordinal)))
-            || (!string.IsNullOrEmpty(matcher.FileNamePrefix)
-                && (fact.FileNameWithoutExtension is null
-                    || !fact.FileNameWithoutExtension.StartsWith(matcher.FileNamePrefix, StringComparison.Ordinal))))
-        {
-            return false;
-        }
-
-        return LayoutConventionChecker.MatchesWhenForSourceType(
-            matcher,
-            context,
-            fact.AssemblyName,
-            fact.FullTypeName,
-            typesByIdentity);
-    }
-
-    private static bool ConventionUsesWhen(ArchitectureLayoutConventionContract convention) =>
-        convention.FilesMatching.CompiledWhen is not null
-        || convention.ExcludeFilesMatching.Any(matcher => matcher.CompiledWhen is not null);
 
     private static SourceSubject CreateSourceSubject(
         ArchitectureDeclaredTypeFact fact,
@@ -190,15 +232,20 @@ internal static class LayoutConventionApplicabilityChecker
     {
         string normalizedPath = Normalize(sourceFilePath);
         string directoryPath = DirectoryOf(normalizedPath);
+        ArchitectureDeclaredTypeFact sourceFact = fact with
+        {
+            SourceFilePath = normalizedPath,
+            FileNameWithoutExtension = GetFileNameWithoutExtension(normalizedPath),
+            FolderSegments = GetFolderSegments(normalizedPath),
+        };
         return new SourceSubject(
             directoryPath,
-            fact with
-            {
-                SourceFilePath = normalizedPath,
-                FileNameWithoutExtension = GetFileNameWithoutExtension(normalizedPath),
-                FolderSegments = GetFolderSegments(normalizedPath),
-            });
+            sourceFact,
+            BuildSubjectIdentity(normalizedPath, sourceFact));
     }
+
+    private static string BuildSubjectIdentity(string sourceFilePath, ArchitectureDeclaredTypeFact fact) =>
+        $"{sourceFilePath}|{fact.AssemblyName}|{fact.FullTypeName}";
 
     private static string Combine(string scope, string path)
     {
@@ -260,9 +307,21 @@ internal static class LayoutConventionApplicabilityChecker
         || (prefix != "." && path.StartsWith(prefix + "/", StringComparison.Ordinal))
         || prefix == ".";
 
-    private sealed record SourceSubject(string DirectoryPath, ArchitectureDeclaredTypeFact Fact);
+    private sealed record SourceSubject(
+        string DirectoryPath,
+        ArchitectureDeclaredTypeFact Fact,
+        string Identity);
+
+    internal sealed record SubjectMapping(string SubjectIdentity, string ConventionId);
+
+    internal sealed record SubjectIssue(
+        string SubjectIdentity,
+        string SourceFilePath,
+        string ReasonCode);
 
     internal sealed record Result(
         IReadOnlyList<ArchitectureApplicabilityExpectedEntry> ExpectedEntries,
-        IReadOnlyList<ArchitectureApplicabilityRecord> Records);
+        IReadOnlyList<ArchitectureApplicabilityRecord> Records,
+        IReadOnlyList<SubjectMapping> SubjectMappings,
+        IReadOnlyList<SubjectIssue> SubjectIssues);
 }
