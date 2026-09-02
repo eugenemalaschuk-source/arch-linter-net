@@ -384,7 +384,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         }
 
         return fields;
-}
+    }
     private static string ResolveMode(ParseResult parseResult)
     {
         string mode = StrictMode;
