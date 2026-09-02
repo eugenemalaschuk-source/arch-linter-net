@@ -27,6 +27,16 @@ internal sealed class HealthCommandHandler(
           -m, --mode <mode>            strict, audit, or all (default: all)
               --contract <id>          Restrict complete analysis to a contract (repeatable)
               --condition-set <name>   Select policy condition set
+              --execution-context <id> Correlate a persisted JSON artifact with its change report
+              --external-evidence <binding>
+                                      Bind a declared external_evidence requirement to a
+                                      repository-local SARIF artifact. Repeatable: id=<id>,
+                                      path=<path>[,repository=<value>][,revision=<value>][,scope=<value>]
+              --evidence-repository <value>
+                                      Current repository identity for external-evidence context
+              --evidence-revision <value>
+                                      Current source revision for external-evidence context
+              --evidence-scope <value> Current assessment scope for external-evidence context
               --base-context <path>    Base effective-policy context JSON (requires --current-context)
               --current-context <path> Current effective-policy context JSON (requires --base-context)
               --ensure-built           Build and receipt-verify before complete candidate collection
@@ -47,7 +57,12 @@ internal sealed class HealthCommandHandler(
           2   Gate is unassessable, or arguments/contexts/policy/runtime are invalid
         """;
 
-    public int Execute(ArchitectureAnalysisCommandOptions options)
+    public int Execute(
+        ArchitectureAnalysisCommandOptions options,
+        string? executionContext = null,
+        IReadOnlyList<SarifEvidenceArtifactReference>? externalEvidenceArtifacts = null,
+        SarifEvidenceAssessmentContext? externalEvidenceAssessmentContext = null,
+        string? externalEvidenceParseError = null)
     {
         if (options.ShowHelp)
         {
@@ -57,6 +72,8 @@ internal sealed class HealthCommandHandler(
 
         if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
             || !TryValidateFormat(options.Format)
+            || !TryValidateExecutionContext(executionContext, options.Format)
+            || !TryValidateExternalEvidenceParseError(externalEvidenceParseError, options.Format)
             || !BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "health", options.BaselinePath)
             || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
             || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath ?? string.Empty)
@@ -70,6 +87,9 @@ internal sealed class HealthCommandHandler(
             ArchitectureHealthOutcome outcome = runtime.EvaluateHealth(new ArchitectureHealthRequest
             {
                 DebtGate = ArchitectureAnalysisCommandSupport.CreateDebtGateRequest(options, fileSystem, cancellationToken),
+                ExecutionContext = executionContext,
+                ExternalEvidenceArtifacts = externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>(),
+                ExternalEvidenceAssessmentContext = externalEvidenceAssessmentContext,
             });
 
             console.Out.WriteLine(options.Format == "json"
@@ -104,6 +124,28 @@ internal sealed class HealthCommandHandler(
         }
 
         CliErrorOutputWriter.Write(console, format, "invalid-format", "Invalid format. Use 'human' or 'json'.");
+        return false;
+    }
+
+    private bool TryValidateExecutionContext(string? executionContext, string format)
+    {
+        if (executionContext is null || !string.IsNullOrWhiteSpace(executionContext))
+        {
+            return true;
+        }
+
+        CliErrorOutputWriter.Write(console, format, "invalid-execution-context", "--execution-context must not be blank.");
+        return false;
+    }
+
+    private bool TryValidateExternalEvidenceParseError(string? parseError, string format)
+    {
+        if (parseError is null)
+        {
+            return true;
+        }
+
+        CliErrorOutputWriter.Write(console, format, "invalid-external-evidence", parseError);
         return false;
     }
 

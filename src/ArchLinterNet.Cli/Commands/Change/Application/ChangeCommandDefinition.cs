@@ -65,19 +65,22 @@ internal sealed class ChangeCommandDefinition(ChangeCommandHandler handler)
         Option<string> format = OptionWithDefault("--format", "human");
         format.Aliases.Add("-f");
         Option<string> output = new("--output");
+        Option<string> executionContext = new("--execution-context");
         Option<bool> help = new("--help");
         help.Aliases.Add("-h");
         command.Options.Add(baseline);
         command.Options.Add(current);
         command.Options.Add(format);
         command.Options.Add(output);
+        command.Options.Add(executionContext);
         command.Options.Add(help);
         command.SetAction(result => handler.CreateReport(new ChangeReportCommandOptions(
             result.GetValue(baseline) ?? string.Empty,
             result.GetValue(current) ?? string.Empty,
             result.GetValue(format) ?? "human",
             result.GetValue(output),
-            result.GetValue(help))));
+            result.GetValue(help),
+            result.GetValue(executionContext))));
         return command;
     }
 

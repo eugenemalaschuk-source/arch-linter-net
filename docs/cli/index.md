@@ -71,7 +71,7 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 <!-- cli-command: change report -->
 
-| `arch-linter-net change report --base <path> --current <path>` | Compare two architecture snapshots. |
+| `arch-linter-net change report --base <path> --current <path> --execution-context <id>` | Compare two architecture snapshots into a correlatable report artifact. |
 
 <!-- cli-command: coverage -->
 
@@ -95,7 +95,7 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 <!-- cli-command: health -->
 
-| `arch-linter-net health ...` | Project the canonical non-compensating architecture-health/v1 summary. |
+| `arch-linter-net health ...` | Project the canonical non-compensating architecture-health/v1 summary, including bound external evidence when configured. |
 
 <!-- cli-command: graph -->
 
@@ -148,6 +148,14 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 <!-- cli-command: public-api update -->
 
 | `arch-linter-net public-api update ...` | Update a reviewed public API snapshot. |
+
+<!-- cli-command: report -->
+
+| `arch-linter-net report` | Render reports from canonical local architecture artifacts. |
+
+<!-- cli-command: report pr -->
+
+| `arch-linter-net report pr --health <architecture-health.json> --change <architecture-change.json>` | Render a deterministic architecture-only pull-request Markdown report from canonical artifacts; does not rerun analysis or call GitHub. |
 
 <!-- cli-command: scaffold -->
 
@@ -273,7 +281,8 @@ arch-linter-net health \
   --policy architecture/arch.yml \
   --baseline architecture/baseline.arch.yml \
   --mode all \
-  --format json
+  --format json \
+  --execution-context pr-123
 ```
 
 `health` is a read-only projection of canonical architecture-governance authorities. It reports
@@ -281,6 +290,13 @@ the ordered `architecture-health/v1` dimensions and their reasons in human or JS
 projection is non-compensating: it has no score, percentage, letter grade, badge, pull-request
 rendering, or SARIF output. A valid but unassessable result is emitted as a health document rather
 than a command-error document.
+
+For each policy-declared `external_evidence` requirement, pass one repository-local SARIF binding:
+`--external-evidence id=<id>,path=<path>`. Add `repository=<value>`, `revision=<value>`, and
+`scope=<value>` to a binding when that artifact's producer context is supplied outside SARIF. The
+current assessment context is explicit and shared by the bindings: use `--evidence-repository`,
+`--evidence-revision`, and `--evidence-scope`. Health uses the same canonical binding authority as
+validation before it writes its reporting evidence.
 
 For topology, metric budgets, and imported external diagnostics, `evaluable` means only that the
 authority could assess the control; the health dimension still reflects that authority's resulting
@@ -293,6 +309,85 @@ Coverage retains its existing severity semantics in Health: `analysis.coverage: 
 while `warn` remains non-blocking reportable evidence. For `--mode audit` and `--mode all`,
 `audit_evidence` preserves audit-only diagnostics without turning the Health gate into a strict
 failure.
+
+## Architecture pull-request report
+
+Render a reviewer-oriented Markdown report from a canonical Health artifact and a canonical
+architecture-change report:
+
+```bash
+arch-linter-net report pr \
+  --health architecture-health.json \
+  --change architecture-change.json \
+  --output architecture-pr-report.md \
+  --max-details 20
+```
+
+`--output` is optional; without it, Markdown is written to standard output. `--max-details` is
+optional and must be a positive count. It bounds each detailed evidence section independently while
+retaining canonical totals and making omitted details explicit. The report is deterministic and
+architecture-only: it reads the supplied artifacts, does not run or recreate analysis, and does not
+inspect or call GitHub.
+
+The Health input must be an `architecture-health/v1` document from a supported CLI. When it includes
+versioned canonical reporting evidence, its non-empty execution context must match the versioned
+canonical architecture-change JSON report's context and selected mode receipt; mismatches are
+rejected. A legacy Health artifact without the reporting-evidence envelope still renders a report,
+but all evidence drill-down is explicitly `unavailable`; it is never presented as zero or pass. The
+command does not reopen snapshots or compare them again.
+
+Create the pair from the real producers using one workflow-owned identifier:
+
+```bash
+# Base and candidate checkouts/worktrees, respectively
+arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output base-snapshot.json
+arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output current-snapshot.json
+
+arch-linter-net change report \
+  --base base-snapshot.json \
+  --current current-snapshot.json \
+  --execution-context pr-123 \
+  --format json \
+  --output architecture-change.json
+
+arch-linter-net health \
+  --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --mode strict \
+  --format json \
+  --execution-context pr-123 \
+  > architecture-health.json
+```
+
+If that policy declares required external evidence, add the producer inputs to the same Health
+invocation, for example:
+
+```bash
+arch-linter-net health \
+  --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --mode strict \
+  --format json \
+  --execution-context pr-123 \
+  --external-evidence id=security-scan,path=artifacts/security.sarif \
+  --evidence-repository example/repository \
+  --evidence-revision "$GIT_COMMIT" \
+  --evidence-scope pull-request \
+  > architecture-health.json
+```
+
+The report headline repeats direct Health/projection facts such as `gate` and `health`; it is not a
+score, percentage, grade, or compensating quality calculation. Rule/effective-control counts,
+applicability completeness, topology evidence, and external evidence remain separate sections and
+must not be combined or inferred from one another. For each configured external evidence artifact,
+the report retains its logical identity and canonical trust receipt: `current`, `stale`, or
+`wrong_context` as applicable, plus the selected run/result provenance. A valid evidence run with
+zero findings is shown as `current` with `results=0`. Missing or incomplete canonical evidence is
+rendered as unavailable or unassessable, never as zero or pass. Canonical identities and provenance
+are retained where supplied so reviewers can drill back to the source artifacts.
+
+This command only renders the local report. GitHub comment publication, workflow/event orchestration,
+security permissions, and related integration remain outside this command's boundary in #681.
 
 ## Change snapshots
 
@@ -312,6 +407,7 @@ arch-linter-net change snapshot \
 arch-linter-net change report \
   --base base-snapshot.json \
   --current current-snapshot.json \
+  --execution-context local-review \
   --format human
 ```
 

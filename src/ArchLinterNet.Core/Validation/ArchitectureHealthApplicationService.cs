@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation.Abstractions;
 
 namespace ArchLinterNet.Core.Validation;
@@ -38,6 +39,11 @@ public sealed class ArchitectureHealthApplicationService(
         ArchitectureHealthValidationOutcome[] validationOutcomes = modes
             .Select(mode => new ArchitectureHealthValidationOutcome(mode, snapshot.Evaluate(mode)))
             .ToArray();
+        validationOutcomes = AttachExternalEvidence(
+            validationOutcomes,
+            request.ExternalEvidenceArtifacts,
+            request.ExternalEvidenceAssessmentContext,
+            debtGateRequest.CancellationToken);
         ArchitectureDebtGateOutcome debtGate = debtGateService.Evaluate(debtGateRequest, snapshot);
         return new ArchitectureHealthOutcome(
             ArchitectureHealthProjector.Project(validationOutcomes, debtGate),
@@ -45,6 +51,8 @@ public sealed class ArchitectureHealthApplicationService(
             debtGate)
         {
             AnalysisCounters = snapshot.Counters,
+            ExecutionContext = request.ExecutionContext,
+            ConditionSetName = debtGateRequest.ConditionSetName ?? string.Empty,
         };
     }
 
@@ -55,4 +63,32 @@ public sealed class ArchitectureHealthApplicationService(
         "all" => ["strict", "audit"],
         _ => throw new ArgumentException("Invalid mode. Use 'strict', 'audit', or 'all'.", nameof(mode)),
     };
+
+    private static ArchitectureHealthValidationOutcome[] AttachExternalEvidence(
+        IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes,
+        IReadOnlyList<SarifEvidenceArtifactReference> artifacts,
+        SarifEvidenceAssessmentContext? assessmentContext,
+        CancellationToken cancellationToken)
+    {
+        ArchitectureHealthValidationOutcome first = outcomes[0];
+        ArchitectureExternalEvidenceBinder.ValidateBindingIds(
+            first.Outcome.ExternalEvidenceRequirements,
+            artifacts);
+        if (first.Outcome.PreflightBlocked)
+        {
+            return outcomes.ToArray();
+        }
+
+        ArchitectureExternalEvidenceBindingResult binding = ArchitectureExternalEvidenceBinder.Evaluate(
+            first.Outcome.ExternalEvidenceRequirements,
+            first.Outcome.RepositoryRoot,
+            artifacts,
+            assessmentContext,
+            cancellationToken);
+        return outcomes
+            .Select(outcome => new ArchitectureHealthValidationOutcome(
+                outcome.Mode,
+                ArchitectureExternalEvidenceBinder.Attach(outcome.Outcome, binding, outcome.Mode)))
+            .ToArray();
+    }
 }

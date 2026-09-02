@@ -335,7 +335,7 @@ internal sealed class CliRuntime : ICliRuntime
 
     public string FormatHealthAsJson(ArchitectureHealthOutcome outcome)
     {
-        return ArchitectureHealthProjector.FormatAsJson(outcome.Summary);
+        return ArchitectureHealthProjector.FormatAsJson(outcome);
     }
 
     public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)

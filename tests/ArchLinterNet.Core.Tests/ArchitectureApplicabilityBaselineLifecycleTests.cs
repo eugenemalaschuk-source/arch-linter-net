@@ -91,9 +91,9 @@ public sealed class ArchitectureApplicabilityBaselineLifecycleTests
         ArchitectureChangeSnapshot initial = Snapshot(initialProjection);
         ArchitectureChangeSnapshot changed = Snapshot(changedProjection);
 
-        ArchitectureChangeReport newlyIntroduced = ArchitectureChangeReports.Compare(withoutApplicability, initial);
-        ArchitectureChangeReport exactKnown = ArchitectureChangeReports.Compare(initial, initial);
-        ArchitectureChangeReport identityChanged = ArchitectureChangeReports.Compare(initial, changed);
+        ArchitectureChangeReport newlyIntroduced = ArchitectureChangeReports.Compare(withoutApplicability, initial, "run");
+        ArchitectureChangeReport exactKnown = ArchitectureChangeReports.Compare(initial, initial, "run");
+        ArchitectureChangeReport identityChanged = ArchitectureChangeReports.Compare(initial, changed, "run");
 
         Assert.Multiple(() =>
         {

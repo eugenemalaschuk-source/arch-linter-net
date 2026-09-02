@@ -16,6 +16,8 @@ global using ArchLinterNet.Cli.Commands.Policy.Application;
 global using ArchLinterNet.Cli.Commands.Policy.EntryPoint;
 global using ArchLinterNet.Cli.Commands.PublicApi.Application;
 global using ArchLinterNet.Cli.Commands.PublicApi.EntryPoint;
+global using ArchLinterNet.Cli.Commands.Report.Application;
+global using ArchLinterNet.Cli.Commands.Report.EntryPoint;
 global using ArchLinterNet.Cli.Commands.Scaffold.Application;
 global using ArchLinterNet.Cli.Commands.Scaffold.EntryPoint;
 global using ArchLinterNet.Cli.Commands.Schema.Application;

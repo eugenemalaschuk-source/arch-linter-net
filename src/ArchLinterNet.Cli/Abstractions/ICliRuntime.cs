@@ -258,7 +258,7 @@ internal interface ICliRuntime
         ArchitectureHealthProjector.FormatAsHuman(outcome.Summary);
 
     string FormatHealthAsJson(ArchitectureHealthOutcome outcome) =>
-        ArchitectureHealthProjector.FormatAsJson(outcome.Summary);
+        ArchitectureHealthProjector.FormatAsJson(outcome);
 
     PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request);
 

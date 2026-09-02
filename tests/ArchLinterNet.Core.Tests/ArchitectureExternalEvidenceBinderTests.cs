@@ -73,6 +73,9 @@ public sealed class ArchitectureExternalEvidenceBinderTests
             Assert.That(result.ImportedDiagnostics.Findings, Is.Empty);
             Assert.That(result.ApplicabilityRecords.Single().State,
                 Is.EqualTo(ArchitectureApplicabilityRecordState.Evaluable));
+            Assert.That(result.TrustReceipts.Single().Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid));
+            Assert.That(result.TrustReceipts.Single().LogicalId, Is.EqualTo("external.scan"));
+            Assert.That(result.TrustReceipts.Single().ResultCount, Is.EqualTo(0));
         });
     }
 
@@ -128,6 +131,7 @@ public sealed class ArchitectureExternalEvidenceBinderTests
             Assert.That(result.ApplicabilityRecords.Single().State,
                 Is.EqualTo(ArchitectureApplicabilityRecordState.Unassessable));
             Assert.That(result.ImportedDiagnostics.Findings, Is.Empty);
+            Assert.That(result.TrustReceipts.Single().Status, Is.EqualTo(SarifEvidenceTrustStatus.MissingRequiredInput));
         });
     }
 
@@ -149,6 +153,7 @@ public sealed class ArchitectureExternalEvidenceBinderTests
             Assert.That(result.ApplicabilityRecords.Single().State,
                 Is.EqualTo(ArchitectureApplicabilityRecordState.Unassessable));
             Assert.That(result.ImportedDiagnostics.Findings, Is.Empty);
+            Assert.That(result.TrustReceipts.Single().Status, Is.EqualTo(SarifEvidenceTrustStatus.WrongRevision));
         });
     }
 
@@ -296,6 +301,8 @@ public sealed class ArchitectureExternalEvidenceBinderTests
             Assert.That(result.AssessmentCompletionEvidence!.State,
                 Is.EqualTo(ArchitectureAssessmentCompletionState.Pass));
             Assert.That(result.Passed, Is.True);
+            Assert.That(result.ExternalEvidenceTrustReceipts.Single().Status,
+                Is.EqualTo(SarifEvidenceTrustStatus.Valid));
         });
     }
 

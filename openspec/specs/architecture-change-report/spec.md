@@ -140,3 +140,34 @@ The system SHALL collapse repeated semantic-role observations only when their su
 - **WHEN** two structurally different semantic-role observations serialize to the same `(Kind, Identity)` pair because their legacy identity encoding is ambiguous
 - **THEN** snapshot serialization rejects the snapshot with the duplicate-or-empty entry-identity error
 - **AND THEN** neither observation is silently removed or merged
+
+### Requirement: Change report retains resolved findings for downstream projections
+The deterministic architecture-change report SHALL retain the stable normalized findings present in the base snapshot but absent from the current snapshot as `resolved_findings`, separately from added, existing, and baseline-debt findings. The report SHALL preserve the same compatible-mode and condition-set validation, ordering, and complete-snapshot-only comparison rules as its other delta sections.
+
+#### Scenario: Resolved finding is retained without a second comparison
+- **WHEN** a finding exists in a compatible base snapshot and is absent from the compatible current snapshot
+- **THEN** the canonical change report contains that finding once in its ordered resolved-findings section
+- **AND** downstream consumers can disclose the resolution without reopening or recomparing either snapshot
+
+#### Scenario: Existing and new findings remain distinct from resolutions
+- **WHEN** a compatible current snapshot contains one base-known finding and one finding absent from the base while another base finding is absent from current
+- **THEN** the report retains the three findings in existing, new, and resolved sections respectively
+- **AND** no finding is counted in more than one section
+
+### Requirement: Persisted change reports carry compatible execution context
+The versioned machine-readable architecture-change report SHALL retain the
+mode and condition-set scope validated from its input snapshots and a
+non-empty execution identifier supplied by the report workflow.  Consumers
+SHALL reject a report whose context is absent, malformed, or unsupported.
+
+#### Scenario: Change report retains report workflow identity
+- **WHEN** a workflow compares compatible strict snapshots with an execution
+  identifier
+- **THEN** its JSON report retains that identifier, strict mode, and
+  condition-set scope alongside the ordered delta sections
+
+#### Scenario: Context-less report is unsupported
+- **WHEN** a consumer reads a persisted architecture-change report without
+  required execution context
+- **THEN** it rejects the report rather than treating it as compatible with a
+  Health artifact

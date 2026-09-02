@@ -91,6 +91,13 @@ debt, and policy weakening authorities. History is explicitly `not_configured` u
 advisory-only history input is added. The command does not parse another command's output or
 recompute any dimension in the CLI.
 
+When the selected policy declares `external_evidence`, supply its repository-local SARIF inputs
+through repeatable `--external-evidence id=<id>,path=<path>` bindings and supply the current
+producer context with `--evidence-repository`, `--evidence-revision`, and, when required,
+`--evidence-scope`. Health binds those artifacts through the canonical trust authority before it
+projects JSON, so a matching zero-result SARIF receipt remains `current` rather than becoming an
+unavailable report authority.
+
 Human output is Core's readable projection. JSON is one health document with `schema_id`, `gate`,
 `health`, and ordered `dimensions`; each dimension retains ordered `reasons`. The health model is
 non-compensating and deliberately has no score, percentage, letter grade, badge, PR rendering, or
@@ -109,6 +116,37 @@ Coverage follows its existing severity authority: `analysis.coverage: error` pro
 coverage dimension, while `warn` retains the finding as non-blocking degrading evidence. When
 `--mode audit` is requested, ordinary audit diagnostics are retained in the non-blocking
 `audit_evidence` dimension, so a clean result remains distinguishable from an audit-only result.
+
+## Architecture pull-request report output
+
+`arch-linter-net report pr --health <architecture-health.json> --change <architecture-change.json>` renders deterministic Markdown from two canonical local artifacts. The
+Health input is an `architecture-health/v1` document with versioned canonical reporting evidence;
+the change input is the versioned architecture-change report. Both must carry the same non-empty
+workflow execution identifier and condition-set scope when the Health envelope is present.
+Malformed, incomplete supplied envelopes and incompatible artifacts fail closed. A legacy Health
+artifact that has no reporting-evidence envelope remains a valid input, but the report renders its
+headline with report availability `unavailable` and no fabricated evidence detail. The command consumes
+those artifacts only:
+it does not rerun or recreate analysis, reopen snapshots, inspect GitHub, or publish a pull-request
+comment. Use `--output <architecture-pr-report.md>` to write the Markdown file; otherwise it is
+written to standard output.
+
+Use `--max-details <positive-count>` to bound each detailed evidence family independently. Canonical
+totals and omitted counts remain visible, and ordering is stable across runs. The report combines
+neither evidence nor authority: its headline repeats direct Health/projection `gate` and `health`
+facts and is not a score, percentage, grade, or compensating quality calculation. Effective rule
+counts, applicability completeness, topology evidence, and external evidence remain distinct report
+sections. Change details likewise retain the canonical added, continuing, and resolved evidence
+supplied by the change report.
+
+Missing or incomplete canonical evidence is represented as unavailable or unassessable, never as a
+zero count or passing state. Input/schema incompatibility fails closed rather than being interpreted
+as a clean report. Canonical family, control, policy, evidence, and navigation identities remain
+source references for drill-down; the renderer does not manufacture replacements.
+
+GitHub comment publication, workflow/event orchestration, security permissions, and related
+integration are intentionally deferred to #681. This command is the local architecture-report
+projection only.
 
 ## Human output
 

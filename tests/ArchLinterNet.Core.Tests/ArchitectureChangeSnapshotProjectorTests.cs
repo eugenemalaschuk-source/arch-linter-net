@@ -28,7 +28,7 @@ public sealed partial class ArchitectureChangeSnapshotProjectorTests
             EmptyGraph(),
             Array.Empty<ArchitectureBaselineComparisonEntry>());
 
-        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(linuxSnapshot, windowsSnapshot);
+        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(linuxSnapshot, windowsSnapshot, "run");
 
         Assert.Multiple(() =>
         {
@@ -125,7 +125,7 @@ public sealed partial class ArchitectureChangeSnapshotProjectorTests
             new[] { current.Findings.Single(finding => finding.Identity == knownCanonicalIdentity) },
             Array.Empty<string>());
 
-        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current);
+        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current, "run");
 
         Assert.Multiple(() =>
         {
