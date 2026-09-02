@@ -180,7 +180,7 @@ def _resolve_fixture(
         },
         "jobs": [
             {
-                "name": "Architecture PR Report Producer",
+                "name": "Architecture Coverage",
                 "conclusion": producer_conclusion,
             }
         ],
@@ -269,7 +269,7 @@ def test_ci_producer_uses_per_tree_baseline_and_separate_strict_gate() -> None:
     producer = _job(workflow, "architecture_pr_report_producer", "architecture_pr_report_gate")
     gate = _job(workflow, "architecture_pr_report_gate", "tooling_support_tests")
 
-    assert "name: Architecture PR Report Producer" in producer
+    assert "name: Architecture Coverage" in producer
     assert producer.count("if [[ -f architecture/baseline.arch.yml ]]; then") == 2
     assert "snapshot \"$output_directory/base-architecture-change-snapshot.json\"" in producer
     assert "snapshot \"$output_directory/current-architecture-change-snapshot.json\"" in producer
@@ -306,7 +306,7 @@ def test_resolve_rejects_failed_or_cancelled_producer(producer_conclusion: str) 
 def test_resolve_rejects_ambiguous_producer_jobs() -> None:
     fixture = _resolve_fixture(conclusion="success")
     fixture["jobs"].append(
-        {"name": "Architecture PR Report Producer", "conclusion": "success"},
+        {"name": "Architecture Coverage", "conclusion": "success"},
     )
     result = _run_script("Resolve current PR and bound report artifact", fixture)
 

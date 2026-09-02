@@ -70,7 +70,7 @@ jobs:
               run_id: workflowRun.id,
               per_page: 100,
             });
-            const producerJobs = jobs.filter((job) => job.name === 'Architecture PR Report Producer');
+            const producerJobs = jobs.filter((job) => job.name === 'Architecture Coverage');
             if (producerJobs.length === 0) {
               setResult('producer_missing', values);
               return;

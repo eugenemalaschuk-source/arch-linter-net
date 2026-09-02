@@ -315,7 +315,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   architecture_pr_report_producer:
-    name: Architecture PR Report Producer
+    name: Architecture Coverage
     runs-on: ubuntu-latest
     # This builds the head, materializes a base snapshot, then emits health/change/report artifacts.
     timeout-minutes: 30
