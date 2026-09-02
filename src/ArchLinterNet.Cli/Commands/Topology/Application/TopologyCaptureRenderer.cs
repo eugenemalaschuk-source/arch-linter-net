@@ -112,7 +112,7 @@ internal static class TopologyCaptureRenderer
         {
             contract_name = diagnostic.ContractName,
             contract_id = diagnostic.ContractId,
-            state = PreflightStateToken(diagnostic.State),
+            state = CliErrorOutputWriter.FormatPreflightState(diagnostic.State),
             project_path = evidence.ProjectPath,
             assembly_name = evidence.AssemblyName,
             requested_configuration = evidence.RequestedConfiguration,
@@ -128,20 +128,4 @@ internal static class TopologyCaptureRenderer
         };
     }
 
-    private static string PreflightStateToken(BuildStatePreflightState state) => state switch
-    {
-        BuildStatePreflightState.Cancelled => "cancelled",
-        BuildStatePreflightState.RestoreRequired => "restore-required",
-        BuildStatePreflightState.MissingArtifact => "missing-artifact",
-        BuildStatePreflightState.WrongConfiguration => "wrong-configuration",
-        BuildStatePreflightState.WrongTargetFramework => "wrong-target-framework",
-        BuildStatePreflightState.WrongProjectOutput => "wrong-project-output",
-        BuildStatePreflightState.InconsistentDependencyArtifact => "inconsistent-dependency-artifact",
-        BuildStatePreflightState.StaleArtifact => "stale-artifact",
-        BuildStatePreflightState.UnverifiableArtifact => "unverifiable-artifact",
-        BuildStatePreflightState.Current => "current",
-        BuildStatePreflightState.BuildFailed => "build-failed",
-        BuildStatePreflightState.RestoreFailed => "restore-failed",
-        _ => throw new ArgumentOutOfRangeException(nameof(state), state, null),
-    };
 }

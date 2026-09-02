@@ -89,26 +89,8 @@ internal sealed class TopologyCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        try
+        return ExecuteWithValidationOutcome(options, "diff", outcome =>
         {
-            ValidationOutcome nativeOutcome = runtime.Validate(
-                ValidationExecutionSemantics.CreateRequest(options, options.Mode, cacheLocation: null, cancellationToken), null);
-
-            string? collision = TopologyCommandGuards.FindValidationOutputCollision(
-                options.OutputPath,
-                options.PolicyPath,
-                nativeOutcome,
-                options.BaselinePath,
-                ValidationExecutionSemantics.ResolveExternalEvidencePaths(options, nativeOutcome.RepositoryRoot),
-                fileSystem);
-            if (collision is not null)
-            {
-                return WriteError(options.Format, "output-collision", collision);
-            }
-
-            ValidationOutcome outcome = ValidationExecutionSemantics.AttachExternalEvidence(
-                options, nativeOutcome, options.Mode, cancellationToken);
-
             if (outcome.PreflightBlocked)
             {
                 CliErrorOutputWriter.WritePreflightFailure(
@@ -144,15 +126,7 @@ internal sealed class TopologyCommandHandler(
             return report.IsNonReviewableUnassessability
                 ? CliExitCodes.InvalidArgumentsOrRuntimeError
                 : CliExitCodes.Success;
-        }
-        catch (OperationCanceledException)
-        {
-            return WriteError(options.Format, "cancelled", "Topology diff was cancelled.");
-        }
-        catch (Exception exception)
-        {
-            return WriteException(options.Format, "Topology diff error", exception);
-        }
+        });
     }
 
     public int Verify(TopologyValidationCommandOptions options)
@@ -170,28 +144,8 @@ internal sealed class TopologyCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        try
+        return ExecuteWithValidationOutcome(options, "verify", outcome =>
         {
-            // This is the only validation call in verify. The coordinator only renders the
-            // returned outcome; it never re-evaluates it or creates a topology result envelope.
-            ValidationOutcome nativeOutcome = runtime.Validate(
-                ValidationExecutionSemantics.CreateRequest(options, options.Mode, cacheLocation: null, cancellationToken), null);
-
-            string? collision = TopologyCommandGuards.FindValidationOutputCollision(
-                options.OutputPath,
-                options.PolicyPath,
-                nativeOutcome,
-                options.BaselinePath,
-                ValidationExecutionSemantics.ResolveExternalEvidencePaths(options, nativeOutcome.RepositoryRoot),
-                fileSystem);
-            if (collision is not null)
-            {
-                return WriteError(options.Format, "output-collision", collision);
-            }
-
-            ValidationOutcome outcome = ValidationExecutionSemantics.AttachExternalEvidence(
-                options, nativeOutcome, options.Mode, cancellationToken);
-
             if (!outcome.PreflightBlocked && FindTopologyEvidence(outcome) is null)
             {
                 return WriteError(options.Format, "no-declared-topology",
@@ -204,15 +158,7 @@ internal sealed class TopologyCommandHandler(
             return publishResult != CliExitCodes.Success
                 ? publishResult
                 : ValidateCommandHandler.ResolveValidationExitCode(outcome);
-        }
-        catch (OperationCanceledException)
-        {
-            return WriteError(options.Format, "cancelled", "Topology verify was cancelled.");
-        }
-        catch (Exception exception)
-        {
-            return WriteException(options.Format, "Topology verify error", exception);
-        }
+        });
     }
 
     internal static ArchitectureTopologyMappingEvidence? FindTopologyEvidence(ValidationOutcome outcome) =>
@@ -298,6 +244,43 @@ internal sealed class TopologyCommandHandler(
         }
 
         return true;
+    }
+
+    private int ExecuteWithValidationOutcome(
+        TopologyValidationCommandOptions options,
+        string operation,
+        Func<ValidationOutcome, int> continueWithOutcome)
+    {
+        try
+        {
+            // This is the only validation call for topology diff or verify. The continuation only
+            // projects its returned ordinary-validation outcome; it never re-evaluates topology.
+            ValidationOutcome nativeOutcome = runtime.Validate(
+                ValidationExecutionSemantics.CreateRequest(options, options.Mode, cacheLocation: null, cancellationToken), null);
+            string? collision = TopologyCommandGuards.FindValidationOutputCollision(
+                options.OutputPath,
+                options.PolicyPath,
+                nativeOutcome,
+                options.BaselinePath,
+                ValidationExecutionSemantics.ResolveExternalEvidencePaths(options, nativeOutcome.RepositoryRoot),
+                fileSystem);
+            if (collision is not null)
+            {
+                return WriteError(options.Format, "output-collision", collision);
+            }
+
+            ValidationOutcome outcome = ValidationExecutionSemantics.AttachExternalEvidence(
+                options, nativeOutcome, options.Mode, cancellationToken);
+            return continueWithOutcome(outcome);
+        }
+        catch (OperationCanceledException)
+        {
+            return WriteError(options.Format, "cancelled", $"Topology {operation} was cancelled.");
+        }
+        catch (Exception exception)
+        {
+            return WriteException(options.Format, $"Topology {operation} error", exception);
+        }
     }
 
     private int Publish(string document, string? outputPath, string format, string operation)

@@ -3,7 +3,6 @@ using System.CommandLine.Parsing;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Topology.Abstractions;
 using ArchLinterNet.Cli.Commands.Topology.Application;
-using ArchLinterNet.Cli.Commands.Validate.Application;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Cli.Commands.Topology.EntryPoint;
@@ -127,7 +126,7 @@ internal abstract class TopologyValidationSubcommandModule
         string? externalEvidenceParseError = null;
         try
         {
-            externalEvidenceArtifacts = ValidateCommandDefinition.ParseExternalEvidenceBindings(
+            externalEvidenceArtifacts = ExternalEvidenceCommandSupport.ParseBindings(
                 result.GetValue(externalEvidence));
         }
         catch (InvalidOperationException exception)
@@ -155,7 +154,7 @@ internal abstract class TopologyValidationSubcommandModule
             HasFormatConflict = result.GetValue(json) && result.GetValue(format) is not null,
             WaiverEvaluationDate = result.GetValue(waiverEvaluationDate),
             ExternalEvidenceArtifacts = externalEvidenceArtifacts,
-            ExternalEvidenceAssessmentContext = ValidateCommandDefinition.ResolveExternalEvidenceAssessmentContext(
+            ExternalEvidenceAssessmentContext = ExternalEvidenceCommandSupport.ResolveAssessmentContext(
                 result.GetValue(evidenceRepository), result.GetValue(evidenceRevision), result.GetValue(evidenceScope)),
             ExternalEvidenceParseError = externalEvidenceParseError,
         };
