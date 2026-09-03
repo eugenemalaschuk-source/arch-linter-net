@@ -18,7 +18,12 @@ internal static partial class CheckpointBProcessRunner
         private const uint CreateNoWindowFlag = 0x08000000;
         private const uint HandleFlagInherit = 0x00000001;
         private const nuint ProcThreadAttributeJobList = 0x2000D;
-        private const int StdInputHandle = -10;
+        private const nuint ProcThreadAttributeHandleList = 0x20002;
+        private const uint GenericRead = 0x80000000;
+        private const uint FileShareRead = 0x00000001;
+        private const uint FileShareWrite = 0x00000002;
+        private const uint OpenExisting = 3;
+        private const uint FileAttributeNormal = 0x00000080;
         private static readonly nint _invalidHandleValue = -1;
         private static readonly char[] _pathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
 
@@ -50,7 +55,10 @@ internal static partial class CheckpointBProcessRunner
         /// <summary>
         /// Starts <paramref name="startInfo"/> with this job attached via
         /// PROC_THREAD_ATTRIBUTE_JOB_LIST, so containment happens atomically at process creation
-        /// rather than through a separate post-start AssignProcessToJobObject call.
+        /// rather than through a separate post-start AssignProcessToJobObject call. Inheritance is
+        /// further scoped with PROC_THREAD_ATTRIBUTE_HANDLE_LIST to exactly the three redirected
+        /// stdio handles, so the child cannot pick up unrelated inheritable handles that happen to
+        /// be open in the test host process.
         /// </summary>
         internal (Process Process, StreamReader StandardOutput, StreamReader StandardError) LaunchContained(
             ProcessStartInfo startInfo)
@@ -59,25 +67,37 @@ internal static partial class CheckpointBProcessRunner
             SafeFileHandle? childStandardError = null;
             SafeFileHandle? parentStandardOutput = null;
             SafeFileHandle? parentStandardError = null;
+            SafeFileHandle? standardInput = null;
             nint attributeList = 0;
             nint jobListBuffer = 0;
+            nint handleListBuffer = 0;
             nint environmentBlock = 0;
             nint commandLineBuffer = 0;
             try
             {
                 CreateInheritablePipe(out parentStandardOutput, out childStandardOutput);
                 CreateInheritablePipe(out parentStandardError, out childStandardError);
+                standardInput = CreateInheritableNullHandle();
 
-                attributeList = CreateJobListAttributeList(_handle, out jobListBuffer);
+                nint[] inheritableHandles =
+                [
+                    standardInput.DangerousGetHandle(),
+                    childStandardOutput.DangerousGetHandle(),
+                    childStandardError.DangerousGetHandle(),
+                ];
+                attributeList = CreateProcessAttributeList(
+                    _handle,
+                    inheritableHandles,
+                    out jobListBuffer,
+                    out handleListBuffer);
                 environmentBlock = BuildEnvironmentBlock(startInfo.Environment);
                 commandLineBuffer = Marshal.StringToHGlobalUni(BuildCommandLine(startInfo));
                 string executablePath = ResolveExecutablePath(startInfo.FileName);
 
-                nint stdInputHandle = NativeMethods.GetStdHandle(StdInputHandle);
                 var startupInfo = new StartupInfoEx();
                 startupInfo.StartupInfo.Size = Marshal.SizeOf<StartupInfoEx>();
                 startupInfo.StartupInfo.Flags = StartfUseStdHandles;
-                startupInfo.StartupInfo.StandardInput = stdInputHandle == _invalidHandleValue ? 0 : stdInputHandle;
+                startupInfo.StartupInfo.StandardInput = standardInput.DangerousGetHandle();
                 startupInfo.StartupInfo.StandardOutput = childStandardOutput.DangerousGetHandle();
                 startupInfo.StartupInfo.StandardError = childStandardError.DangerousGetHandle();
                 startupInfo.AttributeList = attributeList;
@@ -122,6 +142,7 @@ internal static partial class CheckpointBProcessRunner
                 childStandardError?.Dispose();
                 parentStandardOutput?.Dispose();
                 parentStandardError?.Dispose();
+                standardInput?.Dispose();
                 if (attributeList != 0)
                 {
                     NativeMethods.DeleteProcThreadAttributeList(attributeList);
@@ -131,6 +152,11 @@ internal static partial class CheckpointBProcessRunner
                 if (jobListBuffer != 0)
                 {
                     Marshal.FreeHGlobal(jobListBuffer);
+                }
+
+                if (handleListBuffer != 0)
+                {
+                    Marshal.FreeHGlobal(handleListBuffer);
                 }
 
                 if (environmentBlock != 0)
@@ -177,13 +203,19 @@ internal static partial class CheckpointBProcessRunner
             }
         }
 
-        private static nint CreateJobListAttributeList(nint jobHandle, out nint jobListBuffer)
+        private static nint CreateProcessAttributeList(
+            nint jobHandle,
+            nint[] inheritableHandles,
+            out nint jobListBuffer,
+            out nint handleListBuffer)
         {
             jobListBuffer = 0;
+            handleListBuffer = 0;
+            const int AttributeCount = 2;
             nuint size = 0;
-            _ = NativeMethods.InitializeProcThreadAttributeList(0, 1, 0, ref size);
+            _ = NativeMethods.InitializeProcThreadAttributeList(0, AttributeCount, 0, ref size);
             nint attributeList = Marshal.AllocHGlobal((nint)size);
-            if (!NativeMethods.InitializeProcThreadAttributeList(attributeList, 1, 0, ref size))
+            if (!NativeMethods.InitializeProcThreadAttributeList(attributeList, AttributeCount, 0, ref size))
             {
                 Marshal.FreeHGlobal(attributeList);
                 throw NativeFailure("initialize the Checkpoint B process attribute list");
@@ -191,7 +223,6 @@ internal static partial class CheckpointBProcessRunner
 
             jobListBuffer = Marshal.AllocHGlobal(nint.Size);
             Marshal.WriteIntPtr(jobListBuffer, jobHandle);
-
             if (!NativeMethods.UpdateProcThreadAttribute(
                     attributeList,
                     0,
@@ -209,7 +240,59 @@ internal static partial class CheckpointBProcessRunner
                 throw NativeFailure("attach the Checkpoint B job list to process creation", error);
             }
 
+            // Restrict inheritance to exactly these handles; otherwise CreateProcess(inheritHandles:
+            // true) would pass through every inheritable handle currently open in the test host.
+            handleListBuffer = Marshal.AllocHGlobal(nint.Size * inheritableHandles.Length);
+            for (int index = 0; index < inheritableHandles.Length; index++)
+            {
+                Marshal.WriteIntPtr(handleListBuffer, index * nint.Size, inheritableHandles[index]);
+            }
+
+            if (!NativeMethods.UpdateProcThreadAttribute(
+                    attributeList,
+                    0,
+                    ProcThreadAttributeHandleList,
+                    handleListBuffer,
+                    (nuint)(nint.Size * inheritableHandles.Length),
+                    0,
+                    0))
+            {
+                int error = Marshal.GetLastWin32Error();
+                NativeMethods.DeleteProcThreadAttributeList(attributeList);
+                Marshal.FreeHGlobal(attributeList);
+                Marshal.FreeHGlobal(jobListBuffer);
+                Marshal.FreeHGlobal(handleListBuffer);
+                jobListBuffer = 0;
+                handleListBuffer = 0;
+                throw NativeFailure("attach the Checkpoint B handle list to process creation", error);
+            }
+
             return attributeList;
+        }
+
+        private static SafeFileHandle CreateInheritableNullHandle()
+        {
+            var attributes = new SecurityAttributes
+            {
+                Length = (uint)Marshal.SizeOf<SecurityAttributes>(),
+                SecurityDescriptor = 0,
+                InheritHandle = 1,
+            };
+
+            nint handle = NativeMethods.CreateFile(
+                "NUL",
+                GenericRead,
+                FileShareRead | FileShareWrite,
+                ref attributes,
+                OpenExisting,
+                FileAttributeNormal,
+                0);
+            if (handle == _invalidHandleValue)
+            {
+                throw NativeFailure("open the Checkpoint B null stdin handle");
+            }
+
+            return new SafeFileHandle(handle, ownsHandle: true);
         }
 
         private static nint BuildEnvironmentBlock(IDictionary<string, string?> environment)
@@ -298,8 +381,15 @@ internal static partial class CheckpointBProcessRunner
             [return: MarshalAs(UnmanagedType.Bool)]
             internal static partial bool SetHandleInformation(nint handle, uint mask, uint flags);
 
-            [LibraryImport("kernel32.dll", SetLastError = true)]
-            internal static partial nint GetStdHandle(int stdHandle);
+            [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+            internal static partial nint CreateFile(
+                string fileName,
+                uint desiredAccess,
+                uint shareMode,
+                ref SecurityAttributes securityAttributes,
+                uint creationDisposition,
+                uint flagsAndAttributes,
+                nint templateFile);
 
             [LibraryImport("kernel32.dll", SetLastError = true)]
             [return: MarshalAs(UnmanagedType.Bool)]
