@@ -251,7 +251,7 @@ jobs:
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
             /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
             /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
-            /d:sonar.coverage.exclusions="tools/ArchLinterNet.GitFuzz/**,tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
+            /d:sonar.coverage.exclusions="tools/ArchLinterNet.GitFuzz/**,tools/ArchLinterNet.ProcessTreeProbe/**,tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
 
       - name: Build for SonarCloud analysis
         if: env.TRUSTED_PR == 'true'

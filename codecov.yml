@@ -30,6 +30,7 @@ ignore:
   - "**/*.Tests/**"
   - "**/obj/**"
   - "**/bin/**"
+  - "tools/ArchLinterNet.ProcessTreeProbe/**"
 
 flags:
   unittests:
