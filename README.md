@@ -41,7 +41,7 @@ Use it when you want architecture rules to be declarative, reviewable, CI-friend
 
 ## Quick start
 
-Create a root policy. This quick start uses the recommended concise path `architecture/arch.yml`; the filename is configurable and has no runtime semantics. New v0.8 policy authoring should prefer `version: 2`, which defaults manual waivers to strict lifecycle governance; existing `version: 1` policies remain supported with compatibility defaults.
+Create a root policy. This quick start uses the recommended concise path `architecture/arch.yml`; the filename is configurable and has no runtime semantics. New policy authoring should prefer `version: 2`, which defaults manual waivers to strict lifecycle governance; existing `version: 1` policies remain supported with compatibility defaults.
 
 ```yaml
 version: 2
@@ -136,7 +136,7 @@ The public capability references are checked against runtime/schema/CLI inventor
 
 Internal project documentation remains in repository Markdown files such as `docs/internal/`, `openspec/`, `.github/`, and root governance files. It is not part of the published product site.
 
-GitHub Pages is deployed only by the public release workflow. A merge to `main` refreshes quality telemetry and development/dogfood `main.N` packages, but does not deploy MkDocs.
+GitHub Pages is deployed only by the public release workflow. A merge to `main` refreshes focused quality telemetry and development/dogfood `main.N` packages, but does not deploy MkDocs. A successfully processed red Sonar quality gate remains visible through the direct Sonar badge/dashboard while `Main quality` represents successful current-SHA telemetry delivery; scanner, upload, processing, revision, import, or Codecov delivery failures still make that workflow red.
 
 ## Local documentation workflow
 
@@ -188,7 +188,7 @@ arch-linter-net badge architecture-policy --input architecture-strict.json
   <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Security" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main"></a>
 </p>
 
-The Main quality badge tracks the latest merged `main` coverage telemetry run. That run refreshes Codecov and SonarCloud for the same merged revision and fails closed if coverage collection, Codecov upload, or the Sonar quality-gate scan cannot complete successfully. The Architecture Health badge is different: a required PR Architecture Coverage job creates the exact ArchLinterNet payload, and a trusted post-merge publisher releases it only after proving the PR head and squash-merged `main` commit have the same Git tree. Missing, stale, or mismatched evidence replaces the stable endpoint with an explicit unassessable badge; it never leaves an old healthy payload represented as current. This publication does not rerun the architecture matrix or deploy MkDocs. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code before merge:
+The Main quality badge tracks successful current-SHA post-merge telemetry delivery. That run requires all three Linux coverage shards, one canonical complete coverage receipt, successful Sonar scanner/upload/processing/revision/import verification, and a successful Codecov upload. A processed Sonar Quality Gate failure remains a warning and direct Sonar branch badge/dashboard signal rather than being misclassified as a failed telemetry refresh. The Architecture Health badge is different: a required PR Architecture Coverage job creates the exact ArchLinterNet payload, and a trusted post-merge publisher releases it only after proving the PR head and squash-merged `main` commit have the same Git tree. Missing, stale, or mismatched evidence replaces the stable endpoint with an explicit unassessable badge; it never leaves an old healthy payload represented as current. This publication does not rerun the architecture matrix or deploy MkDocs. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code before merge:
 
 | Quality signal | Source |
 |---|---|
@@ -196,7 +196,7 @@ The Main quality badge tracks the latest merged `main` coverage telemetry run. T
 | Test coverage (line %) | PR CI and post-merge `Main Quality Telemetry` collect coverage; the merged-main run uploads Cobertura XML to Codecov so the primary coverage badge follows `main` |
 | Architecture Health | Canonical Health, accumulated explicit ignore debt, and effective policy controls from required PR evidence promoted only after exact merged-tree proof; it is not generic CI, a score, or coverage |
 | SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
-| SonarCloud main quality signals | `Main Quality Telemetry` analyzes the merged revision with OpenCover/TRX/Python coverage and refreshes the `main` quality-gate, maintainability, reliability, and security badges |
+| SonarCloud main quality signals | `Main Quality Telemetry` analyzes the merged revision with OpenCover/TRX/Python coverage; successful delivery may coexist with a red direct Sonar Quality Gate badge because the processed gate result is telemetry, while delivery/integrity failures keep Main quality red |
 | OpenSSF Scorecard | trusted pull requests produce reviewable SARIF; default-branch and scheduled runs publish the supply-chain score to the public Scorecard API and GitHub code scanning |
 | Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`), including the reviewed public API snapshots under `architecture/api/`; read-only, never rewrites either |
 | Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment on the required pull-request gate |
