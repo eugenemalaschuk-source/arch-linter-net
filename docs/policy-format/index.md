@@ -6,10 +6,17 @@ The packaged JSON Schema is the syntax authority. Runtime validators and the exe
 
 ## Root policy
 
-A selected root policy uses `version: 1` and normally contains:
+The current root schema accepts policy `version: 1` and `version: 2`.
+
+- `version: 1` preserves compatibility waiver defaults for existing policies.
+- `version: 2` defaults to strict structured-waiver lifecycle governance.
+
+Both versions use the same root shape and supported contract inventory; the policy version is a persisted policy-contract version, not the NuGet package SemVer.
+
+A selected root policy normally contains:
 
 ```yaml
-version: 1
+version: 2
 name: My Architecture Contract
 
 imports: []
@@ -30,13 +37,15 @@ analysis: {}
 contracts: {}
 ```
 
-`imports`, external/package/framework groups, source sets, and classification are optional. The root schema requires the root identity and the core `layers`, `analysis`, and `contracts` containers; imported fragments can contribute entries during composition.
+`imports`, external/package/framework groups, source sets, classification, topology, metrics, and external evidence are optional. The root schema requires the root identity and the core `layers`, `analysis`, and `contracts` containers; imported fragments can contribute entries during composition.
+
+Existing policies do not need to change from v1 merely to run the current CLI. Move to v2 deliberately when you are ready for strict structured-waiver defaults. See [Structured waivers](structured-waivers.md) and [Adopt or upgrade](../guides/upgrading.md).
 
 See [YAML schema reference](../reference/yaml-schema.md) and [Policy imports](imports.md).
 
 ## Declared topology
 
-An optional native `topology` section declares stable components, their mappings, allowed directional edges, and the bounded observed subject universe that a later topology evaluator must assess. It is not a diagram language and does not infer unreviewed components. See [Declared topology](declared-topology.md) for the complete mapping, completeness, and reviewed out-of-scope semantics.
+An optional native `topology` section declares stable components, their mappings, allowed directional edges, and the bounded observed subject universe that validation assesses. It is not a diagram language and does not infer unreviewed components. See [Declared topology](declared-topology.md) for the complete mapping, completeness, and reviewed out-of-scope semantics.
 
 ## Layers: namespaces and semantic selectors
 
@@ -74,7 +83,7 @@ analysis:
   coverage: error
 ```
 
-Other analysis controls include assembly search paths, source roots, target framework/build selectors, condition sets, ignored-violation behavior, policy-consistency severity, and coverage severity.
+Other analysis controls include assembly search paths, source roots, target framework/build selectors, condition sets, ignored-violation behavior, policy-consistency severity, coverage severity, and waiver lifecycle profile.
 
 Normal validation does not silently build. Use `--ensure-built` when the CLI should build the selected project graph and verify its build-state receipt before validation.
 
@@ -139,7 +148,7 @@ arch-linter-net policy context --policy architecture/arch.yml --format json > po
 arch-linter-net --policy architecture/arch.yml --mode strict
 ```
 
-For base/current review, compare exported contexts with `policy weakening`. For repository change review, use `change snapshot`, `change report`, and `gate`.
+For base/current review, compare exported contexts with `policy weakening`. For repository change review, use `change snapshot`, `change report`, `gate`, and [Architecture Health](../reference/architecture-health.md).
 
 ## Sources of truth
 
