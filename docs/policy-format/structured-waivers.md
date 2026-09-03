@@ -119,22 +119,27 @@ A missing policy inventory is missing evidence. Consumers must not interpret it 
 
 A waiver is a policy relaxation. Adding one or broadening its governed scope must remain visible to policy weakening/new-debt review instead of being treated as neutral configuration churn.
 
-Export contexts from the actual reviewed base and candidate policy states with the same pinned ArchLinterNet version:
+Use one absolute artifact directory and export contexts from the actual reviewed base and candidate policy states with the same pinned ArchLinterNet executable:
 
 ```bash
-# Reviewed base checkout/worktree
-arch-linter-net policy context \
-  --policy architecture/arch.yml \
-  --format json > /shared/artifacts/policy-base.json
+ARTIFACTS="$(pwd)/artifacts"
+BASE_WORKTREE="../architecture-base"
+mkdir -p "$ARTIFACTS"
 
-# Candidate checkout/worktree
+(
+  cd "$BASE_WORKTREE"
+  arch-linter-net policy context \
+    --policy architecture/arch.yml \
+    --format json > "$ARTIFACTS/policy-base.json"
+)
+
 arch-linter-net policy context \
   --policy architecture/arch.yml \
-  --format json > artifacts/policy-current.json
+  --format json > "$ARTIFACTS/policy-current.json"
 
 arch-linter-net policy weakening \
-  --base-context artifacts/policy-base.json \
-  --current-context artifacts/policy-current.json
+  --base-context "$ARTIFACTS/policy-base.json" \
+  --current-context "$ARTIFACTS/policy-current.json"
 ```
 
 When these contexts are supplied to `gate` or `health`, the default `analysis.policy_weakening: error` setting makes a detected new or broadened waiver blocking. The independent gate therefore fails while Architecture Health records at least `degrading`. An explicitly reviewed compatibility/migration configuration may alter the owning severity only when the policy supports that choice; it does not make explicit waiver debt disappear or allow `health: healthy`.
