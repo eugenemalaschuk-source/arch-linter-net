@@ -1,36 +1,33 @@
 # Exit Codes
 
-ArchLinterNet uses stable exit codes so CI can distinguish architecture violations from runtime/configuration failures.
+ArchLinterNet uses stable exit categories so CI can distinguish a completed failing gate from an invocation or evidence failure.
 
 | Code | Meaning | CI interpretation |
-|------|---------|-------------------|
-| `0` | Validation completed and no violations were found. | Pass |
-| `1` | Validation completed and one or more selected contracts failed. | Fail for strict gates; expected for failing audit checks if run manually |
-| `2` | Runtime or configuration error before normal validation completed. | Fail |
+| --- | --- | --- |
+| `0` | The command completed and its requested validation/comparison gate passed. | Pass |
+| `1` | The command completed, but its requested validation/comparison gate failed. | Fail blocking jobs; expected only for deliberately inspected non-blocking commands. |
+| `2` | The command could not complete normally, or `health` completed with a valid `gate: unassessable` result. | Fail closed; inspect structured output. |
 
-For `health`, code `2` also represents a valid architecture-health result whose gate is
-`unassessable`; inspect the output's `gate` and `health` fields to distinguish it from an invalid
-invocation.
+For `health`, code `2` can accompany a valid `architecture-health/v1` document whose gate is `unassessable`. Inspect `schema_id`, `gate`, and `health` to distinguish that result from an invalid invocation, which uses the command-error envelope when JSON output was selected.
 
 ## Exit code 1
 
-Exit code `1` means the tool worked and found architecture violations. Examples:
+Exit code `1` means ArchLinterNet completed the requested operation and the selected gate failed. Examples:
 
 - a strict dependency contract found a forbidden reference;
 - a cycle contract found a cycle;
 - an allow-only contract found an unapproved layer reference;
-- a namespace coverage contract reported `coverage_findings` while `analysis.coverage` is `error`;
-- the policy-consistency pass reported `policy_consistency_findings` while `analysis.policy_consistency` is `error`;
-- a stale ignored violation is treated as a blocking policy error by current configuration.
-- `gate` completed but found new, resolved, stale, ambiguous, or configuration-error persistent debt, or an error-severity policy-weakening finding.
-- `health` completed with `gate: fail` and therefore exits `1`; `gate: unassessable` exits `2`
-  while retaining the normal `architecture-health/v1` health document.
+- a coverage contract reported `coverage_findings` while `analysis.coverage` is `error`;
+- the policy-consistency pass reported findings while `analysis.policy_consistency` is `error`;
+- a stale ignored violation is blocking under the selected policy configuration;
+- `gate` found new, resolved, stale, ambiguous, or configuration-error persistent debt, or an error-severity policy-weakening finding;
+- `health` completed with `gate: fail` while retaining the normal `architecture-health/v1` document.
 
-Note: coverage, policy-consistency, and unmatched-ignore failures do not appear in `--format sarif` results — see [Output Formats — SARIF output](output-formats.md#sarif-output) if you rely on SARIF alone in CI.
+Coverage, policy-consistency, and unmatched-ignore failures are supplemental configuration/governance evidence and are not all represented in ordinary validation SARIF. See [Output Formats — SARIF output](output-formats.md#sarif-output) when CI consumes SARIF alongside JSON.
 
 ## Exit code 2
 
-Exit code `2` means the run could not be trusted as normal validation. Examples:
+Exit code `2` means the run cannot be treated as an ordinary completed pass/fail gate, or Health explicitly determined that required evidence is unassessable. Examples:
 
 - invalid arguments;
 - missing policy file;
@@ -39,34 +36,36 @@ Exit code `2` means the run could not be trusted as normal validation. Examples:
 - unknown condition set passed to `--condition-set`;
 - invalid `analysis.coverage`, `analysis.policy_consistency`, or `analysis.unmatched_ignored_violations` value;
 - an unsupported or malformed coverage `scope` value outside the documented closed vocabulary;
-- baseline references a contract ID that does not exist in the policy;
+- a baseline references a contract ID that does not exist in the policy;
+- a required `gate` or `health` baseline path is absent or unreadable;
 - required target assemblies cannot be resolved when configuration treats that as fatal;
-- `--report` destination is not writable, collides with an input file, or has an invalid format.
-- `gate` received only one policy-context artifact, or a supplied baseline/policy-context comparison could not be trusted.
-- `health` received only one policy-context artifact, or policy/context/runtime evaluation failed
-  before a health result could be produced; these failures use the normal `command_error` output
-  envelope when `--format json` is selected.
+- a `--report` destination is not writable, collides with an input, or has an invalid format;
+- `gate` or `health` receives only one of the paired base/current policy-context artifacts;
+- supplied baseline, policy-context, build, applicability, topology, metric, or external-evidence input cannot be trusted;
+- `health` successfully projects `gate: unassessable` from incomplete required evidence.
 
-When a `--report` file sink fails, the validation result is still reported. The exit code is `2` with a typed status: `output-failed` if no file sinks wrote, or `partial-output` if some sinks succeeded and some failed. The error is written to stderr (human format) or as a JSON error with `output_status` field (json/sarif format).
+When a repeatable validation `--report` file sink fails, the validation result is still reported. Exit `2` carries typed output status: `output-failed` if no file sinks wrote, or `partial-output` if some sinks succeeded and some failed. Human diagnostics use stderr; structured modes retain their command/output error contract.
 
-Cancellation also exits `2` with typed `cancelled` completion. A cancellation
-observed before full publication wins over a clean result; it must not be
-treated as a passed gate or a reusable partial cache entry. The
-[upgrade guide](../guides/upgrading.md) describes the corresponding report and
-artifact evidence.
+Cancellation also exits `2` with typed `cancelled` completion. A cancellation observed before full publication wins over a clean result; it must not be treated as a passed gate or reusable partial cache state.
 
-CI should fail closed on exit code `2`.
+CI should always fail closed on exit code `2`. A report-producing workflow may preserve and schema-check a valid unassessable Health document for reviewer presentation, but a separate required gate must still block acceptance.
 
-## Strict + audit CI pattern
+## Strict and audit CI patterns
+
+A strict validation gate is blocking:
 
 ```yaml
 - name: Validate architecture (strict)
   run: arch-linter-net --mode strict
+```
 
+If audit is deliberately advisory, keep it in a separate explicitly non-blocking step and preserve its artifact:
+
+```yaml
 - name: Architecture audit report
   if: always()
   continue-on-error: true
   run: arch-linter-net --mode audit --json > architecture-audit.json
 ```
 
-Strict failures block the pull request. Audit failures are captured for visibility without changing the strict gate result.
+If both strict and audit are intended to contribute to one required decision from the same immutable build state, use the combined `--mode strict,audit` invocation instead. Its aggregate exit is `1` when either requested mode fails.
