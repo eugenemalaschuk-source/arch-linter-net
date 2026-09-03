@@ -2,6 +2,8 @@
 
 ArchLinterNet is a YAML-first architecture governance tool for .NET repositories. It turns architecture decisions into executable contracts that can be checked locally, in tests, and in CI.
 
+**One ArchLinterNet CLI covers the complete static architecture-governance cycle:** policy validation, applicability/completeness, architecture validation, topology, visible contract surfaces, debt and structured waivers, metrics/budgets, imported SARIF evidence, architecture change, Architecture Health, PR Markdown, machine artifacts, and the real Architecture Health badge. CI invokes and transports these product artifacts; it is not a second governance implementation.
+
 The public documentation describes the behavior of the current supported tool line. Runtime validators, the CLI command tree, and the packaged policy schemas are the highest-precedence sources of truth; the machine-readable `archlinternet.capabilities.json` inventory and this site are checked against them by `make lint-docs`.
 
 ## Start here
@@ -12,13 +14,32 @@ For a first adoption, follow this path:
 1. Create a minimal root policy such as `architecture/arch.yml`.
 1. Run `arch-linter-net policy check --policy architecture/arch.yml`.
 1. Build the selected projects, or opt in to `--ensure-built`.
-1. Run strict validation.
-1. Add the same strict command to CI.
+1. Run strict validation and inspect applicability/completeness evidence.
 1. If the repository has existing debt, capture a reviewed migration baseline instead of weakening rules.
-1. Add coverage contracts so new namespaces, projects, assemblies, dependency edges, rule inputs, and semantic roles cannot silently escape governance.
-1. Add advanced contracts only where they express a real architectural decision.
+1. Migrate manual exceptions to [structured waivers](policy-format/structured-waivers.md) and keep waiver debt distinct from finding debt.
+1. Add coverage, topology, contract-surface, metrics/budgets, and external evidence where they express real governance decisions.
+1. Project [Architecture Health](reference/architecture-health.md), architecture change, PR Markdown, JSON/SARIF, and the Health badge from canonical CLI artifacts.
+1. Put the same product workflow in CI; keep CI glue limited to invocation, evidence transport, integrity checks, and publication.
 
-The [Getting Started](getting-started/index.md) guide walks through the complete flow. For an existing production repository, use the [real-repository workflow](guides/real-repository-workflow.md).
+The [Getting Started](getting-started/index.md) guide covers the minimal path. The [complete single-tool workflow](guides/single-tool-workflow.md) covers the full v0.8 governance cycle. For an existing production repository, use the [real-repository workflow](guides/real-repository-workflow.md) and [adopt-or-upgrade guide](guides/upgrading.md).
+
+## Complete governance cycle
+
+```text
+install/pin
+  -> declare policy
+  -> policy check
+  -> analyze + prove applicability/completeness
+  -> validate topology and visible contract surfaces
+  -> govern finding debt, waiver debt, new debt and weakening
+  -> measure architecture and enforce budgets
+  -> bind required current-context SARIF evidence
+  -> inspect architecture change
+  -> Architecture Health
+  -> PR Markdown / JSON / SARIF / Health badge
+```
+
+Architecture Health keeps gate and health separate. The gate is `pass`, `fail`, or `unassessable`; Health is `healthy`, `debt`, `degrading`, `failing`, or `unassessable`. These are deterministic non-compensating states, not a weighted score, letter grade, or universal percentage.
 
 ## What ArchLinterNet can govern
 
@@ -29,9 +50,13 @@ The current contract model covers more than namespace layering:
 - type placement, source-layout conventions, attribute usage, inheritance, interface implementation, composition roots, and public API surfaces;
 - semantic classification, selector-backed layers, contextual dependencies, contextual allow-only rules, and semantic port/ACL boundaries;
 - architecture coverage for namespaces, projects, assemblies, dependency edges, rule inputs, and semantic roles;
-- migration baselines, policy consistency, policy-context export and weakening review;
-- change snapshots/reports, no-new-debt gates, history forensics, dependency graph export, and dependency-path explanation;
-- deterministic JSON/SARIF/human output, analysis profiles, optional persistent analysis cache, and CI-oriented report sinks.
+- native declared topology with capture/diff/verify and exhaustive completeness evidence;
+- recursive visible contract-surface exposure and version-isolation governance;
+- architecture metrics, absolute budgets, and baseline-relative no-worse-than/delta budgets;
+- repository-local vendor-neutral SARIF evidence with current repository/revision/scope binding;
+- migration baselines, structured waiver lifecycle, policy inventory, policy consistency, policy-context export and weakening review;
+- change snapshots/reports, no-new-debt gates, Architecture Health, deterministic PR Markdown, and Health badge projection;
+- history forensics, dependency graph export, dependency-path explanation, deterministic JSON/SARIF/human output, analysis profiles, optional persistent analysis cache, and CI-oriented report sinks.
 
 See [Contract families](contracts/index.md) and [Supported capabilities and non-goals](policy-format/supported-capabilities.md) for the reviewed inventory.
 
@@ -65,6 +90,18 @@ arch-linter-net gate \
 
 The gate combines validation with no-new-debt and policy-weakening checks intended for CI.
 
+### Project Architecture Health
+
+```bash
+arch-linter-net health \
+  --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --mode strict \
+  --format json > architecture-health.json
+```
+
+Use the canonical Health artifact for reviewer reports and the real Architecture Health badge instead of rebuilding Health semantics in scripts.
+
 ### Investigate architecture changes
 
 ```bash
@@ -78,17 +115,21 @@ For dependency investigation, use `graph`, `explain`, and `history analyze`. For
 ## Documentation map
 
 - [Getting Started](getting-started/index.md)
+- [Complete single-tool governance workflow](guides/single-tool-workflow.md)
 - [Installation](installation/index.md)
 - [CLI reference](cli/index.md)
 - [Policy format](policy-format/index.md)
+- [Structured waivers](policy-format/structured-waivers.md)
 - [YAML schema reference](reference/yaml-schema.md)
+- [Architecture Health](reference/architecture-health.md)
 - [Contract families](contracts/index.md)
 - [Supported capabilities and non-goals](policy-format/supported-capabilities.md)
 - [CI integration](guides/ci-integration.md)
 - [Migration baselines](guides/migration-baselines.md)
+- [Adopt or upgrade](guides/upgrading.md)
 - [Real-repository workflow](guides/real-repository-workflow.md)
 - [AI policy authoring](ai/index.md)
 
 ## Non-goals
 
-ArchLinterNet is a static architecture-governance tool. It does not prove runtime dependency-injection behavior, authorization/security correctness, code ownership, or arbitrary semantic data flow, and it does not accept undocumented custom contract families outside the packaged schema.
+ArchLinterNet is a static architecture-governance tool. It does not prove runtime dependency-injection behavior, authorization/security correctness, code ownership, runtime serialization behavior, or arbitrary semantic data flow, and it does not accept undocumented custom contract families outside the packaged schema.
