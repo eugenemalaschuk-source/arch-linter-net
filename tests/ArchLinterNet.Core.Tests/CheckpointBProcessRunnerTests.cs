@@ -33,11 +33,9 @@ public sealed class CheckpointBProcessRunnerTests
                 }
             });
 
-            Assert.That(SpinWait.SpinUntil(
-                    () => File.Exists(childPidPath) && int.TryParse(File.ReadAllText(childPidPath).Trim(), out _),
-                    TimeSpan.FromSeconds(5)),
+            int childPid = 0;
+            Assert.That(SpinWait.SpinUntil(() => TryReadPublishedPid(childPidPath, out childPid), TimeSpan.FromSeconds(5)),
                 Is.True, "The probe did not publish its descendant process id.");
-            int childPid = int.Parse(File.ReadAllText(childPidPath).Trim(), System.Globalization.CultureInfo.InvariantCulture);
             Assert.That(IsProcessAlive(childPid), Is.True, "The descendant must be alive before cancellation.");
 
             cancellation.Cancel();
@@ -97,12 +95,10 @@ public sealed class CheckpointBProcessRunnerTests
             Assert.That(failure.Message, Does.Contain("stdout tail"));
             Assert.That(failure.Message, Does.Contain("stderr tail"));
 
-            Assert.That(SpinWait.SpinUntil(
-                    () => File.Exists(childPidPath) && int.TryParse(File.ReadAllText(childPidPath).Trim(), out _),
-                    TimeSpan.FromSeconds(2)),
+            int childPid = 0;
+            Assert.That(SpinWait.SpinUntil(() => TryReadPublishedPid(childPidPath, out childPid), TimeSpan.FromSeconds(2)),
                 Is.True,
                 "The inherited-handle probe did not publish its descendant process id.");
-            int childPid = int.Parse(File.ReadAllText(childPidPath).Trim(), System.Globalization.CultureInfo.InvariantCulture);
             Assert.That(SpinWait.SpinUntil(() => !IsProcessAlive(childPid), TimeSpan.FromSeconds(2)), Is.True,
                 "Closing the Windows job scope must terminate a descendant after the root exits.");
         }
@@ -191,12 +187,10 @@ public sealed class CheckpointBProcessRunnerTests
                 "Task.WhenAll waiting for the other (still legitimately blocked) stream to finish " +
                 "and the drain bound to elapse.");
 
-            Assert.That(SpinWait.SpinUntil(
-                    () => File.Exists(childPidPath) && int.TryParse(File.ReadAllText(childPidPath).Trim(), out _),
-                    TimeSpan.FromSeconds(2)),
+            int childPid = 0;
+            Assert.That(SpinWait.SpinUntil(() => TryReadPublishedPid(childPidPath, out childPid), TimeSpan.FromSeconds(2)),
                 Is.True,
                 "The inherited-handle probe did not publish its descendant process id.");
-            int childPid = int.Parse(File.ReadAllText(childPidPath).Trim(), System.Globalization.CultureInfo.InvariantCulture);
             Assert.That(SpinWait.SpinUntil(() => !IsProcessAlive(childPid), TimeSpan.FromSeconds(2)), Is.True,
                 "A fault while decoding a redirected stream must still trigger bounded cleanup that " +
                 "terminates the descendant, not leave it running because the exceptional path skipped " +
@@ -267,6 +261,35 @@ public sealed class CheckpointBProcessRunnerTests
         public override int GetMaxByteCount(int charCount) => charCount;
 
         public override int GetMaxCharCount(int byteCount) => byteCount;
+    }
+
+    [Test]
+    [CancelAfter(5_000)]
+    public void AwaitPhaseAsyncPreservesAGenuineTimeoutExceptionFromThePrimaryTask()
+    {
+        using var standardOutput = new CheckpointBProcessRunner.StreamCapture();
+        using var standardError = new CheckpointBProcessRunner.StreamCapture();
+        var genuineFailure = new TimeoutException("genuine subprocess timeout, not the runner's own deadline");
+        Task primary = Task.FromException(genuineFailure);
+
+        // AwaitPhaseAsync distinguishes its own deadline from a real TimeoutException by task
+        // identity, not by catching TimeoutException: a genuine one raised by the primary task
+        // itself must come back out exactly as thrown, never rewritten into the bounded-diagnostic
+        // timeout this method raises for its own deadline.
+        TimeoutException? observed = Assert.ThrowsAsync<TimeoutException>(() =>
+            CheckpointBProcessRunner.AwaitPhaseAsync(
+                primary,
+                [],
+                TimeSpan.FromSeconds(5),
+                CancellationToken.None,
+                "test phase",
+                "test command",
+                1234,
+                Stopwatch.StartNew(),
+                standardOutput,
+                standardError));
+
+        Assert.That(observed, Is.SameAs(genuineFailure));
     }
 
     [Test]
@@ -379,6 +402,31 @@ public sealed class CheckpointBProcessRunnerTests
         }
 
         throw new IOException($"Timed out deleting process-runner probe directory '{root}'.", lastError);
+    }
+
+    /// <summary>
+    /// Reads a PID published by a probe process, tolerating the brief window in which the file is
+    /// visible to <see cref="File.Exists"/> but the writer still holds it open: a plain
+    /// <c>File.Exists(path) &amp;&amp; File.ReadAllText(path)</c> predicate can otherwise throw
+    /// <see cref="IOException"/> (sharing violation) from inside a <see cref="SpinWait.SpinUntil(Func{bool},TimeSpan)"/>
+    /// poll instead of just trying again on the next spin.
+    /// </summary>
+    private static bool TryReadPublishedPid(string path, out int pid)
+    {
+        pid = 0;
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            return int.TryParse(File.ReadAllText(path).Trim(), out pid);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
     }
 
     private static bool IsProcessAlive(int processId)

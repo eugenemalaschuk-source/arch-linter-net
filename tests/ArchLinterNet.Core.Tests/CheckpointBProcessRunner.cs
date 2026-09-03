@@ -165,7 +165,7 @@ internal static partial class CheckpointBProcessRunner
     /// never mistaken for this method's own deadline (and vice versa): only this method's own
     /// internal deadline task is rewritten into the bounded diagnostic.
     /// </summary>
-    private static async Task AwaitPhaseAsync(
+    internal static async Task AwaitPhaseAsync(
         Task primary,
         IReadOnlyList<Task> watchedFaults,
         TimeSpan timeout,
@@ -393,7 +393,7 @@ internal static partial class CheckpointBProcessRunner
     /// timeout diagnostics. The full content is only materialized (read back from the spool) on
     /// the successful completion path, where a caller actually needs it.
     /// </summary>
-    private sealed class StreamCapture : IDisposable
+    internal sealed class StreamCapture : IDisposable
     {
         private readonly object _gate = new();
         private readonly StringBuilder _tail = new();
