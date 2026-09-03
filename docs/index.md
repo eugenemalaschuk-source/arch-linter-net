@@ -72,25 +72,15 @@ arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
 
 ### Review policy changes
 
-Export contexts from the actual base and candidate revisions with the same pinned CLI version:
+Create `policy-base.json` in the reviewed base checkout and `policy-current.json` in the candidate checkout with the exact same pinned CLI version. Transport both files unchanged into one artifact directory, then compare them:
 
 ```bash
-# Reviewed base checkout/worktree
-arch-linter-net policy context \
-  --policy architecture/arch.yml \
-  --format json > /shared/artifacts/policy-base.json
-
-# Candidate checkout/worktree
-arch-linter-net policy context \
-  --policy architecture/arch.yml \
-  --format json > artifacts/policy-current.json
-
 arch-linter-net policy weakening \
   --base-context artifacts/policy-base.json \
   --current-context artifacts/policy-current.json
 ```
 
-Use policy context and weakening analysis to review whether a policy edit relaxes governance. This does not replace normal architecture validation.
+Use policy context and weakening analysis to review whether a policy edit relaxes governance. This does not replace normal architecture validation. The [complete workflow](guides/single-tool-workflow.md) contains the full worktree command sequence.
 
 ### Gate new debt and weakening
 
@@ -123,16 +113,15 @@ Use the canonical Health artifact for reviewer reports and the real Architecture
 
 ### Investigate architecture changes
 
+Create `before.json` in the reviewed base checkout and `after.json` in the candidate checkout with the same CLI version, selected mode and build context. Transport both unchanged into one artifact directory, then render JSON change evidence:
+
 ```bash
-# Create before.json in the reviewed base checkout and after.json in the candidate checkout.
-arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output before.json
-arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output after.json
 arch-linter-net change report \
-  --base before.json \
-  --current after.json \
+  --base artifacts/before.json \
+  --current artifacts/after.json \
   --execution-context local-review \
   --format json \
-  --output architecture-change.json
+  --output artifacts/architecture-change.json
 ```
 
 For dependency investigation, use `graph`, `explain`, and `history analyze`. For public API governance, use the `public-api` workflow. The [complete workflow](guides/single-tool-workflow.md) shows how compatible change and Health artifacts feed `report pr`.
