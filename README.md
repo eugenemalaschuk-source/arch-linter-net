@@ -17,6 +17,8 @@ YAML-first architecture governance for .NET repositories.
 
 ArchLinterNet turns architecture decisions into executable, reviewable contracts. It governs namespace and assembly boundaries, project/package metadata, semantic roles and contexts, public API surfaces, architecture coverage, migration debt, and CI change gates — with deterministic diagnostics that humans and automation can consume.
 
+**One packed ArchLinterNet CLI covers the complete static architecture-governance cycle:** declare and check policy, prove applicability, validate topology and visible contract surfaces, govern finding and waiver debt, measure budgets, bind repository-local SARIF, compare change, project Architecture Health, and render PR Markdown and the real Health badge. CI invokes and transports the resulting canonical artifacts; it is not a second governance implementation.
+
 The goal is not just to lint dependencies. ArchLinterNet makes architecture rules explicit and safe to evolve as normal repository code.
 
 ## Why ArchLinterNet?
@@ -39,10 +41,10 @@ Use it when you want architecture rules to be declarative, reviewable, CI-friend
 
 ## Quick start
 
-Create a root policy. This quick start uses the recommended concise path `architecture/arch.yml`; the filename is configurable and has no runtime semantics:
+Create a root policy. This quick start uses the recommended concise path `architecture/arch.yml`; the filename is configurable and has no runtime semantics. New v0.8 policy authoring should prefer `version: 2`, which defaults manual waivers to strict lifecycle governance; existing `version: 1` policies remain supported with compatibility defaults.
 
 ```yaml
-version: 1
+version: 2
 name: Example Architecture Contract
 
 layers:
@@ -98,9 +100,10 @@ ArchLinterNet focuses on static architecture governance:
 - Type placement, source-layout conventions, attribute usage, inheritance, interface implementation, composition boundaries, and public API surface snapshots.
 - Semantic classification from implemented code facts, selector-backed layers, contextual dependency/allow-only rules, and semantic port/ACL boundaries.
 - Coverage contracts for `namespace`, `project`, `assembly`, `dependency_edge`, `rule_input`, and `semantic_role` inventory.
+- Native declared topology with capture/diff/verify, recursive contract-surface exposure, architecture metrics, absolute/baseline-relative budgets, and repository-local external SARIF evidence.
 - Project/solution discovery, explicit build-state preflight, opt-in `--ensure-built`, condition sets, persistent analysis cache, and bounded parallel scanning.
-- Strict gates, audit discovery, migration baselines, policy consistency, policy-context export, and policy-weakening review.
-- Architecture change snapshots/reports, history forensics, dependency graphs/path explanation, Architecture Health and legacy architecture-policy badge projections, and public API lifecycle commands.
+- Strict gates, audit discovery, migration baselines, structured waiver lifecycle, effective policy inventory, policy consistency, policy-context export, and policy-weakening review.
+- Architecture change snapshots/reports, history forensics, dependency graphs/path explanation, Architecture Health, deterministic PR Markdown, Health and legacy architecture-policy badge projections, and public API lifecycle commands.
 - Human, normalized JSON, SARIF where applicable, repeatable report sinks, timings, analysis profiles, and CI-oriented coverage artifacts.
 - CEL-backed `when` predicates at documented closed locations — standard CEL under a safe profile, not an open-ended scripting language.
 
@@ -112,15 +115,19 @@ Public product documentation is published through MkDocs and GitHub Pages:
 
 - [Documentation home](https://eugenemalaschuk-source.github.io/arch-linter-net/)
 - [Getting started](https://eugenemalaschuk-source.github.io/arch-linter-net/getting-started/)
+- [Complete single-tool governance workflow](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/single-tool-workflow/)
 - [Installation](https://eugenemalaschuk-source.github.io/arch-linter-net/installation/)
 - [CLI reference](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
 - [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
+- [Structured waivers](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/structured-waivers/)
+- [Architecture Health](https://eugenemalaschuk-source.github.io/arch-linter-net/reference/architecture-health/)
 - [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
 - [Coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
 - [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)
 - [Real-repository workflow](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/real-repository-workflow/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)
 - [Adopt or upgrade ArchLinterNet](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/upgrading/)
+- [v0.7 to v0.8 adoption](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/v07-to-v08-adoption/)
 - [Reference entrypoints](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/reference-entrypoints/)
 - [Verify release provenance](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/)
 - [AI policy authoring](https://eugenemalaschuk-source.github.io/arch-linter-net/ai/)
