@@ -8,11 +8,15 @@ Run it with:
 arch-linter-net health \
   --policy architecture/arch.yml \
   --baseline architecture/baseline.arch.yml \
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json \
   --mode strict \
   --ensure-built \
   --execution-context local-review \
   --format json
 ```
+
+`--base-context` and `--current-context` are optional as a pair. Supply both when Health must include policy-weakening evidence. When the policy declares required external evidence, also pass the same `--external-evidence` and `--evidence-*` bindings used for current validation; evidence held by another CLI process is not reused automatically.
 
 ## Gate and Health are different
 
@@ -25,11 +29,19 @@ A passing gate does not imply zero debt. A repository may be allowed to continue
 
 | Gate | Health | Meaning |
 | --- | --- | --- |
-| `pass` | `healthy` | Required current evidence is assessable, blocking controls pass, and explicit waiver debt is zero. |
+| `pass` | `healthy` | All required evidence is assessable, configured current authorities pass, and no reviewed finding debt, explicit waiver debt, new debt, weakening, or metric regression exists. |
 | `pass` | `debt` | Blocking controls pass but reviewed finding debt and/or valid explicit waiver debt remains. |
-| `pass` or `fail` | `degrading` | Current evidence shows architectural regression such as new debt, weakening, a new/broadened waiver, or metric regression. The owning gate still determines whether that regression blocks the invocation. |
+| `pass` or `fail` | `degrading` | Current evidence shows architectural regression such as new debt, weakening, a new/broadened waiver, reportable warning coverage, audit-only diagnostics, or metric regression. The owning authority still determines whether that regression blocks the gate. |
 | `fail` | `failing` | A current blocking architecture requirement fails. |
 | `unassessable` | `unassessable` | Required evidence cannot be trusted as complete or current. |
+
+The deterministic non-compensating precedence is:
+
+```text
+unassessable > failing > degrading > debt > healthy
+```
+
+For example, an unassessable required evidence dimension dominates an otherwise current strict failure, while both dimensions remain available for drill-down.
 
 The CLI maps gate outcomes to exit codes: `pass -> 0`, `fail -> 1`, and `unassessable -> 2`. Exit `2` can therefore represent a valid Health document with `gate: unassessable`; distinguish that from an invalid invocation by reading the structured output.
 
@@ -49,11 +61,11 @@ A migration baseline records reviewed existing normalized findings. It is a debt
 
 ### Explicit waiver debt
 
-A structured waiver is a policy-authored exception with an exact target fingerprint, stable waiver ID and lifecycle metadata. It is counted separately from finding baseline debt. A valid active waiver can coexist with `gate: pass`, but its presence prevents a zero-waiver `healthy` state.
+A structured waiver is a policy-authored exception with an exact target fingerprint, stable waiver ID and lifecycle metadata. It is counted separately from finding baseline debt. A valid active waiver can coexist with `gate: pass`, but its presence prevents `health: healthy`.
 
 ### New debt and weakening
 
-A new finding outside the reviewed baseline, a new or broadened waiver, or a policy edit that relaxes governance is change evidence. Health can therefore become `degrading` even when much of the current repository remains valid.
+A new finding outside the reviewed baseline, a new or broadened waiver, or a policy edit that relaxes governance is change evidence. Health can therefore become `degrading` even when much of the current repository remains valid. When the owning weakening/debt gate is configured as blocking, the independent gate remains `fail`.
 
 ### Metric regression
 
@@ -69,7 +81,13 @@ Structured waiver states are not equally harmless:
 - `metadata_incomplete` — legacy compatibility entry without complete structured lifecycle metadata;
 - `invalid` — malformed or unsupported lifecycle metadata; this fails closed instead of suppressing a finding.
 
-Under strict waiver lifecycle semantics, stale/expired/invalid evidence cannot be treated as ordinary harmless debt. See [Structured waivers](../policy-format/structured-waivers.md).
+When more than one predicate could apply, canonical lifecycle classification uses this precedence:
+
+```text
+invalid > expired > stale > active > metadata_incomplete
+```
+
+Under strict waiver-lifecycle semantics, stale, expired, metadata-incomplete, or invalid evidence follows the selected profile's blocking state and cannot be flattened into ordinary reviewed debt. See [Structured waivers](../policy-format/structured-waivers.md).
 
 ## Applicability and completeness
 
@@ -108,13 +126,13 @@ architecture | HEALTHY · 0 ignores · 42 rules
 architecture | DEBT · 3 ignores · 42 rules
 ```
 
-The exact values and badge color are CLI-owned. CI may validate transport metadata and publish the finished JSON, but it must not reconstruct Health, recount waivers/rules, or invent zeroes. Missing or mismatched trusted promotion evidence must publish an explicit unassessable state rather than retain an older healthy badge as current.
+The exact values and badge color are CLI-owned. CI may validate transport metadata and publish the finished JSON, but it must not reconstruct Health, recount waivers/rules, or invent zeroes. Missing or mismatched trusted promotion evidence must publish `UNASSESSABLE · ? ignores · ? rules` rather than retain an older healthy badge as current.
 
 The Architecture Health badge is distinct from the legacy `badge architecture-policy` projection and from GitHub Actions, SonarCloud or Codecov status badges.
 
 ## PR report projection
 
-`report pr` consumes the canonical Health and architecture-change artifacts and renders reviewer Markdown without re-running analysis:
+`report pr` consumes canonical Health and architecture-change JSON and renders reviewer Markdown without re-running analysis:
 
 ```bash
 arch-linter-net report pr \
@@ -123,4 +141,4 @@ arch-linter-net report pr \
   --output architecture-pr-report.md
 ```
 
-A publisher may carry that inert Markdown to a sticky pull-request comment only after validating its repository/PR/head/run/schema/size/hash transport evidence. The publisher must not compute report sections or remediation semantics itself.
+The Health reporting evidence and change report must carry the same non-empty execution context and selected mode. A publisher may carry the inert Markdown to a sticky pull-request comment only after validating its repository/PR/head/run/schema/size/hash transport evidence. The publisher must not compute report sections or remediation semantics itself.
