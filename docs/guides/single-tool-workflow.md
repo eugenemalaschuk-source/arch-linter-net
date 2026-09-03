@@ -139,29 +139,42 @@ See [Contract-surface exposure](../contracts/contract-surface-exposure.md).
 
 A migration baseline records reviewed existing findings. A structured waiver is a policy-authored exception with its own exact target identity and lifecycle. Intended topology/coverage exclusions are policy scope, not waiver debt.
 
-Use the baseline and no-new-debt workflow:
+First export policy contexts from the actual reviewed base and candidate revisions. Run both exports with the exact same reviewed ArchLinterNet package version; do not let an older base-worktree tool manifest silently select different semantics.
 
 ```bash
-dotnet arch-linter-net baseline verify \
+# Run in a checkout/worktree of the reviewed base revision.
+arch-linter-net policy context \
+  --policy architecture/arch.yml \
+  --format json > /shared/artifacts/policy-base.json
+
+# Run in the candidate checkout/worktree.
+arch-linter-net policy context \
+  --policy architecture/arch.yml \
+  --format json > artifacts/policy-current.json
+```
+
+Review policy relaxation directly:
+
+```bash
+arch-linter-net policy weakening \
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json
+```
+
+Use the baseline and no-new-debt gate with those same contexts:
+
+```bash
+arch-linter-net baseline verify \
   --policy architecture/arch.yml \
   --baseline architecture/baseline.arch.yml
 
-dotnet arch-linter-net gate \
+arch-linter-net gate \
   --policy architecture/arch.yml \
   --baseline architecture/baseline.arch.yml \
-  --mode all
-```
-
-Review policy relaxation separately:
-
-```bash
-dotnet arch-linter-net policy context \
-  --policy architecture/arch.yml \
-  --format json > current-policy.json
-
-dotnet arch-linter-net policy weakening \
-  --base-context base-policy.json \
-  --current-context current-policy.json
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json \
+  --mode all \
+  --ensure-built
 ```
 
 The canonical policy inventory counts effective authored controls once and projects explicit waiver debt without source-set/runtime fan-out inflating the rule count.
@@ -197,46 +210,74 @@ A successful current-context zero-result artifact is valid evidence. Missing, ma
 
 See [External evidence](../policy-format/external-evidence.md).
 
-## 10. Inspect architecture change
+## 10. Produce a real base/current architecture change artifact
+
+A change report needs two snapshots created in different repository states. Use the same CLI version, selected mode, condition set and build selectors for both. The example below selects `strict`, matching the later Health artifact.
 
 ```bash
-dotnet arch-linter-net change snapshot \
+# Run in a checkout/worktree of the reviewed base revision.
+arch-linter-net change snapshot \
   --policy architecture/arch.yml \
+  --mode strict \
+  --baseline architecture/baseline.arch.yml \
+  --ensure-built \
+  --output /shared/artifacts/architecture-base.json
+
+# Run in the candidate checkout/worktree.
+arch-linter-net change snapshot \
+  --policy architecture/arch.yml \
+  --mode strict \
+  --baseline architecture/baseline.arch.yml \
+  --ensure-built \
   --output artifacts/architecture-current.json
 
-dotnet arch-linter-net change report \
+arch-linter-net change report \
   --base artifacts/architecture-base.json \
   --current artifacts/architecture-current.json \
-  --execution-context pr-123
+  --execution-context pr-123 \
+  --format json \
+  --output artifacts/architecture-change.json
 ```
+
+Omit `--baseline` from both snapshot commands when the repository has no reviewed baseline. Do not point the current snapshot at a baseline taken from a different revision merely because that file is convenient.
 
 Change evidence stays distinct from current-state Health. Resolved findings are improvement evidence; new findings, broadened/new waivers and policy weakening must not disappear behind unrelated healthy dimensions.
 
-## 11. Produce Architecture Health
+## 11. Produce Architecture Health from the same authority inputs
+
+Pass the policy contexts used by the gate so Health can project policy weakening. When the policy declares required external evidence, bind that evidence to Health as well; a previous validation process does not transfer its in-memory evidence to a new CLI process.
 
 ```bash
 dotnet arch-linter-net health \
   --policy architecture/arch.yml \
   --baseline architecture/baseline.arch.yml \
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json \
   --mode strict \
   --ensure-built \
   --execution-context pr-123 \
+  --external-evidence "id=static-analysis,path=evidence/static-analysis.sarif" \
+  --evidence-repository "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+  --evidence-revision "$GITHUB_SHA" \
+  --evidence-scope "ci" \
   --format json \
   > artifacts/architecture-health.json
 ```
+
+Omit the external-evidence options only when the policy declares no such requirement. Omit `--baseline` only when the repository has no reviewed baseline.
 
 Read `gate` and `health` separately:
 
 - gate: `pass | fail | unassessable`;
 - health: `healthy | debt | degrading | failing | unassessable`.
 
-Reviewed debt can therefore coexist with `gate: pass` / `health: debt`. Missing required evidence cannot be compensated by healthy dimensions. There is no weighted score, letter grade or universal architecture percentage.
+Reviewed debt can coexist with `gate: pass` / `health: debt`. `healthy` additionally requires all required evidence to be assessable, configured current authorities to pass, and no reviewed finding debt, explicit waiver debt, new debt, weakening, or metric regression. Missing required evidence cannot be compensated by healthy dimensions. There is no weighted score, letter grade or universal architecture percentage.
 
 See [Architecture Health](../reference/architecture-health.md).
 
 ## 12. Render reviewer artifacts
 
-The PR renderer consumes canonical Health and change artifacts; it does not rerun analysis:
+The PR renderer consumes canonical Health and architecture-change JSON; it does not rerun analysis. The Health report evidence and change report must carry the same non-empty execution context and selected mode.
 
 ```bash
 dotnet arch-linter-net report pr \
@@ -280,7 +321,7 @@ ArchLinterNet's own repository keeps complete architecture validation PR-authori
 
 | Gate | Health | Typical meaning |
 | --- | --- | --- |
-| `pass` | `healthy` | Assessable current state, required controls pass, zero explicit waiver debt. |
+| `pass` | `healthy` | All required evidence is assessable, configured authorities pass, and reviewed finding debt, explicit waiver debt, new debt, weakening and metric regression are absent. |
 | `pass` | `debt` | Reviewed finding debt and/or valid explicit waiver debt remains. |
 | `pass` or `fail` | `degrading` | New debt, weakening, new/broadened waiver or metric regression shows movement in the wrong direction. |
 | `fail` | `failing` | A current blocking architecture requirement fails. |
