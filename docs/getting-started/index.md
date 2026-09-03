@@ -168,6 +168,6 @@ The minimal strict gate is only the starting point. The complete v0.8 product pa
 - canonical Architecture Health;
 - CLI-rendered PR Markdown and the real Health badge.
 
-Follow the [complete single-tool workflow](../guides/single-tool-workflow.md). Existing v0.7/v1 adopters should use the focused [v0.7 to v0.8 guide](../guides/v07-to-v08-adoption.md).
+Follow the [complete single-tool workflow](../guides/single-tool-workflow.md). Existing v1 adopters should use the evergreen [extended-governance adoption guide](../guides/extended-governance-adoption.md), which includes the v0.7 to v0.8 transition.
 
 For a worked adoption against a real repository, continue with [Real-repository workflow](../guides/real-repository-workflow.md).
