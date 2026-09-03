@@ -148,10 +148,27 @@ Base/current review needs two repository states and one shared absolute artifact
 ```bash
 ARTIFACTS="$(pwd)/artifacts"
 BASE_WORKTREE="../architecture-base"
+TOOL_PATH="$ARTIFACTS/tool"
 mkdir -p "$ARTIFACTS"
 ```
 
-Use the exact same reviewed ArchLinterNet executable for both states. If the base worktree contains an older tool manifest, do not let it silently select different semantics; stage the reviewed CLI in a workflow-owned tool path or otherwise keep one executable on `PATH`.
+Stage the exact version from the committed local manifest into one workflow-local tool path, then keep that executable on `PATH` while changing worktrees:
+
+```bash
+ARCHLINTERNET_VERSION="$({
+  dotnet tool list --local ArchLinterNet.Cli |
+    awk 'tolower($1) == "archlinternet.cli" { print $2 }'
+})"
+test -n "$ARCHLINTERNET_VERSION"
+
+dotnet tool install ArchLinterNet.Cli \
+  --tool-path "$TOOL_PATH" \
+  --version "$ARCHLINTERNET_VERSION"
+export PATH="$TOOL_PATH:$PATH"
+arch-linter-net --version
+```
+
+The install uses the repository's configured NuGet sources and credentials. This second, workflow-local installation does not select a new version; it exposes the already reviewed manifest version through one absolute executable path so the base worktree cannot silently resolve an older manifest.
 
 Export policy contexts from the actual base and candidate policies:
 
@@ -340,7 +357,7 @@ See [Architecture Health](../reference/architecture-health.md).
 The PR renderer consumes canonical Health and architecture-change JSON; it does not rerun analysis. The Health report evidence and change report must carry the same non-empty execution context and selected mode.
 
 ```bash
-dotnet arch-linter-net report pr \
+arch-linter-net report pr \
   --health "$ARTIFACTS/architecture-health.json" \
   --change "$ARTIFACTS/architecture-change.json" \
   --max-details 20 \
@@ -352,7 +369,7 @@ dotnet arch-linter-net report pr \
 Generate the real Health badge payload from canonical Health evidence:
 
 ```bash
-dotnet arch-linter-net badge architecture-health \
+arch-linter-net badge architecture-health \
   --input "$ARTIFACTS/architecture-health.json" \
   --output "$ARTIFACTS/architecture-health-badge.json"
 ```
