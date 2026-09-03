@@ -39,7 +39,7 @@
 
 ## 6. Docs/spec drift (only if surfaced)
 
-- [ ] 6.1 If any stage of Section 3 reveals drift between `docs/guides/single-tool-workflow.md` and actual CLI behavior, fix the owning capability or the doc directly (not test glue), and note the fix here.
+- [x] 6.1 `docs/guides/single-tool-workflow.md` itself matched observed CLI behavior throughout Section 3. Found and fixed a separate, narrower drift: `BaselineHelpTexts.DiffHelpText` documented `--ensure-built`/`--no-restore`/`--configuration`/`--framework`/`--platform`/`--runtime` options that `DiffBaselineSubcommandModule.cs` never actually wires onto the `baseline diff` command (confirmed empirically: the packed CLI rejects them as unknown options) -- corrected the help text to state plainly that `baseline diff` has no build-state options and always evaluates in Ordinary mode, pointing at `baseline verify` (which genuinely has them) as the build-state-aware alternative. Verified via `BaselineCommandHandlerTests.FormatOptions.cs` (52/52 passing).
 
 ## 7. Spec synchronization and archive
 
