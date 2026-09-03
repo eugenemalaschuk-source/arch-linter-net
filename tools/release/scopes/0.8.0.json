@@ -1,0 +1,33 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.8.0-extended-static-governance",
+  "release_target": "0.8.0",
+  "story": 90,
+  "_comment": [
+    "The reviewed v0.8.0 release authority owned by #90 (Deliver v0.8 extended static",
+    "governance). Required items are the high-level closed authorities that define v0.8",
+    "release intent, per #524's release-scope declaration instructions. #524 itself is not",
+    "listed as a required item: it is the acceptance procedure that proves this declared",
+    "scope through immutable Checkpoint B evidence, not release-scope content of its own.",
+    "#510 and #673 are explicitly optional/non-blocking for v0.8. #742 is delivered",
+    "repository-self-governance context, not a user-facing v0.8 release capability."
+  ],
+  "required_items": [
+    { "issue": 504, "finding": "applicability-completeness", "summary": "Make extended-governance applicability and evidence explicit" },
+    { "issue": 91, "finding": "declared-topology", "summary": "Add native declared topology governance with capture/diff/verify" },
+    { "issue": 92, "finding": "contract-surface-governance", "summary": "Add contract-surface exposure and DTO/version boundary governance" },
+    { "issue": 93, "finding": "metrics-budgets", "summary": "Add deterministic architecture metrics and enforced budgets" },
+    { "issue": 95, "finding": "external-evidence-federation", "summary": "Federate external static diagnostics through bounded SARIF ingestion" },
+    { "issue": 633, "finding": "architecture-health", "summary": "Deliver Architecture Health, unified architecture PR report and badge" },
+    { "issue": 672, "finding": "cli-fail-closed-inputs", "summary": "Fail closed on unknown CLI subcommands and invalid arguments with exit 2" },
+    { "issue": 684, "finding": "public-single-tool-docs", "summary": "Publish the v0.8 single-tool architecture-governance workflow guide" },
+    { "issue": 706, "finding": "pr-delivery-authority", "summary": "Make PR validation authoritative and publish installable main.N development builds" }
+  ],
+  "excluded_items": [
+    { "issue": 510, "reason": "Optional diagram interoperability adapter; native declared topology is already complete without it." },
+    { "issue": 673, "reason": "Optional human-output readability improvement for policy check; no product-governance semantic dependency." }
+  ],
+  "delivered_items": [
+    { "issue": 742, "reason": "Repository self-governance debt freeze; protects implementation debt but is not a user-facing v0.8 release capability." }
+  ]
+}

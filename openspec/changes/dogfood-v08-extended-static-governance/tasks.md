@@ -1,14 +1,14 @@
 ## 1. Release-scope declaration (small, self-contained, low-risk — do first)
 
-- [ ] 1.1 Re-verify the current state of every issue #524 names for the v0.8 declaration (`gh issue view <n>`) — required {504,91,92,93,95,633,672,684,706}, excluded {510,673}, delivered {742}, story owner (#90) — before transcribing numbers into the declaration.
-- [ ] 1.2 Add `tools/release/scopes/0.8.0.json` (schema `checkpoint-b-release-scope-declaration/v2`, `declaration_id: v0.8.0-extended-static-governance`, `release_target: 0.8.0`, `story: 90`), with `required_items`/`excluded_items`/`delivered_items` per the verified list; do NOT list #524 itself as a required item.
-- [ ] 1.3 Extend `tools/release/tests/test_create_release_scope_evidence.py::test_shipped_declarations_preserve_both_reviewed_release_authorities` to assert the 7th declaration (`len(declarations) == len(by_target) == 7`, `"0.8.0"` in the target set, and its story/required/excluded/delivered assertions).
-- [ ] 1.4 Run `python3 -m pytest tools/release/tests/test_create_release_scope_evidence.py -q` and fix until green.
+- [x] 1.1 Re-verify the current state of every issue #524 names for the v0.8 declaration (`gh issue view <n>`) — required {504,91,92,93,95,633,672,684,706}, excluded {510,673}, delivered {742}, story owner (#90) — before transcribing numbers into the declaration.
+- [x] 1.2 Add `tools/release/scopes/0.8.0.json` (schema `checkpoint-b-release-scope-declaration/v2`, `declaration_id: v0.8.0-extended-static-governance`, `release_target: 0.8.0`, `story: 90`), with `required_items`/`excluded_items`/`delivered_items` per the verified list; do NOT list #524 itself as a required item.
+- [x] 1.3 Extend `tools/release/tests/test_create_release_scope_evidence.py::test_shipped_declarations_preserve_both_reviewed_release_authorities` to assert the 7th declaration (`len(declarations) == len(by_target) == 7`, `"0.8.0"` in the target set, and its story/required/excluded/delivered assertions).
+- [x] 1.4 Run `python3 -m pytest tools/release/tests/test_create_release_scope_evidence.py -q` and fix until green. (Ran via `make test-release-evidence`: 272 passed.)
 
 ## 2. Base/current fixture wiring (new integration surface — build and test in isolation before the full-cycle scenario depends on it)
 
-- [ ] 2.1 Add a small helper that materializes an `AdoptionAcceptanceFixture` copy of `modular-consumer` as a `GitTestRepository` root (or copies it into one), producing two deterministic commits (base, current) via `Commit(message) -> sha`.
-- [ ] 2.2 Add a focused test proving the wiring alone: two distinct commits exist, each is checkoutable/readable independently, and the working copy used for "current" is not accidentally shared state with "base".
+- [x] 2.1 Add a small helper that materializes an `AdoptionAcceptanceFixture` copy of `modular-consumer` as a `GitTestRepository` root (or copies it into one), producing two deterministic commits (base, current) via `Commit(message) -> sha`. (`GitVersionedAdoptionFixture`, plus `GitTestRepository.CreateAt`.)
+- [x] 2.2 Add a focused test proving the wiring alone: two distinct commits exist, each is checkoutable/readable independently, and the working copy used for "current" is not accidentally shared state with "base". Found and fixed a real pre-existing deadlock in `GitTestRepository`: `git add -A` across modular-consumer's 60+ files produces enough CRLF-conversion warnings on stderr to fill the pipe buffer, and the old sequential `ReadToEnd()` on stdout-then-stderr deadlocked waiting for a process that was itself blocked writing to a full stderr pipe. Fixed by reading both streams concurrently (`ReadBothStreamsToEnd`); verified all 207 existing `History` tests still pass.
 - [ ] 2.3 Decide and record (in this file or a short code comment) the specific deterministic mutation `modular-consumer` undergoes between base and current (e.g., one module touched to introduce a reviewed baseline entry) — keep it minimal and legible.
 
 ## 3. Primary server/modular full-cycle scenario

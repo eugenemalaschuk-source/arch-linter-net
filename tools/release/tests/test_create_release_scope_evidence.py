@@ -398,8 +398,8 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 6
-    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4"}
+    assert len(declarations) == len(by_target) == 7
+    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4", "0.8.0"}
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
     assert by_target["0.7.0"]["story"] == 613
@@ -435,5 +435,25 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
         {
             "issue": 699,
             "reason": "Repository-agent release-preparation workflow delivered after v0.7.3; explicitly no product behavior, release-pipeline semantics, package bytes, public API or OpenSpec capability change.",
+        }
+    ]
+    assert by_target["0.8.0"]["story"] == 90
+    assert {item["issue"] for item in by_target["0.8.0"]["required_items"]} == {
+        504, 91, 92, 93, 95, 633, 672, 684, 706,
+    }
+    assert by_target["0.8.0"]["excluded_items"] == [
+        {
+            "issue": 510,
+            "reason": "Optional diagram interoperability adapter; native declared topology is already complete without it.",
+        },
+        {
+            "issue": 673,
+            "reason": "Optional human-output readability improvement for policy check; no product-governance semantic dependency.",
+        },
+    ]
+    assert by_target["0.8.0"]["delivered_items"] == [
+        {
+            "issue": 742,
+            "reason": "Repository self-governance debt freeze; protects implementation debt but is not a user-facing v0.8 release capability.",
         }
     ]
