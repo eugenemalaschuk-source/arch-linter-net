@@ -70,6 +70,8 @@ Zero ordinary findings are not enough when required analysis inputs are missing,
 
 A required missing applicability record, empty exhaustive topology universe, incomplete recursive exposure universe, incomplete metric scope, or missing required SARIF artifact must remain unassessable rather than becoming a clean zero. Coverage and mapping ratios are transparency evidence, not quality percentages.
 
+The JSON result's `policy_inventory.effective_rule_count` and its applicability/evaluability denominator answer different questions. The first counts all effective authored controls once after composition. The second includes only controls that require applicability proof. Missing required applicability evidence cannot shrink that denominator, and neither value is a quality score.
+
 ## 5. Review declared topology
 
 Start with observation, then hand-author the architecture decision. Capture requires an explicit subject kind:
@@ -139,7 +141,7 @@ See [Contract-surface exposure](../contracts/contract-surface-exposure.md).
 
 A migration baseline records reviewed existing findings. A structured waiver is a policy-authored exception with its own exact target identity and lifecycle. Intended topology/coverage exclusions are policy scope, not waiver debt.
 
-Base/current review needs two repository states and one shared absolute artifact directory. The following POSIX example starts in the candidate checkout and assumes a reviewed base worktree at `../architecture-base`:
+Base/current review needs two repository states and one shared absolute artifact directory. The following Bash example starts in the candidate checkout and assumes a reviewed base worktree at `../architecture-base`:
 
 ```bash
 ARTIFACTS="$(pwd)/artifacts"
@@ -206,6 +208,20 @@ See [Architecture metrics](../policy-format/architecture-metrics.md).
 
 ## 9. Bind required external SARIF evidence
 
+Declare the logical evidence requirement separately from its runtime path:
+
+```yaml
+external_evidence:
+  - id: static-analysis
+    format: sarif
+    required: true
+    tool: Example Analyzer
+    run: architecture-check
+    require_repository: true
+    require_revision: true
+    require_scope: true
+```
+
 The analyzer executes outside ArchLinterNet and writes a repository-local SARIF file. ArchLinterNet then owns bounded trust, filtering, normalization and applicability:
 
 ```bash
@@ -270,9 +286,14 @@ Change evidence stays distinct from current-state Health. Resolved findings are 
 Pass the policy contexts used by the gate so Health can project policy weakening. When the policy declares required external evidence, bind that evidence to Health as well; a previous validation process does not transfer its in-memory evidence to a new CLI process.
 
 ```bash
+health_baseline_args=()
+if [[ -f architecture/baseline.arch.yml ]]; then
+  health_baseline_args=(--baseline architecture/baseline.arch.yml)
+fi
+
 dotnet arch-linter-net health \
   --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml \
+  "${health_baseline_args[@]}" \
   --base-context "$ARTIFACTS/policy-base.json" \
   --current-context "$ARTIFACTS/policy-current.json" \
   --mode strict \
@@ -286,7 +307,7 @@ dotnet arch-linter-net health \
   > "$ARTIFACTS/architecture-health.json"
 ```
 
-Omit the external-evidence options only when the policy declares no such requirement. Omit `--baseline` when the candidate revision has no reviewed baseline.
+Omit the external-evidence options only when the policy declares no such requirement.
 
 Read `gate` and `health` separately:
 
@@ -294,6 +315,8 @@ Read `gate` and `health` separately:
 - health: `healthy | debt | degrading | failing | unassessable`.
 
 Reviewed debt can coexist with `gate: pass` / `health: debt`. `healthy` additionally requires all required evidence to be assessable, configured current authorities to pass, and no reviewed finding debt, explicit waiver debt, new debt, weakening, or metric regression. Missing required evidence cannot be compensated by healthy dimensions. There is no weighted score, letter grade or universal architecture percentage.
+
+The command maps `pass`, `fail`, and `unassessable` gates to exit `0`, `1`, and `2`. Exit `1` or `2` can still accompany a valid `architecture-health/v1` document. A CI report producer should preserve and schema-check that document before a separate required gate blocks the PR; it must not globally coerce a failing or unassessable Health result into success.
 
 See [Architecture Health](../reference/architecture-health.md).
 
@@ -318,6 +341,8 @@ dotnet arch-linter-net badge architecture-health \
 
 The badge carries CLI-owned Health, explicit-ignore debt and effective-rule counts. Missing evidence remains unknown/unassessable; CI must not fabricate zeroes or retain an older healthy payload as current.
 
+A publication-only sticky writer may validate repository, PR, head, producer run/attempt, schema, byte count and SHA-256 before writing one inert Markdown comment. It never executes PR content, recalculates report sections, or turns arbitrary workflow status into architecture evidence.
+
 ## 13. Keep CI as transport
 
 A recommended split is:
@@ -329,15 +354,24 @@ pull request
   -> CLI-generated PR Markdown and badge payload
   -> required merge gate
 
-main
-  -> focused generic quality telemetry where desired
-  -> independent development-package publication where desired
-  -> trusted promotion of ready PR evidence only after exact merged-tree proof
+main quality
+  -> three Linux coverage shards
+  -> one canonical complete coverage receipt
+  -> independent SonarCloud and Codecov refreshes
+  -> fail-closed main quality summary
+
+main packages
+  -> explicit development version + monotonic run
+  -> exact source/version/package-set verification
+  -> 0.8.0-main.N development/dogfood distribution
+
+trusted badge publication
+  -> promote ready PR payload only after exact merged-tree/content proof
 ```
 
 A privileged publisher may validate repository/PR/head/run/schema/size/hash transport metadata and move inert Markdown or badge JSON. It must not recompute PASS/FAIL/UNASSESSABLE, Health, waiver debt, effective controls, report sections or badge colors/messages.
 
-ArchLinterNet's own repository keeps complete architecture validation PR-authoritative. Ordinary main quality refreshes focused coverage/Sonar/Codecov telemetry; `main.N` packages are independent dogfood builds. Public MkDocs/GitHub Pages deployment remains owned by a real `release-nuget.yml` publication with `publish: true`.
+ArchLinterNet's complete architecture validation is PR-authoritative. Generic main quality telemetry remains distinct from Architecture Health, and `main.N` packages remain distinct from public-release authority. Public MkDocs/GitHub Pages deployment is owned by a real `release-nuget.yml` publication with `publish: true`.
 
 ## Health paths at a glance
 
@@ -349,8 +383,8 @@ ArchLinterNet's own repository keeps complete architecture validation PR-authori
 | `fail` | `failing` | A current blocking architecture requirement fails. |
 | `unassessable` | `unassessable` | Required applicability, topology, build, metric, baseline or external evidence is not trustworthy. |
 
-## Moving from v0.7
+## Moving from an existing policy
 
-Existing v0.7-compatible policies can adopt v0.8 incrementally. Keep `version: 1` while confirming compatibility, migrate legacy ignores to structured waivers before deliberately enabling v2 strict lifecycle defaults, introduce partial topology before exhaustive claims, measure before budgets, bind SARIF only after producer context is reliable, and replace repository-owned report/counting scripts with first-class Health/report/badge projections.
+Existing v1 policies can adopt extended governance incrementally. Keep `version: 1` while confirming compatibility, migrate legacy ignores to structured waivers before deliberately enabling v2 strict lifecycle defaults, introduce partial topology before exhaustive claims, measure before budgets, bind SARIF only after producer context is reliable, and replace repository-owned report/counting scripts with first-class Health/report/badge projections.
 
-Follow the complete [v0.7 to v0.8 adoption guide](v07-to-v08-adoption.md).
+Follow the evergreen [extended-governance adoption guide](extended-governance-adoption.md), which includes the v0.7 to v0.8 migration boundary.
