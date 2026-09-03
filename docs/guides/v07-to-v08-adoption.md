@@ -1,6 +1,6 @@
 # Adopt v0.8 from v0.7
 
-ArchLinterNet v0.8 is intentionally adoptable in stages. Existing v0.7-compatible policies can keep their current behavior while teams opt into the new topology, exposure, metrics, external-evidence, waiver-lifecycle, Health, report, and badge surfaces deliberately.
+ArchLinterNet v0.8 is intentionally adoptable in stages. Existing v0.7-compatible policies can keep their current behavior while teams opt into topology, exposure, metrics, external evidence, waiver lifecycle, Health, report, and badge surfaces deliberately.
 
 This page is the migration path for an existing adopter. For greenfield setup, start with the [complete single-tool workflow](single-tool-workflow.md).
 
@@ -16,13 +16,13 @@ dotnet arch-linter-net policy check --policy architecture/arch.yml
 dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
 ```
 
-Do not weaken a rule simply because the newer CLI exposes previously hidden incomplete or stale evidence.
+Record the reviewed package version and use that exact version for both base and candidate evidence. Do not weaken a rule simply because the newer CLI exposes previously hidden incomplete or stale evidence.
 
 ## 2. Keep v1 compatibility until waiver migration is ready
 
 Policy `version: 1` preserves compatibility waiver defaults. You can therefore adopt most v0.8 features without immediately converting every legacy manual ignore.
 
-Use this period to inspect canonical waiver lifecycle and policy-inventory output. Migrate each still-legitimate manual ignore to a structured waiver with stable ID, exact target fingerprint, reason, owner, issue/remediation, introduced date, and expiry.
+Use this period to inspect canonical waiver lifecycle and policy-inventory output. Under compatibility semantics, matcher-only ignores remain visible as `metadata_incomplete` debt and retain their prior pass/fail behavior. Migrate each still-legitimate manual ignore to a structured waiver with stable ID, exact target fingerprint, reason, owner, issue/remediation, introduced date, and expiry.
 
 When all manual exceptions are ready for strict lifecycle behavior, move the root policy to:
 
@@ -91,7 +91,7 @@ Existing dependency rules do not need to be replaced. Add `contract_surface_expo
 
 When you already use `public_api_surface`, reuse that reviewed membership as the source. Do not replace a type's existing semantic role with an API-only role just to make exposure rules work.
 
-Start in audit if you expect existing leakage, then promote the contract to strict after reviewing/fixing the findings. Runtime serialization, endpoint routing and arbitrary semantic data flow remain outside this static contract.
+Start in audit if you expect existing leakage, then promote the contract to strict after reviewing or fixing the findings. Runtime serialization, endpoint routing and arbitrary semantic data flow remain outside this static contract.
 
 ## 6. Measure before introducing budgets
 
@@ -125,33 +125,76 @@ dotnet arch-linter-net \
   --evidence-scope "ci"
 ```
 
-A successful current-context zero-result artifact is valid evidence. A missing, failed, malformed, stale, wrong-revision, or wrong-scope required artifact is unassessable. Do not carry forward any v0.7 script that treats filename, modification time, job name, or mere file presence as freshness proof.
+A successful current-context zero-result artifact is valid evidence. A missing, failed, malformed, stale, wrong-revision, or wrong-scope required artifact is unassessable. Do not carry forward a v0.7 script that treats filename, modification time, job name, or mere file presence as freshness proof.
 
 ## 8. Add policy weakening and architecture change evidence
 
-Export policy contexts from the actual base/current policy states and compare them with `policy weakening`. Capture base/current architecture snapshots and render a change report when reviewers need delta evidence.
+Export policy contexts and architecture snapshots from the actual base and candidate states. Use the exact same v0.8 CLI version and the same selected mode/build context for both snapshots.
 
-This is where a new/broadened waiver, relaxed exclusion, removed control, new finding debt, or resolved finding becomes explicit change evidence instead of being hidden inside a current-state pass/fail result.
+```bash
+# Reviewed base checkout/worktree
+arch-linter-net policy context \
+  --policy architecture/arch.yml \
+  --format json > /shared/artifacts/policy-base.json
+
+arch-linter-net change snapshot \
+  --policy architecture/arch.yml \
+  --mode strict \
+  --baseline architecture/baseline.arch.yml \
+  --ensure-built \
+  --output /shared/artifacts/architecture-base.json
+
+# Candidate checkout/worktree
+arch-linter-net policy context \
+  --policy architecture/arch.yml \
+  --format json > artifacts/policy-current.json
+
+arch-linter-net change snapshot \
+  --policy architecture/arch.yml \
+  --mode strict \
+  --baseline architecture/baseline.arch.yml \
+  --ensure-built \
+  --output artifacts/architecture-current.json
+
+arch-linter-net policy weakening \
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json
+
+arch-linter-net change report \
+  --base artifacts/architecture-base.json \
+  --current artifacts/architecture-current.json \
+  --execution-context pr-123 \
+  --format json \
+  --output artifacts/architecture-change.json
+```
+
+Omit `--baseline` from both snapshots when the repository has no reviewed baseline. This is where a new/broadened waiver, relaxed exclusion, removed control, new finding debt, or resolved finding becomes explicit change evidence instead of being hidden inside a current-state pass/fail result.
 
 ## 9. Adopt Architecture Health
 
-Once the current validation, baseline, waiver, topology, metrics, and required external evidence are trustworthy, project the canonical Health result:
+Once current validation, baseline, waiver, topology, metrics, and required external evidence are trustworthy, project Health from the same authority inputs. Include base/current policy contexts so weakening is represented, and repeat every required external-evidence binding because a new CLI process does not inherit evidence from an earlier validation command.
 
 ```bash
 dotnet arch-linter-net health \
   --policy architecture/arch.yml \
   --baseline architecture/baseline.arch.yml \
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json \
   --mode strict \
   --ensure-built \
   --execution-context pr-123 \
+  --external-evidence "id=static-analysis,path=evidence/static-analysis.sarif" \
+  --evidence-repository "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+  --evidence-revision "$GITHUB_SHA" \
+  --evidence-scope "ci" \
   --format json > artifacts/architecture-health.json
 ```
 
-Interpret `gate` and `health` separately:
+Omit the external-evidence options only when the policy declares no such requirement. Interpret `gate` and `health` separately:
 
-- pass + healthy: assessable current state with zero explicit waiver debt;
+- pass + healthy: all required evidence is assessable, configured authorities pass, and reviewed finding debt, explicit waiver debt, new debt, weakening, and metric regression are absent;
 - pass + debt: reviewed debt remains but the current gate passes;
-- degrading: regression/change evidence exists;
+- degrading: regression/change evidence exists, with the owning authority still deciding whether the independent gate blocks;
 - fail + failing: a blocking current requirement fails;
 - unassessable: required evidence cannot be trusted as complete/current.
 
@@ -161,7 +204,7 @@ See [Architecture Health](../reference/architecture-health.md).
 
 If v0.7 CI used Python, JavaScript, shell or PowerShell to count rules, classify debt, render architecture sections, or decide badge color, retire that logic after moving to the v0.8 projections.
 
-Use the CLI-generated reviewer report:
+Use the JSON change artifact created in step 8 together with the Health artifact carrying the same `pr-123` execution context and `strict` selected mode:
 
 ```bash
 dotnet arch-linter-net report pr \
@@ -170,7 +213,7 @@ dotnet arch-linter-net report pr \
   --output artifacts/architecture-pr-report.md
 ```
 
-and Health badge payload:
+Generate the Health badge payload separately:
 
 ```bash
 dotnet arch-linter-net badge architecture-health \
@@ -210,7 +253,7 @@ The PR remains the complete architecture merge authority. Generic main telemetry
 
 The public release workflow (`release-nuget.yml`) creates and validates a fresh immutable candidate, verifies its package/provenance evidence, and only then may publish to NuGet.org and create the GitHub Release. No `main.N` package is promoted or renamed into a stable release.
 
-Package visibility is not the trust boundary; exact version, source identity, package-set integrity, and the release workflow's authorization evidence are.
+Package visibility is not the trust boundary; exact version, source identity, package-set integrity, deterministic restore, and the release workflow's authorization evidence are. The repository retains only the newest five complete four-package `main.N` sets; stable and other prerelease families are outside that retention selection. See [Release process](../reference/release-process.md) for exact package-set and provenance verification.
 
 ## 13. Documentation publication behavior
 
