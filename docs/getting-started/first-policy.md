@@ -134,4 +134,4 @@ Policy v2 changes the default waiver-lifecycle profile, not the meaning of the d
 - Add [CI integration](../guides/ci-integration.md).
 - Read the [contract overview](../contracts/index.md).
 - Check [supported capabilities and non-goals](../policy-format/supported-capabilities.md) before adding advanced rules.
-- Existing v0.7/v1 adopters should follow the [v0.7 to v0.8 migration guide](../guides/v07-to-v08-adoption.md).
+- Existing v1 adopters should follow the [extended-governance migration guide](../guides/extended-governance-adoption.md).
