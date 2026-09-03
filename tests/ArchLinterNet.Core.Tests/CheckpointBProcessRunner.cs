@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Text;
 
 namespace ArchLinterNet.Core.Tests;
@@ -63,73 +64,58 @@ internal static partial class CheckpointBProcessRunner
 
             int processId = process.Id;
 
-            standardOutput = new StreamCapture();
-            standardError = new StreamCapture();
+            // Everything from here on runs against a live process: any exception, whether it is a
+            // deliberate cancellation/timeout or a genuine fault from WaitForExitAsync or a stream
+            // read, must trigger the same bounded best-effort cleanup and then propagate unchanged.
+            // Cleanup itself must never be allowed to replace that original exception.
+            try
+            {
+                standardOutput = new StreamCapture();
+                standardError = new StreamCapture();
 #pragma warning disable CA2016
-            standardOutputTask = standardOutput.ReadAsync(standardOutputReader);
-            standardErrorTask = standardError.ReadAsync(standardErrorReader);
+                standardOutputTask = standardOutput.ReadAsync(standardOutputReader);
+                standardErrorTask = standardError.ReadAsync(standardErrorReader);
 #pragma warning restore CA2016
-            completion = process.WaitForExitAsync();
+                completion = process.WaitForExitAsync();
 
-            WaitOutcome processOutcome = await WaitBoundedAsync(
-                    completion,
-                    ProcessCompletionTimeout,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            if (processOutcome == WaitOutcome.Canceled)
+                await AwaitPhaseAsync(
+                        completion,
+                        ProcessCompletionTimeout,
+                        cancellationToken,
+                        "process completion",
+                        command,
+                        processId,
+                        elapsed,
+                        standardOutput,
+                        standardError)
+                    .ConfigureAwait(false);
+
+                Task streams = Task.WhenAll(standardOutputTask, standardErrorTask);
+                await AwaitPhaseAsync(
+                        streams,
+                        PostExitDrainTimeout,
+                        cancellationToken,
+                        "post-exit stream drain",
+                        command,
+                        processId,
+                        elapsed,
+                        standardOutput,
+                        standardError)
+                    .ConfigureAwait(false);
+
+                return new CheckpointBReleaseGateTests.CommandResult(
+                    process.ExitCode,
+                    standardOutput.ReadResult(),
+                    standardError.ReadResult());
+            }
+            catch (Exception error)
             {
+                ExceptionDispatchInfo capturedError = ExceptionDispatchInfo.Capture(error);
                 await CleanupAfterFailureAsync(process, job, completion, standardOutputTask, standardErrorTask)
                     .ConfigureAwait(false);
-                throw new OperationCanceledException(cancellationToken);
+                capturedError.Throw();
+                throw; // Unreachable: capturedError.Throw() always throws.
             }
-
-            if (processOutcome == WaitOutcome.TimedOut)
-            {
-                await CleanupAfterFailureAsync(process, job, completion, standardOutputTask, standardErrorTask)
-                    .ConfigureAwait(false);
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    throw new OperationCanceledException(cancellationToken);
-                }
-
-                throw new TimeoutException(BuildTimeoutDiagnostic(
-                    command,
-                    processId,
-                    "process completion",
-                    elapsed,
-                    standardOutput,
-                    standardError));
-            }
-
-            Task streams = Task.WhenAll(standardOutputTask, standardErrorTask);
-            WaitOutcome drainOutcome = await WaitBoundedAsync(
-                    streams,
-                    PostExitDrainTimeout,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            if (drainOutcome != WaitOutcome.Completed)
-            {
-                await CleanupAfterFailureAsync(process, job, completion, standardOutputTask, standardErrorTask)
-                    .ConfigureAwait(false);
-                if (drainOutcome == WaitOutcome.Canceled || cancellationToken.IsCancellationRequested)
-                {
-                    throw new OperationCanceledException(cancellationToken);
-                }
-
-                throw new TimeoutException(BuildTimeoutDiagnostic(
-                    command,
-                    processId,
-                    "post-exit stream drain",
-                    elapsed,
-                    standardOutput,
-                    standardError));
-            }
-
-            await streams.ConfigureAwait(false);
-            return new CheckpointBReleaseGateTests.CommandResult(
-                process.ExitCode,
-                standardOutput.ReadResult(),
-                standardError.ReadResult());
         }
         finally
         {
@@ -143,6 +129,11 @@ internal static partial class CheckpointBProcessRunner
                 ObserveFailure(standardErrorTask);
             }
 
+            if (completion is not null)
+            {
+                ObserveFailure(completion);
+            }
+
             standardOutputReader?.Dispose();
             standardErrorReader?.Dispose();
             standardOutput?.Dispose();
@@ -152,37 +143,76 @@ internal static partial class CheckpointBProcessRunner
         }
     }
 
-    private static async Task<WaitOutcome> WaitBoundedAsync(
+    /// <summary>
+    /// Awaits <paramref name="task"/> bounded by <paramref name="timeout"/> and
+    /// <paramref name="cancellationToken"/>. A genuine fault from <paramref name="task"/> and a
+    /// cancellation propagate unchanged; only this method's own timeout is rewritten into a
+    /// <see cref="TimeoutException"/> carrying the bounded diagnostic.
+    /// </summary>
+    private static async Task AwaitPhaseAsync(
         Task task,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string phase,
+        string command,
+        int processId,
+        Stopwatch elapsed,
+        StreamCapture standardOutput,
+        StreamCapture standardError)
     {
-        Task timeoutTask = Task.Delay(timeout);
-        Task cancellationTask = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-        Task completed = await Task.WhenAny(task, timeoutTask, cancellationTask).ConfigureAwait(false);
-        if (completed == task)
+        try
         {
-            await task.ConfigureAwait(false);
-            return WaitOutcome.Completed;
+            await task.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
         }
-
-        return completed == cancellationTask ? WaitOutcome.Canceled : WaitOutcome.TimedOut;
+        catch (TimeoutException)
+        {
+            throw new TimeoutException(BuildTimeoutDiagnostic(
+                command,
+                processId,
+                phase,
+                elapsed,
+                standardOutput,
+                standardError));
+        }
     }
 
     private static async Task CleanupAfterFailureAsync(
         Process process,
         WindowsJobScope? job,
-        Task completion,
-        Task standardOutput,
-        Task standardError)
+        Task? completion,
+        Task? standardOutputTask,
+        Task? standardErrorTask)
     {
         RequestCleanup(process, job);
-        _ = await WaitBoundedAsync(completion, CleanupTimeout, CancellationToken.None).ConfigureAwait(false);
-        _ = await WaitBoundedAsync(
-                Task.WhenAll(standardOutput, standardError),
-                CleanupTimeout,
-                CancellationToken.None)
-            .ConfigureAwait(false);
+        if (completion is not null)
+        {
+            await WaitBestEffortAsync(completion, CleanupTimeout).ConfigureAwait(false);
+        }
+
+        if (standardOutputTask is not null || standardErrorTask is not null)
+        {
+            Task streams = Task.WhenAll(
+                standardOutputTask ?? Task.CompletedTask,
+                standardErrorTask ?? Task.CompletedTask);
+            await WaitBestEffortAsync(streams, CleanupTimeout).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Waits for <paramref name="task"/> up to <paramref name="timeout"/> without ever throwing:
+    /// used only during best-effort cleanup, where a fault or a timeout on the task being cleaned
+    /// up must never replace the original exception this runner is already propagating.
+    /// </summary>
+    internal static async Task WaitBestEffortAsync(Task task, TimeSpan timeout)
+    {
+        try
+        {
+            await task.WaitAsync(timeout).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Intentionally swallowed: see summary.
+        }
     }
 
     private static void RequestCleanup(Process process, WindowsJobScope? job)
@@ -311,13 +341,6 @@ internal static partial class CheckpointBProcessRunner
             CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
-    }
-
-    private enum WaitOutcome
-    {
-        Completed,
-        TimedOut,
-        Canceled,
     }
 
     /// <summary>

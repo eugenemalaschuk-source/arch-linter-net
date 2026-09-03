@@ -16,7 +16,9 @@ internal static partial class CheckpointBProcessRunner
         private const uint ExtendedStartupInfoPresent = 0x00080000;
         private const uint CreateUnicodeEnvironment = 0x00000400;
         private const uint CreateNoWindowFlag = 0x08000000;
+        private const uint CreateSuspendedFlag = 0x00000004;
         private const uint HandleFlagInherit = 0x00000001;
+        private const uint InvalidResumeCount = 0xFFFFFFFF;
         private const nuint ProcThreadAttributeJobList = 0x2000D;
         private const nuint ProcThreadAttributeHandleList = 0x20002;
         private const uint GenericRead = 0x80000000;
@@ -58,7 +60,12 @@ internal static partial class CheckpointBProcessRunner
         /// rather than through a separate post-start AssignProcessToJobObject call. Inheritance is
         /// further scoped with PROC_THREAD_ATTRIBUTE_HANDLE_LIST to exactly the three redirected
         /// stdio handles, so the child cannot pick up unrelated inheritable handles that happen to
-        /// be open in the test host process.
+        /// be open in the test host process. The process is created CREATE_SUSPENDED and only
+        /// resumed after a managed <see cref="Process"/> has been attached by PID, so the root
+        /// cannot exit (and free its PID for reuse) before that attachment is guaranteed to name
+        /// the process this method just created; CreateProcessW's own hProcess is held open as the
+        /// authoritative reference for that entire window and used to force-terminate the child if
+        /// attachment fails.
         /// </summary>
         internal (Process Process, StreamReader StandardOutput, StreamReader StandardError) LaunchContained(
             ProcessStartInfo startInfo)
@@ -73,6 +80,8 @@ internal static partial class CheckpointBProcessRunner
             nint handleListBuffer = 0;
             nint environmentBlock = 0;
             nint commandLineBuffer = 0;
+            nint rawProcessHandle = 0;
+            nint rawThreadHandle = 0;
             try
             {
                 CreateInheritablePipe(out parentStandardOutput, out childStandardOutput);
@@ -102,7 +111,7 @@ internal static partial class CheckpointBProcessRunner
                 startupInfo.StartupInfo.StandardError = childStandardError.DangerousGetHandle();
                 startupInfo.AttributeList = attributeList;
 
-                uint creationFlags = ExtendedStartupInfoPresent | CreateUnicodeEnvironment;
+                uint creationFlags = ExtendedStartupInfoPresent | CreateUnicodeEnvironment | CreateSuspendedFlag;
                 if (startInfo.CreateNoWindow)
                 {
                     creationFlags |= CreateNoWindowFlag;
@@ -124,9 +133,31 @@ internal static partial class CheckpointBProcessRunner
                     throw NativeFailure("create the Checkpoint B contained process");
                 }
 
-                Process process = Process.GetProcessById(unchecked((int)processInformation.ProcessId));
-                NativeMethods.CloseHandle(processInformation.Thread);
-                NativeMethods.CloseHandle(processInformation.Process);
+                rawProcessHandle = processInformation.Process;
+                rawThreadHandle = processInformation.Thread;
+
+                // The primary thread is still suspended, so the process cannot exit and free its
+                // PID for reuse: GetProcessById is guaranteed to attach to the process this method
+                // just created, not to an unrelated process that happens to reuse the same PID.
+                Process process;
+                try
+                {
+                    process = Process.GetProcessById(unchecked((int)processInformation.ProcessId));
+                }
+                catch
+                {
+                    NativeMethods.TerminateProcess(rawProcessHandle, InvalidResumeCount);
+                    throw;
+                }
+
+                uint previousSuspendCount = NativeMethods.ResumeThread(rawThreadHandle);
+                if (previousSuspendCount == InvalidResumeCount)
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    NativeMethods.TerminateProcess(rawProcessHandle, InvalidResumeCount);
+                    process.Dispose();
+                    throw NativeFailure("resume the Checkpoint B contained process", error);
+                }
 
                 Encoding outputEncoding = startInfo.StandardOutputEncoding ?? Console.OutputEncoding;
                 Encoding errorEncoding = startInfo.StandardErrorEncoding ?? Console.OutputEncoding;
@@ -138,6 +169,16 @@ internal static partial class CheckpointBProcessRunner
             }
             finally
             {
+                if (rawThreadHandle != 0)
+                {
+                    NativeMethods.CloseHandle(rawThreadHandle);
+                }
+
+                if (rawProcessHandle != 0)
+                {
+                    NativeMethods.CloseHandle(rawProcessHandle);
+                }
+
                 childStandardOutput?.Dispose();
                 childStandardError?.Dispose();
                 parentStandardOutput?.Dispose();
@@ -426,6 +467,13 @@ internal static partial class CheckpointBProcessRunner
                 string? currentDirectory,
                 ref StartupInfoEx startupInfo,
                 out ProcessInformation processInformation);
+
+            [LibraryImport("kernel32.dll", SetLastError = true)]
+            internal static partial uint ResumeThread(nint thread);
+
+            [LibraryImport("kernel32.dll", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            internal static partial bool TerminateProcess(nint process, uint exitCode);
         }
 
         [StructLayout(LayoutKind.Sequential)]

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -109,6 +110,143 @@ public sealed class CheckpointBProcessRunnerTests
         {
             DeleteDirectoryEventually(root);
         }
+    }
+
+    [Test]
+    [CancelAfter(90_000)]
+    public void ImmediateRootExitDoesNotRaceProcessAttachment()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("This regression targets the Windows CreateProcessW handle-attachment race.");
+        }
+
+        // A root that exits the instant it starts is the worst case for the window between
+        // CreateProcessW returning and this runner attaching a managed Process by PID: run it many
+        // times to make a reintroduced race (attaching by PID after the process could already have
+        // exited and its PID been reused) show up as an intermittent failure rather than a rare one.
+        for (int iteration = 0; iteration < 150; iteration++)
+        {
+            var startInfo = new ProcessStartInfo("cmd.exe")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            startInfo.ArgumentList.Add("/c");
+            startInfo.ArgumentList.Add("exit 0");
+
+            CheckpointBReleaseGateTests.CommandResult result =
+                CheckpointBReleaseGateTests.Run(startInfo, TestContext.CurrentContext.CancellationToken);
+            Assert.That(result.ExitCode, Is.EqualTo(0),
+                $"Iteration {iteration} did not observe a clean exit code from an immediately-exiting root.");
+        }
+    }
+
+    [Test]
+    [CancelAfter(10_000)]
+    public void StreamDecodeFaultDuringDrainPreservesOriginalExceptionAndTerminatesDescendant()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The inherited redirected-handle regression requires Windows job objects.");
+        }
+
+        string root = Path.Combine(Path.GetTempPath(), $"checkpoint-b-process-runner-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        string childPidPath = Path.Combine(root, "child.pid");
+
+        // Reuses the same inherited-handle probe as the timeout regression above; the fault comes
+        // not from the probe's output but from decoding it with an encoding rigged to always throw,
+        // so the descendant's ordinary output writes are enough to trigger it. Both stdout and
+        // stderr are rigged (not just stdout): the drain phase awaits Task.WhenAll(stdout, stderr),
+        // which only completes once BOTH constituent tasks are done, faulted or not — with only
+        // stdout faulting, stderr would stay legitimately pending (the descendant holds it open)
+        // and the drain phase would time out instead of observing the fault.
+        var startInfo = new ProcessStartInfo(ProcessTreeProbePath)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            StandardOutputEncoding = AlwaysThrowingDecodeEncoding.Instance,
+            StandardErrorEncoding = AlwaysThrowingDecodeEncoding.Instance,
+        };
+        startInfo.ArgumentList.Add("root");
+        startInfo.ArgumentList.Add(childPidPath);
+        startInfo.ArgumentList.Add("30");
+
+        try
+        {
+            // This is a genuine fault raised while decoding the redirected streams, not the
+            // runner's own timeout or a cancellation: it must surface unchanged, proving cleanup
+            // never replaces the original exception with one of its own (e.g. a cleanup-phase
+            // TimeoutException), and that a fault mid-drain still runs cleanup at all.
+            Assert.Throws<InvalidDataException>(() =>
+                CheckpointBReleaseGateTests.Run(startInfo, TestContext.CurrentContext.CancellationToken));
+
+            Assert.That(SpinWait.SpinUntil(
+                    () => File.Exists(childPidPath) && int.TryParse(File.ReadAllText(childPidPath).Trim(), out _),
+                    TimeSpan.FromSeconds(2)),
+                Is.True,
+                "The inherited-handle probe did not publish its descendant process id.");
+            int childPid = int.Parse(File.ReadAllText(childPidPath).Trim(), System.Globalization.CultureInfo.InvariantCulture);
+            Assert.That(SpinWait.SpinUntil(() => !IsProcessAlive(childPid), TimeSpan.FromSeconds(2)), Is.True,
+                "A fault while decoding a redirected stream must still trigger bounded cleanup that " +
+                "terminates the descendant, not leave it running because the exceptional path skipped " +
+                "cleanup.");
+        }
+        finally
+        {
+            DeleteDirectoryEventually(root);
+        }
+    }
+
+    /// <summary>
+    /// A minimal <see cref="Encoding"/> whose decoding side always throws, used to deterministically
+    /// inject a fault while a redirected stream is being decoded, independent of any real invalid
+    /// byte sequence or Decoder buffering/EOF timing.
+    /// </summary>
+    private sealed class AlwaysThrowingDecodeEncoding : Encoding
+    {
+        internal static readonly AlwaysThrowingDecodeEncoding Instance = new();
+
+        public override int GetByteCount(char[] chars, int index, int count) => 0;
+
+        public override int GetBytes(char[] chars, int charIndex, int charCount, byte[] bytes, int byteIndex) => 0;
+
+        public override int GetCharCount(byte[] bytes, int index, int count) =>
+            throw new InvalidDataException("Injected stream-decode fault for testing.");
+
+        public override int GetChars(byte[] bytes, int byteIndex, int byteCount, char[] chars, int charIndex) =>
+            throw new InvalidDataException("Injected stream-decode fault for testing.");
+
+        public override int GetMaxByteCount(int charCount) => charCount;
+
+        public override int GetMaxCharCount(int byteCount) => byteCount;
+    }
+
+    [Test]
+    [CancelAfter(5_000)]
+    public async Task WaitBestEffortAsyncSwallowsAFaultedTask()
+    {
+        Task faulted = Task.FromException(new InvalidOperationException("boom"));
+
+        // No exception escaping this call is the assertion: a fault on the task being cleaned up
+        // must never replace the exception the caller is already propagating.
+        await CheckpointBProcessRunner.WaitBestEffortAsync(faulted, TimeSpan.FromSeconds(1));
+    }
+
+    [Test]
+    [CancelAfter(5_000)]
+    public async Task WaitBestEffortAsyncSwallowsATimeout()
+    {
+        var neverCompletes = new TaskCompletionSource();
+        Stopwatch elapsed = Stopwatch.StartNew();
+
+        await CheckpointBProcessRunner.WaitBestEffortAsync(neverCompletes.Task, TimeSpan.FromMilliseconds(200));
+
+        Assert.That(elapsed.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)),
+            "A best-effort cleanup wait must return once its own timeout elapses, not hang indefinitely.");
     }
 
     private static ProcessStartInfo CreateProcessTree(string childPidPath)
