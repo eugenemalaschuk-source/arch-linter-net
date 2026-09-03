@@ -135,7 +135,9 @@ contracts:
 
 Recursive exposure follows visible nested generic, tuple, array and wrapper positions and reports deterministic exposure paths. It is static metadata/signature governance; runtime serialization, routing, DI and arbitrary semantic data flow are outside this contract.
 
-See [Contract-surface exposure](../contracts/contract-surface-exposure.md).
+When one selected contract surface must not expose another version or an implementation-only surface, use `strict_versioned_contract_surface_isolation` or its audit counterpart. That family reuses the same recursive exposure evidence with rule-local named surfaces; it does not create another public-API snapshot, replace semantic roles, or perform runtime version negotiation.
+
+See [Contract-surface exposure](../contracts/contract-surface-exposure.md) and [Versioned contract-surface isolation](../contracts/versioned-contract-surface-isolation.md).
 
 ## 7. Keep debt categories separate
 
@@ -251,6 +253,8 @@ dotnet arch-linter-net \
 
 A successful current-context zero-result artifact is valid evidence. Missing, malformed, failed, wrong-revision, wrong-scope or otherwise untrusted required evidence is unassessable. Filename, mtime, artifact order and CI job name are never freshness proof.
 
+The canonical trust receipt retains the logical evidence identity, selected tool/run, normalized repository-local path, exact consumed-byte SHA-256, and validated repository/revision/scope context. Downstream Health/report consumers use that receipt instead of reopening the SARIF or querying producer SaaS state.
+
 See [External evidence](../policy-format/external-evidence.md).
 
 ## 10. Produce a real base/current architecture change artifact
@@ -339,8 +343,11 @@ The PR renderer consumes canonical Health and architecture-change JSON; it does 
 dotnet arch-linter-net report pr \
   --health "$ARTIFACTS/architecture-health.json" \
   --change "$ARTIFACTS/architecture-change.json" \
+  --max-details 20 \
   --output "$ARTIFACTS/architecture-pr-report.md"
 ```
+
+`--max-details` bounds each detailed evidence section independently while preserving canonical totals and explicitly reporting omitted details. Its default is 20; set another positive value when the publication transport requires a tighter bound.
 
 Generate the real Health badge payload from canonical Health evidence:
 
