@@ -129,46 +129,62 @@ A successful current-context zero-result artifact is valid evidence. A missing, 
 
 ## 8. Add policy weakening and architecture change evidence
 
-Export policy contexts and architecture snapshots from the actual base and candidate states. Use the exact same v0.8 CLI version and the same selected mode/build context for both snapshots.
+Start in the candidate checkout, create one absolute artifact directory, and point `BASE_WORKTREE` at a reviewed base worktree. Run both states with the exact same v0.8 CLI executable.
 
 ```bash
-# Reviewed base checkout/worktree
+ARTIFACTS="$(pwd)/artifacts"
+BASE_WORKTREE="../architecture-base"
+mkdir -p "$ARTIFACTS"
+
+(
+  cd "$BASE_WORKTREE"
+
+  arch-linter-net policy context \
+    --policy architecture/arch.yml \
+    --format json > "$ARTIFACTS/policy-base.json"
+
+  baseline_args=()
+  if [[ -f architecture/baseline.arch.yml ]]; then
+    baseline_args=(--baseline architecture/baseline.arch.yml)
+  fi
+
+  arch-linter-net change snapshot \
+    --policy architecture/arch.yml \
+    --mode strict \
+    "${baseline_args[@]}" \
+    --ensure-built \
+    --output "$ARTIFACTS/architecture-base.json"
+)
+
 arch-linter-net policy context \
   --policy architecture/arch.yml \
-  --format json > /shared/artifacts/policy-base.json
+  --format json > "$ARTIFACTS/policy-current.json"
+
+baseline_args=()
+if [[ -f architecture/baseline.arch.yml ]]; then
+  baseline_args=(--baseline architecture/baseline.arch.yml)
+fi
 
 arch-linter-net change snapshot \
   --policy architecture/arch.yml \
   --mode strict \
-  --baseline architecture/baseline.arch.yml \
+  "${baseline_args[@]}" \
   --ensure-built \
-  --output /shared/artifacts/architecture-base.json
-
-# Candidate checkout/worktree
-arch-linter-net policy context \
-  --policy architecture/arch.yml \
-  --format json > artifacts/policy-current.json
-
-arch-linter-net change snapshot \
-  --policy architecture/arch.yml \
-  --mode strict \
-  --baseline architecture/baseline.arch.yml \
-  --ensure-built \
-  --output artifacts/architecture-current.json
+  --output "$ARTIFACTS/architecture-current.json"
 
 arch-linter-net policy weakening \
-  --base-context artifacts/policy-base.json \
-  --current-context artifacts/policy-current.json
+  --base-context "$ARTIFACTS/policy-base.json" \
+  --current-context "$ARTIFACTS/policy-current.json"
 
 arch-linter-net change report \
-  --base artifacts/architecture-base.json \
-  --current artifacts/architecture-current.json \
+  --base "$ARTIFACTS/architecture-base.json" \
+  --current "$ARTIFACTS/architecture-current.json" \
   --execution-context pr-123 \
   --format json \
-  --output artifacts/architecture-change.json
+  --output "$ARTIFACTS/architecture-change.json"
 ```
 
-Omit `--baseline` from both snapshots when the repository has no reviewed baseline. This is where a new/broadened waiver, relaxed exclusion, removed control, new finding debt, or resolved finding becomes explicit change evidence instead of being hidden inside a current-state pass/fail result.
+Base and candidate baselines are selected independently. This is where a new/broadened waiver, relaxed exclusion, removed control, new finding debt, or resolved finding becomes explicit change evidence instead of being hidden inside a current-state pass/fail result.
 
 ## 9. Adopt Architecture Health
 
@@ -177,9 +193,9 @@ Once current validation, baseline, waiver, topology, metrics, and required exter
 ```bash
 dotnet arch-linter-net health \
   --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml \
-  --base-context artifacts/policy-base.json \
-  --current-context artifacts/policy-current.json \
+  "${baseline_args[@]}" \
+  --base-context "$ARTIFACTS/policy-base.json" \
+  --current-context "$ARTIFACTS/policy-current.json" \
   --mode strict \
   --ensure-built \
   --execution-context pr-123 \
@@ -187,7 +203,7 @@ dotnet arch-linter-net health \
   --evidence-repository "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
   --evidence-revision "$GITHUB_SHA" \
   --evidence-scope "ci" \
-  --format json > artifacts/architecture-health.json
+  --format json > "$ARTIFACTS/architecture-health.json"
 ```
 
 Omit the external-evidence options only when the policy declares no such requirement. Interpret `gate` and `health` separately:
@@ -208,17 +224,17 @@ Use the JSON change artifact created in step 8 together with the Health artifact
 
 ```bash
 dotnet arch-linter-net report pr \
-  --health artifacts/architecture-health.json \
-  --change artifacts/architecture-change.json \
-  --output artifacts/architecture-pr-report.md
+  --health "$ARTIFACTS/architecture-health.json" \
+  --change "$ARTIFACTS/architecture-change.json" \
+  --output "$ARTIFACTS/architecture-pr-report.md"
 ```
 
 Generate the Health badge payload separately:
 
 ```bash
 dotnet arch-linter-net badge architecture-health \
-  --input artifacts/architecture-health.json \
-  --output artifacts/architecture-health-badge.json
+  --input "$ARTIFACTS/architecture-health.json" \
+  --output "$ARTIFACTS/architecture-health-badge.json"
 ```
 
 CI may validate repository/PR/head/run/schema/size/hash transport metadata and publish these finished bytes. It should not reconstruct their semantics.
