@@ -6,6 +6,9 @@ namespace ArchLinterNet.Cli.Commands.Badge.Application;
 
 internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileSystem)
 {
+    private const string ArchitectureHealthHelp =
+        "arch-linter-net badge architecture-health --input <architecture-health.json> [--output <badge.json>]";
+
     public int Execute(BadgeCommandOptions options)
     {
         if (options.ShowHelp)
@@ -34,6 +37,46 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
         }
     }
 
+    public int ExecuteArchitectureHealth(ArchitectureHealthBadgeCommandOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.ShowHelp)
+        {
+            console.Out.WriteLine(ArchitectureHealthHelp);
+            return CliExitCodes.Success;
+        }
+
+        ArchitectureHealthBadgeProjection projection;
+        try
+        {
+            projection = ArchitectureHealthBadgeProjector.Project(fileSystem.ReadAllText(options.InputPath));
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or InvalidOperationException
+            or NotSupportedException)
+        {
+            projection = ArchitectureHealthBadgeProjector.Unassessable();
+        }
+
+        try
+        {
+            Write(projection, options.OutputPath);
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or InvalidOperationException
+            or NotSupportedException)
+        {
+            console.Error.WriteLine($"Could not write Architecture Health badge: {exception.Message}");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        return projection.ExitCode;
+    }
+
     private void Write(string message, string color) => console.Out.WriteLine(JsonSerializer.Serialize(new
     {
         schemaVersion = 1,
@@ -41,6 +84,25 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
         message,
         color,
     }));
+
+    private void Write(ArchitectureHealthBadgeProjection projection, string? outputPath)
+    {
+        string json = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            label = "architecture",
+            message = projection.Message,
+            color = projection.Color,
+        });
+        if (outputPath is null)
+        {
+            console.Out.WriteLine(json);
+            return;
+        }
+
+        string temporaryPath = fileSystem.WriteAllTextToTemp(outputPath, json + Environment.NewLine);
+        fileSystem.RenameTempToTarget(temporaryPath, outputPath);
+    }
 
     private static JsonElement SelectStrictResult(JsonElement document)
     {

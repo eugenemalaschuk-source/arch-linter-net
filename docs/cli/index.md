@@ -21,6 +21,10 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | `arch-linter-net badge architecture-policy --input <strict-result.json>` | Project an existing strict JSON result to a Shields endpoint payload; does not rerun analysis. |
 
+<!-- cli-command: badge architecture-health -->
+
+| `arch-linter-net badge architecture-health --input <architecture-health.json> [--output <badge.json>]` | Project canonical Architecture Health plus policy inventory into a Shields endpoint payload; does not rerun analysis. |
+
 <!-- cli-command: baseline -->
 
 | `arch-linter-net baseline` | Migration-baseline lifecycle. |
@@ -506,14 +510,36 @@ arch-linter-net schema print policy-root
 
 Use these commands for installed/offline schema discovery rather than deriving schema identity from package SemVer.
 
-## Architecture-policy badge
+## Architecture Health badge
+
+```bash
+arch-linter-net badge architecture-health \
+  --input architecture-health.json \
+  --output architecture-health-badge.json
+```
+
+This command reads only the canonical `architecture-health/v1` document and its
+selected `architecture-policy-inventory/v1` receipt. It produces one compact
+Shields payload such as `DEBT · 7 ignores · 42 rules`: the first term is the
+canonical non-compensating Health category, `ignores` is accumulated explicit
+waiver debt, and `rules` is the effective policy-control count after policy
+composition. It does not parse policy YAML, recount findings or waivers, run
+analysis, or turn the rule count into a quality score.
+
+`healthy`, `debt`, `degrading`, and `failing` retain the canonical Health
+category and a deterministic typed color. A missing, malformed, inconsistent,
+or unassessable Health/inventory input produces `UNASSESSABLE · ? ignores · ? rules` with a non-green color and exit code 2; unknown is never fabricated as
+zero. Otherwise the command preserves the Health gate exit category: pass is
+0 and fail is 1.
+
+## Legacy architecture-policy badge
 
 ```bash
 arch-linter-net badge architecture-policy \
   --input architecture-strict.json
 ```
 
-This projects an existing strict result into badge endpoint JSON. It does not rerun architecture analysis.
+This compatibility projection reads an existing strict result into badge endpoint JSON. It does not rerun architecture analysis and remains deliberately narrower than Architecture Health.
 
 ## Measure-first metrics
 

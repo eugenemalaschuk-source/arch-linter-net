@@ -81,7 +81,36 @@ outcomes and does not run analysis again.
 
 See [Exit codes](../usage/exit-codes.md) for details.
 
-## Architecture-policy badge payload
+## Architecture Health badge payload
+
+```bash
+arch-linter-net badge architecture-health \
+  --input architecture-health.json \
+  --output architecture-health-badge.json
+```
+
+This is a local projection over the canonical Health artifact and its canonical
+policy-inventory receipt. The primary message contains Health, accumulated
+explicit ignores, and effective policy controls. A rule count is transparency
+about configured controls, not a coverage percentage or quality score. Health,
+ignore debt, rule count, and colors belong to the CLI; CI only transports the
+complete generated JSON.
+
+For this repository, the required read-only PR Architecture Coverage job emits
+the exact payload with a bounded manifest binding repository, PR/base context,
+head SHA, head Git-tree identity, producer run, byte count, and SHA-256. A
+trusted `push main` publisher resolves the merged PR and promotes that payload
+only if the validated PR tree equals the merged `main` tree. This tree proof is
+required for squash merge: matching commit SHA alone is not sufficient.
+
+If the PR, required producer, artifact, manifest, hash, or tree proof is
+missing, stale, failed, expired, ambiguous, or invalid, the publisher replaces
+the fixed public endpoint with the CLI-generated `UNASSESSABLE · ? ignores · ? rules` payload and publication metadata. It does not reuse a prior healthy
+payload as current, rerun architecture analysis, mutate policy/baselines, or
+deploy MkDocs/GitHub Pages. The public endpoint is a fixed raw JSON file on an
+automation-owned static branch, suitable for Shields' `endpoint` image.
+
+## Legacy architecture-policy badge payload
 
 `arch-linter-net badge architecture-policy --input architecture-strict.json`
 projects strict validation JSON into a Shields endpoint payload without rerunning analysis.
@@ -249,10 +278,10 @@ post-merge telemetry:
 - **Sonar Quality Gate / Maintainability / Reliability / Security** are direct
   SonarCloud project badges for `branch=main`; the main telemetry workflow sends
   OpenCover/TRX plus Python coverage before ending the scanner.
-- The old README **Architecture policy** image was only another label over a
-  generic workflow-status badge. It is not used as architecture evidence. A
-  first-class Architecture Health badge must be generated from canonical
-  ArchLinterNet outputs rather than inferred from generic CI success.
+- **Architecture Health** is a canonical ArchLinterNet badge, not a workflow
+  status. It contains Health, explicit ignore debt, and effective policy
+  controls from required PR evidence only after exact merged-tree proof. Its
+  unassessable state is explicit when that promotion proof is unavailable.
 
 The repository's full self-policy and architecture-coverage validation remain
 required PR checks. They are not repeated after merge merely to refresh generic
