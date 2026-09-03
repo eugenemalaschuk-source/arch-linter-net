@@ -21,7 +21,7 @@ For a first adoption, follow this path:
 1. Project [Architecture Health](reference/architecture-health.md), architecture change, PR Markdown, JSON/SARIF, and the Health badge from canonical CLI artifacts.
 1. Put the same product workflow in CI; keep CI glue limited to invocation, evidence transport, integrity checks, and publication.
 
-The [Getting Started](getting-started/index.md) guide covers the minimal path. The [complete single-tool workflow](guides/single-tool-workflow.md) covers the full v0.8 governance cycle. For an existing production repository, use the [real-repository workflow](guides/real-repository-workflow.md) and [adopt-or-upgrade guide](guides/upgrading.md).
+The [Getting Started](getting-started/index.md) guide covers the minimal path. The [complete single-tool workflow](guides/single-tool-workflow.md) covers the full v0.8 governance cycle. Existing adopters should use the [real-repository workflow](guides/real-repository-workflow.md), evergreen [adopt-or-upgrade guide](guides/upgrading.md), and focused [v0.7 to v0.8 migration](guides/v07-to-v08-adoption.md).
 
 ## Complete governance cycle
 
@@ -72,23 +72,39 @@ arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
 
 ### Review policy changes
 
+Export contexts from the actual base and candidate revisions with the same pinned CLI version:
+
 ```bash
-arch-linter-net policy context --policy architecture/arch.yml --format json > current-policy.json
-arch-linter-net policy weakening --base-context base-policy.json --current-context current-policy.json
+# Reviewed base checkout/worktree
+arch-linter-net policy context \
+  --policy architecture/arch.yml \
+  --format json > /shared/artifacts/policy-base.json
+
+# Candidate checkout/worktree
+arch-linter-net policy context \
+  --policy architecture/arch.yml \
+  --format json > artifacts/policy-current.json
+
+arch-linter-net policy weakening \
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json
 ```
 
 Use policy context and weakening analysis to review whether a policy edit relaxes governance. This does not replace normal architecture validation.
 
-### Gate new debt
+### Gate new debt and weakening
 
 ```bash
 arch-linter-net gate \
   --policy architecture/arch.yml \
   --baseline architecture/baseline.arch.yml \
-  --mode all
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json \
+  --mode all \
+  --ensure-built
 ```
 
-The gate combines validation with no-new-debt and policy-weakening checks intended for CI.
+The gate combines no-new-debt comparison with policy-weakening review when both context artifacts are supplied. It never writes a baseline.
 
 ### Project Architecture Health
 
@@ -96,21 +112,30 @@ The gate combines validation with no-new-debt and policy-weakening checks intend
 arch-linter-net health \
   --policy architecture/arch.yml \
   --baseline architecture/baseline.arch.yml \
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json \
   --mode strict \
+  --execution-context local-review \
   --format json > architecture-health.json
 ```
 
-Use the canonical Health artifact for reviewer reports and the real Architecture Health badge instead of rebuilding Health semantics in scripts.
+Use the canonical Health artifact for reviewer reports and the real Architecture Health badge instead of rebuilding Health semantics in scripts. Add the policy-required external-evidence bindings to this invocation when configured.
 
 ### Investigate architecture changes
 
 ```bash
-arch-linter-net change snapshot --policy architecture/arch.yml --output before.json
-arch-linter-net change snapshot --policy architecture/arch.yml --output after.json
-arch-linter-net change report --base before.json --current after.json --execution-context local-review
+# Create before.json in the reviewed base checkout and after.json in the candidate checkout.
+arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output before.json
+arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output after.json
+arch-linter-net change report \
+  --base before.json \
+  --current after.json \
+  --execution-context local-review \
+  --format json \
+  --output architecture-change.json
 ```
 
-For dependency investigation, use `graph`, `explain`, and `history analyze`. For public API governance, use the `public-api` workflow.
+For dependency investigation, use `graph`, `explain`, and `history analyze`. For public API governance, use the `public-api` workflow. The [complete workflow](guides/single-tool-workflow.md) shows how compatible change and Health artifacts feed `report pr`.
 
 ## Documentation map
 
@@ -127,6 +152,7 @@ For dependency investigation, use `graph`, `explain`, and `history analyze`. For
 - [CI integration](guides/ci-integration.md)
 - [Migration baselines](guides/migration-baselines.md)
 - [Adopt or upgrade](guides/upgrading.md)
+- [v0.7 to v0.8 adoption](guides/v07-to-v08-adoption.md)
 - [Real-repository workflow](guides/real-repository-workflow.md)
 - [AI policy authoring](ai/index.md)
 
