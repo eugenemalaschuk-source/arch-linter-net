@@ -1,8 +1,11 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Cli.Commands.Badge.Application;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -90,8 +93,17 @@ public sealed class BadgeCommandHandlerTests
     [TestCase("healthy", "unknown")]
     public void Handler_HealthUnsupportedValues_UseExplicitUnknownPayload(string health, string gate)
     {
+        string input = Health("healthy", "pass", 7, 42);
+        if (health == "unknown")
+        {
+            input = input.Replace("\"health\":\"healthy\"", "\"health\":\"unknown\"", StringComparison.Ordinal);
+        }
+        if (gate == "unknown")
+        {
+            input = input.Replace("\"gate\":\"pass\"", "\"gate\":\"unknown\"", StringComparison.Ordinal);
+        }
         FakeConsole console = new();
-        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(Health(health, gate, 7, 42)))
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(input))
             .ExecuteArchitectureHealth(new ArchitectureHealthBadgeCommandOptions("input.json", null, false));
         using JsonDocument output = JsonDocument.Parse(console.Output);
 
@@ -120,6 +132,42 @@ public sealed class BadgeCommandHandlerTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(output.RootElement.GetProperty("color").GetString(), Is.EqualTo("lightgrey"));
         });
+    }
+
+    [TestCase("\"schema_version\":2", "\"schema_version\":3")]
+    [TestCase("\"kind\":\"architecture-health-report-evidence\"", "\"kind\":\"unsupported\"")]
+    public void Handler_HealthRejectsUnsupportedOrMismatchedEvidenceEnvelope(string expected, string replacement)
+    {
+        string input = Health("healthy", "pass", 7, 42).Replace(expected, replacement, StringComparison.Ordinal);
+
+        AssertUnassessable(input);
+    }
+
+    [Test]
+    public void Handler_HealthRejectsMismatchedInnerEvidenceState()
+    {
+        JsonObject document = JsonNode.Parse(Health("healthy", "pass", 7, 42))!.AsObject();
+        document["report_evidence"]!["health"] = "debt";
+
+        AssertUnassessable(document.ToJsonString());
+    }
+
+    [Test]
+    public void Handler_HealthRejectsInventoryLessProductionShapedOutcome()
+    {
+        JsonObject document = JsonNode.Parse(Health("healthy", "pass", 7, 42))!.AsObject();
+        document["report_evidence"]!["validation_outcomes"]![0]!.AsObject().Remove("policy_inventory");
+
+        AssertUnassessable(document.ToJsonString());
+    }
+
+    [Test]
+    public void Handler_HealthRejectsNonObjectProductionShapedOutcome()
+    {
+        JsonObject document = JsonNode.Parse(Health("healthy", "pass", 7, 42))!.AsObject();
+        document["report_evidence"]!["validation_outcomes"]![0] = null;
+
+        AssertUnassessable(document.ToJsonString());
     }
 
     [Test]
@@ -174,28 +222,80 @@ public sealed class BadgeCommandHandlerTests
         });
     }
 
-    private static string Health(string health, string gate, int ignores, int rules) => JsonSerializer.Serialize(new
+    private static void AssertUnassessable(string input)
     {
-        schema_id = "architecture-health/v1",
-        gate,
-        health,
-        report_evidence = new
+        FakeConsole console = new();
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(input))
+            .ExecuteArchitectureHealth(new ArchitectureHealthBadgeCommandOptions("input.json", null, false));
+        using JsonDocument output = JsonDocument.Parse(console.Output);
+
+        Assert.Multiple(() =>
         {
-            validation_outcomes = new[]
-            {
-                new
-                {
-                    mode = "strict",
-                    policy_inventory = new
-                    {
-                        schema = "architecture-policy-inventory/v1",
-                        effective_rule_count = rules,
-                        ignore_debt = new { total = ignores },
-                    },
-                },
-            },
-        },
-    });
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(output.RootElement.GetProperty("message").GetString(),
+                Is.EqualTo("UNASSESSABLE \u00B7 ? ignores \u00B7 ? rules"));
+        });
+    }
+
+    private static string Health(string health, string gate, int ignores, int rules)
+    {
+        ArchitectureHealthGate gateState = gate switch
+        {
+            "pass" => ArchitectureHealthGate.Pass,
+            "fail" => ArchitectureHealthGate.Fail,
+            "unassessable" => ArchitectureHealthGate.Unassessable,
+            _ => throw new ArgumentOutOfRangeException(nameof(gate)),
+        };
+        ArchitectureHealthState healthState = health switch
+        {
+            "healthy" => ArchitectureHealthState.Healthy,
+            "debt" => ArchitectureHealthState.Debt,
+            "degrading" => ArchitectureHealthState.Degrading,
+            "failing" => ArchitectureHealthState.Failing,
+            "unassessable" => ArchitectureHealthState.Unassessable,
+            _ => throw new ArgumentOutOfRangeException(nameof(health)),
+        };
+        var inventory = new ArchitecturePolicyInventory(
+            ArchitecturePolicyInventory.CurrentSchemaId,
+            rules,
+            new ArchitecturePolicyInventoryRules(rules, 0, 0),
+            new ArchitecturePolicyInventoryIgnoreDebt(ignores, ignores, 0, 0, 0, 0),
+            []);
+        ValidationOutcome validation = new(
+            Passed: gateState == ArchitectureHealthGate.Pass,
+            Violations: [],
+            Cycles: [],
+            CoverageFindings: [],
+            CoverageConfig: "off",
+            UnmatchedIgnoredViolations: [],
+            UnmatchedIgnoredViolationsConfig: "off",
+            PolicyConsistencyFindings: [],
+            PolicyConsistencyConfig: "off",
+            CoverageSummaries: [],
+            ClassificationConflicts: [],
+            ClassificationMetadataFailures: [])
+        {
+            PolicyInventory = inventory,
+        };
+        var debtGate = new ArchitectureDebtGateOutcome(
+            Succeeded: true,
+            Passed: gateState == ArchitectureHealthGate.Pass,
+            new ArchitectureDebtGateEvaluation(true, "strict", []),
+            new BaselineVerifyOutcome(true, true, [], [], [], [], []));
+        var outcome = new ArchitectureHealthOutcome(
+            new ArchitectureHealthSummary(
+                ArchitectureHealthSummary.CurrentSchemaId,
+                gateState,
+                healthState,
+                []),
+            [new ArchitectureHealthValidationOutcome("strict", validation)],
+            debtGate)
+        {
+            ExecutionContext = "badge-projector-test",
+            ConditionSetName = "ci",
+        };
+        return ArchLinterNet.Core.Validation.ArchitectureHealthProjector.FormatAsJson(outcome);
+    }
 
     private sealed class FakeConsole : ICliConsole
     {

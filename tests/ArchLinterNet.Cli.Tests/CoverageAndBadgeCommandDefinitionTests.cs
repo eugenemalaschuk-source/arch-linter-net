@@ -101,7 +101,7 @@ public sealed class CoverageAndBadgeCommandDefinitionTests
     {
         const string Health =
             """
-            {"schema_id":"architecture-health/v1","gate":"pass","health":"debt","report_evidence":{"validation_outcomes":[{"policy_inventory":{"schema":"architecture-policy-inventory/v1","effective_rule_count":42,"ignore_debt":{"total":7}}}]}}
+            {"schema_id":"architecture-health/v1","gate":"pass","health":"debt","dimensions":[],"report_evidence":{"schema_version":2,"kind":"architecture-health-report-evidence","gate":"pass","health":"debt","validation_outcomes":[{"mode":"strict","availability":{"policy_inventory":"available"},"findings":[],"provenance":{},"policy_inventory":{"schema":"architecture-policy-inventory/v1","effective_rule_count":42,"ignore_debt":{"total":7}}}],"debt_gate":{}}}
             """;
         FakeFileSystem fileSystem = new(("input.json", Health));
         RootCommand root = new();

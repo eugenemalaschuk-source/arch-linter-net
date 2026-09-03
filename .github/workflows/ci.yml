@@ -512,6 +512,26 @@ jobs:
             --output "$output_directory/architecture-pr-report.md" \
             --max-details 20
 
+      - name: Verify reviewed unavailable Architecture Health badge receipt
+        id: architecture_health_badge_unavailable
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          reviewed_payload="$GITHUB_WORKSPACE/architecture/architecture-health-badge-unavailable.json"
+          generated_payload="$RUNNER_TEMP/architecture-health-badge-unavailable.json"
+          set +e
+          dotnet run --no-build --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- \
+            badge architecture-health \
+            --input "$RUNNER_TEMP/missing-architecture-health.json" \
+            --output "$generated_payload"
+          fallback_exit=$?
+          set -e
+          if [ "$fallback_exit" -ne 2 ] || [ ! -s "$generated_payload" ]; then
+            exit 1
+          fi
+          cmp --silent "$reviewed_payload" "$generated_payload"
+
       - name: Create bound architecture PR report manifest
         id: architecture_report_manifest
         if: always() && steps.architecture_report_inputs.outcome == 'success'
@@ -681,6 +701,10 @@ jobs:
 
       - name: Fail if Architecture Health badge manifest is unavailable
         if: always() && steps.architecture_health_badge_manifest.outcome != 'success'
+        run: exit 1
+
+      - name: Fail if reviewed unavailable Architecture Health badge receipt is unavailable
+        if: always() && steps.architecture_health_badge_unavailable.outcome != 'success'
         run: exit 1
 
   architecture_pr_report_gate:

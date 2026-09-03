@@ -9,6 +9,8 @@ internal static class ArchitectureHealthBadgeProjector
 {
     private const string HealthSchema = "architecture-health/v1";
     private const string InventorySchema = "architecture-policy-inventory/v1";
+    private const int ReportEvidenceSchemaVersion = 2;
+    private const string ReportEvidenceKind = "architecture-health-report-evidence";
 
     internal static ArchitectureHealthBadgeProjection Project(string input)
     {
@@ -19,12 +21,13 @@ internal static class ArchitectureHealthBadgeProjector
             RequireString(root, "schema_id", HealthSchema);
             string gate = RequiredString(root, "gate");
             string health = RequiredString(root, "health");
+            JsonElement evidence = ReadCanonicalEvidence(root, gate, health);
             if (gate == "unassessable" || health == "unassessable")
             {
                 return Unassessable();
             }
 
-            (int ignores, int rules) = ReadInventory(root);
+            (int ignores, int rules) = ReadInventory(evidence);
             return health switch
             {
                 "healthy" => new ArchitectureHealthBadgeProjection(
@@ -48,18 +51,29 @@ internal static class ArchitectureHealthBadgeProjector
         }
     }
 
-    private static (int Ignores, int Rules) ReadInventory(JsonElement root)
+    private static JsonElement ReadCanonicalEvidence(JsonElement root, string gate, string health)
     {
         JsonElement evidence = Required(root, "report_evidence", JsonValueKind.Object);
+        RequiredInt(evidence, "schema_version", ReportEvidenceSchemaVersion);
+        RequireString(evidence, "kind", ReportEvidenceKind);
+        RequireString(evidence, "gate", gate);
+        RequireString(evidence, "health", health);
+        return evidence;
+    }
+
+    private static (int Ignores, int Rules) ReadInventory(JsonElement evidence)
+    {
         JsonElement outcomes = Required(evidence, "validation_outcomes", JsonValueKind.Array);
         List<(int Ignores, int Rules)> inventories = [];
         foreach (JsonElement outcome in outcomes.EnumerateArray())
         {
-            if (outcome.ValueKind != JsonValueKind.Object
-                || !outcome.TryGetProperty("policy_inventory", out JsonElement inventory))
-            {
-                continue;
-            }
+            RequiredObjectReceipt(outcome, "validation outcome");
+            _ = RequiredString(outcome, "mode");
+            JsonElement availability = Required(outcome, "availability", JsonValueKind.Object);
+            RequireString(availability, "policy_inventory", "available");
+            _ = Required(outcome, "findings", JsonValueKind.Array);
+            _ = Required(outcome, "provenance", JsonValueKind.Object);
+            JsonElement inventory = Required(outcome, "policy_inventory", JsonValueKind.Object);
 
             RequireString(inventory, "schema", InventorySchema);
             int rules = RequiredNonNegativeInt(inventory, "effective_rule_count");
@@ -104,6 +118,23 @@ internal static class ArchitectureHealthBadgeProjector
         }
 
         return parsed;
+    }
+
+    private static void RequiredInt(JsonElement element, string name, int expected)
+    {
+        if (!element.TryGetProperty(name, out JsonElement value) || !value.TryGetInt32(out int parsed)
+            || parsed != expected)
+        {
+            throw new InvalidOperationException($"Unsupported {name} value.");
+        }
+    }
+
+    private static void RequiredObjectReceipt(JsonElement element, string description)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException($"Malformed {description}.");
+        }
     }
 
     private static string RequiredString(JsonElement element, string name)

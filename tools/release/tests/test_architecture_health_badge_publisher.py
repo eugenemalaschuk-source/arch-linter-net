@@ -21,6 +21,7 @@ _HEAD_SHA = "a" * 40
 _TREE_SHA = "d" * 40
 _RUN_ID = 123456
 _RUN_ATTEMPT = 2
+_UNAVAILABLE_PAYLOAD_PATH = "architecture/architecture-health-badge-unavailable.json"
 
 
 _NODE_HARNESS = r"""
@@ -32,12 +33,25 @@ const fixture = JSON.parse(Buffer.from(process.env.WORKFLOW_FIXTURE_B64, 'base64
 const outputs = {};
 const calls = [];
 const missing = () => Object.assign(new Error('not found'), { status: 404 });
-const core = { setOutput(name, value) { outputs[name] = String(value); } };
+const failWhen = (name) => {
+  if (fixture.failAt === name) throw new Error(`simulated failure at ${name}`);
+};
+const core = {
+  setOutput(name, value) { outputs[name] = String(value); },
+  warning() {},
+  notice() {},
+};
 const github = {
+  request: async (route, parameters) => {
+    calls.push({ type: 'request', route, parameters });
+    if (route === 'GET /repos/{owner}/{repo}/rules/branches/{branch}') {
+      return { data: fixture.effectiveRules ?? [] };
+    }
+    throw new Error(`unexpected request: ${route}`);
+  },
   paginate: async (method, parameters) => {
     calls.push({ type: 'paginate', method: method.name, parameters });
     if (method === github.rest.repos.listPullRequestsAssociatedWithCommit) return fixture.associated ?? [];
-    if (method === github.rest.repos.getRepoRulesets) return fixture.rulesets ?? [];
     if (method === github.rest.actions.listWorkflowRunsForRepo) return fixture.runs ?? [];
     if (method === github.rest.actions.listJobsForWorkflowRun) return fixture.jobs ?? [];
     if (method === github.rest.actions.listWorkflowRunArtifacts) return fixture.artifacts ?? [];
@@ -46,25 +60,19 @@ const github = {
   rest: {
     repos: {
       listPullRequestsAssociatedWithCommit: async function listPullRequestsAssociatedWithCommit() {},
-      getRepoRulesets: async function getRepoRulesets() {},
-      getRepoRuleset: async (parameters) => {
-        calls.push({ type: 'repos.getRepoRuleset', parameters });
-        return { data: fixture.ruleset ?? { rules: [] } };
-      },
       getCommit: async (parameters) => {
         calls.push({ type: 'repos.getCommit', parameters });
-        if (parameters.ref === process.env.MAIN_SHA) return { data: fixture.mainCommit };
+        if (parameters.ref === process.env.MAIN_SHA) {
+          return { data: fixture.mainCommit ?? { commit: { tree: { sha: 'd'.repeat(40) } } } };
+        }
         if (parameters.ref === fixture.pullRequest?.head?.sha) return { data: fixture.headCommit };
+        if (parameters.ref === fixture.publicationRefSha) return { data: fixture.publicationCommit };
         throw missing();
       },
       getContent: async (parameters) => {
         calls.push({ type: 'repos.getContent', parameters });
         if (fixture.contents?.[parameters.path]) return { data: fixture.contents[parameters.path] };
         throw missing();
-      },
-      createOrUpdateFileContents: async (parameters) => {
-        calls.push({ type: 'repos.createOrUpdateFileContents', parameters });
-        return { data: {} };
       },
     },
     pulls: {
@@ -84,17 +92,43 @@ const github = {
       listJobsForWorkflowRun: async function listJobsForWorkflowRun() {},
       listWorkflowRunArtifacts: async function listWorkflowRunArtifacts() {},
     },
-    git: {
-      getRef: async (parameters) => {
-        calls.push({ type: 'git.getRef', parameters });
-        if (fixture.branchExists) return { data: {} };
-        throw missing();
+      git: {
+        getRef: async (parameters) => {
+          calls.push({ type: 'git.getRef', parameters });
+          if (parameters.ref === 'heads/main') {
+            return { data: { object: { sha: fixture.currentMainSha ?? process.env.MAIN_SHA } } };
+          }
+          if (parameters.ref === 'heads/architecture-health-badge' && fixture.branchExists) {
+            return { data: { object: { sha: fixture.publicationRefSha ?? process.env.MAIN_SHA } } };
+          }
+          throw missing();
+        },
+        createRef: async (parameters) => {
+          calls.push({ type: 'git.createRef', parameters });
+          failWhen('git.createRef');
+          return { data: {} };
+        },
+        updateRef: async (parameters) => {
+          calls.push({ type: 'git.updateRef', parameters });
+          failWhen('git.updateRef');
+          return { data: {} };
+        },
+        createBlob: async (parameters) => {
+          calls.push({ type: 'git.createBlob', parameters });
+          failWhen('git.createBlob');
+          return { data: { sha: `${calls.length}`.padStart(40, '0') } };
+        },
+        createTree: async (parameters) => {
+          calls.push({ type: 'git.createTree', parameters });
+          failWhen('git.createTree');
+          return { data: { sha: '1'.repeat(40) } };
+        },
+        createCommit: async (parameters) => {
+          calls.push({ type: 'git.createCommit', parameters });
+          failWhen('git.createCommit');
+          return { data: { sha: '2'.repeat(40) } };
+        },
       },
-      createRef: async (parameters) => {
-        calls.push({ type: 'git.createRef', parameters });
-        return { data: {} };
-      },
-    },
   },
 };
 const context = { repo: { owner: 'eugenemalaschuk-source', repo: 'arch-linter-net' } };
@@ -104,8 +138,12 @@ try {
   await execute(require, github, core, context);
   process.stdout.write(JSON.stringify({ outputs, calls }));
 } catch (error) {
-  process.stderr.write(error.stack ?? String(error));
-  process.exitCode = 1;
+  if (fixture.expectError) {
+    process.stdout.write(JSON.stringify({ outputs, calls, error: error.message }));
+  } else {
+    process.stderr.write(error.stack ?? String(error));
+    process.exitCode = 1;
+  }
 }
 """
 
@@ -170,17 +208,15 @@ def _fixture(*, head_tree: str = _TREE_SHA, artifacts: list[dict[str, object]] |
             "merge_commit_sha": _MAIN_SHA,
         },
         "rulesets": [{"id": 1, "enforcement": "active"}],
-        "ruleset": {
-            "rules": [
-                {
-                    "type": "required_status_checks",
-                    "parameters": {
-                        "strict_required_status_checks_policy": True,
-                        "required_status_checks": [{"context": "Architecture Coverage"}],
-                    },
-                }
-            ]
-        },
+        "effectiveRules": [
+            {
+                "type": "required_status_checks",
+                "parameters": {
+                    "strict_required_status_checks_policy": True,
+                    "required_status_checks": [{"context": "Architecture Coverage"}],
+                },
+            }
+        ],
         "checkRuns": [
             {
                 "name": "Architecture Coverage",
@@ -209,6 +245,15 @@ def _fixture(*, head_tree: str = _TREE_SHA, artifacts: list[dict[str, object]] |
 
 def _payload() -> bytes:
     return b'{"schemaVersion":1,"label":"architecture","message":"DEBT \\u00b7 7 ignores \\u00b7 42 rules","color":"yellow"}'
+
+
+def _unavailable_content() -> dict[str, str]:
+    payload = (_REPOSITORY_ROOT / _UNAVAILABLE_PAYLOAD_PATH).read_bytes()
+    return {
+        "type": "file",
+        "encoding": "base64",
+        "content": base64.b64encode(payload).decode(),
+    }
 
 
 def _manifest(badge_payload: bytes, **overrides: object) -> bytes:
@@ -269,6 +314,12 @@ def test_resolve_accepts_required_successful_pr_evidence_with_matching_squash_tr
         "pr_number": "759",
         "producer_run_attempt": str(_RUN_ATTEMPT),
         "producer_run_id": str(_RUN_ID),
+    }
+    effective_rule_request = next(call for call in result["calls"] if call["type"] == "request")
+    assert effective_rule_request == {
+        "type": "request",
+        "route": "GET /repos/{owner}/{repo}/rules/branches/{branch}",
+        "parameters": {"owner": "eugenemalaschuk-source", "repo": "arch-linter-net", "branch": "main"},
     }
 
 
@@ -333,7 +384,7 @@ def test_validate_accepts_exact_cli_payload_without_interpreting_health_semantic
     assert result["outputs"]["payload_path"].endswith("architecture-health-badge.json")
 
 
-def test_static_publisher_creates_the_fixed_branch_and_updates_only_fixed_paths() -> None:
+def test_static_publisher_creates_one_atomic_commit_for_the_fixed_paths() -> None:
     result = _run_script(
         "Publish fixed badge endpoint and metadata",
         {"branchExists": False},
@@ -349,10 +400,86 @@ def test_static_publisher_creates_the_fixed_branch_and_updates_only_fixed_paths(
         files={"payload.json": _payload()},
     )
 
-    writes = [call["parameters"] for call in result["calls"] if call["type"] == "repos.createOrUpdateFileContents"]
-    assert [call["path"] for call in writes] == ["architecture-health.json", "architecture-health-publication.json"]
-    assert all(call["branch"] == "architecture-health-badge" for call in writes)
+    tree = next(call["parameters"] for call in result["calls"] if call["type"] == "git.createTree")
+    assert [entry["path"] for entry in tree["tree"]] == [
+        "architecture-health.json",
+        "architecture-health-publication.json",
+    ]
+    assert len([call for call in result["calls"] if call["type"] == "git.createCommit"]) == 1
+    assert len([call for call in result["calls"] if call["type"] == "git.createRef"]) == 1
+    assert not [call for call in result["calls"] if call["type"] == "repos.createOrUpdateFileContents"]
+    assert result["outputs"] == {"status": "ready"}
+
+
+def test_static_publisher_falls_back_to_reviewed_receipt_without_a_cli_payload() -> None:
+    result = _run_script(
+        "Publish fixed badge endpoint and metadata",
+        {"branchExists": False, "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()}},
+        environment={
+            "MAIN_SHA": _MAIN_SHA,
+            "MAIN_TREE_SHA": _TREE_SHA,
+            "PUBLICATION_REASON": "badge_artifact_missing",
+            "PUBLICATION_STATUS": "unassessable",
+            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
+        },
+    )
+
+    blobs = [call["parameters"] for call in result["calls"] if call["type"] == "git.createBlob"]
+    reviewed_payload = (_REPOSITORY_ROOT / _UNAVAILABLE_PAYLOAD_PATH).read_bytes()
+    assert any(call["content"] == base64.b64encode(reviewed_payload).decode() for call in blobs)
+    assert result["outputs"] == {"status": "unassessable"}
     assert any(call["type"] == "git.createRef" for call in result["calls"])
+
+
+def test_static_publisher_stale_main_event_makes_no_publication_write() -> None:
+    result = _run_script(
+        "Publish fixed badge endpoint and metadata",
+        {
+            "branchExists": False,
+            "currentMainSha": "e" * 40,
+            "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()},
+        },
+        environment={
+            "MAIN_SHA": _MAIN_SHA,
+            "PUBLICATION_STATUS": "unassessable",
+            "PUBLICATION_REASON": "badge_artifact_missing",
+            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
+        },
+    )
+
+    writes = {"git.createBlob", "git.createTree", "git.createCommit", "git.createRef", "git.updateRef"}
+    assert result["outputs"] == {"status": "stale_main"}
+    assert not [call for call in result["calls"] if call["type"] in writes]
+
+
+def test_static_publisher_never_moves_the_ref_when_atomic_tree_creation_fails() -> None:
+    result = _run_script(
+        "Publish fixed badge endpoint and metadata",
+        {
+            "branchExists": False,
+            "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()},
+            "failAt": "git.createTree",
+            "expectError": True,
+        },
+        environment={
+            "MAIN_SHA": _MAIN_SHA,
+            "PUBLICATION_STATUS": "unassessable",
+            "PUBLICATION_REASON": "badge_artifact_missing",
+            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
+        },
+    )
+
+    assert result["error"] == "simulated failure at git.createTree"
+    assert not [call for call in result["calls"] if call["type"] in {"git.createRef", "git.updateRef"}]
+
+
+def test_resolve_rejects_unrelated_active_ruleset_when_main_has_no_effective_gate() -> None:
+    fixture = _fixture()
+    fixture["effectiveRules"] = []
+
+    result = _run_script("Resolve required PR evidence for the merged tree", fixture)
+
+    assert result["outputs"] == {"reason": "required_architecture_gate_missing"}
 
 
 def test_ci_producer_generates_a_bound_cli_payload_without_badge_semantics_in_workflow() -> None:
@@ -361,6 +488,8 @@ def test_ci_producer_generates_a_bound_cli_payload_without_badge_semantics_in_wo
     assert "badge architecture-health" in workflow
     assert "architecture-health-badge-promotion/v1" in workflow
     assert "architecture-health-badge-v1" in workflow
+    assert "architecture/architecture-health-badge-unavailable.json" in workflow
+    assert "cmp --silent" in workflow
     assert '"head_tree_sha"' in workflow
     assert "Architecture Health badge manifest is unavailable" in workflow
     assert "pull-requests: write" not in workflow
@@ -376,8 +505,14 @@ def test_badge_workflow_has_a_serialized_static_only_publication_boundary() -> N
     assert "architecture-health-badge" in workflow
     assert "architecture-health.json" in workflow
     assert "architecture-health-publication.json" in workflow
-    assert "ref: ${{ github.sha }}" in workflow
-    assert "persist-credentials: false" in workflow
+    assert "GET /repos/{owner}/{repo}/rules/branches/{branch}" in workflow
+    assert "getRef('heads/main')" in workflow
+    assert "createTree" in workflow
+    assert "createCommit" in workflow
+    assert "updateRef" in workflow
+    assert "Checkout trusted main for unavailable payload" not in workflow
+    assert "Setup .NET for unavailable payload" not in workflow
+    assert "dotnet" not in workflow.lower()
     assert "make acceptance" not in workflow
     assert "deploy-pages" not in workflow
     assert "mkdocs" not in workflow.lower()

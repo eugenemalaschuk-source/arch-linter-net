@@ -38,25 +38,16 @@ jobs:
               }
             };
             const hasRequiredArchitectureGate = async () => {
-              const summaries = await github.paginate(github.rest.repos.getRepoRulesets, {
+              const { data: effectiveRules } = await github.request(
+                'GET /repos/{owner}/{repo}/rules/branches/{branch}', {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                per_page: 100,
+                branch: 'main',
               });
-              for (const summary of summaries.filter((item) => item.enforcement === 'active')) {
-                const { data: ruleset } = await github.rest.repos.getRepoRuleset({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ruleset_id: summary.id,
-                });
-                if (ruleset.rules?.some((rule) => rule.type === 'required_status_checks'
-                    && rule.parameters?.strict_required_status_checks_policy === true
-                    && rule.parameters.required_status_checks?.some((check) =>
-                      check.context === 'Architecture Coverage'))) {
-                  return true;
-                }
-              }
-              return false;
+              return effectiveRules.some((rule) => rule.type === 'required_status_checks'
+                && rule.parameters?.strict_required_status_checks_policy === true
+                && rule.parameters.required_status_checks?.some((check) =>
+                  check.context === 'Architecture Coverage'));
             };
 
             try {
@@ -290,47 +281,18 @@ jobs:
             core.setOutput('reason', 'ready');
             core.setOutput('payload_path', payloadPath);
 
-      - name: Checkout trusted main for unavailable payload
-        if: always() && steps.validate.outputs.status != 'ready'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-
-      - name: Setup .NET for unavailable payload
-        if: always() && steps.validate.outputs.status != 'ready'
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Generate explicit unavailable badge payload
-        id: fallback
-        if: always() && steps.validate.outputs.status != 'ready'
-        shell: bash
-        run: |
-          payload_path="$RUNNER_TEMP/architecture-health-badge-unavailable.json"
-          set +e
-          dotnet run --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- \
-            badge architecture-health \
-            --input "$RUNNER_TEMP/missing-architecture-health.json" \
-            --output "$payload_path"
-          fallback_exit=$?
-          set -e
-          if [ "$fallback_exit" -ne 2 ] || [ ! -s "$payload_path" ]; then
-            exit 1
-          fi
-          echo "payload_path=$payload_path" >> "$GITHUB_OUTPUT"
-
       - name: Publish fixed badge endpoint and metadata
-        if: always() && (steps.validate.outputs.status == 'ready' || steps.fallback.outputs.payload_path != '')
+        id: publish
+        if: always()
         env:
           MAIN_SHA: ${{ github.sha }}
           MAIN_TREE_SHA: ${{ steps.resolve.outputs.main_tree_sha }}
-          PAYLOAD_PATH: ${{ steps.validate.outputs.status == 'ready' && steps.validate.outputs.payload_path || steps.fallback.outputs.payload_path }}
+          PAYLOAD_PATH: ${{ steps.validate.outputs.payload_path }}
           PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
           PRODUCER_RUN_ID: ${{ steps.resolve.outputs.producer_run_id }}
           PUBLICATION_REASON: ${{ steps.validate.outputs.status == 'ready' && 'ready' || steps.validate.outputs.reason || steps.resolve.outputs.reason }}
           PUBLICATION_STATUS: ${{ steps.validate.outputs.status == 'ready' && 'ready' || 'unassessable' }}
+          UNAVAILABLE_PAYLOAD_PATH: architecture/architecture-health-badge-unavailable.json
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
@@ -338,78 +300,144 @@ jobs:
             const branch = 'architecture-health-badge';
             const endpointPath = 'architecture-health.json';
             const metadataPath = 'architecture-health-publication.json';
-            const payload = fs.readFileSync(process.env.PAYLOAD_PATH);
+            const mainSha = process.env.MAIN_SHA;
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            const exactKeys = (value, keys) => value !== null && !Array.isArray(value)
+              && typeof value === 'object' && JSON.stringify(Object.keys(value).sort()) === JSON.stringify(keys);
+            const validateEndpoint = (content, expectedUnavailable) => {
+              const document = JSON.parse(content.toString('utf8'));
+              if (!exactKeys(document, ['color', 'label', 'message', 'schemaVersion'])
+                  || document.schemaVersion !== 1 || document.label !== 'architecture'
+                  || typeof document.message !== 'string' || document.message.length === 0
+                  || typeof document.color !== 'string' || document.color.length === 0
+                  || (expectedUnavailable && (document.message !== 'UNASSESSABLE · ? ignores · ? rules'
+                    || document.color !== 'lightgrey'))) {
+                throw new Error('Architecture Health badge endpoint has an invalid fixed shape.');
+              }
+            };
+            const readUnavailablePayload = async () => {
+              const { data } = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path: process.env.UNAVAILABLE_PAYLOAD_PATH,
+                ref: mainSha,
+              });
+              if (Array.isArray(data) || data.type !== 'file' || data.encoding !== 'base64'
+                  || typeof data.content !== 'string') {
+                throw new Error('Reviewed unavailable Architecture Health receipt is not a base64 file.');
+              }
+              const content = Buffer.from(data.content.replace(/\n/g, ''), 'base64');
+              validateEndpoint(content, true);
+              return content;
+            };
+            let publicationStatus = process.env.PUBLICATION_STATUS;
+            let publicationReason = process.env.PUBLICATION_REASON;
+            let payload;
+            if (publicationStatus === 'ready') {
+              try {
+                payload = fs.readFileSync(process.env.PAYLOAD_PATH);
+                validateEndpoint(payload, false);
+              } catch (error) {
+                core.warning(`Validated artifact could not be read at publication: ${error.message}`);
+                payload = await readUnavailablePayload();
+                publicationStatus = 'unassessable';
+                publicationReason = 'validated_payload_unavailable';
+              }
+            } else {
+              payload = await readUnavailablePayload();
+            }
             const metadata = Buffer.from(`${JSON.stringify({
               schema: 'architecture-health-badge-publication/v1',
-              status: process.env.PUBLICATION_STATUS,
-              reason: process.env.PUBLICATION_REASON,
-              repository: `${context.repo.owner}/${context.repo.repo}`,
-              main_sha: process.env.MAIN_SHA,
+              status: publicationStatus,
+              reason: publicationReason,
+              repository,
+              main_sha: mainSha,
               main_tree_sha: process.env.MAIN_TREE_SHA || null,
               pr_number: process.env.PR_NUMBER || null,
               producer_run_id: process.env.PRODUCER_RUN_ID || null,
             }, null, 2)}\n`, 'utf8');
-            const ensureBranch = async () => {
+            const getRef = async (ref) => {
               try {
-                await github.rest.git.getRef({
+                const { data } = await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref,
+                });
+                return data;
+              } catch (error) {
+                if (error.status === 404) return undefined;
+                throw error;
+              }
+            };
+            const mainRef = await getRef('heads/main');
+            if (mainRef?.object?.sha !== mainSha) {
+              core.notice(`Skip stale Architecture Health publication for ${mainSha}.`);
+              core.setOutput('status', 'stale_main');
+              return;
+            }
+            const publicationRef = await getRef(`heads/${branch}`);
+            const parentSha = publicationRef?.object?.sha ?? mainSha;
+            const { data: parentCommit } = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: parentSha,
+            });
+            const baseTree = parentCommit.commit?.tree?.sha;
+            if (!/^[a-f0-9]{40}$/.test(baseTree ?? '')) {
+              throw new Error('Publication parent does not have a valid tree.');
+            }
+            const createBlob = async (content) => {
+              const { data } = await github.rest.git.createBlob({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                content: content.toString('base64'),
+                encoding: 'base64',
+              });
+              return data.sha;
+            };
+            const [payloadBlob, metadataBlob] = await Promise.all([createBlob(payload), createBlob(metadata)]);
+            const { data: tree } = await github.rest.git.createTree({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base_tree: baseTree,
+              tree: [
+                { path: endpointPath, mode: '100644', type: 'blob', sha: payloadBlob },
+                { path: metadataPath, mode: '100644', type: 'blob', sha: metadataBlob },
+              ],
+            });
+            const { data: commit } = await github.rest.git.createCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              message: `Publish Architecture Health badge for ${mainSha}`,
+              tree: tree.sha,
+              parents: [parentSha],
+            });
+            const currentMainRef = await getRef('heads/main');
+            if (currentMainRef?.object?.sha !== mainSha) {
+              core.notice(`Skip stale Architecture Health publication for ${mainSha}.`);
+              core.setOutput('status', 'stale_main');
+              return;
+            }
+            try {
+              if (publicationRef) {
+                await github.rest.git.updateRef({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   ref: `heads/${branch}`,
+                  sha: commit.sha,
+                  force: false,
                 });
-              } catch (error) {
-                if (error.status !== 404) {
-                  throw error;
-                }
-                try {
-                  await github.rest.git.createRef({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    ref: `refs/heads/${branch}`,
-                    sha: process.env.MAIN_SHA,
-                  });
-                } catch (createError) {
-                  if (createError.status !== 422) {
-                    throw createError;
-                  }
-                }
-              }
-            };
-            const put = async (path, content) => {
-              let sha;
-              try {
-                const { data } = await github.rest.repos.getContent({
+              } else {
+                await github.rest.git.createRef({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  path,
-                  ref: branch,
+                  ref: `refs/heads/${branch}`,
+                  sha: commit.sha,
                 });
-                if (Array.isArray(data) || data.type !== 'file') {
-                  throw new Error(`Static badge path '${path}' is not a file.`);
-                }
-                sha = data.sha;
-                const existing = Buffer.from(data.content, 'base64');
-                if (existing.equals(content)) {
-                  return;
-                }
-              } catch (error) {
-                if (error.status !== 404) {
-                  throw error;
-                }
               }
-              await github.rest.repos.createOrUpdateFileContents({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                branch,
-                path,
-                message: `Publish Architecture Health badge for ${process.env.MAIN_SHA}`,
-                content: content.toString('base64'),
-                ...(sha ? { sha } : {}),
-              });
-            };
-            await ensureBranch();
-            await put(endpointPath, payload);
-            await put(metadataPath, metadata);
-
-      - name: Fail when no payload can be published
-        if: always() && steps.validate.outputs.status != 'ready' && steps.fallback.outputs.payload_path == ''
-        run: exit 1
+              core.setOutput('status', publicationStatus);
+            } catch (error) {
+              if (error.status !== 422) throw error;
+              core.notice('Architecture Health publication lost its compare-and-swap race.');
+              core.setOutput('status', 'publication_race_lost');
+            }
