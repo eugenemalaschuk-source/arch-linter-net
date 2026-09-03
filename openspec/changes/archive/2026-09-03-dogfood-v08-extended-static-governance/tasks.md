@@ -49,9 +49,9 @@
 
 ## 8. Validation and PR
 
-- [ ] 8.1 `make fmt` on changed files; inspect the diff.
-- [ ] 8.2 Focused validation: new/changed C# tests, new/changed Python tests, relevant lint (`make lint-architecture`, `make public-api-check` if touched).
-- [ ] 8.3 Open exactly one PR targeting `main`, `Closes #524` when the PR itself satisfies the issue's PR-level acceptance criteria (new shard consumes the immutable candidate; candidate manifest/version/source binding passes; PR packed acceptance passes on Windows x64 and Apple Silicon macOS; required repository lint/unit/E2E/package-validation/CodeQL/architecture gates are green; Architecture PR Report publication remains valid; release-scope declaration/tooling tests pass; no source-tree product binary substitutes for the packed candidate) — leaving the post-merge rehearsal (Section 9) as an explicit follow-up in the PR body, not implied as done.
+- [x] 8.1 `make fmt` run; C#/workflow formatting was already clean. Reverted 3 unrelated markdown files it also reformatted (pre-existing drift, out of this change's scope).
+- [x] 8.2 Focused validation: `ArchitecturePolicyEffectiveSchemaValidatorTests`/`GitTestRepository`/`GitVersionedAdoptionFixture`/`History` (223/223), `BaselineCommandHandlerTests` (52/52), `tools/release/tests` (272/272), `make lint-architecture` (Architecture validation passed), `openspec validate --changes` (passed). `make public-api-check` not run -- no reviewed public API surface was touched (only internal CLI help text and test-only code).
+- [x] 8.3 Opened https://github.com/eugenemalaschuk-source/arch-linter-net/pull/766 targeting `main`. Not marked `Closes #524`: the post-merge rehearsal (Section 9) is explicit required follow-up, not yet done, so the issue stays open until it completes.
 
 ## 9. Mandatory post-merge rehearsal (NOT delivered by this change's implementation — separate follow-up after merge)
 
