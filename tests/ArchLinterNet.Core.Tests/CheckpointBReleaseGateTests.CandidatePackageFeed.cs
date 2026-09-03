@@ -684,11 +684,9 @@ public sealed partial class CheckpointBReleaseGateTests
 
         private static void Pack(string repositoryRoot, string feed, string candidateVersion)
         {
-            CommandResult result = RunDotnet(repositoryRoot,
-                "pack", "ArchLinterNet.slnx",
-                "--configuration", "Release",
-                "--output", feed,
-                "--no-restore",
+            CommandResult result = RunDotnet(repositoryRoot, disableMsBuildNodeReuse: true,
+                "pack", "ArchLinterNet.slnx", "--configuration", "Release",
+                "--output", feed, "--no-restore", "--disable-build-servers",
                 $"-p:Version={candidateVersion}",
                 $"-p:PackageVersion={candidateVersion}",
                 "--nologo");

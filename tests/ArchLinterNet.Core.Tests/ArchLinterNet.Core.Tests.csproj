@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\src\ArchLinterNet.Core\ArchLinterNet.Core.csproj" />
     <ProjectReference Include="..\..\src\ArchLinterNet.Testing\ArchLinterNet.Testing.csproj" />
     <ProjectReference Include="..\..\tools\ArchLinterNet.GitFuzz\ArchLinterNet.GitFuzz.csproj" />
+    <ProjectReference Include="..\..\tools\ArchLinterNet.ProcessTreeProbe\ArchLinterNet.ProcessTreeProbe.csproj" />
   </ItemGroup>
 
   <ItemGroup>
