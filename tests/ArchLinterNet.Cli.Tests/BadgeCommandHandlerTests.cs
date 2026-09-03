@@ -86,6 +86,74 @@ public sealed class BadgeCommandHandlerTests
         });
     }
 
+    [TestCase("unknown", "pass")]
+    [TestCase("healthy", "unknown")]
+    public void Handler_HealthUnsupportedValues_UseExplicitUnknownPayload(string health, string gate)
+    {
+        FakeConsole console = new();
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(Health(health, gate, 7, 42)))
+            .ExecuteArchitectureHealth(new ArchitectureHealthBadgeCommandOptions("input.json", null, false));
+        using JsonDocument output = JsonDocument.Parse(console.Output);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(output.RootElement.GetProperty("message").GetString(),
+                Is.EqualTo("UNASSESSABLE · ? ignores · ? rules"));
+        });
+    }
+
+    [TestCase("{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\"}")]
+    [TestCase("{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\"}")]
+    [TestCase("{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\",\"report_evidence\":{\"validation_outcomes\":[{}]}}")]
+    [TestCase("{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\",\"report_evidence\":{\"validation_outcomes\":[{\"policy_inventory\":{\"schema\":\"unexpected\",\"effective_rule_count\":42,\"ignore_debt\":{\"total\":7}}}]}}")]
+    [TestCase("{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\",\"report_evidence\":{\"validation_outcomes\":[{\"policy_inventory\":{\"schema\":\"architecture-policy-inventory/v1\",\"effective_rule_count\":-1,\"ignore_debt\":{\"total\":7}}}]}}")]
+    public void Handler_HealthMalformedCanonicalFields_UseExplicitUnknownPayload(string input)
+    {
+        FakeConsole console = new();
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(input))
+            .ExecuteArchitectureHealth(new ArchitectureHealthBadgeCommandOptions("input.json", null, false));
+        using JsonDocument output = JsonDocument.Parse(console.Output);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(output.RootElement.GetProperty("color").GetString(), Is.EqualTo("lightgrey"));
+        });
+    }
+
+    [Test]
+    public void Handler_HealthReadFailure_WritesExplicitUnknownPayload()
+    {
+        FakeConsole console = new();
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(
+            "{}", readException: new IOException("input unavailable")))
+            .ExecuteArchitectureHealth(new ArchitectureHealthBadgeCommandOptions("input.json", null, false));
+        using JsonDocument output = JsonDocument.Parse(console.Output);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(output.RootElement.GetProperty("message").GetString(),
+                Is.EqualTo("UNASSESSABLE · ? ignores · ? rules"));
+        });
+    }
+
+    [Test]
+    public void Handler_HealthWriteFailure_ReturnsRuntimeError()
+    {
+        FakeConsole console = new();
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(
+            Health("healthy", "pass", 0, 42), writeException: new IOException("target unavailable")))
+            .ExecuteArchitectureHealth(new ArchitectureHealthBadgeCommandOptions("input.json", "badge.json", false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorOutput, Does.Contain("Could not write Architecture Health badge: target unavailable"));
+        });
+    }
+
     [Test]
     public void Handler_HealthOutputFile_IsDeterministic()
     {
@@ -132,20 +200,27 @@ public sealed class BadgeCommandHandlerTests
     private sealed class FakeConsole : ICliConsole
     {
         private readonly StringBuilder _output = new();
+        private readonly StringBuilder _error = new();
         public TextWriter Out => new StringWriter(_output);
-        public TextWriter Error => TextWriter.Null;
+        public TextWriter Error => new StringWriter(_error);
         public string Output => _output.ToString();
+        public string ErrorOutput => _error.ToString();
     }
 
-    private sealed class FakeFileSystem(string input) : IFileSystem
+    private sealed class FakeFileSystem(string input, Exception? readException = null, Exception? writeException = null) : IFileSystem
     {
         public Dictionary<string, string> Written { get; } = new(StringComparer.Ordinal);
 
         public bool FileExists(string path) => true;
-        public string ReadAllText(string path) => input;
+        public string ReadAllText(string path) => readException is null ? input : throw readException;
         public void WriteAllText(string path, string contents) => Written[path] = contents;
         public string WriteAllTextToTemp(string targetPath, string contents)
         {
+            if (writeException is not null)
+            {
+                throw writeException;
+            }
+
             string temporaryPath = targetPath + ".tmp";
             Written[temporaryPath] = contents;
             return temporaryPath;

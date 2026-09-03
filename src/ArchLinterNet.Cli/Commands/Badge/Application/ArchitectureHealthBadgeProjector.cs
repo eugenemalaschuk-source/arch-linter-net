@@ -83,7 +83,6 @@ internal static class ArchitectureHealthBadgeProjector
     {
         "pass" => CliExitCodes.Success,
         "fail" => CliExitCodes.ValidationFailure,
-        "unassessable" => CliExitCodes.InvalidArgumentsOrRuntimeError,
         _ => throw new InvalidOperationException($"Unsupported Architecture Health gate '{gate}'."),
     };
 
