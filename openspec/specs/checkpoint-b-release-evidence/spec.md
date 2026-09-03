@@ -5,7 +5,9 @@ Define the release-blocking Checkpoint B contract: validate one immutable NuGet
 candidate set on every required platform, preserve verifiable synthetic-adopter
 evidence, and authorize publication only for the digest-verified files that
 were tested.
+
 ## Requirements
+
 ### Requirement: Checkpoint B consumes packed candidate artifacts
 The repository SHALL provide a deterministic NUnit Checkpoint B entrypoint that
 consumes a supplied immutable candidate manifest, validates package metadata, dependency graph,
@@ -289,13 +291,48 @@ Before final release aggregation, the repository SHALL merge exactly the require
 
 ### Requirement: Checkpoint B subprocess cancellation bounds the process tree
 
-Checkpoint B subprocess execution SHALL observe the NUnit cancellation token while waiting for child processes. When cancellation or the test timeout fires, the gate SHALL terminate the complete descendant process tree before propagating cancellation so timed-out `dotnet`, shell, MSBuild, or synthetic-consumer processes cannot continue mutating temporary state after the test has ended.
+Checkpoint B subprocess execution SHALL observe the NUnit cancellation token
+while waiting for child processes and SHALL bound both process completion and
+post-exit draining of redirected stdout and stderr. When cancellation, the
+process-completion bound, or the post-exit drain bound fires, the gate SHALL
+terminate the complete descendant process tree before completing the test so
+timed-out `dotnet`, shell, MSBuild, or synthetic-consumer processes cannot
+continue mutating temporary state after the test has ended.
+
+The resulting cancellation or timeout failure SHALL identify the rendered
+command, tracked root process id, elapsed duration, and phase, and SHALL retain
+bounded stdout and stderr tails. On Windows, the root process SHALL be placed
+in its tracked job at creation (not through a separate post-start assignment),
+and the scope SHALL retain a cleanup mechanism that can terminate tracked
+descendants even after the root process has exited; this after-root-exit
+guarantee is Windows-only. On non-Windows platforms, descendant termination is
+guaranteed only while the root process is still alive; a descendant that
+outlives its own root process is outside the direct-tree fallback's reach, and
+the bounded post-exit drain wait is the only bound that still applies. Locally
+packed Checkpoint B candidates SHALL not reuse persistent `dotnet` build
+servers or MSBuild nodes.
 
 #### Scenario: A child process owns a long-running descendant
 
-- **WHEN** Checkpoint B cancellation fires while a subprocess tree is still running
+- **WHEN** Checkpoint B cancellation fires while a subprocess tree is still
+  running
 - **THEN** the direct subprocess and its descendants terminate
-- **AND** the test returns cancellation rather than waiting for the original child duration
+- **AND** the test returns cancellation rather than waiting for the original
+  child duration
+
+#### Scenario: A descendant retains a redirected output handle after root exit (Windows)
+
+- **WHEN** on Windows, the root subprocess exits but a descendant keeps stdout
+  or stderr open past the post-exit drain bound
+- **THEN** Checkpoint B terminates the tracked descendant process tree
+- **AND** the bounded failure identifies the command, process id, drain phase,
+  elapsed duration, and bounded output tails
+
+#### Scenario: Checkpoint B packs a local candidate
+
+- **WHEN** the fixture creates its own candidate package feed
+- **THEN** the packaging invocation disables persistent build-server and MSBuild
+  node reuse
 
 ### Requirement: Checkpoint B preserves the complete candidate subject inventory
 Checkpoint B platform records and final release evidence SHALL retain and

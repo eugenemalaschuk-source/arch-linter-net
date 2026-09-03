@@ -303,6 +303,12 @@ public sealed partial class CheckpointBReleaseGateTests
     }
 
     private static CommandResult RunDotnet(string workingDirectory, params string[] arguments)
+        => RunDotnet(workingDirectory, disableMsBuildNodeReuse: false, arguments);
+
+    private static CommandResult RunDotnet(
+        string workingDirectory,
+        bool disableMsBuildNodeReuse,
+        params string[] arguments)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
@@ -311,6 +317,11 @@ public sealed partial class CheckpointBReleaseGateTests
             UseShellExecute = false,
             WorkingDirectory = workingDirectory,
         };
+        if (disableMsBuildNodeReuse)
+        {
+            startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+        }
+
         foreach (string argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
@@ -323,35 +334,7 @@ public sealed partial class CheckpointBReleaseGateTests
         Run(startInfo, TestContext.CurrentContext.CancellationToken);
 
     internal static CommandResult Run(ProcessStartInfo startInfo, CancellationToken cancellationToken)
-    {
-        using Process process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException($"Failed to start '{startInfo.FileName}'.");
-        // Deliberately not forwarding cancellationToken: on cancellation these must keep reading to
-        // the killed process's natural stream EOF below, not fault with their own cancellation — the
-        // catch block depends on Task.WaitAll completing cleanly so the bare `throw;` re-surfaces a
-        // plain OperationCanceledException instead of an AggregateException.
-#pragma warning disable CA2016
-        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
-        Task<string> standardError = process.StandardError.ReadToEndAsync();
-#pragma warning restore CA2016
-        try
-        {
-            process.WaitForExitAsync(cancellationToken).GetAwaiter().GetResult();
-        }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-                process.WaitForExit();
-            }
-            Task.WaitAll(standardOutput, standardError);
-            throw;
-        }
-
-        Task.WaitAll(standardOutput, standardError);
-        return new CommandResult(process.ExitCode, standardOutput.Result, standardError.Result);
-    }
+        => CheckpointBProcessRunner.Run(startInfo, cancellationToken);
 
     internal sealed record CommandResult(int ExitCode, string StandardOutput, string StandardError)
     {
