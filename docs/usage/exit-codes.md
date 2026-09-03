@@ -38,7 +38,7 @@ Exit code `2` means the run could not be trusted as normal validation. Examples:
 - unknown contract ID passed to `--contract`;
 - unknown condition set passed to `--condition-set`;
 - invalid `analysis.coverage`, `analysis.policy_consistency`, or `analysis.unmatched_ignored_violations` value;
-- unsupported coverage scope such as `project` or `assembly`;
+- an unsupported or malformed coverage `scope` value outside the documented closed vocabulary;
 - baseline references a contract ID that does not exist in the policy;
 - required target assemblies cannot be resolved when configuration treats that as fatal;
 - `--report` destination is not writable, collides with an input file, or has an invalid format.
