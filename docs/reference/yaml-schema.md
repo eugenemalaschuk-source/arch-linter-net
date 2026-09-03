@@ -13,7 +13,7 @@ arch-linter-net schema print policy-root
 
 Persisted format schemas are versioned independently from package SemVer. Do not synthesize schema URLs from the tool package version.
 
-Immutable release-qualified schema IDs remain valid when the version is itself the machine contract. Policy root/fragment v1 currently use `https://archlinternet.dev/schema/0.8.0/dependencies.arch.schema.json` and `https://archlinternet.dev/schema/0.8.0/dependencies.arch.fragment.schema.json`; other frozen registry entries retain their immutable `0.5.1` or `0.6.1` identities. These numbers are schema-contract identities, not the identity of this evergreen page.
+Immutable release-qualified schema IDs remain valid when the version is itself the machine contract. Policy root/fragment schemas currently use `https://archlinternet.dev/schema/0.8.0/dependencies.arch.schema.json` and `https://archlinternet.dev/schema/0.8.0/dependencies.arch.fragment.schema.json`; other frozen registry entries retain their immutable `0.5.1` or `0.6.1` identities. These numbers are schema-contract identities, not the identity of this evergreen page.
 
 ## Root and fragment schemas
 
@@ -26,8 +26,10 @@ The root schema requires `version`, `name`, `layers`, `analysis`, and `contracts
 
 ## Minimal root
 
+For new v0.8 policy authoring, prefer policy `version: 2` so strict structured-waiver lifecycle defaults are explicit:
+
 ```yaml
-version: 1
+version: 2
 name: My Architecture Contract
 
 layers:
@@ -40,7 +42,12 @@ analysis:
 contracts: {}
 ```
 
-`version` is currently `1`. `name` is human-readable policy identity.
+The schema accepts policy versions `1` and `2`:
+
+- version 1 preserves compatibility waiver defaults for existing policies;
+- version 2 defaults to strict structured-waiver lifecycle governance.
+
+The policy version is a persisted policy-contract version, not the NuGet package SemVer. Existing v1 policies remain supported; move to v2 deliberately when their manual ignores are ready for strict lifecycle behavior. `name` is the human-readable policy identity. See [Structured waivers](../policy-format/structured-waivers.md) and the [extended-governance adoption guide](../guides/extended-governance-adoption.md).
 
 ## Layers
 
@@ -174,6 +181,7 @@ analysis:
   unmatched_ignored_violations: error
   policy_consistency: error
   coverage: error
+  policy_weakening: error
   waiver_lifecycle_profile: strict # strict or compatibility; v2 defaults to strict
 ```
 
@@ -181,11 +189,7 @@ Policies may use explicit target assemblies or project/solution discovery. Norma
 
 ### Architecture-waiver lifecycle
 
-`ignored_violations` retains its legacy matcher shape for version-1 policies. A
-version-2 policy defaults to the `strict` waiver-lifecycle profile: every
-manually authored waiver must name an immutable target fingerprint, owner,
-tracking issue, introduced date, and expiry date. Use `compatibility`
-explicitly only while migrating existing legacy entries.
+`ignored_violations` retains its legacy matcher shape for version-1 policies. A version-2 policy defaults to the `strict` waiver-lifecycle profile: every manually authored waiver must name an immutable target fingerprint, owner, tracking issue, introduced date, and expiry date. Use `compatibility` explicitly only while migrating existing legacy entries.
 
 ```yaml
 ignored_violations:
@@ -201,14 +205,7 @@ ignored_violations:
     expires: 2026-10-01
 ```
 
-Use `ArchitectureWaiverTargetFingerprint.Create` from the Core API to create a
-target value from the exact violation identity. The linter does not treat the
-display matchers as the target: the fingerprint prevents the waiver from
-silently covering another occurrence that happens to have the same text. A
-fingerprint is `sha256:` followed by 64 lowercase hexadecimal characters;
-uppercase hexadecimal is rejected as non-canonical. An incomplete manual
-waiver is reported as fail-closed `invalid` lifecycle evidence and does not
-suppress a finding.
+Use `ArchitectureWaiverTargetFingerprint.Create` from the Core API to create a target value from the exact violation identity. The linter does not treat the display matchers as the target: the fingerprint prevents the waiver from silently covering another occurrence that happens to have the same text. A fingerprint is `sha256:` followed by 64 lowercase hexadecimal characters; uppercase hexadecimal is rejected as non-canonical. An incomplete manual waiver under the strict profile is reported as fail-closed `invalid` lifecycle evidence and does not suppress a finding. Under compatibility semantics, a legacy matcher-only entry remains visible as `metadata_incomplete` debt.
 
 ## Contracts
 

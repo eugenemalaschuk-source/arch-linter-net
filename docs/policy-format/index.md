@@ -6,10 +6,10 @@ The packaged JSON Schema is the syntax authority. Runtime validators and the exe
 
 ## Root policy
 
-A selected root policy uses `version: 1` and normally contains:
+A selected root policy uses `version: 1` or `version: 2` and normally contains:
 
 ```yaml
-version: 1
+version: 2
 name: My Architecture Contract
 
 imports: []
@@ -25,18 +25,23 @@ classification: {}
 
 topology: {}
 
+metrics: []
+external_evidence: []
+
 analysis: {}
 
 contracts: {}
 ```
 
-`imports`, external/package/framework groups, source sets, and classification are optional. The root schema requires the root identity and the core `layers`, `analysis`, and `contracts` containers; imported fragments can contribute entries during composition.
+`version: 1` preserves compatibility waiver defaults for existing policies. `version: 2` defaults to strict structured-waiver lifecycle governance and is the recommended starting point for new policy authoring. The policy version is a persisted policy-contract version, not the NuGet package version.
 
-See [YAML schema reference](../reference/yaml-schema.md) and [Policy imports](imports.md).
+`imports`, external/package/framework groups, source sets, classification, topology, metrics, and external evidence are optional. The root schema requires the root identity and the core `layers`, `analysis`, and `contracts` containers; imported fragments can contribute entries during composition.
+
+See [YAML schema reference](../reference/yaml-schema.md), [Policy imports](imports.md), [Structured waivers](structured-waivers.md), and [Extended governance adoption](../guides/extended-governance-adoption.md).
 
 ## Declared topology
 
-An optional native `topology` section declares stable components, their mappings, allowed directional edges, and the bounded observed subject universe that a later topology evaluator must assess. It is not a diagram language and does not infer unreviewed components. See [Declared topology](declared-topology.md) for the complete mapping, completeness, and reviewed out-of-scope semantics.
+An optional native `topology` section declares stable components, their mappings, allowed directional edges, and the bounded observed subject universe that validation assesses. It is not a diagram language and does not infer unreviewed components. See [Declared topology](declared-topology.md) for the complete mapping, completeness, and reviewed out-of-scope semantics.
 
 ## Layers: namespaces and semantic selectors
 
@@ -72,9 +77,11 @@ analysis:
     - "**/*.Tests/**"
   configuration: Debug
   coverage: error
+  policy_weakening: error
+  waiver_lifecycle_profile: strict
 ```
 
-Other analysis controls include assembly search paths, source roots, target framework/build selectors, condition sets, ignored-violation behavior, policy-consistency severity, and coverage severity.
+Other analysis controls include assembly search paths, source roots, target framework/build selectors, condition sets, ignored-violation behavior, policy-consistency severity, coverage severity, policy-weakening severity, and waiver lifecycle profile.
 
 Normal validation does not silently build. Use `--ensure-built` when the CLI should build the selected project graph and verify its build-state receipt before validation.
 
@@ -118,6 +125,24 @@ Coverage is a normal contract family (`strict_coverage` / `audit_coverage`) with
 Use coverage to make policy omissions visible: unmapped first-party namespaces/projects/assemblies, ungoverned observed dependency edges, stale or unresolved rule inputs, and semantic roles not covered by selector-backed/contextual governance.
 
 See [Coverage contracts](../contracts/coverage.md).
+
+## Extended governance
+
+The complete static governance cycle composes existing authorities rather than introducing a second architecture engine:
+
+```text
+policy check
+  -> architecture validation + applicability/completeness
+  -> declared topology + visible contract surfaces
+  -> finding baseline debt + structured waiver lifecycle + weakening
+  -> measurements and budgets
+  -> current-context external SARIF evidence
+  -> architecture change
+  -> Architecture Health
+  -> PR Markdown / JSON / SARIF / Health badge
+```
+
+Use [Architecture metrics](architecture-metrics.md), [External evidence](external-evidence.md), [Architecture Health](../reference/architecture-health.md), and the [complete single-tool workflow](../guides/single-tool-workflow.md) for the delivered end-to-end path.
 
 ## Semantic classification
 
