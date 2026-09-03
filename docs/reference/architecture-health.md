@@ -43,11 +43,29 @@ unassessable > failing > degrading > debt > healthy
 
 For example, an unassessable required evidence dimension dominates an otherwise current strict failure, while both dimensions remain available for drill-down.
 
-The CLI maps gate outcomes to exit codes: `pass -> 0`, `fail -> 1`, and `unassessable -> 2`. Exit `2` can therefore represent a valid Health document with `gate: unassessable`; distinguish that from an invalid invocation by reading the structured output.
+The CLI maps gate outcomes to exit codes: `pass -> 0`, `fail -> 1`, and `unassessable -> 2`. Exit `1` or `2` can accompany a valid `architecture-health/v1` document; distinguish that from an invalid invocation by reading the structured output.
 
-## Non-compensating dimensions
+## Canonical dimensions
 
-Health dimensions do not offset one another. A healthy topology dimension cannot compensate for missing required external evidence; a strong metric cannot compensate for a current blocking dependency violation; a resolved finding cannot erase unrelated new debt.
+The JSON and human projections retain one deterministic ordered list of separately authoritative dimensions:
+
+1. `current_evaluation`;
+1. `applicability`;
+1. `audit_evidence`;
+1. `coverage`;
+1. `topology`;
+1. `metrics`;
+1. `external_evidence`;
+1. `policy_inventory`;
+1. `reviewed_finding_debt`;
+1. `new_architecture_debt`;
+1. `waiver_debt`;
+1. `policy_weakening`;
+1. `history`.
+
+A dimension can be `pass`, `debt`, `degrading`, `fail`, `unassessable`, `not_applicable`, or `not_configured` according to its owning authority. `history` is currently advisory/not configured in the canonical projection; it does not silently become a release gate.
+
+Dimensions do not offset one another. A healthy topology dimension cannot compensate for missing required external evidence; a strong metric cannot compensate for a current blocking dependency violation; a resolved finding cannot erase unrelated new debt.
 
 This is why Architecture Health exposes no weighted score, letter grade or universal percentage. Counts and ratios are transparency evidence, not substitutes for the owning architecture semantics.
 
@@ -103,11 +121,13 @@ Important examples:
 
 A valid zero-result external SARIF artifact is different: if the trust proof succeeds and the selected run explicitly completed successfully with zero selected diagnostics, the evidence is evaluable.
 
-## Policy inventory
+## Policy inventory and applicability are not the same count
 
-The Health projection consumes the canonical `architecture-policy-inventory/v1` object when available. `effective_rule_count` counts effective authored controls once rather than counting findings, YAML lines, or source-set/runtime fan-out. Explicit ignore/waiver debt is projected from the same selected effective policy scope.
+The Health projection consumes the canonical `architecture-policy-inventory/v1` object when available. `effective_rule_count` counts every effective authored control once after imports and conditions, rather than counting findings, YAML lines, or source-set/runtime fan-out. Explicit ignore/waiver debt is projected from the same selected effective policy scope.
 
-A missing inventory is missing evidence. Consumers must not turn it into `0 rules` or `0 ignores`.
+The applicability/evaluability denominator contains only controls that require applicability proof. It may therefore be smaller than `effective_rule_count`. A missing required applicability record cannot shrink that denominator or be represented as complete. Neither count is a quality score.
+
+A missing policy inventory is missing evidence. Consumers must not turn it into `0 rules` or `0 ignores`.
 
 ## Badge projection
 
@@ -141,4 +161,6 @@ arch-linter-net report pr \
   --output architecture-pr-report.md
 ```
 
-The Health reporting evidence and change report must carry the same non-empty execution context and selected mode. A publisher may carry the inert Markdown to a sticky pull-request comment only after validating its repository/PR/head/run/schema/size/hash transport evidence. The publisher must not compute report sections or remediation semantics itself.
+The Health reporting evidence and change report must carry the same non-empty execution context and selected mode. Because a failing or unassessable Health gate exits `1` or `2` while still producing a valid document, a CI report producer should retain and schema-check the JSON before a separate required gate blocks the pull request. It must not convert the underlying architecture decision into a pass.
+
+A publisher may carry the inert Markdown to one sticky pull-request comment only after validating its repository/PR/head/run/schema/size/hash transport evidence. The publisher must not execute PR content, compute report sections, or infer Architecture Health from arbitrary workflow status.
