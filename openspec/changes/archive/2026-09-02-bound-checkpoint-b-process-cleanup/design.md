@@ -41,11 +41,19 @@ the command, PID, phase, elapsed duration, and stream tails.
 
 ### Use a Windows kill-on-close job scope; retain process-tree cleanup elsewhere
 
-Immediately after starting a Windows process, the runner assigns it to a
-kill-on-close job object. Closing that scope terminates the process group even
-when the root `dotnet` process already exited and a descendant retains the
-redirected handle. On non-Windows platforms the existing direct
-`Kill(entireProcessTree: true)` approach remains the reviewable fallback.
+On Windows, the root process is placed in a kill-on-close job object
+atomically at creation, via `STARTUPINFOEX` and
+`PROC_THREAD_ATTRIBUTE_JOB_LIST` passed to `CreateProcessW`, rather than
+through a separate `AssignProcessToJobObject` call after `Process.Start`
+returns. This closes the window a post-start assignment would leave open: a
+descendant spawned between start and assignment could otherwise escape the
+job, and a failed assignment could leave an already-running root untracked.
+Closing the job scope terminates the process group even when the root
+`dotnet` process already exited and a descendant retains the redirected
+handle. On non-Windows platforms the existing direct
+`Kill(entireProcessTree: true)` approach remains the reviewable fallback, and
+only while the root process itself is still alive: a descendant that outlives
+its own root process is outside that fallback's reach on non-Windows.
 
 Job objects were selected over post-exit child enumeration because they are
 attached before descendants are created and keep an operating-system-owned

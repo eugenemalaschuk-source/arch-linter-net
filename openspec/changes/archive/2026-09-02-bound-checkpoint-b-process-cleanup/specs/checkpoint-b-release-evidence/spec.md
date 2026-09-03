@@ -12,10 +12,16 @@ continue mutating temporary state after the test has ended.
 
 The resulting cancellation or timeout failure SHALL identify the rendered
 command, tracked root process id, elapsed duration, and phase, and SHALL retain
-bounded stdout and stderr tails. On Windows, the scope SHALL retain a cleanup
-mechanism that can terminate tracked descendants even after the root process
-has exited. Locally packed Checkpoint B candidates SHALL not reuse persistent
-`dotnet` build servers or MSBuild nodes.
+bounded stdout and stderr tails. On Windows, the root process SHALL be placed
+in its tracked job at creation (not through a separate post-start assignment),
+and the scope SHALL retain a cleanup mechanism that can terminate tracked
+descendants even after the root process has exited; this after-root-exit
+guarantee is Windows-only. On non-Windows platforms, descendant termination is
+guaranteed only while the root process is still alive; a descendant that
+outlives its own root process is outside the direct-tree fallback's reach, and
+the bounded post-exit drain wait is the only bound that still applies. Locally
+packed Checkpoint B candidates SHALL not reuse persistent `dotnet` build
+servers or MSBuild nodes.
 
 #### Scenario: A child process owns a long-running descendant
 
@@ -25,10 +31,10 @@ has exited. Locally packed Checkpoint B candidates SHALL not reuse persistent
 - **AND** the test returns cancellation rather than waiting for the original
   child duration
 
-#### Scenario: A descendant retains a redirected output handle after root exit
+#### Scenario: A descendant retains a redirected output handle after root exit (Windows)
 
-- **WHEN** the root subprocess exits but a descendant keeps stdout or stderr
-  open past the post-exit drain bound
+- **WHEN** on Windows, the root subprocess exits but a descendant keeps stdout
+  or stderr open past the post-exit drain bound
 - **THEN** Checkpoint B terminates the tracked descendant process tree
 - **AND** the bounded failure identifies the command, process id, drain phase,
   elapsed duration, and bounded output tails

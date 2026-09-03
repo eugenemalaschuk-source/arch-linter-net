@@ -139,13 +139,21 @@ internal static partial class CheckpointBProcessRunner
                 // The primary thread is still suspended, so the process cannot exit and free its
                 // PID for reuse: GetProcessById is guaranteed to attach to the process this method
                 // just created, not to an unrelated process that happens to reuse the same PID.
-                Process process;
+                // GetProcessById itself only binds a PID, though — it does not open a durable native
+                // handle until something (SafeHandle, WaitForExitAsync, ...) forces it to. Touching
+                // SafeHandle here, still while suspended, forces that OpenProcess now and caches the
+                // result inside the Process object, so every later operation (WaitForExitAsync,
+                // ExitCode, ...) uses this handle rather than re-resolving the PID after resume,
+                // when it could already have been reused by an unrelated process.
+                Process? process = null;
                 try
                 {
                     process = Process.GetProcessById(unchecked((int)processInformation.ProcessId));
+                    _ = process.SafeHandle;
                 }
                 catch
                 {
+                    process?.Dispose();
                     NativeMethods.TerminateProcess(rawProcessHandle, InvalidResumeCount);
                     throw;
                 }

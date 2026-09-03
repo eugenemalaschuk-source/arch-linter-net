@@ -158,18 +158,18 @@ public sealed class CheckpointBProcessRunnerTests
 
         // Reuses the same inherited-handle probe as the timeout regression above; the fault comes
         // not from the probe's output but from decoding it with an encoding rigged to always throw,
-        // so the descendant's ordinary output writes are enough to trigger it. Both stdout and
-        // stderr are rigged (not just stdout): the drain phase awaits Task.WhenAll(stdout, stderr),
-        // which only completes once BOTH constituent tasks are done, faulted or not — with only
-        // stdout faulting, stderr would stay legitimately pending (the descendant holds it open)
-        // and the drain phase would time out instead of observing the fault.
+        // so the descendant's ordinary "descendant-output" write is enough to trigger it. Only
+        // stdout is rigged: stderr keeps the default encoding and legitimately stays blocked for the
+        // whole drain window, since the descendant holds it open (the same shape as the timeout
+        // regression above). Task.WhenAll(stdout, stderr) alone would not complete until stderr also
+        // finishes, masking stdout's fault behind a drain timeout; the runner must observe the fault
+        // on the single faulted stream without waiting for the other.
         var startInfo = new ProcessStartInfo(ProcessTreeProbePath)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             StandardOutputEncoding = AlwaysThrowingDecodeEncoding.Instance,
-            StandardErrorEncoding = AlwaysThrowingDecodeEncoding.Instance,
         };
         startInfo.ArgumentList.Add("root");
         startInfo.ArgumentList.Add(childPidPath);
@@ -177,12 +177,19 @@ public sealed class CheckpointBProcessRunnerTests
 
         try
         {
-            // This is a genuine fault raised while decoding the redirected streams, not the
+            Stopwatch elapsed = Stopwatch.StartNew();
+
+            // This is a genuine fault raised while decoding the redirected stdout stream, not the
             // runner's own timeout or a cancellation: it must surface unchanged, proving cleanup
             // never replaces the original exception with one of its own (e.g. a cleanup-phase
             // TimeoutException), and that a fault mid-drain still runs cleanup at all.
             Assert.Throws<InvalidDataException>(() =>
                 CheckpointBReleaseGateTests.Run(startInfo, TestContext.CurrentContext.CancellationToken));
+
+            Assert.That(elapsed.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)),
+                "A fault on one stream must surface as soon as it happens, not be masked behind " +
+                "Task.WhenAll waiting for the other (still legitimately blocked) stream to finish " +
+                "and the drain bound to elapse.");
 
             Assert.That(SpinWait.SpinUntil(
                     () => File.Exists(childPidPath) && int.TryParse(File.ReadAllText(childPidPath).Trim(), out _),
@@ -199,6 +206,43 @@ public sealed class CheckpointBProcessRunnerTests
         {
             DeleteDirectoryEventually(root);
         }
+    }
+
+    [Test]
+    [CancelAfter(15_000)]
+    public void StreamDecodeFaultWhileProcessStillRunningSurfacesWithoutProcessCompletionBound()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The inherited redirected-handle regression requires Windows job objects.");
+        }
+
+        // The root here writes a line and then sleeps well past this test's own bound without
+        // exiting, so process completion never wins its own race. A fix that only inspected the
+        // stream tasks after process completion (or after the drain phase started) would have to
+        // wait out ProcessCompletionTimeout (2 minutes) — far longer than this test allows — instead
+        // of observing the fault as soon as it happens.
+        var startInfo = new ProcessStartInfo("pwsh")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            StandardOutputEncoding = AlwaysThrowingDecodeEncoding.Instance,
+        };
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-NonInteractive");
+        startInfo.ArgumentList.Add("-Command");
+        startInfo.ArgumentList.Add(
+            "[Console]::Out.WriteLine('trigger'); [Console]::Out.Flush(); Start-Sleep -Seconds 60");
+
+        Stopwatch elapsed = Stopwatch.StartNew();
+
+        Assert.Throws<InvalidDataException>(() =>
+            CheckpointBReleaseGateTests.Run(startInfo, TestContext.CurrentContext.CancellationToken));
+
+        Assert.That(elapsed.Elapsed, Is.LessThan(TimeSpan.FromSeconds(10)),
+            "A genuine stream-decode fault must surface as soon as it happens even while the " +
+            "process itself is still running, not only once process completion or drain bounds out.");
     }
 
     /// <summary>

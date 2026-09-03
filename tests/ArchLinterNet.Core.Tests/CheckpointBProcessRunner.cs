@@ -78,8 +78,12 @@ internal static partial class CheckpointBProcessRunner
 #pragma warning restore CA2016
                 completion = process.WaitForExitAsync();
 
+                // Watching both stream tasks here (not just completion) means a genuine read fault
+                // that happens while the process is still running surfaces immediately, instead of
+                // waiting out the full two-minute process-completion bound first.
                 await AwaitPhaseAsync(
                         completion,
+                        [standardOutputTask, standardErrorTask],
                         ProcessCompletionTimeout,
                         cancellationToken,
                         "process completion",
@@ -90,9 +94,15 @@ internal static partial class CheckpointBProcessRunner
                         standardError)
                     .ConfigureAwait(false);
 
+                // Task.WhenAll only completes once BOTH streams finish, fault or not, so it alone
+                // cannot report an early fault on one stream while the other is still legitimately
+                // blocked (e.g. held open by a surviving descendant). Watching the two tasks
+                // individually lets that fault surface as soon as it happens instead of being
+                // masked by a drain timeout once the bound runs out.
                 Task streams = Task.WhenAll(standardOutputTask, standardErrorTask);
                 await AwaitPhaseAsync(
                         streams,
+                        [standardOutputTask, standardErrorTask],
                         PostExitDrainTimeout,
                         cancellationToken,
                         "post-exit stream drain",
@@ -144,13 +154,20 @@ internal static partial class CheckpointBProcessRunner
     }
 
     /// <summary>
-    /// Awaits <paramref name="task"/> bounded by <paramref name="timeout"/> and
-    /// <paramref name="cancellationToken"/>. A genuine fault from <paramref name="task"/> and a
-    /// cancellation propagate unchanged; only this method's own timeout is rewritten into a
-    /// <see cref="TimeoutException"/> carrying the bounded diagnostic.
+    /// Awaits <paramref name="primary"/> to completion, bounded by <paramref name="timeout"/> and
+    /// <paramref name="cancellationToken"/>, while also racing <paramref name="watchedFaults"/> so a
+    /// fault on any of them surfaces immediately rather than only once <paramref name="primary"/>
+    /// itself gives up. A task that finishes without faulting is dropped from the race and does not
+    /// by itself end the wait; only <paramref name="primary"/> finishing successfully, any watched
+    /// or primary task faulting, or this method's own bound, ends it. Which task ends the race is
+    /// decided by reference identity, not by exception type, so a genuine
+    /// <see cref="TimeoutException"/> raised by <paramref name="primary"/> or a watched task is
+    /// never mistaken for this method's own deadline (and vice versa): only this method's own
+    /// internal deadline task is rewritten into the bounded diagnostic.
     /// </summary>
     private static async Task AwaitPhaseAsync(
-        Task task,
+        Task primary,
+        IReadOnlyList<Task> watchedFaults,
         TimeSpan timeout,
         CancellationToken cancellationToken,
         string phase,
@@ -160,19 +177,46 @@ internal static partial class CheckpointBProcessRunner
         StreamCapture standardOutput,
         StreamCapture standardError)
     {
-        try
+        using var timeoutSource = new CancellationTokenSource(timeout);
+        using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
+        Task deadline = Task.Delay(Timeout.InfiniteTimeSpan, linkedSource.Token);
+
+        var pending = new HashSet<Task>(watchedFaults);
+        pending.Remove(primary);
+        while (true)
         {
-            await task.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
-        }
-        catch (TimeoutException)
-        {
-            throw new TimeoutException(BuildTimeoutDiagnostic(
-                command,
-                processId,
-                phase,
-                elapsed,
-                standardOutput,
-                standardError));
+            var race = new List<Task>(pending.Count + 2) { primary, deadline };
+            race.AddRange(pending);
+            Task completed = await Task.WhenAny(race).ConfigureAwait(false);
+
+            if (completed == primary)
+            {
+                await primary.ConfigureAwait(false);
+                return;
+            }
+
+            if (completed == deadline)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+
+                throw new TimeoutException(BuildTimeoutDiagnostic(
+                    command,
+                    processId,
+                    phase,
+                    elapsed,
+                    standardOutput,
+                    standardError));
+            }
+
+            if (completed.IsFaulted)
+            {
+                await completed.ConfigureAwait(false);
+            }
+
+            pending.Remove(completed);
         }
     }
 
