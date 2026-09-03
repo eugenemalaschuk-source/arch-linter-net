@@ -57,21 +57,21 @@ The CLI maps gate outcomes to exit codes: `pass -> 0`, `fail -> 1`, and `unasses
 
 ## Canonical dimensions
 
-The JSON and human projections retain one deterministic ordered list of separately authoritative dimensions:
+The model exposes a fixed set of separately authoritative dimensions. The summary stores them deterministically sorted by dimension name; consumers should key by `name`, never by array position:
 
-1. `current_evaluation`;
-1. `applicability`;
-1. `audit_evidence`;
-1. `coverage`;
-1. `topology`;
-1. `metrics`;
-1. `external_evidence`;
-1. `policy_inventory`;
-1. `reviewed_finding_debt`;
-1. `new_architecture_debt`;
-1. `waiver_debt`;
-1. `policy_weakening`;
-1. `history`.
+- `applicability`;
+- `audit_evidence`;
+- `coverage`;
+- `current_evaluation`;
+- `external_evidence`;
+- `history`;
+- `metrics`;
+- `new_architecture_debt`;
+- `policy_inventory`;
+- `policy_weakening`;
+- `reviewed_finding_debt`;
+- `topology`;
+- `waiver_debt`.
 
 A dimension can be `pass`, `debt`, `degrading`, `fail`, `unassessable`, `not_applicable`, or `not_configured` according to its owning authority. `history` is currently advisory/not configured in the canonical projection; it does not silently become a release gate.
 
