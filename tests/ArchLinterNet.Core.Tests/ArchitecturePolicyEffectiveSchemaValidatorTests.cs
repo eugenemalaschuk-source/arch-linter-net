@@ -95,6 +95,44 @@ public sealed class ArchitecturePolicyEffectiveSchemaValidatorTests
                 CreateProvenance(("/contracts/strict/0/id", "contracts.strict[0].id"))));
     }
 
+    // Regression: RemoveValidatedContractIds strips the composed instance's "id" field before
+    // schema evaluation for every contract family except an explicit exemption list, on the
+    // assumption that older families tolerate an absent id. contractSurfaceExposureContract's own
+    // schema declares "id" required (the same as versioned-contract-surface-isolation, which was
+    // already exempted) -- so an otherwise-valid strict_contract_surface_exposure/
+    // audit_contract_surface_exposure entry with an explicit id previously failed effective-schema
+    // validation with a self-inflicted "Required properties [id] are not present", because the
+    // validator deleted the very field it was about to require. No existing test authored this
+    // family as YAML (only as the in-memory contract-object-model), so nothing caught it before.
+    [TestCase("strict_contract_surface_exposure")]
+    [TestCase("audit_contract_surface_exposure")]
+    public void Validate_ContractSurfaceExposureWithExplicitId_RemainsValid(string groupName)
+    {
+        string yaml = $$"""
+            version: 1
+            name: Example
+            layers:
+              domain:
+                namespace: App.Domain
+            analysis:
+              target_assemblies: [App]
+            contracts:
+              {{groupName}}:
+                - id: no-forbidden-domain-types
+                  name: no-forbidden-domain-types
+                  source:
+                    assemblies: [App]
+                  forbidden:
+                    - namespace: App.Forbidden
+                  reason: Regression fixture for the id-stripping bug.
+            """;
+
+        Assert.DoesNotThrow(() =>
+            ArchitecturePolicyEffectiveSchemaValidator.Validate(
+                yaml,
+                CreateProvenance(($"/contracts/{groupName}/0/id", $"contracts.{groupName}[0].id"))));
+    }
+
     [Test]
     public void Validate_InvalidNamespaceLayer_ReportsTheScalarFailureWithoutSelectorAlternativeNoise()
     {
