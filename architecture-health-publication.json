@@ -1,0 +1,10 @@
+{
+  "schema": "architecture-health-badge-publication/v1",
+  "status": "ready",
+  "reason": "ready",
+  "repository": "eugenemalaschuk-source/arch-linter-net",
+  "main_sha": "a1534dd75676f9ae8ee1aa800b8b6767f568817d",
+  "main_tree_sha": "14500fa257f3c35c609a7d404b9565cc3470f833",
+  "pr_number": "764",
+  "producer_run_id": "33722247192"
+}
