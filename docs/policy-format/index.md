@@ -6,14 +6,7 @@ The packaged JSON Schema is the syntax authority. Runtime validators and the exe
 
 ## Root policy
 
-The current root schema accepts policy `version: 1` and `version: 2`.
-
-- `version: 1` preserves compatibility waiver defaults for existing policies.
-- `version: 2` defaults to strict structured-waiver lifecycle governance.
-
-Both versions use the same root shape and supported contract inventory; the policy version is a persisted policy-contract version, not the NuGet package SemVer.
-
-A selected root policy normally contains:
+A selected root policy uses `version: 1` or `version: 2` and normally contains:
 
 ```yaml
 version: 2
@@ -32,16 +25,19 @@ classification: {}
 
 topology: {}
 
+metrics: []
+external_evidence: []
+
 analysis: {}
 
 contracts: {}
 ```
 
+`version: 1` preserves compatibility waiver defaults for existing policies. `version: 2` defaults to strict structured-waiver lifecycle governance and is the recommended starting point for new policy authoring. The policy version is a persisted policy-contract version, not the NuGet package version.
+
 `imports`, external/package/framework groups, source sets, classification, topology, metrics, and external evidence are optional. The root schema requires the root identity and the core `layers`, `analysis`, and `contracts` containers; imported fragments can contribute entries during composition.
 
-Existing policies do not need to change from v1 merely to run the current CLI. Move to v2 deliberately when you are ready for strict structured-waiver defaults. See [Structured waivers](structured-waivers.md) and [Adopt or upgrade](../guides/upgrading.md).
-
-See [YAML schema reference](../reference/yaml-schema.md) and [Policy imports](imports.md).
+See [YAML schema reference](../reference/yaml-schema.md), [Policy imports](imports.md), [Structured waivers](structured-waivers.md), and [Extended governance adoption](../guides/extended-governance-adoption.md).
 
 ## Declared topology
 
@@ -81,9 +77,11 @@ analysis:
     - "**/*.Tests/**"
   configuration: Debug
   coverage: error
+  policy_weakening: error
+  waiver_lifecycle_profile: strict
 ```
 
-Other analysis controls include assembly search paths, source roots, target framework/build selectors, condition sets, ignored-violation behavior, policy-consistency severity, coverage severity, and waiver lifecycle profile.
+Other analysis controls include assembly search paths, source roots, target framework/build selectors, condition sets, ignored-violation behavior, policy-consistency severity, coverage severity, policy-weakening severity, and waiver lifecycle profile.
 
 Normal validation does not silently build. Use `--ensure-built` when the CLI should build the selected project graph and verify its build-state receipt before validation.
 
@@ -128,6 +126,24 @@ Use coverage to make policy omissions visible: unmapped first-party namespaces/p
 
 See [Coverage contracts](../contracts/coverage.md).
 
+## Extended governance
+
+The complete static governance cycle composes existing authorities rather than introducing a second architecture engine:
+
+```text
+policy check
+  -> architecture validation + applicability/completeness
+  -> declared topology + visible contract surfaces
+  -> finding baseline debt + structured waiver lifecycle + weakening
+  -> measurements and budgets
+  -> current-context external SARIF evidence
+  -> architecture change
+  -> Architecture Health
+  -> PR Markdown / JSON / SARIF / Health badge
+```
+
+Use [Architecture metrics](architecture-metrics.md), [External evidence](external-evidence.md), [Architecture Health](../reference/architecture-health.md), and the [complete single-tool workflow](../guides/single-tool-workflow.md) for the delivered end-to-end path.
+
 ## Semantic classification
 
 Implemented classification inputs include attribute, assembly-attribute, inheritance, and namespace facts. Selector-backed layers consume the per-run role/metadata index. Contextual dependency/allow-only and port-boundary contracts consume the same semantic evidence directly.
@@ -148,7 +164,7 @@ arch-linter-net policy context --policy architecture/arch.yml --format json > po
 arch-linter-net --policy architecture/arch.yml --mode strict
 ```
 
-For base/current review, compare exported contexts with `policy weakening`. For repository change review, use `change snapshot`, `change report`, `gate`, and [Architecture Health](../reference/architecture-health.md).
+For base/current review, compare exported contexts with `policy weakening`. For repository change review, use `change snapshot`, `change report`, and `gate`.
 
 ## Sources of truth
 
