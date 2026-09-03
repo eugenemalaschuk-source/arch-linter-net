@@ -23,6 +23,8 @@ analysis:
 
 Treat that as a reviewed migration state, not as the target end state. Remove the override once all manual ignores have complete structured metadata.
 
+Under compatibility semantics, a legacy matcher-only entry remains visible as `metadata_incomplete` debt and retains its prior pass/fail behavior. Under strict semantics, incomplete structured metadata becomes fail-closed `invalid` lifecycle evidence.
+
 ## Structured waiver shape
 
 ```yaml
@@ -50,7 +52,7 @@ A structured waiver carries:
 - introduced date;
 - expiry date.
 
-The exact field/type authority is the packaged schema (`arch-linter-net schema print policy-root`).
+The exact field/type authority is the packaged schema (`arch-linter-net schema print policy-root`). Duplicate structured waiver IDs are invalid across the effective policy, including imported fragments.
 
 ## Exact target identity
 
@@ -62,7 +64,7 @@ A fingerprint is `sha256:` followed by 64 lowercase hexadecimal characters. Unsu
 
 Do not reuse a fingerprint for another occurrence and do not broaden the display matchers as a substitute for creating the correct target.
 
-## Lifecycle states
+## Lifecycle states and precedence
 
 Canonical waiver evidence distinguishes these states:
 
@@ -73,6 +75,14 @@ Canonical waiver evidence distinguishes these states:
 | `expired` | The review window has elapsed. | Reassess immediately; strict lifecycle does not treat it as harmless debt. |
 | `metadata_incomplete` | Legacy compatibility entry without complete structured lifecycle metadata. | Migrate it to a structured waiver or remove it. |
 | `invalid` | Metadata or target is malformed/unsupported. | Fix the policy; invalid evidence does not suppress a finding. |
+
+One configured waiver contributes once to the total. When several predicates could apply, canonical classification uses this deterministic precedence:
+
+```text
+invalid > expired > stale > active > metadata_incomplete
+```
+
+For example, an expired waiver whose original finding has also disappeared is classified as `expired`, not double-counted as both expired and stale.
 
 Use `--waiver-evaluation-date yyyy-MM-dd` when a reproducible expiry-boundary assessment is required. Otherwise the CLI captures one UTC evaluation date for the invocation.
 
@@ -105,23 +115,29 @@ Effective controls are counted once by authored control identity. Imports, condi
 
 A missing policy inventory is missing evidence. Consumers must not interpret it as zero controls or zero waivers.
 
-## New and broadened waivers are change evidence
+## New and broadened waivers are blocking change evidence by default
 
 A waiver is a policy relaxation. Adding one or broadening its governed scope must remain visible to policy weakening/new-debt review instead of being treated as neutral configuration churn.
 
-Use base/current policy contexts:
+Export contexts from the actual reviewed base and candidate policy states with the same pinned ArchLinterNet version:
 
 ```bash
+# Reviewed base checkout/worktree
 arch-linter-net policy context \
   --policy architecture/arch.yml \
-  --format json > current-policy.json
+  --format json > /shared/artifacts/policy-base.json
+
+# Candidate checkout/worktree
+arch-linter-net policy context \
+  --policy architecture/arch.yml \
+  --format json > artifacts/policy-current.json
 
 arch-linter-net policy weakening \
-  --base-context base-policy.json \
-  --current-context current-policy.json
+  --base-context artifacts/policy-base.json \
+  --current-context artifacts/policy-current.json
 ```
 
-Architecture Health can therefore become `degrading` when a new or broadened waiver represents regression, even when unrelated dimensions remain healthy.
+When these contexts are supplied to `gate` or `health`, the default `analysis.policy_weakening: error` setting makes a detected new or broadened waiver blocking. The independent gate therefore fails while Architecture Health records at least `degrading`. An explicitly reviewed compatibility/migration configuration may alter the owning severity only when the policy supports that choice; it does not make explicit waiver debt disappear or allow `health: healthy`.
 
 Removing a no-longer-needed waiver is improvement evidence. Do not keep stale exceptions merely to preserve historical counts.
 
