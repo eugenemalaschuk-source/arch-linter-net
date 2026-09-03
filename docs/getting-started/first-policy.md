@@ -1,6 +1,6 @@
 # First Policy
 
-A good first ArchLinterNet policy should be small, mapped to real namespaces, and easy to verify.
+A good first ArchLinterNet policy should be small, mapped to real namespaces, and easy to verify. New v0.8 policies should use `version: 2`, which defaults manual waivers to strict lifecycle governance. Existing `version: 1` policies remain supported with compatibility defaults.
 
 ## 1. Pick real layers
 
@@ -91,7 +91,7 @@ arch-linter-net --mode audit --json > architecture-audit.json
 ## Complete example
 
 ```yaml
-version: 1
+version: 2
 name: My Architecture Contract
 
 layers:
@@ -126,8 +126,12 @@ contracts:
       reason: Dependencies must point inward toward the domain.
 ```
 
+Policy v2 changes the default waiver-lifecycle profile, not the meaning of the dependency contracts above. Read [Structured waivers](../policy-format/structured-waivers.md) before adding a manual exception.
+
 ## Next steps
 
+- Continue through the [complete single-tool governance workflow](../guides/single-tool-workflow.md).
 - Add [CI integration](../guides/ci-integration.md).
 - Read the [contract overview](../contracts/index.md).
 - Check [supported capabilities and non-goals](../policy-format/supported-capabilities.md) before adding advanced rules.
+- Existing v0.7/v1 adopters should follow the [v0.7 to v0.8 migration guide](../guides/v07-to-v08-adoption.md).
