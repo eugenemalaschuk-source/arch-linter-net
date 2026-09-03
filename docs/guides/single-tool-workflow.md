@@ -174,16 +174,32 @@ arch-linter-net policy weakening \
   --current-context "$ARTIFACTS/policy-current.json"
 ```
 
-Use the baseline and no-new-debt gate with those same contexts:
+Both `gate` and `health` require an explicit baseline path. If the repository has no reviewed finding debt file, create a workflow-local empty v3 baseline rather than interpreting absence as zero debt:
 
 ```bash
-arch-linter-net baseline verify \
-  --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml
+if [[ -f architecture/baseline.arch.yml ]]; then
+  CURRENT_BASELINE="$(pwd)/architecture/baseline.arch.yml"
+  arch-linter-net baseline verify \
+    --policy architecture/arch.yml \
+    --baseline "$CURRENT_BASELINE"
+else
+  CURRENT_BASELINE="$ARTIFACTS/empty-baseline.arch.yml"
+  cat > "$CURRENT_BASELINE" <<'YAML'
+version: 3
+baseline: {}
+metric_baselines: []
+YAML
+fi
+```
 
+The ephemeral empty file is explicit zero-debt authority for this invocation; it is not silently written into repository state.
+
+Run the no-new-debt and weakening gate with that authority:
+
+```bash
 arch-linter-net gate \
   --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml \
+  --baseline "$CURRENT_BASELINE" \
   --base-context "$ARTIFACTS/policy-base.json" \
   --current-context "$ARTIFACTS/policy-current.json" \
   --mode all \
@@ -286,14 +302,9 @@ Change evidence stays distinct from current-state Health. Resolved findings are 
 Pass the policy contexts used by the gate so Health can project policy weakening. When the policy declares required external evidence, bind that evidence to Health as well; a previous validation process does not transfer its in-memory evidence to a new CLI process.
 
 ```bash
-health_baseline_args=()
-if [[ -f architecture/baseline.arch.yml ]]; then
-  health_baseline_args=(--baseline architecture/baseline.arch.yml)
-fi
-
 dotnet arch-linter-net health \
   --policy architecture/arch.yml \
-  "${health_baseline_args[@]}" \
+  --baseline "$CURRENT_BASELINE" \
   --base-context "$ARTIFACTS/policy-base.json" \
   --current-context "$ARTIFACTS/policy-current.json" \
   --mode strict \
