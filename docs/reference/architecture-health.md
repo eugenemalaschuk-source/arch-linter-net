@@ -16,6 +16,16 @@ arch-linter-net health \
   --format json
 ```
 
+`--baseline` is required because reviewed finding debt is one of the canonical Health authorities. If a repository has no reviewed baseline file, supply an explicit workflow-local empty v3 baseline instead of treating missing input as zero debt:
+
+```yaml
+version: 3
+baseline: {}
+metric_baselines: []
+```
+
+That empty file is explicit zero-debt evidence for the invocation; `health` does not create it or mutate repository state. The [complete workflow](../guides/single-tool-workflow.md) shows a Bash setup that selects the reviewed repository baseline when present and otherwise writes this empty artifact outside the policy tree.
+
 `--base-context` and `--current-context` are optional as a pair. Supply both when Health must include policy-weakening evidence. When the policy declares required external evidence, also pass the same `--external-evidence` and `--evidence-*` bindings used for current validation; evidence held by another CLI process is not reused automatically.
 
 ## Gate and Health are different
