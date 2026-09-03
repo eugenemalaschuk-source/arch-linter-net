@@ -36,20 +36,33 @@ A version-2 policy can explicitly use `analysis.waiver_lifecycle_profile: compat
 
 Your existing migration baseline remains the reviewed ledger of known normalized findings. Structured waiver debt is separate and should not be folded into the baseline just to preserve one generic debt count.
 
-Run the read-only baseline checks after the CLI upgrade:
+Both `gate` and `health` require an explicit baseline. If the repository has no reviewed baseline file, create an explicit workflow-local empty v3 baseline instead of interpreting an absent input as zero debt:
 
 ```bash
-dotnet arch-linter-net baseline verify \
-  --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml
+ARTIFACTS="$(pwd)/artifacts"
+mkdir -p "$ARTIFACTS"
+
+if [[ -f architecture/baseline.arch.yml ]]; then
+  CURRENT_BASELINE="$(pwd)/architecture/baseline.arch.yml"
+  dotnet arch-linter-net baseline verify \
+    --policy architecture/arch.yml \
+    --baseline "$CURRENT_BASELINE"
+else
+  CURRENT_BASELINE="$ARTIFACTS/empty-baseline.arch.yml"
+  cat > "$CURRENT_BASELINE" <<'YAML'
+version: 3
+baseline: {}
+metric_baselines: []
+YAML
+fi
 
 dotnet arch-linter-net gate \
   --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml \
+  --baseline "$CURRENT_BASELINE" \
   --mode all
 ```
 
-If identity changes require a baseline migration, use the explicit baseline lifecycle commands and review the resulting diff. CI must not regenerate accepted debt automatically.
+The empty file is explicit zero-debt authority for the invocation, not a hidden mutation of repository policy. If identity changes require migration of a real baseline, use the explicit baseline lifecycle commands and review the resulting diff. CI must not regenerate accepted debt automatically.
 
 ## 4. Add topology in partial mode first
 
@@ -129,12 +142,10 @@ A successful current-context zero-result artifact is valid evidence. A missing, 
 
 ## 8. Add policy weakening and architecture change evidence
 
-Start in the candidate checkout, create one absolute artifact directory, and point `BASE_WORKTREE` at a reviewed base worktree. Run both states with the exact same CLI executable.
+Start in the candidate checkout, keep the absolute `ARTIFACTS` directory created above, and point `BASE_WORKTREE` at a reviewed base worktree. Run both states with the exact same CLI executable.
 
 ```bash
-ARTIFACTS="$(pwd)/artifacts"
 BASE_WORKTREE="../architecture-base"
-mkdir -p "$ARTIFACTS"
 
 (
   cd "$BASE_WORKTREE"
@@ -184,7 +195,7 @@ arch-linter-net change report \
   --output "$ARTIFACTS/architecture-change.json"
 ```
 
-Base and candidate baselines are selected independently. This is where a new/broadened waiver, relaxed exclusion, removed control, new finding debt, or resolved finding becomes explicit change evidence instead of being hidden inside a current-state pass/fail result.
+Base and candidate snapshot baselines are selected independently because snapshots describe their own repository revisions. This is where a new/broadened waiver, relaxed exclusion, removed control, new finding debt, or resolved finding becomes explicit change evidence instead of being hidden inside a current-state pass/fail result.
 
 ## 9. Adopt Architecture Health
 
@@ -193,7 +204,7 @@ Once current validation, baseline, waiver, topology, metrics, and required exter
 ```bash
 dotnet arch-linter-net health \
   --policy architecture/arch.yml \
-  "${baseline_args[@]}" \
+  --baseline "$CURRENT_BASELINE" \
   --base-context "$ARTIFACTS/policy-base.json" \
   --current-context "$ARTIFACTS/policy-current.json" \
   --mode strict \
@@ -213,6 +224,8 @@ Omit the external-evidence options only when the policy declares no such require
 - degrading: regression/change evidence exists, with the owning authority still deciding whether the independent gate blocks;
 - fail + failing: a blocking current requirement fails;
 - unassessable: required evidence cannot be trusted as complete/current.
+
+A failing or unassessable gate exits `1` or `2` while still being able to produce a valid `architecture-health/v1` document. Preserve and schema-check that document for reporting before a separate required gate blocks the pull request; do not convert the architecture decision into success.
 
 See [Architecture Health](../reference/architecture-health.md).
 
