@@ -104,7 +104,9 @@ Existing dependency rules do not need to be replaced. Add `contract_surface_expo
 
 When you already use `public_api_surface`, reuse that reviewed membership as the source. Do not replace a type's existing semantic role with an API-only role just to make exposure rules work.
 
-Start in audit if you expect existing leakage, then promote the contract to strict after reviewing or fixing the findings. Runtime serialization, endpoint routing and arbitrary semantic data flow remain outside this static contract.
+Use `versioned_contract_surface_isolation` when locally selected v1/v2 or runtime/implementation surfaces must stay isolated. It reuses the same recursive visible-signature evidence and does not create a second API snapshot or runtime versioning model.
+
+Start in audit if you expect existing leakage, then promote the contract to strict after reviewing or fixing the findings. Runtime serialization, endpoint routing and arbitrary semantic data flow remain outside this static contract. See [Contract-surface exposure](../contracts/contract-surface-exposure.md) and [Versioned contract-surface isolation](../contracts/versioned-contract-surface-isolation.md).
 
 ## 6. Measure before introducing budgets
 
@@ -140,13 +142,34 @@ dotnet arch-linter-net \
 
 A successful current-context zero-result artifact is valid evidence. A missing, failed, malformed, stale, wrong-revision, or wrong-scope required artifact is unassessable. Do not carry forward a script that treats filename, modification time, job name, or mere file presence as freshness proof.
 
+The canonical trust receipt retains the exact consumed-byte SHA-256 together with logical evidence, tool/run, normalized local path and validated repository/revision/scope provenance. Later Health/report consumers do not infer freshness independently.
+
 ## 8. Add policy weakening and architecture change evidence
 
-Start in the candidate checkout, keep the absolute `ARTIFACTS` directory created above, and point `BASE_WORKTREE` at a reviewed base worktree. Run both states with the exact same CLI executable.
+Start in the candidate checkout, keep the absolute `ARTIFACTS` directory created above, and point `BASE_WORKTREE` at a reviewed base worktree. Stage the exact local-manifest version into one workflow-owned tool path so entering the base worktree cannot select an older manifest:
 
 ```bash
 BASE_WORKTREE="../architecture-base"
+TOOL_PATH="$ARTIFACTS/tool"
 
+ARCHLINTERNET_VERSION="$({
+  dotnet tool list --local ArchLinterNet.Cli |
+    awk 'tolower($1) == "archlinternet.cli" { print $2 }'
+})"
+test -n "$ARCHLINTERNET_VERSION"
+
+dotnet tool install ArchLinterNet.Cli \
+  --tool-path "$TOOL_PATH" \
+  --version "$ARCHLINTERNET_VERSION"
+export PATH="$TOOL_PATH:$PATH"
+arch-linter-net --version
+```
+
+The install uses the repository's configured NuGet sources and credentials. It exposes the already reviewed manifest version through one absolute executable path; it does not choose a new version.
+
+Produce base/current policy and architecture evidence with that one executable:
+
+```bash
 (
   cd "$BASE_WORKTREE"
 
@@ -202,7 +225,7 @@ Base and candidate snapshot baselines are selected independently because snapsho
 Once current validation, baseline, waiver, topology, metrics, and required external evidence are trustworthy, project Health from the same authority inputs. Include base/current policy contexts so weakening is represented, and repeat every required external-evidence binding because a new CLI process does not inherit evidence from an earlier validation command.
 
 ```bash
-dotnet arch-linter-net health \
+arch-linter-net health \
   --policy architecture/arch.yml \
   --baseline "$CURRENT_BASELINE" \
   --base-context "$ARTIFACTS/policy-base.json" \
@@ -236,16 +259,19 @@ If the existing CI uses Python, JavaScript, shell or PowerShell to count rules, 
 Use the JSON change artifact created in step 8 together with the Health artifact carrying the same `pr-123` execution context and `strict` selected mode:
 
 ```bash
-dotnet arch-linter-net report pr \
+arch-linter-net report pr \
   --health "$ARTIFACTS/architecture-health.json" \
   --change "$ARTIFACTS/architecture-change.json" \
+  --max-details 20 \
   --output "$ARTIFACTS/architecture-pr-report.md"
 ```
+
+`--max-details` bounds each detailed evidence section while preserving canonical totals and explicit truncation.
 
 Generate the Health badge payload separately:
 
 ```bash
-dotnet arch-linter-net badge architecture-health \
+arch-linter-net badge architecture-health \
   --input "$ARTIFACTS/architecture-health.json" \
   --output "$ARTIFACTS/architecture-health-badge.json"
 ```
