@@ -20,6 +20,7 @@ nav:
       - Overview: getting-started/index.md
       - Installation: installation/index.md
       - First policy: getting-started/first-policy.md
+      - Complete governance cycle: guides/single-tool-workflow.md
       - Run in CI: guides/ci-integration.md
   - Usage:
       - CLI: cli/index.md
@@ -39,6 +40,7 @@ nav:
       - Project metadata: policy-format/project-metadata.md
       - Condition sets: policy-format/condition-sets.md
       - Ignored violations and baselines: guides/migration-baselines.md
+      - Structured waivers: policy-format/structured-waivers.md
       - Semantic classification: policy-format/semantic-classification.md
       - Semantic role catalog: policy-format/semantic-role-catalog.md
       - Supported capabilities and non-goals: policy-format/supported-capabilities.md
@@ -78,6 +80,7 @@ nav:
   - Guides:
       - Adopt in an existing repository: guides/adoption.md
       - Real-repository workflow: guides/real-repository-workflow.md
+      - Extended governance adoption: guides/extended-governance-adoption.md
       - Topology review workflow: guides/topology-review-workflow.md
       - Adopt or upgrade: guides/upgrading.md
       - Reference entrypoints: guides/reference-entrypoints.md
@@ -95,6 +98,7 @@ nav:
       - Policy review checklist: ai/policy-review-checklist.md
   - Reference:
       - YAML schema: reference/yaml-schema.md
+      - Architecture Health: reference/architecture-health.md
       - NuGet package metadata: reference/nuget-metadata.md
       - Release process: reference/release-process.md
 

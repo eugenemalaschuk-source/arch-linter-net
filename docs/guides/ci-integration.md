@@ -10,20 +10,26 @@ intentionally advisory, retain separate strict-blocking and non-blocking-audit
 steps instead; those independent CLI processes do not reuse one another's
 prepared state.
 
+The [complete single-tool workflow](single-tool-workflow.md) shows how policy contexts, base/current
+change snapshots, an explicit baseline, required external evidence, Architecture Health, PR
+Markdown, and the Health badge compose. This page focuses on CI responsibility and transport.
+
 The provider-neutral 0.5.1 contract, offline schema commands, sequential mode,
 and safe POSIX/PowerShell/Make/Task/Tilt templates are in [0.5.1 reference
 entrypoints](reference-entrypoints.md). GitHub Actions below is one example
 provider, not a product dependency.
 
-## Recommended GitHub Actions workflow
+## Recommended pull-request workflow
+
+Make complete architecture validation authoritative before merge. Do not add an ordinary
+`push: main` trigger to this same full matrix merely to replay an already-required candidate after
+merge.
 
 ```yaml
 name: Architecture validation
 
 on:
   pull_request:
-  push:
-    branches: [main]
 
 jobs:
   architecture:
@@ -60,24 +66,30 @@ jobs:
 
 Use `dotnet tool restore` with a local tool manifest when the repository should pin the ArchLinterNet version. Use `dotnet tool install --global ArchLinterNet.Cli` only when global installation is acceptable for your pipeline.
 
-The example above is provider-neutral guidance, not a requirement to rerun the
-same validation twice. ArchLinterNet's own repository uses a stricter protected
-PR gate and does **not** repeat its full lint/architecture/cross-platform matrix
-after merge. Its `main` push is reserved for fresh coverage/Sonar/Codecov
-telemetry plus an independent installable `main.N` package build.
+A project may deliberately choose additional default-branch validation, but it is not required by
+ArchLinterNet semantics. ArchLinterNet's own repository keeps the complete lint, architecture,
+cross-platform, package, E2E, and packed-artifact matrix PR-authoritative. Its ordinary `main`
+workflows are focused: three Linux coverage shards produce one current-SHA canonical receipt for
+independent SonarCloud/Codecov refresh, while a separate lane publishes installable `main.N`
+development packages. Neither lane becomes a second architecture-governance implementation.
 
 ## Exit code behavior
 
 | Code | Meaning | CI action |
-|------|---------|-----------|
-| `0` | No selected contract violations | Pass |
-| `1` | Validation completed and violations were found | Fail strict jobs; expected when manually inspecting failing audit rules |
-| `2` | Invalid arguments, invalid configuration, missing files, or other runtime error | Fail closed |
+| --- | --- | --- |
+| `0` | The command completed and its requested validation/comparison gate passed. | Pass |
+| `1` | The command completed, but its requested validation/comparison gate failed. | Fail required jobs; expected only for deliberately non-blocking inspection. |
+| `2` | The command could not complete normally, or `health` produced a valid `gate: unassessable` result. | Fail closed; inspect structured output. |
 
 For a combined `strict,audit` command, code `1` is the aggregate result: either
 requested mode failing makes the command fail. The JSON and SARIF files above
 contain the completed result for each mode; report routing renders those
 outcomes and does not run analysis again.
+
+A failing or unassessable `health` invocation can still write a valid
+`architecture-health/v1` document while exiting `1` or `2`. A report-producing job may retain and
+schema-check that document so reviewers see the real state, but a separate required gate must still
+block the pull request. Do not globally coerce a Health exit to success.
 
 See [Exit codes](../usage/exit-codes.md) for details.
 
@@ -126,7 +138,9 @@ applicable.
 
 ## Strict vs audit jobs
 
-Strict validation is the no-new-debt gate. It should fail a pull request when an enforced architecture boundary is violated.
+Strict validation is the blocking current-architecture mode. The separate `gate` command adds
+reviewed baseline comparison and policy-weakening guardrails when CI needs an explicit no-new-debt
+decision.
 
 Audit validation is visibility for migration work. It can be uploaded as an artifact, posted to a dashboard, or inspected periodically, but it should not accidentally become the strict gate unless the team intentionally promotes the audit rule.
 
@@ -190,11 +204,15 @@ and `--mode all` merely collects complete candidates from both existing modes.
 ```
 
 The base context must be exported from the base policy state, not reloaded from
-the current checkout. The gate returns `1` for a new, resolved, stale,
-configuration-error, or ambiguous persistent-debt comparison and for an
-`error` policy-weakening finding. `warn` and `impact_not_proven` weakening
-records remain visible without becoming baseline debt. It returns `2` for
-missing/incomplete inputs or blocked complete analysis; CI must fail closed.
+the current checkout. Both context artifacts must be produced with the same reviewed CLI version.
+The gate returns `1` for a new, resolved, stale, ambiguous, or configuration-error persistent-debt
+comparison and for an `error` policy-weakening finding. `warn` and
+`impact_not_proven` weakening records remain visible without becoming baseline debt. It returns `2`
+for missing/incomplete inputs or blocked complete analysis; CI must fail closed.
+
+`gate` requires an explicit baseline path. A repository with no reviewed baseline can supply a
+workflow-local empty v3 baseline (`version: 3`, `baseline: {}`, `metric_baselines: []`) as explicit
+zero-debt authority. The command never creates that file or mutates repository policy.
 
 `gate` never writes a baseline. Use `baseline diff`, `update`, or `prune` in a
 separate reviewed maintenance change.
@@ -271,13 +289,15 @@ post-merge telemetry:
 
 - **Main quality** is the GitHub Actions badge for `main-quality.yml` on the
   merged `main` branch. It means the current merged revision completed the
-  Linux coverage telemetry pipeline and successfully refreshed the external
-  quality services.
+  current-SHA coverage receipt plus SonarCloud/Codecov delivery and verification. A processed red
+  Sonar quality gate remains a warning/branch badge signal rather than making the telemetry
+  transport itself incomplete.
 - **Test coverage** is the Codecov badge explicitly scoped to `branch=main`.
   It is refreshed by the same post-merge coverage reports.
 - **Sonar Quality Gate / Maintainability / Reliability / Security** are direct
   SonarCloud project badges for `branch=main`; the main telemetry workflow sends
-  OpenCover/TRX plus Python coverage before ending the scanner.
+  OpenCover/TRX plus Python coverage before ending the scanner. The direct Quality Gate badge can
+  be red while the Main quality workflow is green because the analysis was delivered and verified.
 - **Architecture Health** is a canonical ArchLinterNet badge, not a workflow
   status. It contains Health, explicit ignore debt, and effective policy
   controls from required PR evidence only after exact merged-tree proof. Its
@@ -335,10 +355,11 @@ semantics:
 - PR coverage execution remains required; the existing PR Codecov upload is
   best-effort so a transient Codecov outage does not make an otherwise valid PR
   flaky.
-- The post-merge `Main Quality Telemetry` upload is fail-closed for Codecov and
-  SonarCloud. If either external refresh cannot complete, the `Main quality`
-  workflow badge is red instead of falsely implying that the external badges
-  were updated for the merged revision.
+- Post-merge `Main Quality Telemetry` is fail-closed for incomplete delivery: a missing token,
+  failed coverage shard or canonical inventory, scanner/upload/processing failure, unrecognized
+  Sonar result, wrong revision, missing coverage import, or failed Codecov upload makes the workflow
+  red. An explicitly processed Sonar quality-gate failure is instead surfaced as warning plus the
+  direct Sonar branch badge/dashboard state.
 
 ## SonarCloud analysis
 
@@ -362,10 +383,12 @@ packed-artifact acceptance. It runs the Linux coverage shards needed to produce
 fresh coverage evidence, performs the Sonar build inside the scanner context,
 imports .NET/Python coverage, and ends the scanner on the merged `main` commit.
 
-The main scan is fail-closed in that workflow: a missing token, failed coverage
-shard, failed Codecov upload, scanner failure, or failed Sonar quality gate makes
-the `Main quality` workflow red. That failure is telemetry about an already
-merged revision; it does not retroactively weaken or bypass the PR merge gate.
+The main workflow fails closed when telemetry delivery cannot be trusted: missing configuration,
+coverage/inventory failure, scanner/upload/processing failure, unknown status, wrong analysis
+revision, or missing coverage import keeps `Main quality` red. If Sonar explicitly processes the
+current revision and reports `QUALITY GATE STATUS: FAILED`, the workflow records that as a warning
+and direct Sonar badge/dashboard signal while keeping the successful telemetry refresh green. This
+post-merge result never retroactively weakens or bypasses the PR merge gate.
 
 ### Required GitHub configuration
 
@@ -376,8 +399,8 @@ The repository workflow expects:
 - Optional `SONAR_PROJECT_KEY` repository variable. If unset, the workflow uses the public project key `eugenemalaschuk-source_arch-linter-net`.
 - Optional `SONAR_ORGANIZATION` repository variable. If unset, the workflow uses the public organization key `eugenemalaschuk-source`.
 
-These are the existing quality-service credentials; #707 does not introduce a
-new repository secret for main package publication.
+These are the existing quality-service credentials; the main package lane does not introduce a
+shared repository PAT for publication.
 
 If a trusted same-repository PR or `main` telemetry run is missing required
 SonarCloud configuration, the relevant workflow fails with an explicit
@@ -400,9 +423,10 @@ After the first successful decorated pull request run, configure GitHub branch p
 After merging a CI topology change:
 
 - confirm `Main Quality Telemetry` ran for the merged `main` SHA;
-- confirm its three Linux coverage shards completed and the aggregate job is green;
+- confirm its three Linux coverage shards and canonical inventory completed;
 - confirm the Codecov repository page and README coverage badge show `main` data from the merged revision;
-- confirm the SonarCloud `main` page and project badges refresh for the merged revision;
+- confirm the SonarCloud `main` page and direct project badges refresh for the merged revision;
+- confirm an explicit processed red Sonar Quality Gate is visible as warning/direct badge state without being confused with delivery failure;
 - confirm the ordinary `CI` workflow, CodeQL push job, Windows/macOS matrices,
   architecture coverage and packed-artifact acceptance did not rerun merely
   because of the merge.

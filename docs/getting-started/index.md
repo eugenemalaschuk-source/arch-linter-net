@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide follows the normal adoption path from an existing .NET repository to a blocking architecture gate.
+This guide follows the normal adoption path from an existing .NET repository to a blocking architecture gate. It covers the minimal path; the [complete single-tool workflow](../guides/single-tool-workflow.md) continues through topology, structured waivers, metrics, external evidence, Architecture Health, PR Markdown, and the Health badge.
 
 ## 1. Install the CLI
 
@@ -24,8 +24,10 @@ A global install is also supported for interactive use. See [Installation](../in
 
 `architecture/arch.yml` is the recommended concise convention in these guides. The filename itself has no runtime semantics. The CLI's compatibility default remains `architecture/dependencies.arch.yml`, so pass `--policy` when using another path.
 
+New v0.8 policies should prefer `version: 2`, which defaults manual waivers to strict lifecycle governance. Existing `version: 1` policies remain supported with compatibility waiver defaults.
+
 ```yaml
-version: 1
+version: 2
 name: My Architecture Contract
 
 layers:
@@ -54,7 +56,7 @@ contracts:
       reason: Dependencies point inward.
 ```
 
-A policy may instead declare explicit projects or target assemblies. See [Policy format](../policy-format/index.md).
+A policy may instead declare explicit projects or target assemblies. See [Policy format](../policy-format/index.md) and [Structured waivers](../policy-format/structured-waivers.md).
 
 ## 3. Check the policy before analyzing code
 
@@ -83,7 +85,7 @@ dotnet arch-linter-net \
   --ensure-built
 ```
 
-`--ensure-built` builds the selected project graph once, records/verifies the build receipt, and then validates. It is never implicit. Use `--no-restore` when CI must fail closed instead of restoring.
+`--ensure-built` builds the selected project graph once, records and verifies the build receipt, and then validates. It is never implicit. Use `--no-restore` when CI must fail closed instead of restoring.
 
 ## 5. Make strict validation the CI gate
 
@@ -123,6 +125,8 @@ dotnet arch-linter-net \
 
 Review baseline entries like code. Use `baseline update`, `prune`, `diff`, `verify`, and `migrate` for its lifecycle. See [Migration baselines](../guides/migration-baselines.md).
 
+A baseline records reviewed finding debt. A manual policy exception is separate [structured waiver](../policy-format/structured-waivers.md) debt; do not weaken the target architecture merely to make the current repository green.
+
 ## 7. Add architecture coverage
 
 A dependency rule can pass while new architecture falls outside every rule. Coverage contracts detect that drift.
@@ -151,16 +155,19 @@ contracts:
 
 See [Coverage contracts](../contracts/coverage.md).
 
-## 8. Add advanced governance only where needed
+## 8. Continue through the complete governance cycle
 
-Common next steps are:
+The minimal strict gate is only the starting point. The complete v0.8 product path adds, where the repository needs them:
 
-- [project/package/framework governance](../contracts/package-dependencies.md);
-- [public API surface governance](../contracts/public-api-surface.md);
-- [semantic classification](../policy-format/semantic-classification.md), contextual rules, and [port boundaries](../contracts/port-boundary.md);
-- reusable `source_sets` for repeated project/assembly/layer selectors;
-- `policy context` + `policy weakening` for policy-change review;
-- `change snapshot` + `change report` and `gate` for CI change governance;
-- `graph`, `explain`, and `history analyze` for investigation.
+- native declared topology with capture/diff/verify;
+- recursive contract-surface and version-isolation governance;
+- structured waiver lifecycle and effective policy inventory;
+- policy weakening and base/current architecture change evidence;
+- measure-first metrics and absolute or baseline-relative budgets;
+- current repository/revision/scope binding for repository-local SARIF;
+- canonical Architecture Health;
+- CLI-rendered PR Markdown and the real Health badge.
+
+Follow the [complete single-tool workflow](../guides/single-tool-workflow.md). Existing v1 adopters should use the evergreen [extended-governance adoption guide](../guides/extended-governance-adoption.md), which includes the v0.7 to v0.8 transition.
 
 For a worked adoption against a real repository, continue with [Real-repository workflow](../guides/real-repository-workflow.md).
