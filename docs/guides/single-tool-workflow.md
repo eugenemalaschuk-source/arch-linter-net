@@ -1,6 +1,6 @@
 # Single-tool architecture governance workflow
 
-ArchLinterNet v0.8 is designed around one product boundary: one packed `arch-linter-net` CLI owns the static architecture-governance semantics, while CI only invokes the CLI and transports the canonical artifacts it produces.
+ArchLinterNet v0.8 has one product boundary: one packed `arch-linter-net` CLI owns static architecture-governance semantics, while CI invokes the CLI and transports the canonical artifacts it produces.
 
 ```text
 install/pin
@@ -16,11 +16,11 @@ install/pin
   -> PR Markdown / JSON / SARIF / Health badge
 ```
 
-This guide is the primary end-to-end path. The linked reference pages remain authoritative for field-level details.
+This is the primary end-to-end user path. The linked reference pages remain authoritative for individual fields and contract families.
 
 ## 1. Pin the CLI
 
-Prefer a repository-local .NET tool so local development and CI use the same package version:
+Prefer a repository-local tool so development and CI use the same package version:
 
 ```bash
 dotnet new tool-manifest
@@ -29,11 +29,9 @@ dotnet tool restore
 dotnet arch-linter-net --version
 ```
 
-For internal dogfooding, `0.8.0-main.N` packages are installable development builds from GitHub Packages. They are not release candidates, stable releases, or public-release authority. The public release workflow builds and proves its own immutable candidate before NuGet.org publication.
+`0.8.0-main.N` packages are development/dogfood builds from GitHub Packages. They are not RCs, stable releases, or public-release authority. `release-nuget.yml` builds and proves a fresh immutable public candidate before NuGet.org publication.
 
 ## 2. Declare and statically check the policy
-
-Create a repository-owned root policy and validate its static shape before loading assemblies:
 
 ```bash
 dotnet arch-linter-net policy check \
@@ -41,21 +39,19 @@ dotnet arch-linter-net policy check \
   --format json
 ```
 
-`policy check` validates schema, imports, identifiers and static configuration. Fact-dependent checks may be deferred; exit `0` therefore means the policy is statically valid, not that the repository architecture is clean.
+`policy check` validates schema, imports, identifiers and static configuration without claiming the analyzed architecture is clean. Fact-dependent checks can remain deferred.
 
-Use policy `version: 1` to retain compatibility waiver defaults. Policy `version: 2` opts into strict structured-waiver defaults. See [Structured waivers](../policy-format/structured-waivers.md).
+Policy `version: 1` retains compatibility waiver defaults. Policy `version: 2` defaults to strict structured-waiver lifecycle governance. See [Structured waivers](../policy-format/structured-waivers.md).
 
 ## 3. Prepare build evidence and validate
 
-Normal validation does not silently rebuild. Either prepare outputs yourself:
+Normal validation does not silently build. Either prepare outputs yourself or opt into CLI-owned preparation:
 
 ```bash
 dotnet restore
 dotnet build Example.Product.slnx --no-restore
 dotnet arch-linter-net --policy architecture/arch.yml --mode strict
 ```
-
-or explicitly let the CLI prepare and verify build state:
 
 ```bash
 dotnet arch-linter-net \
@@ -66,46 +62,53 @@ dotnet arch-linter-net \
   --report sarif=artifacts/architecture-results.sarif
 ```
 
-The combined strict/audit invocation uses one immutable analysis snapshot. Adding report sinks renders completed outcomes; it does not rerun architecture analysis.
+The combined strict/audit invocation uses one immutable analysis snapshot. Report sinks render completed outcomes; they do not rerun analysis.
 
-## 4. Read applicability and completeness before trusting zero findings
+## 4. Prove applicability and completeness
 
-ArchLinterNet separates conformance from evaluability. A policy can have zero ordinary violations and still be unassessable because required inputs were missing, empty, ambiguous, stale or outside the declared governed universe.
+Zero ordinary findings are not enough when required analysis inputs are missing, empty, ambiguous, stale or outside the governed universe. Architecture coverage contracts make omissions observable across namespaces, projects, assemblies, dependency edges, rule inputs and semantic roles.
 
-Use architecture coverage contracts for namespaces, projects, assemblies, dependency edges, rule inputs and semantic roles. Coverage makes policy omissions observable; it is not a quality percentage.
-
-A trustworthy clean result requires both the relevant contracts to pass and the required applicability/completeness evidence to be evaluable. Never interpret an absent applicability record, missing policy inventory, empty topology universe or missing required SARIF artifact as a clean zero.
+A required missing applicability record, empty exhaustive topology universe, incomplete recursive exposure universe, incomplete metric scope, or missing required SARIF artifact must remain unassessable rather than becoming a clean zero. Coverage and mapping ratios are transparency evidence, not quality percentages.
 
 ## 5. Review declared topology
 
-Declare `topology` when the repository needs an explicit semantic component map. Start with `partial` during migration and move to `exhaustive` when every required first-party subject must be mapped or deliberately reviewed out of scope.
-
-Use the native review workflow:
+Start with observation, then hand-author the architecture decision. Capture requires an explicit subject kind:
 
 ```bash
 dotnet arch-linter-net topology capture \
   --policy architecture/arch.yml \
-  --output artifacts/topology-current.json \
-  --ensure-built
+  --subject-kind assembly \
+  --ensure-built \
+  --format json \
+  --output artifacts/topology-capture.json
+```
 
+After reviewing the observations and adding `topology` to the policy, use native diff and verify:
+
+```bash
 dotnet arch-linter-net topology diff \
-  --declared architecture/arch.yml \
-  --observed artifacts/topology-current.json
+  --policy architecture/arch.yml \
+  --mode strict \
+  --ensure-built \
+  --format json \
+  --output artifacts/topology-diff.json
 
 dotnet arch-linter-net topology verify \
   --policy architecture/arch.yml \
-  --ensure-built
+  --mode strict \
+  --ensure-built \
+  --format json
 ```
 
-Keep mapped, unmapped, ambiguous, reviewed-out-of-scope and stale evidence distinct. In exhaustive mode, a new required first-party subject that cannot be mapped exactly is incomplete governance evidence, not an implicit new component and not a clean result. Mapping ratios are completeness transparency only; ArchLinterNet does not turn them into a repository quality score.
+Use `partial` while the declared map is being adopted. Move to `exhaustive` only when every required first-party subject is expected to map exactly or be explicitly reviewed out of scope. Keep mapped, unmapped, ambiguous, reviewed-out-of-scope and stale evidence distinct.
 
 See [Topology review workflow](topology-review-workflow.md) and [Declared topology](../policy-format/declared-topology.md).
 
 ## 6. Govern visible contract surfaces
 
-Dependency rules answer whether code references another boundary. Contract-surface exposure rules answer whether selected exported types expose forbidden types through their visible CLR signatures.
+Dependency rules answer whether code references another boundary. Contract-surface exposure rules answer whether selected exported types expose forbidden types through visible CLR signatures.
 
-Compose reviewed public API membership with recursive exposure checks rather than replacing semantic roles with an `api` role:
+A reviewed public API surface can be reused without replacing primary semantic roles:
 
 ```yaml
 contracts:
@@ -128,15 +131,15 @@ contracts:
       reason: Published signatures must not expose persistence models.
 ```
 
-Recursive exposure follows visible nested generic, tuple, array and wrapper positions and reports deterministic exposure paths. It is static metadata/signature governance; it does not claim runtime serialization, routing, DI or arbitrary semantic data-flow correctness.
+Recursive exposure follows visible nested generic, tuple, array and wrapper positions and reports deterministic exposure paths. It is static metadata/signature governance; runtime serialization, routing, DI and arbitrary semantic data flow are outside this contract.
 
 See [Contract-surface exposure](../contracts/contract-surface-exposure.md).
 
-## 7. Keep finding debt and waiver debt separate
+## 7. Keep debt categories separate
 
-A migration baseline records reviewed existing findings. A structured waiver is a manually authored exception with its own lifecycle and exact target identity. Intended scope exclusions are neither of those.
+A migration baseline records reviewed existing findings. A structured waiver is a policy-authored exception with its own exact target identity and lifecycle. Intended topology/coverage exclusions are policy scope, not waiver debt.
 
-For persistent finding debt, use the baseline lifecycle and the read-only CI gate:
+Use the baseline and no-new-debt workflow:
 
 ```bash
 dotnet arch-linter-net baseline verify \
@@ -149,7 +152,7 @@ dotnet arch-linter-net gate \
   --mode all
 ```
 
-For policy edits, export base/current policy contexts and review weakening:
+Review policy relaxation separately:
 
 ```bash
 dotnet arch-linter-net policy context \
@@ -161,13 +164,11 @@ dotnet arch-linter-net policy weakening \
   --current-context current-policy.json
 ```
 
-The canonical policy inventory counts effective controls once and projects explicit waiver lifecycle debt without inflating counts because a source set or runtime selector fans one authored control out over multiple subjects.
+The canonical policy inventory counts effective authored controls once and projects explicit waiver debt without source-set/runtime fan-out inflating the rule count.
 
 See [Migration baselines](migration-baselines.md) and [Structured waivers](../policy-format/structured-waivers.md).
 
 ## 8. Measure first, then set budgets
-
-Declare architecture metrics, inspect their current value and contributors, and only then choose a reviewed budget:
 
 ```bash
 dotnet arch-linter-net measure \
@@ -175,15 +176,13 @@ dotnet arch-linter-net measure \
   --format json
 ```
 
-Absolute budgets constrain current values. Baseline-relative budgets support no-worse-than-baseline and bounded-delta ratchets, optionally combined with an absolute hard cap. Missing, ambiguous or incomplete metric scope is unassessable; ArchLinterNet does not substitute an artificial low value.
-
-Metric baselines are scalar measurement evidence and remain separate from finding baselines and waiver debt. ArchLinterNet exposes no arbitrary metric formulas or universal repository score.
+Inspect the value, effective scope and contributors before authoring a budget. Delivered budgets support absolute bounds and baseline-relative no-worse-than/delta ratchets with an optional hard cap. Incomplete measurement scope is unassessable, not an artificial low value. Metric baselines remain distinct from finding baselines and waiver debt.
 
 See [Architecture metrics](../policy-format/architecture-metrics.md).
 
 ## 9. Bind required external SARIF evidence
 
-ArchLinterNet can consume a repository-local SARIF artifact through a policy-declared `external_evidence` requirement. The external analyzer still executes separately; ArchLinterNet owns trust validation, filtering, normalization and applicability after the file exists.
+The analyzer executes outside ArchLinterNet and writes a repository-local SARIF file. ArchLinterNet then owns bounded trust, filtering, normalization and applicability:
 
 ```bash
 dotnet arch-linter-net \
@@ -194,13 +193,11 @@ dotnet arch-linter-net \
   --evidence-scope "ci"
 ```
 
-The logical evidence ID, expected tool/run and required repository/revision/scope bindings come from the policy and invocation. A valid successful zero-result SARIF artifact is evaluable evidence. Missing, malformed, failed, wrong-revision, wrong-scope or otherwise untrusted required evidence is unassessable. Filename, modification time, artifact order and CI job name are never freshness proof.
+A successful current-context zero-result artifact is valid evidence. Missing, malformed, failed, wrong-revision, wrong-scope or otherwise untrusted required evidence is unassessable. Filename, mtime, artifact order and CI job name are never freshness proof.
 
 See [External evidence](../policy-format/external-evidence.md).
 
-## 10. Capture and compare architecture change
-
-Use canonical snapshots when reviewers need a bounded base/current architecture delta:
+## 10. Inspect architecture change
 
 ```bash
 dotnet arch-linter-net change snapshot \
@@ -213,11 +210,9 @@ dotnet arch-linter-net change report \
   --execution-context pr-123
 ```
 
-Change evidence is distinct from current-state Health. A resolved finding is improvement evidence; a new finding, broadened waiver or policy weakening must not be hidden by unrelated healthy dimensions.
+Change evidence stays distinct from current-state Health. Resolved findings are improvement evidence; new findings, broadened/new waivers and policy weakening must not disappear behind unrelated healthy dimensions.
 
-## 11. Produce canonical Architecture Health
-
-Project the non-compensating Health model from the current assessment:
+## 11. Produce Architecture Health
 
 ```bash
 dotnet arch-linter-net health \
@@ -230,13 +225,18 @@ dotnet arch-linter-net health \
   > artifacts/architecture-health.json
 ```
 
-Read `gate` and `health` separately. `gate` is `pass`, `fail` or `unassessable`; `health` is `healthy`, `debt`, `degrading`, `failing` or `unassessable`. Reviewed existing debt can therefore produce `gate: pass` with `health: debt`. Missing required evidence cannot be compensated by healthy dimensions.
+Read `gate` and `health` separately:
+
+- gate: `pass | fail | unassessable`;
+- health: `healthy | debt | degrading | failing | unassessable`.
+
+Reviewed debt can therefore coexist with `gate: pass` / `health: debt`. Missing required evidence cannot be compensated by healthy dimensions. There is no weighted score, letter grade or universal architecture percentage.
 
 See [Architecture Health](../reference/architecture-health.md).
 
-## 12. Render the reviewer report and Health badge
+## 12. Render reviewer artifacts
 
-The PR Markdown renderer consumes canonical artifacts; it does not run analysis again:
+The PR renderer consumes canonical Health and change artifacts; it does not rerun analysis:
 
 ```bash
 dotnet arch-linter-net report pr \
@@ -245,7 +245,7 @@ dotnet arch-linter-net report pr \
   --output artifacts/architecture-pr-report.md
 ```
 
-Generate the real Architecture Health badge payload from the same canonical Health evidence:
+Generate the real Health badge payload from canonical Health evidence:
 
 ```bash
 dotnet arch-linter-net badge architecture-health \
@@ -253,53 +253,41 @@ dotnet arch-linter-net badge architecture-health \
   --output artifacts/architecture-health-badge.json
 ```
 
-The badge carries Health plus canonical explicit-ignore and effective-rule counts. Missing evidence must remain unknown/unassessable; CI must not fabricate zeroes or retain an older healthy payload as current.
+The badge carries CLI-owned Health, explicit-ignore debt and effective-rule counts. Missing evidence remains unknown/unassessable; CI must not fabricate zeroes or retain an older healthy payload as current.
 
-## 13. CI is transport, not a second governance engine
+## 13. Keep CI as transport
 
 A recommended split is:
 
 ```text
 pull request
   -> complete authoritative ArchLinterNet validation
-  -> canonical JSON/SARIF/change/Health artifacts
+  -> canonical architecture artifacts
   -> CLI-generated PR Markdown and badge payload
   -> required merge gate
 
 main
   -> focused generic quality telemetry where desired
   -> independent development-package publication where desired
-  -> trusted promotion of already-generated PR evidence only after exact merged-tree proof
+  -> trusted promotion of ready PR evidence only after exact merged-tree proof
 ```
 
-A privileged publisher may validate repository/PR/head/run/schema/size/hash metadata and transport inert Markdown or badge JSON. It must not recompute PASS/FAIL/UNASSESSABLE, Health, waiver debt, rule counts, report sections or badge colors/messages.
+A privileged publisher may validate repository/PR/head/run/schema/size/hash transport metadata and move inert Markdown or badge JSON. It must not recompute PASS/FAIL/UNASSESSABLE, Health, waiver debt, effective controls, report sections or badge colors/messages.
 
-ArchLinterNet's own repository follows this split: complete validation is PR-authoritative; ordinary main quality refreshes focused coverage/Sonar/Codecov telemetry; `main.N` packages are independent dogfood builds. Public MkDocs/GitHub Pages deployment remains owned by a real `release-nuget.yml` publication with `publish: true`.
+ArchLinterNet's own repository keeps complete architecture validation PR-authoritative. Ordinary main quality refreshes focused coverage/Sonar/Codecov telemetry; `main.N` packages are independent dogfood builds. Public MkDocs/GitHub Pages deployment remains owned by a real `release-nuget.yml` publication with `publish: true`.
 
-## Interpreting the five Health paths
+## Health paths at a glance
 
 | Gate | Health | Typical meaning |
 | --- | --- | --- |
-| `pass` | `healthy` | Current evidence is assessable, required controls pass, and explicit waiver debt is zero. |
-| `pass` | `debt` | Current gate passes but reviewed finding debt and/or valid explicit waiver debt remains. |
-| `pass` or `fail` depending on the owning gate | `degrading` | New debt, weakening, broadened/new waiver or metric regression shows architectural movement in the wrong direction. |
-| `fail` | `failing` | A current blocking architecture requirement fails, including blocking invalid/expired waiver state where applicable. |
-| `unassessable` | `unassessable` | Required applicability, topology, build, metric, baseline or external evidence is missing, ambiguous, stale or otherwise not trustworthy. |
+| `pass` | `healthy` | Assessable current state, required controls pass, zero explicit waiver debt. |
+| `pass` | `debt` | Reviewed finding debt and/or valid explicit waiver debt remains. |
+| `pass` or `fail` | `degrading` | New debt, weakening, new/broadened waiver or metric regression shows movement in the wrong direction. |
+| `fail` | `failing` | A current blocking architecture requirement fails. |
+| `unassessable` | `unassessable` | Required applicability, topology, build, metric, baseline or external evidence is not trustworthy. |
 
-These states are deterministic and non-compensating. There is no weighted score, letter grade or universal architecture percentage.
+## Moving from v0.7
 
-## v0.7 adoption summary
+Existing v0.7-compatible policies can adopt v0.8 incrementally. Keep `version: 1` while confirming compatibility, migrate legacy ignores to structured waivers before deliberately enabling v2 strict lifecycle defaults, introduce partial topology before exhaustive claims, measure before budgets, bind SARIF only after producer context is reliable, and replace repository-owned report/counting scripts with first-class Health/report/badge projections.
 
-Existing v0.7-compatible policies do not need to adopt every v0.8 capability at once. A safe sequence is:
-
-1. pin and run the new CLI against the unchanged policy;
-1. keep `version: 1` while confirming compatibility behavior;
-1. migrate legacy ignores to structured waivers, then deliberately move to policy `version: 2` for strict lifecycle defaults;
-1. introduce partial topology before claiming exhaustive coverage;
-1. add contract-surface exposure only to reviewed published/protected surfaces;
-1. measure before authoring metric budgets;
-1. bind external SARIF only after producer repository/revision/scope metadata is reliable;
-1. add change, Health, PR Markdown and badge projections;
-1. remove repository-owned scripts that were previously recalculating architecture report/counting semantics.
-
-The full migration checklist is in [Adopt or upgrade](upgrading.md#v07-to-v08-adoption).
+Follow the complete [v0.7 to v0.8 adoption guide](v07-to-v08-adoption.md).
