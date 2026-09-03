@@ -21,7 +21,7 @@ For a first adoption, follow this path:
 1. Project [Architecture Health](reference/architecture-health.md), architecture change, PR Markdown, JSON/SARIF, and the Health badge from canonical CLI artifacts.
 1. Put the same product workflow in CI; keep CI glue limited to invocation, evidence transport, integrity checks, and publication.
 
-The [Getting Started](getting-started/index.md) guide covers the minimal path. The [complete single-tool workflow](guides/single-tool-workflow.md) covers the full v0.8 governance cycle. Existing adopters should use the [real-repository workflow](guides/real-repository-workflow.md), evergreen [adopt-or-upgrade guide](guides/upgrading.md), and focused [v0.7 to v0.8 migration](guides/v07-to-v08-adoption.md).
+The [Getting Started](getting-started/index.md) guide covers the minimal path. The [complete single-tool workflow](guides/single-tool-workflow.md) covers the full v0.8 governance cycle. Existing adopters should use the [real-repository workflow](guides/real-repository-workflow.md), evergreen [adopt-or-upgrade guide](guides/upgrading.md), and [extended-governance adoption guide](guides/extended-governance-adoption.md).
 
 ## Complete governance cycle
 
@@ -141,7 +141,7 @@ For dependency investigation, use `graph`, `explain`, and `history analyze`. For
 - [CI integration](guides/ci-integration.md)
 - [Migration baselines](guides/migration-baselines.md)
 - [Adopt or upgrade](guides/upgrading.md)
-- [v0.7 to v0.8 adoption](guides/v07-to-v08-adoption.md)
+- [Extended governance adoption](guides/extended-governance-adoption.md)
 - [Real-repository workflow](guides/real-repository-workflow.md)
 - [AI policy authoring](ai/index.md)
 
