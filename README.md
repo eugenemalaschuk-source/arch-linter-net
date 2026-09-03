@@ -127,7 +127,7 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [Real-repository workflow](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/real-repository-workflow/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)
 - [Adopt or upgrade ArchLinterNet](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/upgrading/)
-- [v0.7 to v0.8 adoption](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/v07-to-v08-adoption/)
+- [Extended governance adoption](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/extended-governance-adoption/)
 - [Reference entrypoints](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/reference-entrypoints/)
 - [Verify release provenance](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/)
 - [AI policy authoring](https://eugenemalaschuk-source.github.io/arch-linter-net/ai/)
@@ -136,7 +136,7 @@ The public capability references are checked against runtime/schema/CLI inventor
 
 Internal project documentation remains in repository Markdown files such as `docs/internal/`, `openspec/`, `.github/`, and root governance files. It is not part of the published product site.
 
-GitHub Pages is deployed only by the public release workflow. A merge to `main` refreshes quality telemetry and internal `main.N` packages, but does not deploy MkDocs.
+GitHub Pages is deployed only by the public release workflow. A merge to `main` refreshes quality telemetry and development/dogfood `main.N` packages, but does not deploy MkDocs.
 
 ## Local documentation workflow
 
