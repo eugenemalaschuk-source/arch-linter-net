@@ -77,8 +77,31 @@ _PUBLIC_API_SURFACE_SELECTOR_SCENARIOS = {
     "public-api-surface-selector-strict-run-is-green",
     "public-api-surface-selector-testing-parity",
 }
+# The v0.8 full-cycle matrix (#524): proves the entire documented single-tool workflow -- policy
+# check, strict validate with real contract-surface-exposure and metric-budget violations,
+# recursive exposure evidence, declared topology capture/diff/verify, measure, policy
+# weakening/gate, required external SARIF evidence binding, change snapshot/report, the 5-state
+# Architecture Health matrix, PR report, badge, and cross-projection parity -- against a
+# synthetic fixture genuinely external to ArchLinterNet itself.
+_V08_FULL_CYCLE_SCENARIOS = {
+    "v08-policy-check",
+    "v08-validate-strict-audit",
+    "v08-recursive-exposure-evidence",
+    "v08-topology-capture-diff-verify",
+    "v08-measure-budget",
+    "v08-policy-weakening-gate",
+    "v08-external-evidence-binding",
+    "v08-change-snapshot-report",
+    "v08-health-matrix",
+    "v08-report-pr",
+    "v08-badge",
+    "v08-projection-parity",
+}
 _REQUIRED_SCENARIOS = (
-    _PLATFORM_SCENARIOS | _CONSUMER_CLEANUP_SCENARIOS | _PUBLIC_API_SURFACE_SELECTOR_SCENARIOS
+    _PLATFORM_SCENARIOS
+    | _CONSUMER_CLEANUP_SCENARIOS
+    | _PUBLIC_API_SURFACE_SELECTOR_SCENARIOS
+    | _V08_FULL_CYCLE_SCENARIOS
 )
 _SCENARIO_RESULTS = {"passed", "not_applicable", "failed"}
 _REQUIRED_GATES = {"acceptance", "openspec_strict"}

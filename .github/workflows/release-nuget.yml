@@ -84,6 +84,9 @@ jobs:
           - id: public-api-surface-selector-enforcement
             name: Public API selector enforcement
             target: test-packed-artifact-public-api-surface-selector-enforcement
+          - id: v08-full-cycle
+            name: v0.8 full-cycle
+            target: test-packed-artifact-v08-full-cycle
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
       CHECKPOINT_B_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.package_version }}

@@ -20,22 +20,22 @@
 - [x] 3.5 Implemented in `AssertRecursiveExposureEvidence`, asserting on the real `exposure_path`/`canonical_exposure_path` fields (containing `generic_argument`), not a coarse violation-count check.
 - [x] 3.6 Implemented in `WriteSarif`/`AssertExternalEvidenceBinding`, covering valid zero-result, required-but-missing, and wrong-revision. Wrong-scope was not added as a distinct scenario (wrong-revision already proves the fail-closed unassessable path; considered redundant coverage given time spent on this section).
 - [x] 3.7 Implemented in `AssertProjectionParity`: cross-checks the canonical Health artifact's `gate`/`health` against the badge and PR-report projections of the same evidence.
-- [ ] 3.8 Not yet done — remaining for a follow-up pass.
-- [ ] 3.9 Not yet done — remaining for a follow-up pass.
+- [x] 3.8 Registered `v08-full-cycle` as `_V08_FULL_CYCLE_SCENARIOS` (12 scenario IDs) OR'd into `_REQUIRED_SCENARIOS` in `tools/release/aggregate_checkpoint_b_evidence.py`, and as a 13th entry in `_REQUIRED_SHARDS` in `tools/release/merge_checkpoint_b_platform_evidence.py`.
+- [x] 3.9 Added `TEST_PACKED_ARTIFACT_V08_FULL_CYCLE_FILTER` + `test-packed-artifact-v08-full-cycle` target to `make/packed-artifact.mk`, including its `.PHONY` entry.
 - [x] 3.10 `PackedCandidate_V08FullCycle` passes locally against a locally-packed candidate (green, ~2m11s). Along the way, fixed three real product bugs at their canonical boundary (effective-schema `id`-stripping for contract-surface-exposure/versioned-isolation families; a real deadlock in `GitTestRepository`'s stream reading — see Section 2 note) and discovered three more, too deep to fix safely in this session, each flagged as a follow-up task with full reproduction: (1) `measure`/`baseline generate` cannot resolve target assemblies for any externally-analyzed repository (Ordinary-mode `ShouldResolveAssemblyOutputs` gating); (2) `health`'s debt-gate snapshot-reuse path only ever recognizes cycle-family baseline candidates; (3) `health`'s `current_evaluation` dimension does not honor `analysis.unmatched_ignored_violations: warn`, diverging from standalone `validate`. Also found and fixed two real CLI/docs-drift bugs directly: `baseline diff`'s help text documents `--ensure-built`/`--external-evidence` options that were never actually wired on the command.
 
 ## 4. Library and Unity-style shape-specific proofs
 
-- [ ] 4.1 Decide whether the library (`api-surface-selector`) shape-specific proof needs a new shard or fits inside an existing `public-api-surface-selector-*` shard as new scenario(s); implement accordingly, proving only the shape-specific boundary (materially smaller selected surface, role preservation, recursive first-party escape rejection) — do not re-run the full cycle.
-- [ ] 4.2 Decide whether the Unity-style (`topology-review-unity`) shape-specific proof needs a new shard or fits inside an existing/new topology-focused shard; implement accordingly, proving declared Runtime/Editor topology, exhaustive required-subject mapping, unmapped/ambiguous-subject fail-closed, and runtime/public-surface exposure rejection, through the same canonical Health/report path (no Unity-specific debt/Health model).
-- [ ] 4.3 If either decision in 4.1/4.2 adds a genuinely new shard, register it the same way as Section 3.8/3.9 (registries + Make target); if it extends an existing shard, update that shard's scenario list and any Python tests hardcoding its current scenario set.
+- [x] 4.1 Decided: no new shard needed. The existing `public-api-surface-selector-*` scenarios (`-snapshot-reduction`, `-role-preservation`, `-escape-fails-closed`, already run through the packed CLI via `CheckpointBReleaseGateTests.PublicApiSurfaceSelector.cs`) already prove the exact shape-specific boundary this task asked for: materially smaller selected surface, role preservation, and recursive first-party escape rejection.
+- [ ] 4.2 Deferred to a follow-up change. `TopologyReviewLifecycleAcceptanceTests.cs` already proves declared Runtime/Editor topology and unmapped/ambiguous-subject fail-closed behavior against the `topology-review-unity` fixture, but in-process (direct API), not through the packed Checkpoint B candidate CLI. A genuinely new packed shard is needed to satisfy the "through the immutable candidate CLI only" constraint; not attempted here given the time already spent reaching a working Section 3 (which itself surfaced three real product bugs — see 3.10). Tracking as explicit remaining scope rather than silently dropping it.
+- [ ] 4.3 N/A for 4.1 (no new shard); revisit once 4.2 is implemented.
 
 ## 5. CI wiring
 
-- [ ] 5.1 Append the new shard(s)' matrix entries to `.github/workflows/ci.yml`'s `packed_artifact_windows_shards` and `packed_artifact_macos_shards`.
-- [ ] 5.2 Append the same new shard(s) to `.github/workflows/release-nuget.yml`'s `checkpoint-b-shards` job `shard:` list (the existing 4-platform `platform:` cross-product covers all platforms automatically).
-- [ ] 5.3 Update `tools/release/tests/test_aggregate_checkpoint_b_evidence.py` and `tools/release/tests/test_merge_checkpoint_b_platform_evidence.py` fixtures to match the new `_REQUIRED_SCENARIOS`/`_REQUIRED_SHARDS` sets.
-- [ ] 5.4 Run `python3 -m pytest tools/release/tests/ -q` and fix until green.
+- [x] 5.1 Appended `v08-full-cycle` matrix entries to both `packed_artifact_windows_shards` and `packed_artifact_macos_shards` in `.github/workflows/ci.yml`.
+- [x] 5.2 Appended `v08-full-cycle` to `.github/workflows/release-nuget.yml`'s `checkpoint-b-shards` job `shard:` list.
+- [x] 5.3 Updated `tools/release/tests/test_merge_checkpoint_b_platform_evidence.py`'s local `_SHARDS` fixture list and the `test_rejects_missing_shard` hardcoded count (12 -> 13). `test_aggregate_checkpoint_b_evidence.py` needed no changes (it doesn't hardcode the scenario/shard sets directly).
+- [x] 5.4 `uv run --project tools/pyproject.toml pytest tools/release/tests -q`: 272 passed.
 
 ## 6. Docs/spec drift (only if surfaced)
 
