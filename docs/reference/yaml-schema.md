@@ -47,7 +47,7 @@ The schema accepts policy versions `1` and `2`:
 - version 1 preserves compatibility waiver defaults for existing policies;
 - version 2 defaults to strict structured-waiver lifecycle governance.
 
-The policy version is a persisted policy-contract version, not the NuGet package SemVer. Existing v1 policies remain supported; move to v2 deliberately when their manual ignores are ready for strict lifecycle behavior. `name` is the human-readable policy identity. See [Structured waivers](../policy-format/structured-waivers.md) and the [v0.7 to v0.8 adoption guide](../guides/v07-to-v08-adoption.md).
+The policy version is a persisted policy-contract version, not the NuGet package SemVer. Existing v1 policies remain supported; move to v2 deliberately when their manual ignores are ready for strict lifecycle behavior. `name` is the human-readable policy identity. See [Structured waivers](../policy-format/structured-waivers.md) and the [extended-governance adoption guide](../guides/extended-governance-adoption.md).
 
 ## Layers
 
