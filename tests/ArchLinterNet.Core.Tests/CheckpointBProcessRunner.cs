@@ -199,10 +199,20 @@ internal static partial class CheckpointBProcessRunner
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    throw new OperationCanceledException(cancellationToken);
+                    throw new OperationCanceledException(
+                        BuildFailureDiagnostic(
+                            "was cancelled",
+                            command,
+                            processId,
+                            phase,
+                            elapsed,
+                            standardOutput,
+                            standardError),
+                        cancellationToken);
                 }
 
-                throw new TimeoutException(BuildTimeoutDiagnostic(
+                throw new TimeoutException(BuildFailureDiagnostic(
+                    "timed out",
                     command,
                     processId,
                     phase,
@@ -288,7 +298,8 @@ internal static partial class CheckpointBProcessRunner
         }
     }
 
-    private static string BuildTimeoutDiagnostic(
+    private static string BuildFailureDiagnostic(
+        string outcome,
         string command,
         int processId,
         string phase,
@@ -296,7 +307,7 @@ internal static partial class CheckpointBProcessRunner
         StreamCapture standardOutput,
         StreamCapture standardError)
     {
-        return $"Checkpoint B process runner timed out during {phase}. "
+        return $"Checkpoint B process runner {outcome} during {phase}. "
             + $"Command: {command}; root PID: {processId}; "
             + $"elapsed duration: {elapsed.Elapsed.TotalMilliseconds:0} ms; "
             + $"stdout tail (bounded): {RenderTail(standardOutput.Tail)}; "

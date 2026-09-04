@@ -14,7 +14,7 @@ public sealed partial class CheckpointBReleaseGateTests
         string scope)
     {
         string outputSarifPath = Path.Combine(root, "v08-validate-strict.sarif");
-        CommandResult result = candidate.RunTool(root,
+        CommandResult result = candidate.RunToolWithReusedRestore(root,
             "--policy", DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
@@ -44,7 +44,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // --mode audit surfaces exactly that finding (and none of strict's exposure/budget findings,
         // which audit_assembly_dependency's own family never evaluates) demonstrates the packed CLI
         // actually runs the distinct audit contract set, not merely strict twice.
-        CommandResult auditResult = candidate.RunTool(root,
+        CommandResult auditResult = candidate.RunToolWithReusedRestore(root,
             "--policy", DependenciesPath(root),
             "--mode", "audit",
             "--ensure-built",
@@ -139,7 +139,7 @@ public sealed partial class CheckpointBReleaseGateTests
         CandidatePackageFeed candidate, string root, string revision)
     {
         string capturePath = Path.Combine(root, "v08-topology-capture.json");
-        CommandResult capture = candidate.RunTool(root,
+        CommandResult capture = candidate.RunToolWithReusedRestore(root,
             "topology", "capture",
             "--policy", DependenciesPath(root),
             "--subject-kind", "type",
@@ -158,7 +158,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // declared-versus-observed topology evidence rather than the contract set, so it exits 0
         // here: the declared-topology completeness control itself is clean (fully mapped, no
         // unmapped/ambiguous subjects), independent of the unrelated exposure/budget findings.
-        CommandResult verify = candidate.RunTool(root,
+        CommandResult verify = candidate.RunToolWithReusedRestore(root,
             "topology", "verify",
             "--policy", DependenciesPath(root),
             "--mode", "strict",
@@ -170,7 +170,7 @@ public sealed partial class CheckpointBReleaseGateTests
             "--evidence-scope", V08EvidenceScope);
         Assert.That(verify.ExitCode, Is.EqualTo(1), $"v08-topology-verify: {verify.CombinedOutput}");
 
-        CommandResult diff = candidate.RunTool(root,
+        CommandResult diff = candidate.RunToolWithReusedRestore(root,
             "topology", "diff",
             "--policy", DependenciesPath(root),
             "--mode", "strict",
@@ -209,7 +209,7 @@ public sealed partial class CheckpointBReleaseGateTests
             string baselinePath = Path.Combine(unmappedRoot, "v08-topology-unmapped-baseline.arch.yml");
             File.WriteAllText(baselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
-            CommandResult result = candidate.RunTool(unmappedRoot,
+            CommandResult result = candidate.RunToolWithReusedRestore(unmappedRoot,
                 "health",
                 "--policy", DependenciesPath(unmappedRoot),
                 "--baseline", baselinePath,
@@ -252,7 +252,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // metric that requires exact artifact binding (component_footprint_count with unit:
         // project/assembly -- see ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding),
         // and modules-outgoing has no such binding. It is not itself the documented path.
-        CommandResult measureWithoutEnsureBuilt = candidate.RunTool(root,
+        CommandResult measureWithoutEnsureBuilt = candidate.RunToolWithReusedRestore(root,
             "measure",
             "--policy", DependenciesPath(root),
             "--format", "json");
@@ -266,7 +266,7 @@ public sealed partial class CheckpointBReleaseGateTests
 
         // The documented command (docs/guides/single-tool-workflow.md section 8, --ensure-built
         // included) evaluated for real.
-        CommandResult measure = candidate.RunTool(root,
+        CommandResult measure = candidate.RunToolWithReusedRestore(root,
             "measure",
             "--policy", DependenciesPath(root),
             "--ensure-built",

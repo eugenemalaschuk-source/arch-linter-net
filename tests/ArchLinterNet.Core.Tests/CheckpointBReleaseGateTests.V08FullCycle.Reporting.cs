@@ -9,7 +9,7 @@ public sealed partial class CheckpointBReleaseGateTests
         CandidatePackageFeed candidate, string root, string healthPath, string changeReportPath)
     {
         string outputPath = Path.Combine(root, "v08-architecture-pr-report.md");
-        CommandResult report = candidate.RunTool(root,
+        CommandResult report = candidate.RunToolWithReusedRestore(root,
             "report", "pr",
             "--health", healthPath,
             "--change", changeReportPath,
@@ -25,7 +25,7 @@ public sealed partial class CheckpointBReleaseGateTests
         CandidatePackageFeed candidate, string root, string healthPath)
     {
         string outputPath = Path.Combine(root, "v08-architecture-health-badge.json");
-        CommandResult badge = candidate.RunTool(root,
+        CommandResult badge = candidate.RunToolWithReusedRestore(root,
             "badge", "architecture-health",
             "--input", healthPath,
             "--output", outputPath);

@@ -487,7 +487,7 @@ public sealed partial class CheckpointBReleaseGateTests
         {
             ProcessStartInfo startInfo = CreateShellStartInfo(workingDirectory, arguments);
             startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
-            return Run(startInfo);
+            return RunTracedTool(startInfo, arguments);
         }
 
         public void Dispose()
