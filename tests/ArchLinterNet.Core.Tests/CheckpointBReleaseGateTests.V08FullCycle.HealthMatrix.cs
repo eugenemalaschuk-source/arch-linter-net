@@ -178,6 +178,58 @@ public sealed partial class CheckpointBReleaseGateTests
         return Passed("v08-health-matrix");
     }
 
+    // Advisory Degrading (issue #524's second Degrading variant, distinct from the blocking case
+    // above): the same structured_waiver_added mechanism, but analysis.policy_weakening: warn keeps
+    // ArchitectureDebtGateApplicationService.Evaluate's !weakening.HasErrors term satisfied (only
+    // error-severity findings count), so the gate passes while
+    // ArchitectureHealthProjector.ProjectPolicyWeakening still reports the policy_weakening dimension
+    // Degrading -- it maps any non-empty findings regardless of severity. Registered as its own
+    // required scenario so a regression collapsing both Degrading variants into one gate outcome
+    // cannot hide behind the aggregate v08-health-matrix pass.
+    private static CheckpointScenarioResult AssertHealthMatrixAdvisoryDegrading(CandidatePackageFeed candidate, string baseRoot)
+    {
+        string advisoryRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-v08-degrading-advisory-{Guid.NewGuid():N}");
+        CopyDirectoryExcludingGit(baseRoot, advisoryRoot);
+        try
+        {
+            ApplyWeakeningMutation(advisoryRoot, policyWeakeningSeverity: "warn");
+            string advisoryBaseContext = Path.Combine(advisoryRoot, "v08-degrading-advisory-base-context.json");
+            string advisoryCurrentContext = Path.Combine(advisoryRoot, "v08-degrading-advisory-current-context.json");
+            AssertPolicyContext(candidate, baseRoot, advisoryBaseContext);
+            AssertPolicyContext(candidate, advisoryRoot, advisoryCurrentContext);
+
+            CommandResult advisoryWeakening = candidate.RunTool(advisoryRoot,
+                "policy", "weakening",
+                "--base-context", advisoryBaseContext,
+                "--current-context", advisoryCurrentContext);
+            // Only warn-severity findings exist here, so PolicyWeakeningCommandHandler's exit-1
+            // (HasErrors) condition must NOT trip -- the command still reports the finding, just at a
+            // severity that does not itself fail CI.
+            Assert.That(advisoryWeakening.ExitCode, Is.EqualTo(0),
+                $"v08-health-degrading-advisory (policy weakening): {advisoryWeakening.CombinedOutput}");
+
+            string advisoryBaselinePath = Path.Combine(advisoryRoot, "v08-degrading-advisory-baseline.arch.yml");
+            File.WriteAllText(advisoryBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
+
+            CommandResult advisory = candidate.RunTool(advisoryRoot,
+                "health",
+                "--policy", DependenciesPath(advisoryRoot),
+                "--baseline", advisoryBaselinePath,
+                "--base-context", advisoryBaseContext,
+                "--current-context", advisoryCurrentContext,
+                "--mode", "strict",
+                "--ensure-built",
+                "--format", "json");
+            AssertHealthState(advisory, "degrading", "pass", "v08-health-degrading-advisory");
+        }
+        finally
+        {
+            DeleteDirectoryEventually(advisoryRoot);
+        }
+
+        return Passed("v08-health-degrading-advisory");
+    }
+
     // `baseline generate` cannot produce a baseline for this fixture (see AssertHealthMatrix), so
     // the DEBT scenario's baseline is instead assembled from `baseline verify`'s own "new" report
     // (the exact structured identity of each live, currently-unreviewed violation) run against an
@@ -274,7 +326,16 @@ public sealed partial class CheckpointBReleaseGateTests
     // waiver_id) and only a structured entry carries a waiver id to key on -- this is the mechanism
     // that makes the base/current policy-context comparison see it as "structured_waiver_added" at
     // all, independent of the fingerprint actually matching a live violation.
-    private static void ApplyDegradingWeakeningMutation(string root)
+    private static void ApplyDegradingWeakeningMutation(string root) => ApplyWeakeningMutation(root, policyWeakeningSeverity: null);
+
+    // policyWeakeningSeverity: null leaves analysis.policy_weakening at its documented default
+    // ("error"), producing the blocking Degrading case (gate=fail). An explicit "warn" instead
+    // produces the advisory Degrading case (gate=pass): ArchitecturePolicyWeakeningModels.HasErrors
+    // only counts error-severity findings (feeding ArchitectureDebtGateApplicationService.Evaluate's
+    // !weakening.HasErrors term), while ArchitectureHealthProjector.ProjectPolicyWeakening maps ANY
+    // non-empty findings to the Degrading dimension state regardless of severity -- the same
+    // structured_waiver_added mechanism, just with the gate consequence toggled by policy severity.
+    private static void ApplyWeakeningMutation(string root, string? policyWeakeningSeverity)
     {
         string fragmentPath = Path.Combine(root, "fragments", "module-contracts.yml");
         List<string> lines = File.ReadAllLines(fragmentPath).ToList();
@@ -323,7 +384,10 @@ public sealed partial class CheckpointBReleaseGateTests
         }
 
         int analysisInsertAt = analysisIndex + AnalysisMarker.Length;
-        policy = policy.Insert(analysisInsertAt, $"{Environment.NewLine}  unmatched_ignored_violations: warn");
+        string severityLine = policyWeakeningSeverity is null
+            ? string.Empty
+            : $"{Environment.NewLine}  policy_weakening: {policyWeakeningSeverity}";
+        policy = policy.Insert(analysisInsertAt, $"{severityLine}{Environment.NewLine}  unmatched_ignored_violations: warn");
         File.WriteAllText(policyPath, policy);
     }
 

@@ -158,6 +158,10 @@ internal static class V08FullCycleFragmentContent
 
     // An empty, structurally-valid baseline: `health` unconditionally requires --baseline, but a
     // clean fixture (or one whose violations must stay deliberately unreviewed) has nothing to
-    // carry. Matches the shape CliIntegrationTests.Health.cs already uses for the same purpose.
-    internal const string EmptyBaseline = "version: 2\nbaseline: {}\n";
+    // carry. version: 3 with metric_baselines is the canonical empty baseline the public
+    // single-tool-workflow docs show -- the full v0.8 cycle must exercise that exact lifecycle path,
+    // not the older version: 2 shape (which ArchitectureBaselineComparer now also treats identically
+    // for finding identity, but the docs-facing acceptance authority should still match the public
+    // contract byte for byte).
+    internal const string EmptyBaseline = "version: 3\nbaseline: {}\nmetric_baselines: []\n";
 }

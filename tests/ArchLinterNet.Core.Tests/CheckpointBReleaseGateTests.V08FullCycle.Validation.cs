@@ -213,29 +213,31 @@ public sealed partial class CheckpointBReleaseGateTests
     private static CheckpointScenarioResult AssertMeasureAndBudget(
         CandidatePackageFeed candidate, string root, string validateJson)
     {
-        // Ordinary-mode assembly resolution only probes project OUTPUT paths for a metric that
-        // requires exact artifact binding (component_footprint_count with unit: project/assembly --
-        // see ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding). modules-outgoing is
-        // an outgoing_component_count metric over a type-subject topology with no such binding, so
-        // for a genuinely external target repository (this fixture, not ArchLinterNet analyzing its
-        // own already-loaded assemblies) bare `measure` -- with no build-state option at all -- was
-        // unassessable, exit 2, missing_required_input: a confirmed product gap (`measure` and
-        // `baseline generate`/`update`/`prune` categorically could not resolve
-        // analysis.target_assemblies for any external target), now fixed by giving all four the same
-        // --ensure-built/--no-restore/--configuration/--framework/--platform/--runtime surface
-        // validate/health/gate/topology/baseline verify/diff already had.
+        // docs/guides/single-tool-workflow.md section 8 documents `measure --ensure-built` (fixed
+        // alongside this scenario: the guide previously omitted --ensure-built from measure's snippet
+        // while every other command in the same guide carried it, which is exactly the "docs
+        // authorize an unassessable path" gap #524 forbids). The bare-call check below is a
+        // regression guard for the confirmed product gap that omission was papering over -- bare
+        // `measure` against a genuinely external target repository (this fixture, not ArchLinterNet
+        // analyzing its own already-loaded assemblies) was unassessable, exit 2, missing_required_
+        // input, because Ordinary-mode assembly resolution only probes project OUTPUT paths for a
+        // metric that requires exact artifact binding (component_footprint_count with unit:
+        // project/assembly -- see ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding),
+        // and modules-outgoing has no such binding. It is not itself the documented path.
         CommandResult measureWithoutEnsureBuilt = candidate.RunTool(root,
             "measure",
             "--policy", DependenciesPath(root),
             "--format", "json");
         Assert.That(measureWithoutEnsureBuilt.ExitCode, Is.EqualTo(2),
-            $"v08-measure-budget (bare): {measureWithoutEnsureBuilt.CombinedOutput}");
+            $"v08-measure-budget (bare, regression guard): {measureWithoutEnsureBuilt.CombinedOutput}");
         using (JsonDocument bareDocument = JsonDocument.Parse(measureWithoutEnsureBuilt.StandardOutput))
         {
             Assert.That(bareDocument.RootElement.GetProperty("status").GetString(), Is.EqualTo("unassessable"),
-                $"v08-measure-budget (bare): {measureWithoutEnsureBuilt.CombinedOutput}");
+                $"v08-measure-budget (bare, regression guard): {measureWithoutEnsureBuilt.CombinedOutput}");
         }
 
+        // The documented command (docs/guides/single-tool-workflow.md section 8, --ensure-built
+        // included) evaluated for real.
         CommandResult measure = candidate.RunTool(root,
             "measure",
             "--policy", DependenciesPath(root),

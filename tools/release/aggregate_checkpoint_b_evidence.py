@@ -94,9 +94,11 @@ _V08_FULL_CYCLE_SCENARIOS = {
     "v08-external-evidence-binding",
     "v08-change-snapshot-report",
     "v08-health-matrix",
+    "v08-health-degrading-advisory",
     "v08-report-pr",
     "v08-badge",
     "v08-projection-parity",
+    "v08-unity-topology-review",
 }
 _REQUIRED_SCENARIOS = (
     _PLATFORM_SCENARIOS

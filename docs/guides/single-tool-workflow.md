@@ -234,8 +234,11 @@ See [Migration baselines](migration-baselines.md) and [Structured waivers](../po
 ```bash
 dotnet arch-linter-net measure \
   --policy architecture/arch.yml \
+  --ensure-built \
   --format json
 ```
+
+Ordinary-mode assembly resolution only probes project output paths for a metric that requires exact artifact binding; most metrics do not. Without `--ensure-built`, `measure` against a fresh checkout of a genuinely external target repository (not this repository analyzing its own already-loaded assemblies) is unassessable rather than evaluable — pass `--ensure-built` here exactly as every other command in this guide does.
 
 Inspect the value, effective scope and contributors before authoring a budget. Delivered budgets support absolute bounds and baseline-relative no-worse-than/delta ratchets with an optional hard cap. Incomplete measurement scope is unassessable, not an artificial low value. Metric baselines remain distinct from finding baselines and waiver debt.
 

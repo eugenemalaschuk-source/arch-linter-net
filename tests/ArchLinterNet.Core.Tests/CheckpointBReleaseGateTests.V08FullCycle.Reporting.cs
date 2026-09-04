@@ -38,11 +38,18 @@ public sealed partial class CheckpointBReleaseGateTests
         return (Passed("v08-badge"), outputPath);
     }
 
-    // Real cross-projection agreement on overlapping canonical facts, not a second read of Health's
-    // own two fields: JSON violations vs the SARIF projection of the same strict validate run (same
-    // contract identities as ruleId, per ArchitectureSarifFormatter), and the canonical Health
-    // artifact's gate/health category vs the same category appearing in both the PR report Markdown
-    // and the badge JSON it and report pr were independently rendered from.
+    // Real cross-projection agreement on overlapping canonical facts, comparing full canonical
+    // finding identity (not just contract_id, which many findings for different occurrences can
+    // share) across four independently rendered projections of the SAME strict validate run: the
+    // JSON violations, the SARIF results (ArchitectureSarifFormatter embeds the identical
+    // ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif payload -- including
+    // canonical_identity -- under results[].properties.arch_linter_net), the canonical Health
+    // artifact's own embedded report_evidence.validation_outcomes findings for the strict mode
+    // entry (ArchitectureHealthProjector reuses the same FormatNormalizedFindingForJson), and the
+    // effective rule count / ignore debt counters both JSON and Health carry independently in their
+    // own policy_inventory section. Report Markdown and the badge are prose/summary projections
+    // rather than structured re-parse targets, so they are still checked by content, but against the
+    // full canonical identity set rather than "at least one".
     private static CheckpointScenarioResult AssertProjectionParity(
         string validateJson, string strictValidateSarifPath, string healthPath, string reportPath, string badgePath)
     {
@@ -50,24 +57,32 @@ public sealed partial class CheckpointBReleaseGateTests
         JsonElement jsonFindings = validate.RootElement.TryGetProperty("violations", out JsonElement violations)
             ? violations
             : validate.RootElement.GetProperty("findings");
-        HashSet<string> jsonContractIds = jsonFindings.EnumerateArray()
-            .Select(finding => finding.TryGetProperty("contract_id", out JsonElement id) ? id.GetString() : null)
+        HashSet<string> jsonCanonicalIdentities = jsonFindings.EnumerateArray()
+            .Select(finding => finding.TryGetProperty("canonical_identity", out JsonElement id) ? id.GetString() : null)
             .Where(id => !string.IsNullOrEmpty(id))
             .Select(id => id!)
             .ToHashSet(StringComparer.Ordinal);
-        Assert.That(jsonContractIds, Is.Not.Empty,
-            $"v08-projection-parity expected at least one strict finding contract_id in the JSON projection: {validateJson}");
+        Assert.That(jsonCanonicalIdentities, Is.Not.Empty,
+            $"v08-projection-parity expected at least one strict finding canonical_identity in the JSON projection: {validateJson}");
+
+        JsonElement jsonPolicyInventory = validate.RootElement.GetProperty("policy_inventory");
+        int jsonEffectiveRuleCount = jsonPolicyInventory.GetProperty("effective_rule_count").GetInt32();
+        int jsonIgnoreDebtTotal = jsonPolicyInventory.GetProperty("ignore_debt").GetProperty("total").GetInt32();
 
         using JsonDocument sarif = JsonDocument.Parse(File.ReadAllText(strictValidateSarifPath));
-        HashSet<string> sarifRuleIds = sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
+        HashSet<string> sarifCanonicalIdentities = sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
             .EnumerateArray()
-            .Select(result => result.TryGetProperty("ruleId", out JsonElement ruleId) ? ruleId.GetString() : null)
+            .Select(result => result.TryGetProperty("properties", out JsonElement properties)
+                && properties.TryGetProperty("arch_linter_net", out JsonElement normalized)
+                && normalized.TryGetProperty("canonical_identity", out JsonElement id)
+                ? id.GetString()
+                : null)
             .Where(id => !string.IsNullOrEmpty(id))
             .Select(id => id!)
             .ToHashSet(StringComparer.Ordinal);
-        Assert.That(jsonContractIds.IsSubsetOf(sarifRuleIds), Is.True,
-            $"v08-projection-parity expected every strict JSON finding's contract_id to appear as a SARIF ruleId: "
-            + $"json={string.Join(",", jsonContractIds)} sarif={string.Join(",", sarifRuleIds)}");
+        Assert.That(sarifCanonicalIdentities, Is.EqualTo(jsonCanonicalIdentities),
+            "v08-projection-parity expected the SARIF projection's canonical finding identities to exactly match "
+            + $"the JSON projection's: json={string.Join(",", jsonCanonicalIdentities)} sarif={string.Join(",", sarifCanonicalIdentities)}");
 
         using JsonDocument health = JsonDocument.Parse(File.ReadAllText(healthPath));
         string? healthCategory = health.RootElement.GetProperty("health").GetString();
@@ -80,16 +95,51 @@ public sealed partial class CheckpointBReleaseGateTests
                 "v08-projection-parity expected the canonical Health artifact to carry the fail gate consumed by report/badge.");
         });
 
+        JsonElement strictOutcome = health.RootElement.GetProperty("report_evidence").GetProperty("validation_outcomes")
+            .EnumerateArray()
+            .Single(outcome => outcome.GetProperty("mode").GetString() == "strict");
+        HashSet<string> healthCanonicalIdentities = strictOutcome.GetProperty("findings")
+            .EnumerateArray()
+            .Select(finding => finding.TryGetProperty("canonical_identity", out JsonElement id) ? id.GetString() : null)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Select(id => id!)
+            .ToHashSet(StringComparer.Ordinal);
+        // A subset, not exact equality: ArchitectureHealthProjector.ReportEvidence.Findings.BuildFindings
+        // also folds outcome.PreflightDiagnostics (one build_state_preflight finding per project,
+        // from --ensure-built's receipt verification) into the embedded findings list, which plain
+        // `validate`'s violations[] array does not carry. Every strict violation JSON reports must
+        // still appear in Health's own findings -- Health's set legitimately being broader, never
+        // narrower, is exactly the fail-closed direction this scenario proves.
+        Assert.That(jsonCanonicalIdentities.IsSubsetOf(healthCanonicalIdentities), Is.True,
+            "v08-projection-parity expected every strict JSON finding's canonical_identity to also appear in the "
+            + $"canonical Health artifact's own embedded strict findings: json={string.Join(",", jsonCanonicalIdentities)} "
+            + $"health={string.Join(",", healthCanonicalIdentities)}");
+
+        JsonElement healthPolicyInventory = strictOutcome.GetProperty("policy_inventory");
+        Assert.Multiple(() =>
+        {
+            Assert.That(healthPolicyInventory.GetProperty("effective_rule_count").GetInt32(), Is.EqualTo(jsonEffectiveRuleCount),
+                "v08-projection-parity expected the Health artifact's strict effective_rule_count to match the JSON projection's.");
+            Assert.That(healthPolicyInventory.GetProperty("ignore_debt").GetProperty("total").GetInt32(), Is.EqualTo(jsonIgnoreDebtTotal),
+                "v08-projection-parity expected the Health artifact's strict ignore_debt total to match the JSON projection's.");
+        });
+
         using JsonDocument badge = JsonDocument.Parse(File.ReadAllText(badgePath));
         string badgeMessage = badge.RootElement.GetProperty("message").GetString() ?? string.Empty;
         Assert.That(badgeMessage, Does.StartWith("FAILING"),
             $"v08-projection-parity expected the badge message to carry the same failing Health category: {badgeMessage}");
 
         string reportContent = File.ReadAllText(reportPath);
-        bool reportNamesAStrictFinding = jsonContractIds.Any(id => reportContent.Contains(id, StringComparison.Ordinal));
-        Assert.That(reportNamesAStrictFinding, Is.True,
-            $"v08-projection-parity expected the PR Markdown report to name at least one of the same strict finding "
-            + $"contract_ids as JSON/SARIF ({string.Join(",", jsonContractIds)}), not just Health's gate/category summary.");
+        string[] missingFromReport = jsonFindings.EnumerateArray()
+            .Select(finding => finding.TryGetProperty("contract_id", out JsonElement id) ? id.GetString() : null)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .Where(contractId => !reportContent.Contains(contractId, StringComparison.Ordinal))
+            .ToArray();
+        Assert.That(missingFromReport, Is.Empty,
+            "v08-projection-parity expected the PR Markdown report to name every distinct strict finding contract_id "
+            + $"from JSON/SARIF, not just Health's gate/category summary: missing={string.Join(",", missingFromReport)}");
 
         return Passed("v08-projection-parity");
     }

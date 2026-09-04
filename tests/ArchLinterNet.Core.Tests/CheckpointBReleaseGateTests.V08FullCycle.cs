@@ -73,6 +73,7 @@ public sealed partial class CheckpointBReleaseGateTests
             string healthPath = Path.Combine(fixture.Root, "v08-architecture-health.json");
             scenarios.Add(AssertHealthMatrix(
                 candidate, baseDir, fixture.Root, validSarifPath, currentSha, healthPath));
+            scenarios.Add(AssertHealthMatrixAdvisoryDegrading(candidate, baseDir));
 
             (CheckpointScenarioResult reportScenario, string reportPath) =
                 AssertReportPr(candidate, fixture.Root, healthPath, changeReportPath);
@@ -80,6 +81,7 @@ public sealed partial class CheckpointBReleaseGateTests
             (CheckpointScenarioResult badgeScenario, string badgePath) = AssertBadge(candidate, fixture.Root, healthPath);
             scenarios.Add(badgeScenario);
             scenarios.Add(AssertProjectionParity(validateJson, strictValidateSarifPath, healthPath, reportPath, badgePath));
+            scenarios.Add(AssertUnityTopologyPackedProof(candidate));
         }
         finally
         {
