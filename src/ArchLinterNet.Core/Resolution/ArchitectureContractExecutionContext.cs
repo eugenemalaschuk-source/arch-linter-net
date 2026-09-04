@@ -89,10 +89,16 @@ internal sealed class ArchitectureContractExecutionContext
             {
                 // A caller with its own observeCandidate delegate (cycle checking: it filters
                 // candidates through EdgeParticipatesInCycle before deciding whether to record them
-                // via AddCycleBaselineCandidates/Record, which shares this same underlying list) owns
-                // deciding what reaches _baselineCandidates. Only a still-live occurrence participates
-                // in that decision -- a suppressed one is already reviewed.
-                if (!ignored)
+                // via ArchitectureCycleBaselineCandidateRecorder.Record, which shares this same
+                // underlying list) owns deciding what reaches _baselineCandidates. A still-live
+                // occurrence always participates; a baseline-suppressed one must too -- CycleChecker
+                // excludes a suppressed edge from the graph it builds regardless (the edge is
+                // genuinely not live), but EdgeParticipatesInCycle only needs the REST of the graph to
+                // still reach back from target to source to prove the cycle persists, so the candidate
+                // must still reach the recorder or a still-present baselined cycle is silently
+                // classified Resolved. A policy-waiver-only suppression is excluded exactly as in the
+                // non-cycle branch above.
+                if (!ignored || matchedByLoadedBaseline)
                 {
                     observeCandidate(candidate);
                 }
