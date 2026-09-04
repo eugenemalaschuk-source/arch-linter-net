@@ -1,6 +1,6 @@
 namespace ArchLinterNet.Core.Validation;
 
-public sealed record BaselinePruneRequest
+public sealed record BaselinePruneRequest : BaselineBuildStateRequest
 {
     public required string PolicyPath { get; init; }
 

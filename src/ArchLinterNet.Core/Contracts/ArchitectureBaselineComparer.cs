@@ -11,7 +11,13 @@ public static class ArchitectureBaselineComparer
         string mode,
         IReadOnlyCollection<string>? selectedContractIds = null)
     {
-        bool useStructuredIdentity = baselineDocument.Version == 2;
+        // Version 3 carries the identical structured finding-identity shape as version 2 (it only
+        // adds the separate metric_baselines section) -- ArchitectureBaselineLoadingService validates
+        // and merges v3 finding entries as structured exactly like v2 (see ValidateGroupEntries and
+        // ContractGroupMerger.MergeGroup, both keyed on `documentVersion is 2 or 3`). Comparing a v3
+        // document by legacy display-pair text instead would collide distinct occurrences, assemblies,
+        // or members that only differ in identity fields the comparer would then be ignoring.
+        bool useStructuredIdentity = baselineDocument.Version is 2 or 3;
 
         var newEntries = new List<ArchitectureBaselineComparisonEntry>();
         var frozen = new List<ArchitectureBaselineComparisonEntry>();

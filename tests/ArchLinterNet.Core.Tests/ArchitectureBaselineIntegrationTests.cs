@@ -237,4 +237,76 @@ public sealed class ArchitectureBaselineIntegrationTests
                 Directory.Delete(tempDir, true);
         }
     }
+
+    // Regression for the cycle-checker counterpart of the #742 debt-gate blind spot:
+    // ArchitectureContractExecutionContext.IsIgnored's observeCandidate branch (the one
+    // CycleChecker supplies) used to skip a baseline-suppressed cycle edge entirely -- the edge is
+    // correctly excluded from the live cycle graph, but the candidate never reached
+    // ArchitectureCycleBaselineCandidateRecorder either, so a still-present baselined cycle
+    // silently vanished from baseline comparison (Resolved instead of Frozen). Reuses the checked-in
+    // SelectorCycleFixtures.Domain <-> SelectorCycleFixtures.ApplicationSelector bidirectional cycle
+    // (already proven with cycle contracts by AcyclicSiblingContractTests.Selectors.cs).
+    [Test]
+    public void CycleBaseline_SuppressedEdge_StillCollectedAsBaselineCandidate()
+    {
+        var policy = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Cycle baseline regression fixture",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["domain"] = new() { Namespace = "SelectorCycleFixtures.Domain" },
+                ["application_selector"] = new() { Namespace = "SelectorCycleFixtures.ApplicationSelector" },
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { GetType().Assembly.GetName().Name! },
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictCycles = new List<ArchitectureCycleContract>
+                {
+                    new() { Id = "domain-app-selector-cycle", Name = "domain-app-selector-cycle", Layers = { "domain", "application_selector" } },
+                },
+            },
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { typeof(SelectorCycleFixtures.Domain.SelectedDomainNode).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var generateRunner = new ArchitectureContractRunner(context, policy);
+        generateRunner.CheckCycleContract(policy.Contracts.StrictCycles[0]);
+        Assert.That(generateRunner.BaselineCandidates, Is.Not.Empty,
+            "the fixture cycle must produce at least one baseline candidate before it can be baselined at all.");
+
+        ArchitectureBaselineDocument baseline = _generator.Generate(
+            policy, generateRunner.BaselineCandidates, "cycle baseline regression");
+        string mergedYaml = _generator.Serialize(baseline);
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-cycle-baseline-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string baselinePath = Path.Combine(tempDir, "baseline.yml");
+            File.WriteAllText(baselinePath, mergedYaml);
+
+            var loadedBaseline = _loadingService.LoadFromPath(baselinePath);
+            ArchitectureBaselineLoadingService.MergeAndValidate(policy, loadedBaseline);
+
+            var finalRunner = new ArchitectureContractRunner(context, policy);
+            finalRunner.CheckCycleContract(policy.Contracts.StrictCycles[0]);
+
+            Assert.That(finalRunner.BaselineCandidates, Is.Not.Empty,
+                "the still-present cycle, now suppressed by the loaded baseline, must still be collected as a "
+                + "baseline candidate -- otherwise baseline comparison classifies it Resolved instead of Frozen.");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, true);
+        }
+    }
 }

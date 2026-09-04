@@ -36,6 +36,15 @@ internal static class BaselineOptionsFactory
     /// <summary>Preview and overwrite-intent options shared by every writing subcommand.</summary>
     internal sealed record WriteOptionSet(Option<bool> DryRun, Option<bool> Force);
 
+    /// <summary>Build-state options shared by every subcommand that runs a live analysis pass.</summary>
+    internal sealed record BuildStateOptionSet(
+        Option<bool> EnsureBuilt,
+        Option<bool> NoRestore,
+        Option<string> Configuration,
+        Option<string> TargetFramework,
+        Option<string> Platform,
+        Option<string> RuntimeIdentifier);
+
     public static ReasonOptionSet CreateReasonOptions()
     {
         Option<string> reason = new("--reason");
@@ -46,6 +55,17 @@ internal static class BaselineOptionsFactory
     public static WriteOptionSet CreateWriteOptions()
     {
         return new WriteOptionSet(new Option<bool>("--dry-run"), new Option<bool>("--force"));
+    }
+
+    public static BuildStateOptionSet CreateBuildStateOptions()
+    {
+        return new BuildStateOptionSet(
+            new Option<bool>("--ensure-built"),
+            new Option<bool>("--no-restore"),
+            new Option<string>("--configuration"),
+            new Option<string>("--framework"),
+            new Option<string>("--platform"),
+            new Option<string>("--runtime"));
     }
 
     public static void AddTo(Command command, ReasonOptionSet reasons)
@@ -59,6 +79,16 @@ internal static class BaselineOptionsFactory
     {
         command.Options.Add(write.DryRun);
         command.Options.Add(write.Force);
+    }
+
+    public static void AddTo(Command command, BuildStateOptionSet buildState)
+    {
+        command.Options.Add(buildState.EnsureBuilt);
+        command.Options.Add(buildState.NoRestore);
+        command.Options.Add(buildState.Configuration);
+        command.Options.Add(buildState.TargetFramework);
+        command.Options.Add(buildState.Platform);
+        command.Options.Add(buildState.RuntimeIdentifier);
     }
 
     public static BaselineReasonOptions Read(ParseResult parseResult, ReasonOptionSet reasons)

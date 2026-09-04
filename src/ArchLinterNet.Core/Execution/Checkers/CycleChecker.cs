@@ -18,9 +18,17 @@ internal static class CycleChecker
     // The graph and candidate evidence are returned rather than published here: appending baseline
     // candidates is session-owned mutable state, so the session wrapper does it once the cycle set
     // is known.
+    //
+    // FullGraph carries every observed edge regardless of ignore/suppression status, unlike Graph
+    // (live edges only, used for actual cycle detection/reporting). A baseline-suppressed edge is
+    // correctly excluded from Graph -- it is not live -- but ArchitectureCycleBaselineCandidateRecorder
+    // still needs to know whether that suppressed edge, together with the rest of the true reference
+    // structure, still closes a cycle; checking reachability against Graph alone would find nothing
+    // once every edge of a fully-suppressed cycle is excluded from it.
     internal sealed record Result(
         IReadOnlyCollection<string> Cycles,
         IReadOnlyDictionary<string, HashSet<string>> Graph,
+        IReadOnlyDictionary<string, HashSet<string>> FullGraph,
         IReadOnlyCollection<CycleCandidateEvidence> CandidateEvidence);
 
     public static Result Check(
@@ -33,16 +41,20 @@ internal static class CycleChecker
             layer => layer,
             _ => new HashSet<string>(StringComparer.Ordinal),
             StringComparer.Ordinal);
+        var fullGraph = contractLayers.ToDictionary(
+            layer => layer,
+            _ => new HashSet<string>(StringComparer.Ordinal),
+            StringComparer.Ordinal);
         var cycleCandidateEvidence = new List<CycleCandidateEvidence>();
 
         foreach (string sourceLayerName in contract.Layers)
         {
             CollectCycleEdgesForLayer(
-                contract, sourceLayerName, contractLayers, context, executionContext, graph, cycleCandidateEvidence);
+                contract, sourceLayerName, contractLayers, context, executionContext, graph, fullGraph, cycleCandidateEvidence);
         }
 
         IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
-        return new Result(cycles, graph, cycleCandidateEvidence);
+        return new Result(cycles, graph, fullGraph, cycleCandidateEvidence);
     }
 
     private static void CollectCycleEdgesForLayer(
@@ -52,6 +64,7 @@ internal static class CycleChecker
         ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext,
         Dictionary<string, HashSet<string>> graph,
+        Dictionary<string, HashSet<string>> fullGraph,
         List<CycleCandidateEvidence> cycleCandidateEvidence)
     {
         ArchitectureLayer sourceLayer =
@@ -72,6 +85,8 @@ internal static class CycleChecker
                 {
                     continue;
                 }
+
+                fullGraph[sourceLayerName].Add(referencedLayerName);
 
                 if (executionContext.IsIgnored(
                         sourceTypeName,

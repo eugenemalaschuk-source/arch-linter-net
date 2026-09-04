@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 
@@ -21,4 +22,7 @@ public sealed record BaselinePruneOutcome(
     public bool IsNoOp { get; init; }
 
     public string? Error { get; init; }
+
+    public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics { get; init; } =
+        Array.Empty<BuildStatePreflightDiagnostic>();
 }

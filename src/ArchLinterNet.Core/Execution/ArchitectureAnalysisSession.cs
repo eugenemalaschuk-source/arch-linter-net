@@ -501,9 +501,9 @@ public sealed class ArchitectureAnalysisSession
         _frameworkReferenceAnalysisService.AddFrameworkEvaluationFailureViolations(violations, collector);
 
     internal void AddCycleBaselineCandidates(
-        IReadOnlyDictionary<string, HashSet<string>> graph,
+        IReadOnlyDictionary<string, HashSet<string>> fullGraph,
         IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence) =>
-        _cycleBaselineCandidateRecorder.Record(EnableUnmatchedIgnoreTracking, graph, candidateEvidence);
+        _cycleBaselineCandidateRecorder.Record(EnableUnmatchedIgnoreTracking, fullGraph, candidateEvidence);
 
     internal void AddMetricBaselineCandidate(ArchitectureMetricBaselineEntry candidate)
     {

@@ -335,6 +335,16 @@ public sealed class ArchitectureIgnoredViolation
     [YamlMember(Alias = "occurrence")] public int? Occurrence { get; set; }
 
     [YamlMember(Alias = "configuration")] public string? Configuration { get; set; }
+
+    // Set unconditionally by ArchitectureBaselineLoadingService.ContractGroupMerger for every entry
+    // merged in from a loaded baseline document -- version 1 (legacy glob pair) included, unlike
+    // IsBaselineImported above, which only covers the structured (version 2/3) shape. This is the
+    // provenance signal ArchitectureContractExecutionContext needs: a suppressed occurrence belongs
+    // in baseline-comparison candidates only when the match came from the loaded baseline itself, not
+    // from a policy-authored structured waiver, which is separate waiver debt rather than finding
+    // debt tracked against this baseline.
+    [YamlIgnore]
+    internal bool IsFromLoadedBaseline { get; set; }
 }
 
 /// <summary>Exact canonical target selected by a structured manual architecture waiver.</summary>

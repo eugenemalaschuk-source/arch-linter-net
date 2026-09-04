@@ -32,6 +32,7 @@ _REQUIRED_SHARDS = {
     "public-api-surface-selector-snapshot-and-role",
     "public-api-surface-selector-delta-and-membership",
     "public-api-surface-selector-enforcement",
+    "v08-full-cycle",
 }
 # 'platform' (RuntimeInformation.OSDescription, e.g. "macOS 15.7.7" vs "macOS 15.7.9") is
 # intentionally excluded: shards for the same platform_id run on separate ephemeral runner
