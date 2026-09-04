@@ -390,20 +390,24 @@ this family.
 The scenario family SHALL also exercise the canonical Health matrix states
 HEALTHY, DEBT, DEGRADING, FAILING, and UNASSESSABLE against bounded mutations
 of the primary fixture's evidence, using the existing Health gate/health
-resolution unchanged. HEALTHY, FAILING, and UNASSESSABLE SHALL report their
-correct `gate`/`health` pair. DEGRADING is a warning-level signal only: per
-the existing `ArchitectureHealthProjector.ResolveGate` implementation, a lone
-Degrading dimension does not by itself fail the gate, so DEGRADING SHALL
-report `gate: pass` unless another dimension independently fails or the
-debt-gate itself does not pass. Where the DEBT or DEGRADING mutation exposes
-a genuine, independently-reproducible defect in `health`'s own debt-gate or
-validation-pass computation (confirmed outside the packed candidate, not a
-fixture or test-authoring artifact), the scenario MAY assert the currently
-observed outcome instead of the state the mutation was designed to produce,
-provided the assertion is accompanied by a comment identifying the defect and
-a tracked follow-up — this proves the composed pipeline is exercised
-end-to-end without silently masking a real product gap. The scenario family
-SHALL also prove: at least one recursive first-party contract-surface
+resolution unchanged, and SHALL report the correct `gate`/`health` pair for
+every state — no scenario in this family may assert an outcome other than
+canonically correct evidence. DEGRADING is not gate-determining by itself:
+per `ArchitectureHealthProjector.ResolveGate`/`ResolveHealth`, a lone
+Degrading dimension does not fail the gate (`gate: pass`) when its owning
+authority is advisory (for example stale-but-non-blocking waiver-lifecycle
+debt), but DOES fail the gate (`gate: fail`) when its owning authority is
+itself blocking — for example a newly added or broadened structured waiver
+detected by policy weakening under the default `analysis.policy_weakening:
+error` severity (`ArchitecturePolicyWeakeningWaiverEvaluator`,
+`ArchitectureDebtGateApplicationService.Evaluate`'s
+`!weakening.HasErrors` term), where `!debtGate.Passed` fails the gate while
+`ProjectPolicyWeakening` still maps the same finding to the
+`policy_weakening` dimension's Degrading (not Fail) state. The scenario
+family SHALL prove both the `gate: pass` advisory case and the `gate: fail`
+deliberately-blocking case for DEGRADING. The scenario family SHALL also
+prove: both `strict` and `audit` validation semantics through the packed CLI;
+at least one recursive first-party contract-surface
 exposure violation reached through a nested visible signature path, asserted
 against its exposure-path evidence; and, on overlapping canonical facts,
 agreement between JSON/SARIF/Testing finding projections and between
@@ -422,19 +426,25 @@ scenario family.
 - **AND** no stage substitutes a source-tree build, `ProjectReference`, or a
   package from outside the immutable candidate manifest
 
+#### Scenario: Strict and audit validation semantics are both proven
+- **WHEN** the primary fixture is validated through the packed candidate CLI
+- **THEN** both `--mode strict` and `--mode audit` run against the same
+  candidate and fixture state
+- **AND** each mode's canonical findings/projections are verified, not merely
+  the strict-mode run alone
+
 #### Scenario: The canonical Health matrix is exercised on the primary fixture
 - **WHEN** the primary fixture's policy, baseline, waiver, budget, or required
   external evidence is mutated to each of the HEALTHY, DEBT, DEGRADING,
   FAILING, and UNASSESSABLE shapes
 - **THEN** the resulting canonical Health artifact reports the matching
-  `gate`/`health` pair for HEALTHY, FAILING, and UNASSESSABLE
-- **AND** DEGRADING reports `gate: pass` unless an independent dimension or
-  the debt-gate itself also fails, matching the existing `ResolveGate`
-  implementation rather than treating Degrading as inherently gate-blocking
-- **AND** where DEBT or DEGRADING instead surfaces a confirmed,
-  independently-reproduced defect in Health's own computation, the scenario
-  asserts the observed outcome with a comment naming the defect and its
-  tracked follow-up, rather than silently masking it
+  `gate`/`health` pair for HEALTHY, DEBT, FAILING, and UNASSESSABLE
+- **AND** a DEGRADING mutation whose owning authority is advisory (for
+  example stale-but-non-blocking waiver-lifecycle debt) reports `gate: pass`
+- **AND** a separate DEGRADING mutation whose owning authority is itself
+  blocking (for example a newly added structured waiver detected by policy
+  weakening under the default `error` severity) reports `gate: fail`, proving
+  DEGRADING is not treated as inherently non-blocking
 
 #### Scenario: A missing or wrong-context required external evidence artifact is unassessable
 - **WHEN** the required external SARIF evidence binding is missing or bound to
