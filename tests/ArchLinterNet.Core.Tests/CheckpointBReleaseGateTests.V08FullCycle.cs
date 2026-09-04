@@ -83,6 +83,8 @@ public sealed partial class CheckpointBReleaseGateTests
             scenarios.Add(AssertProjectionParity(
                 candidate, fixture.Root, validateJson, strictValidateSarifPath, healthPath, reportPath, badgePath));
             scenarios.Add(AssertUnityTopologyPackedProof(candidate));
+            scenarios.Add(AssertUnityEditorExposureRejection(candidate));
+            scenarios.Add(AssertUnityHealthReportRouting(candidate));
         }
         finally
         {

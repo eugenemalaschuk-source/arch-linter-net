@@ -14,14 +14,13 @@ public sealed partial class CheckpointBReleaseGateTests
     // boundary is captured and reviewed, and that a required first-party subject the declared
     // topology stops mapping fails closed to unmapped -- not silently mapped or dropped.
     //
-    // What this does NOT prove, and is scoped out of this scenario rather than faked: `validate`,
-    // `health`, and `gate` cannot currently run against a pure asmdef/Unity subject at all --
-    // `analysis.target_assemblies` unconditionally requires real assembly resolution regardless of
-    // --ensure-built, and Unity assemblies are never produced by `dotnet build`. Editor-exposure
-    // denial (the strict_asmdef `forbidden_editor_refs` contract), budget applicability, and the
-    // Health/report/badge pipeline for a Unity-shaped candidate therefore remain a genuine product
-    // gap, not a test-coverage gap -- forcing a "pass" here without that product capability would
-    // recreate exactly the false-green pattern this shard exists to rule out.
+    // Materializing the fixture's own source into Library/ScriptAssemblies via Roslyn (see
+    // MaterializeUnityAssemblies) is not just for topology capture: once those assemblies exist,
+    // `validate`/`health`/`gate` resolve analysis.target_assemblies against them exactly like any
+    // other packed target, matching what TopologyReviewLifecycleAcceptanceTests.
+    // AssertVerifyMatchesOrdinaryValidation already proves in-process. AssertUnityEditorExposureRejection
+    // and AssertUnityHealthReportRouting below exercise that same materialized shape through the
+    // packed candidate for the remaining shape-specific boundary and the canonical Health/report path.
     private static CheckpointScenarioResult AssertUnityTopologyPackedProof(CandidatePackageFeed candidate)
     {
         using AdoptionAcceptanceFixture unityFixture = AdoptionAcceptanceFixture.Create("topology-review-unity");
@@ -75,6 +74,147 @@ public sealed partial class CheckpointBReleaseGateTests
         }
 
         return Passed("v08-unity-topology-review");
+    }
+
+    // Mandatory negative proof: a runtime-layer asmdef that starts referencing an editor-only asmdef
+    // must be rejected by the strict_asmdef `forbidden_editor_refs` contract (contracts.strict_asmdef
+    // in declared.arch.yml, id unity-runtime-no-editor) -- runtime/public-surface exposure of
+    // editor-only types is exactly what this contract exists to forbid. Paired with a clean-fixture
+    // check proving the same contract does not fire spuriously against the checked-in, unmutated
+    // asmdefs.
+    private static CheckpointScenarioResult AssertUnityEditorExposureRejection(CandidatePackageFeed candidate)
+    {
+        using AdoptionAcceptanceFixture cleanFixture = AdoptionAcceptanceFixture.Create("topology-review-unity");
+        MaterializeUnityAssemblies(cleanFixture.Root);
+        CommandResult clean = candidate.RunTool(cleanFixture.Root,
+            "--policy", "declared.arch.yml",
+            "--mode", "strict",
+            "--contract", "unity-runtime-no-editor",
+            "--format", "json");
+        using (JsonDocument cleanDocument = JsonDocument.Parse(clean.StandardOutput))
+        {
+            bool cleanHasExposureViolation = cleanDocument.RootElement.GetProperty("violations").EnumerateArray()
+                .Any(violation => violation.GetProperty("contract_id").GetString() == "unity-runtime-no-editor");
+            Assert.That(cleanHasExposureViolation, Is.False,
+                $"v08-unity-editor-exposure-rejection (clean) expected the checked-in asmdefs to declare no editor "
+                + $"reference from Runtime/Gameplay: {clean.CombinedOutput}");
+        }
+
+        using AdoptionAcceptanceFixture mutatedFixture = AdoptionAcceptanceFixture.Create("topology-review-unity");
+        MaterializeUnityAssemblies(mutatedFixture.Root);
+        string runtimeAsmdefPath = Path.Combine(
+            mutatedFixture.Root, "Assets", "TopologyReview.Unity.Runtime", "TopologyReview.Unity.Runtime.asmdef");
+        string mutatedAsmdef = File.ReadAllText(runtimeAsmdefPath)
+            .Replace("\"references\": []", "\"references\": [\"TopologyReview.Unity.Editor\"]", StringComparison.Ordinal);
+        Assert.That(mutatedAsmdef, Does.Contain("TopologyReview.Unity.Editor"),
+            "Diagnostic: the Runtime asmdef's empty references array no longer matches the expected shape to mutate.");
+        File.WriteAllText(runtimeAsmdefPath, mutatedAsmdef);
+
+        CommandResult mutated = candidate.RunTool(mutatedFixture.Root,
+            "--policy", "declared.arch.yml",
+            "--mode", "strict",
+            "--contract", "unity-runtime-no-editor",
+            "--format", "json");
+        using (JsonDocument mutatedDocument = JsonDocument.Parse(mutated.StandardOutput))
+        {
+            JsonElement? exposureViolation = mutatedDocument.RootElement.GetProperty("violations").EnumerateArray()
+                .Where(violation => violation.GetProperty("contract_id").GetString() == "unity-runtime-no-editor")
+                .Select(violation => (JsonElement?)violation)
+                .FirstOrDefault();
+            Assert.That(exposureViolation, Is.Not.Null,
+                $"v08-unity-editor-exposure-rejection (mutated) expected the Runtime -> Editor asmdef reference to be "
+                + $"rejected: {mutated.CombinedOutput}");
+            Assert.Multiple(() =>
+            {
+                Assert.That(exposureViolation!.Value.GetProperty("source").GetString(), Is.EqualTo("TopologyReview.Unity.Runtime"));
+                Assert.That(exposureViolation.Value.GetProperty("forbidden_references").EnumerateArray()
+                        .Select(reference => reference.GetString()),
+                    Does.Contain("TopologyReview.Unity.Editor"));
+            });
+        }
+
+        return Passed("v08-unity-editor-exposure-rejection");
+    }
+
+    // Proves the Unity-shaped candidate routes through the same canonical Health/report/badge
+    // pipeline every other v0.8 shape uses -- issue #524's explicit requirement, previously
+    // unproven because this scenario never materialized real assemblies before calling
+    // `health`/`report pr`/`badge` (a test-setup gap, not a product one: `analysis.target_assemblies`
+    // resolves against Library/ScriptAssemblies exactly like any other packed target once those
+    // assemblies exist).
+    private static CheckpointScenarioResult AssertUnityHealthReportRouting(CandidatePackageFeed candidate)
+    {
+        using AdoptionAcceptanceFixture unityFixture = AdoptionAcceptanceFixture.Create("topology-review-unity");
+        MaterializeUnityAssemblies(unityFixture.Root);
+
+        string baselinePath = Path.Combine(unityFixture.Root, "unity-health-baseline.arch.yml");
+        File.WriteAllText(baselinePath, V08FullCycleFragmentContent.EmptyBaseline);
+        string healthPath = Path.Combine(unityFixture.Root, "unity-health.json");
+
+        CommandResult health = candidate.RunTool(unityFixture.Root,
+            "health",
+            "--policy", "declared.arch.yml",
+            "--baseline", baselinePath,
+            "--mode", "strict",
+            "--format", "json",
+            "--execution-context", "v08-unity-topology-review");
+        File.WriteAllText(healthPath, health.StandardOutput);
+
+        using (JsonDocument healthDocument = JsonDocument.Parse(health.StandardOutput))
+        {
+            // declared.arch.yml deliberately carries a stale topology node/edge (see the fixture's
+            // README): the declared_topology dimension is a required control that cannot be fully
+            // assessed while that staleness stands, so the canonical Health category is unassessable
+            // here -- a real, deterministic outcome of routing this exact policy through Health, not
+            // an arbitrary placeholder.
+            Assert.That(healthDocument.RootElement.GetProperty("health").GetString(), Is.EqualTo("unassessable"),
+                $"v08-unity-health-report-routing (health): {health.StandardOutput}");
+            Assert.That(healthDocument.RootElement.TryGetProperty("report_evidence", out _), Is.True,
+                $"v08-unity-health-report-routing expected report_evidence to be populated: {health.StandardOutput}");
+        }
+
+        string badgePath = Path.Combine(unityFixture.Root, "unity-badge.json");
+        CommandResult badge = candidate.RunTool(unityFixture.Root,
+            "badge", "architecture-health",
+            "--input", healthPath,
+            "--output", badgePath);
+        using (JsonDocument badgeDocument = JsonDocument.Parse(File.ReadAllText(badgePath)))
+        {
+            string badgeMessage = badgeDocument.RootElement.GetProperty("message").GetString() ?? string.Empty;
+            Assert.That(badgeMessage, Does.StartWith("UNASSESSABLE"),
+                $"v08-unity-health-report-routing (badge) expected the badge to carry the same canonical category: {badgeMessage}");
+        }
+
+        // `report pr` also requires --change; a trivial base==current snapshot pair is enough since
+        // this scenario proves routing, not a bounded delta.
+        string snapshotPath = Path.Combine(unityFixture.Root, "unity-snapshot.json");
+        CommandResult snapshot = candidate.RunTool(unityFixture.Root,
+            "change", "snapshot",
+            "--policy", "declared.arch.yml",
+            "--mode", "strict",
+            "--output", snapshotPath);
+        Assert.That(snapshot.ExitCode, Is.EqualTo(0), $"v08-unity-health-report-routing (change snapshot): {snapshot.CombinedOutput}");
+
+        string changeReportPath = Path.Combine(unityFixture.Root, "unity-change.json");
+        CommandResult changeReport = candidate.RunTool(unityFixture.Root,
+            "change", "report",
+            "--base", snapshotPath,
+            "--current", snapshotPath,
+            "--execution-context", "v08-unity-topology-review",
+            "--format", "json",
+            "--output", changeReportPath);
+        Assert.That(changeReport.ExitCode, Is.EqualTo(0), $"v08-unity-health-report-routing (change report): {changeReport.CombinedOutput}");
+
+        string reportPath = Path.Combine(unityFixture.Root, "unity-report.md");
+        CommandResult report = candidate.RunTool(unityFixture.Root,
+            "report", "pr",
+            "--health", healthPath,
+            "--change", changeReportPath,
+            "--output", reportPath);
+        Assert.That(report.ExitCode, Is.EqualTo(0), $"v08-unity-health-report-routing (report pr): {report.CombinedOutput}");
+        Assert.That(File.ReadAllText(reportPath), Is.Not.Empty, "v08-unity-health-report-routing (report pr)");
+
+        return Passed("v08-unity-health-report-routing");
     }
 
     // Mirrors TopologyReviewLifecycleAcceptanceTests.MaterializeUnityAssemblies: the fixture's

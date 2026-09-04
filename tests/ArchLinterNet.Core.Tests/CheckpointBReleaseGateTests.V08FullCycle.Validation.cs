@@ -79,19 +79,47 @@ public sealed partial class CheckpointBReleaseGateTests
         JsonElement findings = document.RootElement.TryGetProperty("violations", out JsonElement violations)
             ? violations
             : document.RootElement.GetProperty("findings");
-        bool hasExposurePathEvidence = findings.EnumerateArray().Any(static finding =>
-            finding.TryGetProperty("contract_id", out JsonElement contractId)
-            && contractId.GetString() == "m01-contracts-do-not-expose-internal-state"
-            && TryFindExposurePath(finding, out string? exposurePath)
-            && exposurePath!.Contains("generic", StringComparison.OrdinalIgnoreCase));
-        Assert.That(hasExposurePathEvidence, Is.True,
-            $"v08-recursive-exposure-evidence expected a real recursive exposure path, not a coarse violation: {validateJson}");
+        JsonElement? exposureFinding = findings.EnumerateArray()
+            .Where(static finding => finding.TryGetProperty("contract_id", out JsonElement contractId)
+                && contractId.GetString() == "m01-contracts-do-not-expose-internal-state")
+            .Select(static finding => (JsonElement?)finding)
+            .FirstOrDefault();
+        Assert.That(exposureFinding, Is.Not.Null,
+            $"v08-recursive-exposure-evidence expected the deliberate contract-surface-exposure violation: {validateJson}");
+
+        // exposure_path/canonical_exposure_path are the real structured fields
+        // (ArchitectureDiagnosticFormatter.ApplyContractSurfaceExposureCiFields) -- no fallback to
+        // detail/message, whose free text (the fixture's own doc comment and the policy's reason both
+        // say "generic wrapper") could satisfy a coarse substring check even if the structured path
+        // itself silently disappeared.
+        string? exposurePath = TryFindExposurePath(exposureFinding!.Value, out string? path) ? path : null;
+        Assert.That(exposurePath, Is.Not.Null.And.Not.Empty,
+            $"v08-recursive-exposure-evidence expected a non-empty exposure_path or canonical_exposure_path, not a "
+            + $"fallback to free-text detail/message: {exposureFinding}");
+
+        // ModuleContracts.GetSnapshot() returns IReadOnlyList<ModuleInternalState> (see
+        // V08FullCycleFragmentContent.ModuleContractsSource). The canonical exposure path encodes
+        // this as ordered positional segments -- declaring type, member, return, generic-argument
+        // position -- rather than the literal terminal type name; assert the concrete segment chain
+        // that proves the path actually walked into the generic wrapper, not just the word "generic".
+        Assert.Multiple(() =>
+        {
+            Assert.That(exposurePath, Does.Contain("Synthetic.Modules.M01.ModuleContracts"),
+                $"v08-recursive-exposure-evidence expected the exposure path to name the declaring source type: {exposurePath}");
+            Assert.That(exposurePath, Does.Contain("Method:GetSnapshot"),
+                $"v08-recursive-exposure-evidence expected the exposure path to name the source member GetSnapshot: {exposurePath}");
+            Assert.That(exposurePath, Does.Contain("return"),
+                $"v08-recursive-exposure-evidence expected the exposure path to walk through the method's return type: {exposurePath}");
+            Assert.That(exposurePath, Does.Contain("generic_argument"),
+                $"v08-recursive-exposure-evidence expected the exposure path to walk into the IReadOnlyList<> generic wrapper position: {exposurePath}");
+        });
+
         return Passed("v08-recursive-exposure-evidence");
     }
 
     private static bool TryFindExposurePath(JsonElement finding, out string? exposurePath)
     {
-        foreach (string propertyName in new[] { "exposure_path", "canonical_exposure_path", "detail", "message" })
+        foreach (string propertyName in new[] { "exposure_path", "canonical_exposure_path" })
         {
             if (finding.TryGetProperty(propertyName, out JsonElement value) && value.ValueKind == JsonValueKind.String)
             {

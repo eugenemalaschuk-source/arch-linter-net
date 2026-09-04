@@ -489,23 +489,26 @@ scenario family.
   increase scenario count
 - **NOTE**: the library shape is already satisfied by the existing
   `public-api-surface-selector-*` packed scenarios. For the Unity-style
-  shape, the required-inventory packed scenario `v08-unity-topology-review`
-  proves declared Runtime/Gameplay/Editor topology capture/diff and
-  required-subject-unmapped fail-closed behavior through the packed
-  Checkpoint B candidate CLI (reusing the checked-in
-  `topology-review-unity` fixture's own capture/diff lifecycle). It does
-  NOT prove runtime/public-surface exposure rejection or route through the
-  canonical Health/report/badge path, as this scenario otherwise requires:
-  `validate`/`health`/`gate` cannot run against a pure asmdef subject today
-  at all, because `analysis.target_assemblies` unconditionally requires
-  real assembly resolution and Unity assemblies are never produced by
-  `dotnet build`. This is a confirmed product capability gap, not an
-  undelivered test -- closing it needs a product change (letting a
-  topology-only/asmdef-only subject reach Health/report without assembly
-  resolution, or an equivalent seam) before the full scenario text above can
-  be satisfied. Tracked as a follow-up story; until it lands, this NOTE is
-  the authoritative record that the Unity-style shape's release evidence is
-  partial by design, not by oversight.
+  shape, three required-inventory packed scenarios together prove the full
+  boundary through the packed Checkpoint B candidate CLI, reusing the
+  checked-in `topology-review-unity` fixture: `v08-unity-topology-review`
+  (declared Runtime/Gameplay/Editor topology capture/diff and
+  required-subject-unmapped fail-closed behavior), `v08-unity-editor-exposure-rejection`
+  (the `strict_asmdef` `forbidden_editor_refs` contract rejects a mutated
+  Runtime asmdef that references the editor-only assembly, and does not fire
+  against the checked-in, clean asmdefs), and
+  `v08-unity-health-report-routing` (the same materialized fixture routes
+  through `health`/`report pr`/`badge architecture-health`). All three
+  materialize the fixture's own source into `Library/ScriptAssemblies` via
+  Roslyn first (see `MaterializeUnityAssemblies`) -- once those assemblies
+  exist, `analysis.target_assemblies` resolves them exactly like any other
+  packed target, matching what `TopologyReviewLifecycleAcceptanceTests.
+  AssertVerifyMatchesOrdinaryValidation` already proves in-process. An
+  earlier version of this NOTE claimed `validate`/`health`/`gate` could not
+  run against a pure asmdef subject at all and called it a confirmed product
+  capability gap; that was wrong -- it was a test-setup gap (the packed
+  scenario had not materialized the assemblies before calling those
+  commands), corrected once identified.
 
 #### Scenario: A missing or duplicated v0.8 scenario fails evidence
 - **WHEN** a platform's shard evidence omits a required v0.8 scenario ID,

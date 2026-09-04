@@ -99,6 +99,8 @@ _V08_FULL_CYCLE_SCENARIOS = {
     "v08-badge",
     "v08-projection-parity",
     "v08-unity-topology-review",
+    "v08-unity-editor-exposure-rejection",
+    "v08-unity-health-report-routing",
 }
 _REQUIRED_SCENARIOS = (
     _PLATFORM_SCENARIOS

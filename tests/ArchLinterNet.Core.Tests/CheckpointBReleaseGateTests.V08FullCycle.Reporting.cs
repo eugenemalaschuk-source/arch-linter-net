@@ -92,15 +92,15 @@ public sealed partial class CheckpointBReleaseGateTests
         // The packaged ArchLinterNet.Testing API does not bind --external-evidence (that surface is
         // CLI-only), so it cannot resolve the required-evidence applicability control this policy
         // also declares -- but that control produces an applicability finding, not an
-        // ArchitectureViolation, so the same exposure/budget contract violations still surface
-        // through result.Violations. A subset check (not exact equality) accommodates that scope
-        // difference while still proving Testing agrees on every genuine finding JSON/SARIF report.
+        // ArchitectureViolation, so it never appears in result.Violations in the first place and does
+        // not change the expected set. Exact equality (not a one-way subset) so a regression emitting
+        // arbitrary additional identities through the Testing surface fails this scenario too.
         HashSet<string> testingCanonicalIdentities = candidate
             .RunTestingCanonicalIdentities(DependenciesPath(root))
             .ToHashSet(StringComparer.Ordinal);
-        Assert.That(jsonCanonicalIdentities.IsSubsetOf(testingCanonicalIdentities), Is.True,
-            "v08-projection-parity expected every strict JSON finding's canonical_identity to also appear in the "
-            + $"packaged ArchLinterNet.Testing API's own violations: json={string.Join(",", jsonCanonicalIdentities)} "
+        Assert.That(testingCanonicalIdentities, Is.EqualTo(jsonCanonicalIdentities),
+            "v08-projection-parity expected the packaged ArchLinterNet.Testing API's canonical finding identities to "
+            + $"exactly match the JSON projection's: json={string.Join(",", jsonCanonicalIdentities)} "
             + $"testing={string.Join(",", testingCanonicalIdentities)}");
 
         using JsonDocument health = JsonDocument.Parse(File.ReadAllText(healthPath));
@@ -143,12 +143,36 @@ public sealed partial class CheckpointBReleaseGateTests
                 "v08-projection-parity expected the Health artifact's strict ignore_debt total to match the JSON projection's.");
         });
 
+        int healthIgnoreDebtTotal = healthPolicyInventory.GetProperty("ignore_debt").GetProperty("total").GetInt32();
+        int healthEffectiveRuleCount = healthPolicyInventory.GetProperty("effective_rule_count").GetInt32();
+
+        // "FAILING · {ignores} ignores · {rules} rules" (ArchitectureHealthBadgeProjector.Project) --
+        // the badge's embedded counters must match the canonical Health artifact's own
+        // policy_inventory, not just the FAILING/gate prefix.
         using JsonDocument badge = JsonDocument.Parse(File.ReadAllText(badgePath));
         string badgeMessage = badge.RootElement.GetProperty("message").GetString() ?? string.Empty;
-        Assert.That(badgeMessage, Does.StartWith("FAILING"),
-            $"v08-projection-parity expected the badge message to carry the same failing Health category: {badgeMessage}");
+        Assert.That(badgeMessage,
+            Is.EqualTo($"FAILING · {healthIgnoreDebtTotal} ignores · {healthEffectiveRuleCount} rules"),
+            "v08-projection-parity expected the badge message's category and counters to match the canonical Health "
+            + $"artifact exactly: {badgeMessage}");
 
+        // PrReportMarkdownRenderer's exact rendered lines (AppendHeadline/AppendCompleteness) --
+        // every overlapping fact the Markdown represents must match the canonical Health artifact, not
+        // just "each contract id appears somewhere" (which stays green even if the category/gate/
+        // counters shown are stale or fabricated).
         string reportContent = File.ReadAllText(reportPath);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reportContent, Does.Contain($"Architecture acceptance: **{gate}** (`gate={gate}`)"),
+                $"v08-projection-parity expected the PR report headline to match the canonical gate: {reportContent}");
+            Assert.That(reportContent, Does.Contain($"Architecture health: `{healthCategory}`"),
+                $"v08-projection-parity expected the PR report headline to match the canonical Health category: {reportContent}");
+            Assert.That(reportContent, Does.Contain($"Effective policy controls: `{healthEffectiveRuleCount}`"),
+                $"v08-projection-parity expected the PR report to match the canonical effective_rule_count: {reportContent}");
+            Assert.That(reportContent, Does.Contain($"Explicit waiver debt: `{healthIgnoreDebtTotal}` total"),
+                $"v08-projection-parity expected the PR report to match the canonical ignore_debt total: {reportContent}");
+        });
+
         string[] missingFromReport = jsonFindings.EnumerateArray()
             .Select(finding => finding.TryGetProperty("contract_id", out JsonElement id) ? id.GetString() : null)
             .Where(id => !string.IsNullOrEmpty(id))

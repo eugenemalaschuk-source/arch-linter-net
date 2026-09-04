@@ -394,7 +394,18 @@ public sealed partial class CheckpointBReleaseGateTests
     private static void AssertHealthState(
         CommandResult result, string expectedHealth, string expectedGate, string scenarioId, string? extraDiagnostic = null)
     {
-        Assert.That(result.ExitCode, Is.AnyOf(0, 1, 2), $"{scenarioId}: {result.CombinedOutput}");
+        // HealthCommandHandler maps pass -> 0, fail -> 1, unassessable -> 2. Asserting the exact code
+        // derived from expectedGate (not "any documented exit code") is what actually proves the CLI
+        // contract this scenario claims to authorize -- a regression returning 2 for a HEALTHY/DEBT
+        // pass, or 0 for a FAILING fail, would otherwise still pass.
+        int expectedExitCode = expectedGate switch
+        {
+            "pass" => 0,
+            "fail" => 1,
+            "unassessable" => 2,
+            _ => throw new ArgumentOutOfRangeException(nameof(expectedGate), expectedGate, "Unknown expected gate."),
+        };
+        Assert.That(result.ExitCode, Is.EqualTo(expectedExitCode), $"{scenarioId}: {result.CombinedOutput}");
         using JsonDocument document = JsonDocument.Parse(result.StandardOutput);
         string? health = document.RootElement.TryGetProperty("health", out JsonElement healthElement)
             ? healthElement.GetString()
