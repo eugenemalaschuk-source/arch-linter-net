@@ -44,12 +44,8 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
 
             if (!outcome.Succeeded)
             {
-                if (outcome.PreflightDiagnostics.Any(diagnostic => diagnostic.IsBlocking))
+                if (BaselineCommandGuards.TryHandlePreflightFailure(console, options.Format, "prune", outcome.PreflightDiagnostics))
                 {
-                    CliErrorOutputWriter.WritePreflightFailure(
-                        console, options.Format,
-                        "Baseline prune error: build-state preflight is blocked; baseline candidates were not collected.",
-                        outcome.PreflightDiagnostics);
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
                 }
 

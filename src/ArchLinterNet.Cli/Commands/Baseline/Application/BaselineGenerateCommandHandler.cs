@@ -44,12 +44,8 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
 
             if (!outcome.Succeeded)
             {
-                if (outcome.PreflightDiagnostics.Any(diagnostic => diagnostic.IsBlocking))
+                if (BaselineCommandGuards.TryHandlePreflightFailure(console, options.Format, "generate", outcome.PreflightDiagnostics))
                 {
-                    CliErrorOutputWriter.WritePreflightFailure(
-                        console, options.Format,
-                        "Baseline generate error: build-state preflight is blocked; baseline candidates were not collected.",
-                        outcome.PreflightDiagnostics);
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
                 }
 
