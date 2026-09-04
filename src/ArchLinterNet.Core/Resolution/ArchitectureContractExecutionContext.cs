@@ -62,18 +62,40 @@ internal sealed class ArchitectureContractExecutionContext
 
         bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceType, forbiddenReference, _ignoredViolations, _tracker, liveIdentity);
 
-        if (!ignored && ContractId != null && liveIdentity != null)
+        if (ContractId != null && liveIdentity != null)
         {
             var candidate = new ArchitectureBaselineCandidate(
                 _contractGroup!, ContractId, sourceType, forbiddenReference, liveIdentity);
-            _findingIdentityCandidates.Add(candidate);
+
             if (observeCandidate == null)
             {
+                // _baselineCandidates feeds a debt-gate/baseline comparison against a *loaded*
+                // baseline (ArchitectureAnalysisSnapshot.CollectBaselineCandidates, reused by
+                // health/gate) and must see every occurrence, matched or not, to classify baseline
+                // entries as Frozen/Resolved/New. The standalone baseline generate/update/verify/diff
+                // flows that also populate this list never load a baseline for their own
+                // candidate-collection pass (ignored is always false there), so recording matched
+                // occurrences too has no effect on them.
                 _baselineCandidates?.Add(candidate);
             }
             else
             {
-                observeCandidate(candidate);
+                // A caller with its own observeCandidate delegate (cycle checking: it filters
+                // candidates through EdgeParticipatesInCycle before deciding whether to record them
+                // via AddCycleBaselineCandidates/Record, which shares this same underlying list) owns
+                // deciding what reaches _baselineCandidates. Only a still-live occurrence participates
+                // in that decision -- a suppressed one is already reviewed.
+                if (!ignored)
+                {
+                    observeCandidate(candidate);
+                }
+            }
+
+            // _findingIdentityCandidates (occurrence attribution) remains scoped to still-live,
+            // unmatched occurrences -- a suppressed occurrence must not be attributed as a new finding.
+            if (!ignored)
+            {
+                _findingIdentityCandidates.Add(candidate);
             }
         }
 
@@ -99,12 +121,18 @@ internal sealed class ArchitectureContractExecutionContext
         bool ignored = forbiddenReferenceAliases.Any(alias =>
             ArchitectureIgnoreMatcher.IsIgnored(sourceType, alias, _ignoredViolations, _tracker, liveIdentity));
 
-        if (!ignored && ContractId != null && liveIdentity != null)
+        if (ContractId != null && liveIdentity != null)
         {
             var candidate = new ArchitectureBaselineCandidate(
                 _contractGroup!, ContractId, sourceType, canonicalForbiddenReference, liveIdentity);
-            _findingIdentityCandidates.Add(candidate);
+
+            // See the matching comment in IsIgnored: _baselineCandidates must see every occurrence,
+            // matched or not, for debt-gate comparison against a loaded baseline.
             _baselineCandidates?.Add(candidate);
+            if (!ignored)
+            {
+                _findingIdentityCandidates.Add(candidate);
+            }
         }
 
         return ignored;

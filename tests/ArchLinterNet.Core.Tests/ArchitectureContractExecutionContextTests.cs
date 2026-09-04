@@ -281,8 +281,13 @@ public sealed class ArchitectureContractExecutionContextTests
     }
 
     [Test]
-    public void IsIgnored_MatchedIgnore_DoesNotAddCandidate_AndCollectUnmatchedReportsOnlyStaleIgnore()
+    public void IsIgnored_MatchedIgnore_AddsCandidate_AndCollectUnmatchedReportsOnlyStaleIgnore()
     {
+        // _baselineCandidates feeds debt-gate/baseline comparison against a *loaded* baseline and
+        // must see every occurrence, matched or not, to classify baseline entries as
+        // Frozen/Resolved/New -- see ArchitectureContractExecutionContext.IsIgnored. A matched
+        // occurrence therefore still adds a candidate; only unmatched-ignore tracking (a separate
+        // mechanism) stays scoped to the still-live, unmatched entry.
         var ignoredViolations = new List<ArchitectureIgnoredViolation>
         {
             new() { SourceType = "Source.Type", ForbiddenReference = "Forbidden.Reference", Reason = "matched" },
@@ -296,7 +301,9 @@ public sealed class ArchitectureContractExecutionContextTests
         bool ignored = context.IsIgnored("Source.Type", "Forbidden.Reference");
 
         Assert.That(ignored, Is.True);
-        Assert.That(baselineCandidates, Is.Empty);
+        Assert.That(baselineCandidates, Has.Count.EqualTo(1));
+        Assert.That(baselineCandidates[0].SourceType, Is.EqualTo("Source.Type"));
+        Assert.That(baselineCandidates[0].ForbiddenReference, Is.EqualTo("Forbidden.Reference"));
 
         var unmatched = new List<ArchitectureUnmatchedIgnoredViolation>();
         context.CollectUnmatchedIgnores(unmatched);
