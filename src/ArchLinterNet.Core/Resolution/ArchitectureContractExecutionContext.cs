@@ -60,7 +60,8 @@ internal sealed class ArchitectureContractExecutionContext
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
             sourceType, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
 
-        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceType, forbiddenReference, _ignoredViolations, _tracker, liveIdentity);
+        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(
+            sourceType, forbiddenReference, _ignoredViolations, _tracker, liveIdentity, out bool matchedByLoadedBaseline);
 
         if (ContractId != null && liveIdentity != null)
         {
@@ -71,12 +72,18 @@ internal sealed class ArchitectureContractExecutionContext
             {
                 // _baselineCandidates feeds a debt-gate/baseline comparison against a *loaded*
                 // baseline (ArchitectureAnalysisSnapshot.CollectBaselineCandidates, reused by
-                // health/gate) and must see every occurrence, matched or not, to classify baseline
-                // entries as Frozen/Resolved/New. The standalone baseline generate/update/verify/diff
-                // flows that also populate this list never load a baseline for their own
-                // candidate-collection pass (ignored is always false there), so recording matched
-                // occurrences too has no effect on them.
-                _baselineCandidates?.Add(candidate);
+                // health/gate) and must see every occurrence still matching a loaded baseline entry,
+                // suppressed or not, to classify baseline entries as Frozen/Resolved/New. A occurrence
+                // suppressed only by a policy-authored structured waiver is not part of that
+                // comparison at all -- recording it here would make ArchitectureBaselineComparer
+                // classify it as a "New" finding against a baseline it was never in, conflating waiver
+                // debt with finding debt. The standalone baseline generate/update/verify/diff flows
+                // that also populate this list never load a baseline for their own candidate-collection
+                // pass (ignored is always false there), so this condition has no effect on them.
+                if (!ignored || matchedByLoadedBaseline)
+                {
+                    _baselineCandidates?.Add(candidate);
+                }
             }
             else
             {
@@ -118,17 +125,32 @@ internal sealed class ArchitectureContractExecutionContext
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
             sourceType, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
 
-        bool ignored = forbiddenReferenceAliases.Any(alias =>
-            ArchitectureIgnoreMatcher.IsIgnored(sourceType, alias, _ignoredViolations, _tracker, liveIdentity));
+        bool ignored = false;
+        bool matchedByLoadedBaseline = false;
+        foreach (string alias in forbiddenReferenceAliases)
+        {
+            if (ArchitectureIgnoreMatcher.IsIgnored(
+                    sourceType, alias, _ignoredViolations, _tracker, liveIdentity, out bool aliasMatchedByLoadedBaseline))
+            {
+                ignored = true;
+                matchedByLoadedBaseline = aliasMatchedByLoadedBaseline;
+                break;
+            }
+        }
 
         if (ContractId != null && liveIdentity != null)
         {
             var candidate = new ArchitectureBaselineCandidate(
                 _contractGroup!, ContractId, sourceType, canonicalForbiddenReference, liveIdentity);
 
-            // See the matching comment in IsIgnored: _baselineCandidates must see every occurrence,
-            // matched or not, for debt-gate comparison against a loaded baseline.
-            _baselineCandidates?.Add(candidate);
+            // See the matching comment in IsIgnored: a suppressed occurrence belongs in
+            // _baselineCandidates only when the match came from the loaded baseline itself, not a
+            // policy-authored structured waiver.
+            if (!ignored || matchedByLoadedBaseline)
+            {
+                _baselineCandidates?.Add(candidate);
+            }
+
             if (!ignored)
             {
                 _findingIdentityCandidates.Add(candidate);

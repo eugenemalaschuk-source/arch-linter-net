@@ -19,12 +19,30 @@ internal static class ArchitectureIgnoreMatcher
         ArchitectureIgnoreUsageTracker? usageTracker = null,
         ArchitectureViolationIdentity? liveIdentity = null)
     {
+        return IsIgnored(sourceType, forbiddenReference, ignoredViolations, usageTracker, liveIdentity, out _);
+    }
+
+    // Also reports whether any matching entry came from a loaded baseline document (as opposed to a
+    // policy-authored structured waiver) -- callers that feed baseline-comparison candidates need
+    // this to keep waiver debt and finding debt separate. See
+    // ArchitectureIgnoredViolation.IsFromLoadedBaseline.
+    public static bool IsIgnored(
+        string sourceType,
+        string forbiddenReference,
+        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
+        ArchitectureIgnoreUsageTracker? usageTracker,
+        ArchitectureViolationIdentity? liveIdentity,
+        out bool matchedByLoadedBaseline)
+    {
+        matchedByLoadedBaseline = false;
+
         if (usageTracker == null)
         {
             for (int i = 0; i < ignoredViolations.Count; i++)
             {
                 if (Matches(sourceType, forbiddenReference, liveIdentity, ignoredViolations[i]))
                 {
+                    matchedByLoadedBaseline = ignoredViolations[i].IsFromLoadedBaseline;
                     return true;
                 }
             }
@@ -40,6 +58,10 @@ internal static class ArchitectureIgnoreMatcher
             {
                 usageTracker.MarkMatched(i);
                 anyMatched = true;
+                if (ignoredViolations[i].IsFromLoadedBaseline)
+                {
+                    matchedByLoadedBaseline = true;
+                }
             }
         }
 

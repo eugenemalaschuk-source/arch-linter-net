@@ -281,13 +281,16 @@ public sealed class ArchitectureContractExecutionContextTests
     }
 
     [Test]
-    public void IsIgnored_MatchedIgnore_AddsCandidate_AndCollectUnmatchedReportsOnlyStaleIgnore()
+    public void IsIgnored_MatchedByPolicyWaiver_DoesNotAddCandidate_ButCollectUnmatchedReportsOnlyStaleIgnore()
     {
-        // _baselineCandidates feeds debt-gate/baseline comparison against a *loaded* baseline and
-        // must see every occurrence, matched or not, to classify baseline entries as
-        // Frozen/Resolved/New -- see ArchitectureContractExecutionContext.IsIgnored. A matched
-        // occurrence therefore still adds a candidate; only unmatched-ignore tracking (a separate
-        // mechanism) stays scoped to the still-live, unmatched entry.
+        // A manually authored policy ignore (no IsFromLoadedBaseline provenance) suppresses the
+        // occurrence, but must NOT feed _baselineCandidates: that list drives comparison against a
+        // *loaded* baseline document, and an occurrence suppressed only by policy has no baseline
+        // entry to compare against. Recording it anyway would make
+        // ArchitectureBaselineComparer.ProcessNewCandidates classify it as "New" the moment any
+        // baseline is loaded (even an empty one) -- conflating waiver debt with finding debt.
+        // Unmatched-ignore tracking (a separate mechanism) still stays scoped to the still-live,
+        // unmatched entry regardless.
         var ignoredViolations = new List<ArchitectureIgnoredViolation>
         {
             new() { SourceType = "Source.Type", ForbiddenReference = "Forbidden.Reference", Reason = "matched" },
@@ -301,9 +304,8 @@ public sealed class ArchitectureContractExecutionContextTests
         bool ignored = context.IsIgnored("Source.Type", "Forbidden.Reference");
 
         Assert.That(ignored, Is.True);
-        Assert.That(baselineCandidates, Has.Count.EqualTo(1));
-        Assert.That(baselineCandidates[0].SourceType, Is.EqualTo("Source.Type"));
-        Assert.That(baselineCandidates[0].ForbiddenReference, Is.EqualTo("Forbidden.Reference"));
+        Assert.That(baselineCandidates, Is.Empty,
+            "A policy-only suppression is waiver debt, not finding debt, and must not become a baseline-comparison candidate.");
 
         var unmatched = new List<ArchitectureUnmatchedIgnoredViolation>();
         context.CollectUnmatchedIgnores(unmatched);
@@ -311,5 +313,74 @@ public sealed class ArchitectureContractExecutionContextTests
         Assert.That(unmatched, Has.Count.EqualTo(1));
         Assert.That(unmatched[0].SourceType, Is.EqualTo("Other.Type"));
         Assert.That(unmatched[0].ForbiddenReference, Is.EqualTo("Other.Reference"));
+    }
+
+    [Test]
+    public void IsIgnored_MatchedByLoadedBaselineEntry_StillAddsCandidateForComparison()
+    {
+        // The counterpart to the policy-waiver case above: an ignore entry with
+        // IsFromLoadedBaseline = true (set by ArchitectureBaselineLoadingService.ContractGroupMerger
+        // for every entry merged from an actually loaded baseline document, v1 legacy included) must
+        // still add a candidate -- this is the original #742/debt-gate blind-spot fix this provenance
+        // check must not regress: a still-occurring, baselined violation has to remain visible to
+        // ArchitectureBaselineComparer so it classifies as Frozen, not silently Resolved.
+        var ignoredViolations = new List<ArchitectureIgnoredViolation>
+        {
+            new()
+            {
+                SourceType = "Source.Type",
+                ForbiddenReference = "Forbidden.Reference",
+                Reason = "generated baseline",
+                IsFromLoadedBaseline = true,
+            },
+        };
+        var baselineCandidates = new List<ArchitectureBaselineCandidate>();
+        var context = new ArchitectureContractExecutionContext(
+            "contract-name", "contract-id", ignoredViolations,
+            enableUnmatchedIgnoreTracking: true, contractGroup: "group", baselineCandidates: baselineCandidates);
+
+        bool ignored = context.IsIgnored("Source.Type", "Forbidden.Reference");
+
+        Assert.That(ignored, Is.True);
+        Assert.That(baselineCandidates, Has.Count.EqualTo(1));
+        Assert.That(baselineCandidates[0].SourceType, Is.EqualTo("Source.Type"));
+        Assert.That(baselineCandidates[0].ForbiddenReference, Is.EqualTo("Forbidden.Reference"));
+    }
+
+    [Test]
+    public void IsIgnored_ActiveStructuredWaiverWithEmptyBaseline_ProducesNoNewFindingDebt()
+    {
+        // Regression for the P1 waiver/baseline-provenance conflation: an active structured waiver
+        // (owner/issue/target-fingerprint policy metadata, no IsFromLoadedBaseline) suppresses a real
+        // occurrence. Comparing the resulting candidates against an empty baseline document must not
+        // classify that suppressed occurrence as "New" -- it is waiver debt, tracked separately from
+        // finding debt, and gate/health must not fail or degrade because of it.
+        ArchitectureViolationIdentity identity = new(
+            ArchitectureViolationIdentity.CurrentVersion, "strict", "dependency", "contract-id",
+            "Host.A", "Program", null, "mscorlib", null, "System.Object", 0);
+        var ignoredViolations = new List<ArchitectureIgnoredViolation>
+        {
+            new()
+            {
+                SourceType = "Program",
+                ForbiddenReference = "System.Object",
+                Reason = "Move the dependency behind the boundary.",
+                WaiverId = "ARCH-IGN-001",
+                Target = new ArchitectureWaiverTarget { Fingerprint = ArchitectureWaiverTargetFingerprint.Create(identity) },
+                Owner = "architecture-team",
+                Issue = "ARCH-231",
+            },
+        };
+        var baselineCandidates = new List<ArchitectureBaselineCandidate>();
+        var context = new ArchitectureContractExecutionContext(
+            "contract-name", "contract-id", ignoredViolations,
+            enableUnmatchedIgnoreTracking: true, contractGroup: "strict", baselineCandidates: baselineCandidates);
+
+        bool ignored = context.IsIgnored(
+            "Program", "System.Object", sourceAssembly: "Host.A", targetAssembly: "mscorlib", targetMember: "System.Object");
+
+        Assert.That(ignored, Is.True);
+        Assert.That(baselineCandidates, Is.Empty,
+            "An active structured waiver is not a baseline entry -- it must never surface as a new baseline-comparison candidate.");
     }
 }
