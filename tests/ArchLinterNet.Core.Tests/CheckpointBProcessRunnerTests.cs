@@ -43,6 +43,17 @@ public sealed class CheckpointBProcessRunnerTests
                 "The bounded process runner did not return after cancellation.");
             Assert.That(runner.Result, Is.InstanceOf<OperationCanceledException>(),
                 "The bounded process runner must propagate cancellation after killing the tree.");
+            var cancellationFailure = (OperationCanceledException)runner.Result!;
+            Assert.Multiple(() =>
+            {
+                Assert.That(cancellationFailure.CancellationToken, Is.EqualTo(cancellation.Token));
+                Assert.That(cancellationFailure.Message, Does.Contain("process completion"));
+                Assert.That(cancellationFailure.Message, Does.Contain("Command:"));
+                Assert.That(cancellationFailure.Message, Does.Contain("root PID:"));
+                Assert.That(cancellationFailure.Message, Does.Contain("elapsed duration:"));
+                Assert.That(cancellationFailure.Message, Does.Contain("stdout tail (bounded):"));
+                Assert.That(cancellationFailure.Message, Does.Contain("stderr tail (bounded):"));
+            });
             Assert.That(SpinWait.SpinUntil(() => !IsProcessAlive(childPid), TimeSpan.FromSeconds(5)), Is.True,
                 "Cancellation must terminate descendants, not only the direct child process.");
         }

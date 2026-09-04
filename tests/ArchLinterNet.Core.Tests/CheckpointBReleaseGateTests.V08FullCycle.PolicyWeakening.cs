@@ -8,7 +8,7 @@ public sealed partial class CheckpointBReleaseGateTests
 {
     private static void AssertPolicyContext(CandidatePackageFeed candidate, string root, string outputPath)
     {
-        CommandResult context = candidate.RunTool(root,
+        CommandResult context = candidate.RunToolWithReusedRestore(root,
             "policy", "context",
             "--policy", DependenciesPath(root),
             "--format", "json");
@@ -19,7 +19,7 @@ public sealed partial class CheckpointBReleaseGateTests
     private static CheckpointScenarioResult AssertPolicyWeakeningAndGate(
         CandidatePackageFeed candidate, string root, string baseContext, string currentContext)
     {
-        CommandResult weakening = candidate.RunTool(root,
+        CommandResult weakening = candidate.RunToolWithReusedRestore(root,
             "policy", "weakening",
             "--base-context", baseContext,
             "--current-context", currentContext);
@@ -35,7 +35,7 @@ public sealed partial class CheckpointBReleaseGateTests
         string gateBaselinePath = Path.Combine(root, "v08-policy-weakening-gate-baseline.arch.yml");
         File.WriteAllText(gateBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
-        CommandResult gate = candidate.RunTool(root,
+        CommandResult gate = candidate.RunToolWithReusedRestore(root,
             "gate",
             "--policy", DependenciesPath(root),
             "--baseline", gateBaselinePath,
@@ -78,7 +78,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // SarifEvidenceReader's wire reason code "wrong_external_revision"), not just "some exit 2" --
         // any unrelated preflight/runtime failure would also exit 2 without proving this scenario at
         // all.
-        CommandResult wrongRevision = candidate.RunTool(root,
+        CommandResult wrongRevision = candidate.RunToolWithReusedRestore(root,
             "--policy", DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
@@ -95,7 +95,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // Missing required evidence entirely must also fail closed rather than silently pass, with
         // its own distinct reason code -- proving this is genuinely "no evidence supplied" and not
         // the same wrong-revision path reached by a different means.
-        CommandResult missing = candidate.RunTool(root,
+        CommandResult missing = candidate.RunToolWithReusedRestore(root,
             "--policy", DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
@@ -108,7 +108,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // Wrong-scope required evidence must fail closed the same way, with its own distinct reason
         // code -- otherwise scope binding could silently stop being enforced without any scenario
         // catching it.
-        CommandResult wrongScope = candidate.RunTool(root,
+        CommandResult wrongScope = candidate.RunToolWithReusedRestore(root,
             "--policy", DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
@@ -134,7 +134,7 @@ public sealed partial class CheckpointBReleaseGateTests
         File.WriteAllText(validBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
         string validReportPath = Path.Combine(root, "v08-external-evidence-binding-health.json");
 
-        CommandResult validEvidence = candidate.RunTool(root,
+        CommandResult validEvidence = candidate.RunToolWithReusedRestore(root,
             "health",
             "--policy", DependenciesPath(root),
             "--baseline", validBaselinePath,
@@ -183,7 +183,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // interest to this scenario) satisfies that requirement without duplicating the dedicated
         // v08-change-snapshot-report scenario's own bounded-delta proof.
         string trivialSnapshotPath = Path.Combine(root, "v08-external-evidence-binding-snapshot.json");
-        CommandResult trivialSnapshot = candidate.RunTool(root,
+        CommandResult trivialSnapshot = candidate.RunToolWithReusedRestore(root,
             "change", "snapshot",
             "--policy", DependenciesPath(root),
             "--mode", "strict",
@@ -192,7 +192,7 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(trivialSnapshot.ExitCode, Is.EqualTo(0), $"v08-external-evidence-binding (change snapshot): {trivialSnapshot.CombinedOutput}");
 
         string trivialChangeReportPath = Path.Combine(root, "v08-external-evidence-binding-change.json");
-        CommandResult trivialChangeReport = candidate.RunTool(root,
+        CommandResult trivialChangeReport = candidate.RunToolWithReusedRestore(root,
             "change", "report",
             "--base", trivialSnapshotPath,
             "--current", trivialSnapshotPath,
@@ -202,7 +202,7 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(trivialChangeReport.ExitCode, Is.EqualTo(0), $"v08-external-evidence-binding (change report): {trivialChangeReport.CombinedOutput}");
 
         string validReportOutputPath = Path.Combine(root, "v08-external-evidence-binding-report.md");
-        CommandResult reportPr = candidate.RunTool(root,
+        CommandResult reportPr = candidate.RunToolWithReusedRestore(root,
             "report", "pr",
             "--health", validReportPath,
             "--change", trivialChangeReportPath,
@@ -252,7 +252,7 @@ public sealed partial class CheckpointBReleaseGateTests
         string currentSnapshotPath,
         string changeReportPath)
     {
-        CommandResult baseSnapshot = candidate.RunTool(baseRoot,
+        CommandResult baseSnapshot = candidate.RunToolWithReusedRestore(baseRoot,
             "change", "snapshot",
             "--policy", DependenciesPath(baseRoot),
             "--mode", "strict",
@@ -260,7 +260,7 @@ public sealed partial class CheckpointBReleaseGateTests
             "--output", baseSnapshotPath);
         Assert.That(baseSnapshot.ExitCode, Is.EqualTo(0), $"v08-change-snapshot-report (base): {baseSnapshot.CombinedOutput}");
 
-        CommandResult currentSnapshot = candidate.RunTool(currentRoot,
+        CommandResult currentSnapshot = candidate.RunToolWithReusedRestore(currentRoot,
             "change", "snapshot",
             "--policy", DependenciesPath(currentRoot),
             "--mode", "strict",
@@ -268,7 +268,7 @@ public sealed partial class CheckpointBReleaseGateTests
             "--output", currentSnapshotPath);
         Assert.That(currentSnapshot.ExitCode, Is.EqualTo(0), $"v08-change-snapshot-report (current): {currentSnapshot.CombinedOutput}");
 
-        CommandResult report = candidate.RunTool(currentRoot,
+        CommandResult report = candidate.RunToolWithReusedRestore(currentRoot,
             "change", "report",
             "--base", baseSnapshotPath,
             "--current", currentSnapshotPath,

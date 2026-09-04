@@ -28,7 +28,7 @@ public sealed partial class CheckpointBReleaseGateTests
         File.WriteAllText(emptyBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
         // HEALTHY: the unmodified checked-in fixture, no reviewed debt to carry.
-        CommandResult healthy = candidate.RunTool(baseRoot,
+        CommandResult healthy = candidate.RunToolWithReusedRestore(baseRoot,
             "health",
             "--policy", DependenciesPath(baseRoot),
             "--baseline", emptyBaselinePath,
@@ -44,7 +44,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // (ArchitectureHealthReportEvidenceWriter.Format returns the bare summary without it) --
         // report pr/badge both need that evidence, and per the docs guide it must match the change
         // report's own execution context ("v08-full-cycle", used by AssertChangeSnapshotAndReport).
-        CommandResult failing = candidate.RunTool(currentRoot,
+        CommandResult failing = candidate.RunToolWithReusedRestore(currentRoot,
             "health",
             "--policy", DependenciesPath(currentRoot),
             "--baseline", emptyBaselinePath,
@@ -80,7 +80,7 @@ public sealed partial class CheckpointBReleaseGateTests
         string debtBaselineYaml = BuildDebtBaselineFromLiveViolations(candidate, currentRoot, emptyBaselinePath);
         File.WriteAllText(baselinePath, debtBaselineYaml);
 
-        CommandResult debtBaselineSanityCheck = candidate.RunTool(currentRoot,
+        CommandResult debtBaselineSanityCheck = candidate.RunToolWithReusedRestore(currentRoot,
             "baseline", "verify",
             "--policy", DependenciesPath(currentRoot),
             "--baseline", baselinePath,
@@ -90,7 +90,7 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(debtBaselineSanityCheck.ExitCode, Is.EqualTo(0),
             $"v08-health-debt (baseline sanity check): {debtBaselineSanityCheck.CombinedOutput}{Environment.NewLine}--- generated baseline ---{Environment.NewLine}{debtBaselineYaml}");
 
-        CommandResult debt = candidate.RunTool(currentRoot,
+        CommandResult debt = candidate.RunToolWithReusedRestore(currentRoot,
             "health",
             "--policy", DependenciesPath(currentRoot),
             "--baseline", baselinePath,
@@ -106,7 +106,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // UNASSESSABLE: required evidence bound to a revision that does not match the assessment
         // context. Reuses the empty baseline -- a wrong-revision evidence mismatch is unassessable
         // regardless of whether debt happens to be reviewed.
-        CommandResult unassessable = candidate.RunTool(currentRoot,
+        CommandResult unassessable = candidate.RunToolWithReusedRestore(currentRoot,
             "health",
             "--policy", DependenciesPath(currentRoot),
             "--baseline", emptyBaselinePath,
@@ -145,7 +145,7 @@ public sealed partial class CheckpointBReleaseGateTests
             AssertPolicyContext(candidate, baseRoot, degradingBaseContext);
             AssertPolicyContext(candidate, degradingRoot, degradingCurrentContext);
 
-            CommandResult degradingWeakening = candidate.RunTool(degradingRoot,
+            CommandResult degradingWeakening = candidate.RunToolWithReusedRestore(degradingRoot,
                 "policy", "weakening",
                 "--base-context", degradingBaseContext,
                 "--current-context", degradingCurrentContext);
@@ -159,7 +159,7 @@ public sealed partial class CheckpointBReleaseGateTests
             string degradingBaselinePath = Path.Combine(degradingRoot, "v08-degrading-baseline.arch.yml");
             File.WriteAllText(degradingBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
-            CommandResult degrading = candidate.RunTool(degradingRoot,
+            CommandResult degrading = candidate.RunToolWithReusedRestore(degradingRoot,
                 "health",
                 "--policy", DependenciesPath(degradingRoot),
                 "--baseline", degradingBaselinePath,
@@ -198,7 +198,7 @@ public sealed partial class CheckpointBReleaseGateTests
             AssertPolicyContext(candidate, baseRoot, advisoryBaseContext);
             AssertPolicyContext(candidate, advisoryRoot, advisoryCurrentContext);
 
-            CommandResult advisoryWeakening = candidate.RunTool(advisoryRoot,
+            CommandResult advisoryWeakening = candidate.RunToolWithReusedRestore(advisoryRoot,
                 "policy", "weakening",
                 "--base-context", advisoryBaseContext,
                 "--current-context", advisoryCurrentContext);
@@ -211,7 +211,7 @@ public sealed partial class CheckpointBReleaseGateTests
             string advisoryBaselinePath = Path.Combine(advisoryRoot, "v08-degrading-advisory-baseline.arch.yml");
             File.WriteAllText(advisoryBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
-            CommandResult advisory = candidate.RunTool(advisoryRoot,
+            CommandResult advisory = candidate.RunToolWithReusedRestore(advisoryRoot,
                 "health",
                 "--policy", DependenciesPath(advisoryRoot),
                 "--baseline", advisoryBaselinePath,
@@ -238,7 +238,7 @@ public sealed partial class CheckpointBReleaseGateTests
     private static string BuildDebtBaselineFromLiveViolations(
         CandidatePackageFeed candidate, string root, string emptyBaselinePath)
     {
-        CommandResult verify = candidate.RunTool(root,
+        CommandResult verify = candidate.RunToolWithReusedRestore(root,
             "baseline", "verify",
             "--policy", DependenciesPath(root),
             "--baseline", emptyBaselinePath,
