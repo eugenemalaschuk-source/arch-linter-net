@@ -46,6 +46,38 @@ internal static class V08FullCycleFragmentContent
             topology_node: modules
         """;
 
+    // Same declared topology as TopologyAndMetrics, but the composition-host node (and the two
+    // allowed_edges entries naming it) is dropped while composition_host stays in scope.selectors
+    // -- a required first-party subject (every type in the composition_host layer) the declared
+    // topology no longer maps at all. mode: exhaustive means this must fail closed to
+    // unassessable, never a silent pass, per the "newly unmapped required topology subject"
+    // proof.
+    internal const string TopologyAndMetricsWithUnmappedSubject = """
+        topology:
+          mode: exhaustive
+          subject_kind: type
+          scope:
+            selectors:
+              - layer: shared_abstractions
+              - layer: modules
+              - layer: composition_host
+          nodes:
+            - id: shared-abstractions
+              mappings:
+                - layer: shared_abstractions
+            - id: modules
+              mappings:
+                - layer: modules
+          allowed_edges:
+            - from: modules
+              to: shared-abstractions
+
+        metrics:
+          - id: modules-outgoing
+            kind: outgoing_component_count
+            topology_node: modules
+        """;
+
     // One contracts: block (a YAML document cannot repeat a top-level key, so the exposure
     // contract and the metric budget below must share this single mapping rather than each
     // declaring their own contracts: key). Sourced directly from src/**/*.csproj-resolved
@@ -73,6 +105,12 @@ internal static class V08FullCycleFragmentContent
             - id: modules-outgoing-limit
               metric: modules-outgoing
               maximum: 0
+          audit_assembly_dependency:
+            - id: audit-modules-reference-abstractions-under-review
+              name: audit-modules-reference-abstractions-under-review
+              source_sets: [module_assemblies]
+              forbidden: [Synthetic.Shared.Abstractions]
+              reason: Advisory-only future-tightening review of the modules' one legitimate abstractions dependency (already reviewed and allowed at strict level); proves audit is a genuinely separate, non-strict-blocking execution semantic, not merely a second strict pass.
         """;
 
     internal const string ExternalEvidence = """
