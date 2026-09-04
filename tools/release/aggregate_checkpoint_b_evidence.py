@@ -88,6 +88,7 @@ _V08_FULL_CYCLE_SCENARIOS = {
     "v08-validate-strict-audit",
     "v08-recursive-exposure-evidence",
     "v08-topology-capture-diff-verify",
+    "v08-topology-unmapped",
     "v08-measure-budget",
     "v08-policy-weakening-gate",
     "v08-external-evidence-binding",
