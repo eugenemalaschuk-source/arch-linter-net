@@ -3,8 +3,8 @@
   "status": "ready",
   "reason": "ready",
   "repository": "eugenemalaschuk-source/arch-linter-net",
-  "main_sha": "810f1011098b1df9cf765e4405e238709640d354",
-  "main_tree_sha": "72683f9e0378b23b5c183a6e50984bf61a83a230",
-  "pr_number": "766",
-  "producer_run_id": "33873067239"
+  "main_sha": "c67460329ac1db177556e2a6d860f7d3c756cb8f",
+  "main_tree_sha": "782fdcafac47869b8dc5447eeffe5aea18cba656",
+  "pr_number": "770",
+  "producer_run_id": "33919646304"
 }
