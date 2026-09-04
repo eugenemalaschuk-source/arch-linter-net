@@ -61,7 +61,6 @@ jobs:
               'current-head-sha': pullRequest.head.sha,
               'producer-head-sha': workflowRun.head_sha,
               'producer-run-id': workflowRun.id,
-              'producer-run-attempt': workflowRun.run_attempt,
             };
 
             const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
@@ -83,6 +82,16 @@ jobs:
               setResult('producer_not_success', values);
               return;
             }
+
+            // The manifest the "Architecture Coverage" job uploaded embeds github.run_attempt as of
+            // THAT job's own execution -- if only some other, unrelated job in this run was rerun
+            // (e.g. re-running a failed lint job after a transient network flake), the overall
+            // workflow_run.run_attempt advances to the new attempt even though this producer job
+            // never re-executed and its artifact is still exactly correct for the current head SHA.
+            // Bind to the producer job's own run_attempt, not the run's current one, or a rerun of
+            // any unrelated job would make every already-valid PR report look unbound and get
+            // rejected as manifest_binding_invalid.
+            values['producer-run-attempt'] = producerJobs[0].run_attempt;
 
             if (pullRequest.head.sha !== workflowRun.head_sha) {
               setResult('stale_head', values);
