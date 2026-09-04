@@ -6587,6 +6587,7 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest 
   property System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
   property bool IncludeAsmdefContracts {get;init;}
+  property bool NoRestore {get;init;}
   property int? MaxParallelism {get;init;}
   property string PolicyPath {get;init;}
   property string? ConditionSetName {get;init;}
@@ -6678,6 +6679,7 @@ sealed class ArchLinterNet.Core.Validation.BaselineGenerationOutcome : System.IE
   operator !=(ArchLinterNet.Core.Validation.BaselineGenerationOutcome? left, ArchLinterNet.Core.Validation.BaselineGenerationOutcome? right)
   operator ==(ArchLinterNet.Core.Validation.BaselineGenerationOutcome? left, ArchLinterNet.Core.Validation.BaselineGenerationOutcome? right)
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> ConfigurationViolations {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BaselineLifecycleEntry> Entries {get;init;}
   property bool Succeeded {get;init;}
   property int CandidateCount {get;init;}
@@ -6692,14 +6694,20 @@ sealed class ArchLinterNet.Core.Validation.BaselineGenerationRequest : System.IE
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.BaselineGenerationRequest? left, ArchLinterNet.Core.Validation.BaselineGenerationRequest? right)
   operator ==(ArchLinterNet.Core.Validation.BaselineGenerationRequest? left, ArchLinterNet.Core.Validation.BaselineGenerationRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ReasonForContract {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ReasonForFamily {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
+  property bool NoRestore {get;init;}
   property string Mode {get;init;}
   property string PolicyPath {get;init;}
   property string Reason {get;init;}
   property string? ConditionSetName {get;init;}
+  property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
+  property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.BaselineMigrateEntryReport : System.IEquatable<ArchLinterNet.Core.Validation.BaselineMigrateEntryReport>
   ctor(string ContractGroup, string ContractId, string SourceType, string ForbiddenReference, string Status, int MatchCount)
   method ArchLinterNet.Core.Validation.BaselineMigrateEntryReport <Clone>$()
@@ -6761,6 +6769,7 @@ sealed class ArchLinterNet.Core.Validation.BaselinePruneOutcome : System.IEquata
   operator !=(ArchLinterNet.Core.Validation.BaselinePruneOutcome? left, ArchLinterNet.Core.Validation.BaselinePruneOutcome? right)
   operator ==(ArchLinterNet.Core.Validation.BaselinePruneOutcome? left, ArchLinterNet.Core.Validation.BaselinePruneOutcome? right)
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> ConfigurationViolations {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BaselineLifecycleEntry> Entries {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Validation.BaselineRemovedEntry> RemovedEntries {get;init;}
   property bool IsNoOp {get;init;}
@@ -6777,12 +6786,18 @@ sealed class ArchLinterNet.Core.Validation.BaselinePruneRequest : System.IEquata
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.BaselinePruneRequest? left, ArchLinterNet.Core.Validation.BaselinePruneRequest? right)
   operator ==(ArchLinterNet.Core.Validation.BaselinePruneRequest? left, ArchLinterNet.Core.Validation.BaselinePruneRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
+  property bool NoRestore {get;init;}
   property string BaselinePath {get;init;}
   property string Mode {get;init;}
   property string PolicyPath {get;init;}
   property string? ConditionSetName {get;init;}
+  property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
+  property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.BaselineReasonMap
   field const string DefaultReasonText = "generated baseline"
   method static ArchLinterNet.Core.Validation.BaselineReasonMap ForDefault(string defaultReason)
@@ -6812,6 +6827,7 @@ sealed class ArchLinterNet.Core.Validation.BaselineUpdateOutcome : System.IEquat
   operator !=(ArchLinterNet.Core.Validation.BaselineUpdateOutcome? left, ArchLinterNet.Core.Validation.BaselineUpdateOutcome? right)
   operator ==(ArchLinterNet.Core.Validation.BaselineUpdateOutcome? left, ArchLinterNet.Core.Validation.BaselineUpdateOutcome? right)
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> ConfigurationViolations {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BaselineLifecycleEntry> Entries {get;init;}
   property bool Succeeded {get;init;}
   property int NewCount {get;init;}
@@ -6828,15 +6844,21 @@ sealed class ArchLinterNet.Core.Validation.BaselineUpdateRequest : System.IEquat
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.BaselineUpdateRequest? left, ArchLinterNet.Core.Validation.BaselineUpdateRequest? right)
   operator ==(ArchLinterNet.Core.Validation.BaselineUpdateRequest? left, ArchLinterNet.Core.Validation.BaselineUpdateRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ReasonForContract {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ReasonForFamily {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
+  property bool NoRestore {get;init;}
   property string BaselinePath {get;init;}
   property string Mode {get;init;}
   property string PolicyPath {get;init;}
   property string Reason {get;init;}
   property string? ConditionSetName {get;init;}
+  property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
+  property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.BaselineVerifyOutcome : System.IEquatable<ArchLinterNet.Core.Validation.BaselineVerifyOutcome>
   ctor(bool Succeeded, bool InSync, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> New, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> Frozen, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> Resolved, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> ConfigurationErrors, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> ConfigurationViolations)
   method ArchLinterNet.Core.Validation.BaselineVerifyOutcome <Clone>$()
