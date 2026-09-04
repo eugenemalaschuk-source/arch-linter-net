@@ -133,6 +133,81 @@ public sealed class ArchitectureBaselineComparerTests
     }
 
     [Test]
+    public void Compare_Version3Baseline_SameNamedTypeInDifferentAssembly_IsReportedAsNewNotFrozen()
+    {
+        // Regression: version 3 carries the identical structured finding-identity shape as version 2
+        // (only adding the separate metric_baselines section) and must be compared the same way --
+        // not fall through to legacy display-pair matching, which would collide Host.A.Program and
+        // Host.B.Program below into a single (falsely Frozen) entry.
+        ArchitectureContractDocument policy = new()
+        {
+            Version = 1,
+            Name = "Test",
+            Contracts = new ArchitectureContractGroups
+            {
+                Strict = new List<ArchitectureDependencyContract>
+                {
+                    new() { Id = "no-multi-program", Name = "no-multi-program", Source = "app" },
+                },
+            },
+        };
+
+        ArchitectureBaselineDocument baseline = new()
+        {
+            Version = 3,
+            Baseline = new ArchitectureBaselineContractGroups
+            {
+                Strict = new List<ArchitectureBaselineContractEntry>
+                {
+                    new()
+                    {
+                        Id = "no-multi-program",
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
+                        {
+                            new()
+                            {
+                                SourceType = "Host.A.Program",
+                                ForbiddenReference = "System.Object",
+                                Reason = "known debt",
+                                IdentityVersion = 2,
+                                ContractFamily = "strict",
+                                Kind = "dependency",
+                                SourceAssembly = "Host.A",
+                                TargetAssembly = "mscorlib",
+                                TargetMember = "System.Object",
+                                Occurrence = 0,
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates =
+        [
+            new("strict", "no-multi-program", "Host.A.Program", "System.Object",
+                new ArchitectureViolationIdentity(2, "strict", "dependency", "no-multi-program",
+                    "Host.A", "Host.A.Program", null, "mscorlib", null, "System.Object", 0)),
+            new("strict", "no-multi-program", "Host.B.Program", "System.Object",
+                new ArchitectureViolationIdentity(2, "strict", "dependency", "no-multi-program",
+                    "Host.B", "Host.B.Program", null, "mscorlib", null, "System.Object", 0)),
+        ];
+
+        ArchitectureBaselineComparisonResult result = ArchitectureBaselineComparer.Compare(
+            policy, baseline, candidates, mode: "all");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Frozen, Has.Count.EqualTo(1));
+            Assert.That(result.Frozen[0].SourceType, Is.EqualTo("Host.A.Program"));
+            Assert.That(result.New, Has.Count.EqualTo(1));
+            Assert.That(result.New[0].SourceType, Is.EqualTo("Host.B.Program"),
+                "A version-3 baseline must use structured identity, not legacy display-pair text, or this distinct occurrence would collide with the Host.A entry above.");
+            Assert.That(result.Resolved, Is.Empty);
+        });
+    }
+
+    [Test]
     public void Compare_Version1Baseline_UnqualifiedIdentityStillMatchesByLegacyPair()
     {
         // Version 1 baselines must keep matching exactly as before — no structured-identity

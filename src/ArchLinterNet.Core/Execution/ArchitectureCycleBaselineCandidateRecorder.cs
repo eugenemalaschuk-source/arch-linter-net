@@ -14,7 +14,7 @@ internal sealed class ArchitectureCycleBaselineCandidateRecorder
 
     public void Record(
         bool enabled,
-        IReadOnlyDictionary<string, HashSet<string>> graph,
+        IReadOnlyDictionary<string, HashSet<string>> fullGraph,
         IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence)
     {
         if (!enabled)
@@ -22,8 +22,12 @@ internal sealed class ArchitectureCycleBaselineCandidateRecorder
             return;
         }
 
+        // fullGraph carries every observed edge, live or suppressed (see CycleChecker.Result):
+        // reachability must be evaluated against the true reference structure, not the live-only
+        // graph, or a baseline-suppressed edge whose cycle partner is also suppressed could never
+        // prove the cycle still exists once neither edge remains in a live-only graph.
         foreach (CycleCandidateEvidence evidence in candidateEvidence.Where(
-            evidence => EdgeParticipatesInCycle(graph, evidence.SourceLayerName, evidence.TargetLayerName)))
+            evidence => EdgeParticipatesInCycle(fullGraph, evidence.SourceLayerName, evidence.TargetLayerName)))
         {
             _candidates.Add(evidence.Candidate);
         }

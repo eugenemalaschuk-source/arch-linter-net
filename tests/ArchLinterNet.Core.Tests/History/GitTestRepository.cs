@@ -19,10 +19,19 @@ internal sealed class GitTestRepository : IDisposable
 
     public static GitTestRepository CreateWithObjectFormat(string objectFormat) => Create(objectFormat);
 
+    // Initializes a git repository directly inside an already-existing directory (e.g. a fixture
+    // copy materialized elsewhere), instead of creating a fresh temp directory of its own.
+    public static GitTestRepository CreateAt(string path) => Initialize(path, objectFormat: null);
+
     private static GitTestRepository Create(string? objectFormat)
     {
         string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "arch-linter-history-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
+        return Initialize(path, objectFormat);
+    }
+
+    private static GitTestRepository Initialize(string path, string? objectFormat)
+    {
         GitTestRepository repository = new(path);
         List<string> initArguments = ["init", "-b", "main"];
         if (objectFormat is not null)
@@ -95,8 +104,7 @@ internal sealed class GitTestRepository : IDisposable
             input.Write(payload, 0, payload.Length);
         }
 
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
+        (string output, string error) = ReadBothStreamsToEnd(process);
         process.WaitForExit();
         return process.ExitCode == 0
             ? output.Trim()
@@ -140,12 +148,24 @@ internal sealed class GitTestRepository : IDisposable
         }
 
         using Process process = Process.Start(startInfo)!;
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
+        (string output, string error) = ReadBothStreamsToEnd(process);
         process.WaitForExit();
         return process.ExitCode == 0
             ? output
             : throw new InvalidOperationException($"git {string.Join(' ', arguments)} failed: {error}{output}");
+    }
+
+    // Reading stdout and stderr sequentially can deadlock: a command that writes enough to either
+    // stream to fill its pipe buffer (e.g. `add -A` across many files, each producing an LF/CRLF
+    // conversion warning on stderr) blocks trying to write more, while this process is still
+    // blocked reading the other, empty stream — which only unblocks once the process exits, which
+    // it never will. Reading both concurrently avoids that ordering dependency entirely.
+    private static (string Output, string Error) ReadBothStreamsToEnd(Process process)
+    {
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> errorTask = process.StandardError.ReadToEndAsync();
+        Task.WaitAll(outputTask, errorTask);
+        return (outputTask.Result, errorTask.Result);
     }
 
     private ProcessStartInfo NewStartInfo(string[] arguments)

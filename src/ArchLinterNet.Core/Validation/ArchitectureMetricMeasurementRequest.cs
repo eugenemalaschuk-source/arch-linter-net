@@ -17,6 +17,8 @@ public sealed record ArchitectureMetricMeasurementRequest
 
     public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
 
+    public bool NoRestore { get; init; }
+
     public string? RequestedConfiguration { get; init; }
 
     public string? RequestedTargetFramework { get; init; }
@@ -36,6 +38,7 @@ public sealed record ArchitectureMetricMeasurementRequest
         PreprocessorSymbols = PreprocessorSymbols,
         IncludeAsmdefContracts = IncludeAsmdefContracts,
         PreparationMode = PreparationMode,
+        NoRestore = NoRestore,
         RequestedConfiguration = RequestedConfiguration,
         RequestedTargetFramework = RequestedTargetFramework,
         RequestedPlatform = RequestedPlatform,

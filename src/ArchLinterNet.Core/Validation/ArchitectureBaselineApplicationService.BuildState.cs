@@ -26,6 +26,57 @@ public sealed partial class ArchitectureBaselineApplicationService
             request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
     }
 
+    private BaselineCandidateCollection CollectGenerateCandidates(BaselineGenerationRequest request)
+    {
+        BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier,
+            usePreparedPostBuildState: false,
+            preparedPostBuildRunner: null,
+            useMetadataFirstEnsureBuilt: false);
+
+        return CollectCandidatesCore(
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
+    }
+
+    private BaselineCandidateCollection CollectUpdateCandidates(BaselineUpdateRequest request)
+    {
+        BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier,
+            usePreparedPostBuildState: false,
+            preparedPostBuildRunner: null,
+            useMetadataFirstEnsureBuilt: false);
+
+        return CollectCandidatesCore(
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
+    }
+
+    private BaselineCandidateCollection CollectPruneCandidates(BaselinePruneRequest request)
+    {
+        BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier,
+            usePreparedPostBuildState: false,
+            preparedPostBuildRunner: null,
+            useMetadataFirstEnsureBuilt: false);
+
+        return CollectCandidatesCore(
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
+    }
+
     private BaselineCandidateCollection CollectVerifyCandidates(BaselineVerifyRequest request)
     {
         BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(

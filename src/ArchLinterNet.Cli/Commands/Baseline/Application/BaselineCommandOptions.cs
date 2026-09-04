@@ -20,7 +20,13 @@ internal sealed record BaselineGenerateCommandOptions(
     string Format,
     BaselineWriteOptions Write,
     IReadOnlyList<string> ContractIds,
-    bool ShowHelp);
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false,
+    string? Configuration = null,
+    string? TargetFramework = null,
+    string? Platform = null,
+    string? RuntimeIdentifier = null);
 
 internal sealed record BaselineUpdateCommandOptions(
     string PolicyPath,
@@ -32,7 +38,13 @@ internal sealed record BaselineUpdateCommandOptions(
     string Format,
     BaselineWriteOptions Write,
     IReadOnlyList<string> ContractIds,
-    bool ShowHelp);
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false,
+    string? Configuration = null,
+    string? TargetFramework = null,
+    string? Platform = null,
+    string? RuntimeIdentifier = null);
 
 internal sealed record BaselinePruneCommandOptions(
     string PolicyPath,
@@ -43,7 +55,13 @@ internal sealed record BaselinePruneCommandOptions(
     string Format,
     BaselineWriteOptions Write,
     IReadOnlyList<string> ContractIds,
-    bool ShowHelp);
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false,
+    string? Configuration = null,
+    string? TargetFramework = null,
+    string? Platform = null,
+    string? RuntimeIdentifier = null);
 
 internal sealed record BaselineDiffCommandOptions(
     string PolicyPath,

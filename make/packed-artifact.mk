@@ -9,7 +9,8 @@
 	test-packed-artifact-consumer-cleanup-source-set-authoring \
 	test-packed-artifact-public-api-surface-selector-snapshot-and-role \
 	test-packed-artifact-public-api-surface-selector-delta-and-membership \
-	test-packed-artifact-public-api-surface-selector-enforcement
+	test-packed-artifact-public-api-surface-selector-enforcement \
+	test-packed-artifact-v08-full-cycle
 
 # Checkpoint B CI/release sharding. The ordinary `test-packed-artifact` target remains the complete
 # local gate and discovers all CheckpointBReleaseGateTests methods in one NUnit process. These
@@ -27,6 +28,7 @@ TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_SOURCE_SET_AUTHORING_FILTER := FullyQualif
 TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_SNAPSHOT_AND_ROLE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorSnapshotAndRole
 TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_DELTA_AND_MEMBERSHIP_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorDeltaAndMembership
 TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_ENFORCEMENT_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorEnforcement
+TEST_PACKED_ARTIFACT_V08_FULL_CYCLE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_V08FullCycle
 
 CHECKPOINT_B_CANDIDATE_VERSION ?= 0.6.1
 CHECKPOINT_B_CANDIDATE_DIR ?= $(PROJECT_ROOT)/artifacts/checkpoint-b-candidate
@@ -97,6 +99,10 @@ test-packed-artifact-public-api-surface-selector-delta-and-membership:  ## Run C
 test-packed-artifact-public-api-surface-selector-enforcement:  ## Run Checkpoint B public-API selector enforcement shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
 	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_ENFORCEMENT_FILTER)"
+
+test-packed-artifact-v08-full-cycle:  ## Run Checkpoint B v0.8 full-cycle shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_V08_FULL_CYCLE_FILTER)"
 
 # Repository correctness without the packed candidate gate. Release workflows use this once to
 # prove source-tree lint/unit/E2E correctness, then prove the immutable packed candidate separately.

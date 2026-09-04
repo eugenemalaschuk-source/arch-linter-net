@@ -71,6 +71,24 @@ internal static class BaselineCommandGuards
         return false;
     }
 
+    public static bool TryHandlePreflightFailure(
+        ICliConsole console,
+        string format,
+        string verb,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
+    {
+        if (!preflightDiagnostics.Any(diagnostic => diagnostic.IsBlocking))
+        {
+            return false;
+        }
+
+        CliErrorOutputWriter.WritePreflightFailure(
+            console, format,
+            $"Baseline {verb} error: build-state preflight is blocked; baseline candidates were not collected.",
+            preflightDiagnostics);
+        return true;
+    }
+
     public static void WriteOutcomeFailure(
         ICliConsole console,
         string format,

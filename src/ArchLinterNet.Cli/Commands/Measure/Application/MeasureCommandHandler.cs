@@ -1,5 +1,6 @@
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -50,6 +51,12 @@ internal sealed class MeasureCommandHandler(
                 MetricIds = options.MetricIds.Count == 0 ? null : options.MetricIds,
                 ConditionSetName = options.ConditionSetName,
                 CancellationToken = cancellationToken,
+                PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                NoRestore = options.NoRestore,
+                RequestedConfiguration = options.Configuration,
+                RequestedTargetFramework = options.TargetFramework,
+                RequestedPlatform = options.Platform,
+                RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             };
             ArchitectureMetricMeasurementOutcome outcome = runtime.Measure(request, timing: null);
             int maxContributors = options.MaxContributors ?? DefaultMaxContributors;

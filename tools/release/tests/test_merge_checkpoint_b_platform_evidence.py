@@ -50,6 +50,7 @@ _SHARDS = [
     "public-api-surface-selector-snapshot-and-role",
     "public-api-surface-selector-delta-and-membership",
     "public-api-surface-selector-enforcement",
+    "v08-full-cycle",
 ]
 
 
@@ -123,7 +124,7 @@ def test_rejects_missing_shard(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
     (shards / "checkpoint-b-platform-shard-adopter-runtime-core.json").unlink()
 
-    with pytest.raises(ValueError, match="Expected 12 Checkpoint B shard records"):
+    with pytest.raises(ValueError, match="Expected 13 Checkpoint B shard records"):
         merge_platform_shards(shards, manifest)
 
 

@@ -36,15 +36,17 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        BaselineCandidateCollection collection = CollectCandidates(
-            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        BaselineCandidateCollection collection = CollectGenerateCandidates(request);
         IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
         List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
 
         if (candidates == null)
         {
             return new BaselineGenerationOutcome(
-                Succeeded: false, Yaml: null, CandidateCount: 0, ConfigurationViolations: configViolations);
+                Succeeded: false, Yaml: null, CandidateCount: 0, ConfigurationViolations: configViolations)
+            {
+                PreflightDiagnostics = collection.PreflightDiagnostics,
+            };
         }
 
         BaselineWritePlan plan = BaselineWritePlanner.PlanGenerate(candidates, reasonMap);
@@ -79,8 +81,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        BaselineCandidateCollection collection = CollectCandidates(
-            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        BaselineCandidateCollection collection = CollectUpdateCandidates(request);
         ArchitectureContractDocument document = collection.Document;
         IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
         List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
@@ -88,7 +89,10 @@ public sealed partial class ArchitectureBaselineApplicationService(
         if (candidates == null)
         {
             return new BaselineUpdateOutcome(
-                Succeeded: false, Yaml: null, PreservedCount: 0, NewCount: 0, ConfigurationViolations: configViolations);
+                Succeeded: false, Yaml: null, PreservedCount: 0, NewCount: 0, ConfigurationViolations: configViolations)
+            {
+                PreflightDiagnostics = collection.PreflightDiagnostics,
+            };
         }
 
         ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
@@ -115,8 +119,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
     public BaselinePruneOutcome Prune(BaselinePruneRequest request)
     {
-        BaselineCandidateCollection collection = CollectCandidates(
-            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        BaselineCandidateCollection collection = CollectPruneCandidates(request);
         ArchitectureContractDocument document = collection.Document;
         IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
         List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
@@ -124,7 +127,10 @@ public sealed partial class ArchitectureBaselineApplicationService(
         if (candidates == null)
         {
             return new BaselinePruneOutcome(
-                Succeeded: false, Yaml: null, RemovedEntries: Array.Empty<BaselineRemovedEntry>(), ConfigurationViolations: configViolations);
+                Succeeded: false, Yaml: null, RemovedEntries: Array.Empty<BaselineRemovedEntry>(), ConfigurationViolations: configViolations)
+            {
+                PreflightDiagnostics = collection.PreflightDiagnostics,
+            };
         }
 
         ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);

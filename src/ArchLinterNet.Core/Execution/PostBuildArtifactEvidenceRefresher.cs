@@ -59,11 +59,19 @@ internal static class PostBuildArtifactEvidenceRefresher
             .Where(project => receiptVerifiedPaths.ContainsKey(project.AssemblyName))
             .Select(project => Path.GetFullPath(Path.Combine(preparation.RepositoryRoot, project.Path)))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // preparation.ProjectDiscovery.Diagnostics still carries whatever ArchitectureProjectDiscoveryService
+        // reported during the pre-build metadata pass (PrepareRunner), before this graph build ran --
+        // including "missing project build output" for every project that simply had no output yet
+        // (the ordinary, expected state before --ensure-built builds anything). Drop both that and
+        // "stale project build output" once the receipt confirms the project's exact post-build
+        // artifact; otherwise these carry forward as live discovery diagnostics and
+        // ArchitectureConfigurationValidationService.AddDiscoveryDiagnosticViolations turns each one
+        // into a strict violation for an assembly that was, in fact, just built successfully.
         ProjectDiscoveryResult postBuildDiscovery = preparation.ProjectDiscovery with
         {
             ResolvedAssemblyPaths = resolvedPaths,
             Diagnostics = preparation.ProjectDiscovery.Diagnostics
-                .Where(diagnostic => diagnostic.Kind != "stale project build output"
+                .Where(diagnostic => diagnostic.Kind is not ("stale project build output" or "missing project build output")
                     || !receiptVerifiedProjectPaths.Contains(Path.GetFullPath(diagnostic.Subject)))
                 .ToArray()
         };

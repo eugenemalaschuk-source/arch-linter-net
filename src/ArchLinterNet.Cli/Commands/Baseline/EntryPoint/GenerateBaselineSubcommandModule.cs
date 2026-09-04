@@ -30,6 +30,7 @@ internal sealed class GenerateBaselineSubcommandModule : IDefaultBaselineSubcomm
         Option<string[]> contractOption = new("--contract");
         Option<bool> jsonOption = new("--json");
         BaselineOptionsFactory.WriteOptionSet writeOptions = BaselineOptionsFactory.CreateWriteOptions();
+        BaselineOptionsFactory.BuildStateOptionSet buildStateOptions = BaselineOptionsFactory.CreateBuildStateOptions();
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
 
@@ -41,6 +42,7 @@ internal sealed class GenerateBaselineSubcommandModule : IDefaultBaselineSubcomm
         command.Options.Add(contractOption);
         command.Options.Add(jsonOption);
         BaselineOptionsFactory.AddTo(command, writeOptions);
+        BaselineOptionsFactory.AddTo(command, buildStateOptions);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new BaselineGenerateCommandOptions(
@@ -52,7 +54,13 @@ internal sealed class GenerateBaselineSubcommandModule : IDefaultBaselineSubcomm
             parseResult.GetValue(jsonOption) ? "json" : "human",
             BaselineOptionsFactory.Read(parseResult, writeOptions),
             parseResult.GetValue(contractOption) ?? Array.Empty<string>(),
-            parseResult.GetValue(helpOption))));
+            parseResult.GetValue(helpOption),
+            parseResult.GetValue(buildStateOptions.EnsureBuilt),
+            parseResult.GetValue(buildStateOptions.NoRestore),
+            parseResult.GetValue(buildStateOptions.Configuration),
+            parseResult.GetValue(buildStateOptions.TargetFramework),
+            parseResult.GetValue(buildStateOptions.Platform),
+            parseResult.GetValue(buildStateOptions.RuntimeIdentifier))));
 
         return command;
     }

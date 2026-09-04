@@ -470,6 +470,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                             TargetMember = isStructured ? baselineIgnore.TargetMember : null,
                             Occurrence = isStructured ? baselineIgnore.Occurrence ?? 0 : null,
                             Configuration = isStructured ? baselineIgnore.Configuration : null,
+                            IsFromLoadedBaseline = true,
                         });
                     }
                 }

@@ -983,6 +983,13 @@ jobs:
             shard: public-api-surface-selector-enforcement
             shard_name: Public API selector enforcement
             target: test-packed-artifact-public-api-surface-selector-enforcement
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: v08-full-cycle
+            shard_name: v0.8 full-cycle
+            target: test-packed-artifact-v08-full-cycle
     permissions:
       contents: read
     env:
@@ -1088,6 +1095,9 @@ jobs:
           - shard: public-api-surface-selector-enforcement
             shard_name: Public API selector enforcement
             target: test-packed-artifact-public-api-surface-selector-enforcement
+          - shard: v08-full-cycle
+            shard_name: v0.8 full-cycle
+            target: test-packed-artifact-v08-full-cycle
     permissions:
       contents: read
     env:

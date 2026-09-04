@@ -7,4 +7,10 @@ internal sealed record MeasureCommandOptions(
     string? ConditionSetName,
     int? MaxContributors,
     bool AllContributors,
-    bool ShowHelp);
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false,
+    string? Configuration = null,
+    string? TargetFramework = null,
+    string? Platform = null,
+    string? RuntimeIdentifier = null);

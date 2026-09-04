@@ -486,11 +486,14 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
 
                 // Validate the shared id field here (non-empty string, with a precise composed-
                 // policy provenance location) rather than relying solely on the family schema's
-                // own error reporting. Versioned contract-surface isolation has an id-required
-                // schema contract, so keep that validated field in the instance; older families
-                // retain their fallback-id-compatible shape by evaluating their remaining fields.
+                // own error reporting. Versioned contract-surface isolation and contract-surface
+                // exposure both have an id-required schema contract, so keep that validated field
+                // in the instance for them; older families retain their fallback-id-compatible
+                // shape by evaluating their remaining fields without it.
                 if (groupName is not "strict_versioned_contract_surface_isolation"
-                    and not "audit_versioned_contract_surface_isolation")
+                    and not "audit_versioned_contract_surface_isolation"
+                    and not "strict_contract_surface_exposure"
+                    and not "audit_contract_surface_exposure")
                 {
                     contract.Remove("id");
                 }

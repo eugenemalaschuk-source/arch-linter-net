@@ -39,6 +39,17 @@ internal static class BaselineHelpTexts
                               to control conditional compilation symbols during
                               Roslyn source analysis (default: policy
                               default_condition_set, otherwise empty symbol set)
+          --ensure-built      Build and receipt-verify before collecting candidates
+                              (generate/update/prune only; required to resolve
+                              analysis.target_assemblies for a genuinely external
+                              target repository)
+          --no-restore        Do not restore while ensuring build state
+          --configuration <name>
+                              Requested build configuration
+          --framework <tfm>   Requested target framework
+          --platform <platform>
+                              Requested platform
+          --runtime <rid>     Requested runtime identifier
           -h, --help          Show this help message
 
         Subcommands:
@@ -102,6 +113,14 @@ internal static class BaselineHelpTexts
           --contract <id>     Restrict to this contract ID (may be repeated)
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
+          --ensure-built      Build and receipt-verify before collecting candidates
+          --no-restore        Do not restore while ensuring build state
+          --configuration <name>
+                              Requested build configuration
+          --framework <tfm>   Requested target framework
+          --platform <platform>
+                              Requested platform
+          --runtime <rid>     Requested runtime identifier
           -h, --help          Show this help message
 
         Entries carried over keep their reason and issue metadata verbatim; reason
@@ -140,6 +159,14 @@ internal static class BaselineHelpTexts
           --dry-run           Report the proposal without writing any file
           --force             Replace an existing output file other than --baseline
           --json              Report removed entries and the lifecycle report as JSON
+          --ensure-built      Build and receipt-verify before collecting candidates
+          --no-restore        Do not restore while ensuring build state
+          --configuration <name>
+                              Requested build configuration
+          --framework <tfm>   Requested target framework
+          --platform <platform>
+                              Requested platform
+          --runtime <rid>     Requested runtime identifier
           -h, --help          Show this help message
 
         Only entries that match no current violation are removed (`resolved`), along
@@ -170,18 +197,14 @@ internal static class BaselineHelpTexts
           --contract <id>     Restrict to this contract ID (may be repeated)
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
-          --ensure-built      Build and verify the selected project graph before collecting
-                              baseline candidates; required for opted-in shared frameworks
-          --no-restore        Fail closed when restore is required instead of restoring
-          --configuration <name>
-                              Requested build configuration for build-state preflight
-          --framework <tfm>   Requested target framework for build-state preflight
-          --platform <platform>
-                              Requested platform for build-state preflight
-          --runtime <rid>     Requested runtime identifier for build-state preflight
           --json               Shorthand for --format json; cannot be combined with --format
           --format <fmt>       Output format: human (default), json, or sarif
           -h, --help          Show this help message
+
+        This command has no build-state options (--ensure-built, --no-restore,
+        --configuration, --framework, --platform, --runtime): it always evaluates in
+        Ordinary preparation mode. See `baseline verify` for a build-state-aware
+        equivalent when the diff needs a fresh or receipt-verified build.
 
         Exit codes:
           0   Diff produced successfully (regardless of drift found)
