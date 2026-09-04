@@ -7,7 +7,7 @@ public sealed partial class CheckpointBReleaseGateTests
     private sealed partial class CandidatePackageFeed
     {
         private CheckpointBPhaseTrace? _phaseTrace;
-        private readonly HashSet<string> _restoredFullCycleRoots = new(StringComparer.Ordinal);
+        private readonly CheckpointBRestoreReuse _restoreReuse = new();
 
         public IDisposable BeginPhaseTrace(CheckpointBPhaseTrace phaseTrace)
         {
@@ -23,24 +23,9 @@ public sealed partial class CheckpointBReleaseGateTests
 
         public CommandResult RunToolWithReusedRestore(string workingDirectory, params string[] arguments)
         {
-            if (!arguments.Contains("--ensure-built", StringComparer.Ordinal))
-            {
-                return RunTool(workingDirectory, arguments);
-            }
-
-            string root = Path.GetFullPath(workingDirectory);
-            if (arguments.Contains("--no-restore", StringComparer.Ordinal))
-            {
-                return RunTool(workingDirectory, arguments);
-            }
-
-            if (_restoredFullCycleRoots.Contains(root))
-            {
-                return RunTool(workingDirectory, arguments.Append("--no-restore").ToArray());
-            }
-
-            CommandResult result = RunTool(workingDirectory, arguments);
-            _restoredFullCycleRoots.Add(root);
+            string[] preparedArguments = _restoreReuse.PrepareArguments(workingDirectory, arguments);
+            CommandResult result = RunTool(workingDirectory, preparedArguments);
+            _restoreReuse.RecordSuccessfulEnsureBuilt(workingDirectory, arguments, result.ExitCode);
             return result;
         }
 
