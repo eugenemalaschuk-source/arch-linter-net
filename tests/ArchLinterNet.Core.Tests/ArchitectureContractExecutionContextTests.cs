@@ -383,4 +383,45 @@ public sealed class ArchitectureContractExecutionContextTests
         Assert.That(baselineCandidates, Is.Empty,
             "An active structured waiver is not a baseline entry -- it must never surface as a new baseline-comparison candidate.");
     }
+
+    [Test]
+    public void IsIgnoredWithAliases_PolicyWaiverMatchesFirstAliasAndLoadedBaselineMatchesLaterAlias_StillAddsCandidate()
+    {
+        // Regression: PublicApiSurfaceChecker calls IsIgnoredWithAliases with more than one
+        // representation of the same finding (e.g. a canonical signature alias and a
+        // reported/exact signature alias). A legacy (non-structured) policy-authored ignore can
+        // match one alias while a separate legacy baseline-imported entry (IsFromLoadedBaseline)
+        // matches only a different alias -- both are alias-dependent glob matches, unlike
+        // structured-identity or waiver-fingerprint matches, which are alias-independent. Stopping
+        // at the first matched alias would capture matchedByLoadedBaseline from whichever alias
+        // happened to match first; if that is the policy waiver, the later alias's genuine
+        // loaded-baseline match must still be found, or this occurrence is wrongly excluded from
+        // _baselineCandidates and a still-present baselined finding is classified Resolved instead
+        // of Frozen.
+        var ignoredViolations = new List<ArchitectureIgnoredViolation>
+        {
+            new() { SourceType = "Source.Type", ForbiddenReference = "Signature.AliasA", Reason = "policy waiver" },
+            new()
+            {
+                SourceType = "Source.Type",
+                ForbiddenReference = "Signature.AliasB",
+                Reason = "generated baseline",
+                IsFromLoadedBaseline = true,
+            },
+        };
+        var baselineCandidates = new List<ArchitectureBaselineCandidate>();
+        var context = new ArchitectureContractExecutionContext(
+            "contract-name", "contract-id", ignoredViolations,
+            enableUnmatchedIgnoreTracking: true, contractGroup: "group", baselineCandidates: baselineCandidates);
+
+        bool ignored = context.IsIgnoredWithAliases(
+            "Source.Type",
+            forbiddenReferenceAliases: ["Signature.AliasA", "Signature.AliasB"],
+            canonicalForbiddenReference: "Signature.Canonical");
+
+        Assert.That(ignored, Is.True);
+        Assert.That(baselineCandidates, Has.Count.EqualTo(1),
+            "The occurrence is suppressed (via the policy waiver on alias A), but alias B still genuinely matches "
+            + "the loaded baseline, so it must remain a baseline-comparison candidate -- not silently Resolved.");
+    }
 }

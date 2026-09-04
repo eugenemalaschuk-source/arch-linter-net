@@ -131,6 +131,14 @@ internal sealed class ArchitectureContractExecutionContext
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
             sourceType, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
 
+        // Deliberately does not stop at the first matching alias (PublicApiSurfaceChecker calls this
+        // with more than one representation of the same finding -- e.g. a signature and its
+        // reported/exact form -- so a legacy/canonical policy waiver and a structured loaded-baseline
+        // entry can each match a *different* alias of the same occurrence). Stopping early risked
+        // capturing matchedByLoadedBaseline from whichever alias happened to match first: if that was
+        // the policy waiver, a later alias's genuine loaded-baseline match would never be seen, and
+        // this occurrence would be wrongly excluded from _baselineCandidates -- a still-present
+        // baselined finding silently classified Resolved instead of Frozen.
         bool ignored = false;
         bool matchedByLoadedBaseline = false;
         foreach (string alias in forbiddenReferenceAliases)
@@ -139,8 +147,7 @@ internal sealed class ArchitectureContractExecutionContext
                     sourceType, alias, _ignoredViolations, _tracker, liveIdentity, out bool aliasMatchedByLoadedBaseline))
             {
                 ignored = true;
-                matchedByLoadedBaseline = aliasMatchedByLoadedBaseline;
-                break;
+                matchedByLoadedBaseline |= aliasMatchedByLoadedBaseline;
             }
         }
 
