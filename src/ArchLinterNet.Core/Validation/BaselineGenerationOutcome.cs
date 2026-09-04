@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Validation;
@@ -14,4 +15,7 @@ public sealed record BaselineGenerationOutcome(
 
     /// <summary>Argument-level failure (for example a malformed reason mapping).</summary>
     public string? Error { get; init; }
+
+    public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics { get; init; } =
+        Array.Empty<BuildStatePreflightDiagnostic>();
 }

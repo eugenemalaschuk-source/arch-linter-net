@@ -15,15 +15,15 @@ public sealed partial class CheckpointBReleaseGateTests
         string primaryHealthOutputPath)
     {
         // `health` unconditionally requires --baseline (even for a clean run: "reviewed exact
-        // persistent-debt baseline (required)"), but `baseline generate` has no --ensure-built (or
-        // any build-state) option and cannot resolve this fixture's target assemblies at all --
-        // confirmed empirically to hard-fail even immediately after a successful --ensure-built
-        // build, the same category of gap already flagged for `measure`. These baselines are
-        // therefore hand-authored (see V08FullCycleFragmentContent.EmptyBaseline/DebtBaseline)
-        // rather than CLI-generated. An empty baseline covers no violations, so it is reused for
-        // HEALTHY (genuinely nothing to review), FAILING (current's violations stay unreviewed
-        // against it, so the failure is genuinely "current strict violation", not "unassessable"),
-        // and UNASSESSABLE/DEGRADING below (neither depends on debt actually being reviewed).
+        // persistent-debt baseline (required)"). `baseline generate --ensure-built` now works
+        // against this fixture's target_assemblies (the missing-build-state-options gap it and
+        // `measure` shared is fixed -- both now carry --ensure-built/--no-restore/--configuration/
+        // --framework/--platform/--runtime), but the empty case is trivial content
+        // ("version: 2\nbaseline: {}\n") that needs no --ensure-built round trip, so it stays
+        // hand-authored (see V08FullCycleFragmentContent.EmptyBaseline) and is reused for HEALTHY
+        // (genuinely nothing to review), FAILING (current's violations stay unreviewed against it,
+        // so the failure is genuinely "current strict violation", not "unassessable"), and
+        // UNASSESSABLE/DEGRADING below (neither depends on debt actually being reviewed).
         string emptyBaselinePath = Path.Combine(baseRoot, "v08-empty-baseline.arch.yml");
         File.WriteAllText(emptyBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 

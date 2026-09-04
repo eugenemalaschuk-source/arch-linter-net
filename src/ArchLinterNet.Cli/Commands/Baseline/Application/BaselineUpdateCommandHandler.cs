@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
@@ -36,10 +37,25 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
                 ReasonForContract = options.Reasons.ReasonForContract,
                 ReasonForFamily = options.Reasons.ReasonForFamily,
                 ContractIds = options.ContractIds.ToList(),
+                PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                NoRestore = options.NoRestore,
+                RequestedConfiguration = options.Configuration,
+                RequestedTargetFramework = options.TargetFramework,
+                RequestedPlatform = options.Platform,
+                RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             });
 
             if (!outcome.Succeeded)
             {
+                if (outcome.PreflightDiagnostics.Any(diagnostic => diagnostic.IsBlocking))
+                {
+                    CliErrorOutputWriter.WritePreflightFailure(
+                        console, options.Format,
+                        "Baseline update error: build-state preflight is blocked; baseline candidates were not collected.",
+                        outcome.PreflightDiagnostics);
+                    return CliExitCodes.InvalidArgumentsOrRuntimeError;
+                }
+
                 BaselineCommandGuards.WriteOutcomeFailure(
                     console, options.Format, outcome.Error, outcome.ConfigurationViolations, "updated");
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;

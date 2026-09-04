@@ -39,6 +39,17 @@ internal static class BaselineHelpTexts
                               to control conditional compilation symbols during
                               Roslyn source analysis (default: policy
                               default_condition_set, otherwise empty symbol set)
+          --ensure-built      Build and receipt-verify before collecting candidates
+                              (generate/update/prune only; required to resolve
+                              analysis.target_assemblies for a genuinely external
+                              target repository)
+          --no-restore        Do not restore while ensuring build state
+          --configuration <name>
+                              Requested build configuration
+          --framework <tfm>   Requested target framework
+          --platform <platform>
+                              Requested platform
+          --runtime <rid>     Requested runtime identifier
           -h, --help          Show this help message
 
         Subcommands:
@@ -102,6 +113,14 @@ internal static class BaselineHelpTexts
           --contract <id>     Restrict to this contract ID (may be repeated)
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
+          --ensure-built      Build and receipt-verify before collecting candidates
+          --no-restore        Do not restore while ensuring build state
+          --configuration <name>
+                              Requested build configuration
+          --framework <tfm>   Requested target framework
+          --platform <platform>
+                              Requested platform
+          --runtime <rid>     Requested runtime identifier
           -h, --help          Show this help message
 
         Entries carried over keep their reason and issue metadata verbatim; reason
@@ -140,6 +159,14 @@ internal static class BaselineHelpTexts
           --dry-run           Report the proposal without writing any file
           --force             Replace an existing output file other than --baseline
           --json              Report removed entries and the lifecycle report as JSON
+          --ensure-built      Build and receipt-verify before collecting candidates
+          --no-restore        Do not restore while ensuring build state
+          --configuration <name>
+                              Requested build configuration
+          --framework <tfm>   Requested target framework
+          --platform <platform>
+                              Requested platform
+          --runtime <rid>     Requested runtime identifier
           -h, --help          Show this help message
 
         Only entries that match no current violation are removed (`resolved`), along

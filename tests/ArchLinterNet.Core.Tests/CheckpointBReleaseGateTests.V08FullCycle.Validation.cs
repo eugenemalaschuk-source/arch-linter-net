@@ -213,28 +213,48 @@ public sealed partial class CheckpointBReleaseGateTests
     private static CheckpointScenarioResult AssertMeasureAndBudget(
         CandidatePackageFeed candidate, string root, string validateJson)
     {
-        CommandResult measure = candidate.RunTool(root,
+        // Ordinary-mode assembly resolution only probes project OUTPUT paths for a metric that
+        // requires exact artifact binding (component_footprint_count with unit: project/assembly --
+        // see ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding). modules-outgoing is
+        // an outgoing_component_count metric over a type-subject topology with no such binding, so
+        // for a genuinely external target repository (this fixture, not ArchLinterNet analyzing its
+        // own already-loaded assemblies) bare `measure` -- with no build-state option at all -- was
+        // unassessable, exit 2, missing_required_input: a confirmed product gap (`measure` and
+        // `baseline generate`/`update`/`prune` categorically could not resolve
+        // analysis.target_assemblies for any external target), now fixed by giving all four the same
+        // --ensure-built/--no-restore/--configuration/--framework/--platform/--runtime surface
+        // validate/health/gate/topology/baseline verify/diff already had.
+        CommandResult measureWithoutEnsureBuilt = candidate.RunTool(root,
             "measure",
             "--policy", DependenciesPath(root),
             "--format", "json");
-        // `measure` has no --ensure-built (or any build-state) option, and its Ordinary-mode
-        // assembly resolution only probes project OUTPUT paths for a metric that requires exact
-        // artifact binding (component_footprint_count with unit: project/assembly -- see
-        // ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding). modules-outgoing is an
-        // outgoing_component_count metric over a type-subject topology with no such binding, so for
-        // a genuinely external target repository (this fixture, not ArchLinterNet analyzing its own
-        // already-loaded assemblies) it is unassessable via bare `measure`, exit 2 with
-        // missing_required_input -- a real, confirmed product gap, not a fixture authoring mistake.
-        Assert.That(measure.ExitCode, Is.EqualTo(2), $"v08-measure-budget: {measure.CombinedOutput}");
+        Assert.That(measureWithoutEnsureBuilt.ExitCode, Is.EqualTo(2),
+            $"v08-measure-budget (bare): {measureWithoutEnsureBuilt.CombinedOutput}");
+        using (JsonDocument bareDocument = JsonDocument.Parse(measureWithoutEnsureBuilt.StandardOutput))
+        {
+            Assert.That(bareDocument.RootElement.GetProperty("status").GetString(), Is.EqualTo("unassessable"),
+                $"v08-measure-budget (bare): {measureWithoutEnsureBuilt.CombinedOutput}");
+        }
+
+        CommandResult measure = candidate.RunTool(root,
+            "measure",
+            "--policy", DependenciesPath(root),
+            "--ensure-built",
+            "--format", "json");
+        Assert.That(measure.ExitCode, Is.EqualTo(0), $"v08-measure-budget: {measure.CombinedOutput}");
         using JsonDocument document = JsonDocument.Parse(measure.StandardOutput);
-        Assert.That(document.RootElement.ValueKind, Is.EqualTo(JsonValueKind.Object), "v08-measure-budget");
-        Assert.That(document.RootElement.GetProperty("status").GetString(), Is.EqualTo("unassessable"),
+        Assert.That(document.RootElement.GetProperty("status").GetString(), Is.EqualTo("complete"),
+            $"v08-measure-budget: {measure.CombinedOutput}");
+        JsonElement modulesOutgoing = document.RootElement.GetProperty("measurements")
+            .EnumerateArray()
+            .Single(measurement => measurement.GetProperty("id").GetString() == "modules-outgoing");
+        Assert.That(modulesOutgoing.GetProperty("state").GetString(), Is.EqualTo("evaluable"),
+            $"v08-measure-budget: {measure.CombinedOutput}");
+        Assert.That(modulesOutgoing.GetProperty("value").GetInt32(), Is.EqualTo(1),
             $"v08-measure-budget: {measure.CombinedOutput}");
 
         // The enforced budget (strict_metric_budgets: modules-outgoing-limit) is proven by the
-        // earlier strict validate run already reporting it as one of the >= 2 findings; `validate`
-        // resolves the same metric successfully because its EnsureBuilt preparation path always
-        // does project-output discovery, unlike bare `measure`.
+        // earlier strict validate run already reporting it as one of the >= 2 findings.
         using JsonDocument validateDocument = JsonDocument.Parse(validateJson);
         JsonElement findings = validateDocument.RootElement.TryGetProperty("violations", out JsonElement violations)
             ? violations

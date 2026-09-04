@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.BuildState;
+
 namespace ArchLinterNet.Core.Validation;
 
 public sealed record BaselineUpdateRequest
@@ -19,6 +21,19 @@ public sealed record BaselineUpdateRequest
     public IReadOnlyCollection<string>? ReasonForFamily { get; init; }
 
     public IReadOnlyCollection<string>? ContractIds { get; init; }
+
+    // See BaselineGenerationRequest.PreparationMode.
+    public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
+
+    public bool NoRestore { get; init; }
+
+    public string? RequestedConfiguration { get; init; }
+
+    public string? RequestedTargetFramework { get; init; }
+
+    public string? RequestedPlatform { get; init; }
+
+    public string? RequestedRuntimeIdentifier { get; init; }
 
     public CancellationToken CancellationToken { get; init; } = default;
 }

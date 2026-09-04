@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Validation;
@@ -19,4 +20,7 @@ public sealed record BaselineUpdateOutcome(
     public string? CommentDiagnostic { get; init; }
 
     public string? Error { get; init; }
+
+    public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics { get; init; } =
+        Array.Empty<BuildStatePreflightDiagnostic>();
 }

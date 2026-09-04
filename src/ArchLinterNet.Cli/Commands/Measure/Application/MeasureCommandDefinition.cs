@@ -22,6 +22,14 @@ internal sealed class MeasureCommandDefinition(MeasureCommandHandler handler)
                                 Maximum contributors shown per metric (default: 20)
               --all-contributors
                                 Show every ordered contributor; overrides the default bound
+              --ensure-built    Build and receipt-verify before measuring
+              --no-restore      Do not restore while ensuring build state
+              --configuration <name>
+                                Requested build configuration
+              --framework <tfm> Requested target framework
+              --platform <platform>
+                                Requested platform
+              --runtime <rid>   Requested runtime identifier
           -h, --help            Show this help message
 
         Exit codes:
@@ -41,6 +49,12 @@ internal sealed class MeasureCommandDefinition(MeasureCommandHandler handler)
         Option<string> conditionSetOption = new("--condition-set");
         Option<int?> maxContributorsOption = new("--max-contributors");
         Option<bool> allContributorsOption = new("--all-contributors");
+        Option<bool> ensureBuiltOption = new("--ensure-built");
+        Option<bool> noRestoreOption = new("--no-restore");
+        Option<string> configurationOption = new("--configuration");
+        Option<string> targetFrameworkOption = new("--framework");
+        Option<string> platformOption = new("--platform");
+        Option<string> runtimeIdentifierOption = new("--runtime");
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
 
@@ -50,6 +64,12 @@ internal sealed class MeasureCommandDefinition(MeasureCommandHandler handler)
         command.Options.Add(conditionSetOption);
         command.Options.Add(maxContributorsOption);
         command.Options.Add(allContributorsOption);
+        command.Options.Add(ensureBuiltOption);
+        command.Options.Add(noRestoreOption);
+        command.Options.Add(configurationOption);
+        command.Options.Add(targetFrameworkOption);
+        command.Options.Add(platformOption);
+        command.Options.Add(runtimeIdentifierOption);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new MeasureCommandOptions(
@@ -59,7 +79,13 @@ internal sealed class MeasureCommandDefinition(MeasureCommandHandler handler)
             parseResult.GetValue(conditionSetOption),
             parseResult.GetValue(maxContributorsOption),
             parseResult.GetValue(allContributorsOption),
-            parseResult.GetValue(helpOption))));
+            parseResult.GetValue(helpOption),
+            parseResult.GetValue(ensureBuiltOption),
+            parseResult.GetValue(noRestoreOption),
+            parseResult.GetValue(configurationOption),
+            parseResult.GetValue(targetFrameworkOption),
+            parseResult.GetValue(platformOption),
+            parseResult.GetValue(runtimeIdentifierOption))));
 
         return command;
     }

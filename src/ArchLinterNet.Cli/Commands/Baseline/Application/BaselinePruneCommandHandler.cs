@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
@@ -33,10 +34,25 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
                 ConditionSetName = options.ConditionSetName,
                 CancellationToken = cancellationToken,
                 ContractIds = options.ContractIds.ToList(),
+                PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                NoRestore = options.NoRestore,
+                RequestedConfiguration = options.Configuration,
+                RequestedTargetFramework = options.TargetFramework,
+                RequestedPlatform = options.Platform,
+                RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             });
 
             if (!outcome.Succeeded)
             {
+                if (outcome.PreflightDiagnostics.Any(diagnostic => diagnostic.IsBlocking))
+                {
+                    CliErrorOutputWriter.WritePreflightFailure(
+                        console, options.Format,
+                        "Baseline prune error: build-state preflight is blocked; baseline candidates were not collected.",
+                        outcome.PreflightDiagnostics);
+                    return CliExitCodes.InvalidArgumentsOrRuntimeError;
+                }
+
                 WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
