@@ -80,7 +80,8 @@ public sealed partial class CheckpointBReleaseGateTests
             scenarios.Add(reportScenario);
             (CheckpointScenarioResult badgeScenario, string badgePath) = AssertBadge(candidate, fixture.Root, healthPath);
             scenarios.Add(badgeScenario);
-            scenarios.Add(AssertProjectionParity(validateJson, strictValidateSarifPath, healthPath, reportPath, badgePath));
+            scenarios.Add(AssertProjectionParity(
+                candidate, fixture.Root, validateJson, strictValidateSarifPath, healthPath, reportPath, badgePath));
             scenarios.Add(AssertUnityTopologyPackedProof(candidate));
         }
         finally

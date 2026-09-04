@@ -40,17 +40,22 @@ public sealed partial class CheckpointBReleaseGateTests
 
     // Real cross-projection agreement on overlapping canonical facts, comparing full canonical
     // finding identity (not just contract_id, which many findings for different occurrences can
-    // share) across four independently rendered projections of the SAME strict validate run: the
+    // share) across five independently rendered projections of the SAME strict validate run: the
     // JSON violations, the SARIF results (ArchitectureSarifFormatter embeds the identical
     // ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif payload -- including
     // canonical_identity -- under results[].properties.arch_linter_net), the canonical Health
     // artifact's own embedded report_evidence.validation_outcomes findings for the strict mode
-    // entry (ArchitectureHealthProjector reuses the same FormatNormalizedFindingForJson), and the
-    // effective rule count / ignore debt counters both JSON and Health carry independently in their
-    // own policy_inventory section. Report Markdown and the badge are prose/summary projections
-    // rather than structured re-parse targets, so they are still checked by content, but against the
-    // full canonical identity set rather than "at least one".
+    // entry (ArchitectureHealthProjector reuses the same FormatNormalizedFindingForJson), the
+    // packaged ArchLinterNet.Testing API (an isolated external consumer resolves it from the
+    // candidate feed -- not the source-compiled test-host assembly -- and runs
+    // ArchitectureValidationBuilder against the same policy, printing each violation's identity via
+    // the same ArchitectureViolationIdentityJson.Serialize wire projection every formatter uses),
+    // and the effective rule count / ignore debt counters both JSON and Health carry independently
+    // in their own policy_inventory section. Report Markdown and the badge are prose/summary
+    // projections rather than structured re-parse targets, so they are still checked by content, but
+    // against the full canonical identity set rather than "at least one".
     private static CheckpointScenarioResult AssertProjectionParity(
+        CandidatePackageFeed candidate, string root,
         string validateJson, string strictValidateSarifPath, string healthPath, string reportPath, string badgePath)
     {
         using JsonDocument validate = JsonDocument.Parse(validateJson);
@@ -83,6 +88,20 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(sarifCanonicalIdentities, Is.EqualTo(jsonCanonicalIdentities),
             "v08-projection-parity expected the SARIF projection's canonical finding identities to exactly match "
             + $"the JSON projection's: json={string.Join(",", jsonCanonicalIdentities)} sarif={string.Join(",", sarifCanonicalIdentities)}");
+
+        // The packaged ArchLinterNet.Testing API does not bind --external-evidence (that surface is
+        // CLI-only), so it cannot resolve the required-evidence applicability control this policy
+        // also declares -- but that control produces an applicability finding, not an
+        // ArchitectureViolation, so the same exposure/budget contract violations still surface
+        // through result.Violations. A subset check (not exact equality) accommodates that scope
+        // difference while still proving Testing agrees on every genuine finding JSON/SARIF report.
+        HashSet<string> testingCanonicalIdentities = candidate
+            .RunTestingCanonicalIdentities(DependenciesPath(root))
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.That(jsonCanonicalIdentities.IsSubsetOf(testingCanonicalIdentities), Is.True,
+            "v08-projection-parity expected every strict JSON finding's canonical_identity to also appear in the "
+            + $"packaged ArchLinterNet.Testing API's own violations: json={string.Join(",", jsonCanonicalIdentities)} "
+            + $"testing={string.Join(",", testingCanonicalIdentities)}");
 
         using JsonDocument health = JsonDocument.Parse(File.ReadAllText(healthPath));
         string? healthCategory = health.RootElement.GetProperty("health").GetString();

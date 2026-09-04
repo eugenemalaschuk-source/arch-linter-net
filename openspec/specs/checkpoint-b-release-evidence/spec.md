@@ -488,11 +488,24 @@ scenario family.
 - **AND** neither re-executes the full server/modular pipeline merely to
   increase scenario count
 - **NOTE**: the library shape is already satisfied by the existing
-  `public-api-surface-selector-*` packed scenarios. The Unity-style shape is
-  currently proven only in-process (`TopologyReviewLifecycleAcceptanceTests`),
-  not through the packed Checkpoint B candidate CLI this requirement demands;
-  a packed Unity-style shard remains an explicit, tracked follow-up rather
-  than delivered by this change.
+  `public-api-surface-selector-*` packed scenarios. For the Unity-style
+  shape, the required-inventory packed scenario `v08-unity-topology-review`
+  proves declared Runtime/Gameplay/Editor topology capture/diff and
+  required-subject-unmapped fail-closed behavior through the packed
+  Checkpoint B candidate CLI (reusing the checked-in
+  `topology-review-unity` fixture's own capture/diff lifecycle). It does
+  NOT prove runtime/public-surface exposure rejection or route through the
+  canonical Health/report/badge path, as this scenario otherwise requires:
+  `validate`/`health`/`gate` cannot run against a pure asmdef subject today
+  at all, because `analysis.target_assemblies` unconditionally requires
+  real assembly resolution and Unity assemblies are never produced by
+  `dotnet build`. This is a confirmed product capability gap, not an
+  undelivered test -- closing it needs a product change (letting a
+  topology-only/asmdef-only subject reach Health/report without assembly
+  resolution, or an equivalent seam) before the full scenario text above can
+  be satisfied. Tracked as a follow-up story; until it lands, this NOTE is
+  the authoritative record that the Unity-style shape's release evidence is
+  partial by design, not by oversight.
 
 #### Scenario: A missing or duplicated v0.8 scenario fails evidence
 - **WHEN** a platform's shard evidence omits a required v0.8 scenario ID,
