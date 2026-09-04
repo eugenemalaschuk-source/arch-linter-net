@@ -27,7 +27,7 @@ public sealed partial class CheckpointBReleaseGateTests
         MaterializeUnityAssemblies(unityFixture.Root);
 
         string capturePath = Path.Combine(unityFixture.Root, "unity-capture.json");
-        CommandResult capture = candidate.RunTool(unityFixture.Root,
+        CommandResult capture = candidate.RunToolWithReusedRestore(unityFixture.Root,
             "topology", "capture",
             "--policy", "capture.arch.yml",
             "--subject-kind", "assembly",
@@ -41,7 +41,7 @@ public sealed partial class CheckpointBReleaseGateTests
         }
 
         string declaredDiffPath = Path.Combine(unityFixture.Root, "unity-declared-diff.json");
-        CommandResult declaredDiff = candidate.RunTool(unityFixture.Root,
+        CommandResult declaredDiff = candidate.RunToolWithReusedRestore(unityFixture.Root,
             "topology", "diff",
             "--policy", "declared.arch.yml",
             "--mode", "strict",
@@ -60,7 +60,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // subject kind: a required first-party subject (the editor assembly) the declared topology
         // stops mapping must fail closed to genuinely unmapped, not silently pass.
         string unmappedDiffPath = Path.Combine(unityFixture.Root, "unity-unmapped-diff.json");
-        CommandResult unmappedDiff = candidate.RunTool(unityFixture.Root,
+        CommandResult unmappedDiff = candidate.RunToolWithReusedRestore(unityFixture.Root,
             "topology", "diff",
             "--policy", "declared-unmapped.arch.yml",
             "--mode", "strict",
@@ -86,7 +86,7 @@ public sealed partial class CheckpointBReleaseGateTests
     {
         using AdoptionAcceptanceFixture cleanFixture = AdoptionAcceptanceFixture.Create("topology-review-unity");
         MaterializeUnityAssemblies(cleanFixture.Root);
-        CommandResult clean = candidate.RunTool(cleanFixture.Root,
+        CommandResult clean = candidate.RunToolWithReusedRestore(cleanFixture.Root,
             "--policy", "declared.arch.yml",
             "--mode", "strict",
             "--contract", "unity-runtime-no-editor",
@@ -110,7 +110,7 @@ public sealed partial class CheckpointBReleaseGateTests
             "Diagnostic: the Runtime asmdef's empty references array no longer matches the expected shape to mutate.");
         File.WriteAllText(runtimeAsmdefPath, mutatedAsmdef);
 
-        CommandResult mutated = candidate.RunTool(mutatedFixture.Root,
+        CommandResult mutated = candidate.RunToolWithReusedRestore(mutatedFixture.Root,
             "--policy", "declared.arch.yml",
             "--mode", "strict",
             "--contract", "unity-runtime-no-editor",
@@ -151,7 +151,7 @@ public sealed partial class CheckpointBReleaseGateTests
         File.WriteAllText(baselinePath, V08FullCycleFragmentContent.EmptyBaseline);
         string healthPath = Path.Combine(unityFixture.Root, "unity-health.json");
 
-        CommandResult health = candidate.RunTool(unityFixture.Root,
+        CommandResult health = candidate.RunToolWithReusedRestore(unityFixture.Root,
             "health",
             "--policy", "declared.arch.yml",
             "--baseline", baselinePath,
@@ -174,7 +174,7 @@ public sealed partial class CheckpointBReleaseGateTests
         }
 
         string badgePath = Path.Combine(unityFixture.Root, "unity-badge.json");
-        CommandResult badge = candidate.RunTool(unityFixture.Root,
+        CommandResult badge = candidate.RunToolWithReusedRestore(unityFixture.Root,
             "badge", "architecture-health",
             "--input", healthPath,
             "--output", badgePath);
@@ -188,7 +188,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // `report pr` also requires --change; a trivial base==current snapshot pair is enough since
         // this scenario proves routing, not a bounded delta.
         string snapshotPath = Path.Combine(unityFixture.Root, "unity-snapshot.json");
-        CommandResult snapshot = candidate.RunTool(unityFixture.Root,
+        CommandResult snapshot = candidate.RunToolWithReusedRestore(unityFixture.Root,
             "change", "snapshot",
             "--policy", "declared.arch.yml",
             "--mode", "strict",
@@ -196,7 +196,7 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(snapshot.ExitCode, Is.EqualTo(0), $"v08-unity-health-report-routing (change snapshot): {snapshot.CombinedOutput}");
 
         string changeReportPath = Path.Combine(unityFixture.Root, "unity-change.json");
-        CommandResult changeReport = candidate.RunTool(unityFixture.Root,
+        CommandResult changeReport = candidate.RunToolWithReusedRestore(unityFixture.Root,
             "change", "report",
             "--base", snapshotPath,
             "--current", snapshotPath,
@@ -206,7 +206,7 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(changeReport.ExitCode, Is.EqualTo(0), $"v08-unity-health-report-routing (change report): {changeReport.CombinedOutput}");
 
         string reportPath = Path.Combine(unityFixture.Root, "unity-report.md");
-        CommandResult report = candidate.RunTool(unityFixture.Root,
+        CommandResult report = candidate.RunToolWithReusedRestore(unityFixture.Root,
             "report", "pr",
             "--health", healthPath,
             "--change", changeReportPath,

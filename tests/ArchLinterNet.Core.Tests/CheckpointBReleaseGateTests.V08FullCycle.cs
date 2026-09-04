@@ -26,6 +26,7 @@ public sealed partial class CheckpointBReleaseGateTests
     private static List<CheckpointScenarioResult> AssertV08FullCycle(CandidatePackageFeed candidate)
     {
         var scenarios = new List<CheckpointScenarioResult>();
+        var phaseTrace = new CheckpointBPhaseTrace();
         using GitVersionedAdoptionFixture fixture = GitVersionedAdoptionFixture.Create("modular-consumer");
         fixture.Commit("base");
 
@@ -37,60 +38,69 @@ public sealed partial class CheckpointBReleaseGateTests
 
         try
         {
-            scenarios.Add(AssertPolicyCheck(candidate, fixture.Root));
-
-            string validSarifPath = Path.Combine(fixture.Root, "evidence", "v08-static-analysis.sarif");
-            WriteSarif(validSarifPath, executionSuccessful: true, resultMessages: []);
-            using (JsonDocument sanityCheck = JsonDocument.Parse(File.ReadAllBytes(validSarifPath)))
+            using (candidate.BeginPhaseTrace(phaseTrace))
             {
-                Assert.That(sanityCheck.RootElement.ValueKind, Is.EqualTo(JsonValueKind.Object),
-                    $"Diagnostic: written SARIF at '{validSarifPath}' did not parse. Content: {File.ReadAllText(validSarifPath)}");
+                scenarios.Add(AssertPolicyCheck(candidate, fixture.Root));
+
+                string validSarifPath = Path.Combine(fixture.Root, "evidence", "v08-static-analysis.sarif");
+                WriteSarif(validSarifPath, executionSuccessful: true, resultMessages: []);
+                using (JsonDocument sanityCheck = JsonDocument.Parse(File.ReadAllBytes(validSarifPath)))
+                {
+                    Assert.That(sanityCheck.RootElement.ValueKind, Is.EqualTo(JsonValueKind.Object),
+                        $"Diagnostic: written SARIF at '{validSarifPath}' did not parse. Content: {File.ReadAllText(validSarifPath)}");
+                }
+
+                (CheckpointScenarioResult validateScenario, string validateJson, string strictValidateSarifPath) =
+                    AssertValidateStrictAudit(
+                        candidate, fixture.Root, validSarifPath, V08EvidenceRepository, currentSha, V08EvidenceScope);
+                scenarios.Add(validateScenario);
+                scenarios.Add(AssertRecursiveExposureEvidence(validateJson));
+                scenarios.Add(AssertTopologyCaptureDiffVerify(candidate, fixture.Root, currentSha));
+                scenarios.Add(AssertTopologyUnmappedSubjectFailsClosed(candidate, fixture.Root, currentSha));
+                scenarios.Add(AssertMeasureAndBudget(candidate, fixture.Root, validateJson));
+
+                string basePolicyContext = Path.Combine(fixture.Root, "v08-policy-base.json");
+                string currentPolicyContext = Path.Combine(fixture.Root, "v08-policy-current.json");
+                AssertPolicyContext(candidate, baseDir, basePolicyContext);
+                AssertPolicyContext(candidate, fixture.Root, currentPolicyContext);
+                scenarios.Add(AssertPolicyWeakeningAndGate(candidate, fixture.Root, basePolicyContext, currentPolicyContext));
+
+                scenarios.Add(AssertExternalEvidenceBinding(candidate, fixture.Root, validSarifPath, currentSha));
+
+                string baseSnapshot = Path.Combine(fixture.Root, "v08-architecture-base.json");
+                string currentSnapshot = Path.Combine(fixture.Root, "v08-architecture-current.json");
+                string changeReportPath = Path.Combine(fixture.Root, "v08-architecture-change.json");
+                scenarios.Add(AssertChangeSnapshotAndReport(
+                    candidate, baseDir, fixture.Root, baseSnapshot, currentSnapshot, changeReportPath));
+
+                string healthPath = Path.Combine(fixture.Root, "v08-architecture-health.json");
+                scenarios.Add(AssertHealthMatrix(
+                    candidate, baseDir, fixture.Root, validSarifPath, currentSha, healthPath));
+                scenarios.Add(AssertHealthMatrixAdvisoryDegrading(candidate, baseDir));
+
+                (CheckpointScenarioResult reportScenario, string reportPath) =
+                    AssertReportPr(candidate, fixture.Root, healthPath, changeReportPath);
+                scenarios.Add(reportScenario);
+                (CheckpointScenarioResult badgeScenario, string badgePath) = AssertBadge(candidate, fixture.Root, healthPath);
+                scenarios.Add(badgeScenario);
+                scenarios.Add(AssertProjectionParity(
+                    candidate, fixture.Root, validateJson, strictValidateSarifPath, healthPath, reportPath, badgePath));
+                scenarios.Add(AssertUnityTopologyPackedProof(candidate));
+                scenarios.Add(AssertUnityEditorExposureRejection(candidate));
+                scenarios.Add(AssertUnityHealthReportRouting(candidate));
             }
-
-            (CheckpointScenarioResult validateScenario, string validateJson, string strictValidateSarifPath) =
-                AssertValidateStrictAudit(
-                    candidate, fixture.Root, validSarifPath, V08EvidenceRepository, currentSha, V08EvidenceScope);
-            scenarios.Add(validateScenario);
-            scenarios.Add(AssertRecursiveExposureEvidence(validateJson));
-            scenarios.Add(AssertTopologyCaptureDiffVerify(candidate, fixture.Root, currentSha));
-            scenarios.Add(AssertTopologyUnmappedSubjectFailsClosed(candidate, fixture.Root, currentSha));
-            scenarios.Add(AssertMeasureAndBudget(candidate, fixture.Root, validateJson));
-
-            string basePolicyContext = Path.Combine(fixture.Root, "v08-policy-base.json");
-            string currentPolicyContext = Path.Combine(fixture.Root, "v08-policy-current.json");
-            AssertPolicyContext(candidate, baseDir, basePolicyContext);
-            AssertPolicyContext(candidate, fixture.Root, currentPolicyContext);
-            scenarios.Add(AssertPolicyWeakeningAndGate(candidate, fixture.Root, basePolicyContext, currentPolicyContext));
-
-            scenarios.Add(AssertExternalEvidenceBinding(candidate, fixture.Root, validSarifPath, currentSha));
-
-            string baseSnapshot = Path.Combine(fixture.Root, "v08-architecture-base.json");
-            string currentSnapshot = Path.Combine(fixture.Root, "v08-architecture-current.json");
-            string changeReportPath = Path.Combine(fixture.Root, "v08-architecture-change.json");
-            scenarios.Add(AssertChangeSnapshotAndReport(
-                candidate, baseDir, fixture.Root, baseSnapshot, currentSnapshot, changeReportPath));
-
-            string healthPath = Path.Combine(fixture.Root, "v08-architecture-health.json");
-            scenarios.Add(AssertHealthMatrix(
-                candidate, baseDir, fixture.Root, validSarifPath, currentSha, healthPath));
-            scenarios.Add(AssertHealthMatrixAdvisoryDegrading(candidate, baseDir));
-
-            (CheckpointScenarioResult reportScenario, string reportPath) =
-                AssertReportPr(candidate, fixture.Root, healthPath, changeReportPath);
-            scenarios.Add(reportScenario);
-            (CheckpointScenarioResult badgeScenario, string badgePath) = AssertBadge(candidate, fixture.Root, healthPath);
-            scenarios.Add(badgeScenario);
-            scenarios.Add(AssertProjectionParity(
-                candidate, fixture.Root, validateJson, strictValidateSarifPath, healthPath, reportPath, badgePath));
-            scenarios.Add(AssertUnityTopologyPackedProof(candidate));
-            scenarios.Add(AssertUnityEditorExposureRejection(candidate));
-            scenarios.Add(AssertUnityHealthReportRouting(candidate));
+        }
+        catch (OperationCanceledException)
+        {
+            TestContext.Out.WriteLine(phaseTrace.FormatCancellation());
+            throw;
         }
         finally
         {
             DeleteDirectoryEventually(baseDir);
         }
 
+        TestContext.Out.WriteLine(phaseTrace.FormatCompleted());
         return scenarios;
     }
 
@@ -169,7 +179,7 @@ public sealed partial class CheckpointBReleaseGateTests
 
     private static CheckpointScenarioResult AssertPolicyCheck(CandidatePackageFeed candidate, string root)
     {
-        CommandResult result = candidate.RunTool(root, "policy", "check", "--policy", DependenciesPath(root), "--format", "json");
+        CommandResult result = candidate.RunToolWithReusedRestore(root, "policy", "check", "--policy", DependenciesPath(root), "--format", "json");
         Assert.That(result.ExitCode, Is.EqualTo(0), $"v08-policy-check: {result.CombinedOutput}");
         using JsonDocument document = JsonDocument.Parse(result.StandardOutput);
         Assert.That(document.RootElement.ValueKind, Is.EqualTo(JsonValueKind.Object), "v08-policy-check");
