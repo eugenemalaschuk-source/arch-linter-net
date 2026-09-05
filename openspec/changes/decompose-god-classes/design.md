@@ -167,6 +167,11 @@ surface contract/assembly resolution and reuses the session's existing public-su
 They return raw internal evidence to the coordinator; none creates a graph, loads assemblies,
 scans source, repeats public-surface scanning, or constructs a measurement outcome.
 
+Direct calculator seam tests cover representative complete and unavailable topology/public-surface
+evidence, while the external calculator retains its focused source-identity tests. The existing
+measurement, applicability, project-ownership, and budget tests continue to prove coordinator
+outcomes and public behavior.
+
 #### `ArchitectureAnalysisSession` responsibility map
 
 - **Session:** owns immutable policy/run inputs, run-scoped indexes and caches, selection state,

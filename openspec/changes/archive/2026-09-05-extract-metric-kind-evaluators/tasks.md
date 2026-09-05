@@ -12,8 +12,10 @@
 
 ## 2. Prove and record the refactor
 
-- [x] 2.1 Add or move focused collaborator-seam tests while retaining outcome-level metric
-  regression coverage; verify focused Core metric/applicability/budget test families pass.
+- [x] 2.1 Add or move focused collaborator-seam tests for topology success/incomplete evidence,
+  external source-identity recovery, and public-contract success/missing evidence while retaining
+  outcome-level metric regression coverage; verify focused Core metric/applicability/budget test
+  families pass.
 - [x] 2.2 Synchronize the active `decompose-god-classes` design and task evidence with the
   completed responsibility extraction; verify the scoped and umbrella OpenSpec artifacts describe
   the actual structure.

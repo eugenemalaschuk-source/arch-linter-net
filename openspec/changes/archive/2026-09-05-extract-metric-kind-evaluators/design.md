@@ -61,10 +61,10 @@ equivalent projection. Normal validation/capture remain outside this change.
 ### Keep focused tests at collaborator seams and retain outcome coverage
 
 Existing end-to-end measure, applicability, project-ownership, and budget tests remain the
-behavioral regression suite. Focused tests will directly exercise each extracted family where its
-internal calculation seam exposes source/ownership or contributor behavior. Tests continue to
-assert values, units, native subjects, scopes, contributor ordering, and unassessable reason codes
-through the coordinator's public outcome.
+behavioral regression suite. Focused direct seams cover topology success and incomplete relation
+evidence, external source-identity recovery, and public contract-surface success and missing
+evidence. Tests continue to assert values, units, native subjects, scopes, contributor ordering,
+and unassessable reason codes through the coordinator's public outcome.
 
 ## Risks / Trade-offs
 

@@ -211,7 +211,7 @@ internal static class ArchitectureMetricEvaluator
                 scope,
                 session.ExternalDependencyFacts.Facts,
                 session.ExternalDependencyFacts.IncompleteSourceTypes)
-            : ArchitectureTopologyMetricCalculator.Calculate(session, definition, topology, scope);
+            : ArchitectureTopologyMetricCalculator.Calculate(session, definition, topology, scope, scoped);
         return Finish(definition, topologyRaw, reasons, provenance);
     }
 

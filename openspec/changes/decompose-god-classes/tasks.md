@@ -16,8 +16,8 @@
   - [x] Replace `ArchitectureSourceSetExpander`'s inclusion and layer-template fragments with `ArchitectureSourceSetInclusionResolver` and `ArchitectureLayerTemplateContainerExpansionRecorder`.
   - [x] Extract `ArchitectureTopologyEvaluator` observation into explicit validation/capture and metric ownership collaborators while preserving topology evidence and identities (#773).
   - [x] Extract `ArchitectureMetricEvaluator` metric-kind calculators while retaining one
-    coordinator, session, topology projection, applicability/output authority, and canonical
-    contributor semantics (#779).
+    coordinator, session, topology projection, applicability/output authority, canonical
+    contributor semantics, and focused calculator seams (#779).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup

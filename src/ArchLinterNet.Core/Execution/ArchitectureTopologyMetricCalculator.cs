@@ -13,15 +13,14 @@ internal static class ArchitectureTopologyMetricCalculator
         ArchitectureAnalysisSession session,
         ArchitectureMetricDefinition definition,
         ArchitectureTopologyEvaluator.Projection topology,
-        string node)
+        string node,
+        IReadOnlyCollection<ArchitectureTopologyEvaluator.SubjectClassification> scoped)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(topology);
+        ArgumentNullException.ThrowIfNull(scoped);
 
-        ArchitectureTopologyEvaluator.SubjectClassification[] scoped = topology.Classifications
-            .Where(classification => classification.NodeIds.Contains(node, StringComparer.Ordinal))
-            .ToArray();
         return definition.Kind switch
         {
             ArchitectureMetricKinds.TopologyTypeCount => TypeCount(node, scoped),
