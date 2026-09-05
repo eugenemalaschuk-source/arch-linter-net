@@ -19,7 +19,6 @@ namespace ArchLinterNet.Core.Execution;
 public sealed class SarifEvidenceReader
 {
     private readonly SarifEvidenceArtifactReader _artifactReader;
-    private readonly SarifEvidenceSourceProjectionReader _sourceProjectionReader = new();
 
     public SarifEvidenceReader(IArchitectureEvidenceFileSystem? fileSystem = null)
     {
@@ -198,7 +197,7 @@ public sealed class SarifEvidenceReader
         }
     }
 
-    private SarifEvidenceReadResult CreateSelectionFailureResult(
+    private static SarifEvidenceReadResult CreateSelectionFailureResult(
         string requirementId,
         SarifEvidenceProvenance baseProvenance,
         SarifRunSelection selection)
@@ -258,7 +257,7 @@ public sealed class SarifEvidenceReader
         IReadOnlyList<SarifEvidenceSourceDiagnostic> sourceDiagnostics = Array.Empty<SarifEvidenceSourceDiagnostic>();
         SarifEvidenceAuthorizationSnapshot? authorization = null;
         if (requirement.DiagnosticFilter is not null
-            && !_sourceProjectionReader.TryReadSourceDiagnostics(
+            && !SarifEvidenceSourceProjectionReader.TryReadSourceDiagnostics(
                 context.Selected.Run,
                 out sourceDiagnostics,
                 out string? sourceShapeDetail,

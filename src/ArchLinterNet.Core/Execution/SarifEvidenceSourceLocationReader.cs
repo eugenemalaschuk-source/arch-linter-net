@@ -4,7 +4,7 @@ using ArchLinterNet.Core.Model;
 namespace ArchLinterNet.Core.Execution;
 
 /// <summary>Projects SARIF artifact locations, regions, and fingerprints into source facts.</summary>
-internal sealed class SarifEvidenceSourceLocationReader
+internal static class SarifEvidenceSourceLocationReader
 {
     internal static bool TryReadPrimaryLocation(
         JsonElement result,

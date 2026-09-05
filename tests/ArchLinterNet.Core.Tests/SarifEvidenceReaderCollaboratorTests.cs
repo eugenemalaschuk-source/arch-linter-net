@@ -142,8 +142,6 @@ public sealed class SarifEvidenceReaderCollaboratorTests
             Tool = "scanner",
             Run = "run-1",
         };
-        var reader = new SarifEvidenceDocumentReader();
-
         Assert.That(SarifEvidenceDocumentReader.TryGetRuns(document.RootElement, out JsonElement runs, out _, out _), Is.True);
         SarifRunSelection selection = SarifEvidenceDocumentReader.SelectMatchingRun(runs, requirement, new SarifEvidenceLimits(4096, 4, 10), CancellationToken.None);
 
@@ -175,9 +173,7 @@ public sealed class SarifEvidenceReaderCollaboratorTests
     {
         using JsonDocument document = JsonDocument.Parse(
             "{\"tool\":{\"driver\":{\"rules\":[{\"id\":\"RULE\",\"properties\":{\"tags\":[\"security\"]}}]}},\"artifacts\":[{\"location\":{\"uri\":\"src\\\\App.cs\"}}],\"results\":[{\"ruleIndex\":0,\"message\":{\"text\":\"bad\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"index\":0},\"region\":{\"startLine\":4}}}]}]}");
-        var reader = new SarifEvidenceSourceProjectionReader();
-
-        Assert.That(reader.TryReadSourceDiagnostics(
+        Assert.That(SarifEvidenceSourceProjectionReader.TryReadSourceDiagnostics(
             document.RootElement,
             out IReadOnlyList<SarifEvidenceSourceDiagnostic> diagnostics,
             out string? detail,

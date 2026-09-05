@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Model;
 namespace ArchLinterNet.Core.Execution;
 
 /// <summary>Parses bounded SARIF bytes and exposes typed document, run, and execution facts.</summary>
-internal sealed class SarifEvidenceDocumentReader
+internal static class SarifEvidenceDocumentReader
 {
     private const string SupportedFormat = "sarif";
     private const string SupportedVersion = "2.1.0";

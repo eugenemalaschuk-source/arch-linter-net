@@ -3,10 +3,10 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal sealed class SarifEvidenceSourceProjectionReader
+internal static class SarifEvidenceSourceProjectionReader
 {
 
-    internal bool TryReadSourceDiagnostics(
+    internal static bool TryReadSourceDiagnostics(
         JsonElement run,
         out IReadOnlyList<SarifEvidenceSourceDiagnostic> diagnostics,
         out string? detail,
@@ -149,7 +149,7 @@ internal sealed class SarifEvidenceSourceProjectionReader
         return true;
     }
 
-    private bool TryReadSourceDiagnostic(
+    private static bool TryReadSourceDiagnostic(
         JsonElement result,
         SarifDriverRuleCatalog driverRules,
         SarifArtifactCatalog artifacts,

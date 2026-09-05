@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Model;
 namespace ArchLinterNet.Core.Execution;
 
 /// <summary>Merges SARIF and producer context and exposes binding facts for the trust composer.</summary>
-internal sealed class SarifEvidenceContextReader
+internal static class SarifEvidenceContextReader
 {
     internal static ContextReadOutcome ReadContext(
         JsonElement run,
