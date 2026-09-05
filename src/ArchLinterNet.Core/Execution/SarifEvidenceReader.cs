@@ -208,7 +208,7 @@ public sealed class SarifEvidenceReader
         return CreateResult(requirementId, MapDocumentFailure(selection.Failure!.Value), selection.Detail!, provenance);
     }
 
-    private SarifEvidenceReadResult ValidateSelectedRun(
+    private static SarifEvidenceReadResult ValidateSelectedRun(
         ArchitectureExternalEvidenceRequirement requirement,
         SelectedRunValidationContext context)
     {
