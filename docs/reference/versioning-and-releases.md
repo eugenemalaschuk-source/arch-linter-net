@@ -60,16 +60,17 @@ If a published capability release exposes a correctness or integration blocker i
 
 ## Reading release notes
 
-Every public release should identify its release type near the top of the GitHub Release notes:
+The version shape tells you the release-train role; the GitHub Release notes tell you the concrete delta.
 
-- **Capability release** — new reviewed capability line;
-- **Maintenance release** — stabilization of an existing capability line;
-- **Preview release** — early validation before stable publication;
-- **Major release** — a new major compatibility line when ArchLinterNet reaches that stage.
+For example:
 
-The generated change categories below that summary describe the concrete delta: Features, Fixes, Documentation, CI/CD, Dependencies, Breaking Changes, and other reviewed changes.
+- `0.9.0` means a **capability release** even before you inspect its individual change list;
+- `0.9.1`, `0.9.2`, and later `0.9.x` versions are **maintenance releases** for that same capability line;
+- a `preview` suffix means the release is intended for early validation rather than stable adoption.
 
-NuGet package metadata also carries a short release-type summary and links to the full GitHub Release notes and this versioning policy.
+GitHub Release notes are generated into categories such as Features, Fixes, Documentation, CI/CD, Dependencies, Breaking Changes, and other reviewed changes. Use those notes to understand exactly what changed in the specific version.
+
+The NuGet package README links to this policy and the upgrade guide, while the package release-notes metadata points to the corresponding GitHub Release notes.
 
 ## Upgrade guidance
 
