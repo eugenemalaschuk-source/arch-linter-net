@@ -24,6 +24,20 @@ Execute these phases in order:
 
 Do not reorder or skip phases. Keep the user informed at meaningful phase boundaries and stop only for a real access, safety, source-of-truth, or environment blocker.
 
+## Release-context guard
+
+If the issue belongs to a release milestone or is described as release-blocking, stabilization, maintenance, post-release cleanup, technical-debt cleanup, or next-minor work, read `docs/internal/release-lifecycle-governance.md` before deciding scope.
+
+Use that document to distinguish:
+
+- release-required capability from explicitly non-blocking hygiene;
+- correctness/adoption stabilization from behavior-preserving cleanup;
+- release-specific architecture cleanup from broader self-architecture work;
+- architecture stabilization from the later whole-repository Sonar/quality sweep;
+- current-line patch work from unrelated next-minor feature work.
+
+Milestone membership alone does not authorize scope expansion or make the issue a blocker for a concrete release. Do not pull broad cleanup into a feature issue merely because the current file is a known hotspot, and do not defer a known correctness/security/release-integrity defect merely because a post-release cleanup phase exists.
+
 ## 1. Branch lifecycle
 
 Complete this phase before changing files.
