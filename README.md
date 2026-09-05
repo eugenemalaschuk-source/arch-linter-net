@@ -21,6 +21,17 @@ ArchLinterNet turns architecture decisions into executable, reviewable contracts
 
 The goal is not just to lint dependencies. ArchLinterNet makes architecture rules explicit and safe to evolve as normal repository code.
 
+## Versioning and updates
+
+ArchLinterNet follows Semantic Versioning with an explicit release-train convention while the project remains in the `0.x` initial-development range:
+
+- `0.Y.0` is a **capability release**: a reviewed user-facing product increment. Minor releases may include compatibility changes while the project is pre-1.0, so review the release notes before upgrading.
+- `0.Y.Z` with `Z > 0` is a **maintenance release** for the same `0.Y` capability line: correctness/integration fixes, reliability fixes, documentation corrections, and behavior-preserving engineering cleanup. Unrelated next-minor capability work is intentionally excluded.
+- `*-preview.N` is an early-validation **preview release** and may still change before stable publication.
+- `X.Y.Z-main.N` is an internal **development/dogfood build**, not a public stable release.
+
+Within a released minor line, consumers should normally prefer the latest available patch after reviewing its release notes. See [Versioning and release meaning](https://eugenemalaschuk-source.github.io/arch-linter-net/reference/versioning-and-releases/) for the complete public contract and [Adopt or upgrade ArchLinterNet](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/upgrading/) for upgrade steps.
+
 ## Why ArchLinterNet?
 
 Architecture rules often start as diagrams, ADRs, review comments, handwritten test helpers, or tribal knowledge. That works for a while, but the rules quickly become hard to discover, hard to reuse across repositories, and hard for humans or AI agents to review consistently.
@@ -121,6 +132,7 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
 - [Structured waivers](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/structured-waivers/)
 - [Architecture Health](https://eugenemalaschuk-source.github.io/arch-linter-net/reference/architecture-health/)
+- [Versioning and release meaning](https://eugenemalaschuk-source.github.io/arch-linter-net/reference/versioning-and-releases/)
 - [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
 - [Coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
 - [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)

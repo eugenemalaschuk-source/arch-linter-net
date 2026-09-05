@@ -66,8 +66,26 @@ All `make` targets run natively on Windows via **Git Bash** — WSL is not requi
 - If `bash.exe` cannot be found at all, `make` fails immediately with an actionable error naming the fix, instead of failing deep inside a recipe with a WSL error.
 - macOS/Linux targets are unaffected — this Windows-only `SHELL` override only applies when `$(OS)` is `Windows_NT`; `BUNDLE_OS`/`bundle-unix`/the `Brewfile` flow are unchanged.
 
+## Release lifecycle and milestone governance
+Canonical internal policy: [docs/internal/release-lifecycle-governance.md](docs/internal/release-lifecycle-governance.md).
+Public user-facing version meaning: [docs/reference/versioning-and-releases.md](docs/reference/versioning-and-releases.md).
+
+Before planning, creating, moving, implementing, stabilizing, or preparing release-related work, agents MUST identify the current release-lifecycle phase and apply the internal policy. When release/version semantics are user-visible, agents MUST keep the public versioning contract and NuGet-visible `README.md` consistent with that policy.
+
+In particular:
+- a milestone is a development-wave envelope and traceability aid, **not** immutable release authority;
+- milestone membership alone never makes an issue a blocker for `X.Y.0`;
+- minor capability work may deliberately leave bounded, visible, ratcheted behavior-preserving refactoring for post-release stabilization;
+- known correctness, security, release-integrity, false-success, or unusable documented behavior is not optional technical debt and must remain in the owning functional/release path;
+- after `X.Y.0`, validate the released artifact in real consumer-shaped usage and publish as many corrective patches as needed for adoption stability;
+- release-specific architecture cleanup precedes broader self-architecture cleanup, which precedes the authoritative whole-repository Sonar/maintainability sweep;
+- patch releases form a maintenance train, not an exactly-one-patch ritual;
+- next-minor backlog planning may overlap stabilization, but agents must not merge unrelated next-minor product bytes onto the only patch candidate line when that would make a truthful current-line patch impossible without an explicit maintenance-branch/ref strategy.
+
+Use precise completion language: `implementation complete`, `release complete`, `adoption stable`, and `milestone/engineering-health complete` are different states.
+
 ## Backlog governance
-File: `docs/ai/backlog-governance.md`.
+File: `docs/internal/backlog-governance.md`.
 
 Before creating or updating GitHub issues, agents MUST apply the backlog governance rules:
 - use typed titles such as `[STORY][AI] Tooling: ...` and `[TASK][AI] Tooling: ...`;
@@ -75,7 +93,8 @@ Before creating or updating GitHub issues, agents MUST apply the backlog governa
 - link issues explicitly with `Parent story: #...`, `Depends on: #...`, and `Related: #...` where applicable;
 - include the required sections: `Goal`, `Work type`, `Context`, `What to do`, `Manual tasks`, `AI-friendly tasks`, `Estimate`, `Acceptance criteria`, `Validation`, and `Non-goals`;
 - estimate the developer's real hands-on time with AI assistance;
-- keep architecture-governance and release-pipeline task rules aligned with the governance document.
+- keep architecture-governance and release-pipeline task rules aligned with the governance document;
+- for release-related work, state its lifecycle role when useful and keep milestone meaning aligned with `docs/internal/release-lifecycle-governance.md`.
 
 Do not create isolated implementation tasks without an existing story or a newly proposed story.
 
@@ -144,6 +163,8 @@ Do not ask the user to repeat the workflow or confirm that implementation should
 When the current user asks to prepare, ready, close, or otherwise assemble repository-side content/authority for a concrete ArchLinterNet release, load and follow the `release-preparation` skill.
 
 Treat an explicit version as the release target. A request for the next patch/minor/major/preview release may derive the target only through the repository's release-process rules and current release/tag facts.
+
+Before deciding what kind of release should exist or what work belongs in the candidate, apply `docs/internal/release-lifecycle-governance.md`. Then use the release-preparation workflow for the concrete candidate mechanics.
 
 This routing rule prepares release content and reviewed scope; it does not silently authorize package publication, tag/Release creation, or docs deployment. Publication remains the separate maintainer procedure in `docs/reference/release-process.md`.
 
