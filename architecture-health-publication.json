@@ -1,10 +1,10 @@
 {
   "schema": "architecture-health-badge-publication/v1",
-  "status": "unassessable",
-  "reason": "badge_manifest_binding_invalid",
+  "status": "ready",
+  "reason": "ready",
   "repository": "eugenemalaschuk-source/arch-linter-net",
-  "main_sha": "9d03baaf9ef357ec53f165e6bec94a087f56e661",
-  "main_tree_sha": "38dcb4f40ac9a7be62d85876a1ee605cc30813ac",
-  "pr_number": "771",
-  "producer_run_id": "33949221160"
+  "main_sha": "41cd21bde8515aa8f0bb7104410a129dfd945807",
+  "main_tree_sha": "80f20ead135c453ceee512bfd22b24894efad0e1",
+  "pr_number": "780",
+  "producer_run_id": "33965333269"
 }
