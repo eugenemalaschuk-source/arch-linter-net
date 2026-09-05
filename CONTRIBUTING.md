@@ -60,5 +60,12 @@ vulnerability, use private reporting as described in
 ## Backlog conventions
 
 If you are proposing new tracked work rather than a direct pull request, see
-[Backlog governance](docs/ai/backlog-governance.md) for the issue title and
+[Backlog governance](docs/internal/backlog-governance.md) for the issue title and
 structure conventions this repository uses.
+
+For release- or milestone-related work, also read
+[Release lifecycle and milestone governance](docs/internal/release-lifecycle-governance.md).
+It defines the distinction between release-required product scope, post-release
+stabilization, maintenance patches, and milestone closure. Milestone membership
+is planning/traceability metadata; it does not by itself authorize or block a
+public release.
