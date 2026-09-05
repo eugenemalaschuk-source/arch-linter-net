@@ -2,6 +2,8 @@
 
 Use this workflow to prepare the repository-side content and reviewed release-scope authority for a concrete ArchLinterNet release.
 
+Before preparing a concrete candidate, read `docs/internal/release-lifecycle-governance.md` and identify the current lifecycle phase. That document owns the meaning of milestones, minor vs maintenance releases, adoption stabilization, post-release engineering cleanup, and maintenance-line protection. This workflow owns the narrower mechanics of turning the intended release into reviewed repository-side authority.
+
 This workflow owns **release preparation**, not package publication. It turns repository facts into a reviewed release story, release-note categorization inputs, a release-scope declaration, validation evidence, and one pull request. The maintainer publication procedure remains owned by `docs/reference/release-process.md`.
 
 ## Input
@@ -38,6 +40,8 @@ Do **not** create a new evergreen docs page merely to record one release. Update
 Read these before authoring release content:
 
 - `AGENTS.md` and applicable harness instructions;
+- `docs/internal/release-lifecycle-governance.md`;
+- `docs/internal/backlog-governance.md`;
 - `docs/reference/release-process.md`;
 - `.github/release.yml`;
 - `tools/release/scopes/` and the current release-scope schema/consumer tests;
@@ -47,7 +51,7 @@ Read these before authoring release content:
 - the existing release story, when one exists;
 - materially linked bug/feature/release issues and their acceptance evidence.
 
-Milestone membership is a **discovery aid**, never release authority. Mutable issue text or a milestone cannot substitute for the reviewed release-scope declaration selected by the immutable candidate version.
+Milestone membership is a **discovery and traceability aid**, never release authority. A milestone may intentionally contain release-required work, explicitly non-blocking hygiene, and post-release stabilization from the same development wave. Mutable issue text or a milestone cannot substitute for the reviewed release-scope declaration selected by the immutable candidate version.
 
 ## Mandatory lifecycle
 
@@ -85,6 +89,8 @@ A patch release is normally corrective maintenance, not a vehicle for unrelated 
 
 Before authoring a patch declaration, prove that the candidate can actually represent the intended patch scope. If `main` already contains unrelated feature work that would also be shipped, do not hide that fact with an artificially narrow declaration. Report the release-line/candidate blocker and require the repository's reviewed release strategy (for example an appropriate maintenance ref or a different version decision).
 
+This is the concrete candidate guard for the lifecycle rule in `docs/internal/release-lifecycle-governance.md`: next-minor planning may overlap maintenance, but next-minor bytes must not contaminate the only current-line patch candidate unless an explicit maintenance-line strategy exists.
+
 The release-scope declaration describes and authorizes the real immutable candidate; it does not subtract bytes already present in that candidate.
 
 ## 2. Reconstruct the factual candidate delta
@@ -104,6 +110,8 @@ Build a compact evidence inventory containing, where applicable:
 Do not classify scope from commit-title wording alone. Follow linked issues/PRs and inspect enough code/docs/evidence to understand what is actually being shipped.
 
 For a maintenance release, explicitly identify the externally discovered correctness/regression defects being shipped and the merged fixing PRs. For a feature release, reconcile the release story/backlog with what is actually present in the candidate.
+
+For a post-minor maintenance train, also distinguish real-adoption correctness fixes from behavior-preserving architecture/quality stabilization. Both may legitimately ship in a patch, but neither authorizes unrelated next-minor feature scope.
 
 ## 3. Define or reconcile the release story
 
@@ -131,12 +139,13 @@ For a corrective patch release, normally state:
 
 - the previous published version and discovery context;
 - each defect being shipped and the merged fix that resolves it;
+- behavior-preserving stabilization/refactoring being distributed when applicable;
 - that no unrelated feature scope is intended;
 - any combined regression proof needed before publication;
 - that release-scope authoring/evidence wiring is AI-friendly;
 - that workflow dispatch, public publication, and post-publication verification remain maintainer actions.
 
-Do not assume one defect: v0.7.2 shipped two defects, while v0.7.3 shipped one.
+Do not assume one defect or one patch per minor line: maintenance releases are driven by the actual stabilization delta. v0.7.2 shipped two defects, v0.7.3 shipped one, and the broader 0.7 line required several patches before real adoption was stable.
 
 ### Minor / major story
 
@@ -146,7 +155,7 @@ For a broader release, enumerate the reviewed release intent rather than treatin
 - **excluded** items that are explicitly non-blocking for this release;
 - **delivered context** that is already complete and useful to record but is not an open blocker.
 
-This distinction is reflected in the v0.7.0 release declaration and must remain available for future releases.
+Post-release architecture/quality stabilization may remain in the same milestone for causal traceability without becoming required `X.Y.0` candidate scope. This distinction is reflected in the v0.7.0 release declaration and must remain available for future releases.
 
 ## 4. Audit release-note categorization
 
@@ -288,10 +297,9 @@ If the user explicitly asks to proceed with publication, re-read `docs/reference
 
 Use recent releases as behavioral examples, not immutable templates:
 
-- v0.7.1: corrective maintenance release with one release-scope declaration and no feature scope;
-- v0.7.2: corrective maintenance release with two independent externally discovered regressions and combined candidate proof;
-- v0.7.3: corrective maintenance release with one externally discovered correctness defect;
-- v0.7.0: broader release declaration demonstrating `required_items`, `excluded_items`, and `delivered_items` together.
+- v0.7.0: broader feature release showing why `implementation/release complete` is distinct from later real-adoption stability;
+- v0.7.1-v0.7.4: maintenance train in which real consumer adoption exposed correctness/integration defects that required several patches;
+- v0.8.0: consumer-shaped packed acceptance before publication plus an explicit post-release architecture -> self-architecture -> Sonar stabilization sequence.
 
 Always re-read the current files/issues because schemas, labels, tests, and release process can evolve.
 
