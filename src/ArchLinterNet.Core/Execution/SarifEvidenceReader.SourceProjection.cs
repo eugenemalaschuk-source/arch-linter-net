@@ -3,9 +3,11 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class SarifEvidenceReader
+internal sealed class SarifEvidenceSourceProjectionReader
 {
-    private static bool TryReadSourceDiagnostics(
+    private readonly SarifEvidenceSourceLocationReader _locationReader = new();
+
+    internal bool TryReadSourceDiagnostics(
         JsonElement run,
         out IReadOnlyList<SarifEvidenceSourceDiagnostic> diagnostics,
         out string? detail,
@@ -21,7 +23,7 @@ public sealed partial class SarifEvidenceReader
         }
 
         SarifArtifactCatalog artifacts = new();
-        if (!TryReadRunArtifacts(run, artifacts, out detail, cancellationToken))
+        if (!_locationReader.TryReadRunArtifacts(run, artifacts, out detail, cancellationToken))
         {
             return false;
         }
@@ -148,7 +150,7 @@ public sealed partial class SarifEvidenceReader
         return true;
     }
 
-    private static bool TryReadSourceDiagnostic(
+    private bool TryReadSourceDiagnostic(
         JsonElement result,
         SarifDriverRuleCatalog driverRules,
         SarifArtifactCatalog artifacts,
@@ -191,7 +193,7 @@ public sealed partial class SarifEvidenceReader
             return false;
         }
 
-        if (!TryReadPrimaryLocation(
+        if (!_locationReader.TryReadPrimaryLocation(
                 result,
                 artifacts,
                 resultIndex,
@@ -231,6 +233,48 @@ public sealed partial class SarifEvidenceReader
             resolvedRule?.Tags ?? Array.Empty<string>(),
             fingerprints,
             partialFingerprints);
+        return true;
+    }
+
+    private static bool TryReadFingerprintPairs(
+        JsonElement result,
+        string propertyName,
+        bool isPartial,
+        int resultIndex,
+        out IReadOnlyList<SarifEvidenceSourceFingerprint> pairs,
+        out string? detail,
+        CancellationToken cancellationToken)
+    {
+        pairs = Array.Empty<SarifEvidenceSourceFingerprint>();
+        detail = null;
+        if (!result.TryGetProperty(propertyName, out JsonElement fingerprints))
+        {
+            return true;
+        }
+
+        if (fingerprints.ValueKind != JsonValueKind.Object)
+        {
+            detail = $"The SARIF result at index {resultIndex} {propertyName} member must be an object when present.";
+            return false;
+        }
+
+        List<SarifEvidenceSourceFingerprint> parsed = [];
+        foreach (JsonProperty pair in fingerprints.EnumerateObject())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(pair.Name) || pair.Value.ValueKind != JsonValueKind.String)
+            {
+                detail = $"The SARIF result at index {resultIndex} {propertyName} must contain only non-blank keys with string values.";
+                return false;
+            }
+
+            parsed.Add(new SarifEvidenceSourceFingerprint(
+                pair.Name,
+                pair.Value.GetString() ?? string.Empty,
+                isPartial));
+        }
+
+        pairs = Array.AsReadOnly(parsed.ToArray());
         return true;
     }
 

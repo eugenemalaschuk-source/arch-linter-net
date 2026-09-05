@@ -4,16 +4,13 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class SarifEvidenceReader
+/// <summary>Merges SARIF and producer context and exposes binding facts for the trust composer.</summary>
+internal sealed class SarifEvidenceContextReader
 {
-    private static ContextReadOutcome ReadContext(
+    internal ContextReadOutcome ReadContext(
         JsonElement run,
-        SarifEvidenceArtifactReference artifact,
-        out SarifEvidenceTrustStatus? status,
-        out string? detail)
+        SarifEvidenceArtifactReference artifact)
     {
-        status = null;
-        detail = null;
         string? repository = null;
         string? revision = null;
         bool conflict = false;
@@ -23,10 +20,13 @@ public sealed partial class SarifEvidenceReader
                 ref repository,
                 ref revision,
                 ref conflict,
-                out status,
-                out detail))
+                out ContextReadFailure? provenanceFailure,
+                out string? provenanceDetail))
         {
-            return new ContextReadOutcome(new SarifEvidenceResolvedContext(artifact.LogicalId, repository, revision, null));
+            return new ContextReadOutcome(
+                new SarifEvidenceResolvedContext(artifact.LogicalId, repository, revision, null),
+                provenanceFailure,
+                provenanceDetail);
         }
 
         string? scope = MergeProducerContext(
@@ -34,15 +34,71 @@ public sealed partial class SarifEvidenceReader
             ref repository,
             ref revision,
             ref conflict,
-            out status,
-            out detail);
+            out ContextReadFailure? producerFailure,
+            out string? producerDetail);
+        ContextReadFailure? failure = producerFailure;
+        string? detail = producerDetail;
         if (conflict)
         {
-            status = SarifEvidenceTrustStatus.ConflictingContext;
+            failure = ContextReadFailure.ConflictingContext;
             detail = "SARIF and explicit producer context contain conflicting identity metadata.";
         }
 
-        return new ContextReadOutcome(new SarifEvidenceResolvedContext(artifact.LogicalId, repository, revision, scope));
+        return new ContextReadOutcome(
+            new SarifEvidenceResolvedContext(artifact.LogicalId, repository, revision, scope),
+            failure,
+            detail);
+    }
+
+    internal ContextBindingFailure? ValidateBindings(
+        ArchitectureExternalEvidenceRequirement requirement,
+        SarifEvidenceAssessmentContext expected,
+        SarifEvidenceResolvedContext context,
+        out string? detail)
+    {
+        detail = null;
+        if (!string.Equals(context.LogicalId, requirement.Id, StringComparison.Ordinal))
+        {
+            detail = "The artifact logical identity does not match the configured requirement.";
+            return string.IsNullOrWhiteSpace(context.LogicalId)
+                ? ContextBindingFailure.MissingLogicalId
+                : ContextBindingFailure.WrongLogicalId;
+        }
+
+        ContextBindingFailure? failure = ValidateBinding(
+            requirement.RequireRepository,
+            context.Repository,
+            expected.Repository,
+            ContextBindingFailure.MissingRepository,
+            ContextBindingFailure.WrongRepository,
+            "repository",
+            out detail);
+        if (failure is not null)
+        {
+            return failure;
+        }
+
+        failure = ValidateBinding(
+            requirement.RequireRevision,
+            context.Revision,
+            expected.Revision,
+            ContextBindingFailure.MissingRevision,
+            ContextBindingFailure.WrongRevision,
+            "revision",
+            out detail);
+        if (failure is not null)
+        {
+            return failure;
+        }
+
+        return ValidateBinding(
+            requirement.RequireScope,
+            context.Scope,
+            expected.Scope,
+            ContextBindingFailure.MissingScope,
+            ContextBindingFailure.WrongScope,
+            "scope",
+            out detail);
     }
 
     private static bool TryReadSarifProvenance(
@@ -50,10 +106,10 @@ public sealed partial class SarifEvidenceReader
         ref string? repository,
         ref string? revision,
         ref bool conflict,
-        out SarifEvidenceTrustStatus? status,
+        out ContextReadFailure? failure,
         out string? detail)
     {
-        status = null;
+        failure = null;
         detail = null;
         if (!run.TryGetProperty("versionControlProvenance", out JsonElement provenance))
         {
@@ -62,7 +118,7 @@ public sealed partial class SarifEvidenceReader
 
         if (provenance.ValueKind != JsonValueKind.Array)
         {
-            status = SarifEvidenceTrustStatus.UnsupportedShape;
+            failure = ContextReadFailure.UnsupportedShape;
             detail = "The SARIF versionControlProvenance member must be an array.";
             return false;
         }
@@ -71,7 +127,7 @@ public sealed partial class SarifEvidenceReader
         {
             if (!TryMergeSarifProvenanceEntry(entry, ref repository, ref revision, ref conflict, out detail))
             {
-                status = SarifEvidenceTrustStatus.UnsupportedShape;
+                failure = ContextReadFailure.UnsupportedShape;
                 return false;
             }
         }
@@ -137,10 +193,10 @@ public sealed partial class SarifEvidenceReader
         ref string? repository,
         ref string? revision,
         ref bool conflict,
-        out SarifEvidenceTrustStatus? status,
+        out ContextReadFailure? failure,
         out string? detail)
     {
-        status = null;
+        failure = null;
         detail = null;
         SarifEvidenceProducerContext? producer = artifact.ProducerContext;
         if (producer is null)
@@ -152,7 +208,7 @@ public sealed partial class SarifEvidenceReader
         if (producerLogicalId is not null
             && !string.Equals(producerLogicalId, artifact.LogicalId, StringComparison.Ordinal))
         {
-            status = SarifEvidenceTrustStatus.WrongLogicalId;
+            failure = ContextReadFailure.WrongLogicalId;
             detail = "The producer logical identity does not match the artifact logical identity.";
         }
 
@@ -190,63 +246,12 @@ public sealed partial class SarifEvidenceReader
         return true;
     }
 
-    private static SarifEvidenceTrustStatus? ValidateBindings(
-        ArchitectureExternalEvidenceRequirement requirement,
-        SarifEvidenceAssessmentContext expected,
-        SarifEvidenceResolvedContext context,
-        out string? detail)
-    {
-        detail = null;
-        if (!string.Equals(context.LogicalId, requirement.Id, StringComparison.Ordinal))
-        {
-            detail = "The artifact logical identity does not match the configured requirement.";
-            return string.IsNullOrWhiteSpace(context.LogicalId)
-                ? SarifEvidenceTrustStatus.MissingLogicalId
-                : SarifEvidenceTrustStatus.WrongLogicalId;
-        }
-
-        SarifEvidenceTrustStatus? status = ValidateBinding(
-            requirement.RequireRepository,
-            context.Repository,
-            expected.Repository,
-            SarifEvidenceTrustStatus.MissingRepository,
-            SarifEvidenceTrustStatus.WrongRepository,
-            "repository",
-            out detail);
-        if (status is not null)
-        {
-            return status;
-        }
-
-        status = ValidateBinding(
-            requirement.RequireRevision,
-            context.Revision,
-            expected.Revision,
-            SarifEvidenceTrustStatus.MissingRevision,
-            SarifEvidenceTrustStatus.WrongRevision,
-            "revision",
-            out detail);
-        if (status is not null)
-        {
-            return status;
-        }
-
-        return ValidateBinding(
-            requirement.RequireScope,
-            context.Scope,
-            expected.Scope,
-            SarifEvidenceTrustStatus.MissingScope,
-            SarifEvidenceTrustStatus.WrongScope,
-            "scope",
-            out detail);
-    }
-
-    private static SarifEvidenceTrustStatus? ValidateBinding(
+    private static ContextBindingFailure? ValidateBinding(
         bool required,
         string? actual,
         string? expected,
-        SarifEvidenceTrustStatus missingStatus,
-        SarifEvidenceTrustStatus wrongStatus,
+        ContextBindingFailure missingFailure,
+        ContextBindingFailure wrongFailure,
         string label,
         out string? detail)
     {
@@ -259,13 +264,13 @@ public sealed partial class SarifEvidenceReader
         if (actual is null || expected is null)
         {
             detail = $"The required {label} binding is absent from the artifact or assessment context.";
-            return missingStatus;
+            return missingFailure;
         }
 
         if (!string.Equals(actual, expected, StringComparison.Ordinal))
         {
             detail = $"The SARIF {label} binding does not match the assessment context.";
-            return wrongStatus;
+            return wrongFailure;
         }
 
         return null;
@@ -291,4 +296,28 @@ public sealed partial class SarifEvidenceReader
     {
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
+}
+
+internal readonly record struct ContextReadOutcome(
+    SarifEvidenceResolvedContext Context,
+    ContextReadFailure? Failure,
+    string? Detail);
+
+internal enum ContextReadFailure
+{
+    UnsupportedShape,
+    WrongLogicalId,
+    ConflictingContext,
+}
+
+internal enum ContextBindingFailure
+{
+    MissingLogicalId,
+    WrongLogicalId,
+    MissingRepository,
+    WrongRepository,
+    MissingRevision,
+    WrongRevision,
+    MissingScope,
+    WrongScope,
 }

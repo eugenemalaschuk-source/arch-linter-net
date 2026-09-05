@@ -16,11 +16,17 @@ namespace ArchLinterNet.Core.Execution;
 /// SARIF 2.1.0 run and that the run is explicitly bound to the requested assessment context.
 /// </remarks>
 /// <remarks>Creates a reader using the supplied verified evidence-file capability.</remarks>
-public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem? fileSystem = null)
+public sealed class SarifEvidenceReader
 {
-    private const string SupportedFormat = "sarif";
-    private const string SupportedVersion = "2.1.0";
-    private readonly IArchitectureEvidenceFileSystem _fileSystem = fileSystem ?? ArchitectureFileSystem.Real;
+    private readonly SarifEvidenceArtifactReader _artifactReader;
+    private readonly SarifEvidenceDocumentReader _documentReader = new();
+    private readonly SarifEvidenceContextReader _contextReader = new();
+    private readonly SarifEvidenceSourceProjectionReader _sourceProjectionReader = new();
+
+    public SarifEvidenceReader(IArchitectureEvidenceFileSystem? fileSystem = null)
+    {
+        _artifactReader = new SarifEvidenceArtifactReader(fileSystem ?? ArchitectureFileSystem.Real);
+    }
 
     /// <summary>
     /// Reads and trust-validates one declared artifact. Trust failures are returned as values;
@@ -36,7 +42,7 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
     {
         ArgumentNullException.ThrowIfNull(requirement);
         ValidateRepositoryRoot(repositoryRoot);
-        ValidateRequirement(requirement);
+        SarifEvidenceDocumentReader.ValidateRequirement(requirement);
         expectedContext ??= new SarifEvidenceAssessmentContext();
         limits ??= new SarifEvidenceLimits();
 
@@ -45,8 +51,14 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
             return CreateMissingArtifactResult(requirement);
         }
 
-        PathResolution path = ResolveArtifactPath(repositoryRoot, artifact.Path);
-        if (!path.IsSafe)
+        SarifEvidenceArtifactReadOutcome bytes = _artifactReader.Read(
+            repositoryRoot,
+            artifact.Path,
+            limits.MaxArtifactBytes,
+            cancellationToken);
+        if (!bytes.IsReadable
+            && bytes.Failure == ArtifactReadFailure.Unsafe
+            && bytes.RelativePath is null)
         {
             return CreateResult(
                 requirement.Id,
@@ -54,44 +66,9 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
                 "The evidence path is absolute, outside the repository, or crosses an unsafe filesystem indirection.");
         }
 
-        return ReadResolvedArtifact(requirement, artifact, expectedContext, limits, path, cancellationToken);
-    }
-
-    private static void ValidateRepositoryRoot(string repositoryRoot)
-    {
-        if (string.IsNullOrWhiteSpace(repositoryRoot))
-        {
-            throw new ArgumentException("A repository root is required.", nameof(repositoryRoot));
-        }
-    }
-
-    private static SarifEvidenceReadResult CreateMissingArtifactResult(
-        ArchitectureExternalEvidenceRequirement requirement)
-    {
-        return requirement.Required
-            ? CreateResult(
-                requirement.Id,
-                SarifEvidenceTrustStatus.MissingRequiredInput,
-                "The required external evidence artifact was not supplied.")
-            : CreateResult(
-                requirement.Id,
-                SarifEvidenceTrustStatus.OptionalNotConfigured,
-                "The optional external evidence artifact was not configured.");
-    }
-
-    private SarifEvidenceReadResult ReadResolvedArtifact(
-        ArchitectureExternalEvidenceRequirement requirement,
-        SarifEvidenceArtifactReference artifact,
-        SarifEvidenceAssessmentContext expectedContext,
-        SarifEvidenceLimits limits,
-        PathResolution path,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ByteReadOutcome bytes = ReadBoundedBytes(path, limits.MaxArtifactBytes, cancellationToken);
         SarifEvidenceProvenance baseProvenance = new(
             requirement.Id,
-            bytes.IsReadable || bytes.BytesRead > 0 ? path.RelativePath : null,
+            bytes.IsReadable || bytes.BytesRead > 0 ? bytes.RelativePath : null,
             bytes.IsReadable || bytes.BytesRead > 0 ? bytes.Sha256 : null,
             null,
             null,
@@ -124,6 +101,28 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
             cancellationToken);
     }
 
+    private static void ValidateRepositoryRoot(string repositoryRoot)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryRoot))
+        {
+            throw new ArgumentException("A repository root is required.", nameof(repositoryRoot));
+        }
+    }
+
+    private static SarifEvidenceReadResult CreateMissingArtifactResult(
+        ArchitectureExternalEvidenceRequirement requirement)
+    {
+        return requirement.Required
+            ? CreateResult(
+                requirement.Id,
+                SarifEvidenceTrustStatus.MissingRequiredInput,
+                "The required external evidence artifact was not supplied.")
+            : CreateResult(
+                requirement.Id,
+                SarifEvidenceTrustStatus.OptionalNotConfigured,
+                "The optional external evidence artifact was not configured.");
+    }
+
     private static SarifEvidenceReadResult CreateReadFailureResult(
         ArchitectureExternalEvidenceRequirement requirement,
         ArtifactReadFailure failure,
@@ -152,37 +151,7 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
             : SarifEvidenceTrustStatus.UnreadableInput;
     }
 
-    private static void ValidateRequirement(ArchitectureExternalEvidenceRequirement requirement)
-    {
-        if (string.IsNullOrWhiteSpace(requirement.Id))
-        {
-            throw new ArgumentException("An external evidence requirement id is required.", nameof(requirement));
-        }
-
-        if (!string.Equals(requirement.Format, SupportedFormat, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException("The bounded evidence reader supports only SARIF format.", nameof(requirement));
-        }
-
-        if (string.IsNullOrWhiteSpace(requirement.Tool))
-        {
-            throw new ArgumentException("An external evidence tool name is required.", nameof(requirement));
-        }
-
-        if (requirement.ToolVersion is not null && string.IsNullOrWhiteSpace(requirement.ToolVersion))
-        {
-            throw new ArgumentException(
-                "An external evidence tool version must be non-blank when supplied.",
-                nameof(requirement));
-        }
-
-        if (string.IsNullOrWhiteSpace(requirement.Run))
-        {
-            throw new ArgumentException("An external evidence run id is required.", nameof(requirement));
-        }
-    }
-
-    private static SarifEvidenceReadResult ParseAndValidate(
+    private SarifEvidenceReadResult ParseAndValidate(
         ArchitectureExternalEvidenceRequirement requirement,
         SarifEvidenceArtifactReference artifact,
         SarifEvidenceAssessmentContext expectedContext,
@@ -191,7 +160,7 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
         SarifEvidenceProvenance baseProvenance,
         CancellationToken cancellationToken)
     {
-        if (!TryParseDocument(bytes, out JsonDocument? document))
+        if (!_documentReader.TryParseDocument(bytes, out JsonDocument? document))
         {
             return CreateResult(
                 requirement.Id,
@@ -203,13 +172,17 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
         using (JsonDocument parsedDocument = document!)
         {
             JsonElement root = parsedDocument.RootElement;
-            if (!TryGetRuns(root, out JsonElement runs, out SarifEvidenceTrustStatus shapeStatus, out string shapeDetail))
+            if (!_documentReader.TryGetRuns(root, out JsonElement runs, out SarifEvidenceDocumentFailure? shapeFailure, out string shapeDetail))
             {
-                return CreateResult(requirement.Id, shapeStatus, shapeDetail, baseProvenance);
+                return CreateResult(requirement.Id, MapDocumentFailure(shapeFailure!.Value), shapeDetail, baseProvenance);
             }
 
-            SarifRunSelection selection = SelectMatchingRun(runs, requirement, limits, cancellationToken);
-            if (selection.Status is not null)
+            SarifRunSelection selection = _documentReader.SelectMatchingRun(
+                runs,
+                requirement,
+                limits,
+                cancellationToken);
+            if (selection.Failure is not null)
             {
                 return CreateSelectionFailureResult(requirement.Id, baseProvenance, selection);
             }
@@ -226,164 +199,7 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
         }
     }
 
-    private static bool TryParseDocument(byte[] bytes, out JsonDocument? document)
-    {
-        try
-        {
-            document = JsonDocument.Parse(
-                bytes,
-                new JsonDocumentOptions
-                {
-                    AllowTrailingCommas = false,
-                    CommentHandling = JsonCommentHandling.Disallow,
-                    MaxDepth = 128,
-                });
-            return true;
-        }
-        catch (JsonException)
-        {
-            document = null;
-            return false;
-        }
-    }
-
-    private static bool TryGetRuns(
-        JsonElement root,
-        out JsonElement runs,
-        out SarifEvidenceTrustStatus status,
-        out string detail)
-    {
-        runs = default;
-        if (root.ValueKind != JsonValueKind.Object)
-        {
-            status = SarifEvidenceTrustStatus.UnsupportedShape;
-            detail = "The SARIF document root must be an object.";
-            return false;
-        }
-
-        if (!root.TryGetProperty("version", out JsonElement version))
-        {
-            status = SarifEvidenceTrustStatus.UnsupportedVersion;
-            detail = "The SARIF document does not declare a version.";
-            return false;
-        }
-
-        if (version.ValueKind != JsonValueKind.String)
-        {
-            status = SarifEvidenceTrustStatus.UnsupportedShape;
-            detail = "The SARIF version must be a string.";
-            return false;
-        }
-
-        if (!string.Equals(version.GetString(), SupportedVersion, StringComparison.Ordinal))
-        {
-            status = SarifEvidenceTrustStatus.UnsupportedVersion;
-            detail = "Only SARIF version 2.1.0 is supported.";
-            return false;
-        }
-
-        if (!root.TryGetProperty("runs", out runs) || runs.ValueKind != JsonValueKind.Array)
-        {
-            status = SarifEvidenceTrustStatus.UnsupportedShape;
-            detail = "The SARIF document must contain a runs array.";
-            return false;
-        }
-
-        status = default;
-        detail = string.Empty;
-        return true;
-    }
-
-    private static SarifRunSelection SelectMatchingRun(
-        JsonElement runs,
-        ArchitectureExternalEvidenceRequirement requirement,
-        SarifEvidenceLimits limits,
-        CancellationToken cancellationToken)
-    {
-        List<SarifRunCandidate> matches = [];
-        int runCount = 0;
-        foreach (JsonElement run in runs.EnumerateArray())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (++runCount > limits.MaxRuns)
-            {
-                return SarifRunSelection.Failure(
-                    SarifEvidenceTrustStatus.TooManyRuns,
-                    "The SARIF document exceeds the configured run limit.");
-            }
-
-            if (!TryGetMatchingCandidate(run, requirement, out SarifRunCandidate? candidate, out SarifRunSelection? failure))
-            {
-                if (failure is not null)
-                {
-                    return failure.Value;
-                }
-
-                continue;
-            }
-
-            matches.Add(candidate!.Value);
-        }
-
-        return matches.Count switch
-        {
-            0 => SarifRunSelection.Failure(
-                SarifEvidenceTrustStatus.MissingExpectedRun,
-                "No SARIF run matched the configured tool and automation run identity."),
-            1 => SarifRunSelection.Selected(matches[0]),
-            _ => SarifRunSelection.Failure(
-                SarifEvidenceTrustStatus.AmbiguousExpectedRun,
-                "More than one SARIF run matched the configured tool and automation run identity.",
-                matches[0]),
-        };
-    }
-
-    private static bool TryGetMatchingCandidate(
-        JsonElement run,
-        ArchitectureExternalEvidenceRequirement requirement,
-        out SarifRunCandidate? candidate,
-        out SarifRunSelection? failure)
-    {
-        candidate = null;
-        failure = null;
-        if (run.ValueKind != JsonValueKind.Object)
-        {
-            failure = SarifRunSelection.Failure(
-                SarifEvidenceTrustStatus.UnsupportedShape,
-                "Every SARIF run must be an object.");
-            return false;
-        }
-
-        if (!TryReadRunIdentity(run, out SarifRunCandidate parsed, out string? shapeError))
-        {
-            if (shapeError is not null)
-            {
-                failure = SarifRunSelection.Failure(SarifEvidenceTrustStatus.UnsupportedShape, shapeError);
-            }
-
-            return false;
-        }
-
-        if (!MatchesRequirement(parsed, requirement))
-        {
-            return false;
-        }
-
-        candidate = parsed;
-        return true;
-    }
-
-    private static bool MatchesRequirement(
-        SarifRunCandidate candidate,
-        ArchitectureExternalEvidenceRequirement requirement)
-    {
-        return string.Equals(candidate.ToolName, requirement.Tool, StringComparison.Ordinal)
-            && string.Equals(candidate.RunId, requirement.Run, StringComparison.Ordinal)
-            && (string.IsNullOrWhiteSpace(requirement.ToolVersion)
-                || string.Equals(candidate.ToolVersion, requirement.ToolVersion, StringComparison.Ordinal));
-    }
-
-    private static SarifEvidenceReadResult CreateSelectionFailureResult(
+    private SarifEvidenceReadResult CreateSelectionFailureResult(
         string requirementId,
         SarifEvidenceProvenance baseProvenance,
         SarifRunSelection selection)
@@ -391,10 +207,10 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
         SarifEvidenceProvenance provenance = selection.Candidate is { } candidate
             ? WithRun(baseProvenance, candidate, null, null)
             : baseProvenance;
-        return CreateResult(requirementId, selection.Status!.Value, selection.Detail!, provenance);
+        return CreateResult(requirementId, MapDocumentFailure(selection.Failure!.Value), selection.Detail!, provenance);
     }
 
-    private static SarifEvidenceReadResult ValidateSelectedRun(
+    private SarifEvidenceReadResult ValidateSelectedRun(
         ArchitectureExternalEvidenceRequirement requirement,
         SarifEvidenceArtifactReference artifact,
         SarifEvidenceAssessmentContext expectedContext,
@@ -404,45 +220,52 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
         SarifEvidenceProvenance baseProvenance,
         CancellationToken cancellationToken)
     {
-        int? resultCount = ReadResultCount(selected.Run, limits, out SarifEvidenceTrustStatus? resultStatus, out string? resultDetail);
+        int? resultCount = _documentReader.ReadResultCount(
+            selected.Run,
+            limits,
+            out SarifEvidenceDocumentFailure? resultFailure,
+            out string? resultDetail);
         SarifEvidenceProvenance selectedProvenance = WithRun(baseProvenance, selected, resultCount, null);
-        if (resultStatus is not null)
+        if (resultFailure is not null)
         {
-            return CreateResult(requirement.Id, resultStatus.Value, resultDetail!, selectedProvenance);
+            return CreateResult(requirement.Id, MapDocumentFailure(resultFailure.Value), resultDetail!, selectedProvenance);
         }
 
-        if (HasDuplicateProperties(root, cancellationToken))
+        if (_documentReader.HasDuplicateProperties(root, cancellationToken))
         {
             return DuplicatePropertiesResult(requirement.Id, selectedProvenance);
         }
 
-        _ = ReadExecutionState(selected.Run, out SarifEvidenceTrustStatus? executionStatus, out string? executionDetail);
-        if (executionStatus is not null)
+        _documentReader.ReadExecutionState(
+            selected.Run,
+            out SarifEvidenceDocumentFailure? executionFailure,
+            out string? executionDetail);
+        if (executionFailure is not null)
         {
-            return CreateResult(requirement.Id, executionStatus.Value, executionDetail!, selectedProvenance);
+            return CreateResult(requirement.Id, MapDocumentFailure(executionFailure.Value), executionDetail!, selectedProvenance);
         }
 
-        ContextReadOutcome context = ReadContext(selected.Run, artifact, out SarifEvidenceTrustStatus? contextStatus, out string? contextDetail);
+        ContextReadOutcome context = _contextReader.ReadContext(selected.Run, artifact);
         SarifEvidenceProvenance contextProvenance = selectedProvenance with { Context = context.Context };
-        if (contextStatus is not null)
+        if (context.Failure is not null)
         {
-            return CreateResult(requirement.Id, contextStatus.Value, contextDetail!, contextProvenance);
+            return CreateResult(requirement.Id, MapContextFailure(context.Failure.Value), context.Detail!, contextProvenance);
         }
 
-        SarifEvidenceTrustStatus? bindingStatus = ValidateBindings(
+        ContextBindingFailure? bindingFailure = _contextReader.ValidateBindings(
             requirement,
             expectedContext,
             context.Context,
             out string? bindingDetail);
-        if (bindingStatus is not null)
+        if (bindingFailure is not null)
         {
-            return CreateResult(requirement.Id, bindingStatus.Value, bindingDetail!, contextProvenance);
+            return CreateResult(requirement.Id, MapBindingFailure(bindingFailure.Value), bindingDetail!, contextProvenance);
         }
 
         IReadOnlyList<SarifEvidenceSourceDiagnostic> sourceDiagnostics = Array.Empty<SarifEvidenceSourceDiagnostic>();
         SarifEvidenceAuthorizationSnapshot? authorization = null;
         if (requirement.DiagnosticFilter is not null
-            && !TryReadSourceDiagnostics(
+            && !_sourceProjectionReader.TryReadSourceDiagnostics(
                 selected.Run,
                 out sourceDiagnostics,
                 out string? sourceShapeDetail,
@@ -470,6 +293,49 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
             contextProvenance,
             sourceDiagnostics,
             authorization);
+    }
+
+    private static SarifEvidenceTrustStatus MapDocumentFailure(SarifEvidenceDocumentFailure failure)
+    {
+        return failure switch
+        {
+            SarifEvidenceDocumentFailure.UnsupportedVersion => SarifEvidenceTrustStatus.UnsupportedVersion,
+            SarifEvidenceDocumentFailure.UnsupportedShape => SarifEvidenceTrustStatus.UnsupportedShape,
+            SarifEvidenceDocumentFailure.MissingExpectedRun => SarifEvidenceTrustStatus.MissingExpectedRun,
+            SarifEvidenceDocumentFailure.AmbiguousExpectedRun => SarifEvidenceTrustStatus.AmbiguousExpectedRun,
+            SarifEvidenceDocumentFailure.FailedExecution => SarifEvidenceTrustStatus.FailedExecution,
+            SarifEvidenceDocumentFailure.IncompleteExecution => SarifEvidenceTrustStatus.IncompleteExecution,
+            SarifEvidenceDocumentFailure.TooManyRuns => SarifEvidenceTrustStatus.TooManyRuns,
+            SarifEvidenceDocumentFailure.TooManyResults => SarifEvidenceTrustStatus.TooManyResults,
+            _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null),
+        };
+    }
+
+    private static SarifEvidenceTrustStatus MapContextFailure(ContextReadFailure failure)
+    {
+        return failure switch
+        {
+            ContextReadFailure.UnsupportedShape => SarifEvidenceTrustStatus.UnsupportedShape,
+            ContextReadFailure.WrongLogicalId => SarifEvidenceTrustStatus.WrongLogicalId,
+            ContextReadFailure.ConflictingContext => SarifEvidenceTrustStatus.ConflictingContext,
+            _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null),
+        };
+    }
+
+    private static SarifEvidenceTrustStatus MapBindingFailure(ContextBindingFailure failure)
+    {
+        return failure switch
+        {
+            ContextBindingFailure.MissingLogicalId => SarifEvidenceTrustStatus.MissingLogicalId,
+            ContextBindingFailure.WrongLogicalId => SarifEvidenceTrustStatus.WrongLogicalId,
+            ContextBindingFailure.MissingRepository => SarifEvidenceTrustStatus.MissingRepository,
+            ContextBindingFailure.WrongRepository => SarifEvidenceTrustStatus.WrongRepository,
+            ContextBindingFailure.MissingRevision => SarifEvidenceTrustStatus.MissingRevision,
+            ContextBindingFailure.WrongRevision => SarifEvidenceTrustStatus.WrongRevision,
+            ContextBindingFailure.MissingScope => SarifEvidenceTrustStatus.MissingScope,
+            ContextBindingFailure.WrongScope => SarifEvidenceTrustStatus.WrongScope,
+            _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null),
+        };
     }
 
     private static SarifEvidenceReadResult CreateResult(
@@ -606,20 +472,5 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
             SarifEvidenceTrustStatus.TooManyResults => "external_input_limit_exceeded",
             _ => "unassessable_external_input",
         };
-    }
-
-    private readonly record struct ContextReadOutcome(SarifEvidenceResolvedContext Context);
-
-    private readonly record struct SarifRunSelection(
-        SarifRunCandidate? Candidate,
-        SarifEvidenceTrustStatus? Status,
-        string? Detail)
-    {
-        public static SarifRunSelection Selected(SarifRunCandidate candidate) => new(candidate, null, null);
-
-        public static SarifRunSelection Failure(
-            SarifEvidenceTrustStatus status,
-            string detail,
-            SarifRunCandidate? candidate = null) => new(candidate, status, detail);
     }
 }

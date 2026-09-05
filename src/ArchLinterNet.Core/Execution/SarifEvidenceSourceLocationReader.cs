@@ -3,9 +3,10 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class SarifEvidenceReader
+/// <summary>Projects SARIF artifact locations, regions, and fingerprints into source facts.</summary>
+internal sealed class SarifEvidenceSourceLocationReader
 {
-    private static bool TryReadPrimaryLocation(
+    internal bool TryReadPrimaryLocation(
         JsonElement result,
         SarifArtifactCatalog artifacts,
         int resultIndex,
@@ -123,10 +124,7 @@ public sealed partial class SarifEvidenceReader
         return true;
     }
 
-    private static bool HasNormalizedLocationAnchor(SarifEvidenceSourceRegion? region) =>
-        region?.StartLine is not null || region?.CharOffset is not null;
-
-    private static bool TryReadRunArtifacts(
+    internal bool TryReadRunArtifacts(
         JsonElement run,
         SarifArtifactCatalog artifacts,
         out string? detail,
@@ -291,48 +289,6 @@ public sealed partial class SarifEvidenceReader
         return true;
     }
 
-    private static bool TryReadFingerprintPairs(
-        JsonElement result,
-        string propertyName,
-        bool isPartial,
-        int resultIndex,
-        out IReadOnlyList<SarifEvidenceSourceFingerprint> pairs,
-        out string? detail,
-        CancellationToken cancellationToken)
-    {
-        pairs = Array.Empty<SarifEvidenceSourceFingerprint>();
-        detail = null;
-        if (!result.TryGetProperty(propertyName, out JsonElement fingerprints))
-        {
-            return true;
-        }
-
-        if (fingerprints.ValueKind != JsonValueKind.Object)
-        {
-            detail = $"The SARIF result at index {resultIndex} {propertyName} member must be an object when present.";
-            return false;
-        }
-
-        List<SarifEvidenceSourceFingerprint> parsed = [];
-        foreach (JsonProperty pair in fingerprints.EnumerateObject())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(pair.Name) || pair.Value.ValueKind != JsonValueKind.String)
-            {
-                detail = $"The SARIF result at index {resultIndex} {propertyName} must contain only non-blank keys with string values.";
-                return false;
-            }
-
-            parsed.Add(new SarifEvidenceSourceFingerprint(
-                pair.Name,
-                pair.Value.GetString() ?? string.Empty,
-                isPartial));
-        }
-
-        pairs = Array.AsReadOnly(parsed.ToArray());
-        return true;
-    }
-
     private static bool TryNormalizeSourcePath(string? value, out string? normalized)
     {
         normalized = null;
@@ -374,22 +330,48 @@ public sealed partial class SarifEvidenceReader
         normalized = string.Join('/', retained);
         return true;
     }
-    private sealed class SarifArtifactCatalog
+
+    private static bool TryReadNonNegativeIndex(
+        JsonElement value,
+        string propertyName,
+        int resultIndex,
+        out int? index,
+        out string? detail)
     {
-        private readonly List<string?> _paths = [];
-
-        public void Add(string? path) => _paths.Add(path);
-
-        public bool TryResolve(int index, out string? path)
+        index = null;
+        detail = null;
+        if (value.ValueKind != JsonValueKind.Number
+            || !value.TryGetInt32(out int parsed)
+            || parsed < 0)
         {
-            if ((uint)index >= (uint)_paths.Count || _paths[index] is null)
-            {
-                path = null;
-                return false;
-            }
-
-            path = _paths[index];
-            return true;
+            detail =
+                $"The SARIF result at index {resultIndex} {propertyName} member must be a non-negative 32-bit integer when present.";
+            return false;
         }
+
+        index = parsed;
+        return true;
+    }
+
+    private static bool HasNormalizedLocationAnchor(SarifEvidenceSourceRegion? region) =>
+        region?.StartLine is not null || region?.CharOffset is not null;
+}
+
+internal sealed class SarifArtifactCatalog
+{
+    private readonly List<string?> _paths = [];
+
+    public void Add(string? path) => _paths.Add(path);
+
+    public bool TryResolve(int index, out string? path)
+    {
+        if ((uint)index >= (uint)_paths.Count || _paths[index] is null)
+        {
+            path = null;
+            return false;
+        }
+
+        path = _paths[index];
+        return true;
     }
 }
