@@ -25,7 +25,7 @@ public sealed partial class CheckpointBReleaseGateTests
         {
             string[] preparedArguments = _restoreReuse.PrepareArguments(workingDirectory, arguments);
             CommandResult result = RunTool(workingDirectory, preparedArguments);
-            _restoreReuse.RecordSuccessfulEnsureBuilt(workingDirectory, arguments, result.ExitCode);
+            _restoreReuse.RecordCompletedEnsureBuilt(workingDirectory, arguments, result.ExitCode);
             return result;
         }
 
