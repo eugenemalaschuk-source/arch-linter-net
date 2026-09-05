@@ -4,6 +4,8 @@ Use this workflow to prepare the repository-side content and reviewed release-sc
 
 Before preparing a concrete candidate, read `docs/internal/release-lifecycle-governance.md` and identify the current lifecycle phase. That document owns the meaning of milestones, minor vs maintenance releases, adoption stabilization, post-release engineering cleanup, and maintenance-line protection. This workflow owns the narrower mechanics of turning the intended release into reviewed repository-side authority.
 
+The user-facing projection of those semantics is `docs/reference/versioning-and-releases.md`, with a concise copy in the package `README.md`. Keep the public version meaning aligned with the internal lifecycle contract; do not make a patch candidate carry unrelated next-minor capability while publicly describing patches as maintenance releases.
+
 This workflow owns **release preparation**, not package publication. It turns repository facts into a reviewed release story, release-note categorization inputs, a release-scope declaration, validation evidence, and one pull request. The maintainer publication procedure remains owned by `docs/reference/release-process.md`.
 
 ## Input
@@ -42,6 +44,8 @@ Read these before authoring release content:
 - `AGENTS.md` and applicable harness instructions;
 - `docs/internal/release-lifecycle-governance.md`;
 - `docs/internal/backlog-governance.md`;
+- `docs/reference/versioning-and-releases.md`;
+- `README.md` for the NuGet-visible concise versioning statement;
 - `docs/reference/release-process.md`;
 - `.github/release.yml`;
 - `tools/release/scopes/` and the current release-scope schema/consumer tests;
@@ -80,6 +84,8 @@ Determine and record:
 - whether the target tag/GitHub Release already exists;
 - whether an existing `tools/release/scopes/<RELEASE_TARGET>.json` already authorizes the target;
 - whether a release story already exists.
+
+Then verify that the candidate's intended role is consistent with the public versioning contract: a pre-1.0 `0.Y.0` is a capability release, while `0.Y.Z` for `Z > 0` is maintenance of that capability line and must not silently contain unrelated next-minor capability scope.
 
 Fail closed on conflicting release identity. Never overwrite an existing tag, GitHub Release, or incompatible declaration merely because the requested version matches.
 
@@ -131,7 +137,7 @@ Use the repository backlog-governance conventions and include at least:
 - `Validation`;
 - `Non-goals`.
 
-The story must state the intended product delta precisely enough that a reviewer can decide whether the release-scope declaration is truthful.
+The story must state the intended product delta precisely enough that a reviewer can decide whether the release-scope declaration is truthful. It should also use the public release-type language where applicable (`capability release`, `maintenance release`, or `preview`) so repository intent and user-facing version meaning do not drift apart.
 
 ### Patch / maintenance story
 
@@ -238,7 +244,8 @@ At minimum for a normal declaration-only release preparation:
 3. verify the release story and declaration agree exactly;
 4. verify intended public-note labels against `.github/release.yml`;
 5. verify no generated changelog/release-note page was added;
-6. verify no package/version property was changed merely to force the release version.
+6. verify no package/version property was changed merely to force the release version;
+7. verify that the chosen release scenario is consistent with `docs/reference/versioning-and-releases.md` and the NuGet-visible README summary.
 
 If release scripts, workflow logic, schemas, packaging, or publication authority are modified beyond adding a declaration/test entry, escalate validation to the repository's release/publication risk tier and run the broader release-specific gates required by those files.
 
