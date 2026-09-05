@@ -152,6 +152,21 @@ assembly scan, and its projection is deliberately not substituted for normal val
 capture. Shared internal observation DTOs carry facts between those collaborators and the
 evaluator without changing public topology evidence or result contracts.
 
+#### `ArchitectureMetricEvaluator` metric-kind extraction (#779)
+
+`ArchitectureMetricEvaluator` remains the sole metric measurement coordinator: it selects
+definitions, validates requested IDs, applies complete-universe gates, completes applicability,
+normalizes contributor/reason ordering, and creates immutable measurement outcomes. It consumes
+the canonical metric projection from `ArchitectureTopologyMetricObserver` rather than topology
+evaluator implementation helpers.
+
+`ArchitectureTopologyMetricCalculator` owns mapped type-count, footprint, and direct component
+relation contributors. `ArchitectureExternalDependencyMetricCalculator` owns external-fact source
+identity recovery and group contributors. `ArchitecturePublicContractMetricCalculator` owns public
+surface contract/assembly resolution and reuses the session's existing public-surface capture.
+They return raw internal evidence to the coordinator; none creates a graph, loads assemblies,
+scans source, repeats public-surface scanning, or constructs a measurement outcome.
+
 #### `ArchitectureAnalysisSession` responsibility map
 
 - **Session:** owns immutable policy/run inputs, run-scoped indexes and caches, selection state,
