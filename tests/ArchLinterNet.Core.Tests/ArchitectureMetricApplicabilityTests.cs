@@ -300,13 +300,13 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         };
         using ArchitectureAnalysisContext context = CreateContext(ownerA.Assembly, ownerB.Assembly);
         var session = new ArchitectureAnalysisSession(context, document, null, false, null);
-        ArchitectureTopologyEvaluator.ObservedSubject[] subjects =
+        ArchitectureTopologyObservedSubject[] subjects =
         [
             NamespaceSubject(session, ownerA),
             NamespaceSubject(session, ownerB),
         ];
         ArchitectureTopologyEvaluator.Result topology = ArchitectureTopologyEvaluator.Evaluate(
-            session, topologyDefinition, subjects, Array.Empty<ArchitectureTopologyEvaluator.ObservedDependency>());
+            session, topologyDefinition, subjects, Array.Empty<ArchitectureTopologyObservedDependency>());
         ArchitectureTopologyEvaluator.Projection projection = topology.FactProjection!;
         ArchitectureExternalDependencyFact[] facts = [new(ownerA, "Vendor.Client", "vendor-sdk")];
 
@@ -335,29 +335,29 @@ public sealed partial class ArchitectureMetricApplicabilityTests
             },
             Nodes = [AssemblyNode("source", "Source")],
         };
-        ArchitectureTopologyEvaluator.ObservedSubject source = AssemblySubject(
+        ArchitectureTopologyObservedSubject source = AssemblySubject(
             "source", "Source", "source-canonical", "Source, Version=1.0.0.0");
-        ArchitectureTopologyEvaluator.ObservedSubject targetFirst = AssemblySubject(
+        ArchitectureTopologyObservedSubject targetFirst = AssemblySubject(
             "shared-first", "Shared", "shared-first-canonical", "Shared, Version=1.0.0.0");
-        ArchitectureTopologyEvaluator.ObservedSubject targetSecond = AssemblySubject(
+        ArchitectureTopologyObservedSubject targetSecond = AssemblySubject(
             "shared-second", "Shared", "shared-second-canonical", "Shared, Version=2.0.0.0");
-        ArchitectureTopologyEvaluator.ObservedDependency dependency = ArchitectureTopologyEvaluator.BindAssemblyDependencies(
+        ArchitectureTopologyObservedDependency dependency = ArchitectureTopologyMetricObserver.BindAssemblyDependencies(
             [source, targetFirst, targetSecond],
             [
-                new ArchitectureTopologyEvaluator.AssemblyDependencyObservation(
+                new ArchitectureTopologyAssemblyDependencyObservation(
                     "Source",
                     "source-canonical",
-                    [new ArchitectureTopologyEvaluator.AssemblyReferenceObservation(
+                    [new ArchitectureTopologyAssemblyReferenceObservation(
                         "Shared", "Shared, Version=1.0.0.0")]),
             ]).Single();
-        ArchitectureTopologyEvaluator.ObservedDependency unmatchedIdentityDependency =
-            ArchitectureTopologyEvaluator.BindAssemblyDependencies(
+        ArchitectureTopologyObservedDependency unmatchedIdentityDependency =
+            ArchitectureTopologyMetricObserver.BindAssemblyDependencies(
                 [source, targetFirst],
                 [
-                    new ArchitectureTopologyEvaluator.AssemblyDependencyObservation(
+                    new ArchitectureTopologyAssemblyDependencyObservation(
                         "Source",
                         "source-canonical",
-                        [new ArchitectureTopologyEvaluator.AssemblyReferenceObservation(
+                        [new ArchitectureTopologyAssemblyReferenceObservation(
                             "Shared", "Shared, Version=2.0.0.0")]),
                 ]).Single();
         ArchitectureTopologyEvaluator.Result topology = ArchitectureTopologyEvaluator.Evaluate(
@@ -382,9 +382,9 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         Assert.Multiple(() =>
         {
             Assert.That(dependency.TargetBinding,
-                Is.EqualTo(ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Ambiguous));
+                Is.EqualTo(ArchitectureTopologyAssemblyEndpointBinding.Ambiguous));
             Assert.That(unmatchedIdentityDependency.TargetBinding,
-                Is.EqualTo(ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Ambiguous));
+                Is.EqualTo(ArchitectureTopologyAssemblyEndpointBinding.Ambiguous));
             AssertUnassessable(measurement);
             Assert.That(record.Reasons.Select(reason => reason.Code),
                 Is.EqualTo(new[] { ArchitectureApplicabilityReasonCodes.AmbiguousSubject }));
@@ -404,19 +404,19 @@ public sealed partial class ArchitectureMetricApplicabilityTests
             },
             Nodes = [AssemblyNode("source", "Source")],
         };
-        ArchitectureTopologyEvaluator.ObservedSubject sourceFirst = AssemblySubject(
+        ArchitectureTopologyObservedSubject sourceFirst = AssemblySubject(
             "source-first", "Source", "source-first-canonical", "Source, Version=1.0.0.0");
-        ArchitectureTopologyEvaluator.ObservedSubject sourceSecond = AssemblySubject(
+        ArchitectureTopologyObservedSubject sourceSecond = AssemblySubject(
             "source-second", "Source", "source-second-canonical", "Source, Version=2.0.0.0");
-        ArchitectureTopologyEvaluator.ObservedSubject target = AssemblySubject(
+        ArchitectureTopologyObservedSubject target = AssemblySubject(
             "target", "Target", "target-canonical", "Target, Version=1.0.0.0");
-        ArchitectureTopologyEvaluator.ObservedDependency dependency = ArchitectureTopologyEvaluator.BindAssemblyDependencies(
+        ArchitectureTopologyObservedDependency dependency = ArchitectureTopologyMetricObserver.BindAssemblyDependencies(
             [sourceFirst, sourceSecond, target],
             [
-                new ArchitectureTopologyEvaluator.AssemblyDependencyObservation(
+                new ArchitectureTopologyAssemblyDependencyObservation(
                     "Source",
                     "source-first-canonical",
-                    [new ArchitectureTopologyEvaluator.AssemblyReferenceObservation(
+                    [new ArchitectureTopologyAssemblyReferenceObservation(
                         "Target", "Target, Version=1.0.0.0")]),
             ]).Single();
         ArchitectureTopologyEvaluator.Result topology = ArchitectureTopologyEvaluator.Evaluate(
@@ -441,7 +441,7 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         Assert.Multiple(() =>
         {
             Assert.That(dependency.SourceBinding,
-                Is.EqualTo(ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Ambiguous));
+                Is.EqualTo(ArchitectureTopologyAssemblyEndpointBinding.Ambiguous));
             Assert.That(dependency.SourceAssemblyName, Is.EqualTo("Source"));
             AssertUnassessable(measurement);
             Assert.That(record.Reasons.Select(reason => reason.Code),
@@ -452,17 +452,17 @@ public sealed partial class ArchitectureMetricApplicabilityTests
     [Test]
     public void BindAssemblyDependencies_ExcludesExternalMetadataReferenceFromRetainedFirstPartyGraph()
     {
-        ArchitectureTopologyEvaluator.ObservedSubject source = AssemblySubject(
+        ArchitectureTopologyObservedSubject source = AssemblySubject(
             "source", "Source", "source-canonical", "Source, Version=1.0.0.0");
 
-        IReadOnlyList<ArchitectureTopologyEvaluator.ObservedDependency> dependencies =
-            ArchitectureTopologyEvaluator.BindAssemblyDependencies(
+        IReadOnlyList<ArchitectureTopologyObservedDependency> dependencies =
+            ArchitectureTopologyMetricObserver.BindAssemblyDependencies(
                 [source],
                 [
-                    new ArchitectureTopologyEvaluator.AssemblyDependencyObservation(
+                    new ArchitectureTopologyAssemblyDependencyObservation(
                         "Source",
                         "source-canonical",
-                        [new ArchitectureTopologyEvaluator.AssemblyReferenceObservation(
+                        [new ArchitectureTopologyAssemblyReferenceObservation(
                             "External.Library", "External.Library, Version=1.0.0.0")]),
                 ]);
 
@@ -484,13 +484,13 @@ public sealed partial class ArchitectureMetricApplicabilityTests
             },
             Nodes = [AssemblyNode("component", "Shared")],
         };
-        ArchitectureTopologyEvaluator.ObservedSubject first = TypeSubject(CanonicalFirst);
-        ArchitectureTopologyEvaluator.ObservedSubject second = TypeSubject(CanonicalSecond);
+        ArchitectureTopologyObservedSubject first = TypeSubject(CanonicalFirst);
+        ArchitectureTopologyObservedSubject second = TypeSubject(CanonicalSecond);
         ArchitectureTopologyEvaluator.Result topology = ArchitectureTopologyEvaluator.Evaluate(
             session: null,
             topology: topologyDefinition,
             observedSubjects: [first, second],
-            observedDependencies: Array.Empty<ArchitectureTopologyEvaluator.ObservedDependency>());
+            observedDependencies: Array.Empty<ArchitectureTopologyObservedDependency>());
         ArchitectureContractDocument document = new()
         {
             Name = "metric-canonical-contributors",
@@ -597,7 +597,7 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         };
         using ArchitectureAnalysisContext context = CreateContext(selected.Assembly, unrelated.Assembly);
         var session = new ArchitectureAnalysisSession(context, document, null, false, null);
-        ArchitectureTopologyEvaluator.Projection projection = ArchitectureTopologyEvaluator.Project(session, topologyDefinition);
+        ArchitectureTopologyEvaluator.Projection projection = ArchitectureTopologyMetricObserver.Project(session, topologyDefinition);
         var reasons = new List<string>();
 
         HashSet<string> contributors = ArchitectureMetricEvaluator.ExternalGroups(
@@ -637,7 +637,7 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         using ArchitectureAnalysisContext context = CreateContext(emptyAssembly);
         var session = new ArchitectureAnalysisSession(context, document, null, false, null);
 
-        ArchitectureTopologyEvaluator.Projection projection = ArchitectureTopologyEvaluator.Project(session, topology);
+        ArchitectureTopologyEvaluator.Projection projection = ArchitectureTopologyMetricObserver.Project(session, topology);
 
         Assert.Multiple(() =>
         {
@@ -687,16 +687,16 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         Mappings = [new ArchitectureTopologySubjectSelector { Assembly = assembly }],
     };
 
-    private static ArchitectureTopologyEvaluator.ObservedSubject NamespaceSubject(
+    private static ArchitectureTopologyObservedSubject NamespaceSubject(
         ArchitectureAnalysisSession session,
         Type type)
     {
         string assembly = type.Assembly.GetName().Name!;
-        string project = ArchitectureTopologyEvaluator.ResolveProjectForMetric(session, type);
-        string canonicalAssembly = ArchitectureTopologyEvaluator.ResolveCanonicalAssemblyIdentityForMetric(type);
+        string project = ArchitectureTopologyMetricObserver.ResolveProjectForMetric(session, type);
+        string canonicalAssembly = ArchitectureTopologyMetricObserver.ResolveCanonicalAssemblyIdentity(type);
         string @namespace = type.Namespace!;
-        return new ArchitectureTopologyEvaluator.ObservedSubject(
-            ArchitectureTopologyEvaluator.BuildMetricSubjectIdentity(
+        return new ArchitectureTopologyObservedSubject(
+            ArchitectureTopologyMetricObserver.BuildMetricSubjectIdentity(
                 "namespace", project, assembly, canonicalAssembly, @namespace),
             project,
             assembly,
@@ -707,7 +707,7 @@ public sealed partial class ArchitectureMetricApplicabilityTests
             ProjectSelectorIdentity: assembly);
     }
 
-    private static ArchitectureTopologyEvaluator.ObservedSubject AssemblySubject(
+    private static ArchitectureTopologyObservedSubject AssemblySubject(
         string id,
         string assembly,
         string canonicalAssembly,
@@ -769,8 +769,8 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         Nodes = [Node("empty", "Metric.No.Types")],
     };
 
-    private static ArchitectureTopologyEvaluator.ObservedSubject TypeSubject(string canonicalAssembly) => new(
-        ArchitectureTopologyEvaluator.BuildMetricSubjectIdentity(
+    private static ArchitectureTopologyObservedSubject TypeSubject(string canonicalAssembly) => new(
+        ArchitectureTopologyMetricObserver.BuildMetricSubjectIdentity(
             "type", "Shared", "Shared", canonicalAssembly, "Metric.Shared.Type"),
         "Shared",
         "Shared",

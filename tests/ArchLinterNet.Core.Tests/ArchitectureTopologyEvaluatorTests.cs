@@ -333,8 +333,8 @@ public sealed class ArchitectureTopologyEvaluatorTests
 
     private static ArchitectureTopologyEvaluator.Result Evaluate(
         ArchitectureTopology topology,
-        IReadOnlyList<ArchitectureTopologyEvaluator.ObservedSubject> subjects,
-        IReadOnlyList<ArchitectureTopologyEvaluator.ObservedDependency> dependencies) =>
+        IReadOnlyList<Execution.ArchitectureTopologyObservedSubject> subjects,
+        IReadOnlyList<Execution.ArchitectureTopologyObservedDependency> dependencies) =>
         ArchitectureTopologyEvaluator.Evaluate(
             session: null,
             topology: topology,
@@ -364,12 +364,12 @@ public sealed class ArchitectureTopologyEvaluatorTests
 
     private static ArchitectureTopologySubjectSelector Namespace(string value) => new() { Namespace = value };
 
-    private static ArchitectureTopologyEvaluator.ObservedSubject Subject(string id, string @namespace) => new(
+    private static Execution.ArchitectureTopologyObservedSubject Subject(string id, string @namespace) => new(
         id,
         "Sample.Project",
         "Sample.Assembly",
         @namespace);
 
-    private static ArchitectureTopologyEvaluator.ObservedDependency Dependency(string source, string target, string witness) =>
+    private static Execution.ArchitectureTopologyObservedDependency Dependency(string source, string target, string witness) =>
         new(source, target, witness);
 }

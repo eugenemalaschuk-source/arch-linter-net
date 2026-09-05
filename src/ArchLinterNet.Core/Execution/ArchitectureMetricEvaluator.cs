@@ -23,7 +23,7 @@ internal static class ArchitectureMetricEvaluator
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(definitions);
 
-        return Evaluate(session, definitions, ArchitectureTopologyEvaluator.EvaluateForMetrics(session), selectedIds);
+        return Evaluate(session, definitions, ArchitectureTopologyMetricObserver.Evaluate(session), selectedIds);
     }
 
     // This narrow overload keeps the evaluator testable against the same topology projection that
@@ -259,7 +259,7 @@ internal static class ArchitectureMetricEvaluator
         string kind,
         ICollection<string> reasons)
     {
-        IReadOnlyList<ArchitectureTopologyEvaluator.ObservedDependency> dependencies = topology.Dependencies;
+        IReadOnlyList<ArchitectureTopologyObservedDependency> dependencies = topology.Dependencies;
 
         Dictionary<string, ArchitectureTopologyEvaluator.SubjectClassification> classes =
             topology.Classifications.ToDictionary(classification => classification.Subject.Identity, StringComparer.Ordinal);
@@ -278,17 +278,17 @@ internal static class ArchitectureMetricEvaluator
             return contributors;
         }
 
-        foreach (ArchitectureTopologyEvaluator.ObservedDependency dependency in dependencies)
+        foreach (ArchitectureTopologyObservedDependency dependency in dependencies)
         {
             string selectedIdentity = outgoing ? dependency.SourceIdentity : dependency.TargetIdentity;
             string otherIdentity = outgoing ? dependency.TargetIdentity : dependency.SourceIdentity;
-            ArchitectureTopologyEvaluator.AssemblyEndpointBinding selectedBinding = outgoing
+            ArchitectureTopologyAssemblyEndpointBinding selectedBinding = outgoing
                 ? dependency.SourceBinding
                 : dependency.TargetBinding;
             string? selectedAssemblyName = outgoing
                 ? dependency.SourceAssemblyName
                 : dependency.TargetAssemblyName;
-            if (selectedBinding == ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Ambiguous
+            if (selectedBinding == ArchitectureTopologyAssemblyEndpointBinding.Ambiguous
                 && CouldBeSelectedNode(topology, selectedAssemblyName, node))
             {
                 // The synthetic identity for an ambiguous endpoint cannot enter the exact
@@ -310,16 +310,16 @@ internal static class ArchitectureMetricEvaluator
                 continue;
             }
 
-            ArchitectureTopologyEvaluator.AssemblyEndpointBinding otherBinding = outgoing
+            ArchitectureTopologyAssemblyEndpointBinding otherBinding = outgoing
                 ? dependency.TargetBinding
                 : dependency.SourceBinding;
-            if (otherBinding == ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Ambiguous)
+            if (otherBinding == ArchitectureTopologyAssemblyEndpointBinding.Ambiguous)
             {
                 reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
                 continue;
             }
 
-            if (otherBinding == ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Missing)
+            if (otherBinding == ArchitectureTopologyAssemblyEndpointBinding.Missing)
             {
                 reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
                 continue;
@@ -444,9 +444,9 @@ internal static class ArchitectureMetricEvaluator
         ArchitectureAnalysisSession session)
     {
         string fullTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
-        string project = ArchitectureTopologyEvaluator.ResolveProjectForMetric(session, sourceType);
+        string project = ArchitectureTopologyMetricObserver.ResolveProjectForMetric(session, sourceType);
         string assembly = ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty;
-        string canonicalAssemblyIdentity = ArchitectureTopologyEvaluator.ResolveCanonicalAssemblyIdentityForMetric(sourceType);
+        string canonicalAssemblyIdentity = ArchitectureTopologyMetricObserver.ResolveCanonicalAssemblyIdentity(sourceType);
         string subject = topology.Topology.SubjectKind switch
         {
             "type" => fullTypeName,
@@ -455,13 +455,13 @@ internal static class ArchitectureMetricEvaluator
             "assembly" => ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty,
             _ => string.Empty,
         };
-        return ArchitectureTopologyEvaluator.BuildMetricSubjectIdentity(
+        return ArchitectureTopologyMetricObserver.BuildMetricSubjectIdentity(
             topology.Topology.SubjectKind, project, assembly, canonicalAssemblyIdentity, subject);
     }
 
     private static bool HasCanonicalProjectOwner(
         ArchitectureAnalysisSession session,
-        ArchitectureTopologyEvaluator.ObservedSubject subject)
+        ArchitectureTopologyObservedSubject subject)
     {
         return subject.ResolvedAssembly is not null
                && session.Facts.TryGetProjectByResolvedAssembly(subject.ResolvedAssembly, out var project)
@@ -470,7 +470,7 @@ internal static class ArchitectureMetricEvaluator
 
     private static string? ResolveCanonicalProjectOwner(
         ArchitectureAnalysisSession session,
-        ArchitectureTopologyEvaluator.ObservedSubject subject) =>
+        ArchitectureTopologyObservedSubject subject) =>
         HasCanonicalProjectOwner(session, subject)
         && session.Facts.TryGetProjectByResolvedAssembly(subject.ResolvedAssembly!, out var project)
             ? ProjectPathNormalizer.Normalize(project.Path)
@@ -570,7 +570,7 @@ internal static class ArchitectureMetricEvaluator
                 return false;
             }
 
-            resolved.Add(assemblyName, ArchitectureTopologyEvaluator.ResolveCanonicalAssemblyIdentityForMetric(candidates[0]));
+            resolved.Add(assemblyName, ArchitectureTopologyMetricObserver.ResolveCanonicalAssemblyIdentity(candidates[0]));
         }
 
         identities = resolved;
