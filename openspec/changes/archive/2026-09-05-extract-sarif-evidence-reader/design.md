@@ -35,7 +35,7 @@ The existing `IArchitectureEvidenceFileSystem` injection remains owned by the pu
 
 ### Split SARIF parsing by stable responsibility while keeping its vocabulary local
 
-`SarifEvidenceDocumentParser` owns JSON parsing, SARIF version/root validation, duplicate-property detection, matching-run selection, result bounds, and execution-state validation. `SarifEvidenceContextReader` owns SARIF/explicit producer context merge and binding validation. `SarifEvidenceSourceDiagnosticParser` owns driver-rule, artifact, source-location, and result projection validation.
+`SarifEvidenceDocumentReader` owns JSON parsing, SARIF version/root validation, duplicate-property detection, matching-run selection, result bounds, and execution-state validation. `SarifEvidenceContextReader` owns SARIF/explicit producer context merge and binding validation. `SarifEvidenceSourceProjectionReader` owns driver-rule, artifact, source-location, and result projection validation; `SarifEvidenceSourceLocationReader` owns source location parsing mechanics.
 
 They retain the existing private records and deterministic validation details beside the responsibility that uses them. The public facade composes their facts in the existing order and decides which ones become a result status/provenance. A generic JSON/SARIF framework or cross-format parser was rejected because this issue must preserve the intentionally strict SARIF 2.1 trust behavior without broadening a format abstraction.
 
