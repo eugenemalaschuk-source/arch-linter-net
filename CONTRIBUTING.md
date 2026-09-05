@@ -69,3 +69,9 @@ It defines the distinction between release-required product scope, post-release
 stabilization, maintenance patches, and milestone closure. Milestone membership
 is planning/traceability metadata; it does not by itself authorize or block a
 public release.
+
+The user-facing meaning of capability, maintenance, preview, and development
+versions is documented separately in
+[Versioning and release meaning](docs/reference/versioning-and-releases.md).
+Release-related changes must keep the internal lifecycle intent and that public
+versioning contract consistent.
