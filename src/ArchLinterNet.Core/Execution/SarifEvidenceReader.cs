@@ -148,7 +148,7 @@ public sealed class SarifEvidenceReader
             : SarifEvidenceTrustStatus.UnreadableInput;
     }
 
-    private SarifEvidenceReadResult ParseAndValidate(
+    private static SarifEvidenceReadResult ParseAndValidate(
         ArchitectureExternalEvidenceRequirement requirement,
         SarifEvidenceArtifactReference artifact,
         SarifEvidenceAssessmentContext expectedContext,
