@@ -15,6 +15,8 @@ The project is still in the `0.x` initial-development range. Under SemVer, a `0.
 
 For a released minor line, consumers should normally prefer the latest available patch version unless a specific repository has reviewed and pinned an older version for a documented reason.
 
+This same summary is embedded in the repository `README.md`, which is packaged as the NuGet README. A user evaluating an ArchLinterNet package on NuGet.org therefore does not need access to internal maintainer documentation to understand what the version number means.
+
 ## Capability releases
 
 A capability release such as `0.8.0` is the point where ArchLinterNet publishes a coherent new product increment.
