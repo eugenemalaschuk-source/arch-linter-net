@@ -10,7 +10,7 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Backlog governance and issue authoring](backlog-governance.md) — internal issue and backlog rules.
 
-- [Release lifecycle and milestone governance](release-lifecycle-governance.md) — canonical development-wave model from parallel capability planning through minor publication, real-adoption stabilization, post-release architecture/quality cleanup, maintenance patches, and milestone closure.
+- [Release lifecycle and milestone governance](release-lifecycle-governance.md) — canonical development-wave model from parallel capability planning through minor publication, real-adoption stabilization, post-release architecture/quality cleanup, maintenance patches, and milestone closure. Its user-facing version meaning is projected separately through the public [Versioning and release meaning](../reference/versioning-and-releases.md) contract.
 
 - [Core architecture blueprint](core-architecture-blueprint.md) — target Core module graph, application/composition seams, and state-ownership rules for the architecture-health refactor (#132/#133).
 
