@@ -266,8 +266,8 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             }
 
             _cancellationToken.ThrowIfCancellationRequested();
-            ArchitectureTopologyEvaluator.ValidationObservation observation =
-                ArchitectureTopologyEvaluator.ObserveForValidation(EnsureSetup().Runner.Session, subjectKind);
+            global::ArchLinterNet.Core.Execution.ArchitectureTopologyObservation observation =
+                ArchitectureTopologyValidationObserver.Observe(EnsureSetup().Runner.Session, subjectKind);
             ArchitectureTopologyObservation captured = new(
                 observation.Subjects.Select(subject => new ArchitectureTopologyObservedSubject(
                     subject.Identity, subject.Subject, subject.Project, subject.Assembly)).ToArray(),

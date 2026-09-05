@@ -106,6 +106,10 @@ public sealed class ArchitectureTopologyCaptureTests
                 Is.EqualTo(outcome.Subjects.Select(subject => subject.Identity)
                     .OrderBy(identity => identity, StringComparer.Ordinal)));
             Assert.That(
+                outcome.Subjects.All(subject =>
+                    !subject.Identity.Contains("canonical_assembly=", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
                 outcome.Relationships.Select(relationship =>
                     $"{relationship.SourceIdentity}\u001f{relationship.TargetIdentity}\u001f{relationship.Witness}"),
                 Is.EqualTo(outcome.Relationships.Select(relationship =>
