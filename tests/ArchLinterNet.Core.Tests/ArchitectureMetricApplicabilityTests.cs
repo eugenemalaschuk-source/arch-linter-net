@@ -310,15 +310,15 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         ArchitectureTopologyEvaluator.Projection projection = topology.FactProjection!;
         ArchitectureExternalDependencyFact[] facts = [new(ownerA, "Vendor.Client", "vendor-sdk")];
 
-        HashSet<string> first = ArchitectureMetricEvaluator.ExternalGroups(
-            session, projection, "owner-a", new List<string>(), facts);
-        HashSet<string> second = ArchitectureMetricEvaluator.ExternalGroups(
-            session, projection, "owner-b", new List<string>(), facts);
+        ArchitectureMetricRawEvidence first = ArchitectureExternalDependencyMetricCalculator.ExternalGroups(
+            session, projection, "owner-a", facts);
+        ArchitectureMetricRawEvidence second = ArchitectureExternalDependencyMetricCalculator.ExternalGroups(
+            session, projection, "owner-b", facts);
 
         Assert.Multiple(() =>
         {
-            Assert.That(first, Is.EqualTo(new[] { "vendor-sdk" }));
-            Assert.That(second, Is.Empty);
+            Assert.That(first.Contributors, Is.EqualTo(new[] { "vendor-sdk" }));
+            Assert.That(second.Contributors, Is.Empty);
         });
     }
 
@@ -598,19 +598,16 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         using ArchitectureAnalysisContext context = CreateContext(selected.Assembly, unrelated.Assembly);
         var session = new ArchitectureAnalysisSession(context, document, null, false, null);
         ArchitectureTopologyEvaluator.Projection projection = ArchitectureTopologyMetricObserver.Project(session, topologyDefinition);
-        var reasons = new List<string>();
-
-        HashSet<string> contributors = ArchitectureMetricEvaluator.ExternalGroups(
+        ArchitectureMetricRawEvidence result = ArchitectureExternalDependencyMetricCalculator.ExternalGroups(
             session,
             projection,
             "selected",
-            reasons,
             [new ArchitectureExternalDependencyFact(unrelated, "Vendor.Client", "vendor-sdk")]);
 
         Assert.Multiple(() =>
         {
-            Assert.That(contributors, Is.Empty);
-            Assert.That(reasons, Is.Empty);
+            Assert.That(result.Contributors, Is.Empty);
+            Assert.That(result.ReasonCodes, Is.Empty);
         });
     }
 
