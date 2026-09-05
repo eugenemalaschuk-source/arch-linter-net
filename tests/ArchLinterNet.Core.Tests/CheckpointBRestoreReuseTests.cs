@@ -5,8 +5,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class CheckpointBRestoreReuseTests
 {
-    [Test]
-    public void SuccessfulEnsureBuiltIsReusedOnlyForTheSameFixtureRoot()
+    [TestCase(0)]
+    [TestCase(1)]
+    public void CompletedEnsureBuiltIsReusedOnlyForTheSameFixtureRoot(int completedExitCode)
     {
         var restoreReuse = new CheckpointBRestoreReuse();
         string firstRoot = Path.Combine(Path.GetTempPath(), "checkpoint-b-first-root");
@@ -16,7 +17,7 @@ public sealed class CheckpointBRestoreReuseTests
 
         Assert.That(restoreReuse.PrepareArguments(firstRoot, ensureBuilt), Is.EqualTo(ensureBuilt),
             "The first --ensure-built command for a root must retain restore.");
-        restoreReuse.RecordSuccessfulEnsureBuilt(firstRoot, ensureBuilt, exitCode: 0);
+        restoreReuse.RecordCompletedEnsureBuilt(firstRoot, ensureBuilt, completedExitCode);
 
         Assert.Multiple(() =>
         {
@@ -31,13 +32,13 @@ public sealed class CheckpointBRestoreReuseTests
     }
 
     [Test]
-    public void FailedEnsureBuiltDoesNotEnableRestoreReuse()
+    public void UnassessableEnsureBuiltDoesNotEnableRestoreReuse()
     {
         var restoreReuse = new CheckpointBRestoreReuse();
-        string root = Path.Combine(Path.GetTempPath(), "checkpoint-b-failed-root");
+        string root = Path.Combine(Path.GetTempPath(), "checkpoint-b-unassessable-root");
         string[] ensureBuilt = ["validate", "--ensure-built"];
 
-        restoreReuse.RecordSuccessfulEnsureBuilt(root, ensureBuilt, exitCode: 1);
+        restoreReuse.RecordCompletedEnsureBuilt(root, ensureBuilt, exitCode: 2);
 
         Assert.That(restoreReuse.PrepareArguments(root, ensureBuilt), Is.EqualTo(ensureBuilt));
     }

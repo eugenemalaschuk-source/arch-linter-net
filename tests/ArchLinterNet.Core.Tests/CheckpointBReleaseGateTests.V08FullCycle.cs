@@ -16,7 +16,14 @@ public sealed partial class CheckpointBReleaseGateTests
     // repository-relative form, never the absolute validSarifPath used for File I/O.
     private const string V08EvidenceRelativePath = "evidence/v08-static-analysis.sarif";
 
+    // The composed scenario legitimately runs dozens of separately bounded CLI phases. Release
+    // evidence on macOS x64 measured ~4m25 on an ordinary pass and 5m before cancellation under
+    // load; 7m keeps a bounded scenario guard while each child process remains independently
+    // limited by CheckpointBProcessRunner.ProcessCompletionTimeout (2m).
+    private const int V08FullCycleWatchdogMs = 420_000;
+
     [Test]
+    [CancelAfter(V08FullCycleWatchdogMs)]
     public void PackedCandidate_V08FullCycle()
     {
         CandidatePackageFeed candidate = Candidate;
