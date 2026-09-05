@@ -1,11 +1,36 @@
 using System.Security;
 using System.Security.Cryptography;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class SarifEvidenceReader
+/// <summary>Acquires one bounded, repository-local SARIF artifact without interpreting its bytes.</summary>
+internal sealed class SarifEvidenceArtifactReader
 {
+    private readonly IArchitectureEvidenceFileSystem _fileSystem;
+
+    public SarifEvidenceArtifactReader(IArchitectureEvidenceFileSystem fileSystem)
+    {
+        _fileSystem = fileSystem;
+    }
+
+    public SarifEvidenceArtifactReadOutcome Read(
+        string repositoryRoot,
+        string artifactPath,
+        long maximumBytes,
+        CancellationToken cancellationToken)
+    {
+        PathResolution path = ResolveArtifactPath(repositoryRoot, artifactPath);
+        if (!path.IsSafe)
+        {
+            return SarifEvidenceArtifactReadOutcome.Unsafe;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return ReadBoundedBytes(path, maximumBytes, cancellationToken);
+    }
+
     private static PathResolution ResolveArtifactPath(string repositoryRoot, string artifactPath)
     {
         if (IsUnsafeArtifactPath(artifactPath))
@@ -64,7 +89,7 @@ public sealed partial class SarifEvidenceReader
             || FileSystemContainmentGuard.IsReparsePoint(fullPath);
     }
 
-    private ByteReadOutcome ReadBoundedBytes(
+    private SarifEvidenceArtifactReadOutcome ReadBoundedBytes(
         PathResolution path,
         long maximumBytes,
         CancellationToken cancellationToken)
@@ -76,24 +101,24 @@ public sealed partial class SarifEvidenceReader
         {
             if (!IsStillSafe(path))
             {
-                return ByteReadOutcome.Unsafe;
+                return SarifEvidenceArtifactReadOutcome.UnsafeAfterPathResolution(path.RelativePath);
             }
 
             using Stream stream = _fileSystem.OpenRepositoryLocalRegularFile(path.RootPath, path.RelativePath);
             ReadIntoBuffer(stream, buffer, maximumBytes, cancellationToken, out bytesRead, out exceeded);
-            return CreateReadableOutcome(buffer, exceeded, bytesRead);
+            return CreateReadableOutcome(path.RelativePath, buffer, exceeded, bytesRead);
         }
         catch (FileNotFoundException)
         {
-            return CreateFailureOutcome(buffer, ArtifactReadFailure.Missing, bytesRead);
+            return CreateFailureOutcome(path.RelativePath, buffer, ArtifactReadFailure.Missing, bytesRead);
         }
         catch (InvalidDataException)
         {
-            return CreateFailureOutcome(buffer, ArtifactReadFailure.Unsafe, bytesRead);
+            return CreateFailureOutcome(path.RelativePath, buffer, ArtifactReadFailure.Unsafe, bytesRead);
         }
         catch (Exception ex) when (IsUnreadableException(ex))
         {
-            return CreateFailureOutcome(buffer, ArtifactReadFailure.Unreadable, bytesRead);
+            return CreateFailureOutcome(path.RelativePath, buffer, ArtifactReadFailure.Unreadable, bytesRead);
         }
     }
 
@@ -139,26 +164,32 @@ public sealed partial class SarifEvidenceReader
         return (int)Math.Min(chunkLength, remaining);
     }
 
-    private static ByteReadOutcome CreateReadableOutcome(MemoryStream buffer, bool exceeded, long bytesRead)
+    private static SarifEvidenceArtifactReadOutcome CreateReadableOutcome(
+        string relativePath,
+        MemoryStream buffer,
+        bool exceeded,
+        long bytesRead)
     {
         byte[] data = buffer.ToArray();
-        return new ByteReadOutcome(
+        return new SarifEvidenceArtifactReadOutcome(
             true,
             ArtifactReadFailure.None,
             exceeded,
             data,
             bytesRead,
-            Convert.ToHexStringLower(SHA256.HashData(data)));
+            Convert.ToHexStringLower(SHA256.HashData(data)),
+            relativePath);
     }
 
-    private static ByteReadOutcome CreateFailureOutcome(
+    private static SarifEvidenceArtifactReadOutcome CreateFailureOutcome(
+        string relativePath,
         MemoryStream buffer,
         ArtifactReadFailure failure,
         long bytesRead)
     {
         byte[] data = buffer.ToArray();
         string? hash = data.Length == 0 ? null : Convert.ToHexStringLower(SHA256.HashData(data));
-        return new ByteReadOutcome(false, failure, false, data, bytesRead, hash);
+        return new SarifEvidenceArtifactReadOutcome(false, failure, false, data, bytesRead, hash, relativePath);
     }
 
     private static bool IsUnreadableException(Exception exception)
@@ -192,23 +223,28 @@ public sealed partial class SarifEvidenceReader
     {
         public static PathResolution Unsafe => new(false, string.Empty, string.Empty, string.Empty);
     }
+}
 
-    private readonly record struct ByteReadOutcome(
-        bool IsReadable,
-        ArtifactReadFailure Failure,
-        bool ExceededLimit,
-        byte[] Data,
-        long BytesRead,
-        string? Sha256)
-    {
-        public static ByteReadOutcome Unsafe => new(false, ArtifactReadFailure.Unsafe, false, [], 0, null);
-    }
+internal readonly record struct SarifEvidenceArtifactReadOutcome(
+    bool IsReadable,
+    ArtifactReadFailure Failure,
+    bool ExceededLimit,
+    byte[] Data,
+    long BytesRead,
+    string? Sha256,
+    string? RelativePath)
+{
+    public static SarifEvidenceArtifactReadOutcome Unsafe =>
+        new(false, ArtifactReadFailure.Unsafe, false, [], 0, null, null);
 
-    private enum ArtifactReadFailure
-    {
-        None,
-        Missing,
-        Unsafe,
-        Unreadable,
-    }
+    public static SarifEvidenceArtifactReadOutcome UnsafeAfterPathResolution(string relativePath) =>
+        new(false, ArtifactReadFailure.Unsafe, false, [], 0, null, relativePath);
+}
+
+internal enum ArtifactReadFailure
+{
+    None,
+    Missing,
+    Unsafe,
+    Unreadable,
 }
