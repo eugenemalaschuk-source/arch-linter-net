@@ -68,8 +68,9 @@ All `make` targets run natively on Windows via **Git Bash** — WSL is not requi
 
 ## Release lifecycle and milestone governance
 Canonical internal policy: [docs/internal/release-lifecycle-governance.md](docs/internal/release-lifecycle-governance.md).
+Public user-facing version meaning: [docs/reference/versioning-and-releases.md](docs/reference/versioning-and-releases.md).
 
-Before planning, creating, moving, implementing, stabilizing, or preparing release-related work, agents MUST identify the current release-lifecycle phase and apply that policy.
+Before planning, creating, moving, implementing, stabilizing, or preparing release-related work, agents MUST identify the current release-lifecycle phase and apply the internal policy. When release/version semantics are user-visible, agents MUST keep the public versioning contract and NuGet-visible `README.md` consistent with that policy.
 
 In particular:
 - a milestone is a development-wave envelope and traceability aid, **not** immutable release authority;
