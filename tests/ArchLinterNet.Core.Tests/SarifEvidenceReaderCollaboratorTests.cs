@@ -1,7 +1,9 @@
+using System.IO;
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
@@ -28,6 +30,101 @@ public sealed class SarifEvidenceReaderCollaboratorTests
             Assert.That(outcome.IsReadable, Is.True);
             Assert.That(outcome.RelativePath, Is.EqualTo("reports/scan.sarif"));
             Assert.That(outcome.Data, Is.EqualTo(bytes));
+            Assert.That(outcome.Sha256, Is.EqualTo(Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes))));
+        });
+    }
+
+    [Test]
+    public void ArtifactReader_MissingArtifact_ReturnsMissingFailure()
+    {
+        using var repository = new SarifEvidenceTestRepository();
+
+        SarifEvidenceArtifactReadOutcome outcome = new SarifEvidenceArtifactReader(ArchitectureFileSystem.Real).Read(
+            repository.Root,
+            "missing.sarif",
+            4096,
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsReadable, Is.False);
+            Assert.That(outcome.Failure, Is.EqualTo(ArtifactReadFailure.Missing));
+            Assert.That(outcome.ExceededLimit, Is.False);
+            Assert.That(outcome.BytesRead, Is.EqualTo(0));
+            Assert.That(outcome.Data, Is.Empty);
+            Assert.That(outcome.RelativePath, Is.EqualTo("missing.sarif"));
+            Assert.That(outcome.Sha256, Is.Null);
+        });
+    }
+
+    [Test]
+    public void ArtifactReader_UnsafeArtifactPath_ReturnsUnsafeFailure()
+    {
+        using var repository = new SarifEvidenceTestRepository();
+
+        SarifEvidenceArtifactReadOutcome outcome = new SarifEvidenceArtifactReader(ArchitectureFileSystem.Real).Read(
+            repository.Root,
+            "../scan.sarif",
+            4096,
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsReadable, Is.False);
+            Assert.That(outcome.Failure, Is.EqualTo(ArtifactReadFailure.Unsafe));
+            Assert.That(outcome.RelativePath, Is.Null);
+            Assert.That(outcome.Data, Is.Empty);
+            Assert.That(outcome.BytesRead, Is.EqualTo(0));
+            Assert.That(outcome.Sha256, Is.Null);
+            Assert.That(outcome.ExceededLimit, Is.False);
+        });
+    }
+
+    [Test]
+    public void ArtifactReader_UnreadableArtifact_ReturnsUnreadableFailure()
+    {
+        using var repository = new SarifEvidenceTestRepository();
+        var fileSystem = new ThrowingEvidenceFileSystem();
+
+        SarifEvidenceArtifactReadOutcome outcome = new SarifEvidenceArtifactReader(fileSystem).Read(
+            repository.Root,
+            "scan.sarif",
+            4096,
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsReadable, Is.False);
+            Assert.That(outcome.Failure, Is.EqualTo(ArtifactReadFailure.Unreadable));
+            Assert.That(outcome.BytesRead, Is.EqualTo(0));
+            Assert.That(outcome.Data, Is.Empty);
+            Assert.That(outcome.RelativePath, Is.EqualTo("scan.sarif"));
+            Assert.That(outcome.Sha256, Is.Null);
+            Assert.That(outcome.ExceededLimit, Is.False);
+        });
+    }
+
+    [Test]
+    public void ArtifactReader_OverLimit_IsReadableWithExceededFlag()
+    {
+        using var repository = new SarifEvidenceTestRepository();
+        byte[] bytes = [0x00, 0x01, 0x02, 0x03, 0x04];
+        repository.AddFile("scan.sarif", bytes);
+
+        SarifEvidenceArtifactReadOutcome outcome = new SarifEvidenceArtifactReader(ArchitectureFileSystem.Real).Read(
+            repository.Root,
+            "scan.sarif",
+            4,
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsReadable, Is.True);
+            Assert.That(outcome.Failure, Is.EqualTo(ArtifactReadFailure.None));
+            Assert.That(outcome.ExceededLimit, Is.True);
+            Assert.That(outcome.BytesRead, Is.EqualTo(5));
+            Assert.That(outcome.Data, Is.EqualTo(bytes));
+            Assert.That(outcome.RelativePath, Is.EqualTo("scan.sarif"));
             Assert.That(outcome.Sha256, Is.EqualTo(Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes))));
         });
     }
@@ -92,5 +189,13 @@ public sealed class SarifEvidenceReaderCollaboratorTests
             Assert.That(diagnostic.PrimaryLocation!.Path, Is.EqualTo("src/App.cs"));
             Assert.That(diagnostic.PrimaryLocation.Region!.StartLine, Is.EqualTo(4));
         });
+    }
+
+    private sealed class ThrowingEvidenceFileSystem : IArchitectureEvidenceFileSystem
+    {
+        public Stream OpenRepositoryLocalRegularFile(string repositoryRoot, string repositoryRelativePath)
+        {
+            throw new IOException("The evidence source was unavailable.");
+        }
     }
 }
