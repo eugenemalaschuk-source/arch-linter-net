@@ -13,6 +13,23 @@ Roadmap / strategic theme
 
 Use a story when the work groups multiple child tasks. Use a task when the work is focused enough to implement and review in one PR.
 
+## Milestone and release lifecycle rules
+
+The canonical lifecycle and milestone semantics are defined in [Release lifecycle and milestone governance](release-lifecycle-governance.md). Apply that document when planning, assigning, or interpreting release-related backlog.
+
+Key rules:
+
+- a milestone is a **development-wave envelope and traceability aid**, not public-release authority;
+- milestone membership alone never makes an issue release-blocking or part of an immutable candidate;
+- a release milestone may intentionally contain release-required capability work, explicitly non-blocking hygiene, and post-release stabilization work at the same time;
+- the `X.Y.0` minor release may therefore be published while architecture/quality cleanup attributable to that wave remains open in the milestone;
+- real-adoption correctness blockers are functional stabilization work, not optional technical-debt cleanup;
+- post-release architecture cleanup should precede the authoritative whole-repository Sonar/maintainability sweep;
+- patch releases form a maintenance train as needed; there is no requirement for exactly one patch after a minor;
+- next-minor backlog planning may overlap stabilization, but unrelated next-minor product bytes must not make a truthful current-line patch impossible unless an explicit maintenance-line strategy exists.
+
+When an issue participates in a release lifecycle, state its role explicitly in the body where useful: `release-blocking product capability`, `consumer-shaped acceptance`, `optional/non-blocking release hygiene`, `real-adoption correctness stabilization`, `post-release architecture cleanup`, `final Sonar/quality cleanup`, or `maintenance publication`.
+
 ## Issue title convention
 
 All new backlog issues should include a hierarchy marker and a work type marker.
@@ -113,15 +130,23 @@ Architecture-governance tasks must preserve the repository's contract model:
 - JSON schema, docs, examples, and AI-facing guidance must be updated when supported policy fields change.
 - Existing policies must remain backward compatible unless a deliberate migration note is documented.
 
+For post-release architecture cleanup, record the exact analyzed release range and distinguish debt created/materially amplified by that release from older debt merely touched by it. Do not expand a release-specific cleanup into a general rewrite without evidence and explicit ownership.
+
 ## Release task rules
 
-Release tasks must preserve pipeline separation:
+Release tasks must preserve both the [release lifecycle](release-lifecycle-governance.md) and pipeline separation:
 
 - PR CI validates code and documentation only.
 - PR CI must not build or publish official release packages.
 - Manual release workflow owns official package build, NuGet publication, GitHub Release creation, and docs publication.
 - Dry-run release paths must not publish packages or create public releases.
 - Public publication must use one calculated version consistently for packages, tags, artifacts, release notes, and docs.
+- Milestone membership is discovery/traceability metadata, never release-scope authority.
+- Correctness, security, and release-integrity defects must not be mislabeled as optional cleanup to preserve a release date.
+- Broad behavior-preserving refactoring may remain outside the minor critical path only when the debt is visible, bounded, and assigned to an explicit stabilization path.
+- Real-adoption defects discovered after `X.Y.0` belong to focused patch stabilization until the promised workflow is adoption-stable.
+- Whole-repository Sonar cleanup runs after structure-changing architecture stabilization by default.
+- A patch candidate must not silently contain unrelated next-minor feature bytes; follow the maintenance-line rules and patch guard instead of narrowing the release declaration cosmetically.
 
 ## Documentation boundary rule
 
