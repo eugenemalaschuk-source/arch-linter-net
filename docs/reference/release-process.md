@@ -2,8 +2,6 @@
 
 This page documents the maintainer workflow for ArchLinterNet development builds and public preview/stable releases. The public release pipeline is intentionally manual: a maintainer chooses the release scenario, reviews a dry-run, and only then publishes packages and creates the public release record.
 
-For the higher-level policy that decides **when** a minor or maintenance release should exist, what a milestone means, how real-adoption stabilization relates to `X.Y.0`, and why architecture cleanup precedes the final Sonar sweep, see [Release lifecycle and milestone governance](../internal/release-lifecycle-governance.md). This page owns publication mechanics and candidate authority; the lifecycle document owns development-wave semantics. A milestone may remain open after `X.Y.0` without becoming publication authority.
-
 ## Delivery lanes
 
 ArchLinterNet deliberately separates four responsibilities:
