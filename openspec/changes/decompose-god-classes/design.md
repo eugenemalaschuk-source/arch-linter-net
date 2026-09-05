@@ -172,6 +172,24 @@ evidence, while the external calculator retains its focused source-identity test
 measurement, applicability, project-ownership, and budget tests continue to prove coordinator
 outcomes and public behavior.
 
+#### `SarifEvidenceReader` artifact and parsing extraction (#774)
+
+`SarifEvidenceReader` remains the one public trust facade: it retains its existing constructor and
+`Read(...)` contract, validates arguments and optional absence, and composes the sole
+`SarifEvidenceReadResult` status, provenance, authorization, and trusted source-diagnostic result.
+`SarifEvidenceArtifactReader` owns repository-local path normalization, containment/reparse and
+regular-file checks, bounded byte acquisition, and SHA-256 facts through the existing
+`IArchitectureEvidenceFileSystem` seam. `SarifEvidenceDocumentReader`,
+`SarifEvidenceContextReader`, and `SarifEvidenceSourceProjectionReader` separately own strict
+SARIF 2.1 run/document validation, producer/context binding, and source diagnostic/location
+projection. They return internal facts only; no consumer gains a second parsing or trust seam.
+
+The parser consumes the exact bounded bytes whose hash is retained in provenance. Existing
+cancellation checks and fail-closed result statuses/details remain in the facade composition order.
+Direct collaborator tests supplement the end-to-end reader, binder, federation, and CLI tests. The
+exact #742 declaration-count exception is removed after the reader becomes one non-partial
+declaration; none of the collaborators is partial.
+
 #### `ArchitectureAnalysisSession` responsibility map
 
 - **Session:** owns immutable policy/run inputs, run-scoped indexes and caches, selection state,

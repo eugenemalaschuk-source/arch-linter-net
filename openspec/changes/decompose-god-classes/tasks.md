@@ -18,6 +18,9 @@
   - [x] Extract `ArchitectureMetricEvaluator` metric-kind calculators while retaining one
     coordinator, session, topology projection, applicability/output authority, canonical
     contributor semantics, and focused calculator seams (#779).
+  - [x] Extract `SarifEvidenceReader` repository-local artifact acquisition and SARIF
+    document/context/source projection collaborators while retaining one public trust facade,
+    current evidence semantics, and focused collaborator/consumer coverage (#774).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
