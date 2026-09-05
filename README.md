@@ -155,9 +155,9 @@ GitHub Pages is deployed only by the public release workflow. A merge to `main` 
 ```bash
 make venv        # create Python virtual environment
 make docs-serve  # preview MkDocs locally
-make docs-build  # build static documentation site
+make docs-build  # build the static documentation site
 make fmt-docs    # auto-format markdown documentation
-make lint-docs   # verify MkDocs documentation structure
+make lint-docs   # strict structure + semantic documentation validation
 ```
 
 Generated `site/` output is a build artifact and should not be committed.
