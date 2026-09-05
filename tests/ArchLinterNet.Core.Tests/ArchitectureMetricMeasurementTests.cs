@@ -330,7 +330,7 @@ public sealed partial class ArchitectureMetricMeasurementTests
             Assert.That(measurement.IsEvaluable, Is.True);
             Assert.That(measurement.Value, Is.GreaterThan(0));
             Assert.That(measurement.Value, Is.EqualTo(measurement.ContributorCount));
-            string canonicalAssembly = ArchitectureTopologyEvaluator.ResolveCanonicalAssemblyIdentityForMetric(coreAssembly);
+            string canonicalAssembly = ArchitectureTopologyMetricObserver.ResolveCanonicalAssemblyIdentity(coreAssembly);
             Assert.That(measurement.Contributors!.All(value => value.StartsWith(canonicalAssembly + "|", StringComparison.Ordinal)), Is.True);
         });
     }

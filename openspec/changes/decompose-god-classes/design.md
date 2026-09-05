@@ -133,6 +133,25 @@ collaborators, and `ArchitectureContractGroups` moves contract-family binding/mo
 named groups or factories. No replacement type may be `partial`; private helper methods remain
 with the collaborator that owns their data and dependencies.
 
+#### `ArchitectureTopologyEvaluator` observation extraction (#773)
+
+`ArchitectureTopologyEvaluator` evaluates an already-observed topology projection: selector and
+node classification, relationship and stale-declaration evidence, applicability, and ordinary
+violations. It does not own CLR/project/assembly observation or identity selection.
+
+`ArchitectureTopologyValidationObserver` owns the historical normal-validation projection, using
+the session's existing type index and reference graph with the simple project/assembly identity
+format. `ArchitectureTopologyCaptureService` reaches that same observer through the validation
+snapshot, so capture and normal validation retain identical subjects, dependency witnesses, and
+ordering.
+
+`ArchitectureTopologyMetricObserver` owns the distinct metric projection. It consumes the same
+session facts and existing assembly metadata graph, but retains canonical resolved-artifact
+identity and project ownership for metric contributors. It does not create another source or
+assembly scan, and its projection is deliberately not substituted for normal validation or
+capture. Shared internal observation DTOs carry facts between those collaborators and the
+evaluator without changing public topology evidence or result contracts.
+
 #### `ArchitectureAnalysisSession` responsibility map
 
 - **Session:** owns immutable policy/run inputs, run-scoped indexes and caches, selection state,
