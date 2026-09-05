@@ -12,6 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class SarifEvidenceReaderCollaboratorTests
 {
+    private static readonly string[] _securityTags = ["security"];
     [Test]
     public void ArtifactReader_ReportsNormalizedPathHashAndAcquiredBytes()
     {
@@ -143,11 +144,11 @@ public sealed class SarifEvidenceReaderCollaboratorTests
         };
         var reader = new SarifEvidenceDocumentReader();
 
-        Assert.That(reader.TryGetRuns(document.RootElement, out JsonElement runs, out _, out _), Is.True);
-        SarifRunSelection selection = reader.SelectMatchingRun(runs, requirement, new SarifEvidenceLimits(4096, 4, 10), CancellationToken.None);
+        Assert.That(SarifEvidenceDocumentReader.TryGetRuns(document.RootElement, out JsonElement runs, out _, out _), Is.True);
+        SarifRunSelection selection = SarifEvidenceDocumentReader.SelectMatchingRun(runs, requirement, new SarifEvidenceLimits(4096, 4, 10), CancellationToken.None);
 
         Assert.That(selection.Failure, Is.Null);
-        Assert.That(reader.ReadResultCount(selection.Candidate!.Value.Run, new SarifEvidenceLimits(4096, 4, 10), out _, out _), Is.EqualTo(1));
+        Assert.That(SarifEvidenceDocumentReader.ReadResultCount(selection.Candidate!.Value.Run, new SarifEvidenceLimits(4096, 4, 10), out _, out _), Is.EqualTo(1));
     }
 
     [Test]
@@ -160,7 +161,7 @@ public sealed class SarifEvidenceReaderCollaboratorTests
             "scan",
             new SarifEvidenceProducerContext("repo", "rev", "scope"));
 
-        ContextReadOutcome outcome = new SarifEvidenceContextReader().ReadContext(document.RootElement, artifact);
+        ContextReadOutcome outcome = SarifEvidenceContextReader.ReadContext(document.RootElement, artifact);
 
         Assert.Multiple(() =>
         {
@@ -185,7 +186,7 @@ public sealed class SarifEvidenceReaderCollaboratorTests
         Assert.Multiple(() =>
         {
             Assert.That(diagnostic.RuleId, Is.EqualTo("RULE"));
-            Assert.That(diagnostic.DriverRuleTags, Is.EqualTo(new[] { "security" }));
+            Assert.That(diagnostic.DriverRuleTags, Is.EqualTo(_securityTags));
             Assert.That(diagnostic.PrimaryLocation!.Path, Is.EqualTo("src/App.cs"));
             Assert.That(diagnostic.PrimaryLocation.Region!.StartLine, Is.EqualTo(4));
         });

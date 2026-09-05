@@ -6,7 +6,7 @@ namespace ArchLinterNet.Core.Execution;
 /// <summary>Projects SARIF artifact locations, regions, and fingerprints into source facts.</summary>
 internal sealed class SarifEvidenceSourceLocationReader
 {
-    internal bool TryReadPrimaryLocation(
+    internal static bool TryReadPrimaryLocation(
         JsonElement result,
         SarifArtifactCatalog artifacts,
         int resultIndex,
@@ -16,97 +16,23 @@ internal sealed class SarifEvidenceSourceLocationReader
     {
         location = null;
         detail = null;
-        if (!result.TryGetProperty("locations", out JsonElement locations))
-        {
-            return true;
-        }
-
-        if (locations.ValueKind != JsonValueKind.Array)
-        {
-            detail = $"The SARIF result at index {resultIndex} locations member must be an array when present.";
-            return false;
-        }
-
-        using IEnumerator<JsonElement> enumerator = locations.EnumerateArray().GetEnumerator();
-        if (!enumerator.MoveNext())
-        {
-            return true;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        JsonElement first = enumerator.Current;
-        if (first.ValueKind != JsonValueKind.Object)
-        {
-            detail = $"The SARIF result at index {resultIndex} primary location must be an object.";
-            return false;
-        }
-
-        if (!first.TryGetProperty("physicalLocation", out JsonElement physicalLocation))
-        {
-            return true;
-        }
-
-        if (physicalLocation.ValueKind != JsonValueKind.Object)
-        {
-            detail = $"The SARIF result at index {resultIndex} physicalLocation member must be an object.";
-            return false;
-        }
-
-        string? path = null;
-        if (physicalLocation.TryGetProperty("artifactLocation", out JsonElement artifactLocation))
-        {
-            if (artifactLocation.ValueKind != JsonValueKind.Object)
-            {
-                detail = $"The SARIF result at index {resultIndex} artifactLocation member must be an object.";
-                return false;
-            }
-
-            string? directPath = null;
-            if (artifactLocation.TryGetProperty("uri", out JsonElement uri))
-            {
-                if (uri.ValueKind != JsonValueKind.String
-                    || !TryNormalizeSourcePath(uri.GetString(), out directPath))
-                {
-                    detail = $"The SARIF result at index {resultIndex} source location uri must be a repository-relative path.";
-                    return false;
-                }
-            }
-
-            int? artifactIndex = null;
-            if (artifactLocation.TryGetProperty("index", out JsonElement index))
-            {
-                if (!TryReadNonNegativeIndex(index, "artifactLocation.index", resultIndex, out artifactIndex, out detail))
-                {
-                    return false;
-                }
-            }
-
-            if (artifactIndex is not null)
-            {
-                if (!artifacts.TryResolve(artifactIndex.Value, out path))
-                {
-                    detail =
-                        $"The SARIF result at index {resultIndex} artifactLocation.index {artifactIndex.Value} cannot be resolved by run.artifacts.";
-                    return false;
-                }
-
-                if (directPath is not null
-                    && !string.Equals(path, directPath, StringComparison.Ordinal))
-                {
-                    detail =
-                        $"The SARIF result at index {resultIndex} artifactLocation uri and index resolve to different paths.";
-                    return false;
-                }
-            }
-            else
-            {
-                path = directPath;
-            }
-        }
-
-        if (!TryReadSourceRegion(
-                physicalLocation,
+        if (!TryReadFirstLocation(
+                result,
                 resultIndex,
+                out JsonElement first,
+                out detail,
+                cancellationToken)
+            || first.ValueKind == JsonValueKind.Undefined
+            || !first.TryGetProperty("physicalLocation", out JsonElement physicalLocation))
+        {
+            return detail is null;
+        }
+
+        if (!TryReadPhysicalLocation(
+                physicalLocation,
+                artifacts,
+                resultIndex,
+                out string? path,
                 out SarifEvidenceSourceRegion? region,
                 out detail,
                 cancellationToken))
@@ -124,7 +50,129 @@ internal sealed class SarifEvidenceSourceLocationReader
         return true;
     }
 
-    internal bool TryReadRunArtifacts(
+    private static bool TryReadFirstLocation(
+        JsonElement result,
+        int resultIndex,
+        out JsonElement first,
+        out string? detail,
+        CancellationToken cancellationToken)
+    {
+        first = default;
+        detail = null;
+        if (!result.TryGetProperty("locations", out JsonElement locations))
+        {
+            return true;
+        }
+
+        if (locations.ValueKind != JsonValueKind.Array)
+        {
+            detail = $"The SARIF result at index {resultIndex} locations member must be an array when present.";
+            return false;
+        }
+
+        JsonElement.ArrayEnumerator enumerator = locations.EnumerateArray();
+        if (!enumerator.MoveNext())
+        {
+            return true;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        first = enumerator.Current;
+        if (first.ValueKind == JsonValueKind.Object)
+        {
+            return true;
+        }
+
+        detail = $"The SARIF result at index {resultIndex} primary location must be an object.";
+        return false;
+    }
+
+    private static bool TryReadPhysicalLocation(
+        JsonElement physicalLocation,
+        SarifArtifactCatalog artifacts,
+        int resultIndex,
+        out string? path,
+        out SarifEvidenceSourceRegion? region,
+        out string? detail,
+        CancellationToken cancellationToken)
+    {
+        path = null;
+        region = null;
+        detail = null;
+        if (physicalLocation.ValueKind != JsonValueKind.Object)
+        {
+            detail = $"The SARIF result at index {resultIndex} physicalLocation member must be an object.";
+            return false;
+        }
+
+        if (!TryReadArtifactPath(physicalLocation, artifacts, resultIndex, out path, out detail)
+            || !TryReadSourceRegion(physicalLocation, resultIndex, out region, out detail, cancellationToken))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryReadArtifactPath(
+        JsonElement physicalLocation,
+        SarifArtifactCatalog artifacts,
+        int resultIndex,
+        out string? path,
+        out string? detail)
+    {
+        path = null;
+        detail = null;
+        if (!physicalLocation.TryGetProperty("artifactLocation", out JsonElement artifactLocation))
+        {
+            return true;
+        }
+
+        if (artifactLocation.ValueKind != JsonValueKind.Object)
+        {
+            detail = $"The SARIF result at index {resultIndex} artifactLocation member must be an object.";
+            return false;
+        }
+
+        string? directPath = null;
+        if (artifactLocation.TryGetProperty("uri", out JsonElement uri)
+            && (uri.ValueKind != JsonValueKind.String
+                || !TryNormalizeSourcePath(uri.GetString(), out directPath)))
+        {
+            detail = $"The SARIF result at index {resultIndex} source location uri must be a repository-relative path.";
+            return false;
+        }
+
+        int? artifactIndex = null;
+        if (artifactLocation.TryGetProperty("index", out JsonElement index)
+            && !TryReadNonNegativeIndex(index, "artifactLocation.index", resultIndex, out artifactIndex, out detail))
+        {
+            return false;
+        }
+
+        if (artifactIndex is null)
+        {
+            path = directPath;
+            return true;
+        }
+
+        if (!artifacts.TryResolve(artifactIndex.Value, out path))
+        {
+            detail =
+                $"The SARIF result at index {resultIndex} artifactLocation.index {artifactIndex.Value} cannot be resolved by run.artifacts.";
+            return false;
+        }
+
+        if (directPath is not null && !string.Equals(path, directPath, StringComparison.Ordinal))
+        {
+            detail = $"The SARIF result at index {resultIndex} artifactLocation uri and index resolve to different paths.";
+            return false;
+        }
+
+        return true;
+    }
+
+    internal static bool TryReadRunArtifacts(
         JsonElement run,
         SarifArtifactCatalog artifacts,
         out string? detail,
@@ -145,32 +193,37 @@ internal sealed class SarifEvidenceSourceLocationReader
         foreach (JsonElement artifact in artifactsElement.EnumerateArray())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (artifact.ValueKind != JsonValueKind.Object)
+            if (!TryReadRunArtifact(artifact, out string? path, out detail))
             {
-                detail = "Every SARIF run artifact must be an object.";
                 return false;
-            }
-
-            string? path = null;
-            if (artifact.TryGetProperty("location", out JsonElement location))
-            {
-                if (!TryReadArtifactLocation(location, out path, out detail))
-                {
-                    return false;
-                }
-            }
-            else if (artifact.TryGetProperty("artifactLocation", out JsonElement artifactLocation))
-            {
-                if (!TryReadArtifactLocation(artifactLocation, out path, out detail))
-                {
-                    return false;
-                }
             }
 
             artifacts.Add(path);
         }
 
         return true;
+    }
+
+    private static bool TryReadRunArtifact(
+        JsonElement artifact,
+        out string? path,
+        out string? detail)
+    {
+        path = null;
+        detail = null;
+        if (artifact.ValueKind != JsonValueKind.Object)
+        {
+            detail = "Every SARIF run artifact must be an object.";
+            return false;
+        }
+
+        if (artifact.TryGetProperty("location", out JsonElement location))
+        {
+            return TryReadArtifactLocation(location, out path, out detail);
+        }
+
+        return !artifact.TryGetProperty("artifactLocation", out JsonElement artifactLocation)
+            || TryReadArtifactLocation(artifactLocation, out path, out detail);
     }
 
     private static bool TryReadArtifactLocation(
@@ -298,9 +351,9 @@ internal sealed class SarifEvidenceSourceLocationReader
         }
 
         string portable = value.Replace('\\', '/');
-        if (portable.StartsWith("/", StringComparison.Ordinal)
+        if (portable.StartsWith('/')
             || portable.Contains(':')
-            || portable.EndsWith("/", StringComparison.Ordinal))
+            || portable.EndsWith('/'))
         {
             return false;
         }

@@ -40,7 +40,7 @@ internal sealed class SarifEvidenceDocumentReader
         }
     }
 
-    internal bool TryParseDocument(byte[] bytes, out JsonDocument? document)
+    internal static bool TryParseDocument(byte[] bytes, out JsonDocument? document)
     {
         try
         {
@@ -61,7 +61,7 @@ internal sealed class SarifEvidenceDocumentReader
         }
     }
 
-    internal bool TryGetRuns(
+    internal static bool TryGetRuns(
         JsonElement root,
         out JsonElement runs,
         out SarifEvidenceDocumentFailure? failure,
@@ -108,7 +108,7 @@ internal sealed class SarifEvidenceDocumentReader
         return true;
     }
 
-    internal SarifRunSelection SelectMatchingRun(
+    internal static SarifRunSelection SelectMatchingRun(
         JsonElement runs,
         ArchitectureExternalEvidenceRequirement requirement,
         SarifEvidenceLimits limits,
@@ -152,7 +152,7 @@ internal sealed class SarifEvidenceDocumentReader
         };
     }
 
-    internal int? ReadResultCount(
+    internal static int? ReadResultCount(
         JsonElement run,
         SarifEvidenceLimits limits,
         out SarifEvidenceDocumentFailure? failure,
@@ -187,7 +187,7 @@ internal sealed class SarifEvidenceDocumentReader
         return count;
     }
 
-    internal void ReadExecutionState(
+    internal static void ReadExecutionState(
         JsonElement run,
         out SarifEvidenceDocumentFailure? failure,
         out string? detail)
@@ -236,7 +236,7 @@ internal sealed class SarifEvidenceDocumentReader
         }
     }
 
-    internal bool HasDuplicateProperties(JsonElement element, CancellationToken cancellationToken)
+    internal static bool HasDuplicateProperties(JsonElement element, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (element.ValueKind == JsonValueKind.Object)

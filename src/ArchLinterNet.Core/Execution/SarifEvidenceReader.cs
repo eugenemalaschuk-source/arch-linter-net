@@ -19,8 +19,6 @@ namespace ArchLinterNet.Core.Execution;
 public sealed class SarifEvidenceReader
 {
     private readonly SarifEvidenceArtifactReader _artifactReader;
-    private readonly SarifEvidenceDocumentReader _documentReader = new();
-    private readonly SarifEvidenceContextReader _contextReader = new();
     private readonly SarifEvidenceSourceProjectionReader _sourceProjectionReader = new();
 
     public SarifEvidenceReader(IArchitectureEvidenceFileSystem? fileSystem = null)
@@ -160,7 +158,7 @@ public sealed class SarifEvidenceReader
         SarifEvidenceProvenance baseProvenance,
         CancellationToken cancellationToken)
     {
-        if (!_documentReader.TryParseDocument(bytes, out JsonDocument? document))
+        if (!SarifEvidenceDocumentReader.TryParseDocument(bytes, out JsonDocument? document))
         {
             return CreateResult(
                 requirement.Id,
@@ -172,12 +170,12 @@ public sealed class SarifEvidenceReader
         using (JsonDocument parsedDocument = document!)
         {
             JsonElement root = parsedDocument.RootElement;
-            if (!_documentReader.TryGetRuns(root, out JsonElement runs, out SarifEvidenceDocumentFailure? shapeFailure, out string shapeDetail))
+            if (!SarifEvidenceDocumentReader.TryGetRuns(root, out JsonElement runs, out SarifEvidenceDocumentFailure? shapeFailure, out string shapeDetail))
             {
                 return CreateResult(requirement.Id, MapDocumentFailure(shapeFailure!.Value), shapeDetail, baseProvenance);
             }
 
-            SarifRunSelection selection = _documentReader.SelectMatchingRun(
+            SarifRunSelection selection = SarifEvidenceDocumentReader.SelectMatchingRun(
                 runs,
                 requirement,
                 limits,
@@ -189,13 +187,14 @@ public sealed class SarifEvidenceReader
 
             return ValidateSelectedRun(
                 requirement,
-                artifact,
-                expectedContext,
-                limits,
-                root,
-                selection.Candidate!.Value,
-                baseProvenance,
-                cancellationToken);
+                new SelectedRunValidationContext(
+                    artifact,
+                    expectedContext,
+                    limits,
+                    root,
+                    selection.Candidate!.Value,
+                    baseProvenance,
+                    cancellationToken));
         }
     }
 
@@ -212,32 +211,26 @@ public sealed class SarifEvidenceReader
 
     private SarifEvidenceReadResult ValidateSelectedRun(
         ArchitectureExternalEvidenceRequirement requirement,
-        SarifEvidenceArtifactReference artifact,
-        SarifEvidenceAssessmentContext expectedContext,
-        SarifEvidenceLimits limits,
-        JsonElement root,
-        SarifRunCandidate selected,
-        SarifEvidenceProvenance baseProvenance,
-        CancellationToken cancellationToken)
+        SelectedRunValidationContext context)
     {
-        int? resultCount = _documentReader.ReadResultCount(
-            selected.Run,
-            limits,
+        int? resultCount = SarifEvidenceDocumentReader.ReadResultCount(
+            context.Selected.Run,
+            context.Limits,
             out SarifEvidenceDocumentFailure? resultFailure,
             out string? resultDetail);
-        SarifEvidenceProvenance selectedProvenance = WithRun(baseProvenance, selected, resultCount, null);
+        SarifEvidenceProvenance selectedProvenance = WithRun(context.BaseProvenance, context.Selected, resultCount, null);
         if (resultFailure is not null)
         {
             return CreateResult(requirement.Id, MapDocumentFailure(resultFailure.Value), resultDetail!, selectedProvenance);
         }
 
-        if (_documentReader.HasDuplicateProperties(root, cancellationToken))
+        if (SarifEvidenceDocumentReader.HasDuplicateProperties(context.Root, context.CancellationToken))
         {
             return DuplicatePropertiesResult(requirement.Id, selectedProvenance);
         }
 
-        _documentReader.ReadExecutionState(
-            selected.Run,
+        SarifEvidenceDocumentReader.ReadExecutionState(
+            context.Selected.Run,
             out SarifEvidenceDocumentFailure? executionFailure,
             out string? executionDetail);
         if (executionFailure is not null)
@@ -245,17 +238,17 @@ public sealed class SarifEvidenceReader
             return CreateResult(requirement.Id, MapDocumentFailure(executionFailure.Value), executionDetail!, selectedProvenance);
         }
 
-        ContextReadOutcome context = _contextReader.ReadContext(selected.Run, artifact);
-        SarifEvidenceProvenance contextProvenance = selectedProvenance with { Context = context.Context };
-        if (context.Failure is not null)
+        ContextReadOutcome contextRead = SarifEvidenceContextReader.ReadContext(context.Selected.Run, context.Artifact);
+        SarifEvidenceProvenance contextProvenance = selectedProvenance with { Context = contextRead.Context };
+        if (contextRead.Failure is not null)
         {
-            return CreateResult(requirement.Id, MapContextFailure(context.Failure.Value), context.Detail!, contextProvenance);
+            return CreateResult(requirement.Id, MapContextFailure(contextRead.Failure.Value), contextRead.Detail!, contextProvenance);
         }
 
-        ContextBindingFailure? bindingFailure = _contextReader.ValidateBindings(
+        ContextBindingFailure? bindingFailure = SarifEvidenceContextReader.ValidateBindings(
             requirement,
-            expectedContext,
-            context.Context,
+            context.ExpectedContext,
+            contextRead.Context,
             out string? bindingDetail);
         if (bindingFailure is not null)
         {
@@ -266,10 +259,10 @@ public sealed class SarifEvidenceReader
         SarifEvidenceAuthorizationSnapshot? authorization = null;
         if (requirement.DiagnosticFilter is not null
             && !_sourceProjectionReader.TryReadSourceDiagnostics(
-                selected.Run,
+                context.Selected.Run,
                 out sourceDiagnostics,
                 out string? sourceShapeDetail,
-                cancellationToken))
+                context.CancellationToken))
         {
             return CreateResult(
                 requirement.Id,
@@ -282,8 +275,8 @@ public sealed class SarifEvidenceReader
         {
             authorization = CaptureAuthorization(
                 requirement,
-                expectedContext,
-                context.Context);
+                context.ExpectedContext,
+                contextRead.Context);
         }
 
         return CreateResult(
@@ -424,6 +417,15 @@ public sealed class SarifEvidenceReader
             "The SARIF document contains duplicate JSON object properties.",
             provenance);
     }
+
+    private readonly record struct SelectedRunValidationContext(
+        SarifEvidenceArtifactReference Artifact,
+        SarifEvidenceAssessmentContext ExpectedContext,
+        SarifEvidenceLimits Limits,
+        JsonElement Root,
+        SarifRunCandidate Selected,
+        SarifEvidenceProvenance BaseProvenance,
+        CancellationToken CancellationToken);
 
     private static SarifEvidenceProvenance WithRun(
         SarifEvidenceProvenance provenance,

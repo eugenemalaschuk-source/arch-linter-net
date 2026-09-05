@@ -5,7 +5,6 @@ namespace ArchLinterNet.Core.Execution;
 
 internal sealed class SarifEvidenceSourceProjectionReader
 {
-    private readonly SarifEvidenceSourceLocationReader _locationReader = new();
 
     internal bool TryReadSourceDiagnostics(
         JsonElement run,
@@ -23,7 +22,7 @@ internal sealed class SarifEvidenceSourceProjectionReader
         }
 
         SarifArtifactCatalog artifacts = new();
-        if (!_locationReader.TryReadRunArtifacts(run, artifacts, out detail, cancellationToken))
+        if (!SarifEvidenceSourceLocationReader.TryReadRunArtifacts(run, artifacts, out detail, cancellationToken))
         {
             return false;
         }
@@ -193,7 +192,7 @@ internal sealed class SarifEvidenceSourceProjectionReader
             return false;
         }
 
-        if (!_locationReader.TryReadPrimaryLocation(
+        if (!SarifEvidenceSourceLocationReader.TryReadPrimaryLocation(
                 result,
                 artifacts,
                 resultIndex,

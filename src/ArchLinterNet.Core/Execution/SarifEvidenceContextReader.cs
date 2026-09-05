@@ -7,7 +7,7 @@ namespace ArchLinterNet.Core.Execution;
 /// <summary>Merges SARIF and producer context and exposes binding facts for the trust composer.</summary>
 internal sealed class SarifEvidenceContextReader
 {
-    internal ContextReadOutcome ReadContext(
+    internal static ContextReadOutcome ReadContext(
         JsonElement run,
         SarifEvidenceArtifactReference artifact)
     {
@@ -50,7 +50,7 @@ internal sealed class SarifEvidenceContextReader
             detail);
     }
 
-    internal ContextBindingFailure? ValidateBindings(
+    internal static ContextBindingFailure? ValidateBindings(
         ArchitectureExternalEvidenceRequirement requirement,
         SarifEvidenceAssessmentContext expected,
         SarifEvidenceResolvedContext context,
