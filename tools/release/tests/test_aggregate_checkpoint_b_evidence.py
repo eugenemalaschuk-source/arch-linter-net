@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -155,6 +156,20 @@ def test_consumer_cleanup_scenarios_are_required() -> None:
     assert _CONSUMER_CLEANUP_SCENARIOS <= _REQUIRED_SCENARIOS
     assert "source-set-enrolment" in _REQUIRED_SCENARIOS
     assert "consumer-policy-shape" in _REQUIRED_SCENARIOS
+
+
+def test_v08_full_cycle_registry_matches_emitted_scenarios() -> None:
+    repository_root = Path(__file__).resolve().parents[3]
+    source_files = sorted((repository_root / "tests" / "ArchLinterNet.Core.Tests").glob(
+        "CheckpointBReleaseGateTests.V08FullCycle*.cs"
+    ))
+    emitted = {
+        match.group(1)
+        for source_file in source_files
+        for match in re.finditer(r'Passed\("([^"]+)"\)', source_file.read_text())
+    }
+
+    assert emitted == aggregator._V08_FULL_CYCLE_SCENARIOS
 
 
 def test_complete_matrix_authorizes_publication(tmp_path: Path) -> None:

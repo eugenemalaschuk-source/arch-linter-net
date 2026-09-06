@@ -91,6 +91,7 @@ _V08_FULL_CYCLE_SCENARIOS = {
     "v08-topology-unmapped",
     "v08-measure-budget",
     "v08-policy-weakening-gate",
+    "external-testing-policy-context-consumer",
     "v08-external-evidence-binding",
     "v08-change-snapshot-report",
     "v08-health-matrix",
