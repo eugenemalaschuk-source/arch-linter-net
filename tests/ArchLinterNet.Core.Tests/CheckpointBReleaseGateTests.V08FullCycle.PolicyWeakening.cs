@@ -6,13 +6,23 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class CheckpointBReleaseGateTests
 {
-    private static void AssertPolicyContext(CandidatePackageFeed candidate, string root, string outputPath)
+    private static void AssertPolicyContext(
+        CandidatePackageFeed candidate,
+        string root,
+        string outputPath,
+        string? policyPath = null)
     {
         CommandResult context = candidate.RunToolWithReusedRestore(root,
             "policy", "context",
-            "--policy", DependenciesPath(root),
+            "--policy", policyPath ?? DependenciesPath(root),
             "--format", "json");
         Assert.That(context.ExitCode, Is.EqualTo(0), $"policy context ({root}): {context.CombinedOutput}");
+        using JsonDocument document = JsonDocument.Parse(context.StandardOutput);
+        Assert.Multiple(() =>
+        {
+            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(5));
+            Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("architecture-policy-context"));
+        });
         File.WriteAllText(outputPath, context.StandardOutput);
     }
 
