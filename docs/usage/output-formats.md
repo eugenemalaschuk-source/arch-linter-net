@@ -23,16 +23,17 @@ diagnostic and no partial report, ranking, or candidate set.
 ## Policy context output
 
 `arch-linter-net policy context --format json` writes one deterministic
-`architecture-policy-context` document with `schema_version: 4`. It is a
+`architecture-policy-context` document with `schema_version: 5`. It is a
 policy-only artifact for coding-agent context: it describes effective declared
 policy facts and portable provenance, and does not report an architecture
 validation result. `--format markdown` renders the same model as a compact
 prompt-ready summary. Neither format includes local absolute paths, build
 receipts, target-assembly results, or runtime environment values.
 
-Version 4 additionally records the resolved waiver-lifecycle profile and every
-structured waiver's exact target fingerprint, lifecycle metadata, and portable
-provenance alongside typed ignored-violation matchers. It is not backward-compatible as a
+Version 5 additionally records native declared-topology facts. It also retains
+the resolved waiver-lifecycle profile and every structured waiver's exact target
+fingerprint, lifecycle metadata, and portable provenance alongside typed
+ignored-violation matchers. It is not backward-compatible as a
 weakening-comparison input: regenerate base and current contexts with the same
 supported CLI version rather than treating a missing section as empty.
 
