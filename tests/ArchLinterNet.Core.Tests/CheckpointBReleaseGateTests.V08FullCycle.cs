@@ -72,6 +72,16 @@ public sealed partial class CheckpointBReleaseGateTests
                 AssertPolicyContext(candidate, fixture.Root, currentPolicyContext);
                 scenarios.Add(AssertPolicyWeakeningAndGate(candidate, fixture.Root, basePolicyContext, currentPolicyContext));
 
+                (string parityBasePolicy, string parityCurrentPolicy) = WritePolicyContextParityPolicies(baseDir, fixture.Root);
+                string parityBaseContext = Path.Combine(baseDir, "v08-policy-parity-base.json");
+                string parityCurrentContext = Path.Combine(fixture.Root, "v08-policy-parity-current.json");
+                AssertPolicyContext(candidate, baseDir, parityBaseContext, parityBasePolicy);
+                AssertPolicyContext(candidate, fixture.Root, parityCurrentContext, parityCurrentPolicy);
+                string parityBaseline = Path.Combine(fixture.Root, "v08-policy-parity-baseline.arch.yml");
+                File.WriteAllText(parityBaseline, V08FullCycleFragmentContent.EmptyBaseline);
+                scenarios.Add(candidate.AssertExternalTestingPolicyContextConsumer(
+                    parityCurrentPolicy, parityBaseline, parityBaseContext, parityCurrentContext));
+
                 scenarios.Add(AssertExternalEvidenceBinding(candidate, fixture.Root, validSarifPath, currentSha));
 
                 string baseSnapshot = Path.Combine(fixture.Root, "v08-architecture-base.json");
@@ -142,6 +152,28 @@ public sealed partial class CheckpointBReleaseGateTests
         File.WriteAllText(
             Path.Combine(root, "src", "Synthetic.Modules.M01", "ModuleContracts.cs"),
             V08FullCycleFragmentContent.ModuleContractsSource);
+    }
+
+    private static (string BasePolicyPath, string CurrentPolicyPath) WritePolicyContextParityPolicies(
+        string baseRoot,
+        string currentRoot)
+    {
+        string basePolicyPath = DependenciesPath(baseRoot);
+        string currentFragmentPath = Path.Combine(currentRoot, "fragments", "v08-policy-context-current.yml");
+        string moduleContractsPath = Path.Combine(currentRoot, "fragments", "module-contracts.yml");
+        string currentFragment = File.ReadAllText(moduleContractsPath).Replace(
+            "strict_assembly_allow_only:",
+            "audit_assembly_allow_only:",
+            StringComparison.Ordinal);
+        File.WriteAllText(currentFragmentPath, currentFragment);
+
+        string currentPolicyPath = Path.Combine(currentRoot, "v08-policy-context-current.arch.yml");
+        string currentPolicy = File.ReadAllText(DependenciesPath(currentRoot)).Replace(
+            "  - fragments/module-contracts.yml",
+            "  - fragments/v08-policy-context-current.yml",
+            StringComparison.Ordinal);
+        File.WriteAllText(currentPolicyPath, currentPolicy);
+        return (basePolicyPath, currentPolicyPath);
     }
 
     private static string DependenciesPath(string root) => Path.Combine(root, "dependencies.arch.yml");

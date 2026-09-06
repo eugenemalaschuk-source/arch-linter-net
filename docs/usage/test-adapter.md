@@ -59,6 +59,13 @@ must not automatically approve or rewrite them. See
 For the combined new-debt gate, keep the same explicit baseline and optionally
 provide policy contexts exported from independently prepared base/current states:
 
+The context files are the same versioned `architecture-policy-context` JSON
+artifacts produced by `arch-linter-net policy context --format json`; the CLI
+`policy weakening` command and this Testing API consume that artifact through
+the same Core import contract. Regenerate both contexts with the same
+compatible ArchLinterNet release after a policy-context schema change rather
+than treating a missing or older section as empty.
+
 ```csharp
 ArchitectureDebtGateOutcome gate = ArchitectureAssertions
     .FromPolicy("architecture/dependencies.arch.yml")

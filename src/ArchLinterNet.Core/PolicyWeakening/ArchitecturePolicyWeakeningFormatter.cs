@@ -22,7 +22,7 @@ public static class ArchitecturePolicyWeakeningFormatter
 
     /// <summary>Parses and validates one complete policy-context artifact.</summary>
     public static ArchitecturePolicyContextExport DeserializeContext(string json)
-        => ArchitecturePolicyWeakeningContextSupport.DeserializeContext(json);
+        => ArchitecturePolicyContextJsonReader.Deserialize(json);
 
     /// <summary>Calculates the digest that binds optional membership evidence to a policy context.</summary>
     public static string ComputeContextDigest(ArchitecturePolicyContextExport context)
