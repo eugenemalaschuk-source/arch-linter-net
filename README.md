@@ -6,7 +6,7 @@
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet version" src="https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg"></a>
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet downloads" src="https://img.shields.io/nuget/dt/ArchLinterNet.Cli"></a>
   <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/main-quality.yml"><img alt="Main quality" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/main-quality.yml/badge.svg?branch=main"></a>
-  <a href="https://raw.githubusercontent.com/eugenemalaschuk-source/arch-linter-net/architecture-health-badge/architecture-health-publication.json"><img alt="Architecture Health" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Feugenemalaschuk-source%2Farch-linter-net%2Farchitecture-health-badge%2Farchitecture-health.json"></a>
+  <a href="https://raw.githubusercontent.com/eugenemalaschuk-source/arch-linter-net/architecture-health-badge/architecture-health-publication.json" title="Open the canonical Architecture Health publication receipt"><img alt="Architecture Health" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Feugenemalaschuk-source%2Farch-linter-net%2Farchitecture-health-badge%2Farchitecture-health.json"></a>
   <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main"></a>
   <a href="https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net"><img alt="Test coverage" src="https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg?branch=main"></a>
   <a href="https://eugenemalaschuk-source.github.io/arch-linter-net/"><img alt="Documentation" src="https://img.shields.io/badge/docs-GitHub%20Pages-blue"></a>
@@ -177,6 +177,25 @@ The payload headline contains the non-compensating Health category, accumulated
 explicit ignore debt, and effective policy-control count. It is not a score,
 coverage percentage, test result, or generic workflow status. `UNASSESSABLE · ? ignores · ? rules` explicitly means the required Health/inventory evidence
 was not available; it never means zero debt.
+
+The README badge links to the [canonical v2 publication receipt](https://raw.githubusercontent.com/eugenemalaschuk-source/arch-linter-net/architecture-health-badge/architecture-health-publication.json).
+Use that receipt to verify the repository, analyzed and merged commit/tree
+identities, pull request, producer and publisher run/attempt provenance,
+payload digest, status/reason, and publication time; then compare its digest
+with the [raw badge payload](https://raw.githubusercontent.com/eugenemalaschuk-source/arch-linter-net/architecture-health-badge/architecture-health.json).
+The receipt is the source of truth for canonical publication freshness. A new
+receipt for the current merged tree is fresh evidence even when the
+deterministic Gate, Health, ignore, and rule values are unchanged.
+
+If the receipt and raw payload are current but the image looks old, compare the
+raw payload with the Shields endpoint first, then compare Shields with the
+image rendered in this README. Shields endpoint caching and GitHub's README
+image proxy (Camo) can add transport or rendering delay; no fixed duration is
+promised by this repository. An unchanged semantic payload is not, by itself,
+evidence of staleness. Publication never creates cache-busting commits or
+mutates canonical payload values merely to make a refresh visible. See
+[CI integration: verify Architecture Health badge freshness](docs/guides/ci-integration.md#verify-architecture-health-badge-freshness)
+for the layer-by-layer diagnostic.
 
 `badge architecture-policy` remains available for integrations that need the
 older, narrower strict-validation signal:

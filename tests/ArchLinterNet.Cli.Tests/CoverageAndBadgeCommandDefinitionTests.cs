@@ -113,7 +113,7 @@ public sealed class CoverageAndBadgeCommandDefinitionTests
         {
             Assert.That(exitCode, Is.EqualTo(0));
             using JsonDocument badge = JsonDocument.Parse(fileSystem.Written["badge.json"]);
-            Assert.That(badge.RootElement.GetProperty("message").GetString(), Is.EqualTo("DEBT · 7 ignores · 42 rules"));
+            Assert.That(badge.RootElement.GetProperty("message").GetString(), Is.EqualTo("PASS · DEBT · 7 ignores · 42 rules"));
         });
     }
 

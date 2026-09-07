@@ -1,10 +1,4 @@
-# architecture-policy-badge Specification
-
-## Purpose
-Expose canonical Architecture Health through a stable public badge source while
-retaining the narrower strict architecture-policy projection for compatibility.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Dynamic strict self-policy badge
 The repository SHALL expose one primary ArchLinterNet-specific README Architecture Health badge sourced from a stable public Shields endpoint JSON payload. The badge SHALL communicate the independent canonical Gate, canonical Architecture Health, accumulated explicit ignore debt, and effective policy-control count; it SHALL not represent or infer any value from generic workflow success, badge color, test coverage, architecture-coverage percentage, SonarCloud, or Codecov status.
@@ -29,16 +23,6 @@ The repository SHALL expose one primary ArchLinterNet-specific README Architectu
 - **WHEN** a reader views the README badge block
 - **THEN** Main quality, SonarCloud, and Codecov remain separately named generic-quality signals
 - **AND** none of them is labeled or described as Architecture Health
-
-### Requirement: Badge payload is available from the standard CLI
-The native `badge architecture-policy` CLI command SHALL project the strict result
-produced by central CI. The command SHALL be usable by other repositories without
-copying a Python script or triggering another analysis.
-
-#### Scenario: Workflow produces the payload through CLI
-- **WHEN** central CI produces its strict JSON artifact
-- **THEN** `badge architecture-policy` can project that artifact
-- **AND** the workflow status and the command's payload represent the same strict-policy outcome
 
 ### Requirement: Public Architecture Health state is atomically current
 The stable public Architecture Health endpoint and its publication receipt SHALL represent one indivisible, current `main` publication. Trusted automation SHALL publish a ready payload only while the push commit remains the current `main` tip. A stale event or replayed workflow SHALL make no publication write. The versioned receipt SHALL bind repository, analyzed base and PR-head commits and tree, merged `main` commit and tree, PR, producer run and attempt, publisher run and attempt, payload digest, publication time, status, and reason. Transport or rendering time SHALL not change the deterministic badge payload or its canonical identity. When evidence is absent, rejected, or unavailable, the endpoint SHALL be replaced with a reviewed CLI-generated `UNASSESSABLE В· ? ignores В· ? rules` payload without requiring a CLI restore, build, or execution at publication time. A failed publication update SHALL leave neither a new payload paired with an old receipt nor old ready data represented as current.
