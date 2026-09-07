@@ -38,9 +38,18 @@ internal static class ArchitecturePolicyInventoryRenderer
             throw new InvalidOperationException("CI artifact output must be a JSON object before policy inventory can be added.");
         }
 
+        payload["policy_inventory"] = FormatForJson(inventory, inventory.Waivers);
+
+        return payload.ToJsonString();
+    }
+
+    internal static JsonObject FormatForJson(
+        ArchitecturePolicyInventory inventory,
+        IEnumerable<ArchitectureWaiverLifecycleRecord> waivers)
+    {
         ArchitecturePolicyInventoryRules rules = inventory.Rules;
         ArchitecturePolicyInventoryIgnoreDebt debt = inventory.IgnoreDebt;
-        payload["policy_inventory"] = new JsonObject
+        return new JsonObject
         {
             ["schema"] = inventory.SchemaId,
             ["effective_rule_count"] = inventory.EffectiveRuleCount,
@@ -59,12 +68,10 @@ internal static class ArchitecturePolicyInventoryRenderer
                 ["metadata_incomplete"] = debt.MetadataIncomplete,
                 ["invalid"] = debt.Invalid,
             },
-            ["waivers"] = new JsonArray(inventory.Waivers
+            ["waivers"] = new JsonArray(waivers
                 .Select(ArchitectureWaiverLifecycleRenderer.FormatWaiverForJson)
                 .ToArray()),
         };
-
-        return payload.ToJsonString();
     }
 
     private static string FormatWaiverDebtBreakdown(ArchitecturePolicyInventoryIgnoreDebt debt)
