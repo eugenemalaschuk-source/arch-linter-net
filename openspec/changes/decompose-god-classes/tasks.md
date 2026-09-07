@@ -29,21 +29,26 @@
   - [x] Decompose `ArchitectureContractSurfaceExposureScanner` into non-partial shared scan
     state and purpose-named traversal, member/accessor, and attribute-metadata collaborators
     without changing recursive evidence, reflection-incomplete paths, or consumers (#775).
+  - [x] Freeze the post-v0.8 self-health baseline at `929983eb985dab934f886cc2f8e25824ac854984`
+    with a durable raw-evidence bundle; assign every reviewed aggregate and audit finding to a focused
+    remediation owner: existing #802/#803, #807 through #816, Core Model #819, History #820, and
+    factual `build_state_preflight` presentation #801. The shared policy/OpenSpec hunks remain serial
+    coordination work; this records ownership and does not mark the extraction task complete (#804).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
 
-- [ ] 3.1 Split unrelated CLI test aggregates into focused fixtures without changing scenario coverage.
-- [ ] 3.2 Split unrelated Core test aggregates into focused fixtures; retain only dedicated partial-language source fixtures.
+- [ ] 3.1 Split unrelated CLI test aggregates into focused fixtures without changing scenario coverage (#821).
+- [ ] 3.2 Split unrelated Core test aggregates into focused fixtures; retain only dedicated partial-language source fixtures (#822).
   - [x] Extract the v0.8 full-cycle Checkpoint B scenario's orchestration, phase-trace/restore-reuse
     state, and validation/policy-weakening/health-matrix/Unity/reporting phases out of the shared
     `CheckpointBReleaseGateTests` partial aggregate into named `CheckpointBV08*` collaborator types,
     leaving `CheckpointBReleaseGateTests.V08FullCycle.cs` a thin NUnit entrypoint (#778).
-- [ ] 3.3 Add regression coverage proving intentional partial-language fixtures remain discoverable and production aggregates are not reintroduced.
+- [ ] 3.3 Add regression coverage proving intentional partial-language fixtures remain discoverable and production aggregates are not reintroduced (#822).
 
 ## 4. Enforce and verify the final convention
 
-- [ ] 4.1 Switch the production declaration-count self-policy from audit to strict with a maximum of one source declaration and add a negative regression.
-- [ ] 4.2 Update architecture capability documentation and OpenSpec specifications with the final convention and any reviewed exceptions.
-- [ ] 4.3 Run public API review, policy/lint gates, full tests, and OpenSpec validation; verify that no handwritten production partial aggregate remains.
+- [ ] 4.1 Switch the production declaration-count self-policy from audit to strict with a maximum of one source declaration and add a negative regression (#805).
+- [ ] 4.2 Update architecture capability documentation and OpenSpec specifications with the final convention and any reviewed exceptions (#805).
+- [ ] 4.3 Run public API review, policy/lint gates, full tests, and OpenSpec validation; verify that no handwritten production partial aggregate remains (#805).
 - [x] 4.4 Model direct CLI command folders as independent feature modules, retain recursive convention rules for their nested folders, and add a negative self-policy regression.
