@@ -122,6 +122,28 @@ payload as current, rerun architecture analysis, mutate policy/baselines, or
 deploy MkDocs/GitHub Pages. The public endpoint is a fixed raw JSON file on an
 automation-owned static branch, suitable for Shields' `endpoint` image.
 
+### Verify Architecture Health badge freshness
+
+The README image links to the [canonical v2 publication receipt](https://raw.githubusercontent.com/eugenemalaschuk-source/arch-linter-net/architecture-health-badge/architecture-health-publication.json), not to a generic workflow-status result. For a current publication, inspect that receipt first. It records the repository, analyzed/base/head and merged-main commit/tree identities, pull request, producer and publisher run/attempt provenance, payload SHA-256, status/reason, and publication time. Compare the receipt's payload digest with the bytes returned by the [raw Architecture Health payload](https://raw.githubusercontent.com/eugenemalaschuk-source/arch-linter-net/architecture-health-badge/architecture-health.json). `status: unassessable` is an explicit current result, not permission to treat an older healthy payload as current.
+
+Diagnose apparent lag in layers:
+
+1. Compare the receipt's merged-main identities and payload digest with the
+   current `main` commit/tree and raw payload. If those agree, the canonical
+   publication is fresh. A new receipt can be fresh even when the deterministic
+   Gate, Health, ignore, and rule values have not changed.
+1. Request the Shields endpoint directly and compare its response with the raw
+   payload. Shields may cache the endpoint response, so this transport layer
+   can lag the canonical raw source.
+1. Compare the Shields response with the image rendered in the README. GitHub's
+   README image proxy (Camo) and rendered page can add another rendering delay.
+
+No fixed Shields or Camo delay is promised here. Do not treat an unchanged
+semantic message as stale evidence, and do not add cache-busting commits or
+mutate canonical payload values to make transport refreshes visible. The
+receipt and raw payload are the evidence for publication freshness; Shields
+and README/Camo are downstream rendering layers.
+
 ## Legacy architecture-policy badge payload
 
 `arch-linter-net badge architecture-policy --input architecture-strict.json`
