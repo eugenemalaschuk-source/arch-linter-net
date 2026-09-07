@@ -37,4 +37,4 @@ The corresponding immutable Actions artifact digests are retained as independent
 | coverage | `10026272172` | `36337e672d427a61ec5ac856fb585a5d3211b5c6f1adc57ee98731ecac98795a` |
 | change | `10026273578` | `2e00330adc9df0aba19f83f5f133ba1ea7bdead8bf3dea8392a226a428e4cea3` |
 
-These transport artifacts expired on 2026-12-06; their expiration does not remove the repository-backed evidence above.
+These transport artifacts are scheduled to expire on 2026-12-06; their expiration will not remove the repository-backed evidence above.
