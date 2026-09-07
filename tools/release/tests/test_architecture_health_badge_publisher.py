@@ -7,6 +7,7 @@ import os
 import subprocess
 import tempfile
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,8 @@ _HEAD_SHA = "a" * 40
 _TREE_SHA = "d" * 40
 _RUN_ID = 123456
 _RUN_ATTEMPT = 2
+_PUBLISHER_RUN_ID = 987654
+_PUBLISHER_RUN_ATTEMPT = 3
 _UNAVAILABLE_PAYLOAD_PATH = "architecture/architecture-health-badge-unavailable.json"
 
 
@@ -34,7 +37,11 @@ const outputs = {};
 const calls = [];
 const missing = () => Object.assign(new Error('not found'), { status: 404 });
 const failWhen = (name) => {
-  if (fixture.failAt === name) throw new Error(`simulated failure at ${name}`);
+  if (fixture.failAt === name) {
+    const error = new Error(`simulated failure at ${name}`);
+    if (fixture.failStatus !== undefined) error.status = fixture.failStatus;
+    throw error;
+  }
 };
 const core = {
   setOutput(name, value) { outputs[name] = String(value); },
@@ -301,6 +308,19 @@ def _artifact_files(badge_payload: bytes, **overrides: object) -> dict[str, byte
     }
 
 
+def _receipt(result: dict[str, object]) -> dict[str, object]:
+    blobs = [call["parameters"] for call in result["calls"] if call["type"] == "git.createBlob"]
+    assert len(blobs) == 2
+    return json.loads(base64.b64decode(blobs[1]["content"]).decode("utf-8"))
+
+
+def _publisher_environment() -> dict[str, str]:
+    return {
+        "PUBLISHER_RUN_ID": str(_PUBLISHER_RUN_ID),
+        "PUBLISHER_RUN_ATTEMPT": str(_PUBLISHER_RUN_ATTEMPT),
+    }
+
+
 def test_resolve_accepts_required_successful_pr_evidence_with_matching_squash_tree() -> None:
     result = _run_script("Resolve required PR evidence for the merged tree", _fixture())
 
@@ -389,11 +409,16 @@ def test_static_publisher_creates_one_atomic_commit_for_the_fixed_paths() -> Non
         "Publish fixed badge endpoint and metadata",
         {"branchExists": False},
         environment={
+            **_publisher_environment(),
             "MAIN_SHA": _MAIN_SHA,
             "MAIN_TREE_SHA": _TREE_SHA,
+            "ANALYZED_BASE_SHA": _BASE_SHA,
+            "ANALYZED_HEAD_SHA": _HEAD_SHA,
+            "ANALYZED_HEAD_TREE_SHA": _TREE_SHA,
             "PAYLOAD_PATH": "payload.json",
             "PR_NUMBER": "759",
             "PRODUCER_RUN_ID": str(_RUN_ID),
+            "PRODUCER_RUN_ATTEMPT": str(_RUN_ATTEMPT),
             "PUBLICATION_REASON": "ready",
             "PUBLICATION_STATUS": "ready",
         },
@@ -410,12 +435,34 @@ def test_static_publisher_creates_one_atomic_commit_for_the_fixed_paths() -> Non
     assert not [call for call in result["calls"] if call["type"] == "repos.createOrUpdateFileContents"]
     assert result["outputs"] == {"status": "ready"}
 
+    receipt = _receipt(result)
+    assert receipt == {
+        "schema": "architecture-health-badge-publication/v2",
+        "status": "ready",
+        "reason": "ready",
+        "repository": _REPOSITORY,
+        "base_sha": _BASE_SHA,
+        "head_sha": _HEAD_SHA,
+        "head_tree_sha": _TREE_SHA,
+        "main_sha": _MAIN_SHA,
+        "main_tree_sha": _TREE_SHA,
+        "pr_number": "759",
+        "producer_run_id": str(_RUN_ID),
+        "producer_run_attempt": str(_RUN_ATTEMPT),
+        "publisher_run_id": str(_PUBLISHER_RUN_ID),
+        "publisher_run_attempt": str(_PUBLISHER_RUN_ATTEMPT),
+        "payload_sha256": hashlib.sha256(_payload()).hexdigest(),
+        "published_at": receipt["published_at"],
+    }
+    datetime.fromisoformat(str(receipt["published_at"]).replace("Z", "+00:00"))
+
 
 def test_static_publisher_falls_back_to_reviewed_receipt_without_a_cli_payload() -> None:
     result = _run_script(
         "Publish fixed badge endpoint and metadata",
         {"branchExists": False, "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()}},
         environment={
+            **_publisher_environment(),
             "MAIN_SHA": _MAIN_SHA,
             "MAIN_TREE_SHA": _TREE_SHA,
             "PUBLICATION_REASON": "badge_artifact_missing",
@@ -430,6 +477,25 @@ def test_static_publisher_falls_back_to_reviewed_receipt_without_a_cli_payload()
     assert result["outputs"] == {"status": "unassessable"}
     assert any(call["type"] == "git.createRef" for call in result["calls"])
 
+    reviewed_payload = (_REPOSITORY_ROOT / _UNAVAILABLE_PAYLOAD_PATH).read_bytes()
+    receipt = _receipt(result)
+    assert receipt["schema"] == "architecture-health-badge-publication/v2"
+    assert receipt["status"] == "unassessable"
+    assert receipt["reason"] == "badge_artifact_missing"
+    assert receipt["repository"] == _REPOSITORY
+    assert receipt["base_sha"] is None
+    assert receipt["head_sha"] is None
+    assert receipt["head_tree_sha"] is None
+    assert receipt["main_sha"] == _MAIN_SHA
+    assert receipt["main_tree_sha"] == _TREE_SHA
+    assert receipt["pr_number"] is None
+    assert receipt["producer_run_id"] is None
+    assert receipt["producer_run_attempt"] is None
+    assert receipt["publisher_run_id"] == str(_PUBLISHER_RUN_ID)
+    assert receipt["publisher_run_attempt"] == str(_PUBLISHER_RUN_ATTEMPT)
+    assert receipt["payload_sha256"] == hashlib.sha256(reviewed_payload).hexdigest()
+    datetime.fromisoformat(str(receipt["published_at"]).replace("Z", "+00:00"))
+
 
 def test_static_publisher_stale_main_event_makes_no_publication_write() -> None:
     result = _run_script(
@@ -440,6 +506,7 @@ def test_static_publisher_stale_main_event_makes_no_publication_write() -> None:
             "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()},
         },
         environment={
+            **_publisher_environment(),
             "MAIN_SHA": _MAIN_SHA,
             "PUBLICATION_STATUS": "unassessable",
             "PUBLICATION_REASON": "badge_artifact_missing",
@@ -462,6 +529,7 @@ def test_static_publisher_never_moves_the_ref_when_atomic_tree_creation_fails() 
             "expectError": True,
         },
         environment={
+            **_publisher_environment(),
             "MAIN_SHA": _MAIN_SHA,
             "PUBLICATION_STATUS": "unassessable",
             "PUBLICATION_REASON": "badge_artifact_missing",
@@ -471,6 +539,32 @@ def test_static_publisher_never_moves_the_ref_when_atomic_tree_creation_fails() 
 
     assert result["error"] == "simulated failure at git.createTree"
     assert not [call for call in result["calls"] if call["type"] in {"git.createRef", "git.updateRef"}]
+
+
+def test_static_publisher_loses_compare_and_swap_without_creating_a_new_ref() -> None:
+    result = _run_script(
+        "Publish fixed badge endpoint and metadata",
+        {
+            "branchExists": True,
+            "publicationRefSha": "e" * 40,
+            "publicationCommit": {"commit": {"tree": {"sha": "f" * 40}}},
+            "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()},
+            "failAt": "git.updateRef",
+            "failStatus": 422,
+        },
+        environment={
+            **_publisher_environment(),
+            "MAIN_SHA": _MAIN_SHA,
+            "MAIN_TREE_SHA": _TREE_SHA,
+            "PUBLICATION_STATUS": "unassessable",
+            "PUBLICATION_REASON": "badge_artifact_missing",
+            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
+        },
+    )
+
+    assert result["outputs"] == {"status": "publication_race_lost"}
+    assert len([call for call in result["calls"] if call["type"] == "git.updateRef"]) == 1
+    assert not [call for call in result["calls"] if call["type"] == "git.createRef"]
 
 
 def test_resolve_rejects_unrelated_active_ruleset_when_main_has_no_effective_gate() -> None:

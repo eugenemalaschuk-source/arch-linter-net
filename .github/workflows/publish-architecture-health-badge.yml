@@ -287,9 +287,15 @@ jobs:
         env:
           MAIN_SHA: ${{ github.sha }}
           MAIN_TREE_SHA: ${{ steps.resolve.outputs.main_tree_sha }}
+          ANALYZED_BASE_SHA: ${{ steps.resolve.outputs.base_sha }}
+          ANALYZED_HEAD_SHA: ${{ steps.resolve.outputs.head_sha }}
+          ANALYZED_HEAD_TREE_SHA: ${{ steps.resolve.outputs.head_tree_sha }}
           PAYLOAD_PATH: ${{ steps.validate.outputs.payload_path }}
           PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
           PRODUCER_RUN_ID: ${{ steps.resolve.outputs.producer_run_id }}
+          PRODUCER_RUN_ATTEMPT: ${{ steps.resolve.outputs.producer_run_attempt }}
+          PUBLISHER_RUN_ID: ${{ github.run_id }}
+          PUBLISHER_RUN_ATTEMPT: ${{ github.run_attempt }}
           PUBLICATION_REASON: ${{ steps.validate.outputs.status == 'ready' && 'ready' || steps.validate.outputs.reason || steps.resolve.outputs.reason }}
           PUBLICATION_STATUS: ${{ steps.validate.outputs.status == 'ready' && 'ready' || 'unassessable' }}
           UNAVAILABLE_PAYLOAD_PATH: architecture/architecture-health-badge-unavailable.json
@@ -297,6 +303,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            const crypto = require('crypto');
             const branch = 'architecture-health-badge';
             const endpointPath = 'architecture-health.json';
             const metadataPath = 'architecture-health-publication.json';
@@ -346,15 +353,24 @@ jobs:
             } else {
               payload = await readUnavailablePayload();
             }
+            const payloadSha256 = crypto.createHash('sha256').update(payload).digest('hex');
             const metadata = Buffer.from(`${JSON.stringify({
-              schema: 'architecture-health-badge-publication/v1',
+              schema: 'architecture-health-badge-publication/v2',
               status: publicationStatus,
               reason: publicationReason,
               repository,
-              main_sha: mainSha,
+              base_sha: process.env.ANALYZED_BASE_SHA || null,
+              head_sha: process.env.ANALYZED_HEAD_SHA || null,
+              head_tree_sha: process.env.ANALYZED_HEAD_TREE_SHA || null,
+              main_sha: mainSha || null,
               main_tree_sha: process.env.MAIN_TREE_SHA || null,
               pr_number: process.env.PR_NUMBER || null,
               producer_run_id: process.env.PRODUCER_RUN_ID || null,
+              producer_run_attempt: process.env.PRODUCER_RUN_ATTEMPT || null,
+              publisher_run_id: process.env.PUBLISHER_RUN_ID || null,
+              publisher_run_attempt: process.env.PUBLISHER_RUN_ATTEMPT || null,
+              payload_sha256: payloadSha256,
+              published_at: new Date().toISOString(),
             }, null, 2)}\n`, 'utf8');
             const getRef = async (ref) => {
               try {
