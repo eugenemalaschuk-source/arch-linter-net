@@ -346,7 +346,16 @@ def test_resolve_accepts_required_successful_pr_evidence_with_matching_squash_tr
 def test_resolve_rejects_matching_metadata_with_a_different_merged_tree() -> None:
     result = _run_script("Resolve required PR evidence for the merged tree", _fixture(head_tree="e" * 40))
 
-    assert result["outputs"] == {"reason": "merged_tree_mismatch"}
+    assert result["outputs"] == {
+        "reason": "merged_tree_mismatch",
+        "base_sha": _BASE_SHA,
+        "main_tree_sha": _TREE_SHA,
+        "pr_number": "759",
+        "head_sha": _HEAD_SHA,
+        "producer_run_attempt": str(_RUN_ATTEMPT),
+        "producer_run_id": str(_RUN_ID),
+        "head_tree_sha": "e" * 40,
+    }
 
 
 @pytest.mark.parametrize(
@@ -365,7 +374,60 @@ def test_resolve_fails_closed_when_promotion_artifact_is_unavailable(
 ) -> None:
     result = _run_script("Resolve required PR evidence for the merged tree", fixture)
 
-    assert result["outputs"] == {"reason": reason}
+    assert result["outputs"] == {
+        "reason": reason,
+        "base_sha": _BASE_SHA,
+        "main_tree_sha": _TREE_SHA,
+        "pr_number": "759",
+        "head_sha": _HEAD_SHA,
+        "producer_run_attempt": str(_RUN_ATTEMPT),
+        "producer_run_id": str(_RUN_ID),
+        "head_tree_sha": _TREE_SHA,
+    }
+
+
+def test_rejected_resolution_preserves_known_provenance_in_the_unassessable_receipt() -> None:
+    resolution = _run_script("Resolve required PR evidence for the merged tree", _fixture(artifacts=[]))
+    workflow = _workflow()
+
+    assert "MAIN_TREE_SHA: ${{ steps.resolve.outputs.main_tree_sha }}" in workflow
+    assert "ANALYZED_BASE_SHA: ${{ steps.resolve.outputs.base_sha }}" in workflow
+    assert "ANALYZED_HEAD_SHA: ${{ steps.resolve.outputs.head_sha }}" in workflow
+    assert "ANALYZED_HEAD_TREE_SHA: ${{ steps.resolve.outputs.head_tree_sha }}" in workflow
+    assert "PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}" in workflow
+    assert "PRODUCER_RUN_ID: ${{ steps.resolve.outputs.producer_run_id }}" in workflow
+    assert "PRODUCER_RUN_ATTEMPT: ${{ steps.resolve.outputs.producer_run_attempt }}" in workflow
+
+    receipt_result = _run_script(
+        "Publish fixed badge endpoint and metadata",
+        {"branchExists": False, "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()}},
+        environment={
+            **_publisher_environment(),
+            "MAIN_SHA": _MAIN_SHA,
+            "MAIN_TREE_SHA": str(resolution["outputs"]["main_tree_sha"]),
+            "ANALYZED_BASE_SHA": str(resolution["outputs"]["base_sha"]),
+            "ANALYZED_HEAD_SHA": str(resolution["outputs"]["head_sha"]),
+            "ANALYZED_HEAD_TREE_SHA": str(resolution["outputs"]["head_tree_sha"]),
+            "PR_NUMBER": str(resolution["outputs"]["pr_number"]),
+            "PRODUCER_RUN_ID": str(resolution["outputs"]["producer_run_id"]),
+            "PRODUCER_RUN_ATTEMPT": str(resolution["outputs"]["producer_run_attempt"]),
+            "PUBLICATION_REASON": str(resolution["outputs"]["reason"]),
+            "PUBLICATION_STATUS": "unassessable",
+            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
+        },
+    )
+
+    receipt = _receipt(receipt_result)
+    assert receipt["status"] == "unassessable"
+    assert receipt["reason"] == "badge_artifact_missing"
+    assert receipt["base_sha"] == _BASE_SHA
+    assert receipt["head_sha"] == _HEAD_SHA
+    assert receipt["head_tree_sha"] == _TREE_SHA
+    assert receipt["main_sha"] == _MAIN_SHA
+    assert receipt["main_tree_sha"] == _TREE_SHA
+    assert receipt["pr_number"] == "759"
+    assert receipt["producer_run_id"] == str(_RUN_ID)
+    assert receipt["producer_run_attempt"] == str(_RUN_ATTEMPT)
 
 
 @pytest.mark.parametrize(
@@ -573,7 +635,13 @@ def test_resolve_rejects_unrelated_active_ruleset_when_main_has_no_effective_gat
 
     result = _run_script("Resolve required PR evidence for the merged tree", fixture)
 
-    assert result["outputs"] == {"reason": "required_architecture_gate_missing"}
+    assert result["outputs"] == {
+        "reason": "required_architecture_gate_missing",
+        "base_sha": _BASE_SHA,
+        "main_tree_sha": _TREE_SHA,
+        "pr_number": "759",
+        "head_sha": _HEAD_SHA,
+    }
 
 
 def test_ci_producer_generates_a_bound_cli_payload_without_badge_semantics_in_workflow() -> None:

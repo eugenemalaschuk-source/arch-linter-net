@@ -18,7 +18,7 @@ The existing read-only PR producer creates an inert CLI payload and a manifest b
 
 ### Keep semantic projection in the CLI
 
-The badge message becomes `GATE В· HEALTH В· ignores В· rules`, read solely from the canonical Health document and policy-inventory receipt. Health remains the only color authority and Gate remains the only exit-code authority. This avoids having workflow JavaScript infer Gate or recolor a non-healthy health state.
+The badge message becomes `GATE · HEALTH · ignores · rules`, read solely from the canonical Health document and policy-inventory receipt. Health remains the only color authority and Gate remains the only exit-code authority. This avoids having workflow JavaScript infer Gate or recolor a non-healthy health state.
 
 ### Version the receipt rather than silently extending it
 
