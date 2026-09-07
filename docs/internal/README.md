@@ -40,6 +40,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Self-policy capability matrix](self-policy-capability-matrix.md) — per-family adopt / already-covered / not-applicable / defer decisions for the repository's own architecture policy, recorded engine limitations, and the read-only vs writing developer commands (#464).
 
+- [Self-architecture health baseline and remediation ownership](self-architecture-health-baseline.md) — immutable post-v0.8 Health evidence and the focused owner for every remaining reviewed partial aggregate (#804/#784).
+
 - [OpenSSF Best Practices Metal-passing assessment](openssf-best-practices-metal-passing-assessment.md) — per-criterion evidence checklist and manual-submission notes for project `13572`'s passing-level self-assessment (#287).
 
 ## Publishing rule

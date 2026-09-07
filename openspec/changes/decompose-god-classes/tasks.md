@@ -29,6 +29,10 @@
   - [x] Decompose `ArchitectureContractSurfaceExposureScanner` into non-partial shared scan
     state and purpose-named traversal, member/accessor, and attribute-metadata collaborators
     without changing recursive evidence, reflection-incomplete paths, or consumers (#775).
+  - [x] Freeze the post-v0.8 self-health baseline at `929983eb985dab934f886cc2f8e25824ac854984`
+    and assign each remaining reviewed aggregate to a focused remediation owner: existing #802/#803
+    plus #807 through #816. The shared policy/OpenSpec hunks remain serial coordination work; this
+    records ownership and does not mark the extraction task complete (#804).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
