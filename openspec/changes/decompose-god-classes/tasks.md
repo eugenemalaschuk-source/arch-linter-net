@@ -25,6 +25,9 @@
     cache-work, and evaluation-inventory projections into non-partial internal collaborators while
     retaining one public lifecycle/fact-set owner; prove strict/audit/measure/topology reuse and
     remove the reviewed declaration-count exception (#776).
+  - [x] Decompose `ArchitectureContractSurfaceExposureScanner` into non-partial shared scan
+    state and purpose-named traversal, member/accessor, and attribute-metadata collaborators
+    without changing recursive evidence, reflection-incomplete paths, or consumers (#775).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
