@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
@@ -11,32 +9,12 @@ namespace ArchLinterNet.Core.Validation;
 
 internal static class ArchitectureHealthReportReceiptEvidenceWriter
 {
-    internal static JsonObject BuildPolicyInventory(ArchitecturePolicyInventory inventory)
-    {
-        ArchitecturePolicyInventoryRules rules = inventory.Rules;
-        ArchitecturePolicyInventoryIgnoreDebt debt = inventory.IgnoreDebt;
-        return new JsonObject
-        {
-            ["schema"] = inventory.SchemaId,
-            ["effective_rule_count"] = inventory.EffectiveRuleCount,
-            ["rules"] = new JsonObject
-            {
-                ["strict"] = rules.Strict,
-                ["audit"] = rules.Audit,
-                ["coverage"] = rules.Coverage,
-            },
-            ["ignore_debt"] = new JsonObject
-            {
-                ["total"] = debt.Total,
-                ["active"] = debt.Active,
-                ["stale"] = debt.Stale,
-                ["expired"] = debt.Expired,
-                ["metadata_incomplete"] = debt.MetadataIncomplete,
-                ["invalid"] = debt.Invalid,
-            },
-            ["waivers"] = BuildWaivers(inventory.Waivers),
-        };
-    }
+    internal static JsonObject BuildPolicyInventory(ArchitecturePolicyInventory inventory) =>
+        ArchitecturePolicyInventoryRenderer.FormatForJson(
+            inventory,
+            inventory.Waivers
+                .OrderBy(waiver => waiver.Id, StringComparer.Ordinal)
+                .ThenBy(waiver => waiver.ContractGroup, StringComparer.Ordinal));
 
     internal static JsonObject BuildWaiverLifecycle(ArchitectureWaiverLifecycleAssessment assessment) =>
         new()
@@ -48,36 +26,11 @@ internal static class ArchitectureHealthReportReceiptEvidenceWriter
 
     private static JsonArray BuildWaivers(IEnumerable<ArchitectureWaiverLifecycleRecord> waivers)
     {
-        var result = new JsonArray();
-        foreach (ArchitectureWaiverLifecycleRecord waiver in waivers
+        return new JsonArray(waivers
             .OrderBy(item => item.Id, StringComparer.Ordinal)
-            .ThenBy(item => item.ContractGroup, StringComparer.Ordinal))
-        {
-            result.Add(new JsonObject
-            {
-                ["id"] = waiver.Id,
-                ["state"] = waiver.State,
-                ["contract"] = waiver.ContractName,
-                ["contract_id"] = waiver.ContractId,
-                ["contract_group"] = waiver.ContractGroup,
-                ["source_type"] = waiver.SourceType,
-                ["forbidden_reference"] = waiver.ForbiddenReference,
-                ["target_fingerprint"] = waiver.TargetFingerprint,
-                ["reason"] = waiver.Reason,
-                ["owner"] = waiver.Owner,
-                ["issue"] = waiver.Issue,
-                ["introduced"] = FormatDate(waiver.Introduced),
-                ["expires"] = FormatDate(waiver.Expires),
-                ["evaluation_date"] = waiver.EvaluationDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                ["matches_governed_finding"] = waiver.MatchesGovernedFinding,
-                ["policy_location"] = waiver.PolicyLocation is null
-                    ? null
-                    : JsonSerializer.SerializeToNode(
-                        ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(waiver.PolicyLocation)),
-            });
-        }
-
-        return result;
+            .ThenBy(item => item.ContractGroup, StringComparer.Ordinal)
+            .Select(ArchitectureWaiverLifecycleRenderer.FormatWaiverForJson)
+            .ToArray());
     }
 
     internal static JsonObject BuildApplicability(ArchitectureAssessmentCompletionEvidence completion)

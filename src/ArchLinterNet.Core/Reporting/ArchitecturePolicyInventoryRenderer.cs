@@ -1,13 +1,12 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+/// <summary>Renders the Core-owned effective-policy inventory.</summary>
+internal static class ArchitecturePolicyInventoryRenderer
 {
-    /// <summary>Renders the canonical effective-policy inventory in a compact human form.</summary>
-    public static string FormatPolicyInventoryForHumans(ArchitecturePolicyInventory? inventory)
+    internal static string RenderForHumans(ArchitecturePolicyInventory? inventory)
     {
         if (inventory is null)
         {
@@ -22,12 +21,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             + $"Waiver debt       {debt.Total}  ({FormatWaiverDebtBreakdown(debt)})";
     }
 
-    /// <summary>
-    /// Adds the Core-owned policy inventory to a completed CI-artifact JSON document. A null
-    /// inventory deliberately remains absent so a cache-era result is never mistaken for a
-    /// zero-control, zero-debt policy.
-    /// </summary>
-    public static string AddPolicyInventoryToCiArtifacts(
+    internal static string AddToCiArtifacts(
         string ciArtifacts,
         ArchitecturePolicyInventory? inventory)
     {
@@ -44,9 +38,18 @@ public sealed partial class ArchitectureDiagnosticFormatter
             throw new InvalidOperationException("CI artifact output must be a JSON object before policy inventory can be added.");
         }
 
+        payload["policy_inventory"] = FormatForJson(inventory, inventory.Waivers);
+
+        return payload.ToJsonString();
+    }
+
+    internal static JsonObject FormatForJson(
+        ArchitecturePolicyInventory inventory,
+        IEnumerable<ArchitectureWaiverLifecycleRecord> waivers)
+    {
         ArchitecturePolicyInventoryRules rules = inventory.Rules;
         ArchitecturePolicyInventoryIgnoreDebt debt = inventory.IgnoreDebt;
-        payload["policy_inventory"] = new JsonObject
+        return new JsonObject
         {
             ["schema"] = inventory.SchemaId,
             ["effective_rule_count"] = inventory.EffectiveRuleCount,
@@ -65,12 +68,10 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 ["metadata_incomplete"] = debt.MetadataIncomplete,
                 ["invalid"] = debt.Invalid,
             },
-            ["waivers"] = new JsonArray(inventory.Waivers
-                .Select(FormatWaiverForJson)
+            ["waivers"] = new JsonArray(waivers
+                .Select(ArchitectureWaiverLifecycleRenderer.FormatWaiverForJson)
                 .ToArray()),
         };
-
-        return payload.ToJsonString();
     }
 
     private static string FormatWaiverDebtBreakdown(ArchitecturePolicyInventoryIgnoreDebt debt)
@@ -91,26 +92,4 @@ public sealed partial class ArchitectureDiagnosticFormatter
             states.Add($"{count} {state}");
         }
     }
-
-    private static JsonNode FormatWaiverForJson(ArchitectureWaiverLifecycleRecord waiver) => new JsonObject
-    {
-        ["id"] = waiver.Id,
-        ["state"] = waiver.State,
-        ["contract"] = waiver.ContractName,
-        ["contract_id"] = waiver.ContractId,
-        ["contract_group"] = waiver.ContractGroup,
-        ["source_type"] = waiver.SourceType,
-        ["forbidden_reference"] = waiver.ForbiddenReference,
-        ["target_fingerprint"] = waiver.TargetFingerprint,
-        ["reason"] = waiver.Reason,
-        ["owner"] = waiver.Owner,
-        ["issue"] = waiver.Issue,
-        ["introduced"] = FormatDate(waiver.Introduced),
-        ["expires"] = FormatDate(waiver.Expires),
-        ["evaluation_date"] = waiver.EvaluationDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
-        ["matches_governed_finding"] = waiver.MatchesGovernedFinding,
-        ["policy_location"] = waiver.PolicyLocation is null
-            ? null
-            : JsonSerializer.SerializeToNode(FormatPolicyLocationForJson(waiver.PolicyLocation)),
-    };
 }

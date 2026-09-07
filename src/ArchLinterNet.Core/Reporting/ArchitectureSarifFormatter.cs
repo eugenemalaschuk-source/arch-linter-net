@@ -275,9 +275,10 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             json["locations"] = BuildPhysicalLocations(matchedFilePath, Array.Empty<string>());
         }
         else if (diagnostic is ImportedExternalDiagnostic importedDiagnostic
-                 && HasImportedExternalDiagnosticLocation(importedDiagnostic.SourceDiagnostic.PrimaryLocation))
+                 && ArchitectureSarifImportedDiagnosticLocationProjector.HasLocation(
+                     importedDiagnostic.SourceDiagnostic.PrimaryLocation))
         {
-            json["locations"] = BuildImportedExternalDiagnosticLocations(
+            json["locations"] = ArchitectureSarifImportedDiagnosticLocationProjector.Project(
                 importedDiagnostic.SourceDiagnostic.PrimaryLocation!,
                 sourceType,
                 LogicalLocationKindFor(diagnostic, forbiddenNamespace));
@@ -667,6 +668,26 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             return (object)new Dictionary<string, object?> { [PhysicalLocationKey] = physicalLocation };
         }).ToArray();
     }
+
+    private static object[] BuildLogicalLocations(string fullyQualifiedName, string kind)
+    {
+        return new object[]
+        {
+            new Dictionary<string, object?>
+            {
+                ["logicalLocations"] = BuildLogicalLocationValues(fullyQualifiedName, kind),
+            },
+        };
+    }
+
+    private static object[] BuildLogicalLocationValues(string fullyQualifiedName, string kind) =>
+    [
+        new Dictionary<string, object?>
+        {
+            ["fullyQualifiedName"] = fullyQualifiedName,
+            ["kind"] = kind,
+        },
+    ];
 
     // Best-effort hint: no diagnostic kind carries an explicit "this identifier is a
     // namespace/type/package" flag, so the kind is inferred from the diagnostic's concrete subtype.

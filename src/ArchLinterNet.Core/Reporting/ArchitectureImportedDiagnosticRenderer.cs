@@ -3,11 +3,10 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+/// <summary>Renders imported diagnostics while preserving producer and governance evidence.</summary>
+internal static class ArchitectureImportedDiagnosticRenderer
 {
-    private static string FormatImportedExternalDiagnosticForHumans(
-        ImportedExternalDiagnostic diagnostic,
-        string canonicalIdentity)
+    internal static string RenderForHumans(ImportedExternalDiagnostic diagnostic, string canonicalIdentity)
     {
         SarifEvidenceSourceDiagnostic source = diagnostic.SourceDiagnostic;
         SarifEvidenceSourceLocation? location = source.PrimaryLocation;
@@ -28,6 +27,36 @@ public sealed partial class ArchitectureDiagnosticFormatter
             + $"governance_mode={GovernanceModeToken(diagnostic.GovernanceMode)}, "
             + $"canonical_identity={EscapeHumanText(canonicalIdentity)}, fingerprint={fingerprint}; "
             + $"evidence=[{evidence}])";
+    }
+
+    internal static void ApplyCiFields(ImportedExternalDiagnostic diagnostic, Dictionary<string, object?> obj)
+    {
+        SarifEvidenceSourceDiagnostic source = diagnostic.SourceDiagnostic;
+        SarifEvidenceSourceLocation? location = source.PrimaryLocation;
+        obj["logical_evidence_id"] = diagnostic.LogicalEvidenceId;
+        obj["selected_diagnostic_identity"] = diagnostic.SelectedCanonicalIdentity;
+        obj["governance_mode"] = GovernanceModeToken(diagnostic.GovernanceMode);
+        obj["source_diagnostic"] = new Dictionary<string, object?>
+        {
+            ["tool"] = diagnostic.EvidenceProvenances[0].ToolName,
+            ["rule_id"] = source.RuleId,
+            ["message"] = source.Message,
+            ["severity"] = SourceSeverityToken(source.SourceSeverity),
+            ["project"] = source.Project,
+            ["driver_rule_tags"] = source.DriverRuleTags.ToArray(),
+            ["location"] = FormatSourceLocation(location),
+            ["fingerprint"] = new Dictionary<string, object?>
+            {
+                ["origin"] = diagnostic.Fingerprint.Origin == SarifExternalDiagnosticFingerprintOrigin.Source
+                    ? "source"
+                    : "deterministic",
+                ["name"] = diagnostic.Fingerprint.SourceName,
+                ["value"] = diagnostic.Fingerprint.Value,
+            },
+        };
+        obj["evidence_provenance"] = diagnostic.EvidenceProvenances
+            .Select(provenance => (object)FormatEvidenceProvenanceForJson(provenance))
+            .ToArray();
     }
 
     private static string FormatEvidenceProvenanceForHumans(SarifEvidenceProvenance provenance)
@@ -89,38 +118,6 @@ public sealed partial class ArchitectureDiagnosticFormatter
         }
 
         return escaped.ToString();
-    }
-
-    private static void ApplyImportedExternalDiagnosticCiFields(
-        ImportedExternalDiagnostic diagnostic,
-        Dictionary<string, object?> obj)
-    {
-        SarifEvidenceSourceDiagnostic source = diagnostic.SourceDiagnostic;
-        SarifEvidenceSourceLocation? location = source.PrimaryLocation;
-        obj["logical_evidence_id"] = diagnostic.LogicalEvidenceId;
-        obj["selected_diagnostic_identity"] = diagnostic.SelectedCanonicalIdentity;
-        obj["governance_mode"] = GovernanceModeToken(diagnostic.GovernanceMode);
-        obj["source_diagnostic"] = new Dictionary<string, object?>
-        {
-            ["tool"] = diagnostic.EvidenceProvenances[0].ToolName,
-            ["rule_id"] = source.RuleId,
-            ["message"] = source.Message,
-            ["severity"] = SourceSeverityToken(source.SourceSeverity),
-            ["project"] = source.Project,
-            ["driver_rule_tags"] = source.DriverRuleTags.ToArray(),
-            ["location"] = FormatSourceLocation(location),
-            ["fingerprint"] = new Dictionary<string, object?>
-            {
-                ["origin"] = diagnostic.Fingerprint.Origin == SarifExternalDiagnosticFingerprintOrigin.Source
-                    ? "source"
-                    : "deterministic",
-                ["name"] = diagnostic.Fingerprint.SourceName,
-                ["value"] = diagnostic.Fingerprint.Value,
-            },
-        };
-        obj["evidence_provenance"] = diagnostic.EvidenceProvenances
-            .Select(provenance => (object)FormatEvidenceProvenanceForJson(provenance))
-            .ToArray();
     }
 
     private static Dictionary<string, object?>? FormatSourceLocation(SarifEvidenceSourceLocation? location)

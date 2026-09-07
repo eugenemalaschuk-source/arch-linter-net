@@ -2,9 +2,13 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureSarifFormatter
+/// <summary>Projects trusted imported diagnostic source locations into SARIF location values.</summary>
+internal static class ArchitectureSarifImportedDiagnosticLocationProjector
 {
-    private static bool HasImportedExternalDiagnosticLocation(SarifEvidenceSourceLocation? location)
+    private const string PhysicalLocationKey = "physicalLocation";
+    private const string ArtifactLocationKey = "artifactLocation";
+
+    internal static bool HasLocation(SarifEvidenceSourceLocation? location)
     {
         if (location?.Path is { Length: > 0 })
         {
@@ -14,7 +18,7 @@ public sealed partial class ArchitectureSarifFormatter
         return HasSarifRegionAnchor(location?.Region);
     }
 
-    private static object[] BuildImportedExternalDiagnosticLocations(
+    internal static object[] Project(
         SarifEvidenceSourceLocation location,
         string sourceType,
         string logicalLocationKind)

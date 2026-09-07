@@ -222,6 +222,26 @@ reuse the same prepared snapshot facts, preserving cache hit/population, counter
 disposal behaviour. Existing public and integration tests remain the parity authority for their
 respective output contracts.
 
+#### Diagnostic and SARIF governance projection extraction (#777)
+
+`ArchitectureDiagnosticFormatter` remains the stable public caller-facing facade. Its v0.8
+applicability, waiver-lifecycle, policy-inventory, imported-external-diagnostic, and
+contract-surface human-context responsibilities delegate to purpose-named internal, non-partial
+renderers. Those renderers consume existing canonical Core evidence and retain the exact existing
+Human and CI/JSON projection shapes; they do not reconstruct governance semantics from display
+text. The waiver renderer owns the shared lifecycle JSON shape used by the policy-inventory
+renderer.
+
+`ArchitectureSarifFormatter` remains the stable SARIF facade. It delegates trusted imported-source
+location construction to `ArchitectureSarifImportedDiagnosticLocationProjector`, preserving
+physical artifact locations, pathless anchored-region annotations, and logical-location fallback.
+The formatter's public API and existing cancellation boundaries are unchanged.
+
+The five v0.8 `ArchitectureDiagnosticFormatter.*` fragments and the v0.8
+`ArchitectureSarifFormatter.Locations.cs` fragment are removed rather than moved. The reviewed
+declaration-count evidence therefore decreases from 20 to 15 and from 4 to 3 respectively; none
+of the collaborators is partial.
+
 #### `ArchitectureContractSurfaceExposureScanner` traversal extraction (#775)
 
 `ArchitectureContractSurfaceExposureScanner` remains the small internal entry point for one
