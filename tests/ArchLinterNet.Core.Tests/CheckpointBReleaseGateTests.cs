@@ -182,7 +182,7 @@ public sealed partial class CheckpointBReleaseGateTests
     private CandidatePackageFeed Candidate => _candidate
         ?? throw new InvalidOperationException("Checkpoint B candidate was not prepared.");
 
-    private static CheckpointScenarioResult Passed(string id) => new(id, "passed", null);
+    internal static CheckpointScenarioResult Passed(string id) => new(id, "passed", null);
 
     private static void AssertAdopterRuntimeFixtures(CandidatePackageFeed candidate, IEnumerable<string> fixtureIds)
     {
@@ -349,5 +349,5 @@ public sealed partial class CheckpointBReleaseGateTests
 
     private sealed record PackageSubjectEvidence(string Kind, string File, long Size, string Sha256);
 
-    private sealed record CheckpointScenarioResult(string Id, string Result, string? Reason);
+    internal sealed record CheckpointScenarioResult(string Id, string Result, string? Reason);
 }

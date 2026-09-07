@@ -5,7 +5,7 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class CheckpointBReleaseGateTests
 {
-    private sealed partial class CandidatePackageFeed
+    internal sealed partial class CandidatePackageFeed
     {
         /// <summary>
         /// Item 13 — the CLI and the packaged <c>ArchLinterNet.Testing</c> API must resolve the same

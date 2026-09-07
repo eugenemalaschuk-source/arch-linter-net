@@ -159,10 +159,16 @@ def test_consumer_cleanup_scenarios_are_required() -> None:
 
 
 def test_v08_full_cycle_registry_matches_emitted_scenarios() -> None:
-    repository_root = Path(__file__).resolve().parents[3]
-    source_files = sorted((repository_root / "tests" / "ArchLinterNet.Core.Tests").glob(
-        "CheckpointBReleaseGateTests.V08FullCycle*.cs"
-    ))
+    # The v0.8 full-cycle scenario's orchestration lives in the CheckpointBV08* collaborator types
+    # (#778), not only in the CheckpointBReleaseGateTests.V08FullCycle* entrypoint/consumer files
+    # that predate that extraction -- scan both name families for emitted scenario IDs.
+    core_tests_directory = Path(__file__).resolve().parents[3] / "tests" / "ArchLinterNet.Core.Tests"
+    source_files = sorted(
+        {
+            *core_tests_directory.glob("CheckpointBReleaseGateTests.V08FullCycle*.cs"),
+            *core_tests_directory.glob("CheckpointBV08*.cs"),
+        }
+    )
     emitted = {
         match.group(1)
         for source_file in source_files

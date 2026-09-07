@@ -4,7 +4,7 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class CheckpointBReleaseGateTests
 {
-    private sealed partial class CandidatePackageFeed
+    internal sealed partial class CandidatePackageFeed
     {
         /// <summary>
         /// F2 through the packaged <c>ArchLinterNet.Testing</c> surface. Issue #436 was reproduced

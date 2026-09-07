@@ -35,6 +35,10 @@
 
 - [ ] 3.1 Split unrelated CLI test aggregates into focused fixtures without changing scenario coverage.
 - [ ] 3.2 Split unrelated Core test aggregates into focused fixtures; retain only dedicated partial-language source fixtures.
+  - [x] Extract the v0.8 full-cycle Checkpoint B scenario's orchestration, phase-trace/restore-reuse
+    state, and validation/policy-weakening/health-matrix/Unity/reporting phases out of the shared
+    `CheckpointBReleaseGateTests` partial aggregate into named `CheckpointBV08*` collaborator types,
+    leaving `CheckpointBReleaseGateTests.V08FullCycle.cs` a thin NUnit entrypoint (#778).
 - [ ] 3.3 Add regression coverage proving intentional partial-language fixtures remain discoverable and production aggregates are not reintroduced.
 
 ## 4. Enforce and verify the final convention

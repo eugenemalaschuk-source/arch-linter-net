@@ -7,7 +7,7 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class CheckpointBReleaseGateTests
 {
-    private sealed partial class CandidatePackageFeed
+    internal sealed partial class CandidatePackageFeed
     {
         /// <summary>
         /// Proves the reported #788 boundary against the immutable candidate: the packed CLI emits

@@ -220,7 +220,7 @@ public sealed partial class CheckpointBReleaseGateTests
             : throw new AssertionException($"The expansion inventory has no contract '{authoredContractId}'.");
     }
 
-    private sealed record ConsumerPolicyShape(
+    internal sealed record ConsumerPolicyShape(
         int PolicyDocuments,
         int ImportedFragments,
         int GovernedModuleAssemblies,
