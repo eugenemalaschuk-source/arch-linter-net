@@ -125,6 +125,16 @@ The post-tranche audit has nine handwritten source aggregates remaining:
 | `ArchitectureBaselineApplicationService` | 2 |
 | `ArchitecturePublicApiApplicationService` | 2 |
 
+### v0.8 release-delta continuation
+
+The table above records the pre-v0.8 snapshot shape. The `v0.7.4..v0.8.0` release delta then
+grew `ArchitectureAnalysisSnapshot` from its historical base plus `CacheWork` declaration to
+seven handwritten declarations by adding applicability completion, metric measurement, input and
+cache-project provenance, and policy-inventory orchestration projections. The production
+declaration-count ratchet records the current count of seven. Issue #776 owns removing those
+release-added responsibilities without changing snapshot behaviour; it must remove that exception
+rather than refresh it at a different count.
+
 ### Extract collaborators, not more fragments
 
 `ArchitectureAnalysisSession` becomes a coordinator over existing and newly named family analysis
@@ -189,6 +199,28 @@ cancellation checks and fail-closed result statuses/details remain in the facade
 Direct collaborator tests supplement the end-to-end reader, binder, federation, and CLI tests. The
 exact #742 declaration-count exception is removed after the reader becomes one non-partial
 declaration; none of the collaborators is partial.
+
+#### `ArchitectureAnalysisSnapshot` projection extraction (#776)
+
+`ArchitectureAnalysisSnapshot` remains the sole public façade and owner of one prepared fact set,
+the lazy runner/materialization boundary, the synchronization gate, cancellation and disposal
+state, strict/audit outcome memoization, cache authorization and counters. Its public `Evaluate`,
+`Measure`, provenance, baseline-receipt, and topology-capture entry points retain their existing
+contracts and remain serialized by that lifecycle owner.
+
+Purpose-named internal, non-partial collaborators own the release-added work: per-mode evaluation
+and repository inventory completion; applicability completion and baseline-candidate projection;
+metric measurement readiness and evaluation; input/review and cache-project-path projection; and
+cache-work provenance capture. The snapshot delegates through narrow internal inputs and results;
+collaborators neither create a runner, cache a second analysis session, retain mutable lifecycle
+state, nor expose a public seam. The former `CacheWork` partial is absorbed by the cache-work
+collaborator, so the public snapshot returns to one handwritten declaration and its reviewed
+declaration-count exception is removed.
+
+Focused regression coverage proves that strict, audit, measurement, and topology/review projections
+reuse the same prepared snapshot facts, preserving cache hit/population, counter, cancellation, and
+disposal behaviour. Existing public and integration tests remain the parity authority for their
+respective output contracts.
 
 #### `ArchitectureAnalysisSession` responsibility map
 

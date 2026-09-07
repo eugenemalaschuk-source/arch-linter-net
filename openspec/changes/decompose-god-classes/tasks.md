@@ -21,6 +21,10 @@
   - [x] Extract `SarifEvidenceReader` repository-local artifact acquisition and SARIF
     document/context/source projection collaborators while retaining one public trust facade,
     current evidence semantics, and focused collaborator/consumer coverage (#774).
+  - [x] Extract `ArchitectureAnalysisSnapshot` v0.8 applicability, measurement, input/review,
+    cache-work, and evaluation-inventory projections into non-partial internal collaborators while
+    retaining one public lifecycle/fact-set owner; prove strict/audit/measure/topology reuse and
+    remove the reviewed declaration-count exception (#776).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
