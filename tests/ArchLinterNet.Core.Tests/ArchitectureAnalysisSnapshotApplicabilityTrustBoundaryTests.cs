@@ -25,12 +25,8 @@ public sealed class ArchitectureAnalysisSnapshotApplicabilityTrustBoundaryTests
             ArchitectureAssessmentCompletionState.Pass,
             Array.Empty<ArchitectureApplicabilityAssessment>(),
             Array.Empty<ArchitectureApplicabilityReason>()));
-        MethodInfo derive = typeof(ArchitectureAnalysisSnapshot).GetMethod(
-            "DeriveAssessmentCompletion",
-            BindingFlags.Static | BindingFlags.NonPublic)!;
-
         ArchitectureAssessmentCompletionEvidence? completion =
-            (ArchitectureAssessmentCompletionEvidence?)derive.Invoke(null, [execution, true]);
+            ArchitectureAnalysisSnapshotApplicabilityProjector.DeriveAssessmentCompletion(execution, true);
 
         Assert.That(completion, Is.Null);
     }

@@ -37,6 +37,7 @@ compiled types remain high-coupling god classes that are difficult to understand
 ## Impact
 
 - Affects Core source parsing/indexing, policy schema and validation, self-policy YAML, tests, and
-  the large `ArchitectureAnalysisSession`, `ArchitectureContractGroups`, and reporting aggregates.
+  the large `ArchitectureAnalysisSession`, `ArchitectureContractGroups`,
+  `ArchitectureAnalysisSnapshot`, and reporting aggregates.
 - No new runtime dependencies and no intentional public API changes; reviewed snapshots remain
   exact and are updated only if a necessary surface correction is demonstrated.

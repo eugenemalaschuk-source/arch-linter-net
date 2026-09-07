@@ -1,4 +1,3 @@
-using System.Reflection;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Contracts;
@@ -16,7 +15,7 @@ namespace ArchLinterNet.Core.Validation;
 // requested modes (strict/audit — coverage rides inside each mode via the strict_coverage/
 // audit_coverage families) can be evaluated from the same fact set. See
 // docs/internal/analysis-build-state-blueprint.md, "Snapshot ownership".
-public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
+public sealed class ArchitectureAnalysisSnapshot : IDisposable
 {
     private const string ErrorSeverity = "error";
 
@@ -220,7 +219,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
             try
             {
-                return EvaluationOrchestrator.Evaluate(this, mode, timing);
+                return ArchitectureAnalysisSnapshotEvaluationOrchestrator.Evaluate(this, mode, timing);
             }
             catch (OperationCanceledException)
             {
@@ -266,19 +265,146 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             }
 
             _cancellationToken.ThrowIfCancellationRequested();
-            global::ArchLinterNet.Core.Execution.ArchitectureTopologyObservation observation =
-                ArchitectureTopologyValidationObserver.Observe(EnsureSetup().Runner.Session, subjectKind);
-            ArchitectureTopologyObservation captured = new(
-                observation.Subjects.Select(subject => new ArchitectureTopologyObservedSubject(
-                    subject.Identity, subject.Subject, subject.Project, subject.Assembly)).ToArray(),
-                observation.Dependencies.Select(dependency => new ArchitectureTopologyObservedDependency(
-                    dependency.SourceIdentity, dependency.TargetIdentity, dependency.Witness)).ToArray());
+            ArchitectureTopologyObservation captured = ArchitectureAnalysisSnapshotReviewProjector.Capture(
+                EnsureSetup().Runner.Session,
+                subjectKind);
             _cancellationToken.ThrowIfCancellationRequested();
             return captured;
         }
     }
 
-    private void EnsureRequestedContractIdsAreKnownForMode(string mode)
+    /// <summary>
+    /// Returns the exact candidate set already collected by the evaluated snapshot. Health uses
+    /// this internal receipt to compare a baseline without running a second analysis path.
+    /// </summary>
+    internal ArchitectureSnapshotBaselineCandidateReceipt CollectBaselineCandidates(string mode)
+    {
+        if (mode is not ("strict" or "audit" or "all"))
+        {
+            throw new ArgumentException("Invalid mode. Use 'strict', 'audit', or 'all'.", nameof(mode));
+        }
+
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_preflight.Blocked)
+            {
+                return new ArchitectureSnapshotBaselineCandidateReceipt(
+                    _document,
+                    null,
+                    Array.Empty<ArchitectureViolation>(),
+                    _preflight.Diagnostics);
+            }
+
+            return ArchitectureAnalysisSnapshotApplicabilityProjector.CollectBaselineCandidates(
+                _document,
+                _preflight,
+                mode,
+                _evaluatedModes,
+                EnsureSetup().Runner);
+        }
+    }
+
+    /// <summary>
+    /// Measures selected policy metrics from this snapshot without creating findings.
+    /// </summary>
+    public ArchitectureMetricMeasurementOutcome Measure(IReadOnlyCollection<string>? metricIds = null)
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_cancelled)
+            {
+                throw new OperationCanceledException(
+                    "This snapshot observed cancellation during a prior operation and cannot be reused.");
+            }
+
+            try
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+                if (_preflight.Blocked)
+                {
+                    return ArchitectureMetricEvaluator.Unavailable(
+                        _document.Metrics,
+                        metricIds,
+                        _document.Name,
+                        ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+                }
+
+                ArchitectureRunnerSetup setup = EnsureSetup();
+                return ArchitectureAnalysisSnapshotMetricProjector.Measure(
+                    _document,
+                    metricIds,
+                    setup.Runner.Session);
+            }
+            catch (OperationCanceledException)
+            {
+                // Keep Measure() on the same terminal lifecycle as Evaluate(): lazy analysis may
+                // have stopped after materializing only part of a session, so it cannot be reused.
+                _cancelled = true;
+                throw;
+            }
+        }
+    }
+
+    // The following small operations are the only state access used by the stateless evaluation
+    // coordinator. They keep mutation, mode memoization, and cache authorization on the
+    // snapshot while giving the extracted collaborators narrow request/result seams.
+    internal ArchitectureContractDocument Document => _document;
+    internal IReadOnlyCollection<string>? RequestedContractIds => _requestedContractIds;
+    internal bool IncludeAsmdefContracts => _includeAsmdefContracts;
+    internal string CoverageConfig => _coverageConfig;
+    internal bool IsPreflightBlocked => _preflight.Blocked;
+
+    internal CancellationToken CancellationToken => _cancellationToken;
+
+    internal ArchitectureRunnerPreparation? PreparedPostBuildRunner => _preparedPostBuildRunner;
+
+    internal ValidationOutcome GetEvaluatedMode(string mode) => _evaluatedModes[mode];
+
+    internal bool HasEvaluatedMode(string mode) => _evaluatedModes.ContainsKey(mode);
+
+    internal void SetEvaluatedMode(string mode, ValidationOutcome outcome)
+    {
+        _evaluatedModes[mode] = outcome;
+        _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
+    }
+
+    internal bool TryTakeCacheAuthorization(
+        string mode,
+        out AnalysisCachePopulation.PreparedAuthorization authorization)
+    {
+        if (_cacheAuthorizations.Remove(mode, out AnalysisCachePopulation.PreparedAuthorization? candidate)
+            && candidate is not null)
+        {
+            authorization = candidate;
+            return true;
+        }
+
+        authorization = null!;
+        return false;
+    }
+
+    internal (IReadOnlyList<string> Paths,
+        IReadOnlyList<AnalysisCacheCapturedFileIdentity> CapturedIdentities)
+        GetCacheArtifactEvidenceForAuthorization()
+    {
+        CacheArtifactEvidence evidence = GetCacheArtifactEvidence();
+        return (evidence.Paths, evidence.CapturedIdentities);
+    }
+
+    internal void ApplyPolicyInventory(ArchitecturePolicyInventory inventory)
+    {
+        foreach (string evaluatedMode in _evaluatedModes.Keys.ToArray())
+        {
+            ValidationOutcome previous = _evaluatedModes[evaluatedMode];
+            ValidationOutcome completed = previous with { PolicyInventory = inventory };
+            AnalysisCachePopulation.TransferAuthorization(previous, completed);
+            _evaluatedModes[evaluatedMode] = completed;
+        }
+    }
+
+    internal void EnsureRequestedContractIdsAreKnownForMode(string mode)
     {
         if (_requestedContractIds is not { Count: > 0 })
         {
@@ -299,173 +425,55 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         }
     }
 
-    private ValidationOutcome BuildBlockedOutcome()
-    {
-        return new ValidationOutcome(
-            false, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
-            Array.Empty<ArchitectureViolation>(), _coverageConfig,
-            Array.Empty<ArchitectureUnmatchedIgnoredViolation>(), _unmatchedConfig,
-            Array.Empty<PolicyConsistencyDiagnostic>(), _policyConsistencyConfig,
-            Array.Empty<ArchitectureCoverageSummary>(), Array.Empty<ArchitectureClassificationConflict>(),
-            Array.Empty<ArchitectureClassificationMetadataFailure>())
-        {
-            RepositoryRoot = _repositoryRoot,
-            PreflightDiagnostics = _preflight.Diagnostics,
-            PreflightBlocked = true,
-            PolicyImportPaths = GetPolicyImportPaths(),
-            ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
-            DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
-            ConsumedInputPaths = GetConsumedInputPaths(),
-            SourceExpansion = _document.SourceExpansion,
-            ExternalEvidenceRequirements = _document.ExternalEvidence,
-        };
-    }
+    internal ValidationOutcome BuildBlockedOutcome() =>
+        ArchitectureAnalysisSnapshotEvaluationProjector.BuildBlockedOutcome(
+            new ArchitectureAnalysisSnapshotBlockedEvaluationInput(
+                _document,
+                _repositoryRoot,
+                _preflight.Diagnostics,
+                _coverageConfig,
+                _unmatchedConfig,
+                _policyConsistencyConfig,
+                GetPolicyImportPaths(),
+                GetResolvedAssemblyPaths(),
+                GetDiscoveredProjectPaths(),
+                GetConsumedInputPaths()));
 
-    private ValidationOutcome EvaluateCore(string mode, ValidationTiming? timing)
+    internal ValidationOutcome EvaluateCoreForMode(string mode, ValidationTiming? timing)
     {
         IArchitectureContractRunner runner = EnsureSetup().Runner;
-        List<ArchitectureViolation> allViolations = new();
-
-        // ArchitectureAnalysisSession.UnmatchedIgnoredViolations is one mutable list that every
-        // contract check across every mode appends to as it runs against the session shared by
-        // this snapshot — it is never cleared between modes. Recording the count here and slicing
-        // from it after this mode's checks run (see ResolveUnmatchedIgnoredViolations) isolates
-        // each mode's reported unmatched-ignore diagnostics to what that mode's own checks added,
-        // regardless of evaluation order or how many other modes were evaluated on this snapshot
-        // before or after.
-        int unmatchedStartIndex = runner.UnmatchedIgnoredViolations.Count;
-
-        // Same rationale as unmatchedStartIndex above: SubtractiveMatcherParticipation is one
-        // mutable list shared across every mode evaluated on this snapshot's session.
-        int subtractiveMatcherStartIndex = runner.Session.SubtractiveMatcherParticipation.Count;
-
-        CancellationToken cancellationToken = runner.Session.Context.CancellationToken;
-        cancellationToken.ThrowIfCancellationRequested();
-
-        using (timing?.Measure("configuration_check"))
-            allViolations.AddRange(runner.CheckConfiguration(strict: mode == "strict"));
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        List<PolicyConsistencyDiagnostic> policyConsistencyFindings;
-        using (timing?.Measure("policy_consistency_check"))
-        {
-            policyConsistencyFindings = _policyConsistencyConfig == "off"
-                ? new List<PolicyConsistencyDiagnostic>()
-                : runner.CheckPolicyConsistency();
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        ArchitectureContractExecutionResult execution;
-        using (timing?.Measure("contract_checks"))
-        {
-            _profilingCounters?.ResetContractFamilyResultCounts();
-            execution = _contractExecutor.Execute(
-                runner.Session, mode, _handlerRegistry, _includeAsmdefContracts, timing);
-        }
-
-        RecordContractFamilyResultCounts(execution.ContractFamilyResultCounts);
+        (ValidationOutcome outcome, IReadOnlyDictionary<string, int> resultCounts) =
+            ArchitectureAnalysisSnapshotEvaluationProjector.Evaluate(
+                new ArchitectureAnalysisSnapshotEvaluationInput(
+                    _document,
+                    _repositoryRoot,
+                    runner,
+                    _contractExecutor,
+                    _handlerRegistry,
+                    mode,
+                    timing,
+                    _unmatchedConfig,
+                    _policyConsistencyConfig,
+                    _coverageConfig,
+                    _enforceUnmatchedIgnoredViolationsPolicy,
+                    _includeAsmdefContracts,
+                    _requestedContractIds,
+                    _waiverEvaluationDate,
+                    _profilingCounters,
+                    runner.UnmatchedIgnoredViolations.Count,
+                    runner.Session.SubtractiveMatcherParticipation.Count,
+                    _preflight.Diagnostics,
+                    GetPolicyImportPaths(),
+                    GetResolvedAssemblyPaths(),
+                    GetDiscoveredProjectPaths()));
+        RecordContractFamilyResultCounts(resultCounts);
         _profilingCounters?.ResetContractFamilyResultCounts();
-
-        allViolations.AddRange(execution.Violations);
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        IReadOnlyCollection<ArchitectureViolation> coverageFindings = _coverageConfig == "off"
-            ? Array.Empty<ArchitectureViolation>()
-            : execution.CoverageViolations;
-
-        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> rawUnmatched;
-        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatched;
-        using (timing?.Measure("post_processing"))
-        {
-            IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> allUnmatched = runner.UnmatchedIgnoredViolations;
-            rawUnmatched = unmatchedStartIndex >= allUnmatched.Count
-                ? Array.Empty<ArchitectureUnmatchedIgnoredViolation>()
-                : allUnmatched.Skip(unmatchedStartIndex).ToList();
-            unmatched = ResolveUnmatchedIgnoredViolations(runner, unmatchedStartIndex);
-        }
-
-        unmatched = FilterUnmatchedForDisabledCoverage(unmatched);
-        unmatched = unmatched.Select(_document.Provenance.Enrich).ToList();
-
-        bool hasBlockingUnmatched = _enforceUnmatchedIgnoredViolationsPolicy
-            && _unmatchedConfig == ErrorSeverity && unmatched.Count > 0;
-
-        bool hasBlockingPolicyConsistency =
-            _policyConsistencyConfig == ErrorSeverity && policyConsistencyFindings.Count > 0;
-
-        bool hasBlockingCoverage = _coverageConfig == ErrorSeverity && coverageFindings.Count > 0;
-
-        IReadOnlyList<ArchitectureWaiverLifecycleRecord> waivers = ArchitectureWaiverLifecycleEvaluator.Evaluate(
-            _document, mode, rawUnmatched, _waiverEvaluationDate, _requestedContractIds);
-        string waiverProfile = ArchitectureWaiverProfile.Resolve(_document);
-        string[] blockingWaiverStates = waiverProfile == ArchitectureWaiverProfile.Strict
-            ? ["expired", "invalid", "stale"]
-            : ["invalid"];
-        var waiverLifecycleAssessment = new ArchitectureWaiverLifecycleAssessment(
-            waiverProfile,
-            waivers,
-            blockingWaiverStates);
-        bool hasBlockingWaiver = waiverLifecycleAssessment.HasBlockingRecords;
-
-        bool ordinaryPassed = allViolations.Count == 0 && execution.Cycles.Count == 0
-            && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage && !hasBlockingWaiver;
-
-        ArchitectureAssessmentCompletionEvidence? assessmentCompletion = DeriveAssessmentCompletion(execution, ordinaryPassed);
-        ArchitectureApplicabilityProjection? applicabilityProjection = ProjectApplicability(assessmentCompletion, mode);
-        bool passed = HasPassedAssessment(ordinaryPassed, assessmentCompletion);
-
-        (IReadOnlyList<ArchitectureClassificationConflict> classificationConflicts,
-            IReadOnlyList<ArchitectureClassificationMetadataFailure> classificationMetadataFailures) =
-                runner.Session.CheckClassificationFacts();
-        IReadOnlyList<ArchitectureClassificationRoleFact> classificationRoles = runner.Session.CheckClassificationRoles();
-        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred = runner.Session.CheckClassificationPathDeferred();
-
-        ArchitecturePolicyInventory policyInventory = ArchitecturePolicyInventoryProjector.Project(
-            _document,
-            mode,
-            waivers,
-            _requestedContractIds,
-            _includeAsmdefContracts,
-            _coverageConfig != "off");
-
-        // Classification post-processing can materialize additional facts. A signal observed
-        // there must win over constructing and returning an apparently complete outcome.
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return new ValidationOutcome(
-            passed, allViolations, execution.Cycles, coverageFindings, _coverageConfig, unmatched, _unmatchedConfig,
-            policyConsistencyFindings, _policyConsistencyConfig, execution.CoverageSummaries,
-            classificationConflicts, classificationMetadataFailures)
-        {
-            RepositoryRoot = _repositoryRoot,
-            CycleFindings = execution.CycleFindings,
-            ClassificationRoles = classificationRoles,
-            ClassificationPathDeferred = classificationPathDeferred,
-            PreflightDiagnostics = _preflight.Diagnostics,
-            PolicyImportPaths = GetPolicyImportPaths(),
-            ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
-            DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
-            SourceExpansion = _document.SourceExpansion,
-            Waivers = waivers,
-            WaiverLifecycleAssessment = waiverLifecycleAssessment,
-            PolicyInventory = policyInventory,
-            ApplicabilityExpectedEntries = execution.ApplicabilityExpectedEntries,
-            ApplicabilityRecords = execution.ApplicabilityRecords,
-            AssessmentCompletionEvidence = assessmentCompletion,
-            ApplicabilityProjection = applicabilityProjection,
-            SubtractiveMatcherParticipation = runner.Session.SubtractiveMatcherParticipation
-                .Skip(subtractiveMatcherStartIndex)
-                .ToList(),
-            ExternalEvidenceRequirements = _document.ExternalEvidence,
-        };
+        return outcome;
     }
 
     // A cache hit reconstructs its outcome without materializing the runner or executing contracts.
     // Metadata planning still precedes lookup; the lazy runner materializes only after a miss.
-    private ValidationOutcome? TryEvaluateFromCache(string mode, ValidationTiming? timing)
+    internal ValidationOutcome? TryEvaluateFromCache(string mode, ValidationTiming? timing)
     {
         if (_cacheContext is not { } cache)
         {
@@ -641,6 +649,13 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         return new CacheKeyInputEvidence(policyInputs, baselineInput, allInputs, complete);
     }
 
+    private IReadOnlyList<string> GetCacheProjectPaths() =>
+        ArchitectureAnalysisSnapshotInputProjector.GetCacheProjectPaths(
+            _document,
+            _repositoryRoot,
+            _setup,
+            _preparedProjectPaths);
+
     // Project-aware Roslyn method-body analysis lazily evaluates a project's complete source and
     // reference set. Until that dynamic set is captured as exact byte manifests, it is unsafe to
     // authorize a cached outcome from only selected PE/PDB/receipt fingerprints; fail closed.
@@ -668,23 +683,29 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
     private bool HasExplicitSourceRoots() => _document.Provenance.TryGetLocation(
         "/analysis/source_roots", out _);
 
-    private List<string> GetResolvedAssemblyPaths()
-    {
-        return GetSelectedAssemblyArtifactPaths()
-            .Concat(_setup?.Runner.Session.Context.TargetAssemblies
-            .Select(SafeAssemblyLocation)
-            .Where(path => !string.IsNullOrEmpty(path))
-            .Select(path => Path.GetFullPath(path!))
-            ?? Array.Empty<string>())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
+    private IReadOnlyList<string> GetPolicyImportPaths() =>
+        ArchitectureAnalysisSnapshotInputProjector.GetPolicyImportPaths(_document, _repositoryRoot);
+
+    private IReadOnlyList<string> GetResolvedAssemblyPaths() =>
+        ArchitectureAnalysisSnapshotInputProjector.GetResolvedAssemblyPaths(_setup, _preparedArtifactPaths);
 
     private IReadOnlyList<string> GetSelectedAssemblyArtifactPaths() =>
         _setup?.Runner.Session.Context.SelectedAssemblyArtifactPaths ?? _preparedArtifactPaths;
 
     private IReadOnlyList<ArchitectureLoadedAssemblyArtifact> GetLoadedAssemblyArtifacts() =>
         _setup?.Runner.Session.Context.LoadedAssemblyArtifacts ?? Array.Empty<ArchitectureLoadedAssemblyArtifact>();
+
+    internal ArchitectureAnalysisSnapshotWorkSnapshot CaptureWorkSnapshot() =>
+        ArchitectureAnalysisSnapshotCacheWorkProjector.Capture(
+            _counters,
+            _profilingCounters,
+            GetLoadedAssemblyArtifacts());
+
+    internal AnalysisCacheWorkProvenanceV1 CreateWorkProvenance(
+        ArchitectureAnalysisSnapshotWorkSnapshot before) =>
+        ArchitectureAnalysisSnapshotCacheWorkProjector.CreateProvenance(
+            before,
+            CaptureWorkSnapshot());
 
     private void RecordContractFamilyResultCounts(IReadOnlyDictionary<string, int> resultCounts)
     {
@@ -701,22 +722,27 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         }
     }
 
-    private IReadOnlyList<string> GetDiscoveredProjectPaths()
-    {
-        return _setup?.Runner.Session.Context.DiscoveredProjectPaths ?? _preparedProjectPaths;
-    }
+    private IReadOnlyList<string> GetDiscoveredProjectPaths() =>
+        ArchitectureAnalysisSnapshotInputProjector.GetDiscoveredProjectPaths(_setup, _preparedProjectPaths);
 
-    private static string? SafeAssemblyLocation(Assembly assembly)
-    {
-        try
-        {
-            return assembly.Location;
-        }
-        catch (NotSupportedException)
-        {
-            return null;
-        }
-    }
+    private IReadOnlyList<string> GetConsumedInputPaths() =>
+        ArchitectureAnalysisSnapshotInputProjector.GetConsumedInputPaths(_preflight, _setup);
+
+    internal IReadOnlyList<string> GetCapturePolicyImportPaths() => GetPolicyImportPaths();
+
+    internal IReadOnlyList<string> GetCaptureResolvedAssemblyPaths() => GetResolvedAssemblyPaths();
+
+    internal IReadOnlyList<string> GetCaptureDiscoveredProjectPaths() => GetDiscoveredProjectPaths();
+
+    internal IReadOnlyList<string> GetCaptureConsumedInputPaths() => GetConsumedInputPaths();
+
+    public IReadOnlyList<string> GetProfileInputPaths() =>
+        ArchitectureAnalysisSnapshotInputProjector.GetProfileInputPaths(
+            _document,
+            _repositoryRoot,
+            _setup,
+            _preparedArtifactPaths,
+            _preparedProjectPaths);
 
     private sealed record CacheArtifactEvidence(
         IReadOnlyList<string> Paths,
@@ -727,35 +753,6 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         ArchitectureLoadedTextIdentity? BaselineInput,
         IReadOnlyList<ArchitectureLoadedTextIdentity> AllInputs,
         bool IsComplete);
-
-    private IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> ResolveUnmatchedIgnoredViolations(
-        IArchitectureContractRunner runner, int unmatchedStartIndex)
-    {
-        if (!_enforceUnmatchedIgnoredViolationsPolicy || _unmatchedConfig == "off")
-        {
-            return Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
-        }
-
-        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> all = runner.UnmatchedIgnoredViolations;
-        return unmatchedStartIndex >= all.Count
-            ? Array.Empty<ArchitectureUnmatchedIgnoredViolation>()
-            : all.Skip(unmatchedStartIndex).ToList();
-    }
-
-    // See ArchitectureValidationApplicationService.FilterUnmatchedForDisabledCoverage for why this
-    // filters by contract group rather than by contract ID.
-    private IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> FilterUnmatchedForDisabledCoverage(
-        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatched)
-    {
-        if (_coverageConfig != "off" || unmatched.Count == 0)
-        {
-            return unmatched;
-        }
-
-        return unmatched
-            .Where(u => u.ContractGroup is not ("strict_coverage" or "audit_coverage"))
-            .ToList();
-    }
 
     public void Dispose()
     {

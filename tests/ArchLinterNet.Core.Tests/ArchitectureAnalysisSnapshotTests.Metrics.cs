@@ -112,4 +112,26 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
             Assert.Throws<OperationCanceledException>(() => snapshot.Evaluate("strict"));
         });
     }
+
+    [Test]
+    public void EvaluateMeasureAndTopologyCapture_ReuseTheSnapshotPreparedRunner()
+    {
+        Fixture fixture = CreateFixture();
+        using ArchitectureAnalysisSnapshot snapshot = fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest());
+
+        snapshot.Evaluate("strict");
+        snapshot.Measure();
+        snapshot.CaptureTopologyObservation("type");
+        snapshot.Evaluate("audit");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.RunnerSetupService.BuildRunnerCallCount, Is.EqualTo(1));
+            Assert.That(fixture.ContractExecutor.CallCountByMode.GetValueOrDefault("strict"), Is.EqualTo(1));
+            Assert.That(fixture.ContractExecutor.CallCountByMode.GetValueOrDefault("audit"), Is.EqualTo(1));
+            Assert.That(snapshot.Counters.PolicyCompositions, Is.EqualTo(1));
+            Assert.That(snapshot.Counters.ModesEvaluated, Is.EqualTo(2));
+            Assert.That(snapshot.Counters.SnapshotMaterializations, Is.EqualTo(1));
+        });
+    }
 }
