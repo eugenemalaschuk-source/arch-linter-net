@@ -222,6 +222,31 @@ reuse the same prepared snapshot facts, preserving cache hit/population, counter
 disposal behaviour. Existing public and integration tests remain the parity authority for their
 respective output contracts.
 
+#### `ArchitectureContractSurfaceExposureScanner` traversal extraction (#775)
+
+`ArchitectureContractSurfaceExposureScanner` remains the small internal entry point for one
+caller-selected root and normalized visible-surface shape. It creates exactly one
+`ArchitectureContractSurfaceExposureScanState` per scan. That state owns the root identity and
+path, shared exposure/incomplete-evidence collections, deduplication sets, referenced-type map,
+branch-cycle identities, reflection-failure recording, and deterministic result ordering.
+
+`ArchitectureContractSurfaceExposureTraversal` owns recursive type relationships, generic
+parameters and constraints, type shapes, delegates, and visible nested types.
+`ArchitectureContractSurfaceExposureMemberScanner` owns visible constructors, methods,
+properties, fields, events, accessor metadata, parameters, and returns.
+`ArchitectureContractSurfaceExposureAttributeScanner` owns compiled custom-attribute metadata,
+typed arguments, and stable occurrence ordering. These collaborators share the one scan state and
+call the traversal only for recursive shapes; none creates an independent result, recursion set,
+or reflection-failure policy.
+
+The extraction preserves every existing `ArchitectureContractExposurePath` segment, canonical
+sorting/deduplication identity, and incomplete-evidence reason. The scanner facade, traversal, and
+all collaborators are non-partial internal implementation types; no public Core.Scanning API is
+added. Focused traversal and consumer regression tests cover accessor metadata, nested generic
+shapes, deterministic repeated attributes, recursive generic cycle protection, and
+reflection-incomplete evidence. The two exact #748 declaration-count ignores are removed after
+the source types are non-partial.
+
 #### `ArchitectureAnalysisSession` responsibility map
 
 - **Session:** owns immutable policy/run inputs, run-scoped indexes and caches, selection state,
