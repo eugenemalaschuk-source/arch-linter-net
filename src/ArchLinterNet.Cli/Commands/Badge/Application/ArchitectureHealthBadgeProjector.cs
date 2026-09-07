@@ -31,13 +31,13 @@ internal static class ArchitectureHealthBadgeProjector
             return health switch
             {
                 "healthy" => new ArchitectureHealthBadgeProjection(
-                    $"HEALTHY · {ignores} ignores · {rules} rules", "brightgreen", ExitCode(gate)),
+                    $"{GateName(gate)} · HEALTHY · {ignores} ignores · {rules} rules", "brightgreen", ExitCode(gate)),
                 "debt" => new ArchitectureHealthBadgeProjection(
-                    $"DEBT · {ignores} ignores · {rules} rules", "yellow", ExitCode(gate)),
+                    $"{GateName(gate)} · DEBT · {ignores} ignores · {rules} rules", "yellow", ExitCode(gate)),
                 "degrading" => new ArchitectureHealthBadgeProjection(
-                    $"DEGRADING · {ignores} ignores · {rules} rules", "orange", ExitCode(gate)),
+                    $"{GateName(gate)} · DEGRADING · {ignores} ignores · {rules} rules", "orange", ExitCode(gate)),
                 "failing" => new ArchitectureHealthBadgeProjection(
-                    $"FAILING · {ignores} ignores · {rules} rules", "red", ExitCode(gate)),
+                    $"{GateName(gate)} · FAILING · {ignores} ignores · {rules} rules", "red", ExitCode(gate)),
                 _ => Unassessable(),
             };
         }
@@ -97,6 +97,13 @@ internal static class ArchitectureHealthBadgeProjector
     {
         "pass" => CliExitCodes.Success,
         "fail" => CliExitCodes.ValidationFailure,
+        _ => throw new InvalidOperationException($"Unsupported Architecture Health gate '{gate}'."),
+    };
+
+    private static string GateName(string gate) => gate switch
+    {
+        "pass" => "PASS",
+        "fail" => "FAIL",
         _ => throw new InvalidOperationException($"Unsupported Architecture Health gate '{gate}'."),
     };
 

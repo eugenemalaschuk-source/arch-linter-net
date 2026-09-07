@@ -43,7 +43,7 @@ internal sealed class CheckpointBV08ReportingPhases(CheckpointBV08ToolRunner run
         Assert.That(badge.ExitCode, Is.EqualTo(1), $"v08-badge: {badge.CombinedOutput}");
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(outputPath));
         Assert.That(document.RootElement.TryGetProperty("message", out JsonElement badgeMessage), Is.True, "v08-badge");
-        Assert.That(badgeMessage.GetString(), Does.StartWith("FAILING"), "v08-badge");
+        Assert.That(badgeMessage.GetString(), Does.StartWith("FAIL · FAILING"), "v08-badge");
         return (CheckpointBReleaseGateTests.Passed("v08-badge"), outputPath);
     }
 
@@ -155,13 +155,13 @@ internal sealed class CheckpointBV08ReportingPhases(CheckpointBV08ToolRunner run
         int healthIgnoreDebtTotal = healthPolicyInventory.GetProperty("ignore_debt").GetProperty("total").GetInt32();
         int healthEffectiveRuleCount = healthPolicyInventory.GetProperty("effective_rule_count").GetInt32();
 
-        // "FAILING · {ignores} ignores · {rules} rules" (ArchitectureHealthBadgeProjector.Project) --
+        // "FAIL · FAILING · {ignores} ignores · {rules} rules" (ArchitectureHealthBadgeProjector.Project) --
         // the badge's embedded counters must match the canonical Health artifact's own
         // policy_inventory, not just the FAILING/gate prefix.
         using JsonDocument badge = JsonDocument.Parse(File.ReadAllText(badgePath));
         string badgeMessage = badge.RootElement.GetProperty("message").GetString() ?? string.Empty;
         Assert.That(badgeMessage,
-            Is.EqualTo($"FAILING · {healthIgnoreDebtTotal} ignores · {healthEffectiveRuleCount} rules"),
+            Is.EqualTo($"FAIL · FAILING · {healthIgnoreDebtTotal} ignores · {healthEffectiveRuleCount} rules"),
             "v08-projection-parity expected the badge message's category and counters to match the canonical Health "
             + $"artifact exactly: {badgeMessage}");
 

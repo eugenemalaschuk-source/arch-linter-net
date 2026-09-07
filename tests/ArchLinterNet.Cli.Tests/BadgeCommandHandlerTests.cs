@@ -42,10 +42,11 @@ public sealed class BadgeCommandHandlerTests
         });
     }
 
-    [TestCase("healthy", "pass", 0, 42, CliExitCodes.Success, "HEALTHY · 0 ignores · 42 rules", "brightgreen")]
-    [TestCase("debt", "pass", 7, 42, CliExitCodes.Success, "DEBT · 7 ignores · 42 rules", "yellow")]
-    [TestCase("degrading", "pass", 8, 43, CliExitCodes.Success, "DEGRADING · 8 ignores · 43 rules", "orange")]
-    [TestCase("failing", "fail", 7, 42, CliExitCodes.ValidationFailure, "FAILING · 7 ignores · 42 rules", "red")]
+    [TestCase("healthy", "pass", 0, 42, CliExitCodes.Success, "PASS · HEALTHY · 0 ignores · 42 rules", "brightgreen")]
+    [TestCase("debt", "pass", 7, 42, CliExitCodes.Success, "PASS · DEBT · 7 ignores · 42 rules", "yellow")]
+    [TestCase("degrading", "pass", 8, 43, CliExitCodes.Success, "PASS · DEGRADING · 8 ignores · 43 rules", "orange")]
+    [TestCase("degrading", "fail", 8, 43, CliExitCodes.ValidationFailure, "FAIL · DEGRADING · 8 ignores · 43 rules", "orange")]
+    [TestCase("failing", "fail", 7, 42, CliExitCodes.ValidationFailure, "FAIL · FAILING · 7 ignores · 42 rules", "red")]
     [TestCase("unassessable", "unassessable", 7, 42, CliExitCodes.InvalidArgumentsOrRuntimeError, "UNASSESSABLE · ? ignores · ? rules", "lightgrey")]
     public void Handler_ProjectsCanonicalArchitectureHealth(
         string health,
