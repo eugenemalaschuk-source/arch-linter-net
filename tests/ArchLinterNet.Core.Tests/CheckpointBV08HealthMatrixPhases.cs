@@ -4,10 +4,18 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class CheckpointBReleaseGateTests
+using CheckpointScenarioResult = CheckpointBReleaseGateTests.CheckpointScenarioResult;
+using CommandResult = CheckpointBReleaseGateTests.CommandResult;
+
+/// <summary>
+/// The v0.8 full-cycle scenario's <c>health</c> matrix: HEALTHY/FAILING/DEBT/UNASSESSABLE and both
+/// blocking and advisory DEGRADING outcomes, each proven through <see cref="CheckpointBV08HealthOracle"/>.
+/// </summary>
+internal sealed class CheckpointBV08HealthMatrixPhases(CheckpointBV08ToolRunner runner)
 {
-    private static CheckpointScenarioResult AssertHealthMatrix(
-        CandidatePackageFeed candidate,
+    private readonly CheckpointBV08ToolRunner _runner = runner;
+
+    internal CheckpointScenarioResult AssertHealthMatrix(
         string baseRoot,
         string currentRoot,
         string validSarifPath,
@@ -28,14 +36,14 @@ public sealed partial class CheckpointBReleaseGateTests
         File.WriteAllText(emptyBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
         // HEALTHY: the unmodified checked-in fixture, no reviewed debt to carry.
-        CommandResult healthy = candidate.RunToolWithReusedRestore(baseRoot,
+        CommandResult healthy = _runner.RunToolWithReusedRestore(baseRoot,
             "health",
-            "--policy", DependenciesPath(baseRoot),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(baseRoot),
             "--baseline", emptyBaselinePath,
             "--mode", "strict",
             "--ensure-built",
             "--format", "json");
-        AssertHealthState(healthy, "healthy", "pass", "v08-health-healthy");
+        CheckpointBV08HealthOracle.AssertHealthState(healthy, "healthy", "pass", "v08-health-healthy");
 
         // FAILING: the deliberate current-state violations, unreviewed (the empty base baseline
         // covers none of them), with required evidence correctly bound so the failure is genuinely
@@ -44,19 +52,19 @@ public sealed partial class CheckpointBReleaseGateTests
         // (ArchitectureHealthReportEvidenceWriter.Format returns the bare summary without it) --
         // report pr/badge both need that evidence, and per the docs guide it must match the change
         // report's own execution context ("v08-full-cycle", used by AssertChangeSnapshotAndReport).
-        CommandResult failing = candidate.RunToolWithReusedRestore(currentRoot,
+        CommandResult failing = _runner.RunToolWithReusedRestore(currentRoot,
             "health",
-            "--policy", DependenciesPath(currentRoot),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(currentRoot),
             "--baseline", emptyBaselinePath,
             "--mode", "strict",
             "--ensure-built",
             "--format", "json",
             "--execution-context", "v08-full-cycle",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={V08EvidenceRepository},revision={revision},scope={V08EvidenceScope}",
-            "--evidence-repository", V08EvidenceRepository,
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={CheckpointBV08EvidenceIdentity.Repository},revision={revision},scope={CheckpointBV08EvidenceIdentity.Scope}",
+            "--evidence-repository", CheckpointBV08EvidenceIdentity.Repository,
             "--evidence-revision", revision,
-            "--evidence-scope", V08EvidenceScope);
-        AssertHealthState(failing, "failing", "fail", "v08-health-failing");
+            "--evidence-scope", CheckpointBV08EvidenceIdentity.Scope);
+        CheckpointBV08HealthOracle.AssertHealthState(failing, "failing", "fail", "v08-health-failing");
         File.WriteAllText(primaryHealthOutputPath, failing.StandardOutput);
 
         // DEBT: the same current-state violations, reviewed via a baseline covering them exactly.
@@ -77,12 +85,12 @@ public sealed partial class CheckpointBReleaseGateTests
         // it needs to classify as Frozen/matched. Fixed by recording every occurrence, matched or
         // not, when the caller has no cycle-specific observeCandidate filter of its own.
         string baselinePath = Path.Combine(currentRoot, "v08-baseline.arch.yml");
-        string debtBaselineYaml = BuildDebtBaselineFromLiveViolations(candidate, currentRoot, emptyBaselinePath);
+        string debtBaselineYaml = BuildDebtBaselineFromLiveViolations(currentRoot, emptyBaselinePath);
         File.WriteAllText(baselinePath, debtBaselineYaml);
 
-        CommandResult debtBaselineSanityCheck = candidate.RunToolWithReusedRestore(currentRoot,
+        CommandResult debtBaselineSanityCheck = _runner.RunToolWithReusedRestore(currentRoot,
             "baseline", "verify",
-            "--policy", DependenciesPath(currentRoot),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(currentRoot),
             "--baseline", baselinePath,
             "--mode", "strict",
             "--ensure-built",
@@ -90,34 +98,34 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(debtBaselineSanityCheck.ExitCode, Is.EqualTo(0),
             $"v08-health-debt (baseline sanity check): {debtBaselineSanityCheck.CombinedOutput}{Environment.NewLine}--- generated baseline ---{Environment.NewLine}{debtBaselineYaml}");
 
-        CommandResult debt = candidate.RunToolWithReusedRestore(currentRoot,
+        CommandResult debt = _runner.RunToolWithReusedRestore(currentRoot,
             "health",
-            "--policy", DependenciesPath(currentRoot),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(currentRoot),
             "--baseline", baselinePath,
             "--mode", "strict",
             "--ensure-built",
             "--format", "json",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={V08EvidenceRepository},revision={revision},scope={V08EvidenceScope}",
-            "--evidence-repository", V08EvidenceRepository,
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={CheckpointBV08EvidenceIdentity.Repository},revision={revision},scope={CheckpointBV08EvidenceIdentity.Scope}",
+            "--evidence-repository", CheckpointBV08EvidenceIdentity.Repository,
             "--evidence-revision", revision,
-            "--evidence-scope", V08EvidenceScope);
-        AssertHealthState(debt, "debt", "pass", "v08-health-debt");
+            "--evidence-scope", CheckpointBV08EvidenceIdentity.Scope);
+        CheckpointBV08HealthOracle.AssertHealthState(debt, "debt", "pass", "v08-health-debt");
 
         // UNASSESSABLE: required evidence bound to a revision that does not match the assessment
         // context. Reuses the empty baseline -- a wrong-revision evidence mismatch is unassessable
         // regardless of whether debt happens to be reviewed.
-        CommandResult unassessable = candidate.RunToolWithReusedRestore(currentRoot,
+        CommandResult unassessable = _runner.RunToolWithReusedRestore(currentRoot,
             "health",
-            "--policy", DependenciesPath(currentRoot),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(currentRoot),
             "--baseline", emptyBaselinePath,
             "--mode", "strict",
             "--ensure-built",
             "--format", "json",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={V08EvidenceRepository},revision=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef,scope={V08EvidenceScope}",
-            "--evidence-repository", V08EvidenceRepository,
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={CheckpointBV08EvidenceIdentity.Repository},revision=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef,scope={CheckpointBV08EvidenceIdentity.Scope}",
+            "--evidence-repository", CheckpointBV08EvidenceIdentity.Repository,
             "--evidence-revision", revision,
-            "--evidence-scope", V08EvidenceScope);
-        AssertHealthState(unassessable, "unassessable", "unassessable", "v08-health-unassessable");
+            "--evidence-scope", CheckpointBV08EvidenceIdentity.Scope);
+        CheckpointBV08HealthOracle.AssertHealthState(unassessable, "unassessable", "unassessable", "v08-health-unassessable");
 
         // DEGRADING (deliberately blocking, per issue #524): a new structured waiver is added to
         // degradingRoot's policy between the base and current policy-context snapshots.
@@ -136,16 +144,16 @@ public sealed partial class CheckpointBReleaseGateTests
         // dimension state, so waiver_debt alone can never produce "degrading" health under a failing
         // gate -- the deliberately-blocking Degrading case must come from policy weakening instead.
         string degradingRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-v08-degrading-{Guid.NewGuid():N}");
-        CopyDirectoryExcludingGit(baseRoot, degradingRoot);
+        CheckpointBV08FullCycleScenario.CopyDirectoryExcludingGit(baseRoot, degradingRoot);
         try
         {
             ApplyDegradingWeakeningMutation(degradingRoot);
             string degradingBaseContext = Path.Combine(degradingRoot, "v08-degrading-base-context.json");
             string degradingCurrentContext = Path.Combine(degradingRoot, "v08-degrading-current-context.json");
-            AssertPolicyContext(candidate, baseRoot, degradingBaseContext);
-            AssertPolicyContext(candidate, degradingRoot, degradingCurrentContext);
+            _runner.AssertPolicyContext(baseRoot, degradingBaseContext);
+            _runner.AssertPolicyContext(degradingRoot, degradingCurrentContext);
 
-            CommandResult degradingWeakening = candidate.RunToolWithReusedRestore(degradingRoot,
+            CommandResult degradingWeakening = _runner.RunToolWithReusedRestore(degradingRoot,
                 "policy", "weakening",
                 "--base-context", degradingBaseContext,
                 "--current-context", degradingCurrentContext);
@@ -159,23 +167,23 @@ public sealed partial class CheckpointBReleaseGateTests
             string degradingBaselinePath = Path.Combine(degradingRoot, "v08-degrading-baseline.arch.yml");
             File.WriteAllText(degradingBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
-            CommandResult degrading = candidate.RunToolWithReusedRestore(degradingRoot,
+            CommandResult degrading = _runner.RunToolWithReusedRestore(degradingRoot,
                 "health",
-                "--policy", DependenciesPath(degradingRoot),
+                "--policy", CheckpointBV08ToolRunner.DependenciesPath(degradingRoot),
                 "--baseline", degradingBaselinePath,
                 "--base-context", degradingBaseContext,
                 "--current-context", degradingCurrentContext,
                 "--mode", "strict",
                 "--ensure-built",
                 "--format", "json");
-            AssertHealthState(degrading, "degrading", "fail", "v08-health-degrading");
+            CheckpointBV08HealthOracle.AssertHealthState(degrading, "degrading", "fail", "v08-health-degrading");
         }
         finally
         {
-            DeleteDirectoryEventually(degradingRoot);
+            CheckpointBV08FullCycleScenario.DeleteDirectoryEventually(degradingRoot);
         }
 
-        return Passed("v08-health-matrix");
+        return CheckpointBReleaseGateTests.Passed("v08-health-matrix");
     }
 
     // Advisory Degrading (issue #524's second Degrading variant, distinct from the blocking case
@@ -186,19 +194,19 @@ public sealed partial class CheckpointBReleaseGateTests
     // Degrading -- it maps any non-empty findings regardless of severity. Registered as its own
     // required scenario so a regression collapsing both Degrading variants into one gate outcome
     // cannot hide behind the aggregate v08-health-matrix pass.
-    private static CheckpointScenarioResult AssertHealthMatrixAdvisoryDegrading(CandidatePackageFeed candidate, string baseRoot)
+    internal CheckpointScenarioResult AssertHealthMatrixAdvisoryDegrading(string baseRoot)
     {
         string advisoryRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-v08-degrading-advisory-{Guid.NewGuid():N}");
-        CopyDirectoryExcludingGit(baseRoot, advisoryRoot);
+        CheckpointBV08FullCycleScenario.CopyDirectoryExcludingGit(baseRoot, advisoryRoot);
         try
         {
             ApplyWeakeningMutation(advisoryRoot, policyWeakeningSeverity: "warn");
             string advisoryBaseContext = Path.Combine(advisoryRoot, "v08-degrading-advisory-base-context.json");
             string advisoryCurrentContext = Path.Combine(advisoryRoot, "v08-degrading-advisory-current-context.json");
-            AssertPolicyContext(candidate, baseRoot, advisoryBaseContext);
-            AssertPolicyContext(candidate, advisoryRoot, advisoryCurrentContext);
+            _runner.AssertPolicyContext(baseRoot, advisoryBaseContext);
+            _runner.AssertPolicyContext(advisoryRoot, advisoryCurrentContext);
 
-            CommandResult advisoryWeakening = candidate.RunToolWithReusedRestore(advisoryRoot,
+            CommandResult advisoryWeakening = _runner.RunToolWithReusedRestore(advisoryRoot,
                 "policy", "weakening",
                 "--base-context", advisoryBaseContext,
                 "--current-context", advisoryCurrentContext);
@@ -211,23 +219,23 @@ public sealed partial class CheckpointBReleaseGateTests
             string advisoryBaselinePath = Path.Combine(advisoryRoot, "v08-degrading-advisory-baseline.arch.yml");
             File.WriteAllText(advisoryBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
-            CommandResult advisory = candidate.RunToolWithReusedRestore(advisoryRoot,
+            CommandResult advisory = _runner.RunToolWithReusedRestore(advisoryRoot,
                 "health",
-                "--policy", DependenciesPath(advisoryRoot),
+                "--policy", CheckpointBV08ToolRunner.DependenciesPath(advisoryRoot),
                 "--baseline", advisoryBaselinePath,
                 "--base-context", advisoryBaseContext,
                 "--current-context", advisoryCurrentContext,
                 "--mode", "strict",
                 "--ensure-built",
                 "--format", "json");
-            AssertHealthState(advisory, "degrading", "pass", "v08-health-degrading-advisory");
+            CheckpointBV08HealthOracle.AssertHealthState(advisory, "degrading", "pass", "v08-health-degrading-advisory");
         }
         finally
         {
-            DeleteDirectoryEventually(advisoryRoot);
+            CheckpointBV08FullCycleScenario.DeleteDirectoryEventually(advisoryRoot);
         }
 
-        return Passed("v08-health-degrading-advisory");
+        return CheckpointBReleaseGateTests.Passed("v08-health-degrading-advisory");
     }
 
     // `baseline generate` cannot produce a baseline for this fixture (see AssertHealthMatrix), so
@@ -235,12 +243,11 @@ public sealed partial class CheckpointBReleaseGateTests
     // (the exact structured identity of each live, currently-unreviewed violation) run against an
     // empty baseline. This is the same content a human would get from `baseline generate` were it
     // able to run, discovered fresh from this exact candidate/build rather than hardcoded.
-    private static string BuildDebtBaselineFromLiveViolations(
-        CandidatePackageFeed candidate, string root, string emptyBaselinePath)
+    private string BuildDebtBaselineFromLiveViolations(string root, string emptyBaselinePath)
     {
-        CommandResult verify = candidate.RunToolWithReusedRestore(root,
+        CommandResult verify = _runner.RunToolWithReusedRestore(root,
             "baseline", "verify",
-            "--policy", DependenciesPath(root),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--baseline", emptyBaselinePath,
             "--mode", "strict",
             "--ensure-built",
@@ -374,7 +381,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // current_evaluation/reviewed_finding_debt; the policy-weakening comparison that actually
         // drives this scenario is a separate mechanism (--base-context/--current-context), unaffected
         // by this setting.
-        string policyPath = DependenciesPath(root);
+        string policyPath = CheckpointBV08ToolRunner.DependenciesPath(root);
         string policy = File.ReadAllText(policyPath);
         const string AnalysisMarker = "analysis:";
         int analysisIndex = policy.IndexOf(AnalysisMarker, StringComparison.Ordinal);
@@ -389,37 +396,5 @@ public sealed partial class CheckpointBReleaseGateTests
             : $"{Environment.NewLine}  policy_weakening: {policyWeakeningSeverity}";
         policy = policy.Insert(analysisInsertAt, $"{severityLine}{Environment.NewLine}  unmatched_ignored_violations: warn");
         File.WriteAllText(policyPath, policy);
-    }
-
-    private static void AssertHealthState(
-        CommandResult result, string expectedHealth, string expectedGate, string scenarioId, string? extraDiagnostic = null)
-    {
-        // HealthCommandHandler maps pass -> 0, fail -> 1, unassessable -> 2. Asserting the exact code
-        // derived from expectedGate (not "any documented exit code") is what actually proves the CLI
-        // contract this scenario claims to authorize -- a regression returning 2 for a HEALTHY/DEBT
-        // pass, or 0 for a FAILING fail, would otherwise still pass.
-        int expectedExitCode = expectedGate switch
-        {
-            "pass" => 0,
-            "fail" => 1,
-            "unassessable" => 2,
-            _ => throw new ArgumentOutOfRangeException(nameof(expectedGate), expectedGate, "Unknown expected gate."),
-        };
-        Assert.That(result.ExitCode, Is.EqualTo(expectedExitCode), $"{scenarioId}: {result.CombinedOutput}");
-        using JsonDocument document = JsonDocument.Parse(result.StandardOutput);
-        string? health = document.RootElement.TryGetProperty("health", out JsonElement healthElement)
-            ? healthElement.GetString()
-            : null;
-        string? gate = document.RootElement.TryGetProperty("gate", out JsonElement gateElement)
-            ? gateElement.GetString()
-            : null;
-        string message = extraDiagnostic is null
-            ? $"{scenarioId}: {result.StandardOutput}"
-            : $"{scenarioId}: {result.StandardOutput}{Environment.NewLine}{extraDiagnostic}";
-        Assert.Multiple(() =>
-        {
-            Assert.That(health, Is.EqualTo(expectedHealth), message);
-            Assert.That(gate, Is.EqualTo(expectedGate), message);
-        });
     }
 }

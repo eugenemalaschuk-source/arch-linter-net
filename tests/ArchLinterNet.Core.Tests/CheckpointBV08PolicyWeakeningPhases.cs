@@ -4,32 +4,23 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class CheckpointBReleaseGateTests
-{
-    private static void AssertPolicyContext(
-        CandidatePackageFeed candidate,
-        string root,
-        string outputPath,
-        string? policyPath = null)
-    {
-        CommandResult context = candidate.RunToolWithReusedRestore(root,
-            "policy", "context",
-            "--policy", policyPath ?? DependenciesPath(root),
-            "--format", "json");
-        Assert.That(context.ExitCode, Is.EqualTo(0), $"policy context ({root}): {context.CombinedOutput}");
-        using JsonDocument document = JsonDocument.Parse(context.StandardOutput);
-        Assert.Multiple(() =>
-        {
-            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(5));
-            Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("architecture-policy-context"));
-        });
-        File.WriteAllText(outputPath, context.StandardOutput);
-    }
+using CheckpointScenarioResult = CheckpointBReleaseGateTests.CheckpointScenarioResult;
+using CommandResult = CheckpointBReleaseGateTests.CommandResult;
 
-    private static CheckpointScenarioResult AssertPolicyWeakeningAndGate(
-        CandidatePackageFeed candidate, string root, string baseContext, string currentContext)
+/// <summary>
+/// The v0.8 full-cycle scenario's policy-weakening/gate, external-evidence-binding, and
+/// change-snapshot/report phases.
+/// </summary>
+internal sealed class CheckpointBV08PolicyWeakeningPhases(CheckpointBV08ToolRunner runner)
+{
+    private const string V08ExternalEvidenceFamily = "external_diagnostics";
+    private const string V08ExternalEvidenceControlIdentity = "v08-static-analysis";
+
+    private readonly CheckpointBV08ToolRunner _runner = runner;
+
+    internal CheckpointScenarioResult AssertPolicyWeakeningAndGate(string root, string baseContext, string currentContext)
     {
-        CommandResult weakening = candidate.RunToolWithReusedRestore(root,
+        CommandResult weakening = _runner.RunToolWithReusedRestore(root,
             "policy", "weakening",
             "--base-context", baseContext,
             "--current-context", currentContext);
@@ -45,9 +36,9 @@ public sealed partial class CheckpointBReleaseGateTests
         string gateBaselinePath = Path.Combine(root, "v08-policy-weakening-gate-baseline.arch.yml");
         File.WriteAllText(gateBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
-        CommandResult gate = candidate.RunToolWithReusedRestore(root,
+        CommandResult gate = _runner.RunToolWithReusedRestore(root,
             "gate",
-            "--policy", DependenciesPath(root),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--baseline", gateBaselinePath,
             "--base-context", baseContext,
             "--current-context", currentContext,
@@ -72,14 +63,10 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(newDebtEntries, Is.Not.Empty,
             $"v08-policy-weakening-gate expected the deliberate exposure/budget violations to surface as new persistent debt records: {gate.StandardOutput}");
 
-        return Passed("v08-policy-weakening-gate");
+        return CheckpointBReleaseGateTests.Passed("v08-policy-weakening-gate");
     }
 
-    private const string V08ExternalEvidenceFamily = "external_diagnostics";
-    private const string V08ExternalEvidenceControlIdentity = "v08-static-analysis";
-
-    private static CheckpointScenarioResult AssertExternalEvidenceBinding(
-        CandidatePackageFeed candidate, string root, string validSarifPath, string revision)
+    internal CheckpointScenarioResult AssertExternalEvidenceBinding(string root, string validSarifPath, string revision)
     {
         // Wrong-revision required evidence must be unassessable, not silently ignored or treated as
         // a pass: bind the same valid SARIF artifact under a revision that does not match the
@@ -88,15 +75,15 @@ public sealed partial class CheckpointBReleaseGateTests
         // SarifEvidenceReader's wire reason code "wrong_external_revision"), not just "some exit 2" --
         // any unrelated preflight/runtime failure would also exit 2 without proving this scenario at
         // all.
-        CommandResult wrongRevision = candidate.RunToolWithReusedRestore(root,
-            "--policy", DependenciesPath(root),
+        CommandResult wrongRevision = _runner.RunToolWithReusedRestore(root,
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
             "--format", "json",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={V08EvidenceRepository},revision=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef,scope={V08EvidenceScope}",
-            "--evidence-repository", V08EvidenceRepository,
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={CheckpointBV08EvidenceIdentity.Repository},revision=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef,scope={CheckpointBV08EvidenceIdentity.Scope}",
+            "--evidence-repository", CheckpointBV08EvidenceIdentity.Repository,
             "--evidence-revision", revision,
-            "--evidence-scope", V08EvidenceScope);
+            "--evidence-scope", CheckpointBV08EvidenceIdentity.Scope);
         Assert.That(wrongRevision.ExitCode, Is.EqualTo(2),
             $"v08-external-evidence-binding (wrong revision) expected an unassessable/fail-closed runtime exit: {wrongRevision.CombinedOutput}");
         AssertExternalEvidenceApplicabilityReason(wrongRevision, "wrong_external_revision",
@@ -105,8 +92,8 @@ public sealed partial class CheckpointBReleaseGateTests
         // Missing required evidence entirely must also fail closed rather than silently pass, with
         // its own distinct reason code -- proving this is genuinely "no evidence supplied" and not
         // the same wrong-revision path reached by a different means.
-        CommandResult missing = candidate.RunToolWithReusedRestore(root,
-            "--policy", DependenciesPath(root),
+        CommandResult missing = _runner.RunToolWithReusedRestore(root,
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
             "--format", "json");
@@ -118,15 +105,15 @@ public sealed partial class CheckpointBReleaseGateTests
         // Wrong-scope required evidence must fail closed the same way, with its own distinct reason
         // code -- otherwise scope binding could silently stop being enforced without any scenario
         // catching it.
-        CommandResult wrongScope = candidate.RunToolWithReusedRestore(root,
-            "--policy", DependenciesPath(root),
+        CommandResult wrongScope = _runner.RunToolWithReusedRestore(root,
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
             "--format", "json",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={V08EvidenceRepository},revision={revision},scope=audit",
-            "--evidence-repository", V08EvidenceRepository,
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={CheckpointBV08EvidenceIdentity.Repository},revision={revision},scope=audit",
+            "--evidence-repository", CheckpointBV08EvidenceIdentity.Repository,
             "--evidence-revision", revision,
-            "--evidence-scope", V08EvidenceScope);
+            "--evidence-scope", CheckpointBV08EvidenceIdentity.Scope);
         Assert.That(wrongScope.ExitCode, Is.EqualTo(2),
             $"v08-external-evidence-binding (wrong scope) expected an unassessable/fail-closed runtime exit: {wrongScope.CombinedOutput}");
         AssertExternalEvidenceApplicabilityReason(wrongScope, "wrong_external_scope",
@@ -144,18 +131,18 @@ public sealed partial class CheckpointBReleaseGateTests
         File.WriteAllText(validBaselinePath, V08FullCycleFragmentContent.EmptyBaseline);
         string validReportPath = Path.Combine(root, "v08-external-evidence-binding-health.json");
 
-        CommandResult validEvidence = candidate.RunToolWithReusedRestore(root,
+        CommandResult validEvidence = _runner.RunToolWithReusedRestore(root,
             "health",
-            "--policy", DependenciesPath(root),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--baseline", validBaselinePath,
             "--mode", "strict",
             "--ensure-built",
             "--format", "json",
             "--execution-context", "v08-external-evidence-binding",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={V08EvidenceRepository},revision={revision},scope={V08EvidenceScope}",
-            "--evidence-repository", V08EvidenceRepository,
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={CheckpointBV08EvidenceIdentity.Repository},revision={revision},scope={CheckpointBV08EvidenceIdentity.Scope}",
+            "--evidence-repository", CheckpointBV08EvidenceIdentity.Repository,
             "--evidence-revision", revision,
-            "--evidence-scope", V08EvidenceScope);
+            "--evidence-scope", CheckpointBV08EvidenceIdentity.Scope);
         File.WriteAllText(validReportPath, validEvidence.StandardOutput);
 
         using (JsonDocument validDocument = JsonDocument.Parse(validEvidence.StandardOutput))
@@ -181,9 +168,9 @@ public sealed partial class CheckpointBReleaseGateTests
                     "v08-external-evidence-binding (valid) expected the trust receipt to bind the exact consumed bytes of validSarifPath.");
                 Assert.That(receipt.GetProperty("result_count").GetInt32(), Is.EqualTo(0),
                     "v08-external-evidence-binding (valid) expected the zero-result SARIF artifact's result_count to be recorded as 0.");
-                Assert.That(context.GetProperty("repository").GetString(), Is.EqualTo(V08EvidenceRepository));
+                Assert.That(context.GetProperty("repository").GetString(), Is.EqualTo(CheckpointBV08EvidenceIdentity.Repository));
                 Assert.That(context.GetProperty("revision").GetString(), Is.EqualTo(revision));
-                Assert.That(context.GetProperty("scope").GetString(), Is.EqualTo(V08EvidenceScope));
+                Assert.That(context.GetProperty("scope").GetString(), Is.EqualTo(CheckpointBV08EvidenceIdentity.Scope));
             });
         }
 
@@ -193,16 +180,16 @@ public sealed partial class CheckpointBReleaseGateTests
         // interest to this scenario) satisfies that requirement without duplicating the dedicated
         // v08-change-snapshot-report scenario's own bounded-delta proof.
         string trivialSnapshotPath = Path.Combine(root, "v08-external-evidence-binding-snapshot.json");
-        CommandResult trivialSnapshot = candidate.RunToolWithReusedRestore(root,
+        CommandResult trivialSnapshot = _runner.RunToolWithReusedRestore(root,
             "change", "snapshot",
-            "--policy", DependenciesPath(root),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
             "--output", trivialSnapshotPath);
         Assert.That(trivialSnapshot.ExitCode, Is.EqualTo(0), $"v08-external-evidence-binding (change snapshot): {trivialSnapshot.CombinedOutput}");
 
         string trivialChangeReportPath = Path.Combine(root, "v08-external-evidence-binding-change.json");
-        CommandResult trivialChangeReport = candidate.RunToolWithReusedRestore(root,
+        CommandResult trivialChangeReport = _runner.RunToolWithReusedRestore(root,
             "change", "report",
             "--base", trivialSnapshotPath,
             "--current", trivialSnapshotPath,
@@ -212,7 +199,7 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(trivialChangeReport.ExitCode, Is.EqualTo(0), $"v08-external-evidence-binding (change report): {trivialChangeReport.CombinedOutput}");
 
         string validReportOutputPath = Path.Combine(root, "v08-external-evidence-binding-report.md");
-        CommandResult reportPr = candidate.RunToolWithReusedRestore(root,
+        CommandResult reportPr = _runner.RunToolWithReusedRestore(root,
             "report", "pr",
             "--health", validReportPath,
             "--change", trivialChangeReportPath,
@@ -222,7 +209,7 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(reportMarkdown, Does.Contain("logical_evidence=`v08-static-analysis` state=`current`"),
             $"v08-external-evidence-binding expected the PR report to stay bound to the same canonical trust receipt: {reportMarkdown}");
 
-        return Passed("v08-external-evidence-binding");
+        return CheckpointBReleaseGateTests.Passed("v08-external-evidence-binding");
     }
 
     private static void AssertExternalEvidenceApplicabilityReason(CommandResult result, string expectedReasonCode, string scenarioLabel)
@@ -254,31 +241,30 @@ public sealed partial class CheckpointBReleaseGateTests
         return control;
     }
 
-    private static CheckpointScenarioResult AssertChangeSnapshotAndReport(
-        CandidatePackageFeed candidate,
+    internal CheckpointScenarioResult AssertChangeSnapshotAndReport(
         string baseRoot,
         string currentRoot,
         string baseSnapshotPath,
         string currentSnapshotPath,
         string changeReportPath)
     {
-        CommandResult baseSnapshot = candidate.RunToolWithReusedRestore(baseRoot,
+        CommandResult baseSnapshot = _runner.RunToolWithReusedRestore(baseRoot,
             "change", "snapshot",
-            "--policy", DependenciesPath(baseRoot),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(baseRoot),
             "--mode", "strict",
             "--ensure-built",
             "--output", baseSnapshotPath);
         Assert.That(baseSnapshot.ExitCode, Is.EqualTo(0), $"v08-change-snapshot-report (base): {baseSnapshot.CombinedOutput}");
 
-        CommandResult currentSnapshot = candidate.RunToolWithReusedRestore(currentRoot,
+        CommandResult currentSnapshot = _runner.RunToolWithReusedRestore(currentRoot,
             "change", "snapshot",
-            "--policy", DependenciesPath(currentRoot),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(currentRoot),
             "--mode", "strict",
             "--ensure-built",
             "--output", currentSnapshotPath);
         Assert.That(currentSnapshot.ExitCode, Is.EqualTo(0), $"v08-change-snapshot-report (current): {currentSnapshot.CombinedOutput}");
 
-        CommandResult report = candidate.RunToolWithReusedRestore(currentRoot,
+        CommandResult report = _runner.RunToolWithReusedRestore(currentRoot,
             "change", "report",
             "--base", baseSnapshotPath,
             "--current", currentSnapshotPath,
@@ -317,6 +303,6 @@ public sealed partial class CheckpointBReleaseGateTests
                 + $"in the report's new findings, bound to ModuleInternalState's exposure: {report.StandardOutput}");
         });
 
-        return Passed("v08-change-snapshot-report");
+        return CheckpointBReleaseGateTests.Passed("v08-change-snapshot-report");
     }
 }

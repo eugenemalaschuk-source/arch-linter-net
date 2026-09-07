@@ -11,7 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class CheckpointBReleaseGateTests
 {
-    private sealed partial class CandidatePackageFeed : IDisposable
+    internal sealed partial class CandidatePackageFeed : IDisposable
     {
         private readonly string _root;
         private readonly string _feed;
@@ -487,7 +487,7 @@ public sealed partial class CheckpointBReleaseGateTests
         {
             ProcessStartInfo startInfo = CreateShellStartInfo(workingDirectory, arguments);
             startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
-            return RunTracedTool(startInfo, arguments);
+            return Run(startInfo);
         }
 
         public void Dispose()
@@ -624,7 +624,7 @@ public sealed partial class CheckpointBReleaseGateTests
             return path;
         }
 
-        private ProcessStartInfo CreateShellStartInfo(string workingDirectory, IReadOnlyList<string> arguments)
+        internal ProcessStartInfo CreateShellStartInfo(string workingDirectory, IReadOnlyList<string> arguments)
         {
             var startInfo = new ProcessStartInfo
             {

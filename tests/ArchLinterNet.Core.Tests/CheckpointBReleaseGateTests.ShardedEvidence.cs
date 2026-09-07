@@ -5,7 +5,7 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class CheckpointBReleaseGateTests
 {
-    private sealed partial class CandidatePackageFeed
+    internal sealed partial class CandidatePackageFeed
     {
         public void WriteShardEvidence(
             string shardId,
