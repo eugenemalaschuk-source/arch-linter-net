@@ -2,10 +2,10 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+/// <summary>Renders the human-readable context for contract-surface exposure findings.</summary>
+internal static class ArchitectureContractSurfaceExposureRenderer
 {
-    private static string FormatContractSurfaceExposureContextForHumans(
-        ContractSurfaceExposureDiagnostic exposure)
+    internal static string RenderForHumans(ContractSurfaceExposureDiagnostic exposure)
     {
         string site = exposure.MemberOrMetadataSite is { Length: > 0 }
             ? $", site: {exposure.MemberOrMetadataSite}"

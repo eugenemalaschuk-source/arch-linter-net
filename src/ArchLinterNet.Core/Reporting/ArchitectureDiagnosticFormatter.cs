@@ -7,28 +7,28 @@ namespace ArchLinterNet.Core.Reporting;
 public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFormatter
 {
     public static string FormatAssessmentCompletionForHumans(
-        ArchitectureAssessmentCompletionEvidence? completion)
-    {
-        if (completion is null)
-        {
-            return string.Empty;
-        }
+        ArchitectureAssessmentCompletionEvidence? completion) =>
+        ArchitectureApplicabilityHumanRenderer.RenderAssessmentCompletion(completion);
 
-        string reasons = completion.Reasons.Count == 0
-            ? "none"
-            : string.Join(
-                "; ",
-                completion.Reasons.Select(reason =>
-                {
-                    ArchitectureApplicabilityProvenance provenance = reason.Provenance;
-                    string policy = string.IsNullOrEmpty(provenance.PolicyIdentity)
-                        ? string.Empty
-                        : $", policy={provenance.PolicyIdentity}";
-                    return $"{reason.Code} (family={provenance.Family}, control={provenance.ControlIdentity}{policy})";
-                }));
+    public static string FormatApplicabilityProjectionForHumans(
+        ArchitectureApplicabilityProjection? projection) =>
+        ArchitectureApplicabilityHumanRenderer.RenderProjection(projection);
 
-        return $"Assessment completion: {completion.State.ToString().ToLowerInvariant()}; reasons: {reasons}";
-    }
+    public string FormatWaiversForHumans(IReadOnlyCollection<ArchitectureWaiverLifecycleRecord> waivers) =>
+        ArchitectureWaiverLifecycleRenderer.RenderForHumans(waivers);
+
+    public static string AddWaiversToCiArtifacts(
+        string ciArtifacts,
+        IReadOnlyCollection<ArchitectureWaiverLifecycleRecord> waivers) =>
+        ArchitectureWaiverLifecycleRenderer.AddToCiArtifacts(ciArtifacts, waivers);
+
+    public static string FormatPolicyInventoryForHumans(ArchitecturePolicyInventory? inventory) =>
+        ArchitecturePolicyInventoryRenderer.RenderForHumans(inventory);
+
+    public static string AddPolicyInventoryToCiArtifacts(
+        string ciArtifacts,
+        ArchitecturePolicyInventory? inventory) =>
+        ArchitecturePolicyInventoryRenderer.AddToCiArtifacts(ciArtifacts, inventory);
 
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
     {
@@ -285,22 +285,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
     {
         if (diagnostic is ArchitectureApplicabilityDiagnostic applicability)
         {
-            string membership = applicability.Membership is { } membershipValue
-                ? ArchitectureApplicabilityWireNames.MembershipToken(membershipValue)
-                : "unknown";
-            string state = applicability.State is { } stateValue
-                ? ArchitectureApplicabilityWireNames.StateToken(stateValue)
-                : "missing";
-            string validatedState = applicability.ValidatedState is { } validatedStateValue
-                ? ArchitectureApplicabilityWireNames.StateToken(validatedStateValue)
-                : "untrusted";
-            string policy = string.IsNullOrEmpty(applicability.PolicyIdentity)
-                ? string.Empty
-                : $", policy={applicability.PolicyIdentity}";
-            return $"- [applicability] control={applicability.ControlIdentity}, family={applicability.Family}, "
-                + $"membership={membership}, state={state}, validated_state={validatedState}, "
-                + $"reason={applicability.ReasonCode}, provenance=(family={applicability.Provenance.Family}, "
-                + $"control={applicability.Provenance.ControlIdentity}{policy})";
+            return ArchitectureApplicabilityHumanRenderer.RenderDiagnostic(applicability);
         }
 
         string idPrefix = diagnostic.ContractId != null ? $"[{diagnostic.ContractId}] " : string.Empty;
@@ -319,7 +304,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
     private static string FormatFindingForHumans(ArchitectureFinding finding)
     {
         string text = finding.Details is ImportedExternalDiagnostic imported
-            ? FormatImportedExternalDiagnosticForHumans(imported, finding.CanonicalIdentity)
+            ? ArchitectureImportedDiagnosticRenderer.RenderForHumans(imported, finding.CanonicalIdentity)
             : FormatForHumans(finding.Details);
         if (finding.RemediationHint is not null)
         {
@@ -333,6 +318,9 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
     private static string FormatRemediationHintForHumans(ArchitectureRemediationHint hint) =>
         $" (remediation: {ArchitectureRemediationHintFactory.CategoryToken(hint.Category)}: {hint.Summary})";
+
+    internal static string FormatFindingForHumansInternal(ArchitectureFinding finding) =>
+        FormatFindingForHumans(finding);
 
     private static string BuildHumanContext(ArchitectureDiagnostic diagnostic)
     {
@@ -365,7 +353,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         if (diagnostic is ContractSurfaceExposureDiagnostic exposure)
         {
-            context += FormatContractSurfaceExposureContextForHumans(exposure);
+            context += ArchitectureContractSurfaceExposureRenderer.RenderForHumans(exposure);
         }
 
         if (diagnostic is AttributeUsageDiagnostic attributeUsage)
@@ -604,6 +592,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         return obj;
     }
+
+    private static void ApplyImportedExternalDiagnosticCiFields(
+        ImportedExternalDiagnostic diagnostic,
+        Dictionary<string, object?> obj) =>
+        ArchitectureImportedDiagnosticRenderer.ApplyCiFields(diagnostic, obj);
 
     internal static Dictionary<string, object?> FormatNormalizedFindingForSarif(ArchitectureFinding finding) =>
         ToCiJsonObject(finding, includeContract: true);
