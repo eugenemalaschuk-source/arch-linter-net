@@ -3,13 +3,23 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class CheckpointBReleaseGateTests
+using CheckpointScenarioResult = CheckpointBReleaseGateTests.CheckpointScenarioResult;
+using CommandResult = CheckpointBReleaseGateTests.CommandResult;
+
+/// <summary>
+/// The v0.8 full-cycle scenario's <c>report pr</c>/<c>badge</c> phases and the cross-projection
+/// parity oracle comparing the JSON, SARIF, canonical Health, packaged Testing API, PR Markdown,
+/// and badge projections of the same strict validate run.
+/// </summary>
+internal sealed class CheckpointBV08ReportingPhases(CheckpointBV08ToolRunner runner)
 {
-    private static (CheckpointScenarioResult Scenario, string ReportPath) AssertReportPr(
-        CandidatePackageFeed candidate, string root, string healthPath, string changeReportPath)
+    private readonly CheckpointBV08ToolRunner _runner = runner;
+
+    internal (CheckpointScenarioResult Scenario, string ReportPath) AssertReportPr(
+        string root, string healthPath, string changeReportPath)
     {
         string outputPath = Path.Combine(root, "v08-architecture-pr-report.md");
-        CommandResult report = candidate.RunToolWithReusedRestore(root,
+        CommandResult report = _runner.RunToolWithReusedRestore(root,
             "report", "pr",
             "--health", healthPath,
             "--change", changeReportPath,
@@ -18,14 +28,13 @@ public sealed partial class CheckpointBReleaseGateTests
         Assert.That(report.ExitCode, Is.EqualTo(0), $"v08-report-pr: {report.CombinedOutput}");
         Assert.That(File.Exists(outputPath), Is.True, "v08-report-pr");
         Assert.That(File.ReadAllText(outputPath), Is.Not.Empty, "v08-report-pr");
-        return (Passed("v08-report-pr"), outputPath);
+        return (CheckpointBReleaseGateTests.Passed("v08-report-pr"), outputPath);
     }
 
-    private static (CheckpointScenarioResult Scenario, string BadgePath) AssertBadge(
-        CandidatePackageFeed candidate, string root, string healthPath)
+    internal (CheckpointScenarioResult Scenario, string BadgePath) AssertBadge(string root, string healthPath)
     {
         string outputPath = Path.Combine(root, "v08-architecture-health-badge.json");
-        CommandResult badge = candidate.RunToolWithReusedRestore(root,
+        CommandResult badge = _runner.RunToolWithReusedRestore(root,
             "badge", "architecture-health",
             "--input", healthPath,
             "--output", outputPath);
@@ -35,7 +44,7 @@ public sealed partial class CheckpointBReleaseGateTests
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(outputPath));
         Assert.That(document.RootElement.TryGetProperty("message", out JsonElement badgeMessage), Is.True, "v08-badge");
         Assert.That(badgeMessage.GetString(), Does.StartWith("FAILING"), "v08-badge");
-        return (Passed("v08-badge"), outputPath);
+        return (CheckpointBReleaseGateTests.Passed("v08-badge"), outputPath);
     }
 
     // Real cross-projection agreement on overlapping canonical facts, comparing full canonical
@@ -54,8 +63,8 @@ public sealed partial class CheckpointBReleaseGateTests
     // in their own policy_inventory section. Report Markdown and the badge are prose/summary
     // projections rather than structured re-parse targets, so they are still checked by content, but
     // against the full canonical identity set rather than "at least one".
-    private static CheckpointScenarioResult AssertProjectionParity(
-        CandidatePackageFeed candidate, string root,
+    internal CheckpointScenarioResult AssertProjectionParity(
+        string root,
         string validateJson, string strictValidateSarifPath, string healthPath, string reportPath, string badgePath)
     {
         using JsonDocument validate = JsonDocument.Parse(validateJson);
@@ -95,8 +104,8 @@ public sealed partial class CheckpointBReleaseGateTests
         // ArchitectureViolation, so it never appears in result.Violations in the first place and does
         // not change the expected set. Exact equality (not a one-way subset) so a regression emitting
         // arbitrary additional identities through the Testing surface fails this scenario too.
-        HashSet<string> testingCanonicalIdentities = candidate
-            .RunTestingCanonicalIdentities(DependenciesPath(root))
+        HashSet<string> testingCanonicalIdentities = _runner
+            .RunTestingCanonicalIdentities(CheckpointBV08ToolRunner.DependenciesPath(root))
             .ToHashSet(StringComparer.Ordinal);
         Assert.That(testingCanonicalIdentities, Is.EqualTo(jsonCanonicalIdentities),
             "v08-projection-parity expected the packaged ArchLinterNet.Testing API's canonical finding identities to "
@@ -184,10 +193,10 @@ public sealed partial class CheckpointBReleaseGateTests
             "v08-projection-parity expected the PR Markdown report to name every distinct strict finding contract_id "
             + $"from JSON/SARIF, not just Health's gate/category summary: missing={string.Join(",", missingFromReport)}");
 
-        return Passed("v08-projection-parity");
+        return CheckpointBReleaseGateTests.Passed("v08-projection-parity");
     }
 
-    private static void WriteSarif(string path, bool executionSuccessful, IReadOnlyList<string> resultMessages)
+    internal static void WriteSarif(string path, bool executionSuccessful, IReadOnlyList<string> resultMessages)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var sarif = new

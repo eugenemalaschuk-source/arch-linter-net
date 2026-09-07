@@ -3,10 +3,20 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class CheckpointBReleaseGateTests
+using CheckpointScenarioResult = CheckpointBReleaseGateTests.CheckpointScenarioResult;
+using CommandResult = CheckpointBReleaseGateTests.CommandResult;
+
+/// <summary>
+/// The v0.8 full-cycle scenario's <c>validate</c>/<c>topology</c>/<c>measure</c> phases: strict vs.
+/// audit mode isolation, recursive contract-surface exposure evidence, declared-topology
+/// capture/diff/verify (including the mandatory unmapped-subject fail-closed proof), and the
+/// measure/budget round trip.
+/// </summary>
+internal sealed class CheckpointBV08ValidationPhases(CheckpointBV08ToolRunner runner)
 {
-    private static (CheckpointScenarioResult Scenario, string Findings, string SarifPath) AssertValidateStrictAudit(
-        CandidatePackageFeed candidate,
+    private readonly CheckpointBV08ToolRunner _runner = runner;
+
+    internal (CheckpointScenarioResult Scenario, string Findings, string SarifPath) AssertValidateStrictAudit(
         string root,
         string validSarifPath,
         string repository,
@@ -14,13 +24,13 @@ public sealed partial class CheckpointBReleaseGateTests
         string scope)
     {
         string outputSarifPath = Path.Combine(root, "v08-validate-strict.sarif");
-        CommandResult result = candidate.RunToolWithReusedRestore(root,
-            "--policy", DependenciesPath(root),
+        CommandResult result = _runner.RunToolWithReusedRestore(root,
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
             "--report", "json=stdout",
             "--report", $"sarif={outputSarifPath}",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={repository},revision={revision},scope={scope}",
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={repository},revision={revision},scope={scope}",
             "--evidence-repository", repository,
             "--evidence-revision", revision,
             "--evidence-scope", scope);
@@ -44,12 +54,12 @@ public sealed partial class CheckpointBReleaseGateTests
         // --mode audit surfaces exactly that finding (and none of strict's exposure/budget findings,
         // which audit_assembly_dependency's own family never evaluates) demonstrates the packed CLI
         // actually runs the distinct audit contract set, not merely strict twice.
-        CommandResult auditResult = candidate.RunToolWithReusedRestore(root,
-            "--policy", DependenciesPath(root),
+        CommandResult auditResult = _runner.RunToolWithReusedRestore(root,
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--mode", "audit",
             "--ensure-built",
             "--format", "json",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={repository},revision={revision},scope={scope}",
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={repository},revision={revision},scope={scope}",
             "--evidence-repository", repository,
             "--evidence-revision", revision,
             "--evidence-scope", scope);
@@ -70,10 +80,10 @@ public sealed partial class CheckpointBReleaseGateTests
                 || contractId.GetString() == "modules-outgoing-limit"));
         Assert.That(hasStrictOnlyFindingUnderAudit, Is.False,
             $"v08-validate-strict-audit: --mode audit must not evaluate strict-only contracts: {auditResult.StandardOutput}");
-        return (Passed("v08-validate-strict-audit"), result.StandardOutput, outputSarifPath);
+        return (CheckpointBReleaseGateTests.Passed("v08-validate-strict-audit"), result.StandardOutput, outputSarifPath);
     }
 
-    private static CheckpointScenarioResult AssertRecursiveExposureEvidence(string validateJson)
+    internal CheckpointScenarioResult AssertRecursiveExposureEvidence(string validateJson)
     {
         using JsonDocument document = JsonDocument.Parse(validateJson);
         JsonElement findings = document.RootElement.TryGetProperty("violations", out JsonElement violations)
@@ -114,7 +124,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 $"v08-recursive-exposure-evidence expected the exposure path to walk into the IReadOnlyList<> generic wrapper position: {exposurePath}");
         });
 
-        return Passed("v08-recursive-exposure-evidence");
+        return CheckpointBReleaseGateTests.Passed("v08-recursive-exposure-evidence");
     }
 
     private static bool TryFindExposurePath(JsonElement finding, out string? exposurePath)
@@ -135,13 +145,12 @@ public sealed partial class CheckpointBReleaseGateTests
         return false;
     }
 
-    private static CheckpointScenarioResult AssertTopologyCaptureDiffVerify(
-        CandidatePackageFeed candidate, string root, string revision)
+    internal CheckpointScenarioResult AssertTopologyCaptureDiffVerify(string root, string revision)
     {
         string capturePath = Path.Combine(root, "v08-topology-capture.json");
-        CommandResult capture = candidate.RunToolWithReusedRestore(root,
+        CommandResult capture = _runner.RunToolWithReusedRestore(root,
             "topology", "capture",
-            "--policy", DependenciesPath(root),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--subject-kind", "type",
             "--ensure-built",
             "--format", "json",
@@ -158,31 +167,31 @@ public sealed partial class CheckpointBReleaseGateTests
         // declared-versus-observed topology evidence rather than the contract set, so it exits 0
         // here: the declared-topology completeness control itself is clean (fully mapped, no
         // unmapped/ambiguous subjects), independent of the unrelated exposure/budget findings.
-        CommandResult verify = candidate.RunToolWithReusedRestore(root,
+        CommandResult verify = _runner.RunToolWithReusedRestore(root,
             "topology", "verify",
-            "--policy", DependenciesPath(root),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
             "--format", "json",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={V08EvidenceRepository},revision={revision},scope={V08EvidenceScope}",
-            "--evidence-repository", V08EvidenceRepository,
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={CheckpointBV08EvidenceIdentity.Repository},revision={revision},scope={CheckpointBV08EvidenceIdentity.Scope}",
+            "--evidence-repository", CheckpointBV08EvidenceIdentity.Repository,
             "--evidence-revision", revision,
-            "--evidence-scope", V08EvidenceScope);
+            "--evidence-scope", CheckpointBV08EvidenceIdentity.Scope);
         Assert.That(verify.ExitCode, Is.EqualTo(1), $"v08-topology-verify: {verify.CombinedOutput}");
 
-        CommandResult diff = candidate.RunToolWithReusedRestore(root,
+        CommandResult diff = _runner.RunToolWithReusedRestore(root,
             "topology", "diff",
-            "--policy", DependenciesPath(root),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--mode", "strict",
             "--ensure-built",
             "--format", "json",
-            "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={V08EvidenceRepository},revision={revision},scope={V08EvidenceScope}",
-            "--evidence-repository", V08EvidenceRepository,
+            "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={CheckpointBV08EvidenceIdentity.Repository},revision={revision},scope={CheckpointBV08EvidenceIdentity.Scope}",
+            "--evidence-repository", CheckpointBV08EvidenceIdentity.Repository,
             "--evidence-revision", revision,
-            "--evidence-scope", V08EvidenceScope);
+            "--evidence-scope", CheckpointBV08EvidenceIdentity.Scope);
         Assert.That(diff.ExitCode, Is.EqualTo(0), $"v08-topology-diff: {diff.CombinedOutput}");
 
-        return Passed("v08-topology-capture-diff-verify");
+        return CheckpointBReleaseGateTests.Passed("v08-topology-capture-diff-verify");
     }
 
     // Mandatory negative proof (issue #524): a required first-party subject the declared topology
@@ -191,11 +200,10 @@ public sealed partial class CheckpointBReleaseGateTests
     // V08FullCycleFragmentContent.TopologyAndMetricsWithUnmappedSubject, which drops the
     // composition-host node (and its allowed_edges) while composition_host stays in
     // scope.selectors -- every type in that layer is now in scope but genuinely unmapped.
-    private static CheckpointScenarioResult AssertTopologyUnmappedSubjectFailsClosed(
-        CandidatePackageFeed candidate, string root, string revision)
+    internal CheckpointScenarioResult AssertTopologyUnmappedSubjectFailsClosed(string root, string revision)
     {
         string unmappedRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-v08-topology-unmapped-{Guid.NewGuid():N}");
-        CopyDirectoryExcludingGit(root, unmappedRoot);
+        CheckpointBV08FullCycleScenario.CopyDirectoryExcludingGit(root, unmappedRoot);
         try
         {
             string fragmentPath = Path.Combine(unmappedRoot, "fragments", "v08-full-cycle.yml");
@@ -209,18 +217,18 @@ public sealed partial class CheckpointBReleaseGateTests
             string baselinePath = Path.Combine(unmappedRoot, "v08-topology-unmapped-baseline.arch.yml");
             File.WriteAllText(baselinePath, V08FullCycleFragmentContent.EmptyBaseline);
 
-            CommandResult result = candidate.RunToolWithReusedRestore(unmappedRoot,
+            CommandResult result = _runner.RunToolWithReusedRestore(unmappedRoot,
                 "health",
-                "--policy", DependenciesPath(unmappedRoot),
+                "--policy", CheckpointBV08ToolRunner.DependenciesPath(unmappedRoot),
                 "--baseline", baselinePath,
                 "--mode", "strict",
                 "--ensure-built",
                 "--format", "json",
-                "--external-evidence", $"id=v08-static-analysis,path={V08EvidenceRelativePath},repository={V08EvidenceRepository},revision={revision},scope={V08EvidenceScope}",
-                "--evidence-repository", V08EvidenceRepository,
+                "--external-evidence", $"id=v08-static-analysis,path={CheckpointBV08EvidenceIdentity.RelativePath},repository={CheckpointBV08EvidenceIdentity.Repository},revision={revision},scope={CheckpointBV08EvidenceIdentity.Scope}",
+                "--evidence-repository", CheckpointBV08EvidenceIdentity.Repository,
                 "--evidence-revision", revision,
-                "--evidence-scope", V08EvidenceScope);
-            AssertHealthState(result, "unassessable", "unassessable", "v08-topology-unmapped");
+                "--evidence-scope", CheckpointBV08EvidenceIdentity.Scope);
+            CheckpointBV08HealthOracle.AssertHealthState(result, "unassessable", "unassessable", "v08-topology-unmapped");
 
             using JsonDocument document = JsonDocument.Parse(result.StandardOutput);
             JsonElement dimensions = document.RootElement.GetProperty("dimensions");
@@ -230,16 +238,15 @@ public sealed partial class CheckpointBReleaseGateTests
             Assert.That(topologyIsUnassessable, Is.True,
                 $"v08-topology-unmapped expected the topology dimension itself to be unassessable, not another dimension: {result.StandardOutput}");
 
-            return Passed("v08-topology-unmapped");
+            return CheckpointBReleaseGateTests.Passed("v08-topology-unmapped");
         }
         finally
         {
-            DeleteDirectoryEventually(unmappedRoot);
+            CheckpointBV08FullCycleScenario.DeleteDirectoryEventually(unmappedRoot);
         }
     }
 
-    private static CheckpointScenarioResult AssertMeasureAndBudget(
-        CandidatePackageFeed candidate, string root, string validateJson)
+    internal CheckpointScenarioResult AssertMeasureAndBudget(string root, string validateJson)
     {
         // docs/guides/single-tool-workflow.md section 8 documents `measure --ensure-built` (fixed
         // alongside this scenario: the guide previously omitted --ensure-built from measure's snippet
@@ -252,9 +259,9 @@ public sealed partial class CheckpointBReleaseGateTests
         // metric that requires exact artifact binding (component_footprint_count with unit:
         // project/assembly -- see ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding),
         // and modules-outgoing has no such binding. It is not itself the documented path.
-        CommandResult measureWithoutEnsureBuilt = candidate.RunToolWithReusedRestore(root,
+        CommandResult measureWithoutEnsureBuilt = _runner.RunToolWithReusedRestore(root,
             "measure",
-            "--policy", DependenciesPath(root),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--format", "json");
         Assert.That(measureWithoutEnsureBuilt.ExitCode, Is.EqualTo(2),
             $"v08-measure-budget (bare, regression guard): {measureWithoutEnsureBuilt.CombinedOutput}");
@@ -266,9 +273,9 @@ public sealed partial class CheckpointBReleaseGateTests
 
         // The documented command (docs/guides/single-tool-workflow.md section 8, --ensure-built
         // included) evaluated for real.
-        CommandResult measure = candidate.RunToolWithReusedRestore(root,
+        CommandResult measure = _runner.RunToolWithReusedRestore(root,
             "measure",
-            "--policy", DependenciesPath(root),
+            "--policy", CheckpointBV08ToolRunner.DependenciesPath(root),
             "--ensure-built",
             "--format", "json");
         Assert.That(measure.ExitCode, Is.EqualTo(0), $"v08-measure-budget: {measure.CombinedOutput}");
@@ -293,6 +300,6 @@ public sealed partial class CheckpointBReleaseGateTests
             finding.TryGetProperty("contract_id", out JsonElement contractId)
             && contractId.GetString() == "modules-outgoing-limit");
         Assert.That(budgetEnforced, Is.True, "v08-measure-budget expected the enforced budget to participate in the composed path.");
-        return Passed("v08-measure-budget");
+        return CheckpointBReleaseGateTests.Passed("v08-measure-budget");
     }
 }
