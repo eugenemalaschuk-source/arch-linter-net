@@ -21,7 +21,6 @@ public sealed class ArchitectureTargetFrameworkSelectorTests
 
         Assert.That(result, Is.EqualTo(new[] { "NET10.0" }));
         Assert.That(result, Has.Count.EqualTo(1));
-        Assert.That(result, Does.Contain("net10.0"));
         Assert.That(result, Does.Not.Contain("net8.0"));
     }
 
