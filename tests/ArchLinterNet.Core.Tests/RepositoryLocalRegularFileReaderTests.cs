@@ -54,14 +54,9 @@ public sealed class RepositoryLocalRegularFileReaderTests
     [Test]
     public void OpenRepositoryLocalRegularFile_FinalSymlinkEscape_IsRejectedWhenSupported()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("The Windows CI account cannot be assumed to have symlink creation rights.");
-        }
-
         using var outside = new SarifEvidenceTestRepository();
         string outsidePath = outside.AddUtf8File("outside.sarif", "outside");
-        File.CreateSymbolicLink(_repository.GetPath("scan.sarif"), outsidePath);
+        CreateSymbolicLinkOrIgnore(() => File.CreateSymbolicLink(_repository.GetPath("scan.sarif"), outsidePath));
 
         Assert.That(
             () => ArchitectureFileSystem.Real.OpenRepositoryLocalRegularFile(_repository.Root, "scan.sarif"),
@@ -71,17 +66,28 @@ public sealed class RepositoryLocalRegularFileReaderTests
     [Test]
     public void OpenRepositoryLocalRegularFile_AncestorSymlinkEscape_IsRejectedWhenSupported()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("The Windows CI account cannot be assumed to have symlink creation rights.");
-        }
-
         using var outside = new SarifEvidenceTestRepository();
         outside.AddUtf8File("scan.sarif", "outside");
-        Directory.CreateSymbolicLink(_repository.GetPath("linked"), outside.Root);
+        CreateSymbolicLinkOrIgnore(() => Directory.CreateSymbolicLink(_repository.GetPath("linked"), outside.Root));
+
+        Exception exception = Assert.Catch(
+            () => ArchitectureFileSystem.Real.OpenRepositoryLocalRegularFile(_repository.Root, "linked/scan.sarif"))!;
 
         Assert.That(
-            () => ArchitectureFileSystem.Real.OpenRepositoryLocalRegularFile(_repository.Root, "linked/scan.sarif"),
-            Throws.TypeOf<InvalidDataException>());
+            exception is InvalidDataException or FileNotFoundException,
+            Is.True,
+            "The native no-follow traversal must reject the ancestor link without opening its descendant.");
+    }
+
+    private static void CreateSymbolicLinkOrIgnore(Action createLink)
+    {
+        try
+        {
+            createLink();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            Assert.Ignore("Symbolic link creation is not permitted or supported in this environment.");
+        }
     }
 }
