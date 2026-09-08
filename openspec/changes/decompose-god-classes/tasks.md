@@ -46,6 +46,10 @@
     non-partial `RepositoryLocalRegularFileReader`, retaining native regular-file validation,
     containment/reparse/regular-file protections, the existing evidence-file seam, and bounded-read
     ownership; remove only its exact declaration-count waiver (#813).
+  - [x] Extract target-framework selection from `ArchitectureAssemblyResolutionService` into the
+    non-partial `ArchitectureTargetFrameworkSelector`, retaining one artifact-resolution and
+    cancellation owner, selected build-output path semantics, and removing its exact declaration-count
+    waiver (#808).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
