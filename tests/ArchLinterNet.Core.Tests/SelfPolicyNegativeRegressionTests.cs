@@ -211,6 +211,16 @@ public sealed class SelfPolicyNegativeRegressionTests
     }
 
     // ── #742 partial-declaration debt ratchet ───────────────────────────────
+    [TestCase("ArchLinterNet.Cli.Commands.Validate.Application.ValidateCommandHandler")]
+    [TestCase("ArchLinterNet.Cli.Commands.Validate.Application.ReportCoordinator")]
+    public void PartialDeclarationRatchet_DoesNotRetainTheRemediatedValidateCommandWaiver(string remediatedType)
+    {
+        Assert.That(
+            _policy,
+            Does.Not.Contain($"source_type: \"{remediatedType}\""),
+            "A remediated aggregate must stay governed by the strict declaration-count rule rather than regain a waiver.");
+    }
+
     [Test]
     public void PartialDeclarationRatchet_RejectsAnAggregateExceedingItsReviewedCount()
     {
