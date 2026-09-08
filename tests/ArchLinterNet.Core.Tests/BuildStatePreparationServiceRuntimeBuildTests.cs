@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -100,6 +101,78 @@ public sealed class BuildStatePreparationServiceRuntimeBuildTests
             Assert.That(startInfo.RedirectStandardOutput, Is.True);
             Assert.That(startInfo.RedirectStandardError, Is.True);
             Assert.That(startInfo.ArgumentList, Is.EqualTo(new[] { "build", projectPath, "--no-restore" }));
+        });
+    }
+
+    [Test]
+    public void CreateGraphBuildArguments_StandardAndRuntimeSpecificRequestsPreserveTheirDistinctContexts()
+    {
+        string repositoryRoot = Path.Combine(Path.GetTempPath(), "archlinternet build args");
+        BuildStatePreflightRequest standard = CreateRequest(
+            repositoryRoot, Array.Empty<ArchitectureDiscoveredProject>(), [], configuration: "Release",
+            targetFramework: "net10.0", platform: "AnyCPU", runtimeIdentifier: null);
+        BuildStatePreflightRequest runtimeSpecific = standard with { RequestedRuntimeIdentifier = "win-x64" };
+        string targetPath = Path.Combine(repositoryRoot, "App with spaces.slnx");
+
+        List<string> standardArguments = BuildStateRuntimeBuildProcessExecutor.CreateGraphBuildArguments(
+            standard, targetPath, buildsRuntimeSpecificOutput: false);
+        List<string> runtimeArguments = BuildStateRuntimeBuildProcessExecutor.CreateGraphBuildArguments(
+            runtimeSpecific, targetPath, buildsRuntimeSpecificOutput: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(standardArguments, Is.EqualTo(new[]
+            {
+                "build", targetPath, "--nologo", "--no-restore", "-m:1", "-c", "Release", "-f", "net10.0", "-p:Platform=AnyCPU",
+            }));
+            Assert.That(runtimeArguments, Is.EqualTo(new[]
+            {
+                "build", targetPath, "--nologo", "--no-restore", "-m:1",
+            }));
+        });
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void CreateDotnetProcessStartInfo_UsesExistingDotnetRootExecutable()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"archlinternet-dotnet-root-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        string executable = Path.Combine(root, OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet");
+        File.WriteAllText(executable, string.Empty);
+        string? originalDotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        try
+        {
+            Environment.SetEnvironmentVariable("DOTNET_ROOT", root);
+
+            ProcessStartInfo startInfo = BuildStateRuntimeBuildProcessExecutor.CreateDotnetProcessStartInfo(
+                CreateRequest(root, Array.Empty<ArchitectureDiscoveredProject>(), []), ["--version"]);
+
+            Assert.That(startInfo.FileName, Is.EqualTo(executable));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("DOTNET_ROOT", originalDotnetRoot);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public void RunDotnetCommand_NonZeroExitCapturesStructuredArgumentsInTypedDiagnostic()
+    {
+        string repositoryRoot = Path.GetTempPath();
+        string argumentWithSpaces = Path.Combine(repositoryRoot, "invalid argument with spaces");
+
+        BuildStatePreflightDiagnostic? diagnostic = BuildStateRuntimeBuildProcessExecutor.RunDotnetCommand(
+            CreateRequest(repositoryRoot, Array.Empty<ArchitectureDiscoveredProject>(), []),
+            ["not-a-dotnet-command", argumentWithSpaces], "build", BuildStatePreflightState.BuildFailed);
+
+        Assert.That(diagnostic, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostic!.State, Is.EqualTo(BuildStatePreflightState.BuildFailed));
+            Assert.That(diagnostic.Evidence.BuildCommand, Is.EqualTo($"dotnet not-a-dotnet-command \"{argumentWithSpaces}\""));
+            Assert.That(diagnostic.Evidence.Detail, Does.Contain("failed with exit code"));
         });
     }
 

@@ -37,28 +37,37 @@ internal static class BuildStateRuntimeBuildProcessExecutor
 
             // A shared project can be both a solution entry and a ProjectReference. Keep MSBuild
             // single-node here to avoid concurrent writes to its intermediate files.
-            List<string> arguments = new() { "build", buildTargetPath, "--nologo", "--no-restore", "-m:1" };
-            if (!buildsRuntimeSpecificOutput && request.RequestedConfiguration != null)
-            {
-                arguments.Add("-c");
-                arguments.Add(request.RequestedConfiguration);
-            }
-
-            if (!buildsRuntimeSpecificOutput)
-            {
-                AddFrameworkArgument(arguments, request.RequestedTargetFramework);
-                if (request.RequestedPlatform != null)
-                {
-                    arguments.Add($"-p:Platform={request.RequestedPlatform}");
-                }
-            }
-
+            List<string> arguments = CreateGraphBuildArguments(request, buildTargetPath, buildsRuntimeSpecificOutput);
             return RunDotnetCommand(request, arguments, "build", BuildStatePreflightState.BuildFailed);
         }
         finally
         {
             File.Delete(buildTargetPath);
         }
+    }
+
+    // The graph-build argument vector is a security boundary: callers must retain every argument
+    // as one structured entry rather than reconstituting a shell command string.
+    internal static List<string> CreateGraphBuildArguments(
+        BuildStatePreflightRequest request, string buildTargetPath, bool buildsRuntimeSpecificOutput)
+    {
+        List<string> arguments = new() { "build", buildTargetPath, "--nologo", "--no-restore", "-m:1" };
+        if (!buildsRuntimeSpecificOutput && request.RequestedConfiguration != null)
+        {
+            arguments.Add("-c");
+            arguments.Add(request.RequestedConfiguration);
+        }
+
+        if (!buildsRuntimeSpecificOutput)
+        {
+            AddFrameworkArgument(arguments, request.RequestedTargetFramework);
+            if (request.RequestedPlatform != null)
+            {
+                arguments.Add($"-p:Platform={request.RequestedPlatform}");
+            }
+        }
+
+        return arguments;
     }
 
     // This seam is intentionally limited to ProcessStartInfo construction: tests can prove that
@@ -118,7 +127,9 @@ internal static class BuildStateRuntimeBuildProcessExecutor
         }
     }
 
-    private static BuildStatePreflightDiagnostic? RunDotnetCommand(
+    // Kept internal for focused process-boundary regressions that verify real non-zero child exits
+    // preserve the structured argv in typed diagnostics without involving a project build.
+    internal static BuildStatePreflightDiagnostic? RunDotnetCommand(
         BuildStatePreflightRequest request, List<string> arguments, string commandLabel, BuildStatePreflightState failureState)
     {
         ProcessStartInfo startInfo = CreateDotnetProcessStartInfo(request, arguments);
