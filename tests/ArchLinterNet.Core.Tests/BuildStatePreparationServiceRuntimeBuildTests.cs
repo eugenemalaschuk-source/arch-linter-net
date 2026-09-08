@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Discovery;
 using NUnit.Framework;
@@ -13,7 +14,7 @@ public sealed class BuildStatePreparationServiceRuntimeBuildTests
         ArchitectureDiscoveredProject project = new("src/App/App.csproj", "App", ["net10.0"]);
         BuildStatePreflightRequest request = CreateRequest(Path.GetTempPath(), [project], ["App"]);
 
-        string path = BuildStatePreparationService.WriteTemporaryRuntimeGraphBuildProject(request);
+        string path = BuildStateRuntimeGraphBuildProjectFactory.WriteTemporaryRuntimeGraphBuildProject(request);
         try
         {
             Assert.Multiple(() =>
@@ -41,7 +42,7 @@ public sealed class BuildStatePreparationServiceRuntimeBuildTests
         };
         string repositoryRoot = Path.Combine(Path.GetTempPath(), "archlinternet-runtime & build");
 
-        string content = BuildStatePreparationService.CreateRuntimeGraphBuildProjectContent(CreateRequest(
+        string content = BuildStateRuntimeGraphBuildProjectFactory.CreateRuntimeGraphBuildProjectContent(CreateRequest(
             repositoryRoot, [app, library], ["App"], configuration: "Release", targetFramework: "net10.0",
             platform: "AnyCPU", runtimeIdentifier: "win-x64"));
 
@@ -71,7 +72,7 @@ public sealed class BuildStatePreparationServiceRuntimeBuildTests
         };
         string repositoryRoot = Path.Combine(Path.GetTempPath(), "archlinternet-runtime-cycle");
 
-        string content = BuildStatePreparationService.CreateRuntimeGraphBuildProjectContent(CreateRequest(
+        string content = BuildStateRuntimeGraphBuildProjectFactory.CreateRuntimeGraphBuildProjectContent(CreateRequest(
             repositoryRoot, [first, second], Array.Empty<string>()));
 
         Assert.Multiple(() =>
@@ -80,6 +81,25 @@ public sealed class BuildStatePreparationServiceRuntimeBuildTests
             Assert.That(content, Does.Contain(Path.GetFullPath(Path.Combine(repositoryRoot, SecondPath))));
             Assert.That(content, Does.Contain("Properties=\"RestoreDisableParallel=true\""));
             Assert.That(content, Does.Contain("Properties=\"RestoreDisableParallel=true;Restore=false\""));
+        });
+    }
+
+    [Test]
+    public void CreateDotnetProcessStartInfo_PreservesStructuredArgumentsAndDisablesShellExecution()
+    {
+        string repositoryRoot = Path.Combine(Path.GetTempPath(), "archlinternet process & args");
+        BuildStatePreflightRequest request = CreateRequest(repositoryRoot, Array.Empty<ArchitectureDiscoveredProject>(), []);
+        string projectPath = Path.Combine(repositoryRoot, "src", "App with spaces", "App.csproj");
+
+        ProcessStartInfo startInfo = BuildStateRuntimeBuildProcessExecutor.CreateDotnetProcessStartInfo(
+            request, ["build", projectPath, "--no-restore"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(startInfo.UseShellExecute, Is.False);
+            Assert.That(startInfo.RedirectStandardOutput, Is.True);
+            Assert.That(startInfo.RedirectStandardError, Is.True);
+            Assert.That(startInfo.ArgumentList, Is.EqualTo(new[] { "build", projectPath, "--no-restore" }));
         });
     }
 

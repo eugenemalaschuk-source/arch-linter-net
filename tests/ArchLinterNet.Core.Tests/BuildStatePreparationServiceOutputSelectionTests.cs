@@ -36,7 +36,7 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
     {
         string debug = WriteOutput("Debug", "net10.0", "Fixture");
 
-        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+        string? resolved = BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblyPath(
             CreateRequest(debug), _project, projectDirectory: null);
 
         Assert.That(resolved, Is.Null);
@@ -49,12 +49,12 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
         string release = WriteOutput("Release", "net10.0", "Fixture");
         File.SetLastWriteTimeUtc(release, File.GetLastWriteTimeUtc(debug).AddMinutes(1));
 
-        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+        string? resolved = BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblyPath(
             CreateRequest(debug), _project, _projectDirectory);
 
         Assert.Multiple(() =>
         {
-            Assert.That(BuildStatePreparationService.IsProjectOutput(_projectDirectory, _project.AssemblyName, debug), Is.True);
+            Assert.That(BuildStateRuntimeBuildPreparation.IsProjectOutput(_projectDirectory, _project.AssemblyName, debug), Is.True);
             Assert.That(resolved, Is.EqualTo(debug));
         });
     }
@@ -65,12 +65,12 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
         string missingDebug = Path.Combine(_projectDirectory, "bin", "Debug", "net10.0", "Fixture.dll");
         string release = WriteOutput("Release", "net10.0", "Fixture");
 
-        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+        string? resolved = BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblyPath(
             CreateRequest(missingDebug), _project, _projectDirectory);
 
         Assert.Multiple(() =>
         {
-            Assert.That(BuildStatePreparationService.IsProjectOutput(_projectDirectory, _project.AssemblyName, missingDebug), Is.False);
+            Assert.That(BuildStateRuntimeBuildPreparation.IsProjectOutput(_projectDirectory, _project.AssemblyName, missingDebug), Is.False);
             Assert.That(resolved, Is.EqualTo(release));
         });
     }
@@ -83,12 +83,12 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
         File.WriteAllText(outsidePath, "outside");
         string release = WriteOutput("Release", "net10.0", "Fixture");
 
-        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+        string? resolved = BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblyPath(
             CreateRequest(outsidePath), _project, _projectDirectory);
 
         Assert.Multiple(() =>
         {
-            Assert.That(BuildStatePreparationService.IsProjectOutput(_projectDirectory, _project.AssemblyName, outsidePath), Is.False);
+            Assert.That(BuildStateRuntimeBuildPreparation.IsProjectOutput(_projectDirectory, _project.AssemblyName, outsidePath), Is.False);
             Assert.That(resolved, Is.EqualTo(release));
         });
     }
@@ -99,12 +99,12 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
         string otherAssembly = WriteOutput("Debug", "net10.0", "Other");
         string release = WriteOutput("Release", "net10.0", "Fixture");
 
-        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+        string? resolved = BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblyPath(
             CreateRequest(otherAssembly), _project, _projectDirectory);
 
         Assert.Multiple(() =>
         {
-            Assert.That(BuildStatePreparationService.IsProjectOutput(_projectDirectory, _project.AssemblyName, otherAssembly), Is.False);
+            Assert.That(BuildStateRuntimeBuildPreparation.IsProjectOutput(_projectDirectory, _project.AssemblyName, otherAssembly), Is.False);
             Assert.That(resolved, Is.EqualTo(release));
         });
     }
@@ -115,7 +115,7 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
         string debug = WriteOutput("Debug", "net10.0", "Fixture");
         string release = WriteOutput("Release", "net10.0", "Fixture");
 
-        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+        string? resolved = BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblyPath(
             CreateRequest(release, configuration: "Debug"), _project, _projectDirectory);
 
         Assert.That(resolved, Is.EqualTo(debug));
@@ -127,7 +127,7 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
         string net10 = WriteOutput("Debug", "net10.0", "Fixture");
         string net11 = WriteOutput("Debug", "net11.0", "Fixture");
 
-        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+        string? resolved = BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblyPath(
             CreateRequest(net11, targetFramework: "net10.0"), _project, _projectDirectory);
 
         Assert.That(resolved, Is.EqualTo(net10));
@@ -139,7 +139,7 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
         string windows = WriteOutput("Debug", "net10.0", "Fixture", "win-x64");
         string linux = WriteOutput("Debug", "net10.0", "Fixture", "linux-x64");
 
-        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+        string? resolved = BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblyPath(
             CreateRequest(linux, runtimeIdentifier: "win-x64"), _project, _projectDirectory);
 
         Assert.That(resolved, Is.EqualTo(windows));
@@ -152,7 +152,7 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
         string release = WriteOutput("Release", "net10.0", "Fixture");
         File.SetLastWriteTimeUtc(release, File.GetLastWriteTimeUtc(debug).AddMinutes(1));
 
-        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+        string? resolved = BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblyPath(
             CreateRequest(debug, platform: "AnyCPU"), _project, _projectDirectory);
 
         Assert.That(resolved, Is.EqualTo(release));
