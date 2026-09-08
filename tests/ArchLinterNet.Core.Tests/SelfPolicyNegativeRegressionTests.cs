@@ -224,7 +224,7 @@ public sealed class SelfPolicyNegativeRegressionTests
     [Test]
     public void PartialDeclarationRatchet_RejectsAnAggregateExceedingItsReviewedCount()
     {
-        const string ReviewedType = "ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter";
+        const string ReviewedType = "ArchLinterNet.Cli.Commands.Validate.Application.ValidateCommandHandler";
 
         // Discover today's live declaration-count evidence directly from the real repository
         // instead of hardcoding a count that legitimately shifts as unrelated work adds or removes
@@ -263,7 +263,7 @@ public sealed class SelfPolicyNegativeRegressionTests
         ArchitectureValidationResult result = ValidateMutated(
             mutated, "production-partial-type-declaration-count-does-not-increase");
 
-        AssertFailedMentioning(result, "ArchitectureDiagnosticFormatter");
+        AssertFailedMentioning(result, "ValidateCommandHandler");
     }
 
     [Test]

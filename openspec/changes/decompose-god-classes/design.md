@@ -222,7 +222,7 @@ reuse the same prepared snapshot facts, preserving cache hit/population, counter
 disposal behaviour. Existing public and integration tests remain the parity authority for their
 respective output contracts.
 
-#### Diagnostic and SARIF governance projection extraction (#777)
+#### Diagnostic and SARIF governance projection extraction (#777, #802)
 
 `ArchitectureDiagnosticFormatter` remains the stable public caller-facing facade. Its v0.8
 applicability, waiver-lifecycle, policy-inventory, imported-external-diagnostic, and
@@ -237,10 +237,16 @@ location construction to `ArchitectureSarifImportedDiagnosticLocationProjector`,
 physical artifact locations, pathless anchored-region annotations, and logical-location fallback.
 The formatter's public API and existing cancellation boundaries are unchanged.
 
-The five v0.8 `ArchitectureDiagnosticFormatter.*` fragments and the v0.8
-`ArchitectureSarifFormatter.Locations.cs` fragment are removed rather than moved. The reviewed
-declaration-count evidence therefore decreases from 20 to 15 and from 4 to 3 respectively; none
-of the collaborators is partial.
+Issue #802 completes the remaining formatter migration. The former diagnostic-formatting fragments
+are now top-level, purpose-named internal non-partial renderers/projectors for build-state
+preflight, CI/classification/context, coverage, cycles, framework references, layout conventions,
+normalized details and its ordered registry, policy consistency/provenance, public API evidence,
+and source expansion. The SARIF build-state and source-expansion fragments likewise delegate to
+top-level internal projectors, with source-generated regexes isolated from the public façade. Each
+public formatter has exactly one non-partial declaration and only composes or forwards to these
+collaborators. Human, JSON, and SARIF finding identity/order, locations, cancellation behavior, and
+the detail projection registry remain unchanged; the two exact #742 declaration-count waivers are
+removed rather than refreshed.
 
 #### `ArchitectureContractSurfaceExposureScanner` traversal extraction (#775)
 

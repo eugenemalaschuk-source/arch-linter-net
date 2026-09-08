@@ -1,11 +1,12 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitectureClassificationCiArtifactsRenderer
 {
-    public string FormatResultForCiArtifacts(
+    internal static string FormatResultForCiArtifacts(
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -46,7 +47,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the original overload instead of extending it.
     /// </summary>
-    public string FormatResultForCiArtifacts(
+    internal static string FormatResultForCiArtifacts(
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -89,7 +90,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the roles overload instead of extending it.
     /// </summary>
-    public string FormatResultForCiArtifacts(
+    internal static string FormatResultForCiArtifacts(
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -134,7 +135,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the classificationPathDeferred overload instead of extending it.
     /// </summary>
-    public string FormatResultForCiArtifacts(
+    internal static string FormatResultForCiArtifacts(
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -184,7 +185,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     // Bundles FormatResultForCiArtifacts's parameters into one value so the private builder below
     // takes a single argument instead of eleven — the public overloads above still expose each
     // section as its own named parameter for callers.
-    private readonly record struct CiArtifactsRequest(
+    internal readonly record struct CiArtifactsRequest(
         string Mode,
         bool Passed,
         IReadOnlyCollection<ArchitectureViolation> Violations,
@@ -216,7 +217,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         public CancellationToken CancellationToken { get; init; }
     }
 
-    private static string BuildCiArtifactsJson(CiArtifactsRequest request)
+    internal static string BuildCiArtifactsJson(CiArtifactsRequest request)
     {
         var unmatchedSerialized = (request.Unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
             .Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore)
@@ -317,7 +318,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return results;
     }
 
-    public string FormatClassificationFactsForHumans(
+    internal static string FormatClassificationFactsForHumans(
         IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures)
     {
@@ -328,7 +329,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the original overload instead of extending it.
     /// </summary>
-    public string FormatClassificationFactsForHumans(
+    internal static string FormatClassificationFactsForHumans(
         IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
@@ -373,7 +374,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             + string.Join(Environment.NewLine, conflictLines.Concat(failureLines).Concat(pathDeferredLines));
     }
 
-    private static object[] BuildClassificationConflictsJson(
+    internal static object[] BuildClassificationConflictsJson(
         IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts)
     {
         return (classificationConflicts ?? Array.Empty<ArchitectureClassificationConflict>())
@@ -396,7 +397,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             .ToArray();
     }
 
-    private static object[] BuildClassificationMetadataFailuresJson(
+    internal static object[] BuildClassificationMetadataFailuresJson(
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures)
     {
         return (classificationMetadataFailures ?? Array.Empty<ArchitectureClassificationMetadataFailure>())
@@ -413,7 +414,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             .ToArray();
     }
 
-    private static object[] BuildClassificationRolesJson(
+    internal static object[] BuildClassificationRolesJson(
         IReadOnlyCollection<ArchitectureClassificationRoleFact>? classificationRoles)
     {
         return (classificationRoles ?? Array.Empty<ArchitectureClassificationRoleFact>())

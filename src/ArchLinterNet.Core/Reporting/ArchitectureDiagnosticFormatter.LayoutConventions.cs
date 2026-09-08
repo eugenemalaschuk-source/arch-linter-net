@@ -1,13 +1,14 @@
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
 // LayoutConventionDiagnostic-specific formatting, split out of ArchitectureDiagnosticFormatter.cs
 // to keep both files under the repository's file-size lint budget (make/lint.mk
 // CS_SIZE_LINT_ERROR_LINES). See ArchitecturePolicyDocumentLoader.WhenFields.cs for the same idiom.
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitectureLayoutConventionRenderer
 {
-    private static string FormatLayoutConventionContextForHumans(LayoutConventionDiagnostic layoutConvention)
+    internal static string FormatLayoutConventionContextForHumans(LayoutConventionDiagnostic layoutConvention)
     {
         List<string> parts = new();
         if (layoutConvention.DataUnavailable)
@@ -74,7 +75,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return parts.Count == 0 ? string.Empty : $" ({string.Join("; ", parts)})";
     }
 
-    private static void ApplyLayoutConventionCiFields(LayoutConventionDiagnostic layoutConvention, Dictionary<string, object?> obj)
+    internal static void ApplyLayoutConventionCiFields(LayoutConventionDiagnostic layoutConvention, Dictionary<string, object?> obj)
     {
         if (layoutConvention.MatchedFilePath != null)
             obj["matched_file_path"] = layoutConvention.MatchedFilePath;

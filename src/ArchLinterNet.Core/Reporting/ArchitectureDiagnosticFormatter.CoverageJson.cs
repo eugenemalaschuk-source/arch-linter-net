@@ -1,8 +1,10 @@
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+using static ArchitectureDiagnosticFormatter;
+
+internal static class ArchitectureCoverageSummaryJsonProjector
 {
-    private static Dictionary<string, object?> ToCoverageSummaryJsonObject(ArchitectureCoverageSummary summary)
+    internal static Dictionary<string, object?> ToCoverageSummaryJsonObject(ArchitectureCoverageSummary summary)
     {
         return new Dictionary<string, object?>
         {
