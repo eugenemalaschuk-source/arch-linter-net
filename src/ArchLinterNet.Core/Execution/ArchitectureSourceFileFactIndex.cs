@@ -3,7 +3,6 @@ using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
-using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -29,21 +28,15 @@ namespace ArchLinterNet.Core.Execution;
 // - Record detection requires Roslyn source analysis; reflection falls back to Class/Struct.
 // - Paths normalized to forward slashes, relative to repositoryRoot.
 // - All public collections are returned in deterministic (ordinal-sorted) order.
-public sealed partial class ArchitectureSourceFileFactIndex
+public sealed class ArchitectureSourceFileFactIndex
 {
     private static readonly StringComparer _ordinal = StringComparer.Ordinal;
 
     private readonly IReadOnlyCollection<Assembly> _targetAssemblies;
-    private readonly string _repositoryRoot;
     private readonly IReadOnlyList<string> _sourceRoots;
-    private readonly IReadOnlyList<string>? _preprocessorSymbols;
-    private readonly IArchitectureFileSystem _fileSystem;
-    private readonly IReadOnlyList<(string SourcePath, string AssemblyName)> _sourcePathAssemblyOwnership;
     private readonly CancellationToken _cancellationToken;
     private readonly AnalysisSessionProfilingCounters? _profilingCounters;
-    private readonly int _maxParallelism;
-    private readonly int _parallelEligibilityThreshold;
-    private readonly IBoundedParallelPartitionRunner _partitionRunner;
+    private readonly ArchitectureSourceFileFactTraversal _traversal;
     private readonly Lazy<FactIndexData> _data;
 
     public ArchitectureSourceFileFactIndex(
@@ -88,21 +81,17 @@ public sealed partial class ArchitectureSourceFileFactIndex
         ConstructionOptions options = default)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
-        _repositoryRoot = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
         _sourceRoots = sourceRoots ?? throw new ArgumentNullException(nameof(sourceRoots));
-        _preprocessorSymbols = preprocessorSymbols;
-        _fileSystem = fileSystem ?? ArchitectureFileSystem.Real;
-        _sourcePathAssemblyOwnership = BuildSourcePathAssemblyOwnership(
-            _targetAssemblies,
-            _sourceRoots,
-            projectOwnership.ProjectDiscovery,
-            projectOwnership.SourceRootAssemblyOwnership);
         _cancellationToken = options.CancellationToken;
         _profilingCounters = options.ProfilingCounters;
-        _maxParallelism = options.MaxParallelism;
-        _parallelEligibilityThreshold =
-            options.ParallelEligibilityThresholdOverride ?? BoundedParallelPartitionRunner.DefaultParallelEligibilityThreshold;
-        _partitionRunner = options.PartitionRunner ?? new BoundedParallelPartitionRunner();
+        _traversal = new ArchitectureSourceFileFactTraversal(
+            _targetAssemblies,
+            repositoryRoot,
+            _sourceRoots,
+            preprocessorSymbols,
+            fileSystem ?? ArchitectureFileSystem.Real,
+            projectOwnership,
+            options);
         _data = new Lazy<FactIndexData>(BuildData);
     }
 
@@ -113,6 +102,13 @@ public sealed partial class ArchitectureSourceFileFactIndex
     // Unlike AllFacts, this preserves every source declaration of a type, including every part
     // of a partial type. Consumers that need one unambiguous source path must keep using AllFacts.
     internal IReadOnlyList<ArchitectureTypeSourceDeclaration> SourceDeclarations => _data.Value.SourceDeclarations;
+
+    // Do not force lazy source materialization merely to publish an input manifest. If a contract
+    // consumed source text, BuildData retained the exact files successfully passed to the parser;
+    // otherwise there are no source files to protect from this analysis session.
+    internal IReadOnlyList<string> ConsumedSourceInputPaths => _data.IsValueCreated
+        ? _data.Value.ConsumedSourceInputPaths
+        : Array.Empty<string>();
 
     public bool TryGetFact(string fullTypeName, out ArchitectureDeclaredTypeFact fact)
     {
@@ -129,7 +125,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
         ArgumentNullException.ThrowIfNull(assemblyName);
         ArgumentNullException.ThrowIfNull(fullTypeName);
         return _data.Value.FactsByAssemblyAndName.TryGetValue(
-            new SourceFactKey(assemblyName, fullTypeName),
+            new ArchitectureSourceFileFactTraversal.SourceFactKey(assemblyName, fullTypeName),
             out fact!);
     }
 
@@ -160,14 +156,19 @@ public sealed partial class ArchitectureSourceFileFactIndex
             .OrderBy(a => a.GetName().Name ?? string.Empty, _ordinal)
             .ToList();
 
-        Dictionary<string, List<BaseFact>> reflectionFacts = RunReflectionPass(sortedAssemblies);
+        Dictionary<string, List<ArchitectureSourceFileFactTraversal.BaseFact>> reflectionFacts =
+            _traversal.RunReflectionPass(sortedAssemblies);
 
         _cancellationToken.ThrowIfCancellationRequested();
 
-        SourceScanResult sourceScan = _sourceRoots.Count > 0 ? RunSourceScan() : SourceScanResult.Empty;
-        Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap = sourceScan.SourceMap;
+        ArchitectureSourceFileFactTraversal.SourceScanResult sourceScan = _sourceRoots.Count > 0
+            ? _traversal.RunSourceScan()
+            : ArchitectureSourceFileFactTraversal.SourceScanResult.Empty;
+        Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
+            List<ArchitectureSourceFileFactTraversal.SourceDeclaration>> sourceMap = sourceScan.SourceMap;
 
-        (Dictionary<SourceFactKey, SourceInfo> resolvedSourceInfo,
+        (Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
+            ArchitectureSourceFileFactTraversal.SourceInfo> resolvedSourceInfo,
             List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities) =
                 ResolveSourceInfo(sourceMap);
 
@@ -203,7 +204,8 @@ public sealed partial class ArchitectureSourceFileFactIndex
         IReadOnlyList<string> consumedSourceInputPaths)
     {
         Dictionary<string, ArchitectureDeclaredTypeFact> uniqueFactsByName = new(_ordinal);
-        Dictionary<SourceFactKey, ArchitectureDeclaredTypeFact> factsByAssemblyAndName = new();
+        Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
+            ArchitectureDeclaredTypeFact> factsByAssemblyAndName = new();
         HashSet<string> ambiguousFullTypeNames = new(_ordinal);
 
         foreach (ArchitectureDeclaredTypeFact fact in allFacts)
@@ -213,7 +215,8 @@ public sealed partial class ArchitectureSourceFileFactIndex
                 ambiguousFullTypeNames.Add(fact.FullTypeName);
             }
 
-            factsByAssemblyAndName[new SourceFactKey(fact.AssemblyName, fact.FullTypeName)] = fact;
+            factsByAssemblyAndName[new ArchitectureSourceFileFactTraversal.SourceFactKey(
+                fact.AssemblyName, fact.FullTypeName)] = fact;
         }
 
         foreach (string ambiguousFullTypeName in ambiguousFullTypeNames)
@@ -277,44 +280,9 @@ public sealed partial class ArchitectureSourceFileFactIndex
                 _ordinal));
     }
 
-    // Step 1: walk every loadable type in each assembly and collect one BaseFact per
-    // (assemblyName, fullTypeName). Assemblies are already sorted alphabetically before this call.
-    // Bounded-parallel across assemblies (issue #408): each assembly's reflection pass is
-    // independent, so partitions run concurrently and are merged strictly in the pre-sorted
-    // assembly order — never completion order — so factsByName's content and per-key ordering are
-    // byte-identical to the prior sequential implementation at every parallelism level. See
-    // openspec/specs/bounded-parallel-scanning/spec.md, "Source-file fact index materialization is
-    // parallelized without changing output order or content".
-    private Dictionary<string, List<BaseFact>> RunReflectionPass(List<Assembly> sortedAssemblies)
-    {
-        Dictionary<string, List<BaseFact>>[] perAssemblyFacts = _partitionRunner.Run(
-            sortedAssemblies,
-            _maxParallelism,
-            (assembly, _) => BuildReflectionFactsForAssembly(assembly),
-            _cancellationToken,
-            _profilingCounters,
-            _parallelEligibilityThreshold);
-
-        Dictionary<string, List<BaseFact>> factsByName = new(_ordinal);
-        foreach (Dictionary<string, List<BaseFact>> assemblyFacts in perAssemblyFacts)
-        {
-            foreach (KeyValuePair<string, List<BaseFact>> entry in assemblyFacts)
-            {
-                if (!factsByName.TryGetValue(entry.Key, out List<BaseFact>? list))
-                {
-                    list = [];
-                    factsByName[entry.Key] = list;
-                }
-
-                list.AddRange(entry.Value);
-            }
-        }
-
-        return factsByName;
-    }
-
     private static ArchitectureTypeSourceDeclaration[] BuildSourceDeclarations(
-        Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap)
+        Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
+            List<ArchitectureSourceFileFactTraversal.SourceDeclaration>> sourceMap)
     {
         return sourceMap
             .SelectMany(entry => entry.Value.Select(declaration => new ArchitectureTypeSourceDeclaration(
@@ -338,17 +306,21 @@ public sealed partial class ArchitectureSourceFileFactIndex
     // Step 3: for each owned (assemblyName, CLR name), resolve it to either one source file
     // (enriched) or an ambiguity (partial class across multiple files).
     private static (
-        Dictionary<SourceFactKey, SourceInfo> Resolved,
+        Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
+            ArchitectureSourceFileFactTraversal.SourceInfo> Resolved,
         List<ArchitectureDeclaredTypeSourceAmbiguity> Ambiguities)
         ResolveSourceInfo(
-            Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap)
+            Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
+                List<ArchitectureSourceFileFactTraversal.SourceDeclaration>> sourceMap)
     {
-        Dictionary<SourceFactKey, SourceInfo> resolved = [];
+        Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
+            ArchitectureSourceFileFactTraversal.SourceInfo> resolved = [];
         List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities = [];
 
-        foreach (KeyValuePair<SourceFactKey, List<SourceDeclaration>> entry in sourceMap)
+        foreach (KeyValuePair<ArchitectureSourceFileFactTraversal.SourceFactKey,
+            List<ArchitectureSourceFileFactTraversal.SourceDeclaration>> entry in sourceMap)
         {
-            SourceFactKey key = entry.Key;
+            ArchitectureSourceFileFactTraversal.SourceFactKey key = entry.Key;
 
             // Deduplicate by path: overlapping roots or multiple declarations in one file are NOT ambiguous.
             List<string> uniquePaths = entry.Value
@@ -360,8 +332,9 @@ public sealed partial class ArchitectureSourceFileFactIndex
             if (uniquePaths.Count == 1)
             {
                 string relPath = uniquePaths[0];
-                SourceDeclaration declaration = entry.Value.First(e => e.FilePath == relPath);
-                resolved[key] = new SourceInfo(
+                ArchitectureSourceFileFactTraversal.SourceDeclaration declaration =
+                    entry.Value.First(e => e.FilePath == relPath);
+                resolved[key] = new ArchitectureSourceFileFactTraversal.SourceInfo(
                     relPath,
                     declaration.Kind,
                     declaration.IsAbstract,
@@ -373,7 +346,8 @@ public sealed partial class ArchitectureSourceFileFactIndex
                     key.AssemblyName,
                     key.FullTypeName,
                     uniquePaths));
-                resolved[key] = new SourceInfo(null, ArchitectureTypeKind.Unknown, IsAbstract: false, IsAmbiguous: true);
+                resolved[key] = new ArchitectureSourceFileFactTraversal.SourceInfo(
+                    null, ArchitectureTypeKind.Unknown, IsAbstract: false, IsAmbiguous: true);
             }
         }
 
@@ -383,21 +357,22 @@ public sealed partial class ArchitectureSourceFileFactIndex
     // Step 4: emit one ArchitectureDeclaredTypeFact per (assemblyName, fullTypeName) pair,
     // applying source enrichment where available.
     private static List<ArchitectureDeclaredTypeFact> BuildFacts(
-        Dictionary<string, List<BaseFact>> reflectionFactsByName,
-        Dictionary<SourceFactKey, SourceInfo> resolvedSourceInfo)
+        Dictionary<string, List<ArchitectureSourceFileFactTraversal.BaseFact>> reflectionFactsByName,
+        Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
+            ArchitectureSourceFileFactTraversal.SourceInfo> resolvedSourceInfo)
     {
         List<ArchitectureDeclaredTypeFact> allFacts = [];
 
-        foreach (KeyValuePair<string, List<BaseFact>> entry in reflectionFactsByName
+        foreach (KeyValuePair<string, List<ArchitectureSourceFileFactTraversal.BaseFact>> entry in reflectionFactsByName
             .OrderBy(e => e.Key, StringComparer.Ordinal))
         {
             string fullName = entry.Key;
 
-            foreach (BaseFact bf in entry.Value)
+            foreach (ArchitectureSourceFileFactTraversal.BaseFact bf in entry.Value)
             {
                 resolvedSourceInfo.TryGetValue(
-                    new SourceFactKey(bf.AssemblyName, fullName),
-                    out SourceInfo? sourceInfo);
+                    new ArchitectureSourceFileFactTraversal.SourceFactKey(bf.AssemblyName, fullName),
+                    out ArchitectureSourceFileFactTraversal.SourceInfo? sourceInfo);
                 allFacts.Add(CreateFact(bf, fullName, sourceInfo));
             }
         }
@@ -405,196 +380,10 @@ public sealed partial class ArchitectureSourceFileFactIndex
         return allFacts;
     }
 
-    private bool ProcessSourceFile(
-        Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap,
-        string assemblyName,
-        string absoluteRoot,
-        string absoluteFile)
-    {
-        // Relative to the scanned root so ancestor directory names outside the repo
-        // can never be mistaken for excluded segments.
-        string relativeToRoot = Path.GetRelativePath(absoluteRoot, absoluteFile)
-            .Replace('\\', '/');
-
-        if (ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot)) return false;
-        if (!TryReadSourceText(absoluteFile, out string sourceText)) return false;
-
-        // Count only files that passed generated-file exclusion and were successfully read,
-        // i.e. the files the parser actually receives.
-        _profilingCounters?.RecordSourceFileScanned();
-
-        string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
-        AddParsedTypes(sourceMap, assemblyName, normalizedFilePath, sourceText);
-        return true;
-    }
-
-    private bool TryReadSourceText(string absoluteFile, out string sourceText)
-    {
-        try
-        {
-            sourceText = _fileSystem.ReadAllText(absoluteFile);
-            return true;
-        }
-        catch (IOException)
-        {
-            sourceText = string.Empty;
-            return false;
-        }
-    }
-
-    private void AddParsedTypes(
-        Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap,
-        string assemblyName,
-        string normalizedFilePath,
-        string sourceText)
-    {
-        foreach (ArchitectureDeclaredTypeParser.ParsedTypeInfo parsed in
-            ArchitectureDeclaredTypeParser.ParseSourceText(sourceText, _preprocessorSymbols))
-        {
-            SourceFactKey key = new(assemblyName, parsed.FullTypeName);
-            if (!sourceMap.TryGetValue(key, out List<SourceDeclaration>? entries))
-            {
-                entries = [];
-                sourceMap[key] = entries;
-            }
-
-            entries.Add(new SourceDeclaration(
-                normalizedFilePath,
-                parsed.TypeKind,
-                parsed.IsPartial,
-                parsed.IsAbstract,
-                parsed.SourceLine));
-        }
-    }
-
-    private static List<(string SourcePath, string AssemblyName)> BuildSourcePathAssemblyOwnership(
-        IReadOnlyCollection<Assembly> targetAssemblies,
-        IReadOnlyList<string> sourceRoots,
-        ProjectDiscoveryResult? projectDiscovery,
-        IReadOnlyDictionary<string, string>? explicitOwnership)
-    {
-        List<(string SourcePath, string AssemblyName)> ownership = [];
-        HashSet<string> targetAssemblyNames = targetAssemblies
-            .Select(assembly => assembly.GetName().Name ?? string.Empty)
-            .ToHashSet(_ordinal);
-
-        if (explicitOwnership != null)
-        {
-            foreach ((string sourcePath, string assemblyName) in explicitOwnership)
-            {
-                if (!targetAssemblyNames.Contains(assemblyName))
-                {
-                    continue;
-                }
-
-                ownership.Add((NormalizeRelativePath(sourcePath), assemblyName));
-            }
-
-            return ownership;
-        }
-
-        if (projectDiscovery == null)
-        {
-            if (targetAssemblyNames.Count == 1)
-            {
-                string soleAssemblyName = targetAssemblyNames.First();
-                foreach (string sourceRoot in sourceRoots
-                             .Select(NormalizeRelativePath)
-                             .Distinct(_ordinal))
-                {
-                    ownership.Add((sourceRoot, soleAssemblyName));
-                }
-            }
-
-            return ownership;
-        }
-
-        List<(string SourceRoot, string AssemblyName)> discoveredRoots = projectDiscovery.DiscoveredProjects
-            .Where(project => targetAssemblyNames.Contains(project.AssemblyName))
-            .Select(project => (NormalizeRelativePath(GetProjectDirectory(project.Path)), project.AssemblyName))
-            .ToList();
-
-        foreach ((string discoveredRoot, string assemblyName) in discoveredRoots)
-        {
-            if (sourceRoots
-                .Select(NormalizeRelativePath)
-                .Distinct(_ordinal)
-                .Any(configuredRoot => PathsOverlap(discoveredRoot, configuredRoot)))
-            {
-                ownership.Add((discoveredRoot, assemblyName));
-            }
-        }
-
-        return ownership;
-    }
-
-    private static string? ResolveOwnedAssemblyName(
-        string sourceRoot,
-        IReadOnlyList<(string SourceRoot, string AssemblyName)> discoveredRoots)
-    {
-        List<(string SourceRoot, string AssemblyName)> exactMatches = discoveredRoots
-            .Where(entry => _ordinal.Equals(entry.SourceRoot, sourceRoot))
-            .ToList();
-
-        if (exactMatches.Count == 1)
-        {
-            return exactMatches[0].AssemblyName;
-        }
-
-        if (exactMatches.Count > 1)
-        {
-            return null;
-        }
-
-        List<(string SourceRoot, string AssemblyName)> ancestorMatches = discoveredRoots
-            .Where(entry => IsSameOrDescendantPath(sourceRoot, entry.SourceRoot))
-            .OrderByDescending(entry => entry.SourceRoot.Length)
-            .ToList();
-
-        if (ancestorMatches.Count == 0)
-        {
-            return null;
-        }
-
-        int longestLength = ancestorMatches[0].SourceRoot.Length;
-        List<string> mostSpecificAssemblies = ancestorMatches
-            .Where(entry => entry.SourceRoot.Length == longestLength)
-            .Select(entry => entry.AssemblyName)
-            .Distinct(_ordinal)
-            .ToList();
-
-        return mostSpecificAssemblies.Count == 1 ? mostSpecificAssemblies[0] : null;
-    }
-
-    private static bool IsSameOrDescendantPath(string path, string ancestor)
-    {
-        if (ancestor == ".")
-        {
-            return true;
-        }
-
-        return _ordinal.Equals(path, ancestor)
-            || (path.Length > ancestor.Length
-                && path.StartsWith(ancestor, StringComparison.Ordinal)
-                && path[ancestor.Length] == '/');
-    }
-
-    private static bool PathsOverlap(string left, string right)
-    {
-        return IsSameOrDescendantPath(left, right) || IsSameOrDescendantPath(right, left);
-    }
-
-    private static string GetProjectDirectory(string projectPath)
-    {
-        string normalizedProjectPath = NormalizeRelativePath(projectPath);
-        int slash = normalizedProjectPath.LastIndexOf('/');
-        return slash >= 0 ? normalizedProjectPath[..slash] : ".";
-    }
-
     private static ArchitectureDeclaredTypeFact CreateFact(
-        BaseFact baseFact,
+        ArchitectureSourceFileFactTraversal.BaseFact baseFact,
         string fullName,
-        SourceInfo? sourceInfo)
+        ArchitectureSourceFileFactTraversal.SourceInfo? sourceInfo)
     {
         string[] namespaceSegments = GetNamespaceSegments(baseFact.Namespace);
 
@@ -641,18 +430,6 @@ public sealed partial class ArchitectureSourceFileFactIndex
             namespaceSegments);
     }
 
-    private static string NormalizePath(string repositoryRoot, string absoluteFilePath)
-    {
-        try
-        {
-            return NormalizeRelativePath(Path.GetRelativePath(repositoryRoot, absoluteFilePath));
-        }
-        catch (Exception)
-        {
-            return NormalizeRelativePath(absoluteFilePath);
-        }
-    }
-
     private static string NormalizeRelativePath(string path)
     {
         string normalized = path.Replace('\\', '/').Trim();
@@ -682,75 +459,10 @@ public sealed partial class ArchitectureSourceFileFactIndex
     private static string[] GetNamespaceSegments(string ns) =>
         string.IsNullOrEmpty(ns) ? [] : ns.Split('.');
 
-    private static string GetSimpleTypeName(Type type)
-    {
-        string name = type.Name;
-        int backtick = name.IndexOf('`');
-        return backtick >= 0 ? name[..backtick] : name;
-    }
-
-    private static string? SafeFullName(Type type)
-    {
-        try { return type.FullName; }
-        catch { return null; }
-    }
-
-    private static string SafeNamespace(Type type)
-    {
-        try { return type.Namespace ?? string.Empty; }
-        catch { return string.Empty; }
-    }
-
-    private static ArchitectureTypeKind GetTypeKindFromReflection(Type type)
-    {
-        if (type.IsEnum) return ArchitectureTypeKind.Enum;
-        if (type.IsValueType) return ArchitectureTypeKind.Struct;
-        if (type.IsInterface) return ArchitectureTypeKind.Interface;
-        if (type.IsClass)
-        {
-            // Delegates are sealed classes that inherit from MulticastDelegate (which itself inherits
-            // from Delegate). Checking the base type avoids accidentally classifying MulticastDelegate
-            // itself as a Delegate kind.
-            if (type.BaseType != null &&
-                typeof(MulticastDelegate).IsAssignableFrom(type) &&
-                type != typeof(MulticastDelegate) &&
-                type != typeof(Delegate))
-            {
-                return ArchitectureTypeKind.Delegate;
-            }
-
-            return ArchitectureTypeKind.Class;
-        }
-
-        return ArchitectureTypeKind.Unknown;
-    }
-
-    private readonly record struct SourceFactKey(string AssemblyName, string FullTypeName);
-
-    private sealed record BaseFact(
-        string AssemblyName,
-        string Namespace,
-        string FullTypeName,
-        string SimpleTypeName,
-        ArchitectureTypeKind TypeKind,
-        bool IsAbstract);
-
-    private sealed record SourceInfo(
-        string? FilePath,
-        ArchitectureTypeKind KindFromSource,
-        bool IsAbstract,
-        bool IsAmbiguous);
-
-    private sealed record SourceDeclaration(
-        string FilePath,
-        ArchitectureTypeKind Kind,
-        bool IsPartial,
-        bool IsAbstract,
-        int SourceLine);
-
     private sealed record FactIndexData(
         Dictionary<string, ArchitectureDeclaredTypeFact> UniqueFactsByName,
-        Dictionary<SourceFactKey, ArchitectureDeclaredTypeFact> FactsByAssemblyAndName,
+        Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
+            ArchitectureDeclaredTypeFact> FactsByAssemblyAndName,
         IReadOnlyList<ArchitectureDeclaredTypeFact> AllFacts,
         IReadOnlyList<ArchitectureDeclaredTypeSourceAmbiguity> Ambiguities,
         IReadOnlyList<ArchitectureTypeSourceDeclaration> SourceDeclarations,
