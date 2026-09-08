@@ -42,6 +42,10 @@
   - [x] Extract `ArchitectureSourceFileFactIndex` bounded source traversal and its parallel partition
     seam into `ArchitectureSourceFileFactTraversal`, retaining one lazy/cached facade, deterministic
     merge and cancellation behavior, and rejecting enumerated paths outside configured source roots (#810).
+  - [x] Extract `RegularFileHandleReader` repository-local root/traversal handling into the
+    non-partial `RepositoryLocalRegularFileReader`, retaining native regular-file validation,
+    containment/reparse/regular-file protections, the existing evidence-file seam, and bounded-read
+    ownership; remove only its exact declaration-count waiver (#813).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup

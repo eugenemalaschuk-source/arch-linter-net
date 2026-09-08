@@ -14,8 +14,8 @@ public sealed class ArchitectureFileSystem : IArchitectureFileSystem, IArchitect
     /// <inheritdoc />
     public Stream OpenRepositoryLocalRegularFile(string repositoryRoot, string repositoryRelativePath)
     {
-        using RegularFileHandleReader.RepositoryRoot root = RegularFileHandleReader.OpenRepositoryRoot(repositoryRoot);
-        return RegularFileHandleReader.OpenRepositoryLocal(root, repositoryRelativePath);
+        using RepositoryLocalRegularFileReader.RepositoryRoot root = RepositoryLocalRegularFileReader.OpenRepositoryRoot(repositoryRoot);
+        return RepositoryLocalRegularFileReader.OpenRepositoryLocal(root, repositoryRelativePath);
     }
 
     public bool FileExists(string path)
