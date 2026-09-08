@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -207,6 +208,28 @@ public sealed class RuleInputCoverageContractTests
         Assert.That(
             first.Select(f => (f.SourceType, f.ForbiddenNamespace, Reference: f.ForbiddenReferences.Single())),
             Is.EqualTo(second.Select(f => (f.SourceType, f.ForbiddenNamespace, Reference: f.ForbiddenReferences.Single()))));
+    }
+
+    [Test]
+    public void RuleInputCoverage_CheckAndSummary_ReuseSessionCoverageInventory()
+    {
+        ArchitectureContractDocument document = CreateDocument();
+        ArchitectureCoverageContract contract = CreateRuleInputContract(_value);
+        ArchitectureAnalysisContext context = CreateContext();
+        ArchitectureContractRunner runner = new(context, document);
+
+        ArchitectureCoverageSummary summary = runner.BuildCoverageSummary(contract)!;
+        ArchitectureCoverageInventory afterSummary = runner.Session.BuildCoverageInventory(document);
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageInventory afterCheck = runner.Session.BuildCoverageInventory(document);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(summary.Counts.Covered, Is.EqualTo(2));
+            Assert.That(findings, Is.Empty);
+            Assert.That(ReferenceEquals(afterSummary, afterCheck), Is.True,
+                "Rule-input summary and checking must share the session's canonical coverage inventory.");
+        });
     }
 
     [Test]

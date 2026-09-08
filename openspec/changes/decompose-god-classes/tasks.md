@@ -50,6 +50,10 @@
     non-partial `ArchitectureTargetFrameworkSelector`, retaining one artifact-resolution and
     cancellation owner, selected build-output path semantics, and removing its exact declaration-count
     waiver (#808).
+  - [x] Extract `ArchitectureCoverageAnalysisService` rule-input coverage summary and finding
+    analysis into the non-partial `ArchitectureRuleInputCoverageAnalysisService`, retaining the
+    session's canonical cached coverage inventory, descriptor catalog, deterministic ordering, and
+    unmatched-ignore collection; remove its exact declaration-count waiver (#809).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup

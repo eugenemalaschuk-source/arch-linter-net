@@ -9,11 +9,12 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal sealed partial class ArchitectureCoverageAnalysisService
+internal sealed class ArchitectureCoverageAnalysisService
 {
     private readonly ArchitectureAnalysisSession _session;
     private readonly ArchitectureCoverageMatchingService _matching;
     private readonly ArchitectureSemanticCoverageService _semanticCoverageService;
+    private readonly ArchitectureRuleInputCoverageAnalysisService _ruleInputCoverageService;
     private readonly ArchitectureDependencyEdgeCoverageService _dependencyEdgeCoverageService;
 
     public ArchitectureCoverageAnalysisService(ArchitectureAnalysisSession session)
@@ -21,10 +22,14 @@ internal sealed partial class ArchitectureCoverageAnalysisService
         _session = session;
         _matching = new ArchitectureCoverageMatchingService(session);
         _semanticCoverageService = new ArchitectureSemanticCoverageService(session);
+        _ruleInputCoverageService = new ArchitectureRuleInputCoverageAnalysisService(session);
         _dependencyEdgeCoverageService = new ArchitectureDependencyEdgeCoverageService(session, this);
     }
 
     internal ArchitectureSemanticCoverageService SemanticCoverage => _semanticCoverageService;
+
+    internal ArchitectureCoverageSummary BuildRuleInputSummary(ArchitectureCoverageContract contract) =>
+        _ruleInputCoverageService.BuildSummary(contract);
 
     private ArchitectureAnalysisContext Context => _session.Context;
     private ArchitectureContractDocument Document => _session.Document;
@@ -300,7 +305,7 @@ internal sealed partial class ArchitectureCoverageAnalysisService
 
         if (string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))
         {
-            return CheckRuleInputCoverageContract(contract);
+            return _ruleInputCoverageService.Check(contract);
         }
 
         if (string.Equals(contract.Scope, "assembly", StringComparison.Ordinal))
