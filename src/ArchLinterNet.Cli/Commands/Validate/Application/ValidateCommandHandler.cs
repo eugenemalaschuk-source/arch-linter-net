@@ -10,6 +10,9 @@ namespace ArchLinterNet.Cli.Commands.Validate.Application;
 // this type remains the sole command entry point and outcome authority.
 internal sealed class ValidateCommandHandler
 {
+    // Capture before any invocation collaborators are constructed so --profile keeps measuring
+    // allocations made by the complete command invocation, including its composition boundary.
+    private readonly long _allocatedBytesAtStart = GC.GetTotalAllocatedBytes(precise: false);
     private readonly ValidateCommandPreflight _preflight;
     private readonly ValidateCommandExecution _execution;
     private readonly ValidateProfileWriter _profile;
@@ -20,7 +23,7 @@ internal sealed class ValidateCommandHandler
     {
         ReportCoordinator coordinator = new(runtime, console, fileSystem);
         ValidateCacheCoordinator cache = new(console, cancellationToken);
-        _profile = new ValidateProfileWriter(console, fileSystem);
+        _profile = new ValidateProfileWriter(console, fileSystem, _allocatedBytesAtStart);
         _errors = new ValidateCommandErrorReporter(console, coordinator, cancellationToken);
         _preflight = new ValidateCommandPreflight(runtime, console, fileSystem, cache);
         _execution = new ValidateCommandExecution(

@@ -56,16 +56,16 @@ internal sealed class ValidateCommandErrorReporter
         bool isSingleMode,
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
     {
-        const string message = "Architecture validation was cancelled during report output.";
+        const string Message = "Architecture validation was cancelled during report output.";
         Dictionary<string, string> contentByFormat = new();
         foreach (string neededFormat in NeededErrorFormats(options, format))
         {
             string reportContent = _coordinator.RenderReportContent(neededFormat, isSingleMode, outcomesByMode);
             contentByFormat[neededFormat] = neededFormat switch
             {
-                ValidateCommandPreflight.FormatJson => ReportErrorContentFormatter.BuildCancelledOutputJsonText(message, result, reportContent),
-                ValidateCommandPreflight.FormatSarif => ReportErrorContentFormatter.BuildCancelledOutputSarifText(message, result, reportContent),
-                _ => ReportErrorContentFormatter.BuildCancelledOutputHumanText(message, result, reportContent),
+                ValidateCommandPreflight.FormatJson => ReportErrorContentFormatter.BuildCancelledOutputJsonText(Message, result, reportContent),
+                ValidateCommandPreflight.FormatSarif => ReportErrorContentFormatter.BuildCancelledOutputSarifText(Message, result, reportContent),
+                _ => ReportErrorContentFormatter.BuildCancelledOutputHumanText(Message, result, reportContent),
             };
         }
 

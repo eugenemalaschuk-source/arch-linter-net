@@ -17,12 +17,13 @@ internal sealed class ValidateProfileWriter
 
     private readonly ICliConsole _console;
     private readonly IFileSystem _fileSystem;
-    private readonly long _allocatedBytesAtStart = GC.GetTotalAllocatedBytes(precise: false);
+    private readonly long _allocatedBytesAtStart;
 
-    public ValidateProfileWriter(ICliConsole console, IFileSystem fileSystem)
+    public ValidateProfileWriter(ICliConsole console, IFileSystem fileSystem, long allocatedBytesAtStart)
     {
         _console = console;
         _fileSystem = fileSystem;
+        _allocatedBytesAtStart = allocatedBytesAtStart;
     }
 
     internal void WriteCancelledProfile(ValidateCommandOptions options, ValidateProfileExecutionState state)
