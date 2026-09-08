@@ -200,6 +200,24 @@ Direct collaborator tests supplement the end-to-end reader, binder, federation, 
 exact #742 declaration-count exception is removed after the reader becomes one non-partial
 declaration; none of the collaborators is partial.
 
+#### `RegularFileHandleReader` repository-local extraction (#813)
+
+`RegularFileHandleReader` remains the one handwritten native regular-file validator. Its single
+`partial` declaration is required only for compiler-generated interop; it owns opened-handle
+identity/regular-file inspection and native failure classification. The former repository-local
+partial fragment is replaced by `RepositoryLocalRegularFileReader`, a purpose-named internal,
+non-partial collaborator that owns repository-root lifetime, relative-path validation, and Unix and
+Windows no-follow descendant traversal. `ArchitectureFileSystem` retains the existing public
+`IArchitectureEvidenceFileSystem` seam and only delegates that opening operation to the
+collaborator.
+
+The extraction preserves containment, reparse/symlink, and regular-file rejection semantics;
+`SarifEvidenceArtifactReader` remains the single bounded-read, byte-count, and hash owner. Direct
+repository-local tests cover contained files, parent traversal, directories, and final/ancestor
+symlink escapes where supported, while artifact-reader collaborator tests retain bounded-read
+evidence. The exact two-declaration waiver is removed after structural proof, without altering any
+other reviewed debt entry.
+
 #### `ArchitectureAnalysisSnapshot` projection extraction (#776)
 
 `ArchitectureAnalysisSnapshot` remains the sole public façade and owner of one prepared fact set,

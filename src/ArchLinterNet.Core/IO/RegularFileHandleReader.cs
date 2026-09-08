@@ -9,7 +9,7 @@ namespace ArchLinterNet.Core.IO;
 // from indefinitely blocking the caller before fstat can reject it.
 internal static partial class RegularFileHandleReader
 {
-    private static string GetIdentity(SafeFileHandle handle)
+    internal static string GetIdentity(SafeFileHandle handle)
     {
         if (handle.IsInvalid)
         {
@@ -125,7 +125,23 @@ internal static partial class RegularFileHandleReader
     }
 
     [ExcludeFromCodeCoverage]
-    private static IOException ClassifyWindowsFailure(int error)
+    internal static void EnsureWindowsDirectory(SafeFileHandle handle)
+    {
+        if (!GetFileInformationByHandle(handle, out ByHandleFileInformation information))
+        {
+            throw ClassifyWindowsFailure(Marshal.GetLastPInvokeError());
+        }
+
+        FileAttributes attributes = File.GetAttributes(handle);
+        if ((information.FileAttributes & FileAttributeDirectory) == 0
+            || (attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != FileAttributes.Directory)
+        {
+            throw NotRegular("External evidence must not cross a directory reparse point.");
+        }
+    }
+
+    [ExcludeFromCodeCoverage]
+    internal static IOException ClassifyWindowsFailure(int error)
     {
         return error switch
         {
@@ -135,7 +151,7 @@ internal static partial class RegularFileHandleReader
         };
     }
 
-    private static Exception ClassifyUnixFailure(int error)
+    internal static Exception ClassifyUnixFailure(int error)
     {
         if (error == UnixSymbolicLinkLoopError)
         {
@@ -150,25 +166,25 @@ internal static partial class RegularFileHandleReader
         };
     }
 
+    [ExcludeFromCodeCoverage]
+    internal static Exception ClassifyNtStatus(int status)
+    {
+        return unchecked((uint)status) switch
+        {
+            0xC000000F or 0xC0000034 or 0xC000003A => Missing("The external evidence file does not exist."),
+            0xC00000BA or 0xC000050B or 0x8000002D => NotRegular("External evidence must not cross a symbolic-link or reparse-point boundary."),
+            _ => Unreadable($"The external evidence file could not be inspected (NTSTATUS 0x{unchecked((uint)status):X8})."),
+        };
+    }
+
     private static FileNotFoundException Missing(string message) => new(message);
 
-    private static InvalidDataException NotRegular(string message) => new(message);
+    internal static InvalidDataException NotRegular(string message) => new(message);
 
     private static IOException Unreadable(string message) => new(message);
 
-    private const uint GenericRead = 0x80000000;
-    private const int OpenReadOnly = 0;
-    private static int OpenNonBlocking => OperatingSystem.IsMacOS() ? 0x0004 : 0x0800;
-    private static int OpenNoFollow => OperatingSystem.IsMacOS() ? 0x0100 : 0x20000;
     private static int UnixSymbolicLinkLoopError => OperatingSystem.IsMacOS() ? 62 : 40;
-    private const uint FileShareRead = 0x00000001;
-    private const uint FileShareWrite = 0x00000002;
-    private const uint FileShareDelete = 0x00000004;
-    private const uint OpenExisting = 3;
     private const uint FileAttributeDirectory = 0x00000010;
-    private const uint FileAttributeNormal = 0x00000080;
-    private const uint FileFlagBackupSemantics = 0x02000000;
-    private const uint FileFlagOpenReparsePoint = 0x00200000;
     private const uint FileTypeUnknown = 0x00000000;
     private const uint FileTypeDisk = 0x00000001;
     private const uint FileTypeMask = 0xF000;
@@ -178,16 +194,6 @@ internal static partial class RegularFileHandleReader
     private const uint CommonObjectTypeAttribute = 0x00000008;
     private const uint CommonFileIdAttribute = 0x02000000;
     private const uint DarwinRegularFile = 1;
-
-    [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
-    private static partial SafeFileHandle CreateFile(
-        string fileName,
-        uint desiredAccess,
-        uint shareMode,
-        IntPtr securityAttributes,
-        uint creationDisposition,
-        uint flagsAndAttributes,
-        IntPtr templateFile);
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "ByHandleFileInformation embeds ComTypes.FILETIME, unsupported by LibraryImport without assembly-wide DisableRuntimeMarshalling.")]
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -205,9 +211,6 @@ internal static partial class RegularFileHandleReader
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "stat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
     [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
     private static extern int FStatLinuxArm64(SafeFileHandle handle, out LinuxArm64Stat stat);
-
-    [LibraryImport("libc", EntryPoint = "open", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
-    private static partial int OpenUnixDescriptor(string path, int flags);
 
     [LibraryImport("libc", EntryPoint = "fgetattrlist", SetLastError = true)]
     private static partial int FGetAttributeList(
