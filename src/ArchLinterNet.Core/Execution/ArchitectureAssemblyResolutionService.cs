@@ -7,7 +7,7 @@ using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAssemblyResolutionService : IArchitectureAssemblyResolutionService
+public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssemblyResolutionService
 {
     private const string AssemblySearchPathsEnvVar = "ARCHITECTURE_ASSEMBLY_SEARCH_PATHS";
 
@@ -161,7 +161,7 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
         IEnumerable<string> sharedFrameworkProbingPaths = forceIsolatedLoading
             ? ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
                 document.Analysis.SharedFrameworks, document.Analysis.TargetFramework,
-                ExtractDiscoveredTargetFrameworks(exactAssemblyPaths, names), fileSystem, environment)
+                ArchitectureTargetFrameworkSelector.Select(exactAssemblyPaths, names), fileSystem, environment)
             : Array.Empty<string>();
         IReadOnlyList<string> probingPaths = ResolveProbingPaths(
             document,
@@ -414,36 +414,6 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
                 yield return normalized;
             }
         }
-    }
-
-    // Derives the target framework(s) actually selected for this run's target assemblies from their
-    // resolved build output paths (".../bin/{configuration}/{targetFramework}/[runtime/]assembly.dll"),
-    // rather than the ArchLinterNet CLI's own runtime — see ArchitectureSharedFrameworkResolver's
-    // anchor-priority note for why the CLI's runtime major is not a safe substitute for this.
-    private static IReadOnlyCollection<string> ExtractDiscoveredTargetFrameworks(
-        IReadOnlyDictionary<string, string>? resolvedAssemblyPaths, IReadOnlyCollection<string> targetAssemblyNames)
-    {
-        if (resolvedAssemblyPaths is null || resolvedAssemblyPaths.Count == 0)
-        {
-            return Array.Empty<string>();
-        }
-
-        HashSet<string> frameworks = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string name in targetAssemblyNames)
-        {
-            if (!resolvedAssemblyPaths.TryGetValue(name, out string? path))
-            {
-                continue;
-            }
-
-            string? framework = ExtractTargetFrameworkFromBuildOutputPath(path);
-            if (!string.IsNullOrWhiteSpace(framework))
-            {
-                frameworks.Add(framework);
-            }
-        }
-
-        return frameworks;
     }
 
     private static string? GetAssemblyLocation(Assembly assembly)
