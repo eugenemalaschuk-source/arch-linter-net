@@ -664,16 +664,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
     internal static object[] BuildStatePreflightJson(IReadOnlyCollection<BuildStatePreflightDiagnostic>? diagnostics, string mode) => ArchitectureBuildStatePreflightRenderer.BuildStatePreflightJson(diagnostics, mode);
 
     internal static void ApplyDiagnosticSpecificCiFields(ArchitectureDiagnostic diagnostic, Dictionary<string, object?> target)
-    {
-        if (!ArchitectureDiagnosticDetailProjectionRegistry.ByType.TryGetValue(
-            diagnostic.GetType(), out DiagnosticDetailProjector? projector))
-        {
-            throw new InvalidOperationException(
-                $"No diagnostic detail projector registered for diagnostic type '{diagnostic.GetType().Name}'.");
-        }
-
-        projector(diagnostic, target);
-    }
+        => ArchitectureNormalizedDetailsProjector.ApplyDiagnosticSpecificCiFields(diagnostic, target);
 
     // Compatibility façade: the responsibility-specific renderers own the implementations below,
     // while this stable public type keeps the existing caller-facing overloads unchanged.

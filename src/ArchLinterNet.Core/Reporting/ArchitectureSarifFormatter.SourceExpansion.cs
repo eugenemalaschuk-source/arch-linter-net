@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using static ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter;
@@ -59,13 +58,12 @@ internal static class ArchitectureSarifSourceExpansionProjector
     }
 
     /// <summary>
-    /// Cancellation-aware widest instance overload: identical to the one above, but checks
+    /// Cancellation-aware widest string-cycle overload: identical to the one above, but checks
     /// <paramref name="cancellationToken"/> per finding while serializing violation entries — the
     /// dominant contributor to a large report's size — instead of only before/after the whole
     /// document is built. <paramref name="subtractiveMatcherParticipation"/> has no default here
     /// (unlike the overload above) purely so this overload stays unambiguous by arity against it.
     /// </summary>
-    [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as an instance member so CliRuntime can call it through the same _sarifFormatter instance reference as its cycles-based sibling overload, without a CS0176 static-via-instance call error.")]
     internal static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -90,7 +88,7 @@ internal static class ArchitectureSarifSourceExpansionProjector
     }
 
     /// <summary>
-    /// Cancellation-aware widest static overload, mirroring the instance overload above for the
+    /// Cancellation-aware widest finding-cycle overload, mirroring the string-cycle overload above for the
     /// <see cref="ArchitectureCycleFinding"/>-typed cycles path.
     /// </summary>
     internal static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
