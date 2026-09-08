@@ -14,6 +14,9 @@
 - [ ] 2.4 Replace `ArchitectureDiagnosticFormatter` and SARIF formatter partial aggregates with named renderers/projections while preserving human, JSON, and SARIF output parity.
   - [x] Extract the v0.8 applicability, waiver, imported-diagnostic, policy-inventory, and contract-surface projections behind compatibility façades, and move imported-diagnostic SARIF locations to a focused projection collaborator (#777).
 - [ ] 2.5 Remove incidental production partial aggregates created by command, validation, policy-loading, and source-index splits; every replacement must have a named responsibility.
+  - [x] Replace the five-declaration `ValidateCommandHandler` and two-declaration `ReportCoordinator`
+    aggregates with non-partial responsibility collaborators, preserve command/cache/cancellation/profile
+    and sink-rendering semantics, and remove their exact declaration-count waivers (#803).
   - [x] Extract `BuildStatePreparationService` runtime preparation into the non-partial `BuildStateRuntimeBuildPreparation`, preserving structured child-process arguments, cancellation cleanup, and receipt-trust regressions; remove its exact declaration-count waiver (#807).
   - [x] Replace `ArchitectureSourceSetExpander`'s inclusion and layer-template fragments with `ArchitectureSourceSetInclusionResolver` and `ArchitectureLayerTemplateContainerExpansionRecorder`.
   - [x] Extract `ArchitectureTopologyEvaluator` observation into explicit validation/capture and metric ownership collaborators while preserving topology evidence and identities (#773).

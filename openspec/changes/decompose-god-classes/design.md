@@ -282,6 +282,28 @@ the source types are non-partial.
   and diagnostic/SARIF rendering still require named collaborators before the final strict rule
   can be enabled.
 
+#### Validate command orchestration extraction (#803)
+
+The before state is the post-v0.8 self-health baseline commit
+`929983eb985dab934f886cc2f8e25824ac854984`: `ValidateCommandHandler` has five handwritten
+declarations and `ReportCoordinator` has two. Their exact declaration-count waivers are temporary
+ratchet entries, not a structural exception.
+
+`ValidateCommandHandler` remains the one command façade: it owns the explicit invocation lifecycle,
+top-level exception-to-exit-category mapping, and one final command outcome. Purpose-named internal,
+non-partial collaborators own bounded input validation, request execution/cache work, profile
+construction, and error-document composition. A single invocation-state owner carries mutable
+profile/cache facts. Collaborators consume the one prepared analysis outcome; none builds or scans
+again, creates a second snapshot, or becomes a validation or Health authority.
+
+`ReportCoordinator` remains the one report-transport lifecycle owner: sink selection, staged file
+validation, stream ordering, commit/cleanup, cancellation observation, and `RouteResult` evidence
+stay there. Internal, non-partial renderer collaborators receive only outcomes and cancellation
+input, invoke the existing canonical Core formatter facades, and compose Human/JSON/SARIF documents.
+They neither write sinks nor recompute findings, debt, or Health. This preserves one analysis fact
+set and the existing output/error routing semantics while making both former aggregates one-source
+types.
+
 ### Retire an unused CEL placeholder
 
 `CelEngine` had no call sites and did not participate in the supported CEL execution path. The
