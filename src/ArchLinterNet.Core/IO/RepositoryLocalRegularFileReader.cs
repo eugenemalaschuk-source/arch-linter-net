@@ -4,7 +4,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace ArchLinterNet.Core.IO;
 
-internal static partial class RegularFileHandleReader
+internal static class RepositoryLocalRegularFileReader
 {
     internal static RepositoryRoot OpenRepositoryRoot(string repositoryRoot)
     {
@@ -26,7 +26,7 @@ internal static partial class RegularFileHandleReader
         string[] segments = relativePath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length == 0 || segments.Any(segment => segment is "." or ".." || segment.Contains(':')))
         {
-            throw NotRegular("External evidence must be a non-empty repository-relative path without alternate data streams.");
+            throw RegularFileHandleReader.NotRegular("External evidence must be a non-empty repository-relative path without alternate data streams.");
         }
 
         return segments;
@@ -67,7 +67,7 @@ internal static partial class RegularFileHandleReader
     {
         if (descriptor < 0)
         {
-            throw ClassifyUnixFailure(Marshal.GetLastPInvokeError());
+            throw RegularFileHandleReader.ClassifyUnixFailure(Marshal.GetLastPInvokeError());
         }
 
         return new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
@@ -81,13 +81,13 @@ internal static partial class RegularFileHandleReader
             OpenReadOnly | OpenNonBlocking | OpenNoFollow);
         if (descriptor < 0)
         {
-            throw ClassifyUnixFailure(Marshal.GetLastPInvokeError());
+            throw RegularFileHandleReader.ClassifyUnixFailure(Marshal.GetLastPInvokeError());
         }
 
         var handle = new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
         try
         {
-            _ = GetIdentity(handle);
+            _ = RegularFileHandleReader.GetIdentity(handle);
             return new FileStream(handle, FileAccess.Read);
         }
         catch
@@ -111,7 +111,7 @@ internal static partial class RegularFileHandleReader
             SafeFileHandle fileHandle = OpenWindowsRelative(directoryHandle, segments[index], directory: false);
             try
             {
-                _ = GetIdentity(fileHandle);
+                _ = RegularFileHandleReader.GetIdentity(fileHandle);
                 return new FileStream(fileHandle, FileAccess.Read);
             }
             catch
@@ -140,12 +140,12 @@ internal static partial class RegularFileHandleReader
         {
             int error = Marshal.GetLastPInvokeError();
             handle.Dispose();
-            throw ClassifyWindowsFailure(error);
+            throw RegularFileHandleReader.ClassifyWindowsFailure(error);
         }
 
         try
         {
-            EnsureWindowsDirectory(handle);
+            RegularFileHandleReader.EnsureWindowsDirectory(handle);
             return handle;
         }
         catch
@@ -194,14 +194,14 @@ internal static partial class RegularFileHandleReader
             if (status < 0)
             {
                 handle.Dispose();
-                throw ClassifyNtStatus(status);
+                throw RegularFileHandleReader.ClassifyNtStatus(status);
             }
 
             try
             {
                 if (directory)
                 {
-                    EnsureWindowsDirectory(handle);
+                    RegularFileHandleReader.EnsureWindowsDirectory(handle);
                 }
 
                 return handle;
@@ -228,36 +228,17 @@ internal static partial class RegularFileHandleReader
         }
     }
 
-    [ExcludeFromCodeCoverage]
-    private static void EnsureWindowsDirectory(SafeFileHandle handle)
-    {
-        if (!GetFileInformationByHandle(handle, out ByHandleFileInformation information))
-        {
-            throw ClassifyWindowsFailure(Marshal.GetLastPInvokeError());
-        }
-
-        FileAttributes attributes = File.GetAttributes(handle);
-        if ((information.FileAttributes & FileAttributeDirectory) == 0
-            || (attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != FileAttributes.Directory)
-        {
-            throw NotRegular("External evidence must not cross a directory reparse point.");
-        }
-    }
-
-    [ExcludeFromCodeCoverage]
-    private static Exception ClassifyNtStatus(int status)
-    {
-        return unchecked((uint)status) switch
-        {
-            0xC000000F or 0xC0000034 or 0xC000003A => Missing("The external evidence file does not exist."),
-            0xC00000BA or 0xC000050B or 0x8000002D => NotRegular("External evidence must not cross a symbolic-link or reparse-point boundary."),
-            _ => Unreadable($"The external evidence file could not be inspected (NTSTATUS 0x{unchecked((uint)status):X8})."),
-        };
-    }
-
-    private const int OpenDirectoryLinux = 0x10000;
-    private const int OpenDirectoryMacOs = 0x100000;
-    private static int OpenDirectory => OperatingSystem.IsMacOS() ? OpenDirectoryMacOs : OpenDirectoryLinux;
+    private const uint GenericRead = 0x80000000;
+    private const int OpenReadOnly = 0;
+    private static int OpenNonBlocking => OperatingSystem.IsMacOS() ? 0x0004 : 0x0800;
+    private static int OpenNoFollow => OperatingSystem.IsMacOS() ? 0x0100 : 0x20000;
+    private const uint FileShareRead = 0x00000001;
+    private const uint FileShareWrite = 0x00000002;
+    private const uint FileShareDelete = 0x00000004;
+    private const uint OpenExisting = 3;
+    private const uint FileAttributeNormal = 0x00000080;
+    private const uint FileFlagBackupSemantics = 0x02000000;
+    private const uint FileFlagOpenReparsePoint = 0x00200000;
     private const uint Synchronize = 0x00100000;
     private const uint FileOpen = 0x00000001;
     private const uint FileDirectoryFile = 0x00000001;
@@ -265,12 +246,36 @@ internal static partial class RegularFileHandleReader
     private const uint FileSynchronousIoNonAlert = 0x00000020;
     private const uint FileOpenReparsePoint = 0x00200000;
     private const uint ObjectCaseInsensitive = 0x00000040;
+    private const int OpenDirectoryLinux = 0x10000;
+    private const int OpenDirectoryMacOs = 0x100000;
+    private static int OpenDirectory => OperatingSystem.IsMacOS() ? OpenDirectoryMacOs : OpenDirectoryLinux;
 
-    [LibraryImport("libc", EntryPoint = "openat", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
-    private static partial int OpenUnixDescriptorAt(SafeFileHandle directoryHandle, string path, int flags);
+    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "The collaborator is intentionally non-partial; explicit UTF-8 marshalling preserves the open/openat ABI.")]
+    [DllImport("libc", EntryPoint = "open", ExactSpelling = true, SetLastError = true)]
+    private static extern int OpenUnixDescriptor(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        int flags);
+
+    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "The collaborator is intentionally non-partial; explicit UTF-8 marshalling preserves the openat ABI.")]
+    [DllImport("libc", EntryPoint = "openat", ExactSpelling = true, SetLastError = true)]
+    private static extern int OpenUnixDescriptorAt(
+        SafeFileHandle directoryHandle,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        int flags);
+
+    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "The collaborator is intentionally non-partial and uses the Windows UTF-16 entry point.")]
+    [DllImport("kernel32.dll", EntryPoint = "CreateFileW", ExactSpelling = true, CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFile(
+        string fileName,
+        uint desiredAccess,
+        uint shareMode,
+        IntPtr securityAttributes,
+        uint creationDisposition,
+        uint flagsAndAttributes,
+        IntPtr templateFile);
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "NtCreateFile uses native pointer-backed object attributes.")]
-    [DllImport("ntdll.dll")]
+    [DllImport("ntdll.dll", ExactSpelling = true)]
     private static extern int NtCreateFile(
         out SafeFileHandle fileHandle,
         uint desiredAccess,
