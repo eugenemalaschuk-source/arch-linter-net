@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
@@ -7,9 +8,9 @@ namespace ArchLinterNet.Core.Reporting;
 // FrameworkReferenceDiagnostic/FrameworkReferenceAllowOnlyDiagnostic. Split into its own partial
 // file to keep ArchitectureDiagnosticFormatter.cs under the repository's 800-line decomposition
 // limit, mirroring ArchitectureDiagnosticFormatter.Context.cs.
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitectureFrameworkReferenceRenderer
 {
-    private static string FormatFrameworkReferenceContextForHumans(IReadOnlyCollection<FrameworkReferenceEvidence> evidence)
+    internal static string FormatFrameworkReferenceContextForHumans(IReadOnlyCollection<FrameworkReferenceEvidence> evidence)
     {
         string entries = string.Join(", ", evidence.Select(FormatFrameworkReferenceEvidenceEntry));
         return $" [{entries}]";
@@ -27,7 +28,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return $"{evidence.FrameworkName} ({evidence.TargetFramework}, {evidence.Configuration}, {classification}, {evidence.SourcePath})";
     }
 
-    private static void ApplyFrameworkReferenceEvidenceCiFields(
+    internal static void ApplyFrameworkReferenceEvidenceCiFields(
         IReadOnlyCollection<FrameworkReferenceEvidence> evidence, Dictionary<string, object?> obj)
     {
         if (evidence.Count == 0)
@@ -45,13 +46,13 @@ public sealed partial class ArchitectureDiagnosticFormatter
         }).ToArray();
     }
 
-    private static void ApplyFrameworkReferenceCiFields(FrameworkReferenceDiagnostic framework, Dictionary<string, object?> obj)
+    internal static void ApplyFrameworkReferenceCiFields(FrameworkReferenceDiagnostic framework, Dictionary<string, object?> obj)
     {
         obj["forbidden_framework_group"] = framework.ForbiddenFrameworkGroup;
         ApplyFrameworkReferenceEvidenceCiFields(framework.Evidence, obj);
     }
 
-    private static void ApplyFrameworkReferenceAllowOnlyCiFields(FrameworkReferenceAllowOnlyDiagnostic framework, Dictionary<string, object?> obj)
+    internal static void ApplyFrameworkReferenceAllowOnlyCiFields(FrameworkReferenceAllowOnlyDiagnostic framework, Dictionary<string, object?> obj)
     {
         obj["allowed_framework_groups"] = framework.AllowedFrameworkGroups.ToArray();
         ApplyFrameworkReferenceEvidenceCiFields(framework.Evidence, obj);

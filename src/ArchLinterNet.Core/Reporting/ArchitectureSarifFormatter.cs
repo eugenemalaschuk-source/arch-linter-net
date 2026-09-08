@@ -6,28 +6,23 @@ using ArchLinterNet.Core.Reporting.Abstractions;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifFormatter
+public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 {
-    private const string SchemaUri =
+    internal const string SchemaUri =
         "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json";
 
-    private const string ToolName = "arch-linter-net";
-    private const string SarifVersion = "2.1.0";
-    private const string VersionPropertyName = "version";
-    private const string MessagePropertyName = "message";
-    private const string PropertiesKey = "properties";
-    private const string MethodBodyCategory = "method-body";
-    private const string MethodBodyIlCategory = "method-body-il";
-    private const string CycleRuleFallback = "dependency-cycle";
-    private const string PhysicalLocationKey = "physicalLocation";
-    private const string ArtifactLocationKey = "artifactLocation";
+    internal const string ToolName = "arch-linter-net";
+    internal const string SarifVersion = "2.1.0";
+    internal const string VersionPropertyName = "version";
+    internal const string MessagePropertyName = "message";
+    internal const string PropertiesKey = "properties";
+    internal const string MethodBodyCategory = "method-body";
+    internal const string MethodBodyIlCategory = "method-body-il";
+    internal const string CycleRuleFallback = "dependency-cycle";
+    internal const string PhysicalLocationKey = "physicalLocation";
+    internal const string ArtifactLocationKey = "artifactLocation";
 
-    [GeneratedRegex(@"^line (?<line>\d+):", RegexOptions.CultureInvariant)]
-    private static partial Regex MethodBodyLinePattern();
-    [GeneratedRegex(@"^\[(?<id>[^\]]+)\] ", RegexOptions.CultureInvariant)]
-    private static partial Regex CycleIdPrefixPattern();
-
-    public string FormatResultAsSarif(
+    public string FormatResultAsSarif( // NOSONAR: reviewed interface overload remains separate from extracted compatibility overloads
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
@@ -36,7 +31,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level => BuildCycleEntry(cycle, level))),
             toolVersion,
             Array.Empty<BuildStatePreflightDiagnostic>());
     }
@@ -50,7 +45,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level =>
                 BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
             toolVersion,
             Array.Empty<BuildStatePreflightDiagnostic>());
@@ -64,7 +59,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
     {
         ArgumentNullException.ThrowIfNull(findings);
 
-        List<ResultEntry> entries;
+        List<ArchitectureSarifResultEntry> entries;
         try
         {
             entries = findings
@@ -74,7 +69,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                     string level = finding.Severity == "warning" ? "warning" : "error";
                     return BuildViolationEntry(finding, level);
                 })
-                .OrderBy(entry => entry, new ResultEntryOrderComparer(cancellationToken))
+                .OrderBy(entry => entry, new ArchitectureSarifResultEntryOrderComparer(cancellationToken))
                 .ToList();
         }
         catch (InvalidOperationException ex) when (ex.InnerException is OperationCanceledException)
@@ -117,10 +112,10 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         return JsonSerializer.Serialize(payload);
     }
 
-    private static string FormatResultAsSarifCore( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
+    internal static string FormatResultAsSarifCore( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
-        IEnumerable<Func<string, ResultEntry>> cycleEntryFactories,
+        IEnumerable<Func<string, ArchitectureSarifResultEntry>> cycleEntryFactories,
         string toolVersion,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
@@ -140,14 +135,14 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         // machinery wraps comparer exceptions in InvalidOperationException, so the comparer's
         // OperationCanceledException is unwrapped and rethrown as-is below to preserve the
         // cancellation completion semantics the CLI and Testing API depend on.
-        List<ResultEntry> entries;
+        List<ArchitectureSarifResultEntry> entries;
         try
         {
             entries = BuildViolationEntriesCancellationAware(
                     ArchitectureFindingMapper.FromViolations(violations, mode, cancellationToken), level, cancellationToken)
                 .Concat(cycleEntryFactories.Select(factory => factory(level)))
                 .Concat(preflightDiagnostics.Where(d => d.IsBlocking).Select(diagnostic => BuildPreflightEntry(diagnostic, mode)))
-                .OrderBy(e => e, new ResultEntryOrderComparer(cancellationToken))
+                .OrderBy(e => e, new ArchitectureSarifResultEntryOrderComparer(cancellationToken))
                 .ToList();
         }
         catch (InvalidOperationException ex) when (ex.InnerException is OperationCanceledException)
@@ -187,7 +182,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                     ["results"] = results,
                     [PropertiesKey] = new Dictionary<string, object?>
                     {
-                        ["coverage_summary"] = FormatCoverageSummaries(coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>()),
+                        ["coverage_summary"] = ArchitectureSarifCoverageSummaryProjector.Format(coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>()),
                         ["source_set_expansion"] = Reporting.ArchitectureSarifFormatter.FormatSourceExpansion(
                             sourceExpansion ?? ArchitectureSourceExpansionInventory.Empty),
                         ["subtractive_matcher_participation"] = Reporting.ArchitectureSarifFormatter.FormatSubtractiveMatcherParticipation(
@@ -200,10 +195,10 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         return JsonSerializer.Serialize(payload);
     }
 
-    private static List<ResultEntry> BuildViolationEntriesCancellationAware(
+    private static List<ArchitectureSarifResultEntry> BuildViolationEntriesCancellationAware(
         IEnumerable<ArchitectureFinding> findings, string level, CancellationToken cancellationToken)
     {
-        List<ResultEntry> entries = new();
+        List<ArchitectureSarifResultEntry> entries = new();
         foreach (ArchitectureFinding finding in findings)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -213,36 +208,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         return entries;
     }
 
-    private static object[] FormatCoverageSummaries(IReadOnlyCollection<ArchitectureCoverageSummary> summaries)
-    {
-        return summaries.OrderBy(summary => summary.ContractId ?? summary.ContractName, StringComparer.Ordinal)
-            .Select(summary => (object)new Dictionary<string, object?>
-            {
-                ["contract"] = summary.ContractName,
-                ["contract_id"] = summary.ContractId,
-                ["scope"] = summary.Scope,
-                ["optional_empty_items"] = summary.OptionalEmptyItems
-                    .OrderBy(item => item.Item, StringComparer.Ordinal)
-                    .Select(item => (object)new Dictionary<string, object?>
-                    {
-                        ["item"] = item.Item,
-                        ["contract_id"] = item.ContractId,
-                        ["input"] = item.Input,
-                        ["layer"] = item.Layer,
-                        ["reason"] = item.Reason,
-                        ["evidence"] = item.Evidence,
-                        ["policy_location"] = item.PolicyLocation is null ? null : new Dictionary<string, object?>
-                        {
-                            ["source_path"] = item.PolicyLocation.SourcePath,
-                            ["yaml_path"] = item.PolicyLocation.YamlPath,
-                            ["line"] = item.PolicyLocation.Line,
-                            ["column"] = item.PolicyLocation.Column
-                        }
-                    }).ToArray()
-            }).ToArray();
-    }
-
-    private static ResultEntry BuildViolationEntry(ArchitectureFinding finding, string level)
+    private static ArchitectureSarifResultEntry BuildViolationEntry(ArchitectureFinding finding, string level)
     {
         ArchitectureDiagnostic diagnostic = finding.Details;
         (string sourceType, string forbiddenNamespace, IReadOnlyCollection<string> references) = ExtractFields(diagnostic);
@@ -312,7 +278,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         properties["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding);
         json[PropertiesKey] = properties;
 
-        return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
+        return new ArchitectureSarifResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
     }
 
     private static Dictionary<string, object?>? BuildProperties(ArchitectureDiagnostic diagnostic)
@@ -582,9 +548,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             .ToArray();
     }
 
-    private static ResultEntry BuildCycleEntry(string cycle, string level)
+    internal static ArchitectureSarifResultEntry BuildCycleEntry(string cycle, string level)
     {
-        Match match = CycleIdPrefixPattern().Match(cycle);
+        Match match = ArchitectureSarifFormattingRegexes.CycleIdPrefixPattern().Match(cycle);
         string ruleId = match.Success ? match.Groups["id"].Value : CycleRuleFallback;
         string path = match.Success ? cycle[match.Length..] : cycle;
         ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(
@@ -603,10 +569,10 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             },
         };
 
-        return new ResultEntry(ruleId, ruleId, path, "cycle", json);
+        return new ArchitectureSarifResultEntry(ruleId, ruleId, path, "cycle", json);
     }
 
-    private static ResultEntry BuildCycleEntry(CycleDiagnostic diagnostic, string level)
+    internal static ArchitectureSarifResultEntry BuildCycleEntry(CycleDiagnostic diagnostic, string level)
     {
         string ruleId = diagnostic.ContractId ?? CycleRuleFallback;
         ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(
@@ -633,7 +599,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             json["relatedLocations"] = relatedPolicyLocations;
         }
 
-        return new ResultEntry(ruleId, diagnostic.ContractName, diagnostic.Path, "cycle", json);
+        return new ArchitectureSarifResultEntry(ruleId, diagnostic.ContractName, diagnostic.Path, "cycle", json);
     }
 
     private static object[] BuildPhysicalLocations(string filePath, IReadOnlyCollection<string> references)
@@ -659,7 +625,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                 [ArtifactLocationKey] = new Dictionary<string, object?> { ["uri"] = filePath },
             };
 
-            Match match = MethodBodyLinePattern().Match(reference);
+            Match match = ArchitectureSarifFormattingRegexes.MethodBodyLinePattern().Match(reference);
             if (match.Success && int.TryParse(match.Groups["line"].Value, out int line))
             {
                 physicalLocation["region"] = new Dictionary<string, object?> { ["startLine"] = line };
@@ -740,43 +706,89 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             _ => (string.Empty, string.Empty, Array.Empty<string>()),
         };
 
-    private sealed record ResultEntry(
-        string RuleId,
-        string ContractName,
-        string SourceIdentifier,
-        string Category,
-        Dictionary<string, object?> Json);
+    internal static ArchitectureSarifResultEntry BuildPreflightEntry(BuildStatePreflightDiagnostic diagnostic, string mode) =>
+        ArchitectureSarifBuildStatePreflightProjector.BuildPreflightEntry(diagnostic, mode);
 
-    // A single OrderBy(keySelector: identity, comparer) call with one comparer replicating the
-    // former OrderBy(RuleId).ThenBy(SourceIdentifier).ThenBy(Category) chain keeps LINQ's
-    // stable-sort guarantee (ties preserve source order, so sequential/non-cancelled output is
-    // byte-for-byte unchanged) while making the whole sort interruptible: the token is observed
-    // on every comparison, not just before/after the call.
-    private sealed class ResultEntryOrderComparer : IComparer<ResultEntry>
-    {
-        private readonly CancellationToken _cancellationToken;
+    internal static Dictionary<string, object?> FormatSourceExpansion(ArchitectureSourceExpansionInventory inventory) =>
+        ArchitectureSarifSourceExpansionProjector.FormatSourceExpansion(inventory);
 
-        internal ResultEntryOrderComparer(CancellationToken cancellationToken)
-        {
-            _cancellationToken = cancellationToken;
-        }
+    internal static object[] FormatSubtractiveMatcherParticipation(
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation> participation) =>
+        ArchitectureSarifSourceExpansionProjector.FormatSubtractiveMatcherParticipation(participation);
 
-        public int Compare(ResultEntry? x, ResultEntry? y)
-        {
-            _cancellationToken.ThrowIfCancellationRequested();
-            int result = StringComparer.Ordinal.Compare(x!.RuleId, y!.RuleId);
-            if (result != 0)
-            {
-                return result;
-            }
+    // Compatibility façade for the extended SARIF surface. The source-expansion and preflight
+    // projectors own their payloads; these overloads only preserve the existing public signatures.
+    public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
+        string mode, IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries, string toolVersion) =>
+        ArchitectureSarifBuildStatePreflightProjector.FormatResultAsSarif(
+            mode, violations, cycles, preflightDiagnostics, coverageSummaries, toolVersion);
 
-            result = StringComparer.Ordinal.Compare(x.SourceIdentifier, y.SourceIdentifier);
-            if (result != 0)
-            {
-                return result;
-            }
+    public static string FormatResultAsSarif(
+        string mode, IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycles,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries, string toolVersion) =>
+        ArchitectureSarifBuildStatePreflightProjector.FormatResultAsSarif(
+            mode, violations, cycles, preflightDiagnostics, coverageSummaries, toolVersion);
 
-            return StringComparer.Ordinal.Compare(x.Category, y.Category);
-        }
-    }
+    public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
+        string mode, IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        string toolVersion) =>
+        ArchitectureSarifBuildStatePreflightProjector.FormatResultAsSarif(
+            mode, violations, cycles, preflightDiagnostics, toolVersion);
+
+    public static string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload
+        string mode, IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycles,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        string toolVersion) =>
+        ArchitectureSarifBuildStatePreflightProjector.FormatResultAsSarif(
+            mode, violations, cycles, preflightDiagnostics, toolVersion);
+
+    public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
+        string mode, IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion, string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null) =>
+        ArchitectureSarifSourceExpansionProjector.FormatResultAsSarif(
+            mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, toolVersion,
+            subtractiveMatcherParticipation);
+
+    public static string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload
+        string mode, IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycles,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion, string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null) =>
+        ArchitectureSarifSourceExpansionProjector.FormatResultAsSarif(
+            mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, toolVersion,
+            subtractiveMatcherParticipation);
+
+    public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
+        string mode, IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion, string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
+        CancellationToken cancellationToken) =>
+        ArchitectureSarifSourceExpansionProjector.FormatResultAsSarif(
+            mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, toolVersion,
+            subtractiveMatcherParticipation, cancellationToken);
+
+    public static string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload
+        string mode, IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycles,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion, string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
+        CancellationToken cancellationToken) =>
+        ArchitectureSarifSourceExpansionProjector.FormatResultAsSarif(
+            mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, toolVersion,
+            subtractiveMatcherParticipation, cancellationToken);
 }

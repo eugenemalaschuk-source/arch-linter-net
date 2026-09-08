@@ -1,7 +1,5 @@
-using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -222,48 +220,78 @@ public sealed class SelfPolicyNegativeRegressionTests
     }
 
     [Test]
-    public void PartialDeclarationRatchet_RejectsAnAggregateExceedingItsReviewedCount()
+    public void ReintroducedFormatterPartialDeclarations_AreRejectedWithoutWaivers()
     {
-        const string ReviewedType = "ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter";
+        const string DiagnosticFormatter = "ArchitectureDiagnosticFormatter";
+        const string SarifFormatter = "ArchitectureSarifFormatter";
+        string reportingDirectory = Path.Combine(_repositoryRoot, "src", "ArchLinterNet.Core", "Reporting");
+        string diagnosticPath = Path.Combine(reportingDirectory, $"{DiagnosticFormatter}.cs");
+        string sarifPath = Path.Combine(reportingDirectory, $"{SarifFormatter}.cs");
+        string diagnosticOriginal = File.ReadAllText(diagnosticPath);
+        string sarifOriginal = File.ReadAllText(sarifPath);
 
-        // Discover today's live declaration-count evidence directly from the real repository
-        // instead of hardcoding a count that legitimately shifts as unrelated work adds or removes
-        // partial declarations elsewhere: temporarily retarget the reviewed entry's source_type so
-        // nothing suppresses the live finding, run the real ratchet rule, and read the resulting
-        // "expected at most 1 source declaration(s), found N: <paths>" text back off the actual
-        // violation.
-        string unfrozen = SelfPolicyRepository.Replace(
-            _policy,
-            $"source_type: \"{ReviewedType}\"",
-            $"source_type: \"{ReviewedType}NotFrozen\"");
-        ArchitectureValidationResult liveResult = ValidateMutated(
-            unfrozen, "production-partial-type-declaration-count-does-not-increase");
-        ArchitectureViolation liveViolation = liveResult.Violations.Single(
-            violation => violation.SourceType == ReviewedType);
-        string liveForbiddenReference = liveViolation.ForbiddenReferences.Single();
+        try
+        {
+            File.WriteAllText(
+                diagnosticPath,
+                SelfPolicyRepository.Replace(
+                    diagnosticOriginal,
+                    $"public sealed class {DiagnosticFormatter}",
+                    $"public sealed partial class {DiagnosticFormatter}"));
+            File.WriteAllText(
+                sarifPath,
+                SelfPolicyRepository.Replace(
+                    sarifOriginal,
+                    $"public sealed class {SarifFormatter}",
+                    $"public sealed partial class {SarifFormatter}"));
+            SelfPolicyRepository.WriteMutatedReportingSource(
+                _repositoryRoot,
+                """
+                namespace ArchLinterNet.Core.Reporting;
 
-        // Decrementing the discovered count by exactly one reproduces "the aggregate grew by one
-        // declaration past what was reviewed": the frozen entry keeps the real source_type and the
-        // real path list, but its reviewed count text now reads one lower than what the live
-        // declaration-count checker reports for the same type, so the exact-text match fails and
-        // the violation surfaces unignored — proving growth beyond the reviewed baseline is
-        // blocked, not merely that an unrelated source_type mismatch is.
-        Match countMatch = Regex.Match(liveForbiddenReference, "found (\\d+):", RegexOptions.None, TimeSpan.FromSeconds(1));
-        Assert.That(countMatch.Success, Is.True,
-            "Expected the live declaration-count message to contain 'found N:'.");
-        int liveCount = int.Parse(countMatch.Groups[1].Value, CultureInfo.InvariantCulture);
-        string staleForbiddenReference = liveForbiddenReference.Replace(
-            $"found {liveCount}:", $"found {liveCount - 1}:", StringComparison.Ordinal);
+                public sealed partial class ArchitectureDiagnosticFormatter
+                {
+                }
 
-        string mutated = SelfPolicyRepository.Replace(
-            _policy,
-            $"forbidden_reference: \"{liveForbiddenReference}\"",
-            $"forbidden_reference: \"{staleForbiddenReference}\"");
+                public sealed partial class ArchitectureSarifFormatter
+                {
+                }
+                """);
+
+            ArchitectureValidationResult result = ValidateMutated(
+                _policy,
+                "production-partial-type-declaration-count-does-not-increase");
+
+            AssertFailedMentioning(result, DiagnosticFormatter);
+            AssertFailedMentioning(result, SarifFormatter);
+        }
+        finally
+        {
+            File.WriteAllText(diagnosticPath, diagnosticOriginal);
+            File.WriteAllText(sarifPath, sarifOriginal);
+        }
+    }
+
+    [Test]
+    public void PartialDeclarationRatchet_RejectsANewProductionAggregate()
+    {
+        const string Aggregate = "PartialDeclarationRatchetFixture";
+        const string Source = """
+            namespace ArchLinterNet.Core.Reporting;
+
+            internal static partial class PartialDeclarationRatchetFixture
+            {
+            }
+            """;
+
+        SelfPolicyRepository.WriteMutatedReportingSource(_repositoryRoot, Source);
+        SelfPolicyRepository.WriteMutatedReportingSource(_repositoryRoot, Source);
 
         ArchitectureValidationResult result = ValidateMutated(
-            mutated, "production-partial-type-declaration-count-does-not-increase");
+            _policy,
+            "production-partial-type-declaration-count-does-not-increase");
 
-        AssertFailedMentioning(result, "ArchitectureDiagnosticFormatter");
+        AssertFailedMentioning(result, Aggregate);
     }
 
     [Test]

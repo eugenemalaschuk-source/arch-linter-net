@@ -1,10 +1,10 @@
-using System.Diagnostics.CodeAnalysis;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureSarifFormatter
+internal static class ArchitectureSarifSourceExpansionProjector
 {
     private const string PolicyLocationKey = "policy_location";
 
@@ -14,7 +14,7 @@ public sealed partial class ArchitectureSarifFormatter
     /// alongside the prior overloads rather than extending them, matching the pattern used for
     /// build-state preflight and coverage summaries.
     /// </summary>
-    public string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
+    internal static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
@@ -27,7 +27,7 @@ public sealed partial class ArchitectureSarifFormatter
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level => BuildCycleEntry(cycle, level))),
             toolVersion,
             preflightDiagnostics,
             coverageSummaries,
@@ -35,7 +35,7 @@ public sealed partial class ArchitectureSarifFormatter
             subtractiveMatcherParticipation);
     }
 
-    public static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
+    internal static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
@@ -48,7 +48,7 @@ public sealed partial class ArchitectureSarifFormatter
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level =>
                 BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
             toolVersion,
             preflightDiagnostics,
@@ -58,14 +58,13 @@ public sealed partial class ArchitectureSarifFormatter
     }
 
     /// <summary>
-    /// Cancellation-aware widest instance overload: identical to the one above, but checks
+    /// Cancellation-aware widest string-cycle overload: identical to the one above, but checks
     /// <paramref name="cancellationToken"/> per finding while serializing violation entries — the
     /// dominant contributor to a large report's size — instead of only before/after the whole
     /// document is built. <paramref name="subtractiveMatcherParticipation"/> has no default here
     /// (unlike the overload above) purely so this overload stays unambiguous by arity against it.
     /// </summary>
-    [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as an instance member so CliRuntime can call it through the same _sarifFormatter instance reference as its cycles-based sibling overload, without a CS0176 static-via-instance call error.")]
-    public string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
+    internal static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
@@ -79,7 +78,7 @@ public sealed partial class ArchitectureSarifFormatter
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level => BuildCycleEntry(cycle, level))),
             toolVersion,
             preflightDiagnostics,
             coverageSummaries,
@@ -89,10 +88,10 @@ public sealed partial class ArchitectureSarifFormatter
     }
 
     /// <summary>
-    /// Cancellation-aware widest static overload, mirroring the instance overload above for the
+    /// Cancellation-aware widest finding-cycle overload, mirroring the string-cycle overload above for the
     /// <see cref="ArchitectureCycleFinding"/>-typed cycles path.
     /// </summary>
-    public static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
+    internal static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
@@ -106,7 +105,7 @@ public sealed partial class ArchitectureSarifFormatter
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level =>
                 BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
             toolVersion,
             preflightDiagnostics,

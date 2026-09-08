@@ -1,10 +1,11 @@
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitecturePolicyConsistencyProjector
 {
-    private static Dictionary<string, object?> ToPolicyConsistencyJsonObject(
+    internal static Dictionary<string, object?> ToPolicyConsistencyJsonObject(
         PolicyConsistencyDiagnostic finding,
         string? mode)
     {

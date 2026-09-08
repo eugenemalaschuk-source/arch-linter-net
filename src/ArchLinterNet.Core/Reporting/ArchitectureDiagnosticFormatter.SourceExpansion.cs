@@ -1,9 +1,10 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitectureSourceExpansionProjector
 {
     /// <summary>
     /// Additive overload carrying the resolved source-set expansion, so a JSON consumer can prove
@@ -11,7 +12,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     /// cycle-diagnostics overload it extends; <c>sourceExpansion</c> is required (no default) so
     /// this overload stays unambiguous by arity against every prior one.
     /// </summary>
-    public static string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
+    internal static string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -29,7 +30,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null,
         IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
     {
-        return BuildCiArtifactsJson(new CiArtifactsRequest(
+        return ArchitectureClassificationCiArtifactsRenderer.BuildCiArtifactsJson(new ArchitectureClassificationCiArtifactsRenderer.CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
             classificationMetadataFailures, classificationPathDeferred, preflightDiagnostics)
@@ -47,7 +48,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     /// has no default here (unlike the overload above) purely so this overload stays unambiguous
     /// by arity against it; every existing call site is unaffected.
     /// </summary>
-    public static string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
+    internal static string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -66,7 +67,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
         CancellationToken cancellationToken)
     {
-        return BuildCiArtifactsJson(new CiArtifactsRequest(
+        return ArchitectureClassificationCiArtifactsRenderer.BuildCiArtifactsJson(new ArchitectureClassificationCiArtifactsRenderer.CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
             classificationMetadataFailures, classificationPathDeferred, preflightDiagnostics)
