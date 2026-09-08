@@ -2,13 +2,11 @@ using ArchLinterNet.Core.Discovery;
 
 namespace ArchLinterNet.Core.BuildState;
 
-public sealed partial class BuildStatePreparationService
+// Generates the temporary MSBuild driver used for runtime-specific graph builds. The .NET SDK
+// rejects `dotnet build <solution> --runtime <RID>` (NETSDK1134), so the runtime is applied to
+// selected project roots through this driver while their ProjectReference closure remains intact.
+internal static class BuildStateRuntimeGraphBuildProjectFactory
 {
-    // The .NET SDK rejects `dotnet build <solution> --runtime <RID>` (NETSDK1134). Use one
-    // MSBuild driver project for the RID case instead: it invokes the selected graph roots in the
-    // same build process while applying the runtime only to projects, where the SDK supports it.
-    // Selecting graph roots preserves the complete relevant ProjectReference closure without
-    // independently rebuilding every dependency.
     internal static string WriteTemporaryRuntimeGraphBuildProject(BuildStatePreflightRequest request)
     {
         string path = Path.Combine(Path.GetTempPath(), $"archlinternet-ensure-built-{Guid.NewGuid():N}.proj");
@@ -16,13 +14,12 @@ public sealed partial class BuildStatePreparationService
         return path;
     }
 
-    // Kept separate from the temporary-file boundary so the graph-root selection and MSBuild
-    // property handoff can be verified without starting a child `dotnet` process. The process
-    // boundary itself remains covered by the packaged acceptance regression.
+    // Kept separate from the temporary-file boundary so graph-root selection and MSBuild property
+    // handoff can be verified without starting a child process.
     internal static string CreateRuntimeGraphBuildProjectContent(BuildStatePreflightRequest request)
     {
         IReadOnlyCollection<ArchitectureDiscoveredProject> selected =
-            SelectRelevantProjectsWithTransitiveReferences(request);
+            BuildStateRuntimeBuildPreparation.SelectRelevantProjectsWithTransitiveReferences(request);
         HashSet<string> selectedPaths = selected.Select(project => project.Path).ToHashSet(StringComparer.Ordinal);
         HashSet<string> referencedPaths = selected
             .SelectMany(project => project.ProjectReferences)

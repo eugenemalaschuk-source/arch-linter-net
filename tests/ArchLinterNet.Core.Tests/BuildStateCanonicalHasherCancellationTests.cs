@@ -5,7 +5,7 @@ namespace ArchLinterNet.Core.Tests;
 
 // Issue #375 follow-up: BuildStateCanonicalHasher previously accepted no CancellationToken at
 // all, so BuildStatePreflightEvaluator.CheckReceiptFreshness (and
-// BuildStatePreparationService.WriteReceiptsForCurrentArtifacts, which re-hashes to write a
+// BuildStateRuntimeBuildPreparation.WriteReceiptsForCurrentArtifacts, which re-hashes to write a
 // receipt) could not be interrupted mid-hash — only before/after the whole call. These tests
 // prove the token is now honored before any file is touched.
 [TestFixture]
