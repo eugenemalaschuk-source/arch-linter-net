@@ -222,6 +222,59 @@ public sealed class SelfPolicyNegativeRegressionTests
     }
 
     [Test]
+    public void ReintroducedFormatterPartialDeclarations_AreRejectedWithoutWaivers()
+    {
+        const string DiagnosticFormatter = "ArchitectureDiagnosticFormatter";
+        const string SarifFormatter = "ArchitectureSarifFormatter";
+        string reportingDirectory = Path.Combine(_repositoryRoot, "src", "ArchLinterNet.Core", "Reporting");
+        string diagnosticPath = Path.Combine(reportingDirectory, $"{DiagnosticFormatter}.cs");
+        string sarifPath = Path.Combine(reportingDirectory, $"{SarifFormatter}.cs");
+        string diagnosticOriginal = File.ReadAllText(diagnosticPath);
+        string sarifOriginal = File.ReadAllText(sarifPath);
+
+        try
+        {
+            File.WriteAllText(
+                diagnosticPath,
+                SelfPolicyRepository.Replace(
+                    diagnosticOriginal,
+                    $"public sealed class {DiagnosticFormatter}",
+                    $"public sealed partial class {DiagnosticFormatter}"));
+            File.WriteAllText(
+                sarifPath,
+                SelfPolicyRepository.Replace(
+                    sarifOriginal,
+                    $"public sealed class {SarifFormatter}",
+                    $"public sealed partial class {SarifFormatter}"));
+            SelfPolicyRepository.WriteMutatedReportingSource(
+                _repositoryRoot,
+                """
+                namespace ArchLinterNet.Core.Reporting;
+
+                public sealed partial class ArchitectureDiagnosticFormatter
+                {
+                }
+
+                public sealed partial class ArchitectureSarifFormatter
+                {
+                }
+                """);
+
+            ArchitectureValidationResult result = ValidateMutated(
+                _policy,
+                "production-partial-type-declaration-count-does-not-increase");
+
+            AssertFailedMentioning(result, DiagnosticFormatter);
+            AssertFailedMentioning(result, SarifFormatter);
+        }
+        finally
+        {
+            File.WriteAllText(diagnosticPath, diagnosticOriginal);
+            File.WriteAllText(sarifPath, sarifOriginal);
+        }
+    }
+
+    [Test]
     public void PartialDeclarationRatchet_RejectsAnAggregateExceedingItsReviewedCount()
     {
         const string ReviewedType = "ArchLinterNet.Cli.Commands.Validate.Application.ValidateCommandHandler";
