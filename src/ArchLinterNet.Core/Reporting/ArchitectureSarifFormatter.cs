@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts;
@@ -718,6 +719,10 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 
     // Compatibility façade for the extended SARIF surface. The source-expansion and preflight
     // projectors own their payloads; these overloads only preserve the existing public signatures.
+    [SuppressMessage(
+        "Performance",
+        "CA1822:Mark members as static",
+        Justification = "Public compatibility overload retained as an instance member to preserve the reviewed public API.")]
     public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
@@ -748,6 +753,10 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
         ArchitectureSarifBuildStatePreflightProjector.FormatResultAsSarif(
             mode, violations, cycles, preflightDiagnostics, toolVersion);
 
+    [SuppressMessage(
+        "Performance",
+        "CA1822:Mark members as static",
+        Justification = "Public compatibility overload retained as an instance member to preserve the reviewed public API.")]
     public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
@@ -769,6 +778,10 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
             mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, toolVersion,
             subtractiveMatcherParticipation);
 
+    [SuppressMessage(
+        "Performance",
+        "CA1822:Mark members as static",
+        Justification = "Public compatibility overload retained as an instance member to preserve the reviewed public API.")]
     public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
