@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
@@ -6,9 +7,9 @@ namespace ArchLinterNet.Core.Reporting;
 // previous signature) that human and JSON output must describe identically — SARIF exposes the same
 // record through ArchitectureSarifFormatter's properties bag. Kept in its own partial file so the
 // delta vocabulary lives in one place instead of being scattered through the general formatter.
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitecturePublicApiSurfaceRenderer
 {
-    private static string FormatPublicApiSurfaceContextForHumans(PublicApiSurfaceDiagnostic publicApiSurface)
+    internal static string FormatPublicApiSurfaceContextForHumans(PublicApiSurfaceDiagnostic publicApiSurface)
     {
         string reason = ReasonFor(publicApiSurface);
         string context = $" (reason: {reason}, assembly: {publicApiSurface.ApiAssemblyName}, " +
@@ -55,7 +56,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         _ => "undeclared_api_member",
     };
 
-    private static void ApplyPublicApiSurfaceCiFields(PublicApiSurfaceDiagnostic publicApiSurface, Dictionary<string, object?> obj)
+    internal static void ApplyPublicApiSurfaceCiFields(PublicApiSurfaceDiagnostic publicApiSurface, Dictionary<string, object?> obj)
     {
         if (publicApiSurface.UndeclaredApiSignature != null)
             obj["undeclared_api_signature"] = publicApiSurface.UndeclaredApiSignature;

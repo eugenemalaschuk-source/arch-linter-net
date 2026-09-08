@@ -1,10 +1,11 @@
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureSarifFormatter
+internal static class ArchitectureSarifBuildStatePreflightProjector
 {
-    public string FormatResultAsSarif(
+    internal static string FormatResultAsSarif(
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
@@ -15,13 +16,13 @@ public sealed partial class ArchitectureSarifFormatter
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level => BuildCycleEntry(cycle, level))),
             toolVersion,
             preflightDiagnostics,
             coverageSummaries);
     }
 
-    public static string FormatResultAsSarif(
+    internal static string FormatResultAsSarif(
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
@@ -32,14 +33,14 @@ public sealed partial class ArchitectureSarifFormatter
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level =>
                 BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
             toolVersion,
             preflightDiagnostics,
             coverageSummaries);
     }
 
-    public string FormatResultAsSarif(
+    internal static string FormatResultAsSarif(
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
@@ -49,12 +50,12 @@ public sealed partial class ArchitectureSarifFormatter
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level => BuildCycleEntry(cycle, level))),
             toolVersion,
             preflightDiagnostics);
     }
 
-    public static string FormatResultAsSarif(
+    internal static string FormatResultAsSarif(
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
@@ -64,13 +65,13 @@ public sealed partial class ArchitectureSarifFormatter
         return FormatResultAsSarifCore(
             mode,
             violations,
-            cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
+            cycles.Select(cycle => (Func<string, ArchitectureSarifResultEntry>)(level =>
                 BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
             toolVersion,
             preflightDiagnostics);
     }
 
-    private static ResultEntry BuildPreflightEntry(BuildStatePreflightDiagnostic diagnostic, string mode)
+    internal static ArchitectureSarifResultEntry BuildPreflightEntry(BuildStatePreflightDiagnostic diagnostic, string mode)
     {
         string state = PreflightStateToken(diagnostic.State);
         string ruleId = $"build-state-preflight/{state}";
@@ -104,7 +105,7 @@ public sealed partial class ArchitectureSarifFormatter
             },
         };
 
-        return new ResultEntry(ruleId, "build-state-preflight", evidence.ProjectPath, "build-state-preflight", json);
+        return new ArchitectureSarifResultEntry(ruleId, "build-state-preflight", evidence.ProjectPath, "build-state-preflight", json);
     }
 
     private static string FormatPreflightMessage(string state, BuildStatePreflightEvidence evidence)
@@ -113,7 +114,7 @@ public sealed partial class ArchitectureSarifFormatter
         return $"[{state}] {evidence.AssemblyName} ({evidence.ProjectPath}){detail}";
     }
 
-    private static string PreflightStateToken(BuildStatePreflightState state) => state switch
+    internal static string PreflightStateToken(BuildStatePreflightState state) => state switch
     {
         BuildStatePreflightState.Cancelled => "cancelled",
         BuildStatePreflightState.RestoreRequired => "restore-required",

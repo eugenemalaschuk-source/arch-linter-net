@@ -4,7 +4,7 @@ using ArchLinterNet.Core.Reporting.Abstractions;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFormatter
+public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFormatter
 {
     public static string FormatAssessmentCompletionForHumans(
         ArchitectureAssessmentCompletionEvidence? completion) =>
@@ -316,7 +316,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             : text;
     }
 
-    private static string FormatRemediationHintForHumans(ArchitectureRemediationHint hint) =>
+    internal static string FormatRemediationHintForHumans(ArchitectureRemediationHint hint) =>
         $" (remediation: {ArchitectureRemediationHintFactory.CategoryToken(hint.Category)}: {hint.Summary})";
 
     internal static string FormatFindingForHumansInternal(ArchitectureFinding finding) =>
@@ -535,7 +535,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return string.Empty;
     }
 
-    private static Dictionary<string, object?> ToCiJsonObject(
+    internal static Dictionary<string, object?> ToCiJsonObject(
         ArchitectureFinding finding,
         bool includeContract)
     {
@@ -593,7 +593,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return obj;
     }
 
-    private static void ApplyImportedExternalDiagnosticCiFields(
+    internal static void ApplyImportedExternalDiagnosticCiFields(
         ImportedExternalDiagnostic diagnostic,
         Dictionary<string, object?> obj) =>
         ArchitectureImportedDiagnosticRenderer.ApplyCiFields(diagnostic, obj);
@@ -639,122 +639,80 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return details;
     }
 
-    private static Dictionary<string, object?> ToUnmatchedJsonObject(
+    internal static Dictionary<string, object?> ToUnmatchedJsonObject(
         UnmatchedIgnoreDiagnostic unmatched,
         string? mode)
     {
         return ToCiJsonObject(ArchitectureFindingMapper.FromDiagnostic(unmatched, mode), includeContract: true);
     }
 
-    private static void ApplyDependencyCiFields(DependencyDiagnostic dependency, Dictionary<string, object?> obj)
-    {
-        if (dependency.SourceLayer != null)
-            obj["source_layer"] = dependency.SourceLayer;
+    internal static string FormatPolicyLocationSuffix(ArchitectureDiagnostic diagnostic) => ArchitecturePolicyProvenanceProjector.FormatPolicyLocationSuffix(diagnostic);
+    public static Dictionary<string, object?> FormatPolicyLocationForJson(ArchitecturePolicySourceLocation location) => ArchitecturePolicyProvenanceProjector.FormatPolicyLocationForJson(location);
+    internal static void ApplyPolicyLocationFields(ArchitectureDiagnostic diagnostic, Dictionary<string, object?> target) => ArchitecturePolicyProvenanceProjector.ApplyPolicyLocationFields(diagnostic, target);
+    internal static string FormatLayoutConventionContextForHumans(LayoutConventionDiagnostic diagnostic) => ArchitectureLayoutConventionRenderer.FormatLayoutConventionContextForHumans(diagnostic);
+    internal static string FormatPublicApiSurfaceContextForHumans(PublicApiSurfaceDiagnostic diagnostic) => ArchitecturePublicApiSurfaceRenderer.FormatPublicApiSurfaceContextForHumans(diagnostic);
+    internal static string FormatContextDependencyContextForHumans(ContextDependencyDiagnostic diagnostic) => ArchitectureDiagnosticContextRenderer.FormatContextDependencyContextForHumans(diagnostic);
+    internal static string FormatContextAllowOnlyContextForHumans(ContextAllowOnlyDiagnostic diagnostic) => ArchitectureDiagnosticContextRenderer.FormatContextAllowOnlyContextForHumans(diagnostic);
+    internal static string FormatPortBoundaryContextForHumans(PortBoundaryDiagnostic diagnostic) => ArchitectureDiagnosticContextRenderer.FormatPortBoundaryContextForHumans(diagnostic);
+    internal static string FormatFrameworkReferenceContextForHumans(IReadOnlyCollection<FrameworkReferenceEvidence> evidence) => ArchitectureFrameworkReferenceRenderer.FormatFrameworkReferenceContextForHumans(evidence);
+    internal static string FormatWhenExpressionsForHumans(IReadOnlyList<ExpressionParticipation>? expressions) => ArchitectureDiagnosticContextRenderer.FormatWhenExpressionsForHumans(expressions);
+    internal static void ApplyWhenExpressionsCiFields(IReadOnlyList<ExpressionParticipation>? expressions, Dictionary<string, object?> target) => ArchitectureDiagnosticContextRenderer.ApplyWhenExpressionsCiFields(expressions, target);
+    internal static Dictionary<string, object?> ToPolicyConsistencyJsonObject(PolicyConsistencyDiagnostic finding, string? mode) => ArchitecturePolicyConsistencyProjector.ToPolicyConsistencyJsonObject(finding, mode);
+    internal static Dictionary<string, object?> ToCycleJsonObject(ArchitectureCycleFinding finding, string? mode) => ArchitectureCycleRenderer.ToCycleJsonObject(finding, mode);
+    internal static Dictionary<string, object?> ToCycleJsonObject(CycleDiagnostic finding, string? mode) => ArchitectureCycleRenderer.ToCycleJsonObject(finding, mode);
+    internal static Dictionary<string, object?> ToCoverageSummaryJsonObject(ArchitectureCoverageSummary summary) => ArchitectureCoverageSummaryJsonProjector.ToCoverageSummaryJsonObject(summary);
+    internal static object[] BuildStatePreflightJson(IReadOnlyCollection<BuildStatePreflightDiagnostic>? diagnostics, string mode) => ArchitectureBuildStatePreflightRenderer.BuildStatePreflightJson(diagnostics, mode);
 
-        if (dependency.TargetLayer != null)
-            obj["target_layer"] = dependency.TargetLayer;
+    internal static void ApplyDiagnosticSpecificCiFields(ArchitectureDiagnostic diagnostic, Dictionary<string, object?> target)
+        => ArchitectureNormalizedDetailsProjector.ApplyDiagnosticSpecificCiFields(diagnostic, target);
 
-        if (dependency.AllowedImporters != null)
-            obj["allowed_importers"] = dependency.AllowedImporters.ToArray();
-    }
+    // Compatibility façade: the responsibility-specific renderers own the implementations below,
+    // while this stable public type keeps the existing caller-facing overloads unchanged.
+    public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) => ArchitectureBuildStatePreflightRenderer.FormatBuildStatePreflightForHumans(diagnostics);
+    public string FormatViolationsForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<ArchitectureViolation> violations) => ArchitectureViolationCiArtifactsRenderer.FormatViolationsForCiArtifacts(contractName, contractId, violations);
+    public string FormatViolationsForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken) => ArchitectureViolationCiArtifactsRenderer.FormatViolationsForCiArtifacts(contractName, contractId, violations, cancellationToken);
 
-    private static void ApplyTypePlacementCiFields(TypePlacementDiagnostic typePlacement, Dictionary<string, object?> obj)
-    {
-        if (typePlacement.ExpectedTypeLocation != null)
-            obj["expected_type_location"] = typePlacement.ExpectedTypeLocation;
+    public string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null) => ArchitectureClassificationCiArtifactsRenderer.FormatResultForCiArtifacts(mode, passed, violations, cycles, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
 
-        if (typePlacement.ActualTypeLocation != null)
-            obj["actual_type_location"] = typePlacement.ActualTypeLocation;
+    public static string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null) => ArchitectureClassificationCiArtifactsRenderer.FormatResultForCiArtifacts(mode, passed, violations, cycles, cycleFindings, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures); // NOSONAR: reviewed public compatibility overload
 
-        if (typePlacement.ExpectedTypeName != null)
-            obj["expected_type_name"] = typePlacement.ExpectedTypeName;
+    public string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles, IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null) => ArchitectureClassificationCiArtifactsRenderer.FormatResultForCiArtifacts(mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
 
-        if (typePlacement.ActualTypeName != null)
-            obj["actual_type_name"] = typePlacement.ActualTypeName;
-    }
+    public static string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles, IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null) => ArchitectureClassificationCiArtifactsRenderer.FormatResultForCiArtifacts(mode, passed, violations, cycles, cycleFindings, classificationRoles, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures); // NOSONAR: reviewed public compatibility overload
 
-    private static void ApplyAttributeUsageCiFields(AttributeUsageDiagnostic attributeUsage, Dictionary<string, object?> obj)
-    {
-        if (attributeUsage.MatchedAttribute != null)
-            obj["matched_attribute"] = attributeUsage.MatchedAttribute;
+    public string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles, ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null) => ArchitectureClassificationCiArtifactsRenderer.FormatResultForCiArtifacts(mode, passed, violations, cycles, classificationRoles, classificationPathDeferred, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
 
-        if (attributeUsage.AttributeUsageKind != null)
-            obj["attribute_usage_kind"] = attributeUsage.AttributeUsageKind;
+    public static string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles, ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null) => ArchitectureClassificationCiArtifactsRenderer.FormatResultForCiArtifacts(mode, passed, violations, cycles, cycleFindings, classificationRoles, classificationPathDeferred, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures); // NOSONAR: reviewed public compatibility overload
 
-        if (attributeUsage.ExpectedAttributeLocation != null)
-            obj["expected_attribute_location"] = attributeUsage.ExpectedAttributeLocation;
+    public string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles, ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics, IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null) => ArchitectureClassificationCiArtifactsRenderer.FormatResultForCiArtifacts(mode, passed, violations, cycles, classificationRoles, classificationPathDeferred, preflightDiagnostics, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
 
-        if (attributeUsage.ActualAttributeLocation != null)
-            obj["actual_attribute_location"] = attributeUsage.ActualAttributeLocation;
-    }
+    public static string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles, ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics, IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null) => ArchitectureClassificationCiArtifactsRenderer.FormatResultForCiArtifacts(mode, passed, violations, cycles, cycleFindings, classificationRoles, classificationPathDeferred, preflightDiagnostics, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures); // NOSONAR: reviewed public compatibility overload
 
-    private static void ApplyInheritanceCiFields(InheritanceDiagnostic inheritance, Dictionary<string, object?> obj)
-    {
-        if (inheritance.ForbiddenBaseType != null)
-            obj["forbidden_base_type"] = inheritance.ForbiddenBaseType;
+    public static string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles, ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics, ArchitectureSourceExpansionInventory sourceExpansion, IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null, IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null) => ArchitectureSourceExpansionProjector.FormatResultForCiArtifacts(mode, passed, violations, cycles, cycleFindings, classificationRoles, classificationPathDeferred, preflightDiagnostics, sourceExpansion, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures, subtractiveMatcherParticipation); // NOSONAR: reviewed public compatibility overload
 
-        if (inheritance.InheritanceSourceSurface != null)
-            obj["source_surface"] = inheritance.InheritanceSourceSurface;
-    }
+    public static string FormatResultForCiArtifacts(string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles, ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics, ArchitectureSourceExpansionInventory sourceExpansion, IReadOnlyCollection<ArchitectureViolation>? coverageFindings, IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched, IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings, IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries, IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts, IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures, IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation, CancellationToken cancellationToken) => ArchitectureSourceExpansionProjector.FormatResultForCiArtifacts(mode, passed, violations, cycles, cycleFindings, classificationRoles, classificationPathDeferred, preflightDiagnostics, sourceExpansion, coverageFindings, unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures, subtractiveMatcherParticipation, cancellationToken); // NOSONAR: reviewed public compatibility overload
 
-    private static void ApplyInterfaceImplementationCiFields(
-        InterfaceImplementationDiagnostic interfaceImplementation, Dictionary<string, object?> obj)
-    {
-        if (interfaceImplementation.MatchedInterface != null)
-            obj["matched_interface"] = interfaceImplementation.MatchedInterface;
+    public string FormatClassificationFactsForHumans(
+        IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures) =>
+        ArchitectureClassificationCiArtifactsRenderer.FormatClassificationFactsForHumans(conflicts, metadataFailures);
 
-        if (interfaceImplementation.ImplementationKind != null)
-            obj["implementation_kind"] = interfaceImplementation.ImplementationKind;
+    public string FormatClassificationFactsForHumans(
+        IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred) =>
+        ArchitectureClassificationCiArtifactsRenderer.FormatClassificationFactsForHumans(conflicts, metadataFailures, classificationPathDeferred);
 
-        if (interfaceImplementation.ExpectedImplementationLocation != null)
-            obj["expected_implementation_location"] = interfaceImplementation.ExpectedImplementationLocation;
+    public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles) =>
+        ArchitectureCycleRenderer.FormatCyclesForHumans(cycles);
 
-        if (interfaceImplementation.ActualImplementationLocation != null)
-            obj["actual_implementation_location"] = interfaceImplementation.ActualImplementationLocation;
-    }
+    public static string FormatCyclesForHumans(IReadOnlyCollection<ArchitectureCycleFinding> cycles) =>
+        ArchitectureCycleRenderer.FormatCyclesForHumans(cycles);
 
-    private static void ApplyCompositionCiFields(CompositionDiagnostic composition, Dictionary<string, object?> obj)
-    {
-        if (composition.SourceMember != null)
-            obj["source_member"] = composition.SourceMember;
+    public string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles) =>
+        ArchitectureCycleRenderer.FormatCyclesForCiArtifacts(contractName, contractId, cycles);
 
-        if (composition.MatchedForbiddenApi != null)
-            obj["matched_forbidden_api"] = composition.MatchedForbiddenApi;
-
-        if (composition.SourceAssembly != null)
-            obj["source_assembly"] = composition.SourceAssembly;
-
-        if (composition.ExpectedCompositionBoundary != null)
-            obj["expected_composition_boundary"] = composition.ExpectedCompositionBoundary;
-    }
-
-    private static void ApplyProjectMetadataCiFields(ProjectMetadataDiagnostic projectMetadata, Dictionary<string, object?> obj)
-    {
-        if (projectMetadata.ProjectMetadataKind != null)
-            obj["project_metadata_kind"] = projectMetadata.ProjectMetadataKind;
-
-        if (projectMetadata.ProjectMetadataKey != null)
-            obj["project_metadata_key"] = projectMetadata.ProjectMetadataKey;
-
-        if (projectMetadata.ProjectMetadataExpectedValue != null)
-            obj["project_metadata_expected_value"] = projectMetadata.ProjectMetadataExpectedValue;
-
-        if (projectMetadata.ProjectMetadataActualValue != null)
-            obj["project_metadata_actual_value"] = projectMetadata.ProjectMetadataActualValue;
-
-        if (projectMetadata.ProjectMetadataSourcePath != null)
-            obj["project_metadata_source_path"] = projectMetadata.ProjectMetadataSourcePath;
-    }
-
-    private static void ApplyConfigurationCiFields(ConfigurationDiagnostic configuration, Dictionary<string, object?> obj)
-    {
-        if (configuration.TemplateName != null)
-            obj["template_name"] = configuration.TemplateName;
-
-        if (configuration.ContainerNamespace != null)
-            obj["container_namespace"] = configuration.ContainerNamespace;
-
-        if (configuration.DependencyPaths != null)
-            obj["dependency_paths"] = configuration.DependencyPaths.Select(p => p.ToArray()).ToArray();
-    }
+    public static string FormatCyclesForCiArtifacts(
+        string contractName, string? contractId, IReadOnlyCollection<ArchitectureCycleFinding> cycles) =>
+        ArchitectureCycleRenderer.FormatCyclesForCiArtifacts(contractName, contractId, cycles);
 }

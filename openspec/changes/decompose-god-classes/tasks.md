@@ -11,8 +11,9 @@
 - [x] 2.1 Map the dependencies and responsibility seams currently hidden in `ArchitectureAnalysisSession`; extract the first cohesive analysis collaborator with focused parity tests.
 - [x] 2.2 Extract the remaining `ArchitectureAnalysisSession` family-analysis collaborators and reduce the session to orchestration without `partial` declarations.
 - [x] 2.3 Replace the `ArchitectureContractGroups` partial aggregation with a single purpose-named, non-partial contract-group binding root while preserving YAML and public API compatibility.
-- [ ] 2.4 Replace `ArchitectureDiagnosticFormatter` and SARIF formatter partial aggregates with named renderers/projections while preserving human, JSON, and SARIF output parity.
+- [x] 2.4 Replace `ArchitectureDiagnosticFormatter` and SARIF formatter partial aggregates with named renderers/projections while preserving human, JSON, and SARIF output parity.
   - [x] Extract the v0.8 applicability, waiver, imported-diagnostic, policy-inventory, and contract-surface projections behind compatibility façades, and move imported-diagnostic SARIF locations to a focused projection collaborator (#777).
+  - [x] Extract the remaining diagnostic and SARIF responsibility families into top-level internal, non-partial renderers/projectors; retain one public compatibility façade per formatter, preserve output/cancellation parity, and remove the two exact declaration-count waivers (#802).
 - [ ] 2.5 Remove incidental production partial aggregates created by command, validation, policy-loading, and source-index splits; every replacement must have a named responsibility.
   - [x] Replace the five-declaration `ValidateCommandHandler` and two-declaration `ReportCoordinator`
     aggregates with non-partial responsibility collaborators, preserve command/cache/cancellation/profile

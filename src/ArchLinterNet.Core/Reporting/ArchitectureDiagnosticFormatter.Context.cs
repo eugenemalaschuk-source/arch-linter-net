@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
@@ -6,13 +7,13 @@ namespace ArchLinterNet.Core.Reporting;
 // (ContextDependencyDiagnostic/ContextAllowOnlyDiagnostic). Split into its own partial file to
 // keep ArchitectureDiagnosticFormatter.cs under the repository's 800-line decomposition limit,
 // mirroring ArchitectureDiagnosticFormatter.Classification.cs.
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitectureDiagnosticContextRenderer
 {
     // Contextual diagnostics are structurally distinct from DependencyDiagnostic (a separate record
     // type, not a subclass), so they need their own human-readable context — this is also what makes
     // a contextual violation visibly distinguishable from a namespace/layer dependency violation in
     // human-readable output, per the contextual-dependency-contracts/contextual-allow-only-contracts specs.
-    private static string FormatContextDependencyContextForHumans(ContextDependencyDiagnostic diagnostic)
+    internal static string FormatContextDependencyContextForHumans(ContextDependencyDiagnostic diagnostic)
     {
         return $" (kind: context_dependency, source_role: {diagnostic.SourceRole ?? "?"}, " +
                $"source_metadata: {FormatMetadataForHumans(diagnostic.SourceMetadata)}, " +
@@ -22,7 +23,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                $"{FormatWhenExpressionsForHumans(diagnostic.WhenExpressions)})";
     }
 
-    private static string FormatContextAllowOnlyContextForHumans(ContextAllowOnlyDiagnostic diagnostic)
+    internal static string FormatContextAllowOnlyContextForHumans(ContextAllowOnlyDiagnostic diagnostic)
     {
         return $" (kind: context_allow_only, source_role: {diagnostic.SourceRole ?? "?"}, " +
                $"source_metadata: {FormatMetadataForHumans(diagnostic.SourceMetadata)}, " +
@@ -37,7 +38,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     // selector produce an empty suffix, leaving existing output byte-identical. A single violation
     // can carry more than one entry (e.g. both `source.when` and the matched `forbidden[*].when`);
     // each is rendered with its Location so a reader can tell which selector it came from.
-    private static string FormatWhenExpressionsForHumans(IReadOnlyList<ExpressionParticipation>? whenExpressions)
+    internal static string FormatWhenExpressionsForHumans(IReadOnlyList<ExpressionParticipation>? whenExpressions)
     {
         if (whenExpressions == null || whenExpressions.Count == 0)
         {
@@ -57,7 +58,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         }));
     }
 
-    private static void ApplyWhenExpressionsCiFields(
+    internal static void ApplyWhenExpressionsCiFields(
         IReadOnlyList<ExpressionParticipation>? whenExpressions, Dictionary<string, object?> obj)
     {
         if (whenExpressions == null || whenExpressions.Count == 0)
@@ -91,7 +92,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             .Select(entry => $"{entry.Key}={entry.Value}")) + "}";
     }
 
-    private static void ApplyContextDependencyCiFields(ContextDependencyDiagnostic diagnostic, Dictionary<string, object?> obj)
+    internal static void ApplyContextDependencyCiFields(ContextDependencyDiagnostic diagnostic, Dictionary<string, object?> obj)
     {
         if (diagnostic.SourceRole != null)
             obj["source_role"] = diagnostic.SourceRole;
@@ -111,7 +112,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         ApplyWhenExpressionsCiFields(diagnostic.WhenExpressions, obj);
     }
 
-    private static void ApplyContextAllowOnlyCiFields(ContextAllowOnlyDiagnostic diagnostic, Dictionary<string, object?> obj)
+    internal static void ApplyContextAllowOnlyCiFields(ContextAllowOnlyDiagnostic diagnostic, Dictionary<string, object?> obj)
     {
         if (diagnostic.SourceRole != null)
             obj["source_role"] = diagnostic.SourceRole;
@@ -131,13 +132,13 @@ public sealed partial class ArchitectureDiagnosticFormatter
         ApplyWhenExpressionsCiFields(diagnostic.WhenExpressions, obj);
     }
 
-    private static string FormatPortBoundaryContextForHumans(PortBoundaryDiagnostic diagnostic) =>
+    internal static string FormatPortBoundaryContextForHumans(PortBoundaryDiagnostic diagnostic) =>
         $" (kind: port_boundary, evidence_kind: {diagnostic.EvidenceKind ?? "?"}, " +
         $"expected_seam: {diagnostic.ExpectedSeam ?? "?"}, source_role: {diagnostic.SourceRole ?? "?"}, " +
         $"source_metadata: {FormatMetadataForHumans(diagnostic.SourceMetadata)}, target_role: {diagnostic.TargetRole ?? "?"}, " +
         $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)})";
 
-    private static void ApplyPortBoundaryCiFields(PortBoundaryDiagnostic diagnostic, Dictionary<string, object?> obj)
+    internal static void ApplyPortBoundaryCiFields(PortBoundaryDiagnostic diagnostic, Dictionary<string, object?> obj)
     {
         obj["evidence_kind"] = diagnostic.EvidenceKind;
         obj["expected_seam"] = diagnostic.ExpectedSeam;

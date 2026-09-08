@@ -16,7 +16,7 @@ public sealed class ArchitectureDiagnosticFormatterDetailProjectionRegistryTests
             .OrderBy(t => t.Name, StringComparer.Ordinal)
             .ToList();
 
-        var registeredTypes = ArchitectureDiagnosticFormatter.DiagnosticDetailProjectionRegistry.All
+        var registeredTypes = ArchitectureDiagnosticDetailProjectionRegistry.All
             .Select(entry => entry.DiagnosticType)
             .OrderBy(t => t.Name, StringComparer.Ordinal)
             .ToList();
@@ -29,7 +29,7 @@ public sealed class ArchitectureDiagnosticFormatterDetailProjectionRegistryTests
     [Test]
     public void All_HasNoDuplicateDiagnosticTypes()
     {
-        List<Type> types = ArchitectureDiagnosticFormatter.DiagnosticDetailProjectionRegistry.All
+        List<Type> types = ArchitectureDiagnosticDetailProjectionRegistry.All
             .Select(entry => entry.DiagnosticType)
             .ToList();
 
@@ -39,7 +39,7 @@ public sealed class ArchitectureDiagnosticFormatterDetailProjectionRegistryTests
     [Test]
     public void All_EveryEntryHasANonNullProjector()
     {
-        foreach (DiagnosticDetailProjectionEntry entry in ArchitectureDiagnosticFormatter.DiagnosticDetailProjectionRegistry.All)
+        foreach (DiagnosticDetailProjectionEntry entry in ArchitectureDiagnosticDetailProjectionRegistry.All)
         {
             Assert.That(entry.Projector, Is.Not.Null, $"Diagnostic type '{entry.DiagnosticType.Name}' must expose a live projector delegate.");
         }

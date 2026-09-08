@@ -1,10 +1,11 @@
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitecturePolicyProvenanceProjector
 {
-    private static void ApplyPolicyLocationFields(
+    internal static void ApplyPolicyLocationFields(
         ArchitectureDiagnostic diagnostic,
         Dictionary<string, object?> target)
     {
@@ -60,7 +61,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return result;
     }
 
-    private static string FormatPolicyLocationSuffix(ArchitectureDiagnostic diagnostic)
+    internal static string FormatPolicyLocationSuffix(ArchitectureDiagnostic diagnostic)
     {
         if (diagnostic.PolicyLocation is null)
         {

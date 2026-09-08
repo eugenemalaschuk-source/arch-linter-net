@@ -1,10 +1,11 @@
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitectureBuildStatePreflightRenderer
 {
-    public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics)
+    internal static string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics)
     {
         if (diagnostics.Count == 0)
         {
@@ -56,7 +57,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return finding.RemediationHint is null ? line : line + FormatRemediationHintForHumans(finding.RemediationHint);
     }
 
-    private static object[] BuildStatePreflightJson(
+    internal static object[] BuildStatePreflightJson(
         IReadOnlyCollection<BuildStatePreflightDiagnostic>? diagnostics,
         string mode)
     {
@@ -85,7 +86,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         _ => throw new ArgumentOutOfRangeException(nameof(state), state, null)
     };
 
-    private static void ApplyBuildStatePreflightCiFields(BuildStatePreflightDiagnostic preflight, Dictionary<string, object?> obj)
+    internal static void ApplyBuildStatePreflightCiFields(BuildStatePreflightDiagnostic preflight, Dictionary<string, object?> obj)
     {
         BuildStatePreflightEvidence evidence = preflight.Evidence;
         obj["state"] = StateToken(preflight.State); obj["project_path"] = evidence.ProjectPath;

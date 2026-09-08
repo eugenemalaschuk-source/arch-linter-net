@@ -1,15 +1,16 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitectureViolationCiArtifactsRenderer
 {
-    public string FormatViolationsForCiArtifacts(string contractName, string? contractId,
+    internal static string FormatViolationsForCiArtifacts(string contractName, string? contractId,
         IReadOnlyCollection<ArchitectureViolation> violations) =>
         FormatViolationsForCiArtifacts(contractName, contractId, violations, CancellationToken.None);
 
-    public string FormatViolationsForCiArtifacts(string contractName, string? contractId,
+    internal static string FormatViolationsForCiArtifacts(string contractName, string? contractId,
         IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

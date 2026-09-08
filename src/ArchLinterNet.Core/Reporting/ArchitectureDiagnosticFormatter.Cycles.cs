@@ -1,11 +1,12 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public sealed partial class ArchitectureDiagnosticFormatter
+internal static class ArchitectureCycleRenderer
 {
-    public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
+    internal static string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
     {
         var findings = cycles
             .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
@@ -17,7 +18,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 .Select(finding => $"- {((CycleDiagnostic)finding.Details).Path}"));
     }
 
-    public static string FormatCyclesForHumans(IReadOnlyCollection<ArchitectureCycleFinding> cycles)
+    internal static string FormatCyclesForHumans(IReadOnlyCollection<ArchitectureCycleFinding> cycles)
     {
         var findings = cycles
             .Select(ArchitectureDiagnosticMapper.FromCycle)
@@ -35,7 +36,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 }));
     }
 
-    public string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles)
+    internal static string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles)
     {
         var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName, contractId));
 
@@ -50,7 +51,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return JsonSerializer.Serialize(payload);
     }
 
-    public static string FormatCyclesForCiArtifacts(
+    internal static string FormatCyclesForCiArtifacts(
         string contractName,
         string? contractId,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles)
@@ -69,10 +70,10 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return JsonSerializer.Serialize(payload);
     }
 
-    private static Dictionary<string, object?> ToCycleJsonObject(ArchitectureCycleFinding cycle, string? mode) =>
+    internal static Dictionary<string, object?> ToCycleJsonObject(ArchitectureCycleFinding cycle, string? mode) =>
         ToCycleJsonObject(ArchitectureDiagnosticMapper.FromCycle(cycle), mode);
 
-    private static Dictionary<string, object?> ToCycleJsonObject(CycleDiagnostic diagnostic, string? mode)
+    internal static Dictionary<string, object?> ToCycleJsonObject(CycleDiagnostic diagnostic, string? mode)
     {
         ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(diagnostic, mode);
         Dictionary<string, object?> obj = ToCiJsonObject(finding, includeContract: true);
