@@ -17,7 +17,7 @@ public enum BuildStatePreflightState
     UnverifiableArtifact,
     Current,
 
-    // Terminal execution-failure outcome: emitted only by BuildStatePreparationService's
+    // Terminal execution-failure outcome: emitted only by BuildStateRuntimeBuildPreparation's
     // `dotnet build` invocation during --ensure-built, never by Evaluate()'s precedence walk. It
     // is distinct from MissingArtifact (an ordinary-mode observation of absent output) because a
     // failed build attempt is a different, actionable event with its own evidence (build
@@ -25,7 +25,7 @@ public enum BuildStatePreflightState
     BuildFailed,
 
     // Terminal execution-failure outcome, distinct from BuildFailed: emitted only by
-    // BuildStatePreparationService's up-front `dotnet restore` invocation during --ensure-built,
+    // BuildStateRuntimeBuildPreparation's up-front `dotnet restore` invocation during --ensure-built,
     // before the build is even attempted. Keeping this separate from BuildFailed lets a caller
     // tell "the network/package restore step failed" apart from "the build itself failed after a
     // successful restore" — different root causes with different remediation.

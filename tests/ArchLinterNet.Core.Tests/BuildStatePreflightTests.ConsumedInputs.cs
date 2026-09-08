@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -26,5 +27,25 @@ public sealed partial class BuildStatePreflightTests
             Path.GetFullPath(projectPath),
             Path.Combine(Path.GetDirectoryName(projectPath)!, "Class1.cs"),
         }));
+    }
+
+    [Test]
+    public void Evaluate_MalformedReceipt_IsUnverifiableAndNeverCurrent()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        File.WriteAllText(BuildReceiptStore.ReceiptPathFor(assemblyPath), "{ malformed receipt");
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, SingleProjectDiscovery(projectPath, "Fixture"), SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary));
+
+        BuildStatePreflightDiagnostic diagnostic = result.Diagnostics.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostic.State, Is.EqualTo(BuildStatePreflightState.UnverifiableArtifact));
+            Assert.That(diagnostic.State, Is.Not.EqualTo(BuildStatePreflightState.Current));
+            Assert.That(diagnostic.Evidence.Detail, Does.Contain("No ArchLinterNet build receipt"));
+        });
     }
 }

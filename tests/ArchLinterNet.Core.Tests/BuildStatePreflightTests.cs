@@ -51,7 +51,7 @@ public sealed partial class BuildStatePreflightTests
         catch (IOException)
         {
             // Best-effort cleanup: on Windows, Assembly.LoadFrom (used by
-            // BuildStatePreparationService.ResolveBuiltAssemblies, exercised by the
+            // BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblies, exercised by the
             // ensure-built integration test below) keeps its backing .dll file locked for the
             // lifetime of this process's default AssemblyLoadContext — the OS temp directory is
             // cleaned up independently, so a leftover locked file here is not a test failure.
@@ -554,7 +554,7 @@ public sealed partial class BuildStatePreflightTests
     }
 
     // Issue #375: cancellation during EnsureBuilt must terminate the in-flight child
-    // dotnet restore/build process (without a shell — see BuildStatePreparationService's
+    // dotnet restore/build process (without a shell — see BuildStateRuntimeBuildPreparation's
     // ProcessStartInfo, which never sets UseShellExecute=true) and still remove the temporary
     // .slnx solution the existing `finally` block in InvokeGraphBuild already cleans up.
     [Test]
@@ -599,7 +599,7 @@ public sealed partial class BuildStatePreflightTests
         bool killed = false;
 
         BuildStateProcessCleanupTimedOutException? thrown = Assert.Throws<BuildStateProcessCleanupTimedOutException>(() =>
-            BuildStatePreparationService.WaitForExitOrCancellationCore(
+            BuildStateRuntimeBuildProcessExecutor.WaitForExitOrCancellationCore(
                 waitForExit: _ => false,
                 killProcessTree: () => killed = true,
                 cancellationToken: cts.Token,
@@ -618,7 +618,7 @@ public sealed partial class BuildStatePreflightTests
         bool killed = false;
 
         Assert.Throws<OperationCanceledException>(() =>
-            BuildStatePreparationService.WaitForExitOrCancellationCore(
+            BuildStateRuntimeBuildProcessExecutor.WaitForExitOrCancellationCore(
                 waitForExit: _ => killed, // exits only after the kill has been requested
                 killProcessTree: () => killed = true,
                 cancellationToken: cts.Token,
