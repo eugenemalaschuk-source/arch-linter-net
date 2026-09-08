@@ -18,7 +18,7 @@ internal static class ArchitectureNormalizedDetailsProjector
                 $"No diagnostic detail projector registered for diagnostic type '{diagnostic.GetType().Name}'.");
         }
 
-        projector!(diagnostic, obj);
+        projector(diagnostic, obj);
     }
 
     internal static void ApplyExternalDependencyCiFields(ExternalDependencyDiagnostic external, Dictionary<string, object?> obj)

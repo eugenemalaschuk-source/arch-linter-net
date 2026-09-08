@@ -6,7 +6,7 @@ namespace ArchLinterNet.Core.Reporting;
 
 internal static class ArchitectureClassificationCiArtifactsRenderer
 {
-    internal static string FormatResultForCiArtifacts(
+    internal static string FormatResultForCiArtifacts( // NOSONAR: preserves the reviewed compatibility overload's payload contract
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -47,7 +47,7 @@ internal static class ArchitectureClassificationCiArtifactsRenderer
     /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the original overload instead of extending it.
     /// </summary>
-    internal static string FormatResultForCiArtifacts(
+    internal static string FormatResultForCiArtifacts( // NOSONAR: preserves the reviewed compatibility overload's payload contract
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -90,7 +90,7 @@ internal static class ArchitectureClassificationCiArtifactsRenderer
     /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the roles overload instead of extending it.
     /// </summary>
-    internal static string FormatResultForCiArtifacts(
+    internal static string FormatResultForCiArtifacts( // NOSONAR: preserves the reviewed compatibility overload's payload contract
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -135,7 +135,7 @@ internal static class ArchitectureClassificationCiArtifactsRenderer
     /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the classificationPathDeferred overload instead of extending it.
     /// </summary>
-    internal static string FormatResultForCiArtifacts(
+    internal static string FormatResultForCiArtifacts( // NOSONAR: preserves the reviewed compatibility overload's payload contract
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,

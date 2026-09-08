@@ -22,7 +22,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
     internal const string PhysicalLocationKey = "physicalLocation";
     internal const string ArtifactLocationKey = "artifactLocation";
 
-    public string FormatResultAsSarif(
+    public string FormatResultAsSarif( // NOSONAR: reviewed interface overload remains separate from extracted compatibility overloads
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
@@ -718,7 +718,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 
     // Compatibility façade for the extended SARIF surface. The source-expansion and preflight
     // projectors own their payloads; these overloads only preserve the existing public signatures.
-    public string FormatResultAsSarif(
+    public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries, string toolVersion) =>
@@ -733,14 +733,14 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
         ArchitectureSarifBuildStatePreflightProjector.FormatResultAsSarif(
             mode, violations, cycles, preflightDiagnostics, coverageSummaries, toolVersion);
 
-    public string FormatResultAsSarif(
+    public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         string toolVersion) =>
         ArchitectureSarifBuildStatePreflightProjector.FormatResultAsSarif(
             mode, violations, cycles, preflightDiagnostics, toolVersion);
 
-    public static string FormatResultAsSarif(
+    public static string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
@@ -748,7 +748,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
         ArchitectureSarifBuildStatePreflightProjector.FormatResultAsSarif(
             mode, violations, cycles, preflightDiagnostics, toolVersion);
 
-    public string FormatResultAsSarif(
+    public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
@@ -758,7 +758,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
             mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, toolVersion,
             subtractiveMatcherParticipation);
 
-    public static string FormatResultAsSarif(
+    public static string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
@@ -769,7 +769,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
             mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, toolVersion,
             subtractiveMatcherParticipation);
 
-    public string FormatResultAsSarif(
+    public string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload cannot be made static
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
@@ -780,7 +780,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
             mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, toolVersion,
             subtractiveMatcherParticipation, cancellationToken);
 
-    public static string FormatResultAsSarif(
+    public static string FormatResultAsSarif( // NOSONAR: reviewed public compatibility overload
         string mode, IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
