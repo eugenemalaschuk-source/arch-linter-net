@@ -6,8 +6,8 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Validate.Application;
 
-// Rendering helpers are kept separate from report routing so output accounting stays readable.
-internal sealed partial class ReportCoordinator
+// Applicability and completion projections are rendered from the already-computed Core outcome.
+internal sealed class ReportApplicabilityRenderer
 {
     private const string PropertiesPropertyName = "properties";
 
@@ -20,20 +20,10 @@ internal sealed partial class ReportCoordinator
     // regardless of what any one policy happens to declare.
     private const string ImportedRuleIdPrefix = "external-evidence:";
 
-    private string FormatHumanContent(
-        bool isSingleMode,
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
-        CancellationToken cancellationToken)
-    {
-        return isSingleMode
-            ? FormatSingleHuman(outcomesByMode[0].Outcome, cancellationToken)
-            : FormatCombinedHuman(outcomesByMode, cancellationToken);
-    }
-
     private static string CompletionStateToken(ArchitectureAssessmentCompletionState state) =>
         state.ToString().ToLowerInvariant();
 
-    private static string AddAssessmentCompletionToJson(
+    internal string AddAssessmentCompletionToJson(
         string json,
         ArchitectureAssessmentCompletionEvidence? completion,
         ArchitectureApplicabilityProjection? projection = null)
@@ -280,7 +270,7 @@ internal sealed partial class ReportCoordinator
         return result;
     }
 
-    private static string AddAssessmentCompletionToSarif(
+    internal string AddAssessmentCompletionToSarif(
         string json,
         ArchitectureAssessmentCompletionEvidence? completion,
         ArchitectureApplicabilityProjection? projection = null)
@@ -447,250 +437,4 @@ internal sealed partial class ReportCoordinator
         };
     }
 
-    // cancellationToken defaults to None so RenderReportContent (which must always complete a
-    // render regardless of the real cancellation state — see its own comment) keeps working
-    // unchanged; every other caller passes the live token through, checked per violation inside
-    // the widest FormatResultForCiArtifacts overload — the dominant contributor to a large
-    // report's size, not just before/after this call.
-    private string FormatJsonContent(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
-    {
-        string result = _runtime.FormatResultForCiArtifacts(
-            mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.CoverageFindings,
-            outcome.UnmatchedIgnoredViolations,
-            outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
-            outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
-            outcome.ClassificationRoles, outcome.ClassificationPathDeferred, outcome.PreflightDiagnostics,
-            outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
-
-        result = outcome.Waivers.Count == 0
-            ? result
-            : ArchitectureDiagnosticFormatter.AddWaiversToCiArtifacts(result, outcome.Waivers);
-        result = ArchitectureDiagnosticFormatter.AddPolicyInventoryToCiArtifacts(result, outcome.PolicyInventory);
-        result = AddImportedDiagnosticsToJson(result, outcome.ImportedDiagnosticFindings);
-
-        return AddAssessmentCompletionToJson(
-            result, outcome.AssessmentCompletionEvidence, outcome.ApplicabilityProjection);
-    }
-
-    // Additive side-channel, mirroring how applicability_findings is already added to the JSON
-    // payload above rather than merged into the native "violations" array — imported diagnostics
-    // are ArchitectureFinding-normalized (like applicability), not ArchitectureViolation-shaped.
-    private static string AddImportedDiagnosticsToJson(string json, IReadOnlyList<ArchitectureFinding> findings)
-    {
-        if (findings.Count == 0)
-        {
-            return json;
-        }
-
-        JsonNode document = JsonNode.Parse(json)
-            ?? throw new InvalidOperationException("The validation JSON report was empty.");
-        if (document is not JsonObject payload)
-        {
-            throw new InvalidOperationException("The validation JSON report was not an object.");
-        }
-
-        JsonArray result = new();
-        foreach (ArchitectureFinding finding in findings)
-        {
-            result.Add(JsonSerializer.SerializeToNode(
-                ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding)));
-        }
-
-        payload["imported_diagnostics"] = result;
-        return payload.ToJsonString();
-    }
-
-    private string FormatSarifContent(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
-    {
-        string result = _runtime.FormatResultAsSarif(
-            mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics,
-            outcome.CoverageSummaries, outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
-        result = AddImportedDiagnosticsToSarif(result, outcome.ImportedDiagnosticFindings, cancellationToken);
-
-        return AddAssessmentCompletionToSarif(
-            result, outcome.AssessmentCompletionEvidence, outcome.ApplicabilityProjection);
-    }
-
-    // Reuses the Core SARIF formatter (the same one ArchitectureExternalEvidenceBinder's caller
-    // chain already produces trusted findings through) to build the imported-diagnostics results
-    // and rules, then merges them into the existing run the same way AddApplicabilityFindingsToSarifRun
-    // merges applicability results — never hand-building an imported diagnostic's SARIF shape here.
-    private string AddImportedDiagnosticsToSarif(
-        string json, IReadOnlyList<ArchitectureFinding> findings, CancellationToken cancellationToken)
-    {
-        if (findings.Count == 0)
-        {
-            return json;
-        }
-
-        JsonNode document = JsonNode.Parse(json)
-            ?? throw new InvalidOperationException("The validation SARIF report was empty.");
-        if (document is not JsonObject payload)
-        {
-            throw new InvalidOperationException("The validation SARIF report was not an object.");
-        }
-
-        JsonArray runs = payload["runs"] as JsonArray ?? new JsonArray();
-        if (payload["runs"] is null)
-        {
-            payload["runs"] = runs;
-        }
-
-        if (runs.Count == 0)
-        {
-            runs.Add(new JsonObject
-            {
-                ["tool"] = new JsonObject
-                {
-                    ["driver"] = new JsonObject { ["name"] = "arch-linter-net", ["rules"] = new JsonArray() },
-                },
-                ["results"] = new JsonArray(),
-            });
-        }
-
-        string importedSarif = ArchitectureSarifFormatter.FormatFindingsAsSarif(
-            findings, _runtime.Version, cancellationToken);
-        JsonObject importedPayload = (JsonNode.Parse(importedSarif) as JsonObject)!;
-        JsonObject importedRun = (importedPayload["runs"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault()
-            ?? new JsonObject();
-        JsonArray importedResults = importedRun["results"] as JsonArray ?? new JsonArray();
-        JsonArray importedRules = ((importedRun["tool"] as JsonObject)?["driver"] as JsonObject)?["rules"]
-            as JsonArray ?? new JsonArray();
-
-        NamespaceImportedRuleIds(importedResults, importedRules);
-        MergeImportedDiagnosticsIntoRun((JsonObject)runs[0]!, importedResults, importedRules);
-        return payload.ToJsonString();
-    }
-
-    private static void NamespaceImportedRuleIds(JsonArray results, JsonArray rules)
-    {
-        foreach (JsonObject ruleObject in rules.OfType<JsonObject>())
-        {
-            string? id = ruleObject["id"]?.GetValue<string>();
-            if (id is not null)
-            {
-                ruleObject["id"] = ImportedRuleIdPrefix + id;
-            }
-        }
-
-        foreach (JsonObject resultObject in results.OfType<JsonObject>())
-        {
-            string? ruleId = resultObject["ruleId"]?.GetValue<string>();
-            if (ruleId is not null)
-            {
-                resultObject["ruleId"] = ImportedRuleIdPrefix + ruleId;
-            }
-        }
-    }
-
-    private static void MergeImportedDiagnosticsIntoRun(
-        JsonObject run, JsonArray importedResults, JsonArray importedRules)
-    {
-        JsonArray results = run["results"] as JsonArray ?? new JsonArray();
-        run["results"] = results;
-        foreach (JsonNode? result in importedResults.ToArray())
-        {
-            results.Add(result?.DeepClone());
-        }
-
-        JsonObject tool = run["tool"] as JsonObject ?? new JsonObject();
-        run["tool"] = tool;
-        JsonObject driver = tool["driver"] as JsonObject ?? new JsonObject();
-        tool["driver"] = driver;
-        JsonArray rules = driver["rules"] as JsonArray ?? new JsonArray();
-
-        foreach (JsonNode? rule in importedRules)
-        {
-            if (rule is not JsonObject ruleObject)
-            {
-                continue;
-            }
-
-            string? ruleId = ruleObject["id"]?.GetValue<string>();
-            bool alreadyPresent = rules.OfType<JsonObject>()
-                .Any(existing => string.Equals(existing["id"]?.GetValue<string>(), ruleId, StringComparison.Ordinal));
-            if (!alreadyPresent)
-            {
-                rules.Add(rule.DeepClone());
-            }
-        }
-
-        JsonArray orderedRules = new();
-        foreach (JsonNode? rule in rules
-            .OfType<JsonObject>()
-            .OrderBy(rule => rule["id"]?.GetValue<string>(), StringComparer.Ordinal))
-        {
-            orderedRules.Add(rule.DeepClone());
-        }
-
-        driver["rules"] = orderedRules;
-    }
-
-    private static string? RenderContent(
-        string? needed,
-        string format,
-        Func<string> render,
-        SinkDistributionEvidence evidence,
-        ValidationTiming? timing)
-    {
-        if (needed is null)
-        {
-            return null;
-        }
-
-        string content;
-        using (timing?.Measure($"render_{format}"))
-            content = render();
-        evidence.RecordRenderedFormat(format);
-        return content;
-    }
-
-    private static string FormatStructuredContent(
-        bool isSingleMode,
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
-        Func<string, ValidationOutcome, CancellationToken, string> formatSingle,
-        Func<IReadOnlyList<(string Mode, ValidationOutcome Outcome)>, CancellationToken, string> formatCombined,
-        CancellationToken cancellationToken)
-    {
-        return isSingleMode
-            ? formatSingle(outcomesByMode[0].Mode, outcomesByMode[0].Outcome, cancellationToken)
-            : formatCombined(outcomesByMode, cancellationToken);
-    }
-
-    private static Dictionary<string, string> BuildContentByFormat(string? humanContent, string? jsonContent, string? sarifContent)
-    {
-        Dictionary<string, string> contentByFormat = new();
-        if (humanContent is not null)
-        {
-            contentByFormat[FormatHuman] = humanContent;
-        }
-        if (jsonContent is not null)
-        {
-            contentByFormat[FormatJson] = jsonContent;
-        }
-        if (sarifContent is not null)
-        {
-            contentByFormat[FormatSarif] = sarifContent;
-        }
-        return contentByFormat;
-    }
-
-    // Re-renders a complete document from an already-computed outcome for an output-error
-    // envelope; it never repeats validation or contract execution.
-    public string RenderReportContent(
-        string format, bool isSingleMode, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
-    {
-        return format switch
-        {
-            FormatJson => isSingleMode
-                ? FormatSingleJson(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
-                : FormatCombinedJson(outcomesByMode),
-            FormatSarif => isSingleMode
-                ? FormatSingleSarif(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
-                : FormatCombinedSarif(outcomesByMode),
-            _ => isSingleMode
-                ? FormatSingleHuman(outcomesByMode[0].Outcome)
-                : FormatCombinedHuman(outcomesByMode),
-        };
-    }
 }

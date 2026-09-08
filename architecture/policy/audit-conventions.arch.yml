@@ -38,7 +38,7 @@ contracts:
     # stays audit-only and keeps reporting the complete debt inventory that decompose-god-classes
     # targets. This strict rule reuses the same max_declarations_per_type evidence to block any
     # *new* or *grown* handwritten production partial aggregate immediately, while the
-    # ignored_violations entries below freeze today's 19 known aggregates as reviewed debt using
+    # ignored_violations entries below freeze today's 17 known aggregates as reviewed debt using
     # their exact current declaration count and file list. Any added, removed, or renamed
     # declaration changes that exact text, so a frozen entry only tolerates an unchanged aggregate;
     # growth, a new offender, or an improvement all surface as a failing (or newly unmatched, itself
@@ -50,12 +50,6 @@ contracts:
       max_declarations_per_type: 1
       reason: New or grown handwritten production partial-type aggregates are blocked immediately; see #742 and the decompose-god-classes OpenSpec change for the full cleanup authority.
       ignored_violations:
-        - source_type: "ArchLinterNet.Cli.Commands.Validate.Application.ReportCoordinator"
-          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Cli/Commands/Validate/Application/ReportCoordinator.Rendering.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ReportCoordinator.cs"
-          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
-        - source_type: "ArchLinterNet.Cli.Commands.Validate.Application.ValidateCommandHandler"
-          forbidden_reference: "expected at most 1 source declaration(s), found 5: src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.Cache.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.Cancellation.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.Execution.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.Profile.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.cs"
-          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
         - source_type: "ArchLinterNet.Core.Execution.ArchitectureAssemblyResolutionService"
           forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Execution/ArchitectureAssemblyResolutionService.TargetFramework.cs, src/ArchLinterNet.Core/Execution/ArchitectureAssemblyResolutionService.cs"
           reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."

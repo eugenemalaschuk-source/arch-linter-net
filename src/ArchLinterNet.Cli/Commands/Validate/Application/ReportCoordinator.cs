@@ -36,20 +36,20 @@ internal readonly record struct RouteResult(
     public IReadOnlyList<string> RenderedFormats { get; init; } = Array.Empty<string>();
 }
 
-internal sealed partial class ReportCoordinator
+internal sealed class ReportCoordinator
 {
     private const int MaxReportBytes = 100 * 1024 * 1024;
     private const string FormatHuman = "human";
     private const string FormatJson = "json";
     private const string FormatSarif = "sarif";
 
-    private readonly ICliRuntime _runtime;
+    private readonly ReportDocumentRenderer _renderer;
     private readonly ICliConsole _console;
     private readonly IFileSystem _fileSystem;
 
     public ReportCoordinator(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
-        _runtime = runtime;
+        _renderer = new ReportDocumentRenderer(runtime);
         _console = console;
         _fileSystem = fileSystem;
     }
@@ -118,16 +118,14 @@ internal sealed partial class ReportCoordinator
 
             string? humanContent = RenderContent(
                 StdoutOrAnySinkNeeds(FormatHuman, stdoutFormat, additionalSinks, isReportMode), FormatHuman,
-                () => FormatHumanContent(isSingleMode, outcomesByMode, cancellationToken), evidence, timing);
+                () => _renderer.RenderHumanContent(isSingleMode, outcomesByMode, cancellationToken), evidence, timing);
             string? jsonContent = RenderContent(
                 StdoutOrAnySinkNeeds(FormatJson, stdoutFormat, additionalSinks, isReportMode), FormatJson,
-                () => FormatStructuredContent(
-                    isSingleMode, outcomesByMode, FormatSingleJson, FormatCombinedJson, cancellationToken),
+                () => _renderer.RenderStructuredContent(FormatJson, isSingleMode, outcomesByMode, cancellationToken),
                 evidence, timing);
             string? sarifContent = RenderContent(
                 StdoutOrAnySinkNeeds(FormatSarif, stdoutFormat, additionalSinks, isReportMode), FormatSarif,
-                () => FormatStructuredContent(
-                    isSingleMode, outcomesByMode, FormatSingleSarif, FormatCombinedSarif, cancellationToken),
+                () => _renderer.RenderStructuredContent(FormatSarif, isSingleMode, outcomesByMode, cancellationToken),
                 evidence, timing);
 
             if (!isReportMode)
@@ -176,7 +174,7 @@ internal sealed partial class ReportCoordinator
 
             string content;
             using (timing?.Measure("render_human"))
-                content = FormatSingleHuman(outcome, cancellationToken);
+                content = _renderer.RenderHumanContent(isSingleMode: true, new[] { (string.Empty, outcome) }, cancellationToken);
             evidence.RecordRenderedFormat(FormatHuman);
             using (timing?.Measure("output_stream_write"))
                 _console.Out.WriteLine(content);
@@ -577,196 +575,59 @@ internal sealed partial class ReportCoordinator
         }
     }
 
-    // cancellationToken defaults to None (not threaded from RenderReportContent, which
-    // deliberately renders unconditionally — see that method's own comment) so the one caller
-    // that must always complete a render regardless of the real cancellation state keeps doing
-    // so; every other caller passes the live token through from RouteOutcomes.
-    private string FormatSingleHuman(ValidationOutcome outcome, CancellationToken cancellationToken = default)
+    private static string? RenderContent(
+        string? needed,
+        string format,
+        Func<string> render,
+        SinkDistributionEvidence evidence,
+        ValidationTiming? timing)
     {
-        var sb = new StringBuilder();
-        AppendHumanSection(sb, outcome, cancellationToken);
-        return StripAnsi(sb.ToString().TrimEnd());
+        if (needed is null)
+        {
+            return null;
+        }
+
+        string content;
+        using (timing?.Measure($"render_{format}"))
+        {
+            content = render();
+        }
+
+        evidence.RecordRenderedFormat(format);
+        return content;
     }
 
-    private string FormatCombinedHuman(
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode, CancellationToken cancellationToken = default)
+    private static Dictionary<string, string> BuildContentByFormat(
+        string? humanContent,
+        string? jsonContent,
+        string? sarifContent)
     {
-        var sb = new StringBuilder();
-        bool first = true;
-        foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
+        Dictionary<string, string> contentByFormat = new();
+        if (humanContent is not null)
         {
-            // Checked per mode — a combined strict+audit render can now be interrupted between
-            // modes instead of only before the whole multi-mode document starts.
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (!first)
-            {
-                sb.AppendLine();
-            }
-            first = false;
-            if (outcomesByMode.Count > 1)
-            {
-                sb.AppendLine($"=== Mode: {mode} ===");
-            }
-            AppendHumanSection(sb, outcome, cancellationToken);
+            contentByFormat[FormatHuman] = humanContent;
         }
-        return StripAnsi(sb.ToString().TrimEnd());
+
+        if (jsonContent is not null)
+        {
+            contentByFormat[FormatJson] = jsonContent;
+        }
+
+        if (sarifContent is not null)
+        {
+            contentByFormat[FormatSarif] = sarifContent;
+        }
+
+        return contentByFormat;
     }
 
-    internal static string StripAnsi(string content) => AnsiEscapeSequenceStripper.Strip(content);
+    // Re-renders a complete document from an already-computed outcome for output-error envelopes;
+    // it never repeats validation or contract execution.
+    public string RenderReportContent(
+        string format, bool isSingleMode, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode) =>
+        _renderer.RenderReportContent(format, isSingleMode, outcomesByMode);
 
-    // Checked between each section — a human report bundles up to six independently-sized
-    // sections (violations, cycles, policy consistency, unmatched ignores, coverage, coverage
-    // summary, classification facts); a token cancelled partway through no longer has to wait
-    // for every remaining section to render before it is observed.
-    private void AppendHumanSection(StringBuilder sb, ValidationOutcome outcome, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        string preflight = FormatHumanPreflight(outcome);
-        if (!string.IsNullOrEmpty(preflight))
-        {
-            sb.AppendLine(preflight);
-        }
-
-        if (outcome.PreflightBlocked)
-        {
-            return;
-        }
-
-        if (outcome.Passed)
-        {
-            sb.AppendLine("Architecture validation passed.");
-        }
-        else
-        {
-            if (outcome.Violations.Count > 0)
-            {
-                sb.AppendLine(_runtime.FormatViolationsForHumans(outcome.Violations, cancellationToken));
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (outcome.Cycles.Count > 0)
-            {
-                sb.AppendLine(_runtime.FormatCyclesForHumans(outcome.Cycles, outcome.CycleFindings));
-            }
-        }
-
-        // Imported external-evidence diagnostics are independent of native Passed/Violations: an
-        // audit-mode imported finding can be present and non-blocking even when native conformance
-        // passed, so this is rendered unconditionally rather than nested in the branch above.
-        cancellationToken.ThrowIfCancellationRequested();
-        if (outcome.ImportedDiagnosticFindings.Count > 0)
-        {
-            sb.AppendLine(ArchitectureDiagnosticFormatter.FormatFindingsForHumans(outcome.ImportedDiagnosticFindings, cancellationToken));
-        }
-
-        string assessmentCompletion = outcome.ApplicabilityProjection is { } applicabilityProjection
-            ? ArchitectureDiagnosticFormatter.FormatApplicabilityProjectionForHumans(applicabilityProjection)
-            : ArchitectureDiagnosticFormatter.FormatAssessmentCompletionForHumans(
-                outcome.AssessmentCompletionEvidence);
-        if (!string.IsNullOrEmpty(assessmentCompletion))
-        {
-            sb.AppendLine(assessmentCompletion);
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        AppendSection(sb, outcome.PolicyConsistencyConfig != "off" && outcome.PolicyConsistencyFindings.Count > 0,
-            () => _runtime.FormatPolicyConsistencyForHumans(outcome.PolicyConsistencyFindings));
-        cancellationToken.ThrowIfCancellationRequested();
-        AppendSection(sb, outcome.UnmatchedIgnoredViolations.Count > 0 && outcome.UnmatchedIgnoredViolationsConfig != "off",
-            () => _runtime.FormatUnmatchedForHumans(outcome.UnmatchedIgnoredViolations));
-        cancellationToken.ThrowIfCancellationRequested();
-        AppendSection(sb, outcome.PolicyInventory is not null,
-            () => ArchitectureDiagnosticFormatter.FormatPolicyInventoryForHumans(outcome.PolicyInventory));
-        cancellationToken.ThrowIfCancellationRequested();
-        AppendSection(sb, outcome.Waivers.Count > 0,
-            () => _runtime.FormatWaiversForHumans(outcome.Waivers));
-        cancellationToken.ThrowIfCancellationRequested();
-        AppendSection(sb, outcome.CoverageConfig != "off" && outcome.CoverageFindings.Count > 0,
-            () => _runtime.FormatCoverageForHumans(outcome.CoverageFindings, cancellationToken));
-        cancellationToken.ThrowIfCancellationRequested();
-        AppendSection(sb, outcome.CoverageSummaries.Count > 0,
-            () => _runtime.FormatCoverageSummaryForHumans(outcome.CoverageSummaries));
-        cancellationToken.ThrowIfCancellationRequested();
-        AppendSection(sb, outcome.ClassificationConflicts.Count > 0 || outcome.ClassificationMetadataFailures.Count > 0
-                || outcome.ClassificationPathDeferred != null,
-            () => _runtime.FormatClassificationFactsForHumans(
-                outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures, outcome.ClassificationPathDeferred));
-    }
-
-    private string FormatHumanPreflight(ValidationOutcome outcome)
-    {
-        if (outcome.PreflightDiagnostics.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        string text = _runtime.FormatBuildStatePreflightForHumans(outcome.PreflightDiagnostics);
-        return string.IsNullOrEmpty(text) ? string.Empty : $"\n{text}";
-    }
-
-    private static void AppendSection(StringBuilder sb, bool shouldWrite, Func<string> contentFactory)
-    {
-        if (!shouldWrite)
-        {
-            return;
-        }
-
-        string content = contentFactory();
-        if (string.IsNullOrEmpty(content))
-        {
-            return;
-        }
-
-        sb.AppendLine();
-        sb.AppendLine(content);
-    }
-
-    private string FormatSingleJson(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
-    {
-        return FormatJsonContent(mode, outcome, cancellationToken);
-    }
-
-    private string FormatCombinedJson(
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode, CancellationToken cancellationToken = default)
-    {
-        JsonArray results = new();
-        foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
-        {
-            // Checked per mode — a combined strict+audit document stops adding further modes'
-            // results once cancellation is observed, instead of only checking before the whole
-            // multi-mode document starts. FormatJsonContent below additionally checks per finding
-            // within a single mode's own violations list.
-            cancellationToken.ThrowIfCancellationRequested();
-            results.Add(JsonNode.Parse(FormatJsonContent(mode, outcome, cancellationToken)));
-        }
-
-        return new JsonObject { ["results"] = results }.ToJsonString();
-    }
-
-    private string FormatSingleSarif(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
-    {
-        return FormatSarifContent(mode, outcome, cancellationToken);
-    }
-
-    private string FormatCombinedSarif(
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode, CancellationToken cancellationToken = default)
-    {
-        JsonArray runs = new();
-        foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            JsonNode? document = JsonNode.Parse(FormatSarifContent(mode, outcome, cancellationToken));
-            foreach (JsonNode? run in document?["runs"]?.AsArray() ?? new JsonArray())
-            {
-                runs.Add(run?.DeepClone());
-            }
-        }
-
-        return new JsonObject { ["version"] = "2.1.0", ["runs"] = runs }.ToJsonString();
-    }
+    internal static string StripAnsi(string content) => ReportDocumentRenderer.StripAnsi(content);
 
     private static string DispatchFormat(
         string format,
