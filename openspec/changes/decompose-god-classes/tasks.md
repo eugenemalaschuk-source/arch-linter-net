@@ -34,6 +34,9 @@
     remediation owner: existing #802/#803, #807 through #816, Core Model #819, History #820, and
     factual `build_state_preflight` presentation #801. The shared policy/OpenSpec hunks remain serial
     coordination work; this records ownership and does not mark the extraction task complete (#804).
+  - [x] Extract `ArchitectureSourceFileFactIndex` bounded source traversal and its parallel partition
+    seam into `ArchitectureSourceFileFactTraversal`, retaining one lazy/cached facade, deterministic
+    merge and cancellation behavior, and rejecting enumerated paths outside configured source roots (#810).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
