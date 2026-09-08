@@ -400,7 +400,7 @@ internal sealed class ArchitectureSourceFileFactTraversal
 
     private static bool IsOutsideConfiguredSourceRoot(string relativePath)
     {
-        return relativePath.Length == 0
+        return relativePath.Length == 0 || Path.IsPathRooted(relativePath)
             || relativePath == "."
             || relativePath == ".."
             || relativePath.StartsWith("../", StringComparison.Ordinal);

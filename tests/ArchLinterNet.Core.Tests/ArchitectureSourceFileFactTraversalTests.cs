@@ -11,20 +11,21 @@ public sealed class ArchitectureSourceFileFactTraversalTests
 {
     private const string TestAssemblyName = "ArchLinterNet.Core.Tests";
     private const string FixtureTypeName = "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture";
+    private const string FixtureSource =
+        "namespace ArchLinterNet.Core.Tests.SourceFactFixtures { public sealed class SingleTypeFixture { } }";
 
     [Test]
     public void AllFacts_EnumerationEscapingConfiguredSourceRoot_DoesNotReadOrAttachEscapedFile()
     {
         string repositoryRoot = FakePaths.Root("/fake/repo");
         string sourceRoot = repositoryRoot + "/src";
+        string containedFile = sourceRoot + "/SingleTypeFixture.cs";
         string escapedFile = repositoryRoot + "/outside/SingleTypeFixture.cs";
         var inner = new FakeArchitectureFileSystem();
         inner.AddDirectory(sourceRoot);
-        inner.AddFile(
-            escapedFile,
-            "namespace ArchLinterNet.Core.Tests.SourceFactFixtures { public sealed class SingleTypeFixture { } }",
-            DateTime.UtcNow);
-        var fileSystem = new EscapingEnumerationFileSystem(inner, escapedFile);
+        inner.AddFile(containedFile, FixtureSource, DateTime.UtcNow);
+        inner.AddFile(escapedFile, FixtureSource, DateTime.UtcNow);
+        var fileSystem = new EscapingEnumerationFileSystem(inner, [containedFile, escapedFile]);
         var counters = new AnalysisSessionProfilingCounters();
 
         var index = new ArchitectureSourceFileFactIndex(
@@ -37,7 +38,7 @@ public sealed class ArchitectureSourceFileFactTraversalTests
                 ProjectDiscovery: null,
                 SourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
-                    ["src"] = TestAssemblyName
+                    ["."] = TestAssemblyName
                 }),
             new ArchitectureSourceFileFactIndex.ConstructionOptions(counters, CancellationToken.None));
 
@@ -46,16 +47,61 @@ public sealed class ArchitectureSourceFileFactTraversalTests
         Assert.Multiple(() =>
         {
             Assert.That(found, Is.True);
-            Assert.That(fact.SourceFilePath, Is.Null);
-            Assert.That(fileSystem.ReadAllTextCalls, Is.Zero);
-            Assert.That(counters.SourceFilesScanned, Is.Zero);
-            Assert.That(index.ConsumedSourceInputPaths, Is.Empty);
+            Assert.That(fact.SourceFilePath, Is.EqualTo("src/SingleTypeFixture.cs"));
+            Assert.That(fileSystem.ReadAllTextCalls, Is.EqualTo(1));
+            Assert.That(counters.SourceFilesScanned, Is.EqualTo(1));
+            Assert.That(index.ConsumedSourceInputPaths, Is.EqualTo([Path.GetFullPath(containedFile)]));
+        });
+    }
+
+    [Test]
+    public void AllFacts_EnumerationEscapingWindowsVolume_DoesNotReadOrAttachEscapedFile()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("This regression exercises Path.GetRelativePath across Windows volumes.");
+        }
+
+        const string RepositoryRoot = @"C:\repo";
+        string sourceRoot = Path.Combine(RepositoryRoot, "src");
+        string containedFile = Path.Combine(sourceRoot, "SingleTypeFixture.cs");
+        const string EscapedFile = @"D:\outside\SingleTypeFixture.cs";
+        var inner = new FakeArchitectureFileSystem();
+        inner.AddDirectory(sourceRoot);
+        inner.AddFile(containedFile, FixtureSource, DateTime.UtcNow);
+        inner.AddFile(EscapedFile, FixtureSource, DateTime.UtcNow);
+        var fileSystem = new EscapingEnumerationFileSystem(inner, [containedFile, EscapedFile]);
+        var counters = new AnalysisSessionProfilingCounters();
+
+        var index = new ArchitectureSourceFileFactIndex(
+            [typeof(ArchitectureSourceFileFactTraversalTests).Assembly],
+            RepositoryRoot,
+            ["src"],
+            preprocessorSymbols: null,
+            fileSystem,
+            new ArchitectureSourceFileFactIndex.ProjectOwnership(
+                ProjectDiscovery: null,
+                SourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["."] = TestAssemblyName
+                }),
+            new ArchitectureSourceFileFactIndex.ConstructionOptions(counters, CancellationToken.None));
+
+        bool found = index.TryGetFact(FixtureTypeName, out ArchitectureDeclaredTypeFact fact);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(found, Is.True);
+            Assert.That(fact.SourceFilePath, Is.EqualTo("src/SingleTypeFixture.cs"));
+            Assert.That(fileSystem.ReadAllTextCalls, Is.EqualTo(1));
+            Assert.That(counters.SourceFilesScanned, Is.EqualTo(1));
+            Assert.That(index.ConsumedSourceInputPaths, Is.EqualTo([Path.GetFullPath(containedFile)]));
         });
     }
 
     private sealed class EscapingEnumerationFileSystem(
         IArchitectureFileSystem inner,
-        string escapedFile) : IArchitectureFileSystem
+        IReadOnlyList<string> enumeratedFiles) : IArchitectureFileSystem
     {
         public int ReadAllTextCalls { get; private set; }
 
@@ -73,7 +119,10 @@ public sealed class ArchitectureSourceFileFactTraversalTests
 
         public IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption)
         {
-            yield return escapedFile;
+            foreach (string enumeratedFile in enumeratedFiles)
+            {
+                yield return enumeratedFile;
+            }
         }
 
         public IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption) =>
