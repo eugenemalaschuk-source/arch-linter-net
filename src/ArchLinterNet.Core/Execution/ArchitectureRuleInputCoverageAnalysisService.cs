@@ -6,13 +6,23 @@ using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal sealed partial class ArchitectureCoverageAnalysisService
+internal sealed class ArchitectureRuleInputCoverageAnalysisService
 {
-    internal ArchitectureCoverageSummary BuildRuleInputSummary(ArchitectureCoverageContract contract)
-    {
-        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
+    private readonly ArchitectureAnalysisSession _session;
 
-        Dictionary<string, ArchitectureContractDescriptor> descriptorsById = BuildAllDescriptors()
+    public ArchitectureRuleInputCoverageAnalysisService(ArchitectureAnalysisSession session)
+    {
+        _session = session;
+    }
+
+    private ArchitectureContractDocument Document => _session.Document;
+
+    internal ArchitectureCoverageSummary BuildSummary(ArchitectureCoverageContract contract)
+    {
+        ThrowIfCancellationRequested();
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(Document);
+
+        Dictionary<string, ArchitectureContractDescriptor> descriptorsById = _session.BuildAllDescriptors()
             .Where(descriptor => !string.IsNullOrEmpty(descriptor.Id))
             .GroupBy(descriptor => descriptor.Id!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
@@ -26,6 +36,7 @@ internal sealed partial class ArchitectureCoverageAnalysisService
         foreach ((string authoredContractId, string referencedContractId) in ResolveReferencedContractIds(contract)
                      .OrderBy(pair => pair.ResolvedId, StringComparer.Ordinal))
         {
+            ThrowIfCancellationRequested();
             ArchitectureCoverageExclusion? matchedExclusion = contract.Exclude
                 .FirstOrDefault(exclusion => MatchesExcludedContractId(exclusion, authoredContractId, referencedContractId));
 
@@ -53,6 +64,7 @@ internal sealed partial class ArchitectureCoverageAnalysisService
             // change-snapshot coverage-blind-spot entry identity) would collide (#683).
             foreach (ArchitectureRuleInputReference input in referencedInputs)
             {
+                ThrowIfCancellationRequested();
                 string layerName = input.Layer;
                 ArchitectureLayer? layer = null;
                 if (input.IsLayerReference && !Document.Layers.TryGetValue(layerName, out layer))
@@ -107,9 +119,10 @@ internal sealed partial class ArchitectureCoverageAnalysisService
         };
     }
 
-    private List<ArchitectureViolation> CheckRuleInputCoverageContract(ArchitectureCoverageContract contract)
+    internal List<ArchitectureViolation> Check(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
+        ThrowIfCancellationRequested();
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(Document);
 
         HashSet<string> excludedContractIds = new(
             contract.Exclude
@@ -117,16 +130,17 @@ internal sealed partial class ArchitectureCoverageAnalysisService
                 .Select(exclusion => exclusion.ContractId),
             StringComparer.OrdinalIgnoreCase);
 
-        Dictionary<string, ArchitectureContractDescriptor> descriptorsById = BuildAllDescriptors()
+        Dictionary<string, ArchitectureContractDescriptor> descriptorsById = _session.BuildAllDescriptors()
             .Where(descriptor => !string.IsNullOrEmpty(descriptor.Id))
             .GroupBy(descriptor => descriptor.Id!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
-        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
+        ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
         List<ArchitectureViolation> findings = new();
 
         foreach ((string authoredContractId, string referencedContractId) in ResolveReferencedContractIds(contract))
         {
+            ThrowIfCancellationRequested();
             if (excludedContractIds.Contains(referencedContractId)
                 || excludedContractIds.Contains(authoredContractId))
             {
@@ -138,7 +152,7 @@ internal sealed partial class ArchitectureCoverageAnalysisService
                 continue;
             }
 
-            AddRuleInputCoverageFindingsForContract(
+            AddFindingsForContract(
                 contract, authoredContractId, referencedContractId, descriptor, inventory, executionContext, findings);
         }
 
@@ -150,7 +164,7 @@ internal sealed partial class ArchitectureCoverageAnalysisService
             .ToList();
     }
 
-    private void AddRuleInputCoverageFindingsForContract(
+    private void AddFindingsForContract(
         ArchitectureCoverageContract contract,
         string authoredContractId,
         string referencedContractId,
@@ -165,6 +179,7 @@ internal sealed partial class ArchitectureCoverageAnalysisService
 
         foreach (ArchitectureRuleInputReference input in referencedInputs)
         {
+            ThrowIfCancellationRequested();
             string layerName = input.Layer;
             ArchitectureLayer? layer = null;
             if (input.IsLayerReference && !Document.Layers.TryGetValue(layerName, out layer))
@@ -224,9 +239,44 @@ internal sealed partial class ArchitectureCoverageAnalysisService
             && string.Equals(optional.Layer, input.Layer, StringComparison.Ordinal));
     }
 
+    // Source-set expansion derives per-instance contract ids ("<authored-id>/<source>"), so a
+    // coverage contract that references the authored id an author actually wrote must resolve to
+    // every instance it produced. Contracts that were never expanded resolve to themselves.
+    private IEnumerable<(string AuthoredId, string ResolvedId)> ResolveReferencedContractIds(
+        ArchitectureCoverageContract contract)
+    {
+        foreach (string referencedContractId in contract.ContractIds)
+        {
+            IReadOnlyList<string> instanceIds = Document.SourceExpansion.InstanceIdsFor(referencedContractId);
+
+            if (instanceIds.Count == 0)
+            {
+                yield return (referencedContractId, referencedContractId);
+                continue;
+            }
+
+            foreach (string instanceId in instanceIds)
+            {
+                yield return (referencedContractId, instanceId);
+            }
+        }
+    }
+
+    private static bool MatchesExcludedContractId(
+        ArchitectureCoverageExclusion exclusion,
+        string authoredContractId,
+        string resolvedContractId)
+    {
+        return !string.IsNullOrWhiteSpace(exclusion.ContractId)
+            && (string.Equals(exclusion.ContractId, resolvedContractId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(exclusion.ContractId, authoredContractId, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static bool IsInsideModuleContainer(string container, string candidateNamespace)
     {
         return string.Equals(container, candidateNamespace, StringComparison.Ordinal)
             || candidateNamespace.StartsWith(container + ".", StringComparison.Ordinal);
     }
+
+    private void ThrowIfCancellationRequested() => _session.Context.CancellationToken.ThrowIfCancellationRequested();
 }

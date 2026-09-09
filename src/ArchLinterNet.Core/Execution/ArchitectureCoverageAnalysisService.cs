@@ -9,11 +9,12 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal sealed partial class ArchitectureCoverageAnalysisService
+internal sealed class ArchitectureCoverageAnalysisService
 {
     private readonly ArchitectureAnalysisSession _session;
     private readonly ArchitectureCoverageMatchingService _matching;
     private readonly ArchitectureSemanticCoverageService _semanticCoverageService;
+    private readonly ArchitectureRuleInputCoverageAnalysisService _ruleInputCoverageService;
     private readonly ArchitectureDependencyEdgeCoverageService _dependencyEdgeCoverageService;
 
     public ArchitectureCoverageAnalysisService(ArchitectureAnalysisSession session)
@@ -21,10 +22,14 @@ internal sealed partial class ArchitectureCoverageAnalysisService
         _session = session;
         _matching = new ArchitectureCoverageMatchingService(session);
         _semanticCoverageService = new ArchitectureSemanticCoverageService(session);
+        _ruleInputCoverageService = new ArchitectureRuleInputCoverageAnalysisService(session);
         _dependencyEdgeCoverageService = new ArchitectureDependencyEdgeCoverageService(session, this);
     }
 
     internal ArchitectureSemanticCoverageService SemanticCoverage => _semanticCoverageService;
+
+    internal ArchitectureCoverageSummary BuildRuleInputSummary(ArchitectureCoverageContract contract) =>
+        _ruleInputCoverageService.BuildSummary(contract);
 
     private ArchitectureAnalysisContext Context => _session.Context;
     private ArchitectureContractDocument Document => _session.Document;
@@ -300,7 +305,7 @@ internal sealed partial class ArchitectureCoverageAnalysisService
 
         if (string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))
         {
-            return CheckRuleInputCoverageContract(contract);
+            return _ruleInputCoverageService.Check(contract);
         }
 
         if (string.Equals(contract.Scope, "assembly", StringComparison.Ordinal))
@@ -359,39 +364,6 @@ internal sealed partial class ArchitectureCoverageAnalysisService
         _session.CollectUnmatchedIgnores(executionContext);
 
         return findings;
-    }
-
-    // Source-set expansion derives per-instance contract ids ("<authored-id>/<source>"), so a
-    // coverage contract that references the authored id an author actually wrote must resolve to
-    // every instance it produced. Contracts that were never expanded resolve to themselves.
-    private IEnumerable<(string AuthoredId, string ResolvedId)> ResolveReferencedContractIds(
-        ArchitectureCoverageContract contract)
-    {
-        foreach (string referencedContractId in contract.ContractIds)
-        {
-            IReadOnlyList<string> instanceIds = Document.SourceExpansion.InstanceIdsFor(referencedContractId);
-
-            if (instanceIds.Count == 0)
-            {
-                yield return (referencedContractId, referencedContractId);
-                continue;
-            }
-
-            foreach (string instanceId in instanceIds)
-            {
-                yield return (referencedContractId, instanceId);
-            }
-        }
-    }
-
-    private static bool MatchesExcludedContractId(
-        ArchitectureCoverageExclusion exclusion,
-        string authoredContractId,
-        string resolvedContractId)
-    {
-        return !string.IsNullOrWhiteSpace(exclusion.ContractId)
-            && (string.Equals(exclusion.ContractId, resolvedContractId, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(exclusion.ContractId, authoredContractId, StringComparison.OrdinalIgnoreCase));
     }
 
     private List<ArchitectureViolation> CheckAssemblyCoverageContract(ArchitectureCoverageContract contract)
