@@ -8,13 +8,13 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class LayoutConventionFileSelectorMatcherTests
 {
     [Test]
-    public void AnyCandidatePathMatchesFileSelector_NormalizesWindowsSeparators()
+    public void AnyCandidatePathMatchesFileSelector_MatchesNormalizedSourcePath()
     {
         ArchitectureLayoutFileMatcher matcher = CreateMatcher();
 
         bool matches = LayoutConventionFileSelectorMatcher.AnyCandidatePathMatchesFileSelector(
             matcher,
-            [@"src\Services\OrderService.cs"]);
+            ["src/Services/OrderService.cs"]);
 
         Assert.That(matches, Is.True);
     }
@@ -27,8 +27,8 @@ public sealed class LayoutConventionFileSelectorMatcherTests
         bool matches = LayoutConventionFileSelectorMatcher.AnyCandidatePathMatchesFileSelector(
             matcher,
             [
-                @"src\Services\InvoiceService.cs",
-                @"src\Domain\OrderService.cs",
+                "src/Services/InvoiceService.cs",
+                "src/Domain/OrderService.cs",
             ]);
 
         Assert.That(matches, Is.False);

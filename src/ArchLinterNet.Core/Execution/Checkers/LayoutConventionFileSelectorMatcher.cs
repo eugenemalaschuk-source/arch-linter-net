@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
@@ -9,22 +8,10 @@ namespace ArchLinterNet.Core.Execution.Checkers;
 
 // Candidate/file-group selection for the layout_conventions family. This collaborator owns the
 // file-level selector semantics, including the filed/unfiled split, when refinement, exclusion
-// precedence/participation, and path normalization. LayoutConventionChecker remains the facade for
+// precedence/participation, and source-path matching. LayoutConventionChecker remains the facade for
 // contract execution and expectation evaluation.
 internal static class LayoutConventionFileSelectorMatcher
 {
-    // Unconditional bare-word match, deliberately not a "smarter" syntax-aware check - mirrors
-    // ExpressionCompilationValidator's DependencyIdentifierPattern and its documented rationale:
-    // ArchLinterNet.CEL exposes no public API to introspect which identifiers a compiled predicate
-    // references, and two prior attempts at hand-rolled CEL-lexical-grammar-aware string scanning
-    // in this codebase each found a real bypass. A `when` referencing subject.sourcePaths or
-    // subject.sourceDirectoryPrefixes against an empty-facts run would otherwise silently evaluate
-    // to `false` for every candidate (an empty list, not an evaluation error) and produce a clean
-    // pass that looks identical to "everything complies".
-    private static readonly Regex SourcePathIdentifierPattern = new(
-        @"\b(sourcePaths|sourceDirectoryPrefixes)\b",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
     internal sealed record Result(
         List<LayoutConventionChecker.LayoutFileGroup> Groups,
         bool InclusionMatched,
@@ -36,7 +23,7 @@ internal static class LayoutConventionFileSelectorMatcher
         !string.IsNullOrEmpty(matcher.FolderSegment)
         || !string.IsNullOrEmpty(matcher.FileNameSuffix)
         || !string.IsNullOrEmpty(matcher.FileNamePrefix)
-        || ReferencesSourcePathIdentifier(matcher.When);
+        || LayoutConventionSourcePathIdentifierMatcher.References(matcher.When);
 
     // A whole-run data-unavailable diagnostic may be caused by an expectation (for example,
     // require_type_name_matches_file_name), while some authored selectors remain evaluable from
@@ -374,7 +361,7 @@ internal static class LayoutConventionFileSelectorMatcher
             return true;
         }
 
-        bool whenReferencesSourcePath = ReferencesSourcePathIdentifier(matcher.When);
+        bool whenReferencesSourcePath = LayoutConventionSourcePathIdentifierMatcher.References(matcher.When);
         bool isAmbiguous = context.SourceFileFactIndex.Ambiguities.Any(ambiguity =>
             ambiguity.AssemblyName == entry.Fact.AssemblyName
             && ambiguity.FullTypeName == entry.Fact.FullTypeName);
@@ -485,9 +472,8 @@ internal static class LayoutConventionFileSelectorMatcher
     {
         foreach (string candidatePath in candidatePaths)
         {
-            string normalizedPath = NormalizeRelativePath(candidatePath);
-            string[] folderSegments = GetFolderSegmentsFromPath(normalizedPath);
-            string fileName = GetFileNameWithoutExtensionFromPath(normalizedPath);
+            string[] folderSegments = GetFolderSegmentsFromPath(candidatePath);
+            string fileName = GetFileNameWithoutExtensionFromPath(candidatePath);
 
             if (!string.IsNullOrEmpty(matcher.FolderSegment)
                 && !folderSegments.Contains(matcher.FolderSegment, StringComparer.Ordinal))
@@ -513,8 +499,6 @@ internal static class LayoutConventionFileSelectorMatcher
         return false;
     }
 
-    private static string NormalizeRelativePath(string path) => path.Replace('\\', '/');
-
     private static string[] GetFolderSegmentsFromPath(string normalizedRelativePath)
     {
         int lastSlash = normalizedRelativePath.LastIndexOf('/');
@@ -528,9 +512,6 @@ internal static class LayoutConventionFileSelectorMatcher
         int dot = fileName.LastIndexOf('.');
         return dot > 0 ? fileName[..dot] : fileName;
     }
-
-    private static bool ReferencesSourcePathIdentifier(string? when) =>
-        !string.IsNullOrEmpty(when) && SourcePathIdentifierPattern.IsMatch(when);
 
     private static bool EvaluateLayoutWhen(
         ArchitectureLayoutFileMatcher matcher, ArchitectureCheckerContext context, Type type)
