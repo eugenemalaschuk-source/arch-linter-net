@@ -19,6 +19,7 @@ namespace ArchLinterNet.Core.Tests;
 // real post-build resolution pipeline (ArchitectureRunnerSetupService.PrepareRunner +
 // MaterializePreparedRunner) against a real, separately compiled ASP.NET Core fixture assembly.
 [TestFixture]
+[Category("E2E")]
 public sealed class AspNetSharedFrameworkAcceptanceTests
 {
     private sealed class FixedDiscoveryService : IArchitectureProjectDiscoveryService

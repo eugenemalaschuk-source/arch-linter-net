@@ -39,6 +39,9 @@
     remediation owner: existing #802/#803, #807 through #816, Core Model #819, History #820, and
     factual `build_state_preflight` presentation #801. The shared policy/OpenSpec hunks remain serial
     coordination work; this records ownership and does not mark the extraction task complete (#804).
+  - [x] Move the 24 frozen Core Model audit-layout identities into the existing `Models` source
+    directory without changing namespaces, API, schema, or policy; retain a focused negative
+    regression for a record outside that directory (#819).
   - [x] Extract `ArchitectureSourceFileFactIndex` bounded source traversal and its parallel partition
     seam into `ArchitectureSourceFileFactTraversal`, retaining one lazy/cached facade, deterministic
     merge and cancellation behavior, and rejecting enumerated paths outside configured source roots (#810).

@@ -8,6 +8,7 @@ namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
 [Category("Integration")]
+[Category("E2E")]
 public sealed class EnsureBuiltNonDestructiveIntegrationTests
 {
     private string _fixtureRoot = null!;
