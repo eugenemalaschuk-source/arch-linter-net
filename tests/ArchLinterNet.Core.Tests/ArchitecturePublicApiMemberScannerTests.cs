@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using ArchLinterNet.Core.Scanning;
 using NUnit.Framework;
@@ -64,6 +65,26 @@ public sealed class ArchitecturePublicApiMemberScannerTests
             .ToArray();
 
         Assert.That(exportedTypes, Does.Not.Contain(typeof(CompilerGeneratedExportedType)));
+    }
+
+    [Test]
+    public void MaterializeExportedSurface_UnloadableMethodSignature_RemainsBestEffort()
+    {
+        using UnloadableFieldFixture fixture = UnloadableFieldFixture.Create(
+            includeUnloadableField: false,
+            configureConsumerTypeWithDependency: (typeBuilder, dependencyType) =>
+            {
+                typeBuilder.DefineMethod(
+                    "AcceptUnloadable",
+                    MethodAttributes.Public,
+                    typeof(void),
+                    [dependencyType]);
+            });
+
+        (_, _, bool isComplete) = ArchitecturePublicApiSurfaceScanner.MaterializeExportedSurface(
+            fixture.ConsumerAssembly);
+
+        Assert.That(isComplete, Is.False);
     }
 
     public class ExportedMembers
