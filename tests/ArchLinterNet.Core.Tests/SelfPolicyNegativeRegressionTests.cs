@@ -273,6 +273,27 @@ public sealed class SelfPolicyNegativeRegressionTests
     }
 
     [Test]
+    public void ReintroducedPublicApiSurfaceScannerPartial_IsRejectedWithoutWaiver()
+    {
+        const string Scanner = "ArchitecturePublicApiSurfaceScanner";
+        SelfPolicyRepository.WriteMutatedScanningSource(
+            _repositoryRoot,
+            """
+            namespace ArchLinterNet.Core.Scanning;
+
+            internal static partial class ArchitecturePublicApiSurfaceScanner
+            {
+            }
+            """);
+
+        ArchitectureValidationResult result = ValidateMutated(
+            _policy,
+            "production-partial-type-declaration-count-does-not-increase");
+
+        AssertFailedMentioning(result, Scanner);
+    }
+
+    [Test]
     public void PartialDeclarationRatchet_RejectsANewProductionAggregate()
     {
         const string Aggregate = "PartialDeclarationRatchetFixture";

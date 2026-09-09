@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using ArchLinterNet.Core.Scanning;
 using NUnit.Framework;
 
@@ -53,6 +54,35 @@ public sealed class ArchitecturePublicApiMemberScannerTests
             Assert.That(members.Select(entry => entry.Signature), Has.None.Contains("InternalOnly"));
             Assert.That(members.Select(entry => entry.Signature), Has.None.Contains("PrivateOnly"));
         });
+    }
+
+    [Test]
+    public void GetExportedSurface_UnloadableField_PreservesBestEffortEntriesAndMarksIncomplete()
+    {
+        using UnloadableFieldFixture fixture = UnloadableFieldFixture.Create(includeUnloadableType: true);
+
+        (IReadOnlyList<ArchitectureExportedApiEntry> entries,
+            IReadOnlyList<Type> exportedTypes,
+            bool isComplete) = ArchitecturePublicApiSurfaceScanner.MaterializeExportedSurface(
+                fixture.ConsumerAssembly);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(isComplete, Is.False);
+            Assert.That(exportedTypes, Does.Contain(fixture.SourceType));
+            Assert.That(entries.Any(entry => entry.DeclaringTypeName == fixture.SourceType.FullName), Is.True);
+            Assert.That(entries.Any(entry => entry.Signature.Contains("Target", StringComparison.Ordinal)), Is.False);
+        });
+    }
+
+    [Test]
+    public void GetExportedTypes_ExcludesCompilerGeneratedTypes()
+    {
+        IReadOnlyList<Type> exportedTypes = ArchitecturePublicApiSurfaceScanner
+            .GetExportedTypes(typeof(ArchitecturePublicApiMemberScannerTests).Assembly)
+            .ToArray();
+
+        Assert.That(exportedTypes, Does.Not.Contain(typeof(CompilerGeneratedExportedType)));
     }
 
     public class ExportedMembers
@@ -124,5 +154,10 @@ public sealed class ArchitecturePublicApiMemberScannerTests
             add { }
             remove { }
         }
+    }
+
+    [CompilerGenerated]
+    public sealed class CompilerGeneratedExportedType
+    {
     }
 }
