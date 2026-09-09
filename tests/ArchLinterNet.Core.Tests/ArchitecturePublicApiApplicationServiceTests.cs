@@ -675,6 +675,8 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
     {
         public IReadOnlyList<PublicApiSnapshotEntry> Entries { get; set; } = Array.Empty<PublicApiSnapshotEntry>();
 
+        public int ReadCallCount { get; private set; }
+
         public bool Exists { get; set; } = true;
 
         // The real directory entries a PathsMatch probe would see, keyed by full path. Null means
@@ -737,6 +739,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
 
         public PublicApiSnapshotDocument Read(string resolvedPath, string authoredPath)
         {
+            ReadCallCount++;
             return ReadError == null
                 ? new PublicApiSnapshotDocument(PublicApiSnapshotFormat.CurrentVersion, ContractId, Entries)
                 : throw new InvalidOperationException(ReadError);
