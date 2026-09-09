@@ -6,9 +6,14 @@ using ArchLinterNet.Core.Execution.Results;
 
 namespace ArchLinterNet.Core.Graph;
 
-public sealed partial class ArchitectureGraphApplicationService
+// Graph remains the public orchestration facade; this collaborator owns only the optional
+// build-state preflight and the fresh post-build runner handoff. It never creates a second graph
+// authority or re-reads any pipeline data produced by the owning graph service.
+internal sealed class ArchitectureGraphBuildStatePreflightService(
+    IArchitectureRunnerSetupService runnerSetupService,
+    IBuildStatePreparationService? buildStatePreparationService)
 {
-    private ArchitectureRunnerSetup PrepareBuildStateRunner(
+    internal ArchitectureRunnerSetup PrepareBuildStateRunner(
         ArchitectureGraphRequest request,
         ArchitectureContractDocument document,
         HashSet<string>? selectedContractIds,

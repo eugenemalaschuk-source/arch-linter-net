@@ -72,6 +72,12 @@
   - [x] Extract `ArchitectureBaselineApplicationService` candidate collection and build-state
     preparation into the non-partial `ArchitectureBaselineCandidateCollector`, retaining the public
     lifecycle facade, receipt-backed runner semantics, cancellation, and disposal behavior (#815).
+  - [x] Extract graph build-state preflight from the two-declaration
+    `ArchitectureGraphApplicationService.cs` / `.BuildState.cs` aggregate into the internal,
+    non-partial `ArchitectureGraphBuildStatePreflightService`, retaining one graph application
+    authority, preflight ordering, receipt/cache semantics, cancellation behavior, and fresh
+    post-build runner handoff; focused `ArchitectureGraphApplicationServiceBuildStateTests` cover
+    the fail-closed boundary, and the exact strict declaration-count waiver is removed (#812).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
