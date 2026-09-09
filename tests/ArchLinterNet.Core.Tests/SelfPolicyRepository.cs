@@ -137,6 +137,19 @@ internal static class SelfPolicyRepository
         return path;
     }
 
+    /// <summary>Writes a throwaway C# source declaration under Core Scanning for decomposition-ratchet regressions.</summary>
+    public static string WriteMutatedScanningSource(string repositoryRoot, string content)
+    {
+        string path = Path.Combine(
+            repositoryRoot,
+            "src",
+            "ArchLinterNet.Core",
+            "Scanning",
+            $"{MutationPrefix}{Guid.NewGuid():N}.cs");
+        File.WriteAllText(path, content);
+        return path;
+    }
+
     /// <summary>Repository-relative path with forward slashes, as the policy declares them.</summary>
     public static string RelativePolicyPath(string repositoryRoot, string absolutePath) =>
         Path.GetRelativePath(repositoryRoot, absolutePath).Replace('\\', '/');
@@ -148,6 +161,7 @@ internal static class SelfPolicyRepository
                      Path.Combine(repositoryRoot, "architecture"),
                      Path.Combine(repositoryRoot, "architecture", "api"),
                      Path.Combine(repositoryRoot, "src", "ArchLinterNet.Core", "Reporting"),
+                     Path.Combine(repositoryRoot, "src", "ArchLinterNet.Core", "Scanning"),
                  })
         {
             if (!Directory.Exists(directory))

@@ -54,6 +54,10 @@
     analysis into the non-partial `ArchitectureRuleInputCoverageAnalysisService`, retaining the
     session's canonical cached coverage inventory, descriptor catalog, deterministic ordering, and
     unmatched-ignore collection; remove its exact declaration-count waiver (#809).
+  - [x] Extract `ArchitecturePublicApiSurfaceScanner` member scanning into the non-partial
+    `ArchitecturePublicApiMemberScanner`, retaining one surface materialization, canonical member
+    identity/order and visibility filtering, shared incomplete-reflection evidence, and removing its
+    exact declaration-count waiver (#814).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
