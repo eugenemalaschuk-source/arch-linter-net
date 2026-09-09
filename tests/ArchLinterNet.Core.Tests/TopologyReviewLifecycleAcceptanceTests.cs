@@ -40,6 +40,7 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
     }
 
     [Test]
+    [CancelAfter(25_000)]
     public void DotNetCaptureAndDiff_ExerciseTheRealLifecycle()
     {
         AssertCaptureAndDiff(new FixtureCase("dotnet", _dotnetFixture, needsBuildStatePreparation: true));
