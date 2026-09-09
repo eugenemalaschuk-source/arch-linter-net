@@ -341,6 +341,40 @@ public sealed class SelfPolicyNegativeRegressionTests
         AssertFailedMentioning(result, "ArchLinterNet.Core");
     }
 
+    [Test]
+    public void ModelsLayoutRule_RejectsARecordOutsideModelsDirectories()
+    {
+        const string FixtureType = "SelfPolicyModelRecordFixture";
+        string fixturePath = SelfPolicyRepository.WriteMutatedModelRecordSource(
+            _repositoryRoot,
+            $"""
+            namespace ArchLinterNet.Core.Model;
+
+            internal sealed record {FixtureType};
+            """);
+        string fixtureRelativePath = SelfPolicyRepository.RelativePolicyPath(_repositoryRoot, fixturePath);
+
+        ArchitectureValidationResult result = ArchitectureAssertions
+            .FromPolicy(SelfPolicyRepository.PolicyPath(_repositoryRoot))
+            .WithContracts("models-live-in-models-directories-record")
+            .WithEnsureBuilt()
+            .ValidateAudit();
+
+        ArchitectureFinding finding = result.Findings.Single(finding =>
+            finding.ContractId == "models-live-in-models-directories-record"
+            && finding.Details is LayoutConventionDiagnostic diagnostic
+            && diagnostic.SourceType == $"ArchLinterNet.Core.Model.{FixtureType}");
+        var details = (LayoutConventionDiagnostic)finding.Details;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Passed, Is.False, "A model record outside Models must fail audit validation.");
+            Assert.That(result.Mode, Is.EqualTo("audit"));
+            Assert.That(details.SourceType, Is.EqualTo($"ArchLinterNet.Core.Model.{FixtureType}"));
+            Assert.That(details.MatchedFilePath, Is.EqualTo(fixtureRelativePath));
+        });
+    }
+
     // ── Reviewed public API lifecycle ───────────────────────────────────────
     [Test]
     public void PublicApiSurface_RejectsAnUnreviewedAdditionWithoutRewritingTheSnapshot()
