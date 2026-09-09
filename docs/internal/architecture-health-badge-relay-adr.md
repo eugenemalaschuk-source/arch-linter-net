@@ -1,6 +1,6 @@
 # ADR: Architecture Health Badge Relay contract
 
-Status: accepted design baseline for issue [#826](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/826)
+Status: proposed design baseline for issue [#826](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/826), pending maintainer review
 
 Date: 2026-09-09\
 Lifecycle: v0.8.x completeness-stabilization; implementation children remain blocked until this ADR is reviewed and merged.
