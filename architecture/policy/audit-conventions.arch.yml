@@ -50,9 +50,6 @@ contracts:
       max_declarations_per_type: 1
       reason: New or grown handwritten production partial-type aggregates are blocked immediately; see #742 and the decompose-god-classes OpenSpec change for the full cleanup authority.
       ignored_violations:
-        - source_type: "ArchLinterNet.Core.Graph.ArchitectureGraphApplicationService"
-          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Graph/ArchitectureGraphApplicationService.BuildState.cs, src/ArchLinterNet.Core/Graph/ArchitectureGraphApplicationService.cs"
-          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
         - source_type: "ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService"
           forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Validation/ArchitectureBaselineApplicationService.BuildState.cs, src/ArchLinterNet.Core/Validation/ArchitectureBaselineApplicationService.cs"
           reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."

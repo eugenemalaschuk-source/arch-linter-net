@@ -140,6 +140,37 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
     }
 
     [Test]
+    public void BuildGraph_WithOptedInBuildStateAndNoPreparationService_FailsClosedBeforeFacts()
+    {
+        ArchitectureContractDocument document = new() { Version = 1, Name = "Fake" };
+        ProjectDiscoveryResult discovery = DiscoveryWithFixtureProject();
+        FakeContractRunner runner = new(CreateSession(document, discovery, missingAssemblyNames: ["Fixture"]));
+        var setupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            RunnerToReturn = runner,
+        };
+        var executor = new FakeContractExecutor();
+        var service = new ArchitectureGraphApplicationService(
+            setupService, new FakeContractHandlerRegistry(), executor);
+
+        Assert.That(
+            () => service.BuildGraph(new ArchitectureGraphRequest
+            {
+                PolicyPath = "unused.yml",
+                Mode = "strict",
+                NoRestore = true,
+            }),
+            Throws.InvalidOperationException.With.Message.Contains("Build-state preparation is unavailable"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(executor.ModesReceived, Is.Empty);
+            Assert.That(runner.StrictArgumentsReceived, Is.Empty);
+        });
+    }
+
+    [Test]
     public void BuildGraph_PreparedPostBuildStateWithBlockedReceiptVerification_FailsClosed()
     {
         ArchitectureContractDocument document = new() { Version = 1, Name = "Fake" };
@@ -308,13 +339,14 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
     private static ArchitectureAnalysisSession CreateSession(
         ArchitectureContractDocument document,
         ProjectDiscoveryResult discovery,
-        IArchitectureAssemblyLoadScope? isolatedLoadScope = null)
+        IArchitectureAssemblyLoadScope? isolatedLoadScope = null,
+        IReadOnlyCollection<string>? missingAssemblyNames = null)
     {
         var context = new ArchitectureAnalysisContext(
             "/fake/repository/root",
             Array.Empty<System.Reflection.Assembly>(),
             ["Fixture"],
-            Array.Empty<string>(),
+            missingAssemblyNames ?? Array.Empty<string>(),
             projectDiscovery: discovery,
             isolatedLoadScope: isolatedLoadScope);
         return new ArchitectureAnalysisSession(
