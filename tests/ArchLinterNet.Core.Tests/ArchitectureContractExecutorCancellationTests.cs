@@ -1,7 +1,9 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
@@ -106,6 +108,59 @@ public sealed class ArchitectureContractExecutorCancellationTests
         });
     }
 
+    [Test]
+    public void Execute_CancelledAfterPublicApiMaterialization_DoesNotRematerializeSurface()
+    {
+        using CancellationTokenSource cts = new();
+        Assembly assembly = typeof(ArchitectureContractExecutorCancellationTests).Assembly;
+        var context = new ArchitectureAnalysisContext(
+            "/fake/repository/root", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>())
+        {
+            CancellationToken = cts.Token,
+        };
+        string assemblyName = assembly.GetName().Name!;
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Public API cancellation",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                UnmatchedIgnoredViolations = "off",
+                PolicyConsistency = "off",
+                Coverage = "off",
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictPublicApiSurface =
+                [
+                    new ArchitecturePublicApiSurfaceContract
+                    {
+                        Id = "first",
+                        Name = "first",
+                        Assemblies = [assemblyName],
+                    },
+                    new ArchitecturePublicApiSurfaceContract
+                    {
+                        Id = "second",
+                        Name = "second",
+                        Assemblies = [assemblyName],
+                    },
+                ],
+            },
+        };
+        var runner = new ArchitectureContractRunner(context, document);
+        var registry = new CancellingAfterFirstPublicApiContractRegistry(cts);
+
+        Assert.Throws<OperationCanceledException>(() =>
+            new ArchitectureContractExecutor().Execute(runner.Session, "strict", registry));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(registry.ExecutionCount, Is.EqualTo(1));
+            Assert.That(runner.Session.PublicApiSurfaceMaterializationCount, Is.EqualTo(1));
+        });
+    }
+
     private sealed class CancellingAfterFirstContractRegistry : IArchitectureContractHandlerRegistry
     {
         private readonly CancellationTokenSource _cancellation;
@@ -133,6 +188,35 @@ public sealed class ArchitectureContractExecutorCancellationTests
 
             return ArchitectureHandlerResult.FromViolations(
                 [new ArchitectureViolation("rule", null, "source", "target", Array.Empty<string>())]);
+        }
+    }
+
+    private sealed class CancellingAfterFirstPublicApiContractRegistry : IArchitectureContractHandlerRegistry
+    {
+        private readonly CancellationTokenSource _cancellation;
+
+        public CancellingAfterFirstPublicApiContractRegistry(CancellationTokenSource cancellation)
+        {
+            _cancellation = cancellation;
+        }
+
+        public int ExecutionCount { get; private set; }
+
+        public bool TryGetHandler(string family, out ArchitectureContractChecker? checker)
+        {
+            checker = null;
+            return false;
+        }
+
+        public ArchitectureHandlerResult Execute(
+            string family, ArchitectureAnalysisSession session, IArchitectureContract contract)
+        {
+            Assert.That(family, Is.EqualTo("public_api_surface"));
+            ExecutionCount++;
+            List<ArchitectureViolation> violations =
+                session.CheckPublicApiSurfaceContract((ArchitecturePublicApiSurfaceContract)contract);
+            _cancellation.Cancel();
+            return ArchitectureHandlerResult.FromViolations(violations);
         }
     }
 }

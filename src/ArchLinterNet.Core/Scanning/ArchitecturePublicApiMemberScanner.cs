@@ -396,23 +396,7 @@ internal static class ArchitecturePublicApiMemberScanner
                 continue;
             }
 
-            Type? fieldType;
-            try
-            {
-                fieldType = field.FieldType;
-            }
-            catch (TypeLoadException)
-            {
-                completeness.MarkIncomplete();
-                continue;
-            }
-            catch (FileNotFoundException)
-            {
-                completeness.MarkIncomplete();
-                continue;
-            }
-
-            string? fieldTypeName = TryRenderTypeName(fieldType, completeness);
+            string? fieldTypeName = TryRenderTypeName(field.FieldType, completeness);
             if (fieldTypeName == null)
             {
                 continue;
@@ -429,7 +413,7 @@ internal static class ArchitecturePublicApiMemberScanner
                         signature, ArchitecturePublicApiSignatureDetails.ForField(
                             field, fieldVisibility, completeness.MarkIncomplete)),
                 declaringTypeName, assemblyName, fieldVisibility, isConst, constQualifiedName,
-                ReferencedTypes(new[] { fieldType }, completeness: completeness));
+                ReferencedTypes(new[] { field.FieldType }, completeness: completeness));
         }
     }
 
