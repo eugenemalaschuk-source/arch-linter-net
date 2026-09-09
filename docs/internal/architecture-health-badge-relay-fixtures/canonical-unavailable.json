@@ -1,0 +1,15 @@
+{
+  "fixture_type": "canonical-unavailable",
+  "schema_id": "architecture-health-badge-relay-representation/v1",
+  "state": "unavailable",
+  "profile": "headline-only/v1",
+  "payload": {
+    "schemaVersion": 1,
+    "label": "architecture",
+    "message": "UNASSESSABLE · ? ignores · ? rules",
+    "color": "lightgrey"
+  },
+  "canonical_bytes": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"UNASSESSABLE · ? ignores · ? rules\",\"color\":\"lightgrey\"}",
+  "sha256": "b4ee9c5bceaee233f96833624e5677b177bb50b8d4bdb2258fddfb64baa0cff7",
+  "reason_code": "no_current_confirmation"
+}
