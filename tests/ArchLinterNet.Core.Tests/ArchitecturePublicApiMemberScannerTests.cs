@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using ArchLinterNet.Core.Scanning;
@@ -87,6 +88,23 @@ public sealed class ArchitecturePublicApiMemberScannerTests
         Assert.That(isComplete, Is.False);
     }
 
+    [Test]
+    public void GetExportedSurface_RendersGenericConstructedAndArraySignatures()
+    {
+        string declaringTypeName = typeof(GenericExportedMembers<>).FullName!;
+        IReadOnlyList<ArchitectureExportedApiEntry> entries =
+            ArchitecturePublicApiSurfaceScanner.GetExportedSurface(typeof(GenericExportedMembers<>).Assembly)
+                .Where(entry => entry.DeclaringTypeName == declaringTypeName)
+                .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(entries.Select(entry => entry.Signature), Has.Some.Contains("List`1[!0]"));
+            Assert.That(entries.Select(entry => entry.Signature), Has.Some.Contains("!0[]"));
+            Assert.That(entries.Select(entry => entry.Signature), Has.Some.Contains("property"));
+        });
+    }
+
     public class ExportedMembers
     {
         public ExportedMembers()
@@ -156,6 +174,20 @@ public sealed class ArchitecturePublicApiMemberScannerTests
             add { }
             remove { }
         }
+    }
+
+    public class GenericExportedMembers<T>
+        where T : class, new()
+    {
+        public List<T> Values { get; } = new();
+
+        public T[] Transform<TMethod>(TMethod value)
+            where TMethod : class, new()
+        {
+            return Array.Empty<T>();
+        }
+
+        public T this[int index] => Values[index];
     }
 
     [CompilerGenerated]
