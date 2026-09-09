@@ -65,6 +65,10 @@
     `ArchitecturePublicApiMemberScanner`, retaining one surface materialization, canonical member
     identity/order and visibility filtering, shared incomplete-reflection evidence, and removing its
     exact declaration-count waiver (#814).
+  - [x] Extract `ArchitecturePublicApiApplicationService` contract/build/surface resolution into
+    the non-partial `ArchitecturePublicApiSurfaceResolver`, retaining one public application facade,
+    canonical member identity/order, selector-safety, build-state, cancellation, and disposal
+    behavior; remove only its exact declaration-count waiver (#816).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
