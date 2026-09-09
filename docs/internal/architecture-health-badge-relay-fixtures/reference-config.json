@@ -1,0 +1,49 @@
+{
+  "fixture_type": "reference-config",
+  "schema_id": "architecture-health-badge-relay-config/v1",
+  "contract_version": "v1",
+  "mode": "relay",
+  "disclosure_profile": "headline-only/v1",
+  "bundle": "badge-relay/v1",
+  "compatibility_plan": "architecture-health-badge-relay/v1",
+  "destination_alias": "a7f4k2m9",
+  "lease": {
+    "max_minutes": 60,
+    "renewal_minimum_minutes": 30,
+    "oidc_clock_skew_seconds": 300,
+    "maximum_renewals_per_day": 48
+  },
+  "registry_entry": {
+    "repository_id": 700000042,
+    "repository_owner_id": 7000000042,
+    "owner": "synthetic-owner-042",
+    "repository": "synthetic-repo-042",
+    "destination_alias": "a7f4k2m9",
+    "permitted_event": "push",
+    "permitted_ref": "refs/heads/main",
+    "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+    "job_workflow_sha": "2222222222222222222222222222222222222222",
+    "disclosure_profile": "headline-only/v1"
+  },
+  "oidc_trust": {
+    "issuer": "https://token.actions.githubusercontent.com",
+    "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",
+    "audience": "architecture-health-badge-relay-fixture",
+    "allowed_algorithms": [
+      "RS256"
+    ],
+    "subject": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main"
+  },
+  "initial_state": {
+    "generation": 7,
+    "revocation_epoch": 3,
+    "tree_sha": "1111111111111111111111111111111111111111",
+    "semantic_horizon": "2026-09-09T12:00:00Z",
+    "ready_digest": "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d"
+  },
+  "transport": {
+    "canonical_encoding": "utf-8-system-text-json-default-escaping",
+    "verification": "verify-and-copy",
+    "public_metadata": "payload-and-safe-freshness-only"
+  }
+}
