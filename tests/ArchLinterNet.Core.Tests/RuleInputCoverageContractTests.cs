@@ -24,13 +24,16 @@ public sealed class RuleInputCoverageContractTests
 
     private static readonly Assembly[] _targetAssemblies = { typeof(RuleInputCoverageContractTests).Assembly };
 
-    private static ArchitectureAnalysisContext CreateContext()
+    private static ArchitectureAnalysisContext CreateContext(CancellationToken cancellationToken = default)
     {
         return new ArchitectureAnalysisContext(
             repositoryRoot: AppContext.BaseDirectory,
             targetAssemblies: _targetAssemblies,
             missingAssemblyNames: Array.Empty<string>(),
-            assemblyProbingPaths: Array.Empty<string>());
+            assemblyProbingPaths: Array.Empty<string>())
+        {
+            CancellationToken = cancellationToken
+        };
     }
 
     private static ArchitectureContractDocument CreateDocument()
@@ -230,6 +233,20 @@ public sealed class RuleInputCoverageContractTests
             Assert.That(ReferenceEquals(afterSummary, afterCheck), Is.True,
                 "Rule-input summary and checking must share the session's canonical coverage inventory.");
         });
+    }
+
+    [Test]
+    public void RuleInputCoverage_CheckAfterInventoryMaterialization_ObservesCancellation()
+    {
+        using CancellationTokenSource cancellation = new();
+        ArchitectureContractDocument document = CreateDocument();
+        ArchitectureCoverageContract contract = CreateRuleInputContract(_value);
+        ArchitectureContractRunner runner = new(CreateContext(cancellation.Token), document);
+
+        _ = runner.BuildCoverageSummary(contract);
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => runner.CheckCoverageContract(contract));
     }
 
     [Test]

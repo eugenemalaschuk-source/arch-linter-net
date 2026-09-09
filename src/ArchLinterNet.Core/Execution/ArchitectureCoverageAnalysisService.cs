@@ -366,39 +366,6 @@ internal sealed class ArchitectureCoverageAnalysisService
         return findings;
     }
 
-    // Source-set expansion derives per-instance contract ids ("<authored-id>/<source>"), so a
-    // coverage contract that references the authored id an author actually wrote must resolve to
-    // every instance it produced. Contracts that were never expanded resolve to themselves.
-    private IEnumerable<(string AuthoredId, string ResolvedId)> ResolveReferencedContractIds(
-        ArchitectureCoverageContract contract)
-    {
-        foreach (string referencedContractId in contract.ContractIds)
-        {
-            IReadOnlyList<string> instanceIds = Document.SourceExpansion.InstanceIdsFor(referencedContractId);
-
-            if (instanceIds.Count == 0)
-            {
-                yield return (referencedContractId, referencedContractId);
-                continue;
-            }
-
-            foreach (string instanceId in instanceIds)
-            {
-                yield return (referencedContractId, instanceId);
-            }
-        }
-    }
-
-    private static bool MatchesExcludedContractId(
-        ArchitectureCoverageExclusion exclusion,
-        string authoredContractId,
-        string resolvedContractId)
-    {
-        return !string.IsNullOrWhiteSpace(exclusion.ContractId)
-            && (string.Equals(exclusion.ContractId, resolvedContractId, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(exclusion.ContractId, authoredContractId, StringComparison.OrdinalIgnoreCase));
-    }
-
     private List<ArchitectureViolation> CheckAssemblyCoverageContract(ArchitectureCoverageContract contract)
     {
         ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);

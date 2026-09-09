@@ -19,6 +19,7 @@ internal sealed class ArchitectureRuleInputCoverageAnalysisService
 
     internal ArchitectureCoverageSummary BuildSummary(ArchitectureCoverageContract contract)
     {
+        ThrowIfCancellationRequested();
         ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(Document);
 
         Dictionary<string, ArchitectureContractDescriptor> descriptorsById = _session.BuildAllDescriptors()
@@ -35,6 +36,7 @@ internal sealed class ArchitectureRuleInputCoverageAnalysisService
         foreach ((string authoredContractId, string referencedContractId) in ResolveReferencedContractIds(contract)
                      .OrderBy(pair => pair.ResolvedId, StringComparer.Ordinal))
         {
+            ThrowIfCancellationRequested();
             ArchitectureCoverageExclusion? matchedExclusion = contract.Exclude
                 .FirstOrDefault(exclusion => MatchesExcludedContractId(exclusion, authoredContractId, referencedContractId));
 
@@ -62,6 +64,7 @@ internal sealed class ArchitectureRuleInputCoverageAnalysisService
             // change-snapshot coverage-blind-spot entry identity) would collide (#683).
             foreach (ArchitectureRuleInputReference input in referencedInputs)
             {
+                ThrowIfCancellationRequested();
                 string layerName = input.Layer;
                 ArchitectureLayer? layer = null;
                 if (input.IsLayerReference && !Document.Layers.TryGetValue(layerName, out layer))
@@ -118,6 +121,7 @@ internal sealed class ArchitectureRuleInputCoverageAnalysisService
 
     internal List<ArchitectureViolation> Check(ArchitectureCoverageContract contract)
     {
+        ThrowIfCancellationRequested();
         ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(Document);
 
         HashSet<string> excludedContractIds = new(
@@ -136,6 +140,7 @@ internal sealed class ArchitectureRuleInputCoverageAnalysisService
 
         foreach ((string authoredContractId, string referencedContractId) in ResolveReferencedContractIds(contract))
         {
+            ThrowIfCancellationRequested();
             if (excludedContractIds.Contains(referencedContractId)
                 || excludedContractIds.Contains(authoredContractId))
             {
@@ -174,6 +179,7 @@ internal sealed class ArchitectureRuleInputCoverageAnalysisService
 
         foreach (ArchitectureRuleInputReference input in referencedInputs)
         {
+            ThrowIfCancellationRequested();
             string layerName = input.Layer;
             ArchitectureLayer? layer = null;
             if (input.IsLayerReference && !Document.Layers.TryGetValue(layerName, out layer))
@@ -271,4 +277,6 @@ internal sealed class ArchitectureRuleInputCoverageAnalysisService
         return string.Equals(container, candidateNamespace, StringComparison.Ordinal)
             || candidateNamespace.StartsWith(container + ".", StringComparison.Ordinal);
     }
+
+    private void ThrowIfCancellationRequested() => _session.Context.CancellationToken.ThrowIfCancellationRequested();
 }
