@@ -82,10 +82,13 @@ public sealed class ArchitecturePublicApiMemberScannerTests
                     [dependencyType]);
             });
 
-        (_, _, bool isComplete) = ArchitecturePublicApiSurfaceScanner.MaterializeExportedSurface(
-            fixture.ConsumerAssembly);
+        SurfaceScanCompleteness completeness = new(true);
+        _ = ArchitecturePublicApiMemberScanner.Scan(
+            fixture.SourceType,
+            fixture.ConsumerAssembly.GetName().Name!,
+            completeness).ToArray();
 
-        Assert.That(isComplete, Is.False);
+        Assert.That(completeness.IsComplete, Is.False);
     }
 
     [Test]
