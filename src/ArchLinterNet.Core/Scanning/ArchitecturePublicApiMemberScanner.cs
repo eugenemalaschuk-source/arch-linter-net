@@ -1,10 +1,18 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace ArchLinterNet.Core.Scanning;
 
-internal static partial class ArchitecturePublicApiSurfaceScanner
+internal static class ArchitecturePublicApiMemberScanner
 {
-    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedMembers(
+    private const string PublicVisibility = "public";
+    private const string ProtectedInternalVisibility = "protected internal";
+    private const string ProtectedVisibility = "protected";
+
+    private const BindingFlags MemberFlags =
+        BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static; // NOSONAR: intentional — IL scanning needs reflection access to all members
+
+    internal static IEnumerable<ArchitectureExportedApiEntry> Scan(
         Type type,
         string assemblyName,
         SurfaceScanCompleteness completeness)
@@ -41,6 +49,212 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         }
     }
 
+    private static ParameterInfo[] SafeGetParameters(MethodBase method)
+    {
+        try
+        {
+            return method.GetParameters();
+        }
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
+        {
+            return Array.Empty<ParameterInfo>();
+        }
+    }
+
+    private static ParameterInfo[] SafeGetIndexParameters(PropertyInfo property)
+    {
+        try
+        {
+            return property.GetIndexParameters();
+        }
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
+        {
+            return Array.Empty<ParameterInfo>();
+        }
+    }
+
+    private static bool IsAccessorMethodName(string name)
+    {
+        return name.StartsWith("get_", StringComparison.Ordinal)
+            || name.StartsWith("set_", StringComparison.Ordinal)
+            || name.StartsWith("add_", StringComparison.Ordinal)
+            || name.StartsWith("remove_", StringComparison.Ordinal);
+    }
+
+    private static bool IsExportedVisibility(MethodBase method) =>
+        method.IsPublic || method.IsFamily || method.IsFamilyOrAssembly;
+
+    private static bool IsExportedVisibility(FieldInfo field) =>
+        field.IsPublic || field.IsFamily || field.IsFamilyOrAssembly;
+
+    private static bool IsExportedAccessor(MethodInfo? accessor) =>
+        accessor != null && IsExportedVisibility(accessor);
+
+    private static string MemberVisibility(MethodBase method)
+    {
+        if (method.IsPublic)
+        {
+            return PublicVisibility;
+        }
+
+        return method.IsFamilyOrAssembly ? ProtectedInternalVisibility : ProtectedVisibility;
+    }
+
+    private static string MemberVisibility(FieldInfo field)
+    {
+        if (field.IsPublic)
+        {
+            return PublicVisibility;
+        }
+
+        return field.IsFamilyOrAssembly ? ProtectedInternalVisibility : ProtectedVisibility;
+    }
+
+    private static string AccessorVisibility(MethodInfo? getMethod, MethodInfo? setMethod)
+    {
+        string? getVisibility = getMethod != null && IsExportedVisibility(getMethod) ? MemberVisibility(getMethod) : null;
+        string? setVisibility = setMethod != null && IsExportedVisibility(setMethod) ? MemberVisibility(setMethod) : null;
+        return MostOpenVisibility(getVisibility, setVisibility);
+    }
+
+    private static string MostOpenVisibility(string? first, string? second)
+    {
+        static int Rank(string? visibility) => visibility switch
+        {
+            PublicVisibility => 0,
+            ProtectedInternalVisibility => 1,
+            ProtectedVisibility => 2,
+            _ => 3
+        };
+
+        return Rank(first) <= Rank(second) ? first ?? PublicVisibility : second ?? PublicVisibility;
+    }
+
+    // Distinct, assembly-qualified identity of every type a member's signature references
+    // (parameter/return/field/property/event-handler types, plus its own generic parameters'
+    // constraints when genericParameters is supplied), walking through array/pointer/byref wrappers
+    // and generic instantiations. Used to fail closed when a selected member depends on an
+    // unselected first-party exported type (issue #525) — not full C#-syntax rendering, just type
+    // identity. Assembly-qualified because two distinct assemblies can legitimately export a type
+    // under the identical full name.
+    internal static (string AssemblyName, string TypeFullName)[] ReferencedTypes(
+        IEnumerable<Type> types,
+        IEnumerable<Type>? genericParameters = null,
+        SurfaceScanCompleteness? completeness = null)
+    {
+        var collected = new HashSet<Type>();
+        foreach (Type type in types)
+        {
+            CollectReferencedTypes(type, collected);
+        }
+
+        if (genericParameters != null)
+        {
+            foreach (Type parameter in genericParameters)
+            {
+                foreach (Type constraint in SafeGetGenericParameterConstraints(parameter, completeness))
+                {
+                    CollectReferencedTypes(constraint, collected);
+                }
+            }
+        }
+
+        // Ordinal-sorted, not left in HashSet<Type> enumeration order: that order is not guaranteed
+        // stable across runs, and downstream escape-violation reporting depends on encountering
+        // multiple escaping types for the same member in a deterministic sequence.
+        return collected
+            .Select(type => ReferencedTypeIdentity(type, completeness))
+            .Distinct()
+            .OrderBy(reference => reference.AssemblyName, StringComparer.Ordinal)
+            .ThenBy(reference => reference.TypeFullName, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static void CollectReferencedTypes(Type type, HashSet<Type> collected)
+    {
+        if (type.IsByRef || type.IsPointer || type.IsArray)
+        {
+            Type? element = SafeGetElementType(type);
+            if (element != null)
+            {
+                CollectReferencedTypes(element, collected);
+            }
+
+            return;
+        }
+
+        if (type.IsGenericParameter)
+        {
+            return;
+        }
+
+        if (type.IsGenericType && !type.IsGenericTypeDefinition)
+        {
+            collected.Add(type.GetGenericTypeDefinition());
+            foreach (Type argument in type.GetGenericArguments())
+            {
+                CollectReferencedTypes(argument, collected);
+            }
+
+            return;
+        }
+
+        collected.Add(type);
+    }
+
+    private static (string AssemblyName, string TypeFullName) ReferencedTypeIdentity(
+        Type type,
+        SurfaceScanCompleteness? completeness)
+    {
+        string assemblyName = SafeAssemblyName(type, completeness);
+        if (!ArchitectureTypeNames.TryGetFullName(type, out string typeFullName))
+        {
+            completeness?.MarkIncomplete();
+        }
+
+        return (assemblyName, typeFullName);
+    }
+
+    private static string SafeAssemblyName(Type type, SurfaceScanCompleteness? completeness = null)
+    {
+        try
+        {
+            return type.Assembly.GetName().Name ?? string.Empty;
+        }
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
+        {
+            completeness?.MarkIncomplete();
+            return string.Empty;
+        }
+    }
+
+    private static Type[] SafeGetGenericParameterConstraints(
+        Type parameter,
+        SurfaceScanCompleteness? completeness = null)
+    {
+        try
+        {
+            return parameter.GetGenericParameterConstraints();
+        }
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
+        {
+            completeness?.MarkIncomplete();
+            return Array.Empty<Type>();
+        }
+    }
+
+    private static Type? SafeGetElementType(Type type)
+    {
+        try
+        {
+            return type.GetElementType();
+        }
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
+        {
+            return null;
+        }
+    }
+
     private static IEnumerable<ArchitectureExportedApiEntry> GetExportedConstructors(
         Type type,
         string declaringTypeName,
@@ -58,7 +272,9 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 string visibility = MemberVisibility(ctor);
-                var referenced = ReferencedTypes(SafeGetParameters(ctor).Select(p => p.ParameterType), completeness: completeness);
+                var referenced = ReferencedTypes(
+                    SafeGetParameters(ctor).Select(p => p.ParameterType),
+                    completeness: completeness);
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
@@ -93,7 +309,8 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
                 string visibility = MemberVisibility(method);
                 Type[]? genericParameters = method.IsGenericMethodDefinition ? method.GetGenericArguments() : null;
                 var referenced = ReferencedTypes(
-                    SafeGetParameters(method).Select(p => p.ParameterType).Append(method.ReturnType), genericParameters, completeness);
+                    SafeGetParameters(method).Select(p => p.ParameterType).Append(method.ReturnType),
+                    genericParameters, completeness);
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
@@ -132,7 +349,9 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
                         signature, ArchitecturePublicApiSignatureDetails.ForProperty(property, completeness.MarkIncomplete)),
-                    declaringTypeName, assemblyName, AccessorVisibility(property.GetMethod, property.SetMethod), false, null,
+                    declaringTypeName, assemblyName,
+                    AccessorVisibility(property.GetMethod, property.SetMethod),
+                    false, null,
                     referenced);
             }
         }
@@ -221,12 +440,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         {
             parameters = method.GetParameters();
         }
-        catch (TypeLoadException)
-        {
-            completeness.MarkIncomplete();
-            return null;
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness.MarkIncomplete();
             return null;
@@ -290,12 +504,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         {
             indexParameters = property.GetIndexParameters();
         }
-        catch (TypeLoadException)
-        {
-            completeness.MarkIncomplete();
-            return null;
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness.MarkIncomplete();
             return null;
@@ -339,12 +548,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
 
             return name;
         }
-        catch (TypeLoadException)
-        {
-            completeness?.MarkIncomplete();
-            return null;
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness?.MarkIncomplete();
             return null;
@@ -428,24 +632,25 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         {
             return selector(type);
         }
-        catch (TypeLoadException)
-        {
-            completeness?.MarkIncomplete();
-            return Array.Empty<TMember>();
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness?.MarkIncomplete();
             return Array.Empty<TMember>();
         }
     }
 
-    private sealed class SurfaceScanCompleteness
+    internal static bool IsCompilerGenerated(MemberInfo member, SurfaceScanCompleteness? completeness = null)
     {
-        public SurfaceScanCompleteness(bool isComplete) => IsComplete = isComplete;
-
-        public bool IsComplete { get; private set; }
-
-        public void MarkIncomplete() => IsComplete = false;
+        try
+        {
+            return member.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false);
+        }
+        catch (Exception exception) when (
+            exception is TypeLoadException or FileNotFoundException or CustomAttributeFormatException)
+        {
+            completeness?.MarkIncomplete();
+            return false;
+        }
     }
+
 }
