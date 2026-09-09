@@ -55,11 +55,7 @@ internal static class ArchitecturePublicApiMemberScanner
         {
             return method.GetParameters();
         }
-        catch (TypeLoadException)
-        {
-            return Array.Empty<ParameterInfo>();
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             return Array.Empty<ParameterInfo>();
         }
@@ -71,11 +67,7 @@ internal static class ArchitecturePublicApiMemberScanner
         {
             return property.GetIndexParameters();
         }
-        catch (TypeLoadException)
-        {
-            return Array.Empty<ParameterInfo>();
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             return Array.Empty<ParameterInfo>();
         }
@@ -229,12 +221,7 @@ internal static class ArchitecturePublicApiMemberScanner
         {
             return type.Assembly.GetName().Name ?? string.Empty;
         }
-        catch (TypeLoadException)
-        {
-            completeness?.MarkIncomplete();
-            return string.Empty;
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness?.MarkIncomplete();
             return string.Empty;
@@ -249,12 +236,7 @@ internal static class ArchitecturePublicApiMemberScanner
         {
             return parameter.GetGenericParameterConstraints();
         }
-        catch (TypeLoadException)
-        {
-            completeness?.MarkIncomplete();
-            return Array.Empty<Type>();
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness?.MarkIncomplete();
             return Array.Empty<Type>();
@@ -267,11 +249,7 @@ internal static class ArchitecturePublicApiMemberScanner
         {
             return type.GetElementType();
         }
-        catch (TypeLoadException)
-        {
-            return null;
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             return null;
         }
@@ -462,12 +440,7 @@ internal static class ArchitecturePublicApiMemberScanner
         {
             parameters = method.GetParameters();
         }
-        catch (TypeLoadException)
-        {
-            completeness.MarkIncomplete();
-            return null;
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness.MarkIncomplete();
             return null;
@@ -531,12 +504,7 @@ internal static class ArchitecturePublicApiMemberScanner
         {
             indexParameters = property.GetIndexParameters();
         }
-        catch (TypeLoadException)
-        {
-            completeness.MarkIncomplete();
-            return null;
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness.MarkIncomplete();
             return null;
@@ -580,12 +548,7 @@ internal static class ArchitecturePublicApiMemberScanner
 
             return name;
         }
-        catch (TypeLoadException)
-        {
-            completeness?.MarkIncomplete();
-            return null;
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness?.MarkIncomplete();
             return null;
@@ -669,12 +632,7 @@ internal static class ArchitecturePublicApiMemberScanner
         {
             return selector(type);
         }
-        catch (TypeLoadException)
-        {
-            completeness?.MarkIncomplete();
-            return Array.Empty<TMember>();
-        }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException)
         {
             completeness?.MarkIncomplete();
             return Array.Empty<TMember>();
@@ -687,17 +645,8 @@ internal static class ArchitecturePublicApiMemberScanner
         {
             return member.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false);
         }
-        catch (TypeLoadException)
-        {
-            completeness?.MarkIncomplete();
-            return false;
-        }
-        catch (FileNotFoundException)
-        {
-            completeness?.MarkIncomplete();
-            return false;
-        }
-        catch (CustomAttributeFormatException)
+        catch (Exception exception) when (
+            exception is TypeLoadException or FileNotFoundException or CustomAttributeFormatException)
         {
             completeness?.MarkIncomplete();
             return false;
