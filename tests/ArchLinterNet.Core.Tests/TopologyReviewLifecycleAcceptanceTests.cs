@@ -13,6 +13,7 @@ namespace ArchLinterNet.Core.Tests;
 // runtimes fast; this fixture proves the shipped CLI drives real analysis for both .NET and the
 // Unity-shaped Library/ScriptAssemblies layout without modifying a reviewed input.
 [TestFixture]
+[Category("E2E")]
 [NonParallelizable]
 public sealed class TopologyReviewLifecycleAcceptanceTests
 {
