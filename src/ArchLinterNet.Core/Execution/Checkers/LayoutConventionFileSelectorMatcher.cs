@@ -6,17 +6,31 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution.Checkers;
 
-// Candidate/file-group selection for the layout_conventions family. Split from
-// LayoutConventionChecker.cs to keep both files under the repository's file-size lint budget
-// (make/lint.mk CS_SIZE_LINT_ERROR_LINES).
-internal static partial class LayoutConventionChecker
+// Candidate/file-group selection for the layout_conventions family. This collaborator owns the
+// file-level selector semantics, including the filed/unfiled split, when refinement, exclusion
+// precedence/participation, and source-path matching. LayoutConventionChecker remains the facade for
+// contract execution and expectation evaluation.
+internal static class LayoutConventionFileSelectorMatcher
 {
+    internal sealed record Result(
+        List<LayoutConventionChecker.LayoutFileGroup> Groups,
+        bool InclusionMatched,
+        bool InclusionEvaluationFailed,
+        bool[] ExclusionMatched,
+        bool[] ExclusionEvaluationFailed);
+
+    internal static bool MatcherNeedsSourcePath(ArchitectureLayoutFileMatcher matcher) =>
+        !string.IsNullOrEmpty(matcher.FolderSegment)
+        || !string.IsNullOrEmpty(matcher.FileNameSuffix)
+        || !string.IsNullOrEmpty(matcher.FileNamePrefix)
+        || LayoutConventionSourcePathIdentifierMatcher.References(matcher.When);
+
     // A whole-run data-unavailable diagnostic may be caused by an expectation (for example,
     // require_type_name_matches_file_name), while some authored selectors remain evaluable from
     // reflection-only namespace facts. Record every selector in that case: a missing path is
     // explicit EvaluationFailed evidence, and an independent namespace-only result stays useful
     // rather than silently disappearing from coverage/explain.
-    private static void RecordUnavailableSelectorParticipation(
+    internal static void RecordUnavailableSelectorParticipation(
         ArchitectureLayoutConventionContract contract, ArchitectureCheckerContext context)
     {
         (_, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex(context);
@@ -55,28 +69,34 @@ internal static partial class LayoutConventionChecker
     // declared under a different namespace in the same already-selected file. Facts with no
     // resolvable source file (no source enrichment, or an ambiguous partial-class declaration) can
     // only ever satisfy namespace_segment, evaluated per-type since there is no file to group by.
-    private static List<LayoutFileGroup> CollectMatchedFileGroups(
+    internal static Result CollectMatchedFileGroups(
         ArchitectureLayoutConventionContract contract,
         ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext,
-        List<ArchitectureViolation> violations,
-        LayoutExclusionTracker tracker)
+        List<ArchitectureViolation> violations)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
             List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex(context);
+        MatcherParticipationTracker tracker = new(contract.ExcludeFilesMatching.Count);
 
-        List<LayoutFileGroup> groups = ProjectFiledCandidateGroups(
+        List<LayoutConventionChecker.LayoutFileGroup> groups = ProjectFiledCandidateGroups(
             contract,
             context,
             byFile,
             tracker.Matched,
             out bool filedInclusionMatched);
-        List<LayoutFileGroup> unfiledGroups = CollectUnfiledGroups(
+        List<LayoutConventionChecker.LayoutFileGroup> unfiledGroups = CollectUnfiledGroups(
             contract, context, matcher, unfiled, executionContext, violations, tracker);
         groups.AddRange(unfiledGroups);
         tracker.InclusionMatched = filedInclusionMatched || tracker.InclusionMatched;
-        return groups;
+
+        return new Result(
+            groups,
+            tracker.InclusionMatched,
+            tracker.InclusionEvaluationFailed,
+            tracker.Matched,
+            tracker.EvaluationFailed);
     }
 
     private static (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> ByFile,
@@ -104,7 +124,7 @@ internal static partial class LayoutConventionChecker
 
             if (!byFile.TryGetValue(fact.SourceFilePath, out List<(Type Type, ArchitectureDeclaredTypeFact Fact)>? entries))
             {
-                entries = new List<(Type, ArchitectureDeclaredTypeFact)>();
+                entries = new List<(Type Type, ArchitectureDeclaredTypeFact)>();
                 byFile[fact.SourceFilePath] = entries;
             }
 
@@ -118,14 +138,14 @@ internal static partial class LayoutConventionChecker
     // normal layout checker and the opt-in applicability inventory consume it so a selector has
     // exactly one file-level meaning: select the file, refine declarations by `when`, then apply
     // file-level exclusions and their own `when` predicates.
-    internal static List<LayoutFileGroup> ProjectFiledCandidateGroups(
+    internal static List<LayoutConventionChecker.LayoutFileGroup> ProjectFiledCandidateGroups(
         ArchitectureLayoutConventionContract contract,
         ArchitectureCheckerContext context,
         Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
         bool[] exclusionMatched,
         out bool inclusionMatched)
     {
-        List<LayoutFileGroup> groups = new();
+        List<LayoutConventionChecker.LayoutFileGroup> groups = new();
         inclusionMatched = false;
 
         foreach ((string filePath, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries) in
@@ -151,7 +171,8 @@ internal static partial class LayoutConventionChecker
                 continue;
             }
 
-            groups.Add(new LayoutFileGroup(filePath, entries[0].Fact.FileNameWithoutExtension, eligibleFacts));
+            groups.Add(new LayoutConventionChecker.LayoutFileGroup(
+                filePath, entries[0].Fact.FileNameWithoutExtension, eligibleFacts));
         }
 
         return groups;
@@ -211,18 +232,18 @@ internal static partial class LayoutConventionChecker
     // silently include or exclude a candidate the run-level guard never sees (that guard only fires
     // when NO fact anywhere has a path; this is the partial-enrichment case where other facts do).
     // An ambiguous partial-class declaration is exempt: its sourcePaths carries every candidate
-    // declaration path (see ArchitectureExpressionSubjectFactBuilder.ResolveSourcePaths), so a
-    // path-referencing predicate evaluates against real data for it, same as any filed fact.
-    private static List<LayoutFileGroup> CollectUnfiledGroups(
+    // declaration path, so a path-referencing predicate evaluates against real data for it, same
+    // as any filed fact.
+    private static List<LayoutConventionChecker.LayoutFileGroup> CollectUnfiledGroups(
         ArchitectureLayoutConventionContract contract,
         ArchitectureCheckerContext context,
         ArchitectureLayoutFileMatcher matcher,
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        LayoutExclusionTracker tracker)
+        MatcherParticipationTracker tracker)
     {
-        List<LayoutFileGroup> groups = new();
+        List<LayoutConventionChecker.LayoutFileGroup> groups = new();
 
         foreach ((Type Type, ArchitectureDeclaredTypeFact Fact) entry in
                  unfiled.OrderBy(entry => entry.Fact.FullTypeName, StringComparer.Ordinal))
@@ -233,7 +254,7 @@ internal static partial class LayoutConventionChecker
             }
 
             MatcherDiagnosticContext filesMatchingContext = new(
-                contract, "files_matching", BuildUnevaluatedLayoutWhenExpressions(contract));
+                contract, "files_matching", LayoutConventionChecker.BuildUnevaluatedLayoutWhenExpressions(contract));
             if (!TryEvaluateUnfiledMatcher(
                     context, matcher, entry, executionContext, violations, filesMatchingContext, out bool included))
             {
@@ -253,7 +274,10 @@ internal static partial class LayoutConventionChecker
                 continue;
             }
 
-            groups.Add(new LayoutFileGroup(null, null, new List<ArchitectureDeclaredTypeFact> { entry.Fact }));
+            groups.Add(new LayoutConventionChecker.LayoutFileGroup(null, null, new List<ArchitectureDeclaredTypeFact>
+            {
+                entry.Fact,
+            }));
         }
 
         return groups;
@@ -265,7 +289,7 @@ internal static partial class LayoutConventionChecker
         (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        LayoutExclusionTracker tracker)
+        MatcherParticipationTracker tracker)
     {
         // Every authored exclusion is evaluated against this candidate independently - not just
         // until the first one excludes it - so two overlapping exclusion items both get their own
@@ -281,7 +305,7 @@ internal static partial class LayoutConventionChecker
             }
 
             string fieldName = $"exclude_files_matching[{index}]";
-            ExpressionParticipation[]? whenExpressions = BuildLayoutWhenExpressions(
+            ExpressionParticipation[]? whenExpressions = LayoutConventionChecker.BuildLayoutWhenExpressions(
                 exclusion,
                 contract.Name,
                 fieldName,
@@ -292,8 +316,9 @@ internal static partial class LayoutConventionChecker
             {
                 // The exclusion structurally matched this candidate but its `when` couldn't be
                 // evaluated (no resolved source file) - this is neither "matched" nor "stale"; the
-                // candidate is suppressed defensively (fail-closed, matching TryEvaluateUnfiledMatcher's
-                // own DataUnavailable violation) but the matcher's participation status is unknown.
+                // candidate is suppressed defensively (fail-closed, matching
+                // TryEvaluateUnfiledMatcher's own DataUnavailable violation) but the matcher's
+                // participation status is unknown.
                 tracker.EvaluationFailed[index] = true;
                 excludedAny = true;
                 continue;
@@ -309,8 +334,8 @@ internal static partial class LayoutConventionChecker
         return excludedAny;
     }
 
-    // Bundles the diagnostic identity of the matcher being evaluated — the contract it belongs to,
-    // which field it came from, and the pre-built expression-participation payload for its `when` —
+    // Bundles the diagnostic identity of the matcher being evaluated - the contract it belongs to,
+    // which field it came from, and the pre-built expression-participation payload for its `when` -
     // so TryEvaluateUnfiledMatcher's signature doesn't have to name each separately.
     private readonly record struct MatcherDiagnosticContext(
         ArchitectureLayoutConventionContract Contract,
@@ -336,13 +361,13 @@ internal static partial class LayoutConventionChecker
             return true;
         }
 
-        bool whenReferencesSourcePath = ReferencesSourcePathIdentifier(matcher.When);
+        bool whenReferencesSourcePath = LayoutConventionSourcePathIdentifierMatcher.References(matcher.When);
         bool isAmbiguous = context.SourceFileFactIndex.Ambiguities.Any(ambiguity =>
             ambiguity.AssemblyName == entry.Fact.AssemblyName
             && ambiguity.FullTypeName == entry.Fact.FullTypeName);
         if (whenReferencesSourcePath && !isAmbiguous)
         {
-            AddViolation(
+            LayoutConventionChecker.AddViolation(
                 contract,
                 executionContext,
                 violations,
@@ -425,6 +450,69 @@ internal static partial class LayoutConventionChecker
             || fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal);
     }
 
+    internal static bool MatchesWhenForSourceType(
+        ArchitectureLayoutFileMatcher matcher,
+        ArchitectureCheckerContext context,
+        string assemblyName,
+        string fullTypeName,
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
+    {
+        if (matcher.CompiledWhen == null)
+        {
+            return true;
+        }
+
+        return typesByIdentity != null
+            && typesByIdentity.TryGetValue((assemblyName, fullTypeName), out Type? type)
+            && EvaluateLayoutWhen(matcher, context, type);
+    }
+
+    internal static bool AnyCandidatePathMatchesFileSelector(
+        ArchitectureLayoutFileMatcher matcher, IReadOnlyList<string> candidatePaths)
+    {
+        foreach (string candidatePath in candidatePaths)
+        {
+            string[] folderSegments = GetFolderSegmentsFromPath(candidatePath);
+            string fileName = GetFileNameWithoutExtensionFromPath(candidatePath);
+
+            if (!string.IsNullOrEmpty(matcher.FolderSegment)
+                && !folderSegments.Contains(matcher.FolderSegment, StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(matcher.FileNameSuffix)
+                && !fileName.EndsWith(matcher.FileNameSuffix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(matcher.FileNamePrefix)
+                && !fileName.StartsWith(matcher.FileNamePrefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string[] GetFolderSegmentsFromPath(string normalizedRelativePath)
+    {
+        int lastSlash = normalizedRelativePath.LastIndexOf('/');
+        return lastSlash <= 0 ? Array.Empty<string>() : normalizedRelativePath[..lastSlash].Split('/');
+    }
+
+    private static string GetFileNameWithoutExtensionFromPath(string normalizedRelativePath)
+    {
+        int lastSlash = normalizedRelativePath.LastIndexOf('/');
+        string fileName = lastSlash >= 0 ? normalizedRelativePath[(lastSlash + 1)..] : normalizedRelativePath;
+        int dot = fileName.LastIndexOf('.');
+        return dot > 0 ? fileName[..dot] : fileName;
+    }
+
     private static bool EvaluateLayoutWhen(
         ArchitectureLayoutFileMatcher matcher, ArchitectureCheckerContext context, Type type)
     {
@@ -435,5 +523,25 @@ internal static partial class LayoutConventionChecker
             $"when: {matcher.When}) for type '{ArchitectureTypeNames.SafeFullName(type)}'";
         return ArchitectureExpressionFactService.Evaluate(
             matcher.CompiledWhen!, expressionContext, description, matcher.WhenLocation);
+    }
+
+    // Bundles per-contract layout participation state (one array slot per authored exclusion, plus
+    // the single inclusion selector's own status) so the file/candidate collection methods can
+    // thread one object instead of two bool[] arrays and two `out bool` parameters each.
+    private sealed class MatcherParticipationTracker
+    {
+        public MatcherParticipationTracker(int exclusionCount)
+        {
+            Matched = new bool[exclusionCount];
+            EvaluationFailed = new bool[exclusionCount];
+        }
+
+        public bool[] Matched { get; }
+
+        public bool[] EvaluationFailed { get; }
+
+        public bool InclusionMatched { get; set; }
+
+        public bool InclusionEvaluationFailed { get; set; }
     }
 }

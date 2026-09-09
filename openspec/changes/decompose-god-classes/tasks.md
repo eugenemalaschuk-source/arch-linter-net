@@ -57,6 +57,10 @@
     analysis into the non-partial `ArchitectureRuleInputCoverageAnalysisService`, retaining the
     session's canonical cached coverage inventory, descriptor catalog, deterministic ordering, and
     unmatched-ignore collection; remove its exact declaration-count waiver (#809).
+  - [x] Extract `LayoutConventionChecker` file-level selector matching into the non-partial
+    `LayoutConventionFileSelectorMatcher`, retaining one convention-evaluation facade, the shared
+    applicability projection, normalized paths, deterministic selector participation, and the
+    cached source-fact path; remove its exact declaration-count waiver (#811).
   - [x] Extract `ArchitecturePublicApiSurfaceScanner` member scanning into the non-partial
     `ArchitecturePublicApiMemberScanner`, retaining one surface materialization, canonical member
     identity/order and visibility filtering, shared incomplete-reflection evidence, and removing its
