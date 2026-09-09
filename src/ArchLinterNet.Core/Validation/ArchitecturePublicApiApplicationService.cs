@@ -2,7 +2,6 @@ using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Families;
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation.Abstractions;
@@ -17,15 +16,36 @@ namespace ArchLinterNet.Core.Validation;
 // The host must use that resolved path: resolving the authored string again in the host would
 // silently target a different file whenever the process working directory is not the repository
 // root (for example with an absolute --policy).
-public sealed partial class ArchitecturePublicApiApplicationService(
-    IArchitectureRunnerSetupService runnerSetupService,
-    IBuildStatePreparationService buildStatePreparationService,
-    IPublicApiSnapshotStore snapshotStore)
-    : IArchitecturePublicApiApplicationService
+public sealed class ArchitecturePublicApiApplicationService : IArchitecturePublicApiApplicationService
 {
+    private readonly ArchitecturePublicApiSurfaceResolver _surfaceResolver;
+    private readonly IPublicApiSnapshotStore _snapshotStore;
+
+    // Keep the existing public construction seam for consumers that compose Core directly. The
+    // application service delegates all policy/runner/surface work to the internal resolver.
+    public ArchitecturePublicApiApplicationService(
+        IArchitectureRunnerSetupService runnerSetupService,
+        IBuildStatePreparationService buildStatePreparationService,
+        IPublicApiSnapshotStore snapshotStore)
+        : this(
+            new ArchitecturePublicApiSurfaceResolver(runnerSetupService, buildStatePreparationService),
+            snapshotStore)
+    {
+    }
+
+    // DI uses the already-registered resolver, while the public constructor above keeps the
+    // existing public API stable for direct callers and test compositions.
+    internal ArchitecturePublicApiApplicationService(
+        ArchitecturePublicApiSurfaceResolver surfaceResolver,
+        IPublicApiSnapshotStore snapshotStore)
+    {
+        _surfaceResolver = surfaceResolver;
+        _snapshotStore = snapshotStore;
+    }
+
     public PublicApiCaptureOutcome Capture(PublicApiCaptureRequest request)
     {
-        SurfaceResolution resolution = ResolveSurface(
+        ArchitecturePublicApiSurfaceResolution resolution = _surfaceResolver.Resolve(
             request.PolicyPath, request.ContractId, request.ConditionSetName, request.PreparationMode, request.NoRestore,
             request.CancellationToken);
         if (resolution.Error != null)
@@ -47,7 +67,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 
     public PublicApiDiffOutcome Diff(PublicApiDiffRequest request)
     {
-        SurfaceResolution resolution = ResolveSurface(
+        ArchitecturePublicApiSurfaceResolution resolution = _surfaceResolver.Resolve(
             request.PolicyPath, request.ContractId, request.ConditionSetName, request.PreparationMode, request.NoRestore,
             request.CancellationToken);
         if (resolution.Error != null)
@@ -72,7 +92,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 
     public PublicApiUpdateOutcome Update(PublicApiUpdateRequest request)
     {
-        SurfaceResolution resolution = ResolveSurface(
+        ArchitecturePublicApiSurfaceResolution resolution = _surfaceResolver.Resolve(
             request.PolicyPath, request.ContractId, request.ConditionSetName, request.PreparationMode, request.NoRestore,
             request.CancellationToken);
         if (resolution.Error != null)
@@ -135,7 +155,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 
     public PublicApiMigrateOutcome Migrate(PublicApiMigrateRequest request)
     {
-        SurfaceResolution resolution = ResolveSurface(
+        ArchitecturePublicApiSurfaceResolution resolution = _surfaceResolver.Resolve(
             request.PolicyPath, request.ContractId, request.ConditionSetName, request.PreparationMode, request.NoRestore,
             request.CancellationToken);
         if (resolution.Error != null)
@@ -201,7 +221,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
     // at that location rather than inferring identity from any OS assumption or existence check.
     internal bool PathsMatch(string first, string second)
     {
-        return snapshotStore.IsSameFile(first, second);
+        return _snapshotStore.IsSameFile(first, second);
     }
 
     // The policy (and any imported policy source) must never be a snapshot destination: a --force
@@ -213,7 +233,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 
         try
         {
-            destination = snapshotStore.ResolvePath(policyPath, authoredPath);
+            destination = _snapshotStore.ResolvePath(policyPath, authoredPath);
         }
         catch (InvalidOperationException exception)
         {
@@ -238,8 +258,8 @@ public sealed partial class ArchitecturePublicApiApplicationService(
         string? resolved = null;
         try
         {
-            resolved = snapshotStore.ResolvePath(policyPath, snapshotPath);
-            if (!snapshotStore.Exists(resolved))
+            resolved = _snapshotStore.ResolvePath(policyPath, snapshotPath);
+            if (!_snapshotStore.Exists(resolved))
             {
                 return SnapshotRead.Failed(
                     resolved,
@@ -247,7 +267,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
                     "Run 'arch-linter-net public-api capture' to create it.");
             }
 
-            PublicApiSnapshotDocument document = snapshotStore.Read(resolved, snapshotPath);
+            PublicApiSnapshotDocument document = _snapshotStore.Read(resolved, snapshotPath);
             string? ownershipError = PublicApiSnapshotResolver.ValidateOwnership(document, contract, snapshotPath);
             return ownershipError == null
                 ? new SnapshotRead(document.Entries, resolved, null)

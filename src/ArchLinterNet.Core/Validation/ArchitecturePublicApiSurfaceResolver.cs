@@ -8,11 +8,14 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Validation;
 
-// Contract lookup, build-state preflight, and surface capture — the part every public-api operation
-// shares. Split from the operation bodies so neither file grows past the repository's file-size gate.
-public sealed partial class ArchitecturePublicApiApplicationService
+// Canonical resolution path shared by public-api capture, diff, update, and migrate. This
+// collaborator owns policy/contract lookup, build-state preparation, one post-build recreation and
+// verification pass, exactly one surface capture, selector safety, cancellation, and runner scope.
+internal sealed class ArchitecturePublicApiSurfaceResolver(
+    IArchitectureRunnerSetupService runnerSetupService,
+    IBuildStatePreparationService buildStatePreparationService)
 {
-    private SurfaceResolution ResolveSurface(
+    public ArchitecturePublicApiSurfaceResolution Resolve(
         string policyPath,
         string contractId,
         string? conditionSetName,
@@ -37,7 +40,7 @@ public sealed partial class ArchitecturePublicApiApplicationService
                 .OrderBy(id => id, StringComparer.Ordinal)!;
 
             string availableText = available.Any() ? string.Join(", ", available) : "(none)";
-            return SurfaceResolution.Failed(
+            return ArchitecturePublicApiSurfaceResolution.Failed(
                 $"Unknown public API surface contract '{contractId}'. Available contract ids: {availableText}.");
         }
 
@@ -56,7 +59,7 @@ public sealed partial class ArchitecturePublicApiApplicationService
                 setup.Runner, preparationMode, noRestore, requestedConfiguration, requestedTargetFramework, cancellationToken);
             if (preflight.Blocked)
             {
-                return SurfaceResolution.Failed(
+                return ArchitecturePublicApiSurfaceResolution.Failed(
                     "Build state preflight is blocked; the exported surface cannot be captured from artifacts " +
                     "that are missing, stale, or built for a different target framework.",
                     preflight.Diagnostics);
@@ -79,7 +82,7 @@ public sealed partial class ArchitecturePublicApiApplicationService
 
                 if (preflight.Blocked)
                 {
-                    return SurfaceResolution.Failed(
+                    return ArchitecturePublicApiSurfaceResolution.Failed(
                         "Build state preflight is blocked; the exported surface cannot be captured from artifacts " +
                         "that are missing, stale, or built for a different target framework.",
                         preflight.Diagnostics);
@@ -92,7 +95,7 @@ public sealed partial class ArchitecturePublicApiApplicationService
 
             if (missingAssemblies.Count > 0)
             {
-                return SurfaceResolution.Failed(
+                return ArchitecturePublicApiSurfaceResolution.Failed(
                     $"Contract '{contractId}' targets assemblies that could not be resolved: " +
                     $"{string.Join(", ", missingAssemblies)}. Build the solution before capturing its public API.",
                     preflight.Diagnostics);
@@ -104,13 +107,13 @@ public sealed partial class ArchitecturePublicApiApplicationService
             // this lifecycle, which `validate` would then never be able to pass against.
             if (selectorSafetyViolations.Count > 0)
             {
-                return SurfaceResolution.Failed(
+                return ArchitecturePublicApiSurfaceResolution.Failed(
                     $"Contract '{contractId}' failed a selector safety check: " +
                     string.Join(" ", selectorSafetyViolations.Select(DescribeSelectorSafetyViolation)),
                     preflight.Diagnostics);
             }
 
-            return new SurfaceResolution(contract, entries, preflight.Diagnostics, null);
+            return new ArchitecturePublicApiSurfaceResolution(contract, entries, preflight.Diagnostics, null);
         }
         finally
         {
@@ -132,8 +135,7 @@ public sealed partial class ArchitecturePublicApiApplicationService
 
     // Mirrors ArchitectureValidationApplicationService.RunBuildStatePreflight: preflight only has
     // the fingerprint/receipt inputs it needs when project discovery produced a project graph, and
-    // "resolution never ran" (neither resolved nor missing names) must not be read as "artifact
-    // missing".
+    // "resolution never ran" (neither resolved nor missing names) must not be read as "artifact missing".
     private BuildStatePreflightResult RunBuildStatePreflight(
         IArchitectureContractRunner runner,
         BuildPreparationMode preparationMode,
@@ -172,23 +174,5 @@ public sealed partial class ArchitecturePublicApiApplicationService
             requestedConfiguration,
             requestedTargetFramework,
             CancellationToken: cancellationToken));
-    }
-
-    private sealed record SurfaceResolution(
-        ArchitecturePublicApiSurfaceContract? Contract,
-        IReadOnlyList<PublicApiSnapshotEntry> Entries,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics,
-        string? Error,
-        PublicApiFailureKind FailureKind = PublicApiFailureKind.InvalidInput)
-    {
-        public static SurfaceResolution Failed(
-            string error, IReadOnlyCollection<BuildStatePreflightDiagnostic>? diagnostics = null)
-        {
-            return new SurfaceResolution(
-                null,
-                Array.Empty<PublicApiSnapshotEntry>(),
-                diagnostics ?? Array.Empty<BuildStatePreflightDiagnostic>(),
-                error);
-        }
     }
 }
