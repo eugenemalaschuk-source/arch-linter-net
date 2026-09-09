@@ -69,6 +69,9 @@
     the non-partial `ArchitecturePublicApiSurfaceResolver`, retaining one public application facade,
     canonical member identity/order, selector-safety, build-state, cancellation, and disposal
     behavior; remove only its exact declaration-count waiver (#816).
+  - [x] Extract `ArchitectureBaselineApplicationService` candidate collection and build-state
+    preparation into the non-partial `ArchitectureBaselineCandidateCollector`, retaining the public
+    lifecycle facade, receipt-backed runner semantics, cancellation, and disposal behavior (#815).
   - [x] Extract graph build-state preflight from the two-declaration
     `ArchitectureGraphApplicationService.cs` / `.BuildState.cs` aggregate into the internal,
     non-partial `ArchitectureGraphBuildStatePreflightService`, retaining one graph application

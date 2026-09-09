@@ -1,27 +1,47 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
-using ArchLinterNet.Core.Contracts.Families;
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
-using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation.Abstractions;
 
 namespace ArchLinterNet.Core.Validation;
 
-public sealed partial class ArchitectureBaselineApplicationService(
-    IArchitectureRunnerSetupService runnerSetupService,
-    IArchitectureContractHandlerRegistry handlerRegistry,
-    IArchitectureContractExecutor contractExecutor,
-    IArchitectureBaselineGenerator baselineGenerator,
-    IArchitectureBaselineLoadingService baselineLoadingService,
-    IBuildStatePreparationService? buildStatePreparationService = null)
-    : IArchitectureBaselineApplicationService
+public sealed class ArchitectureBaselineApplicationService : IArchitectureBaselineApplicationService
 {
-    private const string ModeStrict = "strict";
-    private const string ModeAudit = "audit";
+    private readonly ArchitectureBaselineCandidateCollector _candidateCollector;
+    private readonly IArchitectureBaselineGenerator _baselineGenerator;
+    private readonly IArchitectureBaselineLoadingService _baselineLoadingService;
+
+    // Keep the existing public construction seam for consumers that compose Core directly. The
+    // application service delegates policy/build/candidate work to the internal collector.
+    public ArchitectureBaselineApplicationService(
+        IArchitectureRunnerSetupService runnerSetupService,
+        IArchitectureContractHandlerRegistry handlerRegistry,
+        IArchitectureContractExecutor contractExecutor,
+        IArchitectureBaselineGenerator baselineGenerator,
+        IArchitectureBaselineLoadingService baselineLoadingService,
+        IBuildStatePreparationService? buildStatePreparationService = null)
+        : this(
+            new ArchitectureBaselineCandidateCollector(
+                runnerSetupService, handlerRegistry, contractExecutor, buildStatePreparationService),
+            baselineGenerator,
+            baselineLoadingService)
+    {
+    }
+
+    // DI composes the already-registered collector, while the public constructor above keeps the
+    // existing direct-composition API stable.
+    internal ArchitectureBaselineApplicationService(
+        ArchitectureBaselineCandidateCollector candidateCollector,
+        IArchitectureBaselineGenerator baselineGenerator,
+        IArchitectureBaselineLoadingService baselineLoadingService)
+    {
+        _candidateCollector = candidateCollector;
+        _baselineGenerator = baselineGenerator;
+        _baselineLoadingService = baselineLoadingService;
+    }
 
     public BaselineGenerationOutcome Generate(BaselineGenerationRequest request)
     {
@@ -36,7 +56,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        BaselineCandidateCollection collection = CollectGenerateCandidates(request);
+        BaselineCandidateCollection collection = _candidateCollector.CollectGenerateCandidates(request);
         IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
         List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
 
@@ -50,7 +70,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
         }
 
         BaselineWritePlan plan = BaselineWritePlanner.PlanGenerate(candidates, reasonMap);
-        ArchitectureBaselineDocument baseline = baselineGenerator.BuildFromEntries(
+        ArchitectureBaselineDocument baseline = _baselineGenerator.BuildFromEntries(
             plan.OutputEntries,
             collection.HasSelectedRelativeMetricBudgets
                 ? ArchitectureViolationIdentity.CurrentVersion + 1
@@ -59,7 +79,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
         return new BaselineGenerationOutcome(
             Succeeded: true,
-            Yaml: baselineGenerator.Serialize(baseline),
+            Yaml: _baselineGenerator.Serialize(baseline),
             CandidateCount: candidates.Count,
             ConfigurationViolations: Array.Empty<ArchitectureViolation>())
         {
@@ -81,7 +101,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        BaselineCandidateCollection collection = CollectUpdateCandidates(request);
+        BaselineCandidateCollection collection = _candidateCollector.CollectUpdateCandidates(request);
         ArchitectureContractDocument document = collection.Document;
         IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
         List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
@@ -95,19 +115,19 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
+        ArchitectureBaselineDocument existingBaseline = _baselineLoadingService.Load(request.BaselinePath);
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
             document, existingBaseline, candidates, request.Mode, request.ContractIds);
 
         BaselineWritePlan plan = BaselineWritePlanner.PlanUpdate(comparison, reasonMap);
-        ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(plan.OutputEntries, existingBaseline.Version);
+        ArchitectureBaselineDocument updated = _baselineGenerator.BuildFromEntries(plan.OutputEntries, existingBaseline.Version);
         updated.MetricBaselines = existingBaseline.MetricBaselines.ToList();
 
         BaselineCommentInspection comments = InspectComments(request.BaselinePath);
 
         return new BaselineUpdateOutcome(
             Succeeded: true,
-            Yaml: comments.Header + baselineGenerator.Serialize(updated),
+            Yaml: comments.Header + _baselineGenerator.Serialize(updated),
             PreservedCount: comparison.Frozen.Count,
             NewCount: comparison.New.Count,
             ConfigurationViolations: Array.Empty<ArchitectureViolation>())
@@ -119,7 +139,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
     public BaselinePruneOutcome Prune(BaselinePruneRequest request)
     {
-        BaselineCandidateCollection collection = CollectPruneCandidates(request);
+        BaselineCandidateCollection collection = _candidateCollector.CollectPruneCandidates(request);
         ArchitectureContractDocument document = collection.Document;
         IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
         List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
@@ -133,7 +153,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
+        ArchitectureBaselineDocument existingBaseline = _baselineLoadingService.Load(request.BaselinePath);
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
             document, existingBaseline, candidates, request.Mode, request.ContractIds);
 
@@ -145,7 +165,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
                 e => new BaselineRemovedEntry(e, BaselineEntryLifecycleNames.Stale)))
             .ToList();
 
-        string rawBaseline = baselineLoadingService.ReadRawText(request.BaselinePath);
+        string rawBaseline = _baselineLoadingService.ReadRawText(request.BaselinePath);
         BaselineCommentInspection comments = BaselineCommentInspector.Inspect(rawBaseline);
 
         // Nothing to remove means the input already is the answer. Reserializing it would be a
@@ -153,7 +173,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
         // has to come back byte-for-byte identical.
         string yaml = plan.RemovesNothing
             ? rawBaseline
-            : comments.Header + baselineGenerator.Serialize(
+            : comments.Header + _baselineGenerator.Serialize(
                 BuildPreservingMetricBaselines(plan.OutputEntries, existingBaseline));
 
         return new BaselinePruneOutcome(
@@ -173,7 +193,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
     public BaselineDiffOutcome Diff(BaselineDiffRequest request)
     {
-        BaselineCandidateCollection collection = CollectDiffCandidates(request);
+        BaselineCandidateCollection collection = _candidateCollector.CollectDiffCandidates(request);
 
         if (collection.Candidates == null)
         {
@@ -189,7 +209,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
+        ArchitectureBaselineDocument existingBaseline = _baselineLoadingService.Load(request.BaselinePath);
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
             collection.Document, existingBaseline, collection.Candidates, request.Mode, request.ContractIds);
 
@@ -208,7 +228,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
     public BaselineVerifyOutcome Verify(BaselineVerifyRequest request)
     {
-        BaselineCandidateCollection collection = CollectVerifyCandidates(request);
+        BaselineCandidateCollection collection = _candidateCollector.CollectVerifyCandidates(request);
         return VerifyCollectedCandidates(
             request,
             collection.Document,
@@ -256,7 +276,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
+        ArchitectureBaselineDocument existingBaseline = _baselineLoadingService.Load(request.BaselinePath);
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
             document, existingBaseline, candidates, request.Mode, request.ContractIds);
 
@@ -296,7 +316,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
             }
         }
 
-        ArchitectureBaselineDocument legacyBaseline = baselineLoadingService.Load(request.BaselinePath);
+        ArchitectureBaselineDocument legacyBaseline = _baselineLoadingService.Load(request.BaselinePath);
         if (legacyBaseline.Version != 1)
         {
             return Fail(
@@ -309,7 +329,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
         // --mode/--contract: every entry in the file is always classified against the full current
         // candidate set (which is why candidates are always collected with mode "all" and no
         // --contract restriction) before anything is written.
-        BaselineCandidateCollection collection = CollectCandidates(
+        BaselineCandidateCollection collection = _candidateCollector.CollectCandidates(
             request.PolicyPath, "all", request.ConditionSetName, contractIds: null, cancellationToken: request.CancellationToken);
         IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
         List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
@@ -371,16 +391,25 @@ public sealed partial class ArchitectureBaselineApplicationService(
         // A dry run must show the deterministic portion of the migration even when ambiguities
         // make the result unsafe to write. The caller keeps the write gate closed in that case.
         bool writable = ambiguous == 0;
-        ArchitectureBaselineDocument migrated = baselineGenerator.BuildFromEntries(
+        ArchitectureBaselineDocument migrated = _baselineGenerator.BuildFromEntries(
             migratedEntries, version: ArchitectureViolationIdentity.CurrentVersion);
-        string yaml = baselineGenerator.Serialize(migrated);
+        string yaml = _baselineGenerator.Serialize(migrated);
 
         return new BaselineMigrateOutcome(writable, yaml, matched, stale, ambiguous, report, Array.Empty<ArchitectureViolation>());
     }
 
+    private ArchitectureBaselineDocument BuildPreservingMetricBaselines(
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> entries,
+        ArchitectureBaselineDocument existingBaseline)
+    {
+        ArchitectureBaselineDocument updated = _baselineGenerator.BuildFromEntries(entries, existingBaseline.Version);
+        updated.MetricBaselines = existingBaseline.MetricBaselines.ToList();
+        return updated;
+    }
+
     private BaselineCommentInspection InspectComments(string baselinePath)
     {
-        return BaselineCommentInspector.Inspect(baselineLoadingService.ReadRawText(baselinePath));
+        return BaselineCommentInspector.Inspect(_baselineLoadingService.ReadRawText(baselinePath));
     }
 
     // Reported rather than thrown: classification and `--dry-run` reporting stay available on a file
@@ -403,298 +432,5 @@ public sealed partial class ArchitectureBaselineApplicationService(
         string normalizedOutput = Path.GetFullPath(outputPath);
         string normalizedBaseline = Path.GetFullPath(baselinePath);
         return string.Equals(normalizedOutput, normalizedBaseline, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private BaselineCandidateCollection CollectCandidates(
-            string policyPath,
-            string mode,
-            string? conditionSetName,
-            IReadOnlyCollection<string>? contractIds,
-            CancellationToken cancellationToken = default)
-    {
-        BaselineCandidateCollection collection = CollectCandidatesCore(
-            policyPath, mode, conditionSetName, contractIds, cancellationToken, buildState: null);
-        return collection;
-    }
-
-    private ArchitectureBaselineDocument BuildPreservingMetricBaselines(
-        IReadOnlyList<ArchitectureBaselineComparisonEntry> entries,
-        ArchitectureBaselineDocument existingBaseline)
-    {
-        ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(entries, existingBaseline.Version);
-        updated.MetricBaselines = existingBaseline.MetricBaselines.ToList();
-        return updated;
-    }
-
-    private BaselineCandidateCollection CollectCandidatesCore(
-            string policyPath,
-            string mode,
-            string? conditionSetName,
-            IReadOnlyCollection<string>? contractIds,
-            CancellationToken cancellationToken,
-            BaselineBuildStateOptions? buildState)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (mode is not (ModeStrict or ModeAudit or "all"))
-        {
-            throw new ArgumentException($"Invalid mode: {mode}. Use 'strict', 'audit', or 'all'.", nameof(mode));
-        }
-
-        ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath, null, null, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        HashSet<string>? selectedContractIds = contractIds is { Count: > 0 }
-            ? new HashSet<string>(contractIds, StringComparer.OrdinalIgnoreCase)
-            : null;
-
-        if (selectedContractIds != null)
-        {
-            HashSet<string> availableIds = CollectAvailableContractIds(document, mode);
-            List<string> unknownIds = selectedContractIds.Where(id => !availableIds.Contains(id)).ToList();
-
-            if (unknownIds.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Unknown contract IDs: {string.Join(", ", unknownIds)}{Environment.NewLine}" +
-                    $"Available IDs in {mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
-            }
-        }
-
-        if (buildState?.UsePreparedPostBuildState == true
-            && buildState.RequestedTargetFramework is not null)
-        {
-            // The preparation carries the exact selected artifact paths. The effective framework
-            // is retained here solely for the isolated shared-framework probing path.
-            document.Analysis.TargetFramework = buildState.RequestedTargetFramework;
-        }
-
-        ArchitectureRunnerSetup? setup = null;
-
-        try
-        {
-            if (buildState?.UsePreparedPostBuildState == true)
-            {
-                setup = runnerSetupService.MaterializePreparedRunner(
-                    document,
-                    buildState.PreparedPostBuildRunner
-                        ?? throw new InvalidOperationException("Prepared baseline analysis requires validation's receipt-backed artifact selection."),
-                    selectedContractIds: selectedContractIds,
-                    enableUnmatchedIgnoreTracking: true,
-                    mode: mode == "all" ? null : mode,
-                    cancellationToken: cancellationToken);
-
-                BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
-                if (preflight.Blocked)
-                {
-                    return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                }
-            }
-            else if (buildState?.PreparationMode == BuildPreparationMode.EnsureBuilt
-                && buildState.UseMetadataFirstEnsureBuilt)
-            {
-                ArchitectureRunnerPreparation preparation = runnerSetupService.PrepareRunner(
-                    document,
-                    policyPath,
-                    conditionSetName,
-                    selectedContractIds: selectedContractIds,
-                    mode: mode == "all" ? null : mode,
-                    cancellationToken: cancellationToken);
-
-                BuildStatePreflightResult preflight = RunBuildStatePreflight(preparation, buildState, cancellationToken);
-                if (preflight.Blocked)
-                {
-                    return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                }
-
-                preparation = PostBuildArtifactEvidenceRefresher.Refresh(
-                    document, preparation, preflight, cancellationToken);
-                preflight = RunBuildStatePreflight(
-                    preparation,
-                    buildState with { PreparationMode = BuildPreparationMode.Ordinary },
-                    cancellationToken);
-                if (preflight.Blocked)
-                {
-                    return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                }
-
-                if (preparation.HasCompleteRootSelection && preparation.SelectedAssemblyArtifactPaths.Count > 0)
-                {
-                    setup = runnerSetupService.MaterializePreparedRunner(
-                        document,
-                        preparation,
-                        selectedContractIds: selectedContractIds,
-                        enableUnmatchedIgnoreTracking: true,
-                        mode: mode == "all" ? null : mode,
-                        cancellationToken: cancellationToken);
-                }
-                else
-                {
-                    // An incomplete metadata selection cannot be materialized. Preserve the
-                    // existing ordinary resolution fallback, but only after metadata preparation
-                    // and both preflight decisions have established that no build result is being
-                    // consumed by the prepared path.
-                    setup = runnerSetupService.BuildRunner(
-                        document,
-                        policyPath,
-                        conditionSetName,
-                        selectedContractIds: selectedContractIds,
-                        enableUnmatchedIgnoreTracking: true,
-                        mode: mode == "all" ? null : mode,
-                        cancellationToken: cancellationToken);
-                }
-            }
-            else
-            {
-                setup = runnerSetupService.BuildRunner(
-                    document,
-                    policyPath,
-                    conditionSetName,
-                    selectedContractIds: selectedContractIds,
-                    enableUnmatchedIgnoreTracking: true,
-                    mode: mode == "all" ? null : mode,
-                    cancellationToken: cancellationToken);
-
-                if (buildState != null)
-                {
-                    BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
-                    if (preflight.Blocked)
-                    {
-                        return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                    }
-
-                    if (buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
-                        && setup.Runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
-                    {
-                        // Baseline diff keeps its established isolated post-build path. Baseline
-                        // verify takes the metadata-first branch above to avoid locking outputs.
-                        ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
-                            document, policyPath, conditionSetName,
-                            selectedContractIds: selectedContractIds,
-                            enableUnmatchedIgnoreTracking: true,
-                            mode: mode == "all" ? null : mode,
-                            cancellationToken: cancellationToken);
-                        setup.Runner.Session.Context.Dispose();
-                        setup = postBuildSetup;
-
-                        preflight = RunBuildStatePreflight(
-                            setup.Runner,
-                            buildState with
-                            {
-                                PreparationMode = BuildPreparationMode.Ordinary,
-                                UsePreparedPostBuildState = false,
-                            },
-                            cancellationToken);
-                        if (preflight.Blocked)
-                        {
-                            return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                        }
-                    }
-                }
-            }
-
-            IArchitectureContractRunner runner = setup is null
-                ? throw new InvalidOperationException("Architecture runner materialization did not produce a runner.")
-                : setup.Runner;
-            List<ArchitectureViolation> configViolations = mode switch
-            {
-                ModeStrict => runner.CheckConfiguration(strict: true),
-                ModeAudit => runner.CheckConfiguration(strict: false),
-                "all" => runner.CheckConfiguration(),
-                _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported baseline mode."),
-            };
-
-            if (configViolations.Count > 0)
-            {
-                return new BaselineCandidateCollection(document, null, configViolations, Array.Empty<BuildStatePreflightDiagnostic>());
-            }
-
-            bool includeStrict = mode is ModeStrict or "all";
-            bool includeAudit = mode is ModeAudit or "all";
-            var applicabilityCandidates = new List<ArchitectureBaselineCandidate>();
-
-            if (includeStrict)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                ArchitectureContractExecutionResult execution = contractExecutor.Execute(
-                    runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
-                applicabilityCandidates.AddRange(ProjectApplicabilityCandidates(document, ModeStrict, execution));
-            }
-
-            if (includeAudit)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                ArchitectureContractExecutionResult execution = contractExecutor.Execute(
-                    runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
-                applicabilityCandidates.AddRange(ProjectApplicabilityCandidates(document, ModeAudit, execution));
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // Ordinary candidates are recorded by the executor while each contract runs. Read the
-            // runner only after both modes have completed, then append the projection-owned
-            // applicability candidates to that complete ordinary inventory.
-            var baselineCandidates = runner.BaselineCandidates.ToList();
-            baselineCandidates.AddRange(applicabilityCandidates);
-            return new BaselineCandidateCollection(
-                document, baselineCandidates, new List<ArchitectureViolation>(), Array.Empty<BuildStatePreflightDiagnostic>())
-            {
-                MetricBaselineCandidates = runner.Session.MetricBaselineCandidates,
-                HasSelectedRelativeMetricBudgets = HasSelectedRelativeMetricBudgets(document, mode, selectedContractIds),
-            };
-        }
-        finally
-        {
-            // Candidate identities are plain value records, so the runner's ordinary or isolated
-            // load context is no longer needed once collection returns.
-            setup?.Runner.Session.Context.Dispose();
-        }
-    }
-
-    private static IReadOnlyList<ArchitectureBaselineCandidate> ProjectApplicabilityCandidates(
-        ArchitectureContractDocument document,
-        string mode,
-        ArchitectureContractExecutionResult execution)
-    {
-        // Baseline collection has no ordinary validation outcome from which to obtain the
-        // conformance bit. It is irrelevant to finding projection (which is driven solely by the
-        // evaluator's insufficiency reasons), so use the non-blocking value and preserve the exact
-        // expected/record join and reason ordering used by validation.
-        ArchitectureAssessmentCompletionEvidence? completion = ArchitectureApplicabilityEvaluator.Evaluate(
-            execution.ApplicabilityExpectedEntries,
-            execution.ApplicabilityRecords,
-            conformancePassed: true);
-        ArchitectureApplicabilityProjection? projection = ArchitectureApplicabilityProjector.Project(completion, mode);
-        return ArchitectureApplicabilityBaselineCandidateProjector.Project(document, mode, projection);
-    }
-
-    private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
-    {
-        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
-
-        if (mode == "all")
-        {
-            HashSet<string> ids = new(catalog.AvailableContractIds(ModeStrict), StringComparer.OrdinalIgnoreCase);
-            ids.UnionWith(catalog.AvailableContractIds(ModeAudit));
-            return ids;
-        }
-
-        return catalog.AvailableContractIds(mode);
-    }
-
-    private static bool HasSelectedRelativeMetricBudgets(
-        ArchitectureContractDocument document,
-        string mode,
-        IReadOnlyCollection<string>? selectedContractIds)
-    {
-        IEnumerable<ArchitectureMetricBudgetContract> budgets = mode switch
-        {
-            ModeStrict => document.Contracts.StrictMetricBudgets,
-            ModeAudit => document.Contracts.AuditMetricBudgets,
-            "all" => document.Contracts.StrictMetricBudgets.Concat(document.Contracts.AuditMetricBudgets),
-            _ => Array.Empty<ArchitectureMetricBudgetContract>(),
-        };
-        return budgets.Any(budget => budget.IsRelative
-            && (selectedContractIds is not { Count: > 0 }
-                || budget.Id is not null && selectedContractIds.Contains(budget.Id, StringComparer.OrdinalIgnoreCase)));
     }
 }

@@ -69,7 +69,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureMetricMeasurementApplicationService, ArchitectureMetricMeasurementApplicationService>();
         services.AddSingleton<IArchitecturePolicyCheckApplicationService, ArchitecturePolicyCheckApplicationService>();
         services.AddSingleton<IArchitecturePolicyContextApplicationService, ArchitecturePolicyContextApplicationService>();
-        services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
+        services.AddSingleton<ArchitectureBaselineCandidateCollector>();
+        services.AddSingleton<IArchitectureBaselineApplicationService>(sp =>
+            new ArchitectureBaselineApplicationService(
+                sp.GetRequiredService<ArchitectureBaselineCandidateCollector>(),
+                sp.GetRequiredService<IArchitectureBaselineGenerator>(),
+                sp.GetRequiredService<IArchitectureBaselineLoadingService>()));
         services.AddSingleton<IArchitectureDebtGateApplicationService, ArchitectureDebtGateApplicationService>();
         services.AddSingleton<IArchitectureHealthApplicationService, ArchitectureHealthApplicationService>();
         services.AddSingleton<IPublicApiSnapshotStore, PublicApiSnapshotStore>();
