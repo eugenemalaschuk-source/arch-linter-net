@@ -69,6 +69,9 @@
     the non-partial `ArchitecturePublicApiSurfaceResolver`, retaining one public application facade,
     canonical member identity/order, selector-safety, build-state, cancellation, and disposal
     behavior; remove only its exact declaration-count waiver (#816).
+  - [x] Extract `ArchitectureBaselineApplicationService` candidate collection and build-state
+    preparation into the non-partial `ArchitectureBaselineCandidateCollector`, retaining the public
+    lifecycle facade, receipt-backed runner semantics, cancellation, and disposal behavior (#815).
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
