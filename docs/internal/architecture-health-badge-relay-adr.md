@@ -80,8 +80,10 @@ color dictionary, and bounded size (16 KiB for a public payload). For
 `headline-only/v1`, canonical bytes are the existing producer's default
 `System.Text.Json` wire representation, including `\\u00B7` escapes for the
 headline separator; literal UTF-8 separator bytes are a different byte string.
-Invalid bytes are rejected; they are never sanitized or rewritten after digest
-verification. Color is Health-owned and Gate-independent: `healthy` is
+`headline-plus-freshness/v1` uses that same encoding and order, appending only
+`verified_at` and `valid_until`; each profile has a schema-constrained golden
+byte string and digest. Invalid bytes are rejected; they are never sanitized or
+rewritten after digest verification. Color is Health-owned and Gate-independent: `healthy` is
 `brightgreen`, `debt` is `yellow`, `degrading` is `orange`, `failing` is `red`,
 and `unassessable` is `lightgrey`.
 
@@ -141,7 +143,7 @@ display strings are never substitutes for IDs.
 | `iss` | Exact `https://token.actions.githubusercontent.com`; no alternate issuer |
 | `aud` | Exact configured audience for the registry entry; each adopter configures one exact owner audience |
 | Protected JOSE header `alg` | `RS256` only; reject `none`, other algorithms, and algorithm confusion before trusting claims |
-| Protected JOSE header `kid` | Select only a key identified by `kid` from the fixed GitHub issuer JWKS endpoint; an unknown key can trigger one bounded refresh of that fixed endpoint and is then rejected. No JWT header or claim can select a network URL. Provider key rotation is controlled through the fixed issuer trust chain, not a permanent snapshot of one key |
+| Protected JOSE header `kid` | Select only a key identified by `kid` from the fixed GitHub issuer JWKS endpoint; an unknown key can trigger one bounded refresh of that fixed endpoint and is then rejected. Configuration stores neither an allowed key-ID set nor current/next key rotation state. No JWT header or claim can select a network URL. Provider key rotation is controlled through the fixed issuer trust chain, not a permanent snapshot of one key |
 | Time claims | Relay UTC clock; require `nbf`, `iat`, and `exp`, reject missing claims, `nbf` or `iat` more than 5 minutes in the future, `exp` more than 5 minutes in the past, or `exp - iat > 10 minutes`. The ±5-minute skew is only token validation allowance and does not extend a lease |
 | `repository_id` | Exact immutable integer in the registry and token context; synthetic vectors use a non-production ID. Display `repository` is diagnostic only |
 | `repository_owner_id` | Exact immutable integer in the registry and token context; synthetic vectors use a non-production ID. Display owner/login is diagnostic only |

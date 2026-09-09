@@ -32,16 +32,6 @@
     "allowed_algorithms": [
       "RS256"
     ],
-    "allowed_key_ids": [
-      "fixture-key-1",
-      "fixture-key-2"
-    ],
-    "bound_kid": "fixture-key-1",
-    "key_rotation": {
-      "current_kid": "fixture-key-1",
-      "next_kid": "fixture-key-2",
-      "overlap_until": "2026-09-09T10:30:00Z"
-    },
     "subject": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main"
   },
   "initial_state": {

@@ -36,7 +36,7 @@
     {
       "id": "payload-valid-freshness",
       "category": "payload",
-      "purpose": "Accept the freshness profile only when it adds the two approved UTC fields.",
+      "purpose": "Accept only the exact bytes and digest of canonical-freshness.json for the freshness profile.",
       "request": {
         "profile": "headline-plus-freshness/v1",
         "canonical_bytes": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\",\"verified_at\":\"2026-09-09T10:00:00Z\",\"valid_until\":\"2026-09-09T11:00:00Z\"}",
@@ -44,7 +44,7 @@
       },
       "expected": {
         "outcome": "accepted",
-        "reason": "Freshness fields are canonical UTC timestamps within the 60 minute lease.",
+        "reason": "Canonical freshness bytes, field order, escapes, timestamps, and digest match the closed profile.",
         "state_change": "ready",
         "public_response": {
           "state": "ready",
@@ -378,7 +378,7 @@
     {
       "id": "oidc-unknown-kid",
       "category": "oidc",
-      "purpose": "Reject a key identifier that is absent from the fixed JWKS allow-list.",
+      "purpose": "After one bounded refresh of the fixed GitHub JWKS endpoint, reject an unresolved key identifier.",
       "request": {
         "operation": "prepare",
         "signature": "fixture-signature-valid",
@@ -405,7 +405,7 @@
       },
       "expected": {
         "outcome": "rejected",
-        "reason": "The key identifier must resolve from the fixed configured JWKS set.",
+        "reason": "The key identifier did not resolve from the fixed GitHub JWKS endpoint after its bounded refresh.",
         "state_change": "none",
         "public_response": {
           "state": "unavailable",

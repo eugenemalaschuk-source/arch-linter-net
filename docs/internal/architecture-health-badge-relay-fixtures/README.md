@@ -7,24 +7,27 @@ relay code, a real adopter identity, a secret, or a JWT.
 ## Files
 
 - `relay-fixtures.schema.json` is the JSON Schema Draft 7 suite. It constrains
-  the safe v1 configuration, closed public payload dictionary, canonical ready
-  and unavailable representations, and vector envelopes.
+  the safe v1 configuration, closed public payload dictionary, canonical
+  headline-only and freshness representations, and vector envelopes.
 - `reference-config.json` is a valid relay configuration. Its repository and
   owner IDs, alias, workflow reference, and workflow SHA are deliberately
   synthetic. The workflow reference and SHA are exact registry pins.
-- `canonical-ready.json` and `canonical-unavailable.json` are the two
-  headline-only public representations. `canonical_bytes` is the byte string
-  that a transport verifies and copies; its SHA-256 is the digest of those exact
-  bytes. `headline-only/v1` retains the current canonical CLI's default
-  `System.Text.Json` escaping (including `\\u00B7`), rather than silently
-  changing its wire serialization. The public payload contains no provenance,
-  URL, SHA, PR, run, or token data.
+- `canonical-ready.json` and `canonical-unavailable.json` are the
+  headline-only public representations. `canonical-freshness.json` is the
+  corresponding exact-byte golden representation for
+  `headline-plus-freshness/v1`. `canonical_bytes` is the byte string that a
+  transport verifies and copies; its SHA-256 is the digest of those exact
+  bytes. Both profiles retain default `System.Text.Json` escaping (including
+  `\\u00B7`), fixed key order, and no provenance, URL, SHA, PR, run, or token
+  data.
 - `conformance-vectors.json` covers accepted bytes and malformed/disclosing
   bytes, OIDC claim and pin checks, replay/idempotency and CAS ordering,
   deadlines, expiry, semantic horizons, lifecycle/recovery, and cache/ETag/
   HEAD behavior. Protected JOSE headers (`alg`, `kid`) are separate from signed
-  claims (`nbf`, `iat`, `exp`). `expected.public_response` is deliberately
-  public-safe.
+  claims (`nbf`, `iat`, `exp`); `kid` selects a key only from the fixed GitHub
+  JWKS endpoint, with at most one bounded refresh for an unknown key. The
+  registry permits only `push` on `refs/heads/main`.
+  `expected.public_response` is deliberately public-safe.
 
 The relay never reconstructs Gate, Health, counts, message, or color. The
 `headline-plus-freshness/v1` profile adds only `verified_at` and `valid_until`.
