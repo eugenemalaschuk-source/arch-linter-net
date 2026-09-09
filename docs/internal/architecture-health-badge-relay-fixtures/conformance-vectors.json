@@ -1,0 +1,1095 @@
+{
+  "fixture_type": "conformance-vectors",
+  "schema_id": "architecture-health-badge-relay-vectors/v1",
+  "vector_version": "v1",
+  "vectors": [
+    {
+      "id": "payload-valid-bytes",
+      "category": "payload",
+      "purpose": "Accept the exact canonical CLI payload bytes and copy them without recomputing semantics.",
+      "request": {
+        "profile": "headline-only/v1",
+        "canonical_bytes": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}",
+        "sha256": "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d"
+      },
+      "expected": {
+        "outcome": "accepted",
+        "reason": "Canonical bytes and digest match the closed headline dictionary.",
+        "state_change": "ready",
+        "public_response": {
+          "state": "ready",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "PASS · HEALTHY · 0 ignores · 42 rules",
+            "color": "brightgreen"
+          },
+          "headers": {
+            "status": 200,
+            "cache_control": "public, max-age=2700, must-revalidate",
+            "etag": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\""
+          }
+        }
+      }
+    },
+    {
+      "id": "payload-valid-freshness",
+      "category": "payload",
+      "purpose": "Accept only the exact bytes and digest of canonical-freshness.json for the freshness profile.",
+      "request": {
+        "profile": "headline-plus-freshness/v1",
+        "canonical_bytes": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\",\"verified_at\":\"2026-09-09T10:00:00Z\",\"valid_until\":\"2026-09-09T11:00:00Z\"}",
+        "sha256": "e4630743393380aadb96dd4ee8d2cffd43488ef4869a7ca66379db755485ed32"
+      },
+      "expected": {
+        "outcome": "accepted",
+        "reason": "Canonical freshness bytes, field order, escapes, timestamps, and digest match the closed profile.",
+        "state_change": "ready",
+        "public_response": {
+          "state": "ready",
+          "profile": "headline-plus-freshness/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "PASS · HEALTHY · 0 ignores · 42 rules",
+            "color": "brightgreen",
+            "verified_at": "2026-09-09T10:00:00Z",
+            "valid_until": "2026-09-09T11:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "id": "payload-duplicate-key",
+      "category": "payload",
+      "purpose": "Reject duplicate JSON keys before digest acceptance or public write.",
+      "request": {
+        "profile": "headline-only/v1",
+        "canonical_bytes": "{\"schemaVersion\":1,\"label\":\"architecture\",\"label\":\"other\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}"
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Duplicate label key is not canonical JSON for the profile.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "payload-additional-key",
+      "category": "payload",
+      "purpose": "Reject an extra field that could carry provenance or a covert disclosure.",
+      "request": {
+        "profile": "headline-only/v1",
+        "canonical_bytes": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\",\"extra\":\"not-allowed\"}"
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "The closed headline profile has no additional fields.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "payload-noncanonical-escape",
+      "category": "payload",
+      "purpose": "Reject semantically equivalent but noncanonical escaped bytes.",
+      "request": {
+        "profile": "headline-only/v1",
+        "canonical_bytes": "{\"schemaVersion\":1,\"label\":\"arch\\u0069tecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}"
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Canonical UTF-8 bytes require the literal fixed label and no escape variant.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "payload-forbidden-disclosure",
+      "category": "payload",
+      "purpose": "Reject a source URL or private provenance field in public bytes.",
+      "request": {
+        "profile": "headline-only/v1",
+        "canonical_bytes": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\",\"source_url\":\"https://example.invalid/synthetic\"}"
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Public payloads never carry source URLs, SHA, PR, run, JWT, or arbitrary provenance.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-valid-claims",
+      "category": "oidc",
+      "purpose": "Accept a synthetic OIDC identity with immutable IDs, exact context, and a valid signature marker.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "now": 1788948900,
+        "claims": {
+          "iss": "https://token.actions.githubusercontent.com",
+          "aud": "architecture-health-badge-relay-fixture",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main",
+          "repository_id": 700000042,
+          "repository_owner_id": 7000000042,
+          "event_name": "push",
+          "ref": "refs/heads/main",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "iat": 1788948400,
+          "exp": 1788949000,
+          "jti": "fixture-jti-001",
+          "nbf": 1788948400
+        },
+        "header": {
+          "alg": "RS256",
+          "kid": "fixture-key-1"
+        }
+      },
+      "expected": {
+        "outcome": "accepted",
+        "reason": "OIDC claims, signature marker, and immutable registry context match.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-missing-issuer",
+      "category": "oidc",
+      "purpose": "Reject an otherwise plausible claim set when the issuer claim is absent.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "claims": {
+          "aud": "architecture-health-badge-relay-fixture",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main",
+          "repository_id": 700000042,
+          "repository_owner_id": 7000000042,
+          "event_name": "push",
+          "ref": "refs/heads/main",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "iat": 1788948400,
+          "exp": 1788949000,
+          "jti": "fixture-jti-002",
+          "nbf": 1788948400
+        },
+        "header": {
+          "alg": "RS256",
+          "kid": "fixture-key-1"
+        },
+        "now": 1788948900
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Issuer is required and must match the fixed GitHub OIDC issuer.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-wrong-issuer",
+      "category": "oidc",
+      "purpose": "Reject a token issued by a different issuer even when all other claims look current.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "claims": {
+          "iss": "https://issuer.example.invalid/synthetic",
+          "aud": "architecture-health-badge-relay-fixture",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main",
+          "repository_id": 700000042,
+          "repository_owner_id": 7000000042,
+          "event_name": "push",
+          "ref": "refs/heads/main",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "iat": 1788948400,
+          "exp": 1788949000,
+          "jti": "fixture-jti-003",
+          "nbf": 1788948400
+        },
+        "header": {
+          "alg": "RS256",
+          "kid": "fixture-key-1"
+        },
+        "now": 1788948900
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Issuer is not the configured GitHub Actions issuer.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-wrong-audience",
+      "category": "oidc",
+      "purpose": "Reject an identity token intended for a different audience.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "claims": {
+          "iss": "https://token.actions.githubusercontent.com",
+          "aud": "different-fixture-audience",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main",
+          "repository_id": 700000042,
+          "repository_owner_id": 7000000042,
+          "event_name": "push",
+          "ref": "refs/heads/main",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "iat": 1788948400,
+          "exp": 1788949000,
+          "jti": "fixture-jti-004",
+          "nbf": 1788948400
+        },
+        "header": {
+          "alg": "RS256",
+          "kid": "fixture-key-1"
+        },
+        "now": 1788948900
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Audience does not match the configured relay audience.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-unsupported-algorithm",
+      "category": "oidc",
+      "purpose": "Reject an unsupported signing algorithm before any write.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "claims": {
+          "iss": "https://token.actions.githubusercontent.com",
+          "aud": "architecture-health-badge-relay-fixture",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main",
+          "repository_id": 700000042,
+          "repository_owner_id": 7000000042,
+          "event_name": "push",
+          "ref": "refs/heads/main",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "iat": 1788948400,
+          "exp": 1788949000,
+          "jti": "fixture-jti-005",
+          "nbf": 1788948400
+        },
+        "header": {
+          "alg": "HS256",
+          "kid": "fixture-key-1"
+        },
+        "now": 1788948900
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Only the pinned RS256 algorithm is accepted.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-unknown-kid",
+      "category": "oidc",
+      "purpose": "After one bounded refresh of the fixed GitHub JWKS endpoint, reject an unresolved key identifier.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "claims": {
+          "iss": "https://token.actions.githubusercontent.com",
+          "aud": "architecture-health-badge-relay-fixture",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main",
+          "repository_id": 700000042,
+          "repository_owner_id": 7000000042,
+          "event_name": "push",
+          "ref": "refs/heads/main",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "iat": 1788948400,
+          "exp": 1788949000,
+          "jti": "fixture-jti-009",
+          "nbf": 1788948400
+        },
+        "header": {
+          "alg": "RS256",
+          "kid": "fixture-key-99"
+        },
+        "now": 1788948900
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "The key identifier did not resolve from the fixed GitHub JWKS endpoint after its bounded refresh.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-expired-time",
+      "category": "oidc",
+      "purpose": "Reject an expired token; the five minute skew is not a lease extension.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "now": 1788948900,
+        "claims": {
+          "iss": "https://token.actions.githubusercontent.com",
+          "aud": "architecture-health-badge-relay-fixture",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main",
+          "repository_id": 700000042,
+          "repository_owner_id": 7000000042,
+          "event_name": "push",
+          "ref": "refs/heads/main",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "iat": 1788944400,
+          "exp": 1788945000,
+          "jti": "fixture-jti-006",
+          "nbf": 1788944400
+        },
+        "header": {
+          "alg": "RS256",
+          "kid": "fixture-key-1"
+        }
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "The token expiration is outside the five minute validation allowance.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-future-time-outside-skew",
+      "category": "oidc",
+      "purpose": "Reject a token issued too far in the future despite a valid issuer and audience.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "now": 1788948000,
+        "claims": {
+          "iss": "https://token.actions.githubusercontent.com",
+          "aud": "architecture-health-badge-relay-fixture",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main",
+          "repository_id": 700000042,
+          "repository_owner_id": 7000000042,
+          "event_name": "push",
+          "ref": "refs/heads/main",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "iat": 1788948601,
+          "exp": 1788949201,
+          "jti": "fixture-jti-007",
+          "nbf": 1788948300
+        },
+        "header": {
+          "alg": "RS256",
+          "kid": "fixture-key-1"
+        }
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Issued-at is more than five minutes ahead of the verifier clock.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-claim-context-mismatch",
+      "category": "oidc",
+      "purpose": "Reject claims whose event, ref, or immutable repository identity differs from the registry pin.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "claims": {
+          "iss": "https://token.actions.githubusercontent.com",
+          "aud": "architecture-health-badge-relay-fixture",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/feature",
+          "repository_id": 700000043,
+          "repository_owner_id": 7000000042,
+          "event_name": "pull_request",
+          "ref": "refs/heads/feature",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "iat": 1788948400,
+          "exp": 1788949000,
+          "jti": "fixture-jti-008",
+          "nbf": 1788948400
+        },
+        "header": {
+          "alg": "RS256",
+          "kid": "fixture-key-1"
+        },
+        "now": 1788948900
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Repository IDs, event, ref, and subject must all match the registry entry.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "pin-workflow-ref-mismatch",
+      "category": "pin",
+      "purpose": "Reject a familiar workflow name when its exact job_workflow_ref is not pinned.",
+      "request": {
+        "operation": "prepare",
+        "registry_job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+        "claims_job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/release",
+        "claims_job_workflow_sha": "2222222222222222222222222222222222222222"
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "The workflow path and ref must equal the exact configured job_workflow_ref.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "pin-workflow-sha-mismatch",
+      "category": "pin",
+      "purpose": "Reject an exact workflow path with a different immutable workflow commit pin.",
+      "request": {
+        "operation": "prepare",
+        "registry_job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+        "claims_job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+        "registry_job_workflow_sha": "2222222222222222222222222222222222222222",
+        "claims_job_workflow_sha": "3333333333333333333333333333333333333333"
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "The workflow commit SHA is an exact pin and cannot be selected by display name.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "replay-same-challenge",
+      "category": "replay",
+      "purpose": "Reject a second delivery using a one-time challenge even when all bytes are unchanged.",
+      "request": {
+        "operation": "publish",
+        "challenge_id": "challenge-001",
+        "idempotency_key": "idem-001",
+        "jti": "fixture-jti-001",
+        "challenge_consumed": true,
+        "canonical_digest": "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d",
+        "generation": 7,
+        "revocation_epoch": 3
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "A challenge is one-time and cannot authorize a replayed delivery.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "idempotency-mismatch",
+      "category": "replay",
+      "purpose": "Reject reuse of an idempotency key when the digest or generation changes.",
+      "request": {
+        "operation": "publish",
+        "idempotency_key": "idem-001",
+        "first_digest": "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d",
+        "replayed_digest": "d03d736489ee145942c0c0faeec1de82d99caa5ca1801c1e01845bef2fa3e379",
+        "first_generation": 7,
+        "replayed_generation": 8
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "An idempotency key is bound to its original digest and target generation.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "stale-writer-loses-cas",
+      "category": "ordering",
+      "purpose": "Reject an older writer after the destination moves to a newer generation or epoch.",
+      "request": {
+        "operation": "publish",
+        "challenge": {
+          "generation": 7,
+          "revocation_epoch": 3,
+          "deadline": "2026-09-09T10:30:00Z"
+        },
+        "current_state": {
+          "generation": 8,
+          "revocation_epoch": 4,
+          "state": "unavailable"
+        },
+        "delivery_digest": "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d"
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Generation and revocation epoch CAS must match at commit time.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "challenge-deadline",
+      "category": "ordering",
+      "purpose": "Reject a delayed publish after its immutable challenge deadline.",
+      "request": {
+        "operation": "publish",
+        "now": "2026-09-09T10:31:00Z",
+        "challenge_id": "challenge-002",
+        "challenge_deadline": "2026-09-09T10:30:00Z",
+        "generation": 7,
+        "revocation_epoch": 3
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "The challenge deadline is immutable and has elapsed.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "expiry-stopped-publisher",
+      "category": "freshness",
+      "purpose": "Serve explicit unavailable state once a stopped publisher lets the ready lease expire.",
+      "request": {
+        "operation": "read",
+        "now": "2026-09-09T11:01:00Z",
+        "publisher_running": false,
+        "stored_state": "ready",
+        "verified_at": "2026-09-09T10:00:00Z",
+        "valid_until": "2026-09-09T11:00:00Z"
+      },
+      "expected": {
+        "outcome": "served",
+        "reason": "Origin read-time expiry removes ready eligibility after valid_until.",
+        "state_change": "expired",
+        "public_response": {
+          "state": "expired",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          },
+          "headers": {
+            "status": 404,
+            "cache_control": "no-store"
+          }
+        }
+      }
+    },
+    {
+      "id": "same-tree-semantic-horizon",
+      "category": "freshness",
+      "purpose": "Reject renewal when the tree is unchanged but semantic validity evidence has passed.",
+      "request": {
+        "operation": "renew",
+        "now": "2026-09-09T12:01:00Z",
+        "tree_sha": "1111111111111111111111111111111111111111",
+        "previous_tree_sha": "1111111111111111111111111111111111111111",
+        "semantic_horizon": "2026-09-09T12:00:00Z",
+        "stored_valid_until": "2026-09-09T11:00:00Z"
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "An unchanged tree cannot manufacture a new semantic validity horizon.",
+        "state_change": "expired",
+        "public_response": {
+          "state": "expired",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "revoke-delayed-ready",
+      "category": "lifecycle",
+      "purpose": "Give revocation precedence over a delayed ready delivery from an older epoch.",
+      "request": {
+        "operation": "publish",
+        "prepared_generation": 7,
+        "prepared_revocation_epoch": 3,
+        "current_generation": 8,
+        "current_revocation_epoch": 4,
+        "current_state": "revoked",
+        "delayed_digest": "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d"
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Revocation epoch invalidation wins over delayed ready data.",
+        "state_change": "revoked",
+        "public_response": {
+          "state": "revoked",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          },
+          "headers": {
+            "status": 410,
+            "cache_control": "no-store"
+          }
+        }
+      }
+    },
+    {
+      "id": "force-push-aba",
+      "category": "ordering",
+      "purpose": "Require fresh proof when a branch returns to an old tree after an intervening change.",
+      "request": {
+        "operation": "publish",
+        "observed_contexts": [
+          {
+            "sequence": 1,
+            "tree_sha": "1111111111111111111111111111111111111111",
+            "generation": 7
+          },
+          {
+            "sequence": 2,
+            "tree_sha": "4444444444444444444444444444444444444444",
+            "generation": 8
+          },
+          {
+            "sequence": 3,
+            "tree_sha": "1111111111111111111111111111111111111111",
+            "generation": 9
+          }
+        ],
+        "old_challenge_generation": 7
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "ABA and force-push history require a fresh challenge; SHA or run ordering is insufficient.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "restore-revoked-state",
+      "category": "recovery",
+      "purpose": "Keep a backup restore unavailable until a current proof commits after the revocation barrier.",
+      "request": {
+        "operation": "recover",
+        "backup_state": {
+          "generation": 7,
+          "revocation_epoch": 3,
+          "state": "ready",
+          "digest": "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d"
+        },
+        "registry_barrier": {
+          "generation": 8,
+          "revocation_epoch": 4,
+          "state": "revoked"
+        },
+        "current_publisher_proof": false
+      },
+      "expected": {
+        "outcome": "served",
+        "reason": "Recovery restores storage only; no old ready payload is observable past the barrier.",
+        "state_change": "revoked",
+        "public_response": {
+          "state": "revoked",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          },
+          "headers": {
+            "status": 410,
+            "cache_control": "no-store"
+          }
+        }
+      }
+    },
+    {
+      "id": "cache-max-age-bounded",
+      "category": "cache",
+      "purpose": "Bound cache freshness by remaining lease time and use an ETag for the complete representation.",
+      "request": {
+        "operation": "read",
+        "now": "2026-09-09T10:15:00Z",
+        "valid_until": "2026-09-09T11:00:00Z",
+        "if_none_match": null
+      },
+      "expected": {
+        "outcome": "served",
+        "reason": "max-age is no greater than the 45 minute remaining lease.",
+        "state_change": "none",
+        "public_response": {
+          "state": "ready",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "PASS · HEALTHY · 0 ignores · 42 rules",
+            "color": "brightgreen"
+          },
+          "headers": {
+            "status": 200,
+            "cache_control": "public, max-age=2700, must-revalidate",
+            "etag": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\""
+          }
+        }
+      }
+    },
+    {
+      "id": "etag-expired-revalidation",
+      "category": "cache",
+      "purpose": "Perform the same expiry check for conditional ETag reads instead of returning 304 after expiry.",
+      "request": {
+        "operation": "read",
+        "now": "2026-09-09T11:01:00Z",
+        "if_none_match": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\"",
+        "valid_until": "2026-09-09T11:00:00Z"
+      },
+      "expected": {
+        "outcome": "served",
+        "reason": "An expired representation cannot produce a 304 not-modified response.",
+        "state_change": "expired",
+        "public_response": {
+          "state": "expired",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          },
+          "headers": {
+            "status": 404,
+            "cache_control": "no-store"
+          }
+        }
+      }
+    },
+    {
+      "id": "head-expired-revalidation",
+      "category": "cache",
+      "purpose": "Apply origin expiry checks to HEAD and never advertise expired ready metadata.",
+      "request": {
+        "operation": "head",
+        "now": "2026-09-09T11:01:00Z",
+        "valid_until": "2026-09-09T11:00:00Z",
+        "if_none_match": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\""
+      },
+      "expected": {
+        "outcome": "served",
+        "reason": "HEAD performs the same freshness decision as GET and returns no expired ETag.",
+        "state_change": "expired",
+        "public_response": {
+          "state": "expired",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          },
+          "headers": {
+            "status": 404,
+            "cache_control": "no-store"
+          }
+        }
+      }
+    },
+    {
+      "id": "oidc-not-before-outside-skew",
+      "category": "oidc",
+      "purpose": "Reject a token whose not-before claim is beyond the five minute allowance while every other dimension is valid.",
+      "request": {
+        "operation": "prepare",
+        "signature": "fixture-signature-valid",
+        "now": 1788948900,
+        "header": {
+          "alg": "RS256",
+          "kid": "fixture-key-1"
+        },
+        "claims": {
+          "iss": "https://token.actions.githubusercontent.com",
+          "aud": "architecture-health-badge-relay-fixture",
+          "sub": "repo:synthetic-owner-042/synthetic-repo-042:ref:refs/heads/main",
+          "repository_id": 700000042,
+          "repository_owner_id": 7000000042,
+          "event_name": "push",
+          "ref": "refs/heads/main",
+          "job_workflow_ref": "synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main",
+          "job_workflow_sha": "2222222222222222222222222222222222222222",
+          "nbf": 1788949201,
+          "iat": 1788948400,
+          "exp": 1788949000,
+          "jti": "fixture-jti-009"
+        }
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Not-before is more than five minutes ahead of the verifier clock.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "payload-health-owned-color",
+      "category": "payload",
+      "purpose": "Reject Gate-independent Health messages when they use a color other than the Health-owned dictionary value.",
+      "request": {
+        "invalid_payloads": [
+          { "message": "FAIL · HEALTHY · 0 ignores · 42 rules", "color": "red" },
+          { "message": "FAIL · DEBT · 0 ignores · 42 rules", "color": "orange" },
+          { "message": "PASS · FAILING · 0 ignores · 42 rules", "color": "brightgreen" }
+        ]
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "Color is determined exclusively by Health, not Gate or an arbitrary enum member.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          }
+        }
+      }
+    },
+    {
+      "id": "etag-renewed-identical-headline",
+      "category": "cache",
+      "purpose": "Give an identical headline a distinct ETag when renewal advances generation or validity.",
+      "request": {
+        "operation": "renew",
+        "profile": "headline-only/v1",
+        "payload_digest": "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d",
+        "previous": { "generation": 7, "state": "ready", "valid_until": "2026-09-09T11:00:00Z", "etag": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\"" },
+        "renewed": { "generation": 8, "state": "ready", "valid_until": "2026-09-09T11:30:00Z" }
+      },
+      "expected": {
+        "outcome": "served",
+        "reason": "ETag represents profile, bytes, generation, state, and validity rather than headline digest alone.",
+        "state_change": "ready",
+        "public_response": {
+          "state": "ready",
+          "profile": "headline-only/v1",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "PASS · HEALTHY · 0 ignores · 42 rules",
+            "color": "brightgreen"
+          },
+          "headers": {
+            "status": 200,
+            "cache_control": "public, max-age=2700, must-revalidate",
+            "etag": "\"eb7754f790a4c0f6c4ee4556fdeadc039da713aaae72e7a8c941778a2cf975b5\""
+          }
+        }
+      }
+    }
+  ]
+}
