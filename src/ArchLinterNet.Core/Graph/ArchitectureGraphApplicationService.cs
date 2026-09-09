@@ -8,13 +8,16 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Graph;
 
-public sealed partial class ArchitectureGraphApplicationService(
+public sealed class ArchitectureGraphApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
     IArchitectureContractHandlerRegistry handlerRegistry,
     IArchitectureContractExecutor contractExecutor,
     IBuildStatePreparationService? buildStatePreparationService)
     : IArchitectureGraphApplicationService
 {
+    private readonly ArchitectureGraphBuildStatePreflightService _buildStatePreflightService =
+        new(runnerSetupService, buildStatePreparationService);
+
     private const string ModeStrict = "strict";
     private const string ModeAudit = "audit";
 
@@ -116,7 +119,7 @@ public sealed partial class ArchitectureGraphApplicationService(
                 enableUnmatchedIgnoreTracking: false,
                 mode: request.Mode == "all" ? null : request.Mode);
 
-        setup = PrepareBuildStateRunner(request, document, selectedIds, setup);
+        setup = _buildStatePreflightService.PrepareBuildStateRunner(request, document, selectedIds, setup);
 
         IArchitectureContractRunner runner = setup.Runner;
 
