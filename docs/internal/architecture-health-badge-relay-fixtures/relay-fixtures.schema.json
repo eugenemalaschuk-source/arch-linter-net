@@ -97,11 +97,11 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "message": { "pattern": "^PASS · HEALTHY ·" } }, "required": [ "message" ] },
+          "if": { "properties": { "message": { "pattern": "^(PASS|FAIL) · HEALTHY ·" } }, "required": [ "message" ] },
           "then": { "properties": { "color": { "const": "brightgreen" } } }
         },
         {
-          "if": { "properties": { "message": { "pattern": "^PASS · DEBT ·" } }, "required": [ "message" ] },
+          "if": { "properties": { "message": { "pattern": "^(PASS|FAIL) · DEBT ·" } }, "required": [ "message" ] },
           "then": { "properties": { "color": { "const": "yellow" } } }
         },
         {
@@ -109,7 +109,7 @@
           "then": { "properties": { "color": { "const": "orange" } } }
         },
         {
-          "if": { "properties": { "message": { "pattern": "^FAIL · FAILING ·" } }, "required": [ "message" ] },
+          "if": { "properties": { "message": { "pattern": "^(PASS|FAIL) · FAILING ·" } }, "required": [ "message" ] },
           "then": { "properties": { "color": { "const": "red" } } }
         },
         {
@@ -163,11 +163,11 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "message": { "pattern": "^PASS · HEALTHY ·" } }, "required": [ "message" ] },
+          "if": { "properties": { "message": { "pattern": "^(PASS|FAIL) · HEALTHY ·" } }, "required": [ "message" ] },
           "then": { "properties": { "color": { "const": "brightgreen" } } }
         },
         {
-          "if": { "properties": { "message": { "pattern": "^PASS · DEBT ·" } }, "required": [ "message" ] },
+          "if": { "properties": { "message": { "pattern": "^(PASS|FAIL) · DEBT ·" } }, "required": [ "message" ] },
           "then": { "properties": { "color": { "const": "yellow" } } }
         },
         {
@@ -175,7 +175,7 @@
           "then": { "properties": { "color": { "const": "orange" } } }
         },
         {
-          "if": { "properties": { "message": { "pattern": "^FAIL · FAILING ·" } }, "required": [ "message" ] },
+          "if": { "properties": { "message": { "pattern": "^(PASS|FAIL) · FAILING ·" } }, "required": [ "message" ] },
           "then": { "properties": { "color": { "const": "red" } } }
         },
         {
@@ -455,7 +455,7 @@
           "properties": {
             "canonical_encoding": {
               "type": "string",
-              "const": "utf-8-json-no-whitespace"
+              "const": "utf-8-system-text-json-default-escaping"
             },
             "verification": {
               "type": "string",
@@ -505,7 +505,7 @@
         },
         "canonical_bytes": {
           "type": "string",
-          "pattern": "^\\{\\\"schemaVersion\\\":1,\\\"label\\\":\\\"architecture\\\",\\\"message\\\":\\\"((PASS|FAIL) · (HEALTHY|DEBT|DEGRADING|FAILING) · (0|[1-9][0-9]{0,3}) ignores · (0|[1-9][0-9]{0,3}) rules|UNASSESSABLE · \\\\? ignores · \\\\? rules)\\\",\\\"color\\\":\\\"(brightgreen|yellow|orange|red|lightgrey)\\\"\\}$",
+          "pattern": "^\\{\\\"schemaVersion\\\":1,\\\"label\\\":\\\"architecture\\\",\\\"message\\\":\\\"((PASS|FAIL) \\\\u00B7 (HEALTHY|DEBT|DEGRADING|FAILING) \\\\u00B7 (0|[1-9][0-9]{0,3}) ignores \\\\u00B7 (0|[1-9][0-9]{0,3}) rules|UNASSESSABLE \\\\u00B7 \\\\? ignores \\\\u00B7 \\\\? rules)\\\",\\\"color\\\":\\\"(brightgreen|yellow|orange|red|lightgrey)\\\"\\}$",
           "maxLength": 256
         },
         "sha256": {
@@ -554,7 +554,7 @@
         },
         "canonical_bytes": {
           "type": "string",
-          "const": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"UNASSESSABLE · ? ignores · ? rules\",\"color\":\"lightgrey\"}"
+          "const": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"UNASSESSABLE \\u00B7 ? ignores \\u00B7 ? rules\",\"color\":\"lightgrey\"}"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -598,7 +598,7 @@
           "properties": {
             "cache_control": {
               "type": "string",
-              "pattern": "^max-age=[0-9]{1,5}(, stale-if-error=[0-9]{1,5})?$"
+              "pattern": "^(public, max-age=[0-9]{1,5}, must-revalidate|no-store)$"
             },
             "etag": {
               "type": "string",

@@ -76,8 +76,14 @@ bounded expiry. A renderer cannot receive a raw private token through a URL.
 
 Profiles accept exact canonical UTF-8 bytes with fixed key order, no duplicate
 keys, no extra keys, deterministic escaping/whitespace, a closed state/message/
-color dictionary, and bounded size (16 KiB for a public payload). Invalid bytes
-are rejected; they are never sanitized or rewritten after digest verification.
+color dictionary, and bounded size (16 KiB for a public payload). For
+`headline-only/v1`, canonical bytes are the existing producer's default
+`System.Text.Json` wire representation, including `\\u00B7` escapes for the
+headline separator; literal UTF-8 separator bytes are a different byte string.
+Invalid bytes are rejected; they are never sanitized or rewritten after digest
+verification. Color is Health-owned and Gate-independent: `healthy` is
+`brightgreen`, `debt` is `yellow`, `degrading` is `orange`, `failing` is `red`,
+and `unassessable` is `lightgrey`.
 
 | Surface | `headline-only/v1` | `headline-plus-freshness/v1` | Visibility decision |
 | --- | --- | --- | --- |
@@ -134,9 +140,9 @@ display strings are never substitutes for IDs.
 | --- | --- |
 | `iss` | Exact `https://token.actions.githubusercontent.com`; no alternate issuer |
 | `aud` | Exact configured audience for the registry entry; each adopter configures one exact owner audience |
-| `alg` | `RS256` only; reject `none`, other algorithms, and algorithm confusion |
-| `kid` | Select only a key identified by `kid` from the fixed GitHub issuer JWKS endpoint; an unknown key can trigger one bounded refresh of that fixed endpoint and is then rejected. No JWT header or claim can select a network URL. Provider key rotation is controlled through the fixed issuer trust chain, not a permanent snapshot of one key |
-| Time | Relay UTC clock; require `iat` and `exp`, reject missing claims, `iat` more than 5 minutes in the future, `exp` more than 5 minutes in the past, or `exp - iat > 10 minutes`. The ±5-minute skew is only token validation allowance and does not extend a lease |
+| Protected JOSE header `alg` | `RS256` only; reject `none`, other algorithms, and algorithm confusion before trusting claims |
+| Protected JOSE header `kid` | Select only a key identified by `kid` from the fixed GitHub issuer JWKS endpoint; an unknown key can trigger one bounded refresh of that fixed endpoint and is then rejected. No JWT header or claim can select a network URL. Provider key rotation is controlled through the fixed issuer trust chain, not a permanent snapshot of one key |
+| Time claims | Relay UTC clock; require `nbf`, `iat`, and `exp`, reject missing claims, `nbf` or `iat` more than 5 minutes in the future, `exp` more than 5 minutes in the past, or `exp - iat > 10 minutes`. The ±5-minute skew is only token validation allowance and does not extend a lease |
 | `repository_id` | Exact immutable integer in the registry and token context; synthetic vectors use a non-production ID. Display `repository` is diagnostic only |
 | `repository_owner_id` | Exact immutable integer in the registry and token context; synthetic vectors use a non-production ID. Display owner/login is diagnostic only |
 | Event and ref | Exact `push` event and `refs/heads/main` for this ArchLinterNet publisher; no wildcard branches or `workflow_run` substitution |
@@ -189,13 +195,13 @@ Generation/epoch and the tombstone defeat these cases:
 ## Origin, cache, SVG, and response contract
 
 Ready responses use a bounded `Cache-Control: public, max-age=N, must-revalidate`, where `N` is no greater than the remaining lease. Expired,
-unavailable, revoked, and storage-uncertain responses are fail-closed and do
-not carry a ready representation. ETag identifies the complete public
-representation only; a conditional request and `HEAD` perform the same
-trusted-clock expiry check. A 304 never extends validity. Browser, GitHub Camo,
-proxy, and offline copies may remain visible beyond expiry and cannot be
-universally recalled; documentation must describe them as cached copies, not
-current origin truth.
+unavailable, revoked, and storage-uncertain responses use `Cache-Control: no-store` and do not carry a ready representation. ETag identifies the complete
+public representation: profile, exact payload bytes, generation, state, and
+`valid_until`; it is never the headline payload digest alone. A conditional
+request and `HEAD` perform the same trusted-clock expiry check. A 304 never
+extends validity. Browser, GitHub Camo, proxy, and offline copies may remain
+visible beyond expiry and cannot be universally recalled; documentation must
+describe them as cached copies, not current origin truth.
 
 The default SVG uses `headline-plus-freshness/v1` and is a fixed local rendering
 with a readable absolute UTC `valid_until` timestamp inseparable from the badge

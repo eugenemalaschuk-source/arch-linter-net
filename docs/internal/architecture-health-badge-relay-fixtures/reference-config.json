@@ -49,10 +49,10 @@
     "revocation_epoch": 3,
     "tree_sha": "1111111111111111111111111111111111111111",
     "semantic_horizon": "2026-09-09T12:00:00Z",
-    "ready_digest": "1d599d222ba872f0ac219fc5899c4da467623e479f37020c2316fd1566e8391a"
+    "ready_digest": "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d"
   },
   "transport": {
-    "canonical_encoding": "utf-8-json-no-whitespace",
+    "canonical_encoding": "utf-8-system-text-json-default-escaping",
     "verification": "verify-and-copy",
     "public_metadata": "payload-and-safe-freshness-only"
   }

@@ -1,30 +1,4 @@
-# architecture-health-badge-relay-contract Specification
-
-## Purpose
-Defines a private-repository badge-publication contract that makes disclosure,
-identity, freshness, and recovery independently testable without changing the
-canonical Architecture Health evaluator.
-
-## Requirements
-
-### Requirement: Supported publication modes preserve one semantic authority
-The system SHALL support `none`, public `github-raw`, and adopter-owned `relay`
-publication modes. `none` SHALL make no external Architecture Health disclosure;
-`github-raw` SHALL remain a static public snapshot and SHALL reject a private
-repository with an actionable visibility error; `relay` SHALL be the sole
-turnkey private mode. All modes SHALL transport, rather than recompute, the
-four canonical headline values: Gate, Health, explicit-ignore count, and
-effective-rule count.
-
-#### Scenario: Private repository selects no transport
-- **WHEN** a private repository uses `none`
-- **THEN** its required checks, reports, and private artifacts remain available
-- **AND** no external Badge Relay destination is contacted
-
-#### Scenario: Private repository selects raw snapshot transport
-- **WHEN** a private repository configures `github-raw`
-- **THEN** setup rejects the configuration with a visibility diagnostic
-- **AND** it does not claim request-time expiry or expose a tokenized raw URL
+## MODIFIED Requirements
 
 ### Requirement: Public disclosure profiles are closed byte contracts
 The system SHALL define `headline-only/v1` and `headline-plus-freshness/v1`
@@ -65,28 +39,6 @@ verification. Color SHALL be determined by Health independently of Gate:
 - **THEN** profile validation accepts only the color assigned to its Health
 - **AND** it rejects every other color even when it is in the color enum
 
-### Requirement: Freshness is bounded independently from canonical headline state
-The four canonical headline values SHALL remain unchanged by publication state.
-`ready`, `expired`, `unavailable`, and `revoked` SHALL express only whether a
-current confirmation exists. A Relay origin SHALL never serve expired ready
-data. A ready lease SHALL be at most 60 minutes, renewals SHALL be optional at
-no more than once per 30 minutes, and each renewal SHALL be capped by the
-canonical semantic validity horizon. Unknown, expired, or mismatched semantic
-validity SHALL forbid renewal. Reads, retries, and unchanged source trees SHALL
-not extend a lease.
-
-#### Scenario: A stopped publisher expires safely
-- **WHEN** no publisher or cron runs after a ready lease reaches `valid_until`
-- **THEN** a Relay read returns the profile's explicit expired or unavailable
-  rendering rather than the last ready payload
-- **AND** it preserves no false claim about the prior Gate or Health
-
-#### Scenario: Same tree cannot extend expired governance evidence
-- **WHEN** a tree is unchanged but its waiver, evaluation date, or required
-  external evidence has passed its semantic validity horizon
-- **THEN** a renewal is rejected
-- **AND** the transport does not re-evaluate waiver semantics
-
 ### Requirement: Promotion is authenticated and context-bound
 The Relay SHALL accept a publication operation only from an approved registry
 entry bound to immutable repository and owner identifiers, permitted event/ref,
@@ -117,28 +69,6 @@ sorting SHALL not establish authorization or ordering.
 - **THEN** the Relay verifies each at its protocol-defined boundary
 - **AND** a vector that changes one header or claim remains valid in all other
   header, claim, time, and registry dimensions
-
-### Requirement: Lifecycle changes have revocation precedence and recovery is authoritative
-The Relay SHALL implement register, prepare, publish, renew, invalidate, read,
-revoke, and recover operations with atomic generation and revocation-epoch
-checks. Revoke, delete, visibility/consent loss, ownership transfer, workflow
-pin rotation, and uninstall SHALL take precedence over delayed ready data.
-Tombstoned aliases SHALL not be reassigned to another tenant without an
-explicit safe registration procedure. Recovery after backup restore SHALL
-require an approved current publisher proof and SHALL not revive a previous
-ready payload or manufacture a current `main` result.
-
-#### Scenario: Restore cannot resurrect revoked data
-- **WHEN** storage is restored to a state before a revocation
-- **THEN** a previously issued ready payload remains unavailable until an
-  approved current proof commits after the restored revocation epoch
-- **AND** the public read surface exposes neither history nor private receipts
-
-#### Scenario: Force-push and ABA do not select a winner by SHA
-- **WHEN** a branch returns to a previously observed commit or tree after an
-  intervening context change
-- **THEN** the Relay requires a fresh challenge and current context proof
-- **AND** it does not infer recency by commit SHA or run ID ordering
 
 ### Requirement: Rendering and release compatibility are explicit and bounded
 The Relay SHALL return no HTML, script, link, redirect, external resource, or

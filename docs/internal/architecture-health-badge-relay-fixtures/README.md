@@ -14,13 +14,17 @@ relay code, a real adopter identity, a secret, or a JWT.
   synthetic. The workflow reference and SHA are exact registry pins.
 - `canonical-ready.json` and `canonical-unavailable.json` are the two
   headline-only public representations. `canonical_bytes` is the byte string
-  that a transport verifies and copies; its SHA-256 is the digest of those
-  exact UTF-8 bytes. The public payload contains no provenance, URL, SHA, PR,
-  run, or token data.
+  that a transport verifies and copies; its SHA-256 is the digest of those exact
+  bytes. `headline-only/v1` retains the current canonical CLI's default
+  `System.Text.Json` escaping (including `\\u00B7`), rather than silently
+  changing its wire serialization. The public payload contains no provenance,
+  URL, SHA, PR, run, or token data.
 - `conformance-vectors.json` covers accepted bytes and malformed/disclosing
   bytes, OIDC claim and pin checks, replay/idempotency and CAS ordering,
   deadlines, expiry, semantic horizons, lifecycle/recovery, and cache/ETag/
-  HEAD behavior. `expected.public_response` is deliberately public-safe.
+  HEAD behavior. Protected JOSE headers (`alg`, `kid`) are separate from signed
+  claims (`nbf`, `iat`, `exp`). `expected.public_response` is deliberately
+  public-safe.
 
 The relay never reconstructs Gate, Health, counts, message, or color. The
 `headline-plus-freshness/v1` profile adds only `verified_at` and `valid_until`.
