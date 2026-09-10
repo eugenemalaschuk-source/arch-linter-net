@@ -1,6 +1,10 @@
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
+using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.PolicyWeakening;
+using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Policy.Application;
 
@@ -16,12 +20,14 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
         Produce each JSON context in its own repository/policy state with:
           arch-linter-net policy context --policy <path> --format json
 
-        This command reads only the supplied artifacts. It does not load policy YAML, build projects,
-        analyze assemblies, or simulate a candidate policy.
+        Without a public API approval, this command reads only the supplied artifacts. An approval
+        additionally captures the current contract surface from --policy, without writing a file.
 
         Options:
           --base-context <path>     JSON policy context from the base state
           --current-context <path>  JSON policy context from the current state
+          --public-api-approval <path> JSON approvals for exact reviewed API additions
+          --policy <path>           Current policy used to capture approved live API evidence
           -f, --format <fmt>        Output format: human, json, or sarif (default: human)
           -h, --help                Show this help message
 
@@ -61,9 +67,25 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
 
         try
         {
+            if (options.PublicApiApprovalPath is not null && !fileSystem.FileExists(options.PublicApiApprovalPath))
+            {
+                throw new ArgumentException($"Public API approval artifact does not exist: {options.PublicApiApprovalPath}");
+            }
+
+            ArchitecturePolicyContextExport baseContext = ArchitecturePolicyWeakeningFormatter.DeserializeContext(
+                fileSystem.ReadAllText(options.BaseContextPath));
+            ArchitecturePolicyContextExport currentContext = ArchitecturePolicyWeakeningFormatter.DeserializeContext(
+                fileSystem.ReadAllText(options.CurrentContextPath));
+            IReadOnlyList<ArchitecturePublicApiWeakeningApproval> approvals = options.PublicApiApprovalPath is null
+                ? []
+                : ArchitecturePolicyWeakeningFormatter.DeserializePublicApiApprovals(fileSystem.ReadAllText(options.PublicApiApprovalPath));
             ArchitecturePolicyWeakeningResult result = runtime.ComparePolicyWeakening(new ArchitecturePolicyWeakeningRequest(
-                ArchitecturePolicyWeakeningFormatter.DeserializeContext(fileSystem.ReadAllText(options.BaseContextPath)),
-                ArchitecturePolicyWeakeningFormatter.DeserializeContext(fileSystem.ReadAllText(options.CurrentContextPath))));
+                baseContext,
+                currentContext)
+            {
+                PublicApiApprovals = approvals,
+                PublicApiLiveEvidence = CaptureLiveEvidence(runtime.CapturePublicApi, options.PolicyPath!, currentContext, approvals),
+            });
             console.Out.WriteLine(options.Format switch
             {
                 "json" => runtime.FormatPolicyWeakeningAsJson(result),
@@ -81,5 +103,44 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
                 $"Policy weakening comparison error: {exception.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    internal static List<ArchitecturePublicApiLiveEvidence> CaptureLiveEvidence(
+        Func<PublicApiCaptureRequest, PublicApiCaptureOutcome> capturePublicApi,
+        string policyPath,
+        ArchitecturePolicyContextExport currentContext,
+        IReadOnlyList<ArchitecturePublicApiWeakeningApproval> approvals)
+    {
+        if (approvals.Count == 0)
+        {
+            return [];
+        }
+
+        string contextDigest = ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(currentContext);
+        List<ArchitecturePublicApiLiveEvidence> evidence = new();
+        foreach (ArchitecturePublicApiWeakeningApproval approval in approvals)
+        {
+            PublicApiCaptureOutcome capture = capturePublicApi(new PublicApiCaptureRequest
+            {
+                PolicyPath = policyPath,
+                ContractId = approval.ContractId,
+                OutputPath = "architecture/public-api-approval-evidence.txt",
+            });
+            if (!capture.Succeeded || capture.Snapshot is null)
+            {
+                throw new InvalidOperationException(capture.Error ??
+                    $"Unable to capture live public API evidence for contract '{approval.ContractId}'.");
+            }
+
+            PublicApiSnapshotDocument document = PublicApiSnapshotFormat.Parse(capture.Snapshot, "captured live public API");
+            evidence.Add(new ArchitecturePublicApiLiveEvidence(
+                ArchitecturePublicApiLiveEvidence.CurrentSchemaVersion,
+                ArchitecturePublicApiLiveEvidence.EvidenceKind,
+                contextDigest,
+                approval.ContractId,
+                document.Entries));
+        }
+
+        return evidence;
     }
 }

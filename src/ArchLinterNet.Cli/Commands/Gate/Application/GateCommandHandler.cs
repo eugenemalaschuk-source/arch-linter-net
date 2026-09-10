@@ -24,6 +24,7 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
               --condition-set <name>   Select policy condition set
               --base-context <path>    Base effective-policy context JSON (requires --current-context)
               --current-context <path> Current effective-policy context JSON (requires --base-context)
+              --public-api-approval <path> Exact reviewed public API addition approval artifact
               --ensure-built           Build and receipt-verify before complete candidate collection
               --no-restore             Do not restore while ensuring build state
               --configuration <name>   Requested build configuration

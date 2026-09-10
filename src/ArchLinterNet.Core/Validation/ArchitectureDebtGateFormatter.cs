@@ -41,6 +41,11 @@ public static class ArchitectureDebtGateFormatter
             {
                 builder.AppendLine($"- [{finding.Severity}] [{finding.Classification}] [{finding.Kind}] {finding.ControlIdentity}");
             }
+
+            foreach (ArchitectureApprovedPublicApiAddition approval in outcome.PolicyWeakening.ApprovedPublicApiAdditions)
+            {
+                builder.AppendLine($"- [approved_public_api_addition] {approval.ContractId} ({approval.ComparisonMode})");
+            }
         }
 
         return builder.ToString().TrimEnd();
@@ -59,7 +64,9 @@ public static class ArchitectureDebtGateFormatter
             .Select(BuildPersistentSarifResult)
             .Concat(outcome.PolicyWeakening is null
                 ? Array.Empty<Dictionary<string, object?>>()
-                : OrderWeakening(outcome.PolicyWeakening.Findings).Select(BuildWeakeningSarifResult))
+                : OrderWeakening(outcome.PolicyWeakening.Findings)
+                    .Select(BuildWeakeningSarifResult)
+                    .Concat(outcome.PolicyWeakening.ApprovedPublicApiAdditions.Select(BuildApprovedPublicApiSarifResult)))
             .OrderBy(result => (string)result["ruleId"]!, StringComparer.Ordinal)
             .ThenBy(result => JsonSerializer.Serialize(result["properties"]), StringComparer.Ordinal)
             .ToList();
@@ -124,6 +131,7 @@ public static class ArchitectureDebtGateFormatter
                 ["policy_version"] = outcome.PolicyWeakening.PolicyVersion,
                 ["severity"] = outcome.PolicyWeakening.Severity,
                 ["findings"] = OrderWeakening(outcome.PolicyWeakening.Findings).Select(BuildWeakeningJsonEntry).ToArray(),
+                ["approved_public_api_additions"] = outcome.PolicyWeakening.ApprovedPublicApiAdditions,
             },
     };
 
@@ -191,6 +199,27 @@ public static class ArchitectureDebtGateFormatter
             ["rationale"] = finding.Rationale,
         },
     };
+
+    private static Dictionary<string, object?> BuildApprovedPublicApiSarifResult(
+        ArchitectureApprovedPublicApiAddition approval) => new()
+        {
+            ["ruleId"] = "ArchLinterNet.DebtGate.PolicyWeakening.ApprovedPublicApiAddition",
+            ["level"] = "note",
+            ["message"] = new Dictionary<string, string>
+            {
+                ["text"] = $"Reviewed public API additions approved for {approval.ContractId}.",
+            },
+            ["properties"] = new Dictionary<string, object?>
+            {
+                ["gate_section"] = "policy_weakening",
+                ["approval"] = "approved_public_api_addition",
+                ["contract_id"] = approval.ContractId,
+                ["base_context_digest"] = approval.BaseContextDigest,
+                ["current_context_digest"] = approval.CurrentContextDigest,
+                ["comparison_mode"] = approval.ComparisonMode,
+                ["added"] = approval.Added,
+            },
+        };
 
     private static IReadOnlyList<BaselineLifecycleEntry> LifecycleEntries(BaselineVerifyOutcome outcome)
     {

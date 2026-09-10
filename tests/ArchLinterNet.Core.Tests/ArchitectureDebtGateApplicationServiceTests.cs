@@ -2,6 +2,7 @@ using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
+using ArchLinterNet.Core.PolicyWeakening;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Core.Validation.Abstractions;
 using NUnit.Framework;
@@ -11,8 +12,6 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureDebtGateApplicationServiceTests
 {
-    private static readonly string[] _persistentDebtAndPolicyWeakeningSections = ["persistent_debt", "policy_weakening"];
-
     [Test]
     public void Evaluate_ErrorSeverityWeakeningFailsGateWhileMatchedDebtRemainsSeparate()
     {
@@ -61,6 +60,41 @@ public sealed class ArchitectureDebtGateApplicationServiceTests
     }
 
     [Test]
+    public void Evaluate_ReviewedPublicApiAdditionUsesCapturedLiveEvidence()
+    {
+        PublicApiSnapshotEntry existing = new("Sample", "class Sample.Api");
+        PublicApiSnapshotEntry added = new("Sample", "class Sample.NewApi");
+        ArchitecturePolicyContextExport baselineContext = PublicApiContext(existing);
+        ArchitecturePolicyContextExport currentContext = PublicApiContext(existing, added);
+        ArchitecturePublicApiWeakeningApproval approval = new(
+            ArchitecturePublicApiWeakeningApproval.CurrentSchemaVersion,
+            ArchitecturePublicApiWeakeningApproval.ApprovalKind,
+            ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(baselineContext),
+            ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(currentContext),
+            "api",
+            [added]);
+        var publicApi = new StubPublicApiService(Snapshot(existing, added));
+
+        ArchitectureDebtGateOutcome result = new ArchitectureDebtGateApplicationService(new StubBaselineService(), publicApi).Evaluate(new ArchitectureDebtGateRequest
+        {
+            PolicyPath = "policy.yml",
+            BaselinePath = "baseline.yml",
+            BasePolicyContext = baselineContext,
+            CurrentPolicyContext = currentContext,
+            PublicApiWeakeningApprovals = [approval],
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Passed, Is.True);
+            Assert.That(result.PolicyWeakening!.Findings, Is.Empty);
+            Assert.That(result.PolicyWeakening.ApprovedPublicApiAdditions.Single().Added, Is.EqualTo([added]));
+            Assert.That(publicApi.CaptureCalls, Is.EqualTo(1));
+            Assert.That(publicApi.Requests.Single().ContractId, Is.EqualTo("api"));
+        });
+    }
+
+    [Test]
     public void Formatters_PreservePersistentAndWeakeningTypedSections()
     {
         var identity = new ArchitectureViolationIdentity(
@@ -101,10 +135,22 @@ public sealed class ArchitectureDebtGateApplicationServiceTests
                 BaselinePath = "baseline.yml",
                 BasePolicyContext = Context("strict", "warn"),
                 CurrentPolicyContext = Context("audit", "warn"),
-            }).PolicyWeakening,
+            }).PolicyWeakening! with
+            {
+                ApprovedPublicApiAdditions =
+                [
+                    new ArchitectureApprovedPublicApiAddition(
+                        "api",
+                        "base-digest",
+                        "current-digest",
+                        "exact",
+                        [new PublicApiSnapshotEntry("Sample", "class Sample.Api")]),
+                ],
+            },
             PolicyWeakeningRequested = true,
         };
 
+        string human = ArchitectureDebtGateFormatter.FormatAsHuman(outcome);
         using JsonDocument json = JsonDocument.Parse(ArchitectureDebtGateFormatter.FormatAsJson(outcome));
         using JsonDocument sarif = JsonDocument.Parse(ArchitectureDebtGateFormatter.FormatAsSarif(outcome, "1.0.0"));
         JsonElement persistentProperties = sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
@@ -120,9 +166,15 @@ public sealed class ArchitectureDebtGateApplicationServiceTests
                 .GetProperty("status").GetString(), Is.EqualTo("new"));
             Assert.That(json.RootElement.GetProperty("policy_weakening").GetProperty("findings")[0]
                 .GetProperty("classification").GetString(), Is.EqualTo("semantic"));
+            Assert.That(json.RootElement.GetProperty("policy_weakening").GetProperty("approved_public_api_additions")[0]
+                .GetProperty("ContractId").GetString(), Is.EqualTo("api"));
+            Assert.That(human, Does.Contain("[approved_public_api_addition] api (exact)"));
             Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
                 .EnumerateArray().Select(result => result.GetProperty("properties").GetProperty("gate_section").GetString()),
-                Is.EquivalentTo(_persistentDebtAndPolicyWeakeningSections));
+                Does.Contain("persistent_debt").And.Contain("policy_weakening"));
+            Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
+                .EnumerateArray().Select(result => result.GetProperty("ruleId").GetString()),
+                Does.Contain("ArchLinterNet.DebtGate.PolicyWeakening.ApprovedPublicApiAddition"));
             Assert.That(persistentProperties.GetProperty("identity_version").GetInt32(), Is.EqualTo(1));
             Assert.That(persistentProperties.GetProperty("source_assembly").GetString(), Is.EqualTo("Sample.Application"));
             Assert.That(persistentProperties.GetProperty("target_assembly").GetString(), Is.EqualTo("Sample.Infrastructure"));
@@ -147,6 +199,44 @@ public sealed class ArchitectureDebtGateApplicationServiceTests
         [],
         [new ArchitecturePolicyContextContract(mode, "dependency", "boundary", "boundary", null, null, [], [], [], [], [], [], null)],
         [], [], [], [], [], [], []);
+
+    private static ArchitecturePolicyContextExport PublicApiContext(params PublicApiSnapshotEntry[] entries) => Context("strict") with
+    {
+        Contracts =
+        [
+            new ArchitecturePolicyContextContract(
+                "strict",
+                "public_api_surface",
+                "api",
+                "api",
+                null,
+                null,
+                [],
+                [
+                    new ArchitecturePolicyContextContractFact("api_comparison", ["exact"], []),
+                    new ArchitecturePolicyContextContractFact(
+                        "resolved_snapshot_entries",
+                        [],
+                        entries.Select(entry => new ArchitecturePolicyContextContractFact(
+                            "entry",
+                            [],
+                            [
+                                new ArchitecturePolicyContextContractFact("assembly", [entry.AssemblyName], []),
+                                new ArchitecturePolicyContextContractFact("signature", [entry.Signature], []),
+                            ])).ToArray()),
+                ],
+                [],
+                [],
+                [],
+                [],
+                null),
+        ],
+    };
+
+    private static string Snapshot(params PublicApiSnapshotEntry[] entries) => PublicApiSnapshotFormat.Serialize(new PublicApiSnapshotDocument(
+        PublicApiSnapshotFormat.CurrentVersion,
+        "surface",
+        entries));
 
     private sealed class StubBaselineService : IArchitectureBaselineApplicationService
     {
@@ -175,5 +265,25 @@ public sealed class ArchitectureDebtGateApplicationServiceTests
         }
 
         public BaselineMigrateOutcome Migrate(BaselineMigrateRequest request) => throw new NotSupportedException();
+    }
+
+    private sealed class StubPublicApiService(string snapshot) : IArchitecturePublicApiApplicationService
+    {
+        public int CaptureCalls { get; private set; }
+
+        public List<PublicApiCaptureRequest> Requests { get; } = [];
+
+        public PublicApiCaptureOutcome Capture(PublicApiCaptureRequest request)
+        {
+            CaptureCalls++;
+            Requests.Add(request);
+            return new PublicApiCaptureOutcome(true, snapshot, 2, null, []);
+        }
+
+        public PublicApiDiffOutcome Diff(PublicApiDiffRequest request) => throw new NotSupportedException();
+
+        public PublicApiUpdateOutcome Update(PublicApiUpdateRequest request) => throw new NotSupportedException();
+
+        public PublicApiMigrateOutcome Migrate(PublicApiMigrateRequest request) => throw new NotSupportedException();
     }
 }

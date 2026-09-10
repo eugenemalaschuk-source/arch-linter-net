@@ -24,6 +24,11 @@ public static class ArchitecturePolicyWeakeningFormatter
     public static ArchitecturePolicyContextExport DeserializeContext(string json)
         => ArchitecturePolicyContextJsonReader.Deserialize(json);
 
+    /// <summary>Parses explicit reviewed public API addition approvals.</summary>
+    public static IReadOnlyList<ArchitecturePublicApiWeakeningApproval> DeserializePublicApiApprovals(string json)
+        => JsonSerializer.Deserialize<ArchitecturePublicApiWeakeningApproval[]>(json, _jsonOptions)
+            ?? throw new ArgumentException("The public API approval artifact is empty or invalid.", nameof(json));
+
     /// <summary>Calculates the digest that binds optional membership evidence to a policy context.</summary>
     public static string ComputeContextDigest(ArchitecturePolicyContextExport context)
         => ArchitecturePolicyWeakeningContextSupport.ComputeContextDigest(context);
@@ -45,6 +50,7 @@ public static class ArchitecturePolicyWeakeningFormatter
         builder.AppendLine($"Policy: {normalized.PolicyName} (policy v{normalized.PolicyVersion})");
         builder.AppendLine($"Configured severity: {normalized.Severity}");
         builder.AppendLine($"Findings: {normalized.Findings.Count}");
+        builder.AppendLine($"Approved public API additions: {normalized.ApprovedPublicApiAdditions.Count}");
         foreach (ArchitecturePolicyWeakeningFinding finding in normalized.Findings)
         {
             builder.AppendLine($"- [{finding.Severity}] [{finding.Classification}] [{finding.Kind}] {finding.ControlIdentity}");
@@ -71,6 +77,12 @@ public static class ArchitecturePolicyWeakeningFormatter
             }
         }
 
+        foreach (ArchitectureApprovedPublicApiAddition approval in normalized.ApprovedPublicApiAdditions)
+        {
+            builder.AppendLine($"- [approved_public_api_addition] {approval.ContractId} ({approval.ComparisonMode})");
+            builder.AppendLine($"  added: {string.Join(", ", approval.Added.Select(entry => entry.AssemblyName + ":" + entry.Signature))}");
+        }
+
         return builder.ToString().TrimEnd();
     }
 
@@ -85,6 +97,9 @@ public static class ArchitecturePolicyWeakeningFormatter
             .Select(group => new SarifRule(
                 RuleId(group.Key),
                 new SarifMessage($"Architecture policy weakening: {group.Key}")))
+            .Concat(normalized.ApprovedPublicApiAdditions.Count == 0
+                ? Array.Empty<SarifRule>()
+                : [new SarifRule("ArchLinterNet.PolicyWeakening.ApprovedPublicApiAddition", new SarifMessage("Reviewed public API addition approved."))])
             .ToArray();
         SarifResult[] findings = normalized.Findings
             .Select(finding => new SarifResult(
@@ -103,6 +118,11 @@ public static class ArchitecturePolicyWeakeningFormatter
                     finding.BaseProvenance,
                     finding.CurrentProvenance,
                     finding.Rationale)))
+            .Concat(normalized.ApprovedPublicApiAdditions.Select(approval => new SarifResult(
+                "ArchLinterNet.PolicyWeakening.ApprovedPublicApiAddition",
+                "note",
+                new SarifMessage($"Reviewed public API additions approved for {approval.ContractId}."),
+                approval)))
             .ToArray();
 
         return JsonSerializer.Serialize(
@@ -120,7 +140,8 @@ public static class ArchitecturePolicyWeakeningFormatter
             || string.IsNullOrWhiteSpace(result.PolicyName)
             || result.PolicyVersion <= 0
             || result.Severity is not ("error" or "warn" or "off")
-            || result.Findings is null)
+            || result.Findings is null
+            || result.ApprovedPublicApiAdditions is null)
         {
             throw new ArgumentException("The policy weakening result is incomplete or unsupported.", nameof(result));
         }
@@ -137,6 +158,15 @@ public static class ArchitecturePolicyWeakeningFormatter
                 BaseValues = finding.BaseValues.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 CurrentValues = finding.CurrentValues.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 AffectedSubjects = finding.AffectedSubjects.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+            })
+            .ToArray(),
+        ApprovedPublicApiAdditions = result.ApprovedPublicApiAdditions
+            .OrderBy(approval => approval.ContractId, StringComparer.Ordinal)
+            .Select(approval => approval with
+            {
+                Added = approval.Added.OrderBy(entry => entry.AssemblyName, StringComparer.Ordinal)
+                    .ThenBy(entry => entry.Signature, StringComparer.Ordinal)
+                    .ToArray(),
             })
             .ToArray(),
     };
@@ -175,7 +205,7 @@ public static class ArchitecturePolicyWeakeningFormatter
         [property: JsonPropertyName("ruleId")] string Rule,
         string Level,
         SarifMessage Message,
-        SarifProperties Properties);
+        object Properties);
 
     private sealed record SarifMessage(string Text);
 

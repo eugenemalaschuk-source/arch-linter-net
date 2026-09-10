@@ -21,7 +21,8 @@ internal sealed record ArchitectureAnalysisCommandOptions(
     string? Configuration,
     string? TargetFramework,
     string? Platform,
-    string? RuntimeIdentifier);
+    string? RuntimeIdentifier,
+    string? PublicApiApprovalPath = null);
 
 internal sealed class ArchitectureAnalysisCommandOptionSet
 {
@@ -41,6 +42,8 @@ internal sealed class ArchitectureAnalysisCommandOptionSet
     public Option<string> BaseContext { get; } = new("--base-context");
 
     public Option<string> CurrentContext { get; } = new("--current-context");
+
+    public Option<string> PublicApiApproval { get; } = new("--public-api-approval");
 
     public Option<string> Format { get; } = WithDefault("--format", "human");
 
@@ -75,6 +78,7 @@ internal sealed class ArchitectureAnalysisCommandOptionSet
         command.Options.Add(Contracts);
         command.Options.Add(BaseContext);
         command.Options.Add(CurrentContext);
+        command.Options.Add(PublicApiApproval);
         command.Options.Add(Format);
         command.Options.Add(EnsureBuilt);
         command.Options.Add(NoRestore);
@@ -100,7 +104,8 @@ internal sealed class ArchitectureAnalysisCommandOptionSet
         result.GetValue(Configuration),
         result.GetValue(Framework),
         result.GetValue(Platform),
-        result.GetValue(Runtime));
+        result.GetValue(Runtime),
+        result.GetValue(PublicApiApproval));
 
     private static Option<string> WithDefault(string name, string value)
     {
@@ -134,6 +139,13 @@ internal static class ArchitectureAnalysisCommandSupport
             return false;
         }
 
+        if (!string.IsNullOrWhiteSpace(options.PublicApiApprovalPath)
+            && (!hasBase || !fileSystem.FileExists(options.PublicApiApprovalPath)))
+        {
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-public-api-approval", "--public-api-approval requires both policy contexts and an existing approval artifact.");
+            return false;
+        }
+
         return true;
     }
 
@@ -153,6 +165,9 @@ internal static class ArchitectureAnalysisCommandSupport
             CurrentPolicyContext = options.CurrentContextPath is null
                 ? null
                 : ArchitecturePolicyWeakeningFormatter.DeserializeContext(fileSystem.ReadAllText(options.CurrentContextPath)),
+            PublicApiWeakeningApprovals = options.PublicApiApprovalPath is null
+                ? null
+                : ArchitecturePolicyWeakeningFormatter.DeserializePublicApiApprovals(fileSystem.ReadAllText(options.PublicApiApprovalPath)),
             PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
             NoRestore = options.NoRestore,
             RequestedConfiguration = options.Configuration,
