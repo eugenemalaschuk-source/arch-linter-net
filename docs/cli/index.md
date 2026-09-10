@@ -270,7 +270,7 @@ arch-linter-net policy weakening \
 
 `policy weakening` compares exported contexts. It is a bounded change-time guardrail, not a second architecture evaluator; `impact_not_proven` means review is required.
 
-`--public-api-approval` is optional and fail-closed. Its JSON root is an array of approvals; each approval binds `schema_version: 1`, `kind: "architecture-public-api-addition-approval"`, the exact base/current context digests, a `public_api_surface` contract id, and the complete `added` snapshot entries. The approval is accepted only for an unchanged `exact` or `additions_only` contract whose canonical delta has precisely those additions and no removals or signature changes. It cannot approve selector, inventory, or comparison-mode changes.
+`--public-api-approval` is optional and fail-closed. Its JSON root is an array of approvals; each approval binds `schema_version: 1`, `kind: "architecture-public-api-addition-approval"`, the exact base/current context digests, a `public_api_surface` contract id, and the complete `added` snapshot entries. When approvals are supplied, `policy weakening` captures the current CLR API from `--policy` and requires it to match the current reviewed snapshot. The approval is accepted only for an unchanged `exact` or `additions_only` contract whose canonical base-snapshot-to-live-CLR delta has precisely those additions and no removals or signature changes. It cannot approve selector, inventory, or comparison-mode changes.
 
 ## Baseline workflow
 

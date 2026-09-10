@@ -5,7 +5,8 @@ using ArchLinterNet.Core.PolicyContext;
 namespace ArchLinterNet.Core.PolicyWeakening;
 
 // An approval is deliberately narrower than a waiver. It can acknowledge only a complete,
-// canonical Added delta for the same public-api contract in the exact base/head contexts.
+// canonical Added delta from the base snapshot to the captured CLR surface for the same
+// public-api contract in the exact base/head contexts.
 internal static class ArchitecturePolicyWeakeningPublicApiApprovalEvaluator
 {
     internal static void Evaluate(
@@ -44,8 +45,8 @@ internal static class ArchitecturePolicyWeakeningPublicApiApprovalEvaluator
             || string.IsNullOrWhiteSpace(approval.ContractId)
             || approval.Added is null
             || approval.Added.Count == 0
-            || !string.Equals(approval.BaseContextDigest, ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(request.BaseContext), StringComparison.Ordinal)
-            || !string.Equals(approval.CurrentContextDigest, ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(request.CurrentContext), StringComparison.Ordinal))
+            || !string.Equals(approval.BaseContextDigest, ArchitecturePolicyWeakeningContextSupport.ComputeContextDigest(request.BaseContext), StringComparison.Ordinal)
+            || !string.Equals(approval.CurrentContextDigest, ArchitecturePolicyWeakeningContextSupport.ComputeContextDigest(request.CurrentContext), StringComparison.Ordinal))
         {
             return false;
         }
@@ -59,12 +60,14 @@ internal static class ArchitecturePolicyWeakeningPublicApiApprovalEvaluator
             || !string.Equals(baseMode, currentMode, StringComparison.Ordinal)
             || baseMode is not ("exact" or "additions_only")
             || !TryGetSnapshotEntries(baseline, out IReadOnlyList<PublicApiSnapshotEntry> baseEntries)
-            || !TryGetSnapshotEntries(current, out IReadOnlyList<PublicApiSnapshotEntry> currentEntries))
+            || !TryGetSnapshotEntries(current, out IReadOnlyList<PublicApiSnapshotEntry> currentEntries)
+            || !TryGetLiveEntries(request, approval, out IReadOnlyList<PublicApiSnapshotEntry> liveEntries)
+            || !SameEntries(currentEntries, liveEntries))
         {
             return false;
         }
 
-        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(baseEntries, currentEntries);
+        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(baseEntries, liveEntries);
         PublicApiSnapshotEntry[] added = delta.Added
             .Select(entry => new PublicApiSnapshotEntry(entry.AssemblyName, entry.Signature))
             .ToArray();
@@ -137,6 +140,29 @@ internal static class ArchitecturePolicyWeakeningPublicApiApprovalEvaluator
         }
 
         entries = parsed;
+        return true;
+    }
+
+    private static bool TryGetLiveEntries(
+        ArchitecturePolicyWeakeningRequest request,
+        ArchitecturePublicApiWeakeningApproval approval,
+        out IReadOnlyList<PublicApiSnapshotEntry> entries)
+    {
+        entries = Array.Empty<PublicApiSnapshotEntry>();
+        ArchitecturePublicApiLiveEvidence[] matchingEvidence = request.PublicApiLiveEvidence.Where(item =>
+            item.SchemaVersion == ArchitecturePublicApiLiveEvidence.CurrentSchemaVersion
+            && string.Equals(item.Kind, ArchitecturePublicApiLiveEvidence.EvidenceKind, StringComparison.Ordinal)
+            && string.Equals(item.ContextDigest, approval.CurrentContextDigest, StringComparison.Ordinal)
+            && string.Equals(item.ContractId, approval.ContractId, StringComparison.Ordinal)).ToArray();
+        if (matchingEvidence.Length != 1
+            || matchingEvidence[0].Entries is null || matchingEvidence[0].Entries.Count == 0
+            || matchingEvidence[0].Entries.Any(entry => string.IsNullOrWhiteSpace(entry.AssemblyName) || string.IsNullOrWhiteSpace(entry.Signature))
+            || matchingEvidence[0].Entries.Distinct().Count() != matchingEvidence[0].Entries.Count)
+        {
+            return false;
+        }
+
+        entries = matchingEvidence[0].Entries;
         return true;
     }
 

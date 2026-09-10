@@ -12,6 +12,9 @@ public sealed record ArchitecturePolicyWeakeningRequest(
 {
     /// <summary>Explicit, context-bound approvals for reviewed public API additions.</summary>
     public IReadOnlyList<ArchitecturePublicApiWeakeningApproval> PublicApiApprovals { get; init; } = [];
+
+    /// <summary>Canonical current CLR public API captures bound to the current policy context.</summary>
+    public IReadOnlyList<ArchitecturePublicApiLiveEvidence> PublicApiLiveEvidence { get; init; } = [];
 }
 
 /// <summary>One deterministic policy-weakening comparison result.</summary>
@@ -50,6 +53,21 @@ public sealed record ArchitecturePublicApiWeakeningApproval(
 
     /// <summary>Stable approval document kind.</summary>
     public const string ApprovalKind = "architecture-public-api-addition-approval";
+}
+
+/// <summary>Canonical current CLR public API capture used to prove an approval against live code.</summary>
+public sealed record ArchitecturePublicApiLiveEvidence(
+    int SchemaVersion,
+    string Kind,
+    string ContextDigest,
+    string ContractId,
+    IReadOnlyList<PublicApiSnapshotEntry> Entries)
+{
+    /// <summary>Current supported live-evidence schema version.</summary>
+    public const int CurrentSchemaVersion = 1;
+
+    /// <summary>Stable live-evidence document kind.</summary>
+    public const string EvidenceKind = "architecture-public-api-live-evidence";
 }
 
 /// <summary>Auditable evidence for a public API addition accepted by policy weakening.</summary>

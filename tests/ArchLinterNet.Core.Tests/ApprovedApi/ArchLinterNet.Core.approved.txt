@@ -5206,6 +5206,7 @@ sealed class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningReque
   property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport CurrentContext {get;init;}
   property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence? BaseMembership {get;init;}
   property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence? CurrentMembership {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence> PublicApiLiveEvidence {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval> PublicApiApprovals {get;init;}
 sealed class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult : System.IEquatable<ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult>
   ctor(int SchemaVersion, string Kind, string PolicyName, int PolicyVersion, string Severity, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFinding> Findings)
@@ -5227,6 +5228,23 @@ sealed class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResul
   property string Kind {get;init;}
   property string PolicyName {get;init;}
   property string Severity {get;init;}
+sealed class ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence : System.IEquatable<ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence>
+  ctor(int SchemaVersion, string Kind, string ContextDigest, string ContractId, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PublicApiSnapshotEntry> Entries)
+  field const int CurrentSchemaVersion = 1
+  field const string EvidenceKind = "architecture-public-api-live-evidence"
+  method ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence <Clone>$()
+  method bool Equals(ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int SchemaVersion, out string Kind, out string ContextDigest, out string ContractId, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PublicApiSnapshotEntry> Entries)
+  operator !=(ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence? left, ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence? right)
+  operator ==(ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence? left, ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PublicApiSnapshotEntry> Entries {get;init;}
+  property int SchemaVersion {get;init;}
+  property string ContextDigest {get;init;}
+  property string ContractId {get;init;}
+  property string Kind {get;init;}
 sealed class ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval : System.IEquatable<ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval>
   ctor(int SchemaVersion, string Kind, string BaseContextDigest, string CurrentContextDigest, string ContractId, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PublicApiSnapshotEntry> Added)
   field const int CurrentSchemaVersion = 1
@@ -6471,6 +6489,7 @@ static class ArchLinterNet.Core.Validation.ArchitectureBaselineService
   method static ArchLinterNet.Core.Validation.BaselineGenerationOutcome Generate(ArchLinterNet.Core.Validation.BaselineGenerationRequest request)
 sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService : ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService
   ctor(ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService baselineService)
+  ctor(ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService baselineService, ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService? publicApiService)
   method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
   method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot snapshot)
 sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation>

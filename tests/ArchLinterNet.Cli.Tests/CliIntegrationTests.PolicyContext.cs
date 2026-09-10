@@ -147,7 +147,7 @@ public partial class CliIntegrationTests
                 Assert.That(exitCode, Is.EqualTo(2));
                 Assert.That(stderr, Is.Empty);
                 Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("command_error"));
-                Assert.That(document.RootElement.GetProperty("message").GetString(), Does.Contain("does not exist"));
+                Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain("does not exist"));
             });
         }
         finally
