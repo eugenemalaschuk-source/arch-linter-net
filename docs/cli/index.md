@@ -131,7 +131,7 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 <!-- cli-command: policy weakening -->
 
-| `arch-linter-net policy weakening --base-context <path> --current-context <path>` | Compare exported contexts for typed policy relaxations. |
+| `arch-linter-net policy weakening --base-context <path> --current-context <path> [--public-api-approval <path>]` | Compare exported contexts for typed policy relaxations, with optional exact reviewed public-API addition approval. |
 
 <!-- cli-command: public-api -->
 
@@ -264,10 +264,13 @@ Base/current weakening review:
 ```bash
 arch-linter-net policy weakening \
   --base-context base-policy.json \
-  --current-context current-policy.json
+  --current-context current-policy.json \
+  --public-api-approval reviewed-api-additions.json
 ```
 
 `policy weakening` compares exported contexts. It is a bounded change-time guardrail, not a second architecture evaluator; `impact_not_proven` means review is required.
+
+`--public-api-approval` is optional and fail-closed. Its JSON root is an array of approvals; each approval binds `schema_version: 1`, `kind: "architecture-public-api-addition-approval"`, the exact base/current context digests, a `public_api_surface` contract id, and the complete `added` snapshot entries. When approvals are supplied, `policy weakening` captures the current CLR API from `--policy` and requires it to match the current reviewed snapshot. The approval is accepted only for an unchanged `exact` or `additions_only` contract whose canonical base-snapshot-to-live-CLR delta has precisely those additions and no removals or signature changes. It cannot approve selector, inventory, or comparison-mode changes.
 
 ## Baseline workflow
 
@@ -292,7 +295,7 @@ arch-linter-net gate \
   --ensure-built
 ```
 
-`gate` can also consume exported base/current policy contexts so CI catches both new findings and error-severity policy weakening.
+`gate` can also consume exported base/current policy contexts and the same optional `--public-api-approval` artifact, so CI catches both new findings and error-severity policy weakening without bypassing reviewed public-API changes.
 
 ## Architecture health
 

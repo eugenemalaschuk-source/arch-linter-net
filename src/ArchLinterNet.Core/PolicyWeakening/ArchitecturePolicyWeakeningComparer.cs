@@ -45,6 +45,8 @@ public static class ArchitecturePolicyWeakeningComparer
             request.CurrentContext.Guardrails.PolicyWeakening,
             findings);
         ArchitecturePolicyWeakeningSelectorEvaluator.Evaluate(request, findings);
+        List<ArchitectureApprovedPublicApiAddition> approvedPublicApiAdditions = new();
+        ArchitecturePolicyWeakeningPublicApiApprovalEvaluator.Evaluate(request, findings, approvedPublicApiAdditions);
 
         return new ArchitecturePolicyWeakeningResult(
             ArchitecturePolicyWeakeningResult.CurrentSchemaVersion,
@@ -58,6 +60,11 @@ public static class ArchitecturePolicyWeakeningComparer
                 .OrderBy(finding => finding.Kind, _comparer)
                 .ThenBy(finding => finding.ControlIdentity, _comparer)
                 .ThenBy(finding => finding.Identity, _comparer)
-                .ToArray());
+                .ToArray())
+        {
+            ApprovedPublicApiAdditions = approvedPublicApiAdditions
+                .OrderBy(approval => approval.ContractId, _comparer)
+                .ToArray(),
+        };
     }
 }

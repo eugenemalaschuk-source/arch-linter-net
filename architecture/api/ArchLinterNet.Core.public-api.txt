@@ -375,6 +375,7 @@ class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfSco
 class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector [sealed]
 class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue [sealed]
 class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver [sealed]
+class ArchLinterNet.Core.PolicyWeakening.ArchitectureApprovedPublicApiAddition [sealed]
 class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership [sealed]
 class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence [sealed]
 class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningComparer [static]
@@ -382,6 +383,8 @@ class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFinding [sea
 class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFormatter [static]
 class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningRequest [sealed]
 class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult [sealed]
+class ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence [sealed]
+class ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval [sealed]
 class ArchLinterNet.Core.Profiling.AnalysisProfile [sealed]
 class ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions [sealed]
 class ArchLinterNet.Core.Profiling.AnalysisProfileBuilder [static]
@@ -790,6 +793,10 @@ const ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence.Cu
 const ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence.EvidenceKind: System.String [value:"architecture-policy-membership"]
 const ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.CurrentSchemaVersion: System.Int32 [value:1]
 const ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.ResultKind: System.String [value:"architecture-policy-weakening"]
+const ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence.CurrentSchemaVersion: System.Int32 [value:1]
+const ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence.EvidenceKind: System.String [value:"architecture-public-api-live-evidence"]
+const ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval.ApprovalKind: System.String [value:"architecture-public-api-addition-approval"]
+const ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval.CurrentSchemaVersion: System.Int32 [value:1]
 const ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus.Cancelled: ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus [value:3]
 const ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus.PreparationFailure: ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus [value:2]
 const ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus.Success: ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus [value:0]
@@ -1164,11 +1171,14 @@ ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScop
 ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector(System.String, System.String, System.String, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance)
 ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue(System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver(System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance)
+ctor ArchLinterNet.Core.PolicyWeakening.ArchitectureApprovedPublicApiAddition(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.PublicApiSnapshotEntry])
 ctor ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership(System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence(System.Int32, System.String, System.String, System.Boolean, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership])
 ctor ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFinding(System.String, System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance, System.Collections.Generic.IReadOnlyList`1[System.String], System.String)
 ctor ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningRequest(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport, ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence, ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence)
 ctor ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult(System.Int32, System.String, System.String, System.Int32, System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFinding])
+ctor ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence(System.Int32, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.PublicApiSnapshotEntry])
+ctor ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval(System.Int32, System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.PublicApiSnapshotEntry])
 ctor ArchLinterNet.Core.Profiling.AnalysisProfile()
 ctor ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions()
 ctor ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters()
@@ -1243,6 +1253,7 @@ ctor ArchLinterNet.Core.Validation.AnalysisSnapshotRequest()
 ctor ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters()
 ctor ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService(ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractExecutor, ArchLinterNet.Core.Contracts.Abstractions.IArchitectureBaselineGenerator, ArchLinterNet.Core.Contracts.Abstractions.IArchitectureBaselineLoadingService, ArchLinterNet.Core.BuildState.IBuildStatePreparationService)
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService(ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService)
+ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService(ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService, ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService)
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation(System.Boolean, System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic])
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome(System.Boolean, System.Boolean, ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation, ArchLinterNet.Core.Validation.BaselineVerifyOutcome)
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest()
@@ -1762,6 +1773,7 @@ method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextFormatter.Forma
 method ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningComparer.Compare(ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningRequest): ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult [static]
 method ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport): System.String [static]
 method ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFormatter.DeserializeContext(System.String): ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport [static]
+method ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFormatter.DeserializePublicApiApprovals(System.String): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval] [static]
 method ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFormatter.FormatAsHuman(ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult): System.String [static]
 method ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFormatter.FormatAsJson(ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult): System.String [static]
 method ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFormatter.FormatAsSarif(ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult): System.String [static]
@@ -4010,6 +4022,11 @@ property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver.Proven
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver.Reason: System.String [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver.TargetFingerprint: System.String [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver.WaiverId: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitectureApprovedPublicApiAddition.Added: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.PublicApiSnapshotEntry] [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitectureApprovedPublicApiAddition.BaseContextDigest: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitectureApprovedPublicApiAddition.ComparisonMode: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitectureApprovedPublicApiAddition.ContractId: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitectureApprovedPublicApiAddition.CurrentContextDigest: System.String [get, init]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership.Family: System.String [get, init]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership.Id: System.String [get, init]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership.Subjects: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
@@ -4033,6 +4050,9 @@ property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningRequest.B
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningRequest.BaseMembership: ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence [get, init]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningRequest.CurrentContext: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport [get, init]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningRequest.CurrentMembership: ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningRequest.PublicApiApprovals: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval] [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningRequest.PublicApiLiveEvidence: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence] [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.ApprovedPublicApiAdditions: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyWeakening.ArchitectureApprovedPublicApiAddition] [get, init]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.Findings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningFinding] [get, init]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.HasErrors: System.Boolean [get]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.Kind: System.String [get, init]
@@ -4040,6 +4060,17 @@ property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.Po
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.PolicyVersion: System.Int32 [get, init]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.SchemaVersion: System.Int32 [get, init]
 property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.Severity: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence.ContextDigest: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence.ContractId: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence.Entries: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.PublicApiSnapshotEntry] [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence.Kind: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiLiveEvidence.SchemaVersion: System.Int32 [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval.Added: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.PublicApiSnapshotEntry] [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval.BaseContextDigest: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval.ContractId: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval.CurrentContextDigest: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval.Kind: System.String [get, init]
+property ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval.SchemaVersion: System.Int32 [get, init]
 property ArchLinterNet.Core.Profiling.AnalysisProfile.CancellationObserved: System.Boolean [get, init]
 property ArchLinterNet.Core.Profiling.AnalysisProfile.CompletionStatus: ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus [get, init]
 property ArchLinterNet.Core.Profiling.AnalysisProfile.Counters: ArchLinterNet.Core.Profiling.AnalysisProfileCounters [get, init]
@@ -4476,6 +4507,7 @@ property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.Mode: System.
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.NoRestore: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.PolicyPath: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.PreparationMode: ArchLinterNet.Core.BuildState.BuildPreparationMode [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.PublicApiWeakeningApprovals: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyWeakening.ArchitecturePublicApiWeakeningApproval] [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedConfiguration: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedPlatform: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedRuntimeIdentifier: System.String [get, init]
