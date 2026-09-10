@@ -12,12 +12,12 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
     public void Compare_ReviewedPublicApiAddition_WithMatchingLiveEvidence_IsAcceptedAndReported(string comparisonMode)
     {
         (ArchitecturePolicyContextExport baseline, ArchitecturePolicyContextExport current) = Contexts(comparisonMode);
-        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", NewApi);
+        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", _newApi);
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)
         {
             PublicApiApprovals = [approval],
-            PublicApiLiveEvidence = [LiveEvidence(current, "api", ExistingApi, NewApi)],
+            PublicApiLiveEvidence = [LiveEvidence(current, "api", _existingApi, _newApi)],
         });
 
         Assert.Multiple(() =>
@@ -34,12 +34,12 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
     public void Compare_HandEditedSnapshotWithoutMatchingLiveApi_RemainsBlocking()
     {
         (ArchitecturePolicyContextExport baseline, ArchitecturePolicyContextExport current) = Contexts("additions_only");
-        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", NewApi);
+        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", _newApi);
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)
         {
             PublicApiApprovals = [approval],
-            PublicApiLiveEvidence = [LiveEvidence(current, "api", ExistingApi)],
+            PublicApiLiveEvidence = [LiveEvidence(current, "api", _existingApi)],
         });
 
         Assert.That(result.Findings.Select(finding => finding.ControlIdentity), Does.Contain("public_api_surface:api:resolved_snapshot_entries"));
@@ -49,13 +49,13 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
     public void Compare_AccidentalLivePublicApiExportOutsideApprovedDelta_RemainsBlocking()
     {
         (ArchitecturePolicyContextExport baseline, ArchitecturePolicyContextExport current) = Contexts("additions_only");
-        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", NewApi);
+        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", _newApi);
         PublicApiSnapshotEntry accidentalApi = new("Sample", "class Sample.AccidentalApi");
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)
         {
             PublicApiApprovals = [approval],
-            PublicApiLiveEvidence = [LiveEvidence(current, "api", ExistingApi, NewApi, accidentalApi)],
+            PublicApiLiveEvidence = [LiveEvidence(current, "api", _existingApi, _newApi, accidentalApi)],
         });
 
         Assert.That(result.Findings, Is.Not.Empty);
@@ -65,7 +65,7 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
     public void Compare_ApprovalWithWrongContextDigest_RemainsBlocking()
     {
         (ArchitecturePolicyContextExport baseline, ArchitecturePolicyContextExport current) = Contexts("exact");
-        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", NewApi) with
+        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", _newApi) with
         {
             CurrentContextDigest = "wrong",
         };
@@ -73,7 +73,7 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)
         {
             PublicApiApprovals = [approval],
-            PublicApiLiveEvidence = [LiveEvidence(current, "api", ExistingApi, NewApi)],
+            PublicApiLiveEvidence = [LiveEvidence(current, "api", _existingApi, _newApi)],
         });
 
         Assert.That(result.Findings, Is.Not.Empty);
@@ -83,12 +83,12 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
     public void Compare_ApprovalForAnotherContract_RemainsBlocking()
     {
         (ArchitecturePolicyContextExport baseline, ArchitecturePolicyContextExport current) = Contexts("exact");
-        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "other-api", NewApi);
+        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "other-api", _newApi);
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)
         {
             PublicApiApprovals = [approval],
-            PublicApiLiveEvidence = [LiveEvidence(current, "other-api", ExistingApi, NewApi)],
+            PublicApiLiveEvidence = [LiveEvidence(current, "other-api", _existingApi, _newApi)],
         });
 
         Assert.That(result.Findings, Is.Not.Empty);
@@ -99,13 +99,13 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
     {
         ArchitecturePolicyContextExport baseline = Context(contracts:
         [
-            Contract("strict", "public_api_surface", "api", [Fact("api_comparison", "exact"), Snapshot(ExistingApi)]),
+            Contract("strict", "public_api_surface", "api", [Fact("api_comparison", "exact"), Snapshot(_existingApi)]),
         ]);
         ArchitecturePolicyContextExport current = Context(contracts:
         [
             Contract("strict", "public_api_surface", "api", [Fact("api_comparison", "exact"), Snapshot()]),
         ]);
-        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", NewApi);
+        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", _newApi);
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)
         {
@@ -123,19 +123,19 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
             "exact",
             FactItems("surface_selector", Fact("role", "Reviewed")),
             FactItems("surface_selector", Fact("role", "Exported")));
-        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", NewApi);
+        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api", _newApi);
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)
         {
             PublicApiApprovals = [approval],
-            PublicApiLiveEvidence = [LiveEvidence(current, "api", ExistingApi, NewApi)],
+            PublicApiLiveEvidence = [LiveEvidence(current, "api", _existingApi, _newApi)],
         });
 
         Assert.That(result.Findings, Is.Not.Empty);
     }
 
-    private static readonly PublicApiSnapshotEntry ExistingApi = new("Sample", "class Sample.Api");
-    private static readonly PublicApiSnapshotEntry NewApi = new("Sample", "class Sample.NewApi");
+    private static readonly PublicApiSnapshotEntry _existingApi = new("Sample", "class Sample.Api");
+    private static readonly PublicApiSnapshotEntry _newApi = new("Sample", "class Sample.NewApi");
 
     private static (ArchitecturePolicyContextExport Baseline, ArchitecturePolicyContextExport Current) Contexts(
         string comparisonMode,
@@ -145,10 +145,10 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
         ArchitecturePolicyContextContractFact[] baseSelectors = baseSelector is null ? [] : [baseSelector];
         ArchitecturePolicyContextContractFact[] currentSelectors = currentSelector is null ? [] : [currentSelector];
         ArchitecturePolicyContextContractFact[] baseFacts = [
-            Fact("api_comparison", comparisonMode), Snapshot(ExistingApi), ..baseSelectors,
+            Fact("api_comparison", comparisonMode), Snapshot(_existingApi), ..baseSelectors,
         ];
         ArchitecturePolicyContextContractFact[] currentFacts = [
-            Fact("api_comparison", comparisonMode), Snapshot(ExistingApi, NewApi), ..currentSelectors,
+            Fact("api_comparison", comparisonMode), Snapshot(_existingApi, _newApi), ..currentSelectors,
         ];
         return (Context(contracts: [Contract("strict", "public_api_surface", "api", baseFacts)]),
             Context(contracts: [Contract("strict", "public_api_surface", "api", currentFacts)]));
