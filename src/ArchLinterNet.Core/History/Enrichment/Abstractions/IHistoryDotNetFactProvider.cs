@@ -6,10 +6,3 @@ internal interface IHistoryDotNetFactProvider
 {
     HistoryDotNetFactMaterialization Materialize(string repositoryPath, string resolvedTo, string policyPath);
 }
-
-internal sealed class HistoryDotNetFactMaterialization(
-    IReadOnlyDictionary<string, IReadOnlyList<HistoryDotNetTypeContext>> typesByCanonicalPath)
-{
-    public IReadOnlyDictionary<string, IReadOnlyList<HistoryDotNetTypeContext>> TypesByCanonicalPath { get; } =
-        typesByCanonicalPath;
-}
