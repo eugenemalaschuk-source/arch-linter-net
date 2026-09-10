@@ -12,8 +12,6 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureDebtGateApplicationServiceTests
 {
-    private static readonly string[] _persistentDebtAndPolicyWeakeningSections = ["persistent_debt", "policy_weakening"];
-
     [Test]
     public void Evaluate_ErrorSeverityWeakeningFailsGateWhileMatchedDebtRemainsSeparate()
     {
@@ -137,10 +135,22 @@ public sealed class ArchitectureDebtGateApplicationServiceTests
                 BaselinePath = "baseline.yml",
                 BasePolicyContext = Context("strict", "warn"),
                 CurrentPolicyContext = Context("audit", "warn"),
-            }).PolicyWeakening,
+            }).PolicyWeakening! with
+            {
+                ApprovedPublicApiAdditions =
+                [
+                    new ArchitectureApprovedPublicApiAddition(
+                        "api",
+                        "base-digest",
+                        "current-digest",
+                        "exact",
+                        [new PublicApiSnapshotEntry("Sample", "class Sample.Api")]),
+                ],
+            },
             PolicyWeakeningRequested = true,
         };
 
+        string human = ArchitectureDebtGateFormatter.FormatAsHuman(outcome);
         using JsonDocument json = JsonDocument.Parse(ArchitectureDebtGateFormatter.FormatAsJson(outcome));
         using JsonDocument sarif = JsonDocument.Parse(ArchitectureDebtGateFormatter.FormatAsSarif(outcome, "1.0.0"));
         JsonElement persistentProperties = sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
@@ -156,9 +166,15 @@ public sealed class ArchitectureDebtGateApplicationServiceTests
                 .GetProperty("status").GetString(), Is.EqualTo("new"));
             Assert.That(json.RootElement.GetProperty("policy_weakening").GetProperty("findings")[0]
                 .GetProperty("classification").GetString(), Is.EqualTo("semantic"));
+            Assert.That(json.RootElement.GetProperty("policy_weakening").GetProperty("approved_public_api_additions")[0]
+                .GetProperty("ContractId").GetString(), Is.EqualTo("api"));
+            Assert.That(human, Does.Contain("[approved_public_api_addition] api (exact)"));
             Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
                 .EnumerateArray().Select(result => result.GetProperty("properties").GetProperty("gate_section").GetString()),
-                Is.EquivalentTo(_persistentDebtAndPolicyWeakeningSections));
+                Does.Contain("persistent_debt").And.Contain("policy_weakening"));
+            Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
+                .EnumerateArray().Select(result => result.GetProperty("ruleId").GetString()),
+                Does.Contain("ArchLinterNet.DebtGate.PolicyWeakening.ApprovedPublicApiAddition"));
             Assert.That(persistentProperties.GetProperty("identity_version").GetInt32(), Is.EqualTo(1));
             Assert.That(persistentProperties.GetProperty("source_assembly").GetString(), Is.EqualTo("Sample.Application"));
             Assert.That(persistentProperties.GetProperty("target_assembly").GetString(), Is.EqualTo("Sample.Infrastructure"));
