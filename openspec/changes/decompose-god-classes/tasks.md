@@ -42,6 +42,10 @@
   - [x] Move the 24 frozen Core Model audit-layout identities into the existing `Models` source
     directory without changing namespaces, API, schema, or policy; retain a focused negative
     regression for a record outside that directory (#819).
+  - [x] Move the three frozen History audit-layout identities to their existing nested
+    `Exceptions`/`Abstractions` conventions without changing namespaces, API, serialization,
+    evidence, or deterministic output; retain focused negative regressions for exceptions and
+    interfaces outside those folders (#820).
   - [x] Extract `ArchitectureSourceFileFactIndex` bounded source traversal and its parallel partition
     seam into `ArchitectureSourceFileFactTraversal`, retaining one lazy/cached facade, deterministic
     merge and cancellation behavior, and rejecting enumerated paths outside configured source roots (#810).

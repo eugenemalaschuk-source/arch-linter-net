@@ -166,6 +166,24 @@ internal static class SelfPolicyRepository
         return path;
     }
 
+    /// <summary>
+    /// Writes a throwaway source declaration under History Enrichment outside its nested
+    /// <c>Exceptions</c> and <c>Abstractions</c> directories, so recursive layout controls run
+    /// against the same production source universe they govern.
+    /// </summary>
+    public static string WriteMutatedHistoryEnrichmentSource(string repositoryRoot, string content)
+    {
+        string path = Path.Combine(
+            repositoryRoot,
+            "src",
+            "ArchLinterNet.Core",
+            "History",
+            "Enrichment",
+            $"{MutationPrefix}{Guid.NewGuid():N}.cs");
+        File.WriteAllText(path, content);
+        return path;
+    }
+
     /// <summary>Repository-relative path with forward slashes, as the policy declares them.</summary>
     public static string RelativePolicyPath(string repositoryRoot, string absolutePath) =>
         Path.GetRelativePath(repositoryRoot, absolutePath).Replace('\\', '/');
@@ -179,6 +197,7 @@ internal static class SelfPolicyRepository
                      Path.Combine(repositoryRoot, "src", "ArchLinterNet.Core", "Reporting"),
                      Path.Combine(repositoryRoot, "src", "ArchLinterNet.Core", "Scanning"),
                      Path.Combine(repositoryRoot, "src", "ArchLinterNet.Core", "Model"),
+                     Path.Combine(repositoryRoot, "src", "ArchLinterNet.Core", "History", "Enrichment"),
                  })
         {
             if (!Directory.Exists(directory))
