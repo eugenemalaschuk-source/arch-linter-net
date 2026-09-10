@@ -84,7 +84,7 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
                 currentContext)
             {
                 PublicApiApprovals = approvals,
-                PublicApiLiveEvidence = CaptureLiveEvidence(runtime, options.PolicyPath!, currentContext, approvals),
+                PublicApiLiveEvidence = CaptureLiveEvidence(runtime.CapturePublicApi, options.PolicyPath!, currentContext, approvals),
             });
             console.Out.WriteLine(options.Format switch
             {
@@ -105,8 +105,8 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
         }
     }
 
-    private static IReadOnlyList<ArchitecturePublicApiLiveEvidence> CaptureLiveEvidence(
-        ICliRuntime runtime,
+    internal static List<ArchitecturePublicApiLiveEvidence> CaptureLiveEvidence(
+        Func<PublicApiCaptureRequest, PublicApiCaptureOutcome> capturePublicApi,
         string policyPath,
         ArchitecturePolicyContextExport currentContext,
         IReadOnlyList<ArchitecturePublicApiWeakeningApproval> approvals)
@@ -120,7 +120,7 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
         List<ArchitecturePublicApiLiveEvidence> evidence = new();
         foreach (ArchitecturePublicApiWeakeningApproval approval in approvals)
         {
-            PublicApiCaptureOutcome capture = runtime.CapturePublicApi(new PublicApiCaptureRequest
+            PublicApiCaptureOutcome capture = capturePublicApi(new PublicApiCaptureRequest
             {
                 PolicyPath = policyPath,
                 ContractId = approval.ContractId,
