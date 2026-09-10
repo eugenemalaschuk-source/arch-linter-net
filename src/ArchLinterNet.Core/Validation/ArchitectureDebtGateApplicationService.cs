@@ -37,6 +37,13 @@ public sealed class ArchitectureDebtGateApplicationService(
                 nameof(request));
         }
 
+        if (request.PublicApiWeakeningApprovals is { Count: > 0 } && !hasBaseContext)
+        {
+            throw new ArgumentException(
+                "Public API weakening approvals require both base and current policy contexts.",
+                nameof(request));
+        }
+
         var baselineRequest = new BaselineVerifyRequest
         {
             PolicyPath = request.PolicyPath,
@@ -58,7 +65,10 @@ public sealed class ArchitectureDebtGateApplicationService(
 
         ArchitecturePolicyWeakeningResult? weakening = hasBaseContext
             ? ArchitecturePolicyWeakeningComparer.Compare(new ArchitecturePolicyWeakeningRequest(
-                request.BasePolicyContext!, request.CurrentPolicyContext!))
+                request.BasePolicyContext!, request.CurrentPolicyContext!)
+            {
+                PublicApiApprovals = request.PublicApiWeakeningApprovals ?? [],
+            })
             : null;
         bool passed = persistentDebt.Succeeded
             && persistentDebt.InSync

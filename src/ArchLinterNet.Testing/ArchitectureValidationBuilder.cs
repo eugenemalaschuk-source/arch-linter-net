@@ -20,6 +20,7 @@ public sealed class ArchitectureValidationBuilder
     private string? _baselinePath;
     private string? _basePolicyContextPath;
     private string? _currentPolicyContextPath;
+    private string? _publicApiApprovalPath;
     private bool _enforceUnmatchedIgnoredViolationsPolicy;
     private bool _collectTimings;
     private bool _collectProfile;
@@ -71,6 +72,13 @@ public sealed class ArchitectureValidationBuilder
     {
         _basePolicyContextPath = baseContextPath;
         _currentPolicyContextPath = currentContextPath;
+        return this;
+    }
+
+    /// <summary>Binds exact reviewed public API addition approvals to policy-weakening evaluation.</summary>
+    public ArchitectureValidationBuilder WithPolicyWeakeningPublicApiApprovals(string approvalPath)
+    {
+        _publicApiApprovalPath = approvalPath;
         return this;
     }
 
@@ -213,6 +221,9 @@ public sealed class ArchitectureValidationBuilder
             CurrentPolicyContext = _currentPolicyContextPath is null
                 ? null
                 : ArchitecturePolicyWeakeningFormatter.DeserializeContext(File.ReadAllText(_currentPolicyContextPath)),
+            PublicApiWeakeningApprovals = _publicApiApprovalPath is null
+                ? null
+                : ArchitecturePolicyWeakeningFormatter.DeserializePublicApiApprovals(File.ReadAllText(_publicApiApprovalPath)),
             PreparationMode = _preparationMode,
             NoRestore = _noRestore,
             RequestedConfiguration = _requestedConfiguration,
@@ -241,6 +252,9 @@ public sealed class ArchitectureValidationBuilder
                 CurrentPolicyContext = _currentPolicyContextPath is null
                     ? null
                     : ArchitecturePolicyWeakeningFormatter.DeserializeContext(File.ReadAllText(_currentPolicyContextPath)),
+                PublicApiWeakeningApprovals = _publicApiApprovalPath is null
+                    ? null
+                    : ArchitecturePolicyWeakeningFormatter.DeserializePublicApiApprovals(File.ReadAllText(_publicApiApprovalPath)),
                 PreparationMode = _preparationMode,
                 NoRestore = _noRestore,
                 RequestedConfiguration = _requestedConfiguration,

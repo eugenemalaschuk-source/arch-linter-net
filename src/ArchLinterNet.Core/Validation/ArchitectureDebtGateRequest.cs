@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.PolicyContext;
+using ArchLinterNet.Core.PolicyWeakening;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -21,6 +22,9 @@ public sealed record ArchitectureDebtGateRequest
 
     /// <summary>Optional current effective-policy context. Must be supplied with <see cref="BasePolicyContext"/>.</summary>
     public ArchitecturePolicyContextExport? CurrentPolicyContext { get; init; }
+
+    /// <summary>Optional exact approvals for reviewed public API additions.</summary>
+    public IReadOnlyList<ArchitecturePublicApiWeakeningApproval>? PublicApiWeakeningApprovals { get; init; }
 
     public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
 

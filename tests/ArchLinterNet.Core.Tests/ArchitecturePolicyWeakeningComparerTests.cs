@@ -706,6 +706,46 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
         id,
         [new ArchitecturePolicyContextContractFact("surface_selector", [], [Fact("role", role)])]);
 
+    [Test]
+    public void Compare_ExactReviewedPublicApiAddition_WithBoundApproval_IsAcceptedAndReported()
+    {
+        ArchitecturePolicyContextExport baseline = Context(contracts:
+        [
+            Contract("strict", "public_api_surface", "api", [
+                Fact("api_comparison", "exact"),
+                FactItems("resolved_snapshot_entries", FactItems("entry", Fact("assembly", "Sample"), Fact("signature", "class Sample.Api"))),
+            ]),
+        ]);
+        ArchitecturePolicyContextExport current = Context(contracts:
+        [
+            Contract("strict", "public_api_surface", "api", [
+                Fact("api_comparison", "exact"),
+                FactItems("resolved_snapshot_entries",
+                    FactItems("entry", Fact("assembly", "Sample"), Fact("signature", "class Sample.Api")),
+                    FactItems("entry", Fact("assembly", "Sample"), Fact("signature", "class Sample.NewApi"))),
+            ]),
+        ]);
+        ArchitecturePublicApiWeakeningApproval approval = new(
+            ArchitecturePublicApiWeakeningApproval.CurrentSchemaVersion,
+            ArchitecturePublicApiWeakeningApproval.ApprovalKind,
+            ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(baseline),
+            ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(current),
+            "api",
+            [new("Sample", "class Sample.NewApi")]);
+
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)
+        {
+            PublicApiApprovals = [approval],
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Findings, Is.Empty);
+            Assert.That(result.ApprovedPublicApiAdditions.Single().ContractId, Is.EqualTo("api"));
+            Assert.That(result.ApprovedPublicApiAdditions.Single().Added, Is.EqualTo(approval.Added));
+        });
+    }
+
     private static ArchitecturePolicyContextContractFact Fact(string name, params string[] values) => new(name, values, []);
 
     private static ArchitecturePolicyContextContractFact FactItems(

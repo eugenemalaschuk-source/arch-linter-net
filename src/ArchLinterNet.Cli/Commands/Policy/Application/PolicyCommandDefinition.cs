@@ -69,6 +69,7 @@ internal sealed class PolicyCommandDefinition(
         Command weakening = new("weakening");
         Option<string> baseContextOption = new("--base-context");
         Option<string> currentContextOption = new("--current-context");
+        Option<string> publicApiApprovalOption = new("--public-api-approval");
         Option<string> weakeningFormatOption = new("--format");
         weakeningFormatOption.Aliases.Add("-f");
         weakeningFormatOption.DefaultValueFactory = _ => HumanFormat;
@@ -77,13 +78,15 @@ internal sealed class PolicyCommandDefinition(
 
         weakening.Options.Add(baseContextOption);
         weakening.Options.Add(currentContextOption);
+        weakening.Options.Add(publicApiApprovalOption);
         weakening.Options.Add(weakeningFormatOption);
         weakening.Options.Add(weakeningHelpOption);
         weakening.SetAction(parseResult => weakeningHandler.Execute(new PolicyWeakeningCommandOptions(
             parseResult.GetValue(baseContextOption) ?? string.Empty,
             parseResult.GetValue(currentContextOption) ?? string.Empty,
             parseResult.GetValue(weakeningFormatOption) ?? HumanFormat,
-            parseResult.GetValue(weakeningHelpOption))));
+            parseResult.GetValue(weakeningHelpOption),
+            parseResult.GetValue(publicApiApprovalOption))));
 
         policy.Subcommands.Add(check);
         policy.Subcommands.Add(context);

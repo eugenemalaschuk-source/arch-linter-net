@@ -22,6 +22,7 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
         Options:
           --base-context <path>     JSON policy context from the base state
           --current-context <path>  JSON policy context from the current state
+          --public-api-approval <path> JSON approvals for exact reviewed API additions
           -f, --format <fmt>        Output format: human, json, or sarif (default: human)
           -h, --help                Show this help message
 
@@ -61,9 +62,19 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
 
         try
         {
+            if (options.PublicApiApprovalPath is not null && !fileSystem.FileExists(options.PublicApiApprovalPath))
+            {
+                throw new ArgumentException($"Public API approval artifact does not exist: {options.PublicApiApprovalPath}");
+            }
+
             ArchitecturePolicyWeakeningResult result = runtime.ComparePolicyWeakening(new ArchitecturePolicyWeakeningRequest(
                 ArchitecturePolicyWeakeningFormatter.DeserializeContext(fileSystem.ReadAllText(options.BaseContextPath)),
-                ArchitecturePolicyWeakeningFormatter.DeserializeContext(fileSystem.ReadAllText(options.CurrentContextPath))));
+                ArchitecturePolicyWeakeningFormatter.DeserializeContext(fileSystem.ReadAllText(options.CurrentContextPath)))
+            {
+                PublicApiApprovals = options.PublicApiApprovalPath is null
+                    ? []
+                    : ArchitecturePolicyWeakeningFormatter.DeserializePublicApiApprovals(fileSystem.ReadAllText(options.PublicApiApprovalPath)),
+            });
             console.Out.WriteLine(options.Format switch
             {
                 "json" => runtime.FormatPolicyWeakeningAsJson(result),

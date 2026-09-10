@@ -127,4 +127,35 @@ public partial class CliIntegrationTests
             File.Delete(temporaryPath);
         }
     }
+
+    [Test]
+    public void PolicyWeakening_MissingPublicApiApprovalArtifact_FailsClosed()
+    {
+        string temporaryPath = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-weakening-{Guid.NewGuid():N}.json");
+        string missingApprovalPath = temporaryPath + ".approval";
+        try
+        {
+            File.WriteAllText(temporaryPath, "{}");
+
+            var (exitCode, stdout, stderr) = RunCli(
+                "policy", "weakening", "--base-context", temporaryPath, "--current-context", temporaryPath,
+                "--public-api-approval", missingApprovalPath, "--format", "json");
+
+            using JsonDocument document = JsonDocument.Parse(stdout);
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(2));
+                Assert.That(stderr, Is.Empty);
+                Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("command_error"));
+                Assert.That(document.RootElement.GetProperty("message").GetString(), Does.Contain("does not exist"));
+            });
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
 }
