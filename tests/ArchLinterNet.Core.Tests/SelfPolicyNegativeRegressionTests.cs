@@ -375,6 +375,43 @@ public sealed class SelfPolicyNegativeRegressionTests
         });
     }
 
+    [Test]
+    public void HistoryLayoutRules_RejectAnExceptionAndInterfaceOutsideTheirConventionalDirectories()
+    {
+        const string ExceptionFixture = "SelfPolicyHistoryExceptionFixture";
+        const string InterfaceFixture = "ISelfPolicyHistoryFactProviderFixture";
+        string fixturePath = SelfPolicyRepository.WriteMutatedHistoryEnrichmentSource(
+            _repositoryRoot,
+            $"namespace ArchLinterNet.Core.History.Enrichment;\n\n" +
+            $"internal sealed class {ExceptionFixture} : Exception;\n\n" +
+            $"internal interface {InterfaceFixture}\n{{\n}}\n");
+        string fixtureRelativePath = SelfPolicyRepository.RelativePolicyPath(_repositoryRoot, fixturePath);
+
+        ArchitectureValidationResult result = ArchitectureAssertions
+            .FromPolicy(SelfPolicyRepository.PolicyPath(_repositoryRoot))
+            .WithContracts(
+                "exceptions-live-in-exceptions-directories",
+                "production-interfaces-live-in-abstractions")
+            .WithEnsureBuilt()
+            .ValidateAudit();
+
+        LayoutConventionDiagnostic exceptionFinding = FindLayoutFinding(
+            result,
+            "exceptions-live-in-exceptions-directories",
+            $"ArchLinterNet.Core.History.Enrichment.{ExceptionFixture}");
+        LayoutConventionDiagnostic interfaceFinding = FindLayoutFinding(
+            result,
+            "production-interfaces-live-in-abstractions",
+            $"ArchLinterNet.Core.History.Enrichment.{InterfaceFixture}");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Passed, Is.False, "Misplaced History types must fail audit validation.");
+            Assert.That(exceptionFinding.MatchedFilePath, Is.EqualTo(fixtureRelativePath));
+            Assert.That(interfaceFinding.MatchedFilePath, Is.EqualTo(fixtureRelativePath));
+        });
+    }
+
     // ── Reviewed public API lifecycle ───────────────────────────────────────
     [Test]
     public void PublicApiSurface_RejectsAnUnreviewedAdditionWithoutRewritingTheSnapshot()
@@ -556,4 +593,13 @@ public sealed class SelfPolicyNegativeRegressionTests
                 _renderedFindingJsonOptions)));
         Assert.That(rendered, Does.Contain(expectedEvidence));
     }
+
+    private static LayoutConventionDiagnostic FindLayoutFinding(
+        ArchitectureValidationResult result,
+        string contractId,
+        string sourceType) =>
+        (LayoutConventionDiagnostic)result.Findings.Single(finding =>
+            finding.ContractId == contractId
+            && finding.Details is LayoutConventionDiagnostic diagnostic
+            && diagnostic.SourceType == sourceType).Details;
 }

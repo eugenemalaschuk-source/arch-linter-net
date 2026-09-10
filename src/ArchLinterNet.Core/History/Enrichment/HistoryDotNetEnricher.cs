@@ -55,8 +55,3 @@ internal sealed class HistoryDotNetEnricher(IHistoryDotNetFactProvider? factProv
             file.CanonicalPath, HistoryDotNetFileEnrichmentStatus.Available, types);
     }
 }
-
-internal sealed class HistoryDotNetEnrichmentUnavailableException(string reason) : Exception(reason) // NOSONAR: internal control-flow signal never crosses the Core assembly boundary.
-{
-    public string Reason { get; } = reason;
-}
