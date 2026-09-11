@@ -119,6 +119,37 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect((await listDurableObjectIds(relay)).length).toBe(before);
   });
 
+  it("expires a ready public GET before conditional handling without a publisher or scheduler", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:00:00Z"));
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(alias));
+    const prepared = await prepareRemote(await token(), `public-read-${crypto.randomUUID()}`);
+    expect(prepared.response.status).toBe(201);
+    const digest = await canonicalPayloadDigest(payload);
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE relay_state SET status='ready', generation=7, payload=?, payload_digest=?, verified_at=?, valid_until=?, tombstoned=0 WHERE id=1",
+        payload,
+        digest,
+        "2026-09-12T10:00:00Z",
+        "2026-09-12T10:01:00Z");
+    });
+    const ready = await SELF.fetch(`https://relay.test/badge-relay/v1/${alias}`);
+    const etag = ready.headers.get("etag") as string;
+    expect(ready.status).toBe(200);
+    expect(await ready.text()).toBe(payload);
+
+    vi.setSystemTime(new Date("2026-09-12T10:01:00Z"));
+    const expired = await SELF.fetch(`https://relay.test/badge-relay/v1/${alias}`, {
+      headers: { "if-none-match": etag }
+    });
+    expect(expired.status).toBe(404);
+    expect(await expired.text()).toContain("UNASSESSABLE");
+    expect(expired.headers.get("etag")).toBeNull();
+    expect(expired.headers.get("cache-control")).toBe("no-store");
+  });
+
   it("persists private registry entries and tombstones across invocation eviction", async () => {
     const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
     const stub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));

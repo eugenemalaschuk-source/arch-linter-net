@@ -12,6 +12,7 @@ import {
 } from "./types";
 import { AuthorizationError, getBearerToken, isTrustedContext, sha256Hex, verifyOidcToken } from "./security";
 import { canonicalPayloadDigest, PayloadError, validateCanonicalPayload } from "./payload";
+import { readPublicRepresentation, type PublicRepresentation } from "./read";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 
@@ -231,6 +232,19 @@ export class RelayDurableObject {
     return genericError(status);
   }
 
+  private async read(request: Request, kind: PublicRepresentation): Promise<Response> {
+    // Public reads are strictly read-only. In particular, do not call
+    // ensureRegistered here: a registered alias may legitimately have no
+    // publication row yet, and a GET must not create or repair one.
+    let current: StateRow | undefined;
+    try {
+      current = this.sql.exec<StateRow>("SELECT * FROM relay_state WHERE id = 1").toArray()[0];
+    } catch {
+      return readPublicRepresentation(request, undefined, kind, true);
+    }
+    return readPublicRepresentation(request, current, kind);
+  }
+
   private async publish(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "publish" | "renew" | "recover", internalProof?: unknown): Promise<Response> {
     this.validateOperationBasics(body, operation);
     const profile = asProfile(body.profile);
@@ -307,7 +321,11 @@ export class RelayDurableObject {
       let entry: RegistryEntry;
       try { entry = JSON.parse(entryHeader) as RegistryEntry; } catch { return genericError(404); }
       const pathname = new URL(request.url).pathname;
-      const operation = pathname.split("/").filter(Boolean).at(-1) ?? "";
+      const pathParts = pathname.split("/").filter(Boolean);
+      const operation = pathParts.at(-1) ?? "";
+      if ((request.method === "GET" || request.method === "HEAD") && pathParts.at(-2) === "read" && (operation === "json" || operation === "svg")) {
+        return await this.read(request, operation);
+      }
       this.ensureRegistered(entry);
       if (request.method !== "POST") return genericError(404);
       const body = await readBoundedJson(request);

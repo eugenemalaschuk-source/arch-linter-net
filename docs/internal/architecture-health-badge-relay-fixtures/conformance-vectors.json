@@ -19,14 +19,18 @@
         "public_response": {
           "state": "ready",
           "profile": "headline-only/v1",
+          "representation": "json",
           "payload": {
             "schemaVersion": 1,
             "label": "architecture",
             "message": "PASS · HEALTHY · 0 ignores · 42 rules",
             "color": "brightgreen"
           },
+          "body": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}",
           "headers": {
             "status": 200,
+            "content_type": "application/json; charset=utf-8",
+            "x_content_type_options": "nosniff",
             "cache_control": "public, max-age=2700, must-revalidate",
             "etag": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\""
           }
@@ -49,6 +53,7 @@
         "public_response": {
           "state": "ready",
           "profile": "headline-plus-freshness/v1",
+          "representation": "json",
           "payload": {
             "schemaVersion": 1,
             "label": "architecture",
@@ -56,6 +61,13 @@
             "color": "brightgreen",
             "verified_at": "2026-09-09T10:00:00Z",
             "valid_until": "2026-09-09T11:00:00Z"
+          },
+          "body": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\",\"verified_at\":\"2026-09-09T10:00:00Z\",\"valid_until\":\"2026-09-09T11:00:00Z\"}",
+          "headers": {
+            "status": 200,
+            "content_type": "application/json; charset=utf-8",
+            "x_content_type_options": "nosniff",
+            "cache_control": "public, max-age=3600, must-revalidate"
           }
         }
       }
@@ -732,6 +744,8 @@
         "operation": "read",
         "now": "2026-09-09T11:01:00Z",
         "publisher_running": false,
+        "scheduler_running": false,
+        "publish_or_renew_attempts": 0,
         "stored_state": "ready",
         "verified_at": "2026-09-09T10:00:00Z",
         "valid_until": "2026-09-09T11:00:00Z"
@@ -743,6 +757,7 @@
         "public_response": {
           "state": "expired",
           "profile": "headline-only/v1",
+          "representation": "json",
           "payload": {
             "schemaVersion": 1,
             "label": "architecture",
@@ -751,6 +766,8 @@
           },
           "headers": {
             "status": 404,
+            "content_type": "application/json; charset=utf-8",
+            "x_content_type_options": "nosniff",
             "cache_control": "no-store"
           }
         }
@@ -914,6 +931,7 @@
         "public_response": {
           "state": "ready",
           "profile": "headline-only/v1",
+          "representation": "json",
           "payload": {
             "schemaVersion": 1,
             "label": "architecture",
@@ -922,6 +940,8 @@
           },
           "headers": {
             "status": 200,
+            "content_type": "application/json; charset=utf-8",
+            "x_content_type_options": "nosniff",
             "cache_control": "public, max-age=2700, must-revalidate",
             "etag": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\""
           }
@@ -945,6 +965,7 @@
         "public_response": {
           "state": "expired",
           "profile": "headline-only/v1",
+          "representation": "json",
           "payload": {
             "schemaVersion": 1,
             "label": "architecture",
@@ -953,6 +974,8 @@
           },
           "headers": {
             "status": 404,
+            "content_type": "application/json; charset=utf-8",
+            "x_content_type_options": "nosniff",
             "cache_control": "no-store"
           }
         }
@@ -975,6 +998,7 @@
         "public_response": {
           "state": "expired",
           "profile": "headline-only/v1",
+          "representation": "json",
           "payload": {
             "schemaVersion": 1,
             "label": "architecture",
@@ -983,6 +1007,8 @@
           },
           "headers": {
             "status": 404,
+            "content_type": "application/json; charset=utf-8",
+            "x_content_type_options": "nosniff",
             "cache_control": "no-store"
           }
         }
@@ -1077,6 +1103,7 @@
         "public_response": {
           "state": "ready",
           "profile": "headline-only/v1",
+          "representation": "json",
           "payload": {
             "schemaVersion": 1,
             "label": "architecture",
@@ -1085,8 +1112,194 @@
           },
           "headers": {
             "status": 200,
+            "content_type": "application/json; charset=utf-8",
+            "x_content_type_options": "nosniff",
             "cache_control": "public, max-age=2700, must-revalidate",
             "etag": "\"eb7754f790a4c0f6c4ee4556fdeadc039da713aaae72e7a8c941778a2cf975b5\""
+          }
+        }
+      }
+    },
+    {
+      "id": "conditional-304-before-expiry",
+      "category": "cache",
+      "purpose": "Return 304 only when the trusted origin clock still proves the ready lease current.",
+      "request": {
+        "operation": "read",
+        "method": "GET",
+        "representation": "json",
+        "now": "2026-09-09T10:15:00Z",
+        "valid_until": "2026-09-09T11:00:00Z",
+        "if_none_match": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\""
+      },
+      "expected": {
+        "outcome": "not_modified",
+        "reason": "The origin clock check succeeds before the matching ETag is evaluated.",
+        "state_change": "none",
+        "public_response": {
+          "state": "ready",
+          "profile": "headline-only/v1",
+          "representation": "json",
+          "headers": {
+            "status": 304,
+            "content_type": "application/json; charset=utf-8",
+            "x_content_type_options": "nosniff",
+            "cache_control": "public, max-age=2700, must-revalidate",
+            "etag": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\""
+          }
+        }
+      }
+    },
+    {
+      "id": "storage-uncertain-safe-fallback",
+      "category": "cache",
+      "purpose": "Fail closed when storage cannot establish current state instead of reusing ready bytes.",
+      "request": {
+        "operation": "read",
+        "method": "GET",
+        "representation": "json",
+        "storage_state": "uncertain",
+        "previous_state": "ready",
+        "previous_etag": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\"",
+        "if_none_match": "\"85c1f2495ce3336f65596155749acbb06d5e637dd893725b2167dbc180da7cd6\""
+      },
+      "expected": {
+        "outcome": "served",
+        "reason": "Uncertain storage is not proof of readiness and cannot expose a prior ETag or body.",
+        "state_change": "unavailable",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "representation": "json",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "UNASSESSABLE · ? ignores · ? rules",
+            "color": "lightgrey"
+          },
+          "body": "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"UNASSESSABLE \\u00B7 ? ignores \\u00B7 ? rules\",\"color\":\"lightgrey\"}",
+          "headers": {
+            "status": 503,
+            "content_type": "application/json; charset=utf-8",
+            "x_content_type_options": "nosniff",
+            "cache_control": "no-store"
+          }
+        }
+      }
+    },
+    {
+      "id": "svg-fixed-template-injection-safe",
+      "category": "rendering",
+      "purpose": "Keep markup-like alias and metadata out of a fixed local freshness SVG template.",
+      "request": {
+        "operation": "read",
+        "method": "GET",
+        "route": "/badge-relay/v1/a7f4k2m9.svg",
+        "representation": "svg",
+        "profile": "headline-plus-freshness/v1",
+        "payload": {
+          "schemaVersion": 1,
+          "label": "architecture",
+          "message": "PASS · HEALTHY · 0 ignores · 42 rules",
+          "color": "brightgreen",
+          "verified_at": "2026-09-09T10:00:00Z",
+          "valid_until": "2026-09-09T11:00:00Z"
+        },
+        "untrusted_alias": "a7f4k2m9\"><script>alert(1)</script>",
+        "untrusted_metadata": "<metadata>private provenance</metadata>"
+      },
+      "expected": {
+        "outcome": "served",
+        "reason": "Only validated closed values enter a local template; route and private metadata are never interpolated.",
+        "state_change": "none",
+        "public_response": {
+          "state": "ready",
+          "profile": "headline-plus-freshness/v1",
+          "representation": "svg",
+          "payload": {
+            "schemaVersion": 1,
+            "label": "architecture",
+            "message": "PASS · HEALTHY · 0 ignores · 42 rules",
+            "color": "brightgreen",
+            "verified_at": "2026-09-09T10:00:00Z",
+            "valid_until": "2026-09-09T11:00:00Z"
+          },
+          "body_assertions": {
+            "template": "fixed-local-svg/v1",
+            "must_include": [
+              "architecture",
+              "PASS · HEALTHY · 0 ignores · 42 rules",
+              "verified at 2026-09-09T10:00:00Z",
+              "valid until 2026-09-09T11:00:00Z"
+            ],
+            "must_exclude": [
+              "<script",
+              "</script>",
+              "<metadata>",
+              "private provenance",
+              "href=",
+              "xlink:href",
+              "onload=",
+              "foreignObject"
+            ]
+          },
+          "headers": {
+            "status": 200,
+            "content_type": "image/svg+xml; charset=utf-8",
+            "x_content_type_options": "nosniff",
+            "cache_control": "public, max-age=2700, must-revalidate"
+          }
+        }
+      }
+    },
+    {
+      "id": "svg-rejects-unapproved-unicode",
+      "category": "rendering",
+      "purpose": "Reject Unicode or control-text payload variants before SVG rendering can create disclosure or markup.",
+      "request": {
+        "operation": "read",
+        "method": "GET",
+        "route": "/badge-relay/v1/a7f4k2m9.svg",
+        "representation": "svg",
+        "profile": "headline-only/v1",
+        "invalid_payload": {
+          "schemaVersion": 1,
+          "label": "architecture",
+          "message": "PASS · HEALTHY · 0 ignores · 42 rules ‮",
+          "color": "brightgreen"
+        },
+        "unicode_inputs": [
+          "U+202E RIGHT-TO-LEFT OVERRIDE",
+          "U+0000 NUL",
+          "U+03C0 GREEK SMALL LETTER PI"
+        ]
+      },
+      "expected": {
+        "outcome": "rejected",
+        "reason": "The closed canonical profile rejects unapproved Unicode/control text before the SVG template is selected.",
+        "state_change": "none",
+        "public_response": {
+          "state": "unavailable",
+          "profile": "headline-only/v1",
+          "representation": "svg",
+          "body_assertions": {
+            "template": "fixed-local-svg/v1",
+            "must_include": [
+              "UNASSESSABLE · ? ignores · ? rules"
+            ],
+            "must_exclude": [
+              "U+202E",
+              "U+0000",
+              "U+03C0",
+              "<script",
+              "foreignObject"
+            ]
+          },
+          "headers": {
+            "status": 404,
+            "content_type": "image/svg+xml; charset=utf-8",
+            "x_content_type_options": "nosniff",
+            "cache_control": "no-store"
           }
         }
       }
