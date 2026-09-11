@@ -79,6 +79,17 @@ def test_main_quality_uses_commit_bound_canonical_coverage_evidence() -> None:
     assert "Codecov commit/upload:" in workflow
 
 
+def test_sonar_workflows_collect_badge_relay_lcov_coverage() -> None:
+    for workflow_name in ("ci.yml", "main-quality.yml"):
+        workflow = _read(workflow_name)
+
+        assert "Setup Node.js for badge relay coverage" in workflow
+        assert "npm ci --ignore-scripts --prefix relay" in workflow
+        assert "npm run test:coverage --prefix relay" in workflow
+        assert "test -s relay/coverage/lcov.info" in workflow
+        assert '/d:sonar.javascript.lcov.reportPaths="relay/coverage/lcov.info"' in workflow
+
+
 def test_main_sonar_and_codecov_refresh_independently_from_same_coverage() -> None:
     workflow = _read("main-quality.yml")
 
