@@ -83,12 +83,13 @@ internal static partial class ArchitectureHealthBadgeDisclosureValidator
 
     private static bool HasClosedHeadline(string message, string color)
     {
+        if (message == "UNASSESSABLE \u00B7 ? ignores \u00B7 ? rules")
+        {
+            return color == "lightgrey";
+        }
+
         Match match = HeadlinePattern().Match(message);
-        if (!match.Success
-            || !int.TryParse(match.Groups[3].Value, System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture, out _)
-            || !int.TryParse(match.Groups[4].Value, System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture, out _))
+        if (!match.Success)
         {
             return false;
         }
@@ -154,6 +155,6 @@ internal static partial class ArchitectureHealthBadgeDisclosureValidator
     private static bool IsSupportedProfile(string profile) =>
         profile is "headline-only/v1" or "headline-plus-freshness/v1";
 
-    [GeneratedRegex("^(PASS|FAIL) \\u00B7 (HEALTHY|DEBT|DEGRADING|FAILING) \\u00B7 ([0-9]+) ignores \\u00B7 ([0-9]+) rules$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^(PASS|FAIL) \\u00B7 (HEALTHY|DEBT|DEGRADING|FAILING) \\u00B7 (0|[1-9][0-9]{0,3}) ignores \\u00B7 (0|[1-9][0-9]{0,3}) rules$", RegexOptions.CultureInvariant)]
     private static partial Regex HeadlinePattern();
 }

@@ -23,10 +23,10 @@ public sealed class PackedBadgeDisclosureContractTests
         Directory.CreateDirectory(extracted);
         try
         {
-            const string version = "0.1.0-issue827";
+            const string PackageVersion = "0.1.0-issue827";
             AssertSuccess(Run("dotnet", root,
                 "pack", "src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj", "--no-restore", "--output", feed,
-                "/p:PackageVersion=" + version));
+                "/p:PackageVersion=" + PackageVersion));
             string packagePath = Directory.EnumerateFiles(feed, "ArchLinterNet.Cli.*.nupkg").Single();
 
             string prefix = "tools/net10.0/any/architecture-health-badge-relay/";
@@ -52,16 +52,13 @@ public sealed class PackedBadgeDisclosureContractTests
 
             AssertSuccess(Run("dotnet", root,
                 "tool", "install", "ArchLinterNet.Cli", "--tool-path", toolPath, "--add-source", feed,
-                "--ignore-failed-sources", "--version", version));
+                "--ignore-failed-sources", "--version", PackageVersion));
 
-            string readyFixture = Path.Combine(extracted, "canonical-ready.json");
-            using JsonDocument ready = JsonDocument.Parse(File.ReadAllText(readyFixture));
-            string acceptedPayload = ready.RootElement.GetProperty("canonical_bytes").GetString()
-                ?? throw new InvalidOperationException("The packaged ready fixture has no canonical bytes.");
+            string acceptedPayload = ReadCanonicalBytes(Path.Combine(extracted, "canonical-ready.json"));
             string acceptedInput = Path.Combine(extracted, "accepted.json");
             File.WriteAllText(acceptedInput, acceptedPayload);
 
-            string installedTool = Path.Combine(toolPath, "arch-linter-net.exe");
+            string installedTool = Path.Combine(toolPath, OperatingSystem.IsWindows() ? "arch-linter-net.exe" : "arch-linter-net");
             CommandResult accepted = Run(installedTool, root,
                 "badge", "architecture-health", "--verify-disclosure-profile", "--disclosure-profile", "headline-only/v1",
                 "--input", acceptedInput);
@@ -69,6 +66,17 @@ public sealed class PackedBadgeDisclosureContractTests
             {
                 Assert.That(accepted.ExitCode, Is.EqualTo(0), accepted.Output + accepted.Error);
                 Assert.That(accepted.Output, Does.Contain("\"valid\":true"));
+            });
+
+            string unavailableInput = Path.Combine(extracted, "unavailable.json");
+            File.WriteAllText(unavailableInput, ReadCanonicalBytes(Path.Combine(extracted, "canonical-unavailable.json")));
+            CommandResult unavailable = Run(installedTool, root,
+                "badge", "architecture-health", "--verify-disclosure-profile", "--disclosure-profile", "headline-only/v1",
+                "--input", unavailableInput);
+            Assert.Multiple(() =>
+            {
+                Assert.That(unavailable.ExitCode, Is.EqualTo(0), unavailable.Output + unavailable.Error);
+                Assert.That(unavailable.Output, Does.Contain("\"valid\":true"));
             });
 
             string altered = Path.Combine(extracted, "noncanonical.json");
@@ -104,6 +112,13 @@ public sealed class PackedBadgeDisclosureContractTests
         }
 
         throw new DirectoryNotFoundException("Could not locate the repository root.");
+    }
+
+    private static string ReadCanonicalBytes(string fixturePath)
+    {
+        using JsonDocument fixture = JsonDocument.Parse(File.ReadAllText(fixturePath));
+        return fixture.RootElement.GetProperty("canonical_bytes").GetString()
+            ?? throw new InvalidOperationException($"The packaged fixture '{Path.GetFileName(fixturePath)}' has no canonical bytes.");
     }
 
     private static CommandResult Run(string fileName, string workingDirectory, params string[] arguments)

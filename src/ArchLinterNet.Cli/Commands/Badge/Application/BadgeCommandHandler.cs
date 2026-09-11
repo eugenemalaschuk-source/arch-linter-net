@@ -68,7 +68,12 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
             or InvalidOperationException
             or NotSupportedException)
         {
-            projection = ArchitectureHealthBadgeProjector.Unassessable();
+            projection = ArchitectureHealthBadgeProjector.Unassessable($"Could not read Architecture Health input: {exception.Message}");
+        }
+
+        if (options.DisclosureProfile is not null && projection.Diagnostic is not null)
+        {
+            console.Error.WriteLine($"Architecture Health disclosure profile rejected: {projection.Diagnostic}");
         }
 
         try

@@ -11,12 +11,15 @@ public sealed class ArchitectureHealthBadgeDisclosureValidatorTests
         "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}";
     private const string Freshness =
         "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\",\"verified_at\":\"2026-09-09T10:00:00Z\",\"valid_until\":\"2026-09-09T11:00:00Z\"}";
+    private const string Unavailable =
+        "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"UNASSESSABLE \\u00B7 ? ignores \\u00B7 ? rules\",\"color\":\"lightgrey\"}";
 
     [TestCase("headline-only/v1", Headline, "b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d")]
     [TestCase(
         "headline-plus-freshness/v1",
         Freshness,
         "e4630743393380aadb96dd4ee8d2cffd43488ef4869a7ca66379db755485ed32")]
+    [TestCase("headline-only/v1", Unavailable, "d03d736489ee145942c0c0faeec1de82d99caa5ca1801c1e01845bef2fa3e379")]
     public void Validator_AcceptsCanonicalBytesAndReturnsTheirDigest(string profile, string json, string expectedDigest)
     {
         bool valid = ArchitectureHealthBadgeDisclosureValidator.TryValidate(profile, Encoding.UTF8.GetBytes(json), out string digest);
@@ -32,6 +35,8 @@ public sealed class ArchitectureHealthBadgeDisclosureValidatorTests
     [TestCase("{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\",\"extra\":\"not-allowed\"}")]
     [TestCase("{\"schemaVersion\":1,\"label\":\"arch\\u0069tecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}")]
     [TestCase("{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"red\"}")]
+    [TestCase("{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0001 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}")]
+    [TestCase("{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 10000 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}")]
     [TestCase("{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"free text\",\"color\":\"brightgreen\"}")]
     [TestCase(" {\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}")]
     public void Validator_RejectsNoncanonicalOrOutOfProfileBytes(string json)
