@@ -199,6 +199,20 @@ jobs:
       - name: Collect Python tooling coverage
         run: make test-tooling-coverage
 
+      - name: Setup Node.js for badge relay coverage
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: relay/package-lock.json
+
+      - name: Collect badge relay coverage
+        shell: bash
+        run: |
+          npm ci --prefix relay
+          npm run test:coverage --prefix relay
+          test -s relay/coverage/lcov.info
+
       - name: Cache SonarQube packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
@@ -244,6 +258,7 @@ jobs:
             /d:sonar.cs.opencover.reportsPaths="$OPENCOVER_FILES" \
             /d:sonar.cs.vstest.reportsPaths="test-results/test-execution-shards/**/*.trx" \
             /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
+            /d:sonar.javascript.lcov.reportPaths="relay/coverage/lcov.info" \
             /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
             /d:sonar.coverage.exclusions="tools/ArchLinterNet.GitFuzz/**,tools/ArchLinterNet.ProcessTreeProbe/**,tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
 

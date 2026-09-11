@@ -110,7 +110,11 @@ export class RelayDurableObject {
   constructor(state: DurableObjectState, _env: unknown) {
     this.state = state as RelayStateLike;
     this.sql = this.state.storage.sql;
-    this.initialized = this.state.blockConcurrencyWhile(async () => { this.ensureSchema(); });
+    this.initialized = this.initializeState();
+  }
+
+  private initializeState(): Promise<void> {
+    return this.state.blockConcurrencyWhile(() => { this.ensureSchema(); });
   }
 
   private ensureSchema(): void {
@@ -262,13 +266,12 @@ export class RelayDurableObject {
       if (validUntilSeconds <= nowSeconds()) return this.finishError(409);
       const validUntil = new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
       this.sql.exec("UPDATE relay_challenges SET consumed = 1 WHERE id = ? AND consumed = 0", challenge.id).toArray();
-      const updated = this.sql.exec(`UPDATE relay_state SET status='ready', profile=?, generation=?, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0, last_renewed_at=?
+      this.sql.exec(`UPDATE relay_state SET status='ready', profile=?, generation=?, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0, last_renewed_at=?
         WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0 AND status <> 'revoked'`, profile, newGeneration, body.canonical_bytes, body.canonical_digest, verifiedAt, validUntil, horizon, nowSeconds(), body.expected_generation, body.expected_revocation_epoch).toArray();
       // SQLite UPDATE's result is not portable across the Workers cursor, so
       // re-read the row as the compare-and-set witness.
       const after = this.row();
       if (after.generation !== newGeneration || after.payload_digest !== body.canonical_digest) return this.finishError(409);
-      void updated;
       return response(200, { ok: true, generation: newGeneration, revocation_epoch: after.revocation_epoch, state: "ready", valid_until: validUntil });
       } catch (error) {
         throw error;

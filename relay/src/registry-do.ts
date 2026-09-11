@@ -51,9 +51,13 @@ export class RelayRegistryDurableObject {
   constructor(state: DurableObjectState, env: { RELAY_REGISTRY?: unknown }) {
     this.state = state as RelayStateLike;
     this.sql = this.state.storage.sql;
-    this.initialized = this.state.blockConcurrencyWhile(() => {
+    this.initialized = this.initializeState(env.RELAY_REGISTRY);
+  }
+
+  private initializeState(config: unknown): Promise<void> {
+    return this.state.blockConcurrencyWhile(() => {
       this.ensureSchema();
-      this.seed(env.RELAY_REGISTRY);
+      this.seed(config);
     });
   }
 
