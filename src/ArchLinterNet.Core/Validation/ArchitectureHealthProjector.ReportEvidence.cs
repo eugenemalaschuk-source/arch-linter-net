@@ -21,7 +21,8 @@ internal sealed record ArchitectureHealthReportEvidenceEnvelope(
     string? ExecutionId,
     string ConditionSet,
     IReadOnlyList<ArchitectureHealthValidationOutcome> ValidationOutcomes,
-    ArchitectureDebtGateOutcome DebtGate);
+    ArchitectureDebtGateOutcome DebtGate,
+    ArchitectureHealthPublicationEvidence PublicationEvidence);
 
 internal static class ArchitectureHealthReportEvidenceWriter
 {
@@ -54,7 +55,8 @@ internal static class ArchitectureHealthReportEvidenceWriter
             outcome.ExecutionContext,
             outcome.ConditionSetName,
             outcome.ValidationOutcomes.OrderBy(item => item.Mode, StringComparer.Ordinal).ToArray(),
-            outcome.DebtGate);
+            outcome.DebtGate,
+            ArchitectureHealthPublicationEvidenceProjector.Project(outcome));
         summary["report_evidence"] = BuildReportEvidence(evidence);
         return summary.ToJsonString();
     }
@@ -86,7 +88,31 @@ internal static class ArchitectureHealthReportEvidenceWriter
 
         result["validation_outcomes"] = outcomes;
         result["debt_gate"] = BuildDebtGateEvidence(evidence.DebtGate);
+        result["publication_evidence"] = BuildPublicationEvidence(evidence.PublicationEvidence);
         return result;
+    }
+
+    private static JsonObject BuildPublicationEvidence(ArchitectureHealthPublicationEvidence evidence)
+    {
+        var reasons = new JsonArray();
+        foreach (ArchitectureHealthPublicationEvidenceReason reason in evidence.Reasons)
+        {
+            reasons.Add(new JsonObject
+            {
+                ["code"] = reason.Code,
+                ["detail"] = reason.Detail,
+            });
+        }
+
+        return new JsonObject
+        {
+            ["schema_id"] = ArchitectureHealthPublicationEvidence.CurrentSchemaId,
+            ["state"] = evidence.State == ArchitectureHealthPublicationEvidenceState.Ready
+                ? "ready"
+                : "unassessable",
+            ["semantic_horizon"] = evidence.SemanticHorizon?.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture),
+            ["reasons"] = reasons,
+        };
     }
 
     private static JsonObject BuildValidationEvidence(ArchitectureHealthValidationOutcome receipt)

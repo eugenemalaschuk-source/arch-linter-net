@@ -24,4 +24,13 @@
     <InternalsVisibleTo Include="ArchLinterNet.Cli.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The Relay is transport-owned, but its closed public profile contract travels with the
+         tool that produces those bytes. Global-tool consumers can therefore validate a shipped
+         fixture set without a source checkout. -->
+    <Content Include="..\..\docs\internal\architecture-health-badge-relay-fixtures\**\*"
+             Pack="true"
+             PackagePath="tools/net10.0/any/architecture-health-badge-relay" />
+  </ItemGroup>
+
 </Project>

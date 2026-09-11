@@ -42,6 +42,22 @@ public sealed class BadgeCommandHandlerTests
         });
     }
 
+    [Test]
+    public void Handler_VerifiesClosedDisclosureBytesWithoutReprojectingHealth()
+    {
+        const string payload = "{\"schemaVersion\":1,\"label\":\"architecture\",\"message\":\"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules\",\"color\":\"brightgreen\"}";
+        FakeConsole console = new();
+
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(payload)).ExecuteArchitectureHealth(
+            new("badge.json", null, false, "headline-only/v1", null, true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(console.Output, Does.Contain("b6a3501a87dc39495210674cfabdb19478df2cd7c701a05a0ea3c397d2166e3d"));
+        });
+    }
+
     [TestCase("healthy", "pass", 0, 42, CliExitCodes.Success, "PASS · HEALTHY · 0 ignores · 42 rules", "brightgreen")]
     [TestCase("debt", "pass", 7, 42, CliExitCodes.Success, "PASS · DEBT · 7 ignores · 42 rules", "yellow")]
     [TestCase("degrading", "pass", 8, 43, CliExitCodes.Success, "PASS · DEGRADING · 8 ignores · 43 rules", "orange")]
@@ -223,6 +239,48 @@ public sealed class BadgeCommandHandlerTests
         });
     }
 
+    [Test]
+    public void Handler_HealthFreshnessProfile_UsesCanonicalEvidenceHorizon()
+    {
+        JsonObject document = JsonNode.Parse(Health("healthy", "pass", 0, 42))!.AsObject();
+        document["report_evidence"]!["publication_evidence"] = new JsonObject
+        {
+            ["schema_id"] = "architecture-health-publication-evidence/v1",
+            ["state"] = "ready",
+            ["semantic_horizon"] = "2026-09-09T11:00:00Z",
+            ["reasons"] = new JsonArray(),
+        };
+        FakeConsole console = new();
+
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(document.ToJsonString()))
+            .ExecuteArchitectureHealth(new ArchitectureHealthBadgeCommandOptions(
+                "input.json", null, false, "headline-plus-freshness/v1", "2026-09-09T10:30:00Z"));
+        using JsonDocument output = JsonDocument.Parse(console.Output);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(output.RootElement.GetProperty("verified_at").GetString(), Is.EqualTo("2026-09-09T10:30:00Z"));
+            Assert.That(output.RootElement.GetProperty("valid_until").GetString(), Is.EqualTo("2026-09-09T11:00:00Z"));
+            Assert.That(console.Output, Does.Contain("\\u00B7"));
+        });
+    }
+
+    [Test]
+    public void Handler_HealthProfile_RejectsLegacyEvidenceWithoutPublicationHorizon()
+    {
+        FakeConsole console = new();
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(Health("healthy", "pass", 0, 42)))
+            .ExecuteArchitectureHealth(new ArchitectureHealthBadgeCommandOptions(
+                "input.json", null, false, "headline-only/v1"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.Output, Does.Contain("UNASSESSABLE"));
+        });
+    }
+
     private static void AssertUnassessable(string input)
     {
         FakeConsole console = new();
@@ -314,6 +372,7 @@ public sealed class BadgeCommandHandlerTests
 
         public bool FileExists(string path) => true;
         public string ReadAllText(string path) => readException is null ? input : throw readException;
+        public byte[] ReadAllBytes(string path) => readException is null ? Encoding.UTF8.GetBytes(input) : throw readException;
         public void WriteAllText(string path, string contents) => Written[path] = contents;
         public string WriteAllTextToTemp(string targetPath, string contents)
         {

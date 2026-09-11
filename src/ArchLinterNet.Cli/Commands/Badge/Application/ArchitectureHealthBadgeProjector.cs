@@ -1,9 +1,16 @@
+using System.Globalization;
 using System.Text.Json;
 using ArchLinterNet.Cli.Commands;
 
 namespace ArchLinterNet.Cli.Commands.Badge.Application;
 
-internal sealed record ArchitectureHealthBadgeProjection(string Message, string Color, int ExitCode);
+internal sealed record ArchitectureHealthBadgeProjection(
+    string Message,
+    string Color,
+    int ExitCode,
+    string? VerifiedAt = null,
+    string? ValidUntil = null,
+    string? DisclosureProfile = null);
 
 internal static class ArchitectureHealthBadgeProjector
 {
@@ -12,7 +19,10 @@ internal static class ArchitectureHealthBadgeProjector
     private const int ReportEvidenceSchemaVersion = 2;
     private const string ReportEvidenceKind = "architecture-health-report-evidence";
 
-    internal static ArchitectureHealthBadgeProjection Project(string input)
+    internal static ArchitectureHealthBadgeProjection Project(
+        string input,
+        string? disclosureProfile = null,
+        string? verifiedAt = null)
     {
         try
         {
@@ -28,18 +38,15 @@ internal static class ArchitectureHealthBadgeProjector
             }
 
             (int ignores, int rules) = ReadInventory(evidence);
-            return health switch
+            ArchitectureHealthBadgeProjection projection = health switch
             {
-                "healthy" => new ArchitectureHealthBadgeProjection(
-                    $"{GateName(gate)} · HEALTHY · {ignores} ignores · {rules} rules", "brightgreen", ExitCode(gate)),
-                "debt" => new ArchitectureHealthBadgeProjection(
-                    $"{GateName(gate)} · DEBT · {ignores} ignores · {rules} rules", "yellow", ExitCode(gate)),
-                "degrading" => new ArchitectureHealthBadgeProjection(
-                    $"{GateName(gate)} · DEGRADING · {ignores} ignores · {rules} rules", "orange", ExitCode(gate)),
-                "failing" => new ArchitectureHealthBadgeProjection(
-                    $"{GateName(gate)} · FAILING · {ignores} ignores · {rules} rules", "red", ExitCode(gate)),
+                "healthy" => Headline(gate, "HEALTHY", ignores, rules, "brightgreen"),
+                "debt" => Headline(gate, "DEBT", ignores, rules, "yellow"),
+                "degrading" => Headline(gate, "DEGRADING", ignores, rules, "orange"),
+                "failing" => Headline(gate, "FAILING", ignores, rules, "red"),
                 _ => Unassessable(),
             };
+            return ProjectProfile(evidence, projection, disclosureProfile, verifiedAt);
         }
         catch (JsonException)
         {
@@ -50,6 +57,80 @@ internal static class ArchitectureHealthBadgeProjector
             return Unassessable();
         }
     }
+
+    private static ArchitectureHealthBadgeProjection Headline(
+        string gate,
+        string health,
+        int ignores,
+        int rules,
+        string color) =>
+        new($"{GateName(gate)} \u00B7 {health} \u00B7 {ignores} ignores \u00B7 {rules} rules", color, ExitCode(gate));
+
+    private static ArchitectureHealthBadgeProjection ProjectProfile(
+        JsonElement evidence,
+        ArchitectureHealthBadgeProjection projection,
+        string? disclosureProfile,
+        string? verifiedAt)
+    {
+        if (disclosureProfile is null)
+        {
+            return string.IsNullOrWhiteSpace(verifiedAt) ? projection : Unassessable();
+        }
+
+        if (disclosureProfile is not ("headline-only/v1" or "headline-plus-freshness/v1"))
+        {
+            return Unassessable();
+        }
+
+        JsonElement publication = Required(evidence, "publication_evidence", JsonValueKind.Object);
+        RequireString(publication, "schema_id", "architecture-health-publication-evidence/v1");
+        RequireString(publication, "state", "ready");
+        JsonElement reasons = Required(publication, "reasons", JsonValueKind.Array);
+        if (reasons.GetArrayLength() != 0)
+        {
+            return Unassessable();
+        }
+
+        DateTimeOffset horizon = ParseUtcTimestamp(RequiredString(publication, "semantic_horizon"));
+        if (disclosureProfile == "headline-only/v1")
+        {
+            return string.IsNullOrWhiteSpace(verifiedAt)
+                ? projection with { DisclosureProfile = disclosureProfile }
+                : Unassessable();
+        }
+
+        DateTimeOffset verified = ParseUtcTimestamp(verifiedAt ?? string.Empty);
+        if (verified >= horizon)
+        {
+            return Unassessable();
+        }
+
+        DateTimeOffset validUntil = verified.AddMinutes(60) < horizon ? verified.AddMinutes(60) : horizon;
+        return projection with
+        {
+            VerifiedAt = FormatUtcTimestamp(verified),
+            ValidUntil = FormatUtcTimestamp(validUntil),
+            DisclosureProfile = disclosureProfile,
+        };
+    }
+
+    private static DateTimeOffset ParseUtcTimestamp(string value)
+    {
+        if (!DateTimeOffset.TryParseExact(
+                value,
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out DateTimeOffset timestamp))
+        {
+            throw new InvalidOperationException("Publication timestamps must use canonical UTC seconds.");
+        }
+
+        return timestamp;
+    }
+
+    private static string FormatUtcTimestamp(DateTimeOffset value) =>
+        value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
 
     private static JsonElement ReadCanonicalEvidence(JsonElement root, string gate, string health)
     {
@@ -67,14 +148,17 @@ internal static class ArchitectureHealthBadgeProjector
         List<(int Ignores, int Rules)> inventories = [];
         foreach (JsonElement outcome in outcomes.EnumerateArray())
         {
-            RequiredObjectReceipt(outcome, "validation outcome");
+            if (outcome.ValueKind != JsonValueKind.Object)
+            {
+                throw new InvalidOperationException("Malformed validation outcome.");
+            }
+
             _ = RequiredString(outcome, "mode");
             JsonElement availability = Required(outcome, "availability", JsonValueKind.Object);
             RequireString(availability, "policy_inventory", "available");
             _ = Required(outcome, "findings", JsonValueKind.Array);
             _ = Required(outcome, "provenance", JsonValueKind.Object);
             JsonElement inventory = Required(outcome, "policy_inventory", JsonValueKind.Object);
-
             RequireString(inventory, "schema", InventorySchema);
             int rules = RequiredNonNegativeInt(inventory, "effective_rule_count");
             JsonElement debt = Required(inventory, "ignore_debt", JsonValueKind.Object);
@@ -91,7 +175,7 @@ internal static class ArchitectureHealthBadgeProjector
     }
 
     internal static ArchitectureHealthBadgeProjection Unassessable() =>
-        new("UNASSESSABLE · ? ignores · ? rules", "lightgrey", CliExitCodes.InvalidArgumentsOrRuntimeError);
+        new("UNASSESSABLE \u00B7 ? ignores \u00B7 ? rules", "lightgrey", CliExitCodes.InvalidArgumentsOrRuntimeError);
 
     private static int ExitCode(string gate) => gate switch
     {
@@ -133,14 +217,6 @@ internal static class ArchitectureHealthBadgeProjector
             || parsed != expected)
         {
             throw new InvalidOperationException($"Unsupported {name} value.");
-        }
-    }
-
-    private static void RequiredObjectReceipt(JsonElement element, string description)
-    {
-        if (element.ValueKind != JsonValueKind.Object)
-        {
-            throw new InvalidOperationException($"Malformed {description}.");
         }
     }
 
