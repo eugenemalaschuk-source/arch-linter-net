@@ -201,6 +201,20 @@ jobs:
       - name: Restore
         run: make restore
 
+      - name: Setup Node.js for badge relay coverage
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: relay/package-lock.json
+
+      - name: Collect badge relay coverage
+        shell: bash
+        run: |
+          npm ci --ignore-scripts --prefix relay
+          npm run test:coverage --prefix relay
+          test -s relay/coverage/lcov.info
+
       - name: Cache SonarQube packages
         if: env.TRUSTED_PR == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -250,6 +264,7 @@ jobs:
             /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
             /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
+            /d:sonar.javascript.lcov.reportPaths="relay/coverage/lcov.info" \
             /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
             /d:sonar.coverage.exclusions="tools/ArchLinterNet.GitFuzz/**,tools/ArchLinterNet.ProcessTreeProbe/**,tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
 
