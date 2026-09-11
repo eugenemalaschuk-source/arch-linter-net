@@ -84,7 +84,7 @@ def test_sonar_workflows_collect_badge_relay_lcov_coverage() -> None:
         workflow = _read(workflow_name)
 
         assert "Setup Node.js for badge relay coverage" in workflow
-        assert "npm ci --prefix relay" in workflow
+        assert "npm ci --ignore-scripts --prefix relay" in workflow
         assert "npm run test:coverage --prefix relay" in workflow
         assert "test -s relay/coverage/lcov.info" in workflow
         assert '/d:sonar.javascript.lcov.reportPaths="relay/coverage/lcov.info"' in workflow

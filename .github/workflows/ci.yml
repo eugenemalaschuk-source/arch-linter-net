@@ -211,7 +211,7 @@ jobs:
       - name: Collect badge relay coverage
         shell: bash
         run: |
-          npm ci --prefix relay
+          npm ci --ignore-scripts --prefix relay
           npm run test:coverage --prefix relay
           test -s relay/coverage/lcov.info
 

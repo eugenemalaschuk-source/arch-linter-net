@@ -39,7 +39,7 @@ export function registryEntriesFromConfig(config: unknown): RegistryEntry[] {
 }
 
 export function validateBundleConfig(config: unknown): boolean {
-  if (!config || typeof config !== "object") return false;
+  if (!config || typeof config !== "object" || Array.isArray(config)) return false;
   const candidate = config as Record<string, unknown>;
   return candidate.schema_id === undefined || candidate.schema_id === "architecture-health-badge-relay-config/v1"
     ? (candidate.mode === undefined || candidate.mode === "relay")
