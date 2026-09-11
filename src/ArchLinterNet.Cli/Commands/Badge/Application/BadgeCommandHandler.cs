@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
@@ -7,7 +8,9 @@ namespace ArchLinterNet.Cli.Commands.Badge.Application;
 internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileSystem)
 {
     private const string ArchitectureHealthHelp =
-        "arch-linter-net badge architecture-health --input <architecture-health.json> [--output <badge.json>]";
+        "arch-linter-net badge architecture-health --input <architecture-health.json> [--output <badge.json>] "
+        + "[--disclosure-profile <headline-only/v1|headline-plus-freshness/v1>] [--verified-at <UTC>] "
+        + "[--verify-disclosure-profile]";
 
     public int Execute(BadgeCommandOptions options)
     {
@@ -46,10 +49,18 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
             return CliExitCodes.Success;
         }
 
+        if (options.VerifyDisclosureProfile)
+        {
+            return VerifyDisclosureProfile(options);
+        }
+
         ArchitectureHealthBadgeProjection projection;
         try
         {
-            projection = ArchitectureHealthBadgeProjector.Project(fileSystem.ReadAllText(options.InputPath));
+            projection = ArchitectureHealthBadgeProjector.Project(
+                fileSystem.ReadAllText(options.InputPath),
+                options.DisclosureProfile,
+                options.VerifiedAt);
         }
         catch (Exception exception) when (exception is IOException
             or UnauthorizedAccessException
@@ -57,7 +68,12 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
             or InvalidOperationException
             or NotSupportedException)
         {
-            projection = ArchitectureHealthBadgeProjector.Unassessable();
+            projection = ArchitectureHealthBadgeProjector.Unassessable($"Could not read Architecture Health input: {exception.Message}");
+        }
+
+        if (options.DisclosureProfile is not null && projection.Diagnostic is not null)
+        {
+            console.Error.WriteLine($"Architecture Health disclosure profile rejected: {projection.Diagnostic}");
         }
 
         try
@@ -77,6 +93,33 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
         return projection.ExitCode;
     }
 
+    private int VerifyDisclosureProfile(ArchitectureHealthBadgeCommandOptions options)
+    {
+        if (options.OutputPath is not null || options.VerifiedAt is not null || options.DisclosureProfile is null)
+        {
+            console.Error.WriteLine("Profile verification requires --input and --disclosure-profile only.");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        try
+        {
+            bool valid = ArchitectureHealthBadgeDisclosureValidator.TryValidate(
+                options.DisclosureProfile,
+                fileSystem.ReadAllBytes(options.InputPath),
+                out string digest);
+            console.Out.WriteLine(JsonSerializer.Serialize(new { valid, sha256 = valid ? digest : null }));
+            return valid ? CliExitCodes.Success : CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            console.Error.WriteLine($"Could not verify Architecture Health badge profile: {exception.Message}");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+    }
+
     private void Write(string message, string color) => console.Out.WriteLine(JsonSerializer.Serialize(new
     {
         schemaVersion = 1,
@@ -87,13 +130,17 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
 
     private void Write(ArchitectureHealthBadgeProjection projection, string? outputPath)
     {
-        string json = JsonSerializer.Serialize(new
+        string json = Serialize(projection);
+        if (projection.DisclosureProfile is not null
+            && !ArchitectureHealthBadgeDisclosureValidator.TryValidate(
+                projection.DisclosureProfile,
+                Encoding.UTF8.GetBytes(json),
+                out _))
         {
-            schemaVersion = 1,
-            label = "architecture",
-            message = projection.Message,
-            color = projection.Color,
-        });
+            projection = ArchitectureHealthBadgeProjector.Unassessable();
+            json = Serialize(projection);
+        }
+
         if (outputPath is null)
         {
             console.Out.WriteLine(json);
@@ -103,6 +150,24 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
         string temporaryPath = fileSystem.WriteAllTextToTemp(outputPath, json + Environment.NewLine);
         fileSystem.RenameTempToTarget(temporaryPath, outputPath);
     }
+
+    private static string Serialize(ArchitectureHealthBadgeProjection projection) => projection.VerifiedAt is null
+            ? JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                label = "architecture",
+                message = projection.Message,
+                color = projection.Color,
+            })
+            : JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                label = "architecture",
+                message = projection.Message,
+                color = projection.Color,
+                verified_at = projection.VerifiedAt,
+                valid_until = projection.ValidUntil,
+            });
 
     private static JsonElement SelectStrictResult(JsonElement document)
     {

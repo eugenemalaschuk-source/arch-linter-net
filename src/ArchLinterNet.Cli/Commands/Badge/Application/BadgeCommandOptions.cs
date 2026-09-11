@@ -5,4 +5,7 @@ internal sealed record BadgeCommandOptions(string InputPath, bool ShowHelp);
 internal sealed record ArchitectureHealthBadgeCommandOptions(
     string InputPath,
     string? OutputPath,
-    bool ShowHelp);
+    bool ShowHelp,
+    string? DisclosureProfile = null,
+    string? VerifiedAt = null,
+    bool VerifyDisclosureProfile = false);

@@ -19,6 +19,9 @@ internal interface IFileSystem
 
     string ReadAllText(string path);
 
+    /// <summary>Reads exact input bytes for closed-profile validation.</summary>
+    byte[] ReadAllBytes(string path) => File.ReadAllBytes(path);
+
     void WriteAllText(string path, string contents);
 
     string WriteAllTextToTemp(string targetPath, string contents);
