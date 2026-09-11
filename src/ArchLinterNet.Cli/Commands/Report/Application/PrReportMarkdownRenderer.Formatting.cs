@@ -43,7 +43,10 @@ internal static class PrReportMarkdownFormatter
     internal static string WaiverHeadline(ArchitecturePrReportProjection projection)
     {
         ArchitecturePolicyInventoryIgnoreDebt? debt = PrimaryReceipt(projection)?.PolicyInventory?.IgnoreDebt;
-        return debt is null ? "`unavailable`" : $"`{debt.Total}` total (`{debt.Active}` active, `{debt.Stale}` stale, `{debt.Expired}` expired)";
+        return debt is null
+            ? "`unavailable`"
+            : $"`{debt.Total}` total (`{debt.Active}` active, `{debt.Stale}` stale, `{debt.Expired}` expired, " +
+              $"`{debt.MetadataIncomplete}` metadata-incomplete, `{debt.Invalid}` invalid)";
     }
 
     internal static string ExistingDebtHeadline(ArchitecturePrReportProjection projection)

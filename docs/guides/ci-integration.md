@@ -289,6 +289,43 @@ read permission: it uploads the exact Markdown plus a bounded manifest that bind
 the repository, PR number, head SHA, CI run and attempt, report schema/kind/marker, byte count,
 and SHA-256.
 
+The read-only producer passes trusted transport context to that CLI invocation. In GitHub Actions,
+the values are the repository base URL (`github.server_url/github.repository`), the pull request's
+current head (`github.event.pull_request.head.sha`), and the fixed run URL
+(`github.server_url/github.repository/actions/runs/github.run_id`):
+
+```bash
+dotnet run --no-build --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- report pr \
+  --health architecture-pr-report/architecture-health.json \
+  --change architecture-pr-report/architecture-change.json \
+  --max-details 20 \
+  --repository-url "$REPORT_REPOSITORY_URL" \
+  --head-sha "$REPORT_HEAD_SHA" \
+  --artifact-url "$REPORT_ARTIFACT_URL" \
+  --output architecture-pr-report/architecture-pr-report.md
+```
+
+Those values are navigation-only transport context. The CLI validates the HTTPS GitHub Actions
+run/artifact URL against the repository/run context and records the current head context, then places the immutable full-report
+bundle/run link outside the bounded detail sections. It does not calculate Gate or Health in YAML,
+and the link cannot change canonical evidence, status, or remediation semantics. The uploaded
+`architecture-pr-report-v1` bundle is the exact Markdown and manifest pair for that producer run;
+reviewers can use the link even when `--max-details` omits ordinary rows.
+
+The rendered report explains Gate and Health separately. Gate is the merge acceptance result;
+Health is the independent healthy/debt/degrading/failing/unassessable state. A `gate=pass` report
+can still be `health=debt` or `health=degrading`: the report's `Blockers` section is reserved for
+canonical blocking reasons, while its Health explanation and non-blocking debt sections retain
+advisory causes and complete lifecycle totals. Applicability, topology, external evidence,
+architecture change, remediation, and canonical navigation are each bounded independently with
+stable totals and omitted counts.
+
+For local runs, legacy artifacts, or a producer that cannot provide a valid repository/head/run
+binding, full bundle navigation is explicitly `unavailable`. The report must not guess a URL or
+turn an absent required authority into a zero or pass. An invalid supplied transport context fails
+closed. This does not alter publication behavior: the completed-CI publisher still validates the
+manifest and current run/head/hash and moves only the exact inert Markdown bytes.
+
 A separate completed-CI publisher is the only job with pull-request write permission. It performs
 no checkout and treats downloaded report bytes as inert data. Before updating the one sticky
 comment it verifies the current PR head, producer run identity, exact artifact shape, bounded

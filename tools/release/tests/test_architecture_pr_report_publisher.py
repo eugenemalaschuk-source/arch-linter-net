@@ -282,6 +282,18 @@ def test_ci_producer_uses_per_tree_baseline_and_separate_strict_gate() -> None:
     assert "outputs.strict_coverage_outcome == 'failure'" in gate
 
 
+def test_ci_producer_passes_trusted_report_navigation_context_to_cli() -> None:
+    workflow = _read("ci.yml")
+    producer = _job(workflow, "architecture_pr_report_producer", "architecture_pr_report_gate")
+
+    assert "REPORT_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}" in producer
+    assert "REPORT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}" in producer
+    assert "REPORT_ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" in producer
+    assert '--repository-url "$REPORT_REPOSITORY_URL"' in producer
+    assert '--head-sha "$REPORT_HEAD_SHA"' in producer
+    assert '--artifact-url "$REPORT_ARTIFACT_URL"' in producer
+
+
 def test_resolve_accepts_a_successful_producer_when_overall_ci_failed() -> None:
     result = _run_script(
         "Resolve current PR and bound report artifact",

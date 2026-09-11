@@ -16,7 +16,10 @@ public enum ArchitecturePrReportAvailability
 public sealed record ArchitecturePrReportInput(
     ArchitectureHealthSummary Summary,
     ArchitecturePrReportEvidence? Evidence,
-    ArchitecturePrReportChange Change);
+    ArchitecturePrReportChange Change)
+{
+    public ArchitecturePrReportNavigationContext? NavigationContext { get; init; }
+}
 
 /// <summary>Correlation metadata carried by report artifacts from one workflow execution.</summary>
 public sealed record ArchitecturePrReportExecutionContext(
@@ -308,6 +311,153 @@ public sealed record ArchitecturePrReportPolicyContextProvenance(
     string YamlPath,
     int SourceOrder);
 
+/// <summary>Canonical Health dimension reason classified for PR-report presentation.</summary>
+/// <remarks>Source reason and identities are preserved; only fail and unassessable are blocking.</remarks>
+public sealed record ArchitecturePrReportDimensionExplanation(
+    string Dimension,
+    ArchitectureHealthDimensionState State,
+    ArchitectureHealthReason Reason,
+    bool IsBlocking)
+{
+    public string Code => Reason.Code;
+    public string Source => Reason.Source;
+    public string? Family => Reason.Family;
+    public string? ControlIdentity => Reason.ControlIdentity;
+    public string? PolicyIdentity => Reason.PolicyIdentity;
+
+    public string? EvidenceIdentity => Reason.EvidenceIdentity;
+}
+
+public sealed record ArchitecturePrReportNavigationContext(
+    string RepositoryUrl,
+    string HeadSha,
+    string? ArtifactUrl)
+{
+    public bool IsUsable => TryNormalize(this, out _);
+
+    public string? GetSourceUrl(string? relativePath)
+    {
+        if (!TryNormalize(this, out ArchitecturePrReportNavigationContext? normalized)
+            || !TryNormalizeRelativePath(relativePath, out string? path))
+        {
+            return null;
+        }
+
+        return $"{normalized!.RepositoryUrl}/blob/{normalized.HeadSha}/{path}";
+    }
+
+    internal static bool TryNormalize(
+        ArchitecturePrReportNavigationContext? context,
+        out ArchitecturePrReportNavigationContext? normalized)
+    {
+        normalized = null;
+        if (context is null || !Uri.TryCreate(context.RepositoryUrl, UriKind.Absolute, out Uri? repository)
+            || !TryRepository(repository, out string? repositoryUrl, out string[]? repositoryParts)
+            || !IsCommitSha(context.HeadSha))
+        {
+            return false;
+        }
+
+        string? artifactUrl = context.ArtifactUrl is null
+            ? null
+            : NormalizeActionUrl(context.ArtifactUrl, repositoryParts!);
+        if (context.ArtifactUrl is not null && artifactUrl is null)
+        {
+            return false;
+        }
+
+        normalized = new ArchitecturePrReportNavigationContext(repositoryUrl!, context.HeadSha.Trim(), artifactUrl);
+        return true;
+    }
+
+    private static bool TryRepository(Uri uri, out string? normalized, out string[]? parts)
+    {
+        normalized = null;
+        parts = null;
+        if (!IsAllowedHttps(uri) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            return false;
+        }
+
+        string[] segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length != 2 || segments.Any(segment => segment is "." or ".." || string.IsNullOrWhiteSpace(segment)))
+        {
+            return false;
+        }
+
+        string name = segments[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+            ? segments[1][..^4]
+            : segments[1];
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        parts = [segments[0], name];
+        normalized = $"https://github.com/{Uri.EscapeDataString(parts[0])}/{Uri.EscapeDataString(name)}";
+        return true;
+    }
+
+    private static string? NormalizeActionUrl(string value, string[] repository)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
+            || !IsAllowedHttps(uri) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            return null;
+        }
+
+        string[] segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        bool prefix = segments.Length is 5 or 7
+            && string.Equals(segments[0], repository[0], StringComparison.OrdinalIgnoreCase)
+            && string.Equals(segments[1], repository[1], StringComparison.OrdinalIgnoreCase)
+            && string.Equals(segments[2], "actions", StringComparison.Ordinal)
+            && string.Equals(segments[3], "runs", StringComparison.Ordinal)
+            && IsDigits(segments[4]);
+        bool artifact = segments.Length == 7
+            && string.Equals(segments[5], "artifacts", StringComparison.Ordinal)
+            && IsDigits(segments[6]);
+        return prefix && (segments.Length == 5 || artifact)
+            ? $"https://github.com/{repository[0]}/{repository[1]}/{string.Join('/', segments[2..])}" : null;
+    }
+
+    private static bool IsAllowedHttps(Uri uri) =>
+        uri.Scheme == Uri.UriSchemeHttps
+        && string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(uri.UserInfo, string.Empty, StringComparison.Ordinal)
+        && uri.Port is -1 or 443;
+
+    private static bool IsCommitSha(string? value) =>
+        value is not null
+        && value.Trim().Length == 40
+        && value.Trim().All(Uri.IsHexDigit);
+
+    private static bool IsDigits(string value) => value.Length > 0 && value.All(char.IsAsciiDigit);
+
+    private static bool TryNormalizeRelativePath(string? relativePath, out string? normalized)
+    {
+        normalized = null;
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return false;
+        }
+
+        string path = relativePath.Trim().Replace('\\', '/');
+        if (path.StartsWith('/') || path.Contains(':'))
+        {
+            return false;
+        }
+
+        string[] segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0 || segments.Any(segment => segment is "." or ".."))
+        {
+            return false;
+        }
+
+        normalized = string.Join('/', segments.Select(Uri.EscapeDataString));
+        return true;
+    }
+}
+
 /// <summary>Headline and fully typed data exposed to a presentation adapter.</summary>
 public sealed record ArchitecturePrReportProjection(
     ArchitecturePrReportHeadline Headline,
@@ -318,6 +468,8 @@ public sealed record ArchitecturePrReportProjection(
     public ArchitecturePrReportAvailability Availability => Headline.Availability;
 
     public bool IsAvailable => Availability == ArchitecturePrReportAvailability.Complete;
+
+    public ArchitecturePrReportNavigationContext? NavigationContext { get; init; }
 }
 
 /// <summary>Report-owned view of the compatible canonical change artifact.</summary>
@@ -335,7 +487,11 @@ public sealed record ArchitecturePrReportHeadline(
     ArchitectureHealthGate Gate,
     ArchitectureHealthState Health,
     ArchitecturePrReportAvailability Availability,
-    IReadOnlyList<ArchitectureHealthDimension> Dimensions);
+    IReadOnlyList<ArchitectureHealthDimension> Dimensions)
+{
+    public IReadOnlyList<ArchitecturePrReportDimensionExplanation> DimensionExplanations { get; init; } =
+        Array.Empty<ArchitecturePrReportDimensionExplanation>();
+}
 
 public sealed record ArchitecturePrReportNavigationReference(
     string Authority,
