@@ -17,15 +17,24 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
         policy.SetAction(result => handler.Execute(new BadgeCommandOptions(result.GetValue(input) ?? string.Empty, result.GetValue(help))));
         Option<string> healthInput = new("--input");
         Option<string> output = new("--output");
+        Option<string> disclosureProfile = new("--disclosure-profile");
+        Option<string> verifiedAt = new("--verified-at");
+        Option<bool> verifyDisclosureProfile = new("--verify-disclosure-profile");
         Option<bool> healthHelp = new("--help");
         healthHelp.Aliases.Add("-h");
         health.Options.Add(healthInput);
         health.Options.Add(output);
+        health.Options.Add(disclosureProfile);
+        health.Options.Add(verifiedAt);
+        health.Options.Add(verifyDisclosureProfile);
         health.Options.Add(healthHelp);
         health.SetAction(result => handler.ExecuteArchitectureHealth(new ArchitectureHealthBadgeCommandOptions(
             result.GetValue(healthInput) ?? string.Empty,
             result.GetValue(output),
-            result.GetValue(healthHelp))));
+            result.GetValue(healthHelp),
+            result.GetValue(disclosureProfile),
+            result.GetValue(verifiedAt),
+            result.GetValue(verifyDisclosureProfile))));
         badge.Subcommands.Add(policy);
         badge.Subcommands.Add(health);
         return badge;
