@@ -174,7 +174,11 @@ internal static class BadgeSetupOutputWriter
     {
         if (configuration.Mode == RelayMode)
         {
-            files.Add(new(".github/workflows/architecture-health-badge-renewal.yml", RenderRenewalWorkflow(configuration)));
+            if (configuration.Renewal.Enabled)
+            {
+                files.Add(new(".github/workflows/architecture-health-badge-renewal.yml", RenderRenewalWorkflow(configuration)));
+            }
+
             files.AddRange(relayFiles);
         }
     }
@@ -276,7 +280,11 @@ internal static class BadgeSetupOutputWriter
         }
         if (configuration.Mode == RelayMode)
         {
-            paths.Add(".github/workflows/architecture-health-badge-renewal.yml");
+            if (configuration.Renewal.Enabled)
+            {
+                paths.Add(".github/workflows/architecture-health-badge-renewal.yml");
+            }
+
             paths.AddRange(relayFiles.Select(static file => file.Path));
         }
 
@@ -462,7 +470,7 @@ name: Renew Architecture Health badge
 
 on:
   schedule:
-    - cron: "__CRON__"
+__CRONS__
 
 permissions:
   contents: read
@@ -482,17 +490,38 @@ jobs:
       operation: renew
 """;
         return Template
-            .Replace("__CRON__", CronFor(configuration.Renewal.CadenceMinutes), StringComparison.Ordinal)
+            .Replace("__CRONS__", CronFor(configuration.Renewal.CadenceMinutes), StringComparison.Ordinal)
             .Replace("__WORKFLOW_REF__", workflowRef, StringComparison.Ordinal)
             .Replace("__WORKFLOW_SHA__", workflowSha, StringComparison.Ordinal);
     }
 
-    private static string CronFor(int cadenceMinutes) => cadenceMinutes switch
+    private static string CronFor(int cadenceMinutes)
     {
-        <= 60 => $"*/{cadenceMinutes} * * * *",
-        _ when cadenceMinutes % 60 == 0 => $"0 */{cadenceMinutes / 60} * * *",
-        _ => "0 * * * *",
-    };
+        if (cadenceMinutes is < 1 or > 1440)
+        {
+            throw new ArgumentOutOfRangeException(nameof(cadenceMinutes));
+        }
+
+        Dictionary<int, List<int>> hoursByMinute = [];
+        for (int elapsedMinutes = 0; elapsedMinutes < 1440; elapsedMinutes += cadenceMinutes)
+        {
+            int minute = elapsedMinutes % 60;
+            int hour = elapsedMinutes / 60;
+            if (!hoursByMinute.TryGetValue(minute, out List<int>? hours))
+            {
+                hours = [];
+                hoursByMinute.Add(minute, hours);
+            }
+
+            hours.Add(hour);
+        }
+
+        return string.Join(
+            "\n",
+            hoursByMinute
+                .OrderBy(static pair => pair.Key)
+                .Select(static pair => $"    - cron: \"{pair.Key} {string.Join(',', pair.Value)} * * *\""));
+    }
 
     private static string BuildReadme(string root, BadgeSetupConfiguration configuration)
     {

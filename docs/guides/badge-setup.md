@@ -41,6 +41,11 @@ renewal is enabled, the preview reports the selected cadence, jobs per day and
 month, private GitHub billed-minute implications, and hosting quotas. The
 contract caps a lease at 60 minutes and renewal at no more than once per 30
 minutes (48 attempts per day); these are limits, not execution guarantees.
+When renewal is disabled, setup emits no scheduled renewal workflow and does
+not allow `schedule` in the Relay registry entry. For enabled cadences that do
+not align to an hour, the generated workflow uses multiple explicit POSIX cron
+entries when necessary; their UTC slots match the previewed jobs-per-day bound
+instead of rounding to a more frequent hourly schedule.
 
 Relay setup is fail-closed. `--provider-plan` is cost metadata only; it cannot
 prove a required check, Rules API, OIDC, provider quota, or account capability.
