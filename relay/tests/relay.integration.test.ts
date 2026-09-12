@@ -67,6 +67,14 @@ const futurePayload = canonicalizePayload({
   verified_at: "2026-09-12T10:10:00Z",
   valid_until: "2026-09-12T10:30:00Z"
 }, "headline-plus-freshness/v1");
+const overLeasePayload = canonicalizePayload({
+  schemaVersion: 1,
+  label: "architecture",
+  message: "PASS · HEALTHY · 0 ignores · 42 rules",
+  color: "brightgreen",
+  verified_at: "2026-09-12T10:00:00Z",
+  valid_until: "2026-09-12T11:30:00Z"
+}, "headline-plus-freshness/v1");
 
 describe("badge-relay/v1 local SQLite Durable Object", () => {
   let privateKey: CryptoKey;
@@ -313,6 +321,39 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
       proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
     }));
     expect(committed.status).toBe(409);
+  });
+
+  it.each([
+    { alias: "a7f4k2q9", bytes: freshnessPayload, horizon: "2026-09-12T10:15:00Z", jti: "over-horizon-jti", key: "over-horizon-key" },
+    { alias: "a7f4k2r9", bytes: overLeasePayload, horizon: "2026-09-12T11:30:00Z", jti: "over-lease-jti", key: "over-lease-key" }
+  ])("rejects freshness publication with a saved validity envelope outside $alias bounds", async ({ alias: targetAlias, bytes, horizon, jti, key }) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:02:00Z"));
+    const targetEntry: RegistryEntry = { ...freshnessEntry, destination_alias: targetAlias };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(targetEntry))).toBe(true);
+
+    const jwt = await token({ jti });
+    const digest = await canonicalPayloadDigest(bytes);
+    const prepare = await SELF.fetch(`https://relay.test/badge-relay/v1/${targetAlias}/prepare`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: bytes, canonical_digest: digest, profile: targetEntry.disclosure_profile, idempotency_key: key, semantic_horizon: horizon })
+    });
+    expect(prepare.status).toBe(201);
+    const challenge = await prepare.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const committed = await runInDurableObject(relay.get(relay.idFromName(targetAlias)), async (instance) => (instance as unknown as RelayDurableObject).commitTrustedPublication({
+      body: { operation: "publish", challenge_id: challenge.challenge_id, idempotency_key: key, canonical_bytes: bytes, canonical_digest: digest, profile: targetEntry.disclosure_profile, expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, semantic_horizon: horizon },
+      entry: targetEntry,
+      jtiHash: await sha256Hex(decodeJwt(jwt).jti as string),
+      proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
+    }));
+    expect(committed.status).toBe(409);
+    const state = await runInDurableObject(relay.get(relay.idFromName(targetAlias)), async (_instance, durableState) => durableState.storage.sql.exec<{ generation: number; payload: string | null }>("SELECT generation, payload FROM relay_state WHERE id=1").toArray()[0]);
+    expect(state.generation).toBe(challenge.generation);
+    expect(state.payload).toBeNull();
   });
 
   it("rejects issuer, algorithm, identity, and workflow-pin failures without mutation", async () => {

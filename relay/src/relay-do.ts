@@ -260,7 +260,7 @@ export class RelayDurableObject {
     if (!horizonSeconds || horizonSeconds <= nowSeconds()) throw new AuthorizationError(409);
     if (profile === "headline-plus-freshness/v1") {
       const payloadHorizon = parseDateSeconds(payload.valid_until);
-      if (!payloadHorizon || payloadHorizon <= nowSeconds() || payloadHorizon !== horizonSeconds || payloadHorizon > nowSeconds() + LEASE_SECONDS) throw new AuthorizationError(409);
+      if (!payloadHorizon || payloadHorizon <= nowSeconds() || payloadHorizon > horizonSeconds || payloadHorizon > nowSeconds() + LEASE_SECONDS) return genericError(409);
     }
     if (!safeInteger(body.expected_generation) || !safeInteger(body.expected_revocation_epoch)) throw new PayloadError();
     const idempotencyHash = await sha256Hex(body.idempotency_key);
@@ -281,10 +281,16 @@ export class RelayDurableObject {
       if (!verifiedAtSeconds || verifiedAtSeconds > nowSeconds()) return this.finishError(409);
       const maxLease = nowSeconds() + LEASE_SECONDS;
       const validUntilSeconds = Math.min(maxLease, horizonSeconds);
-      if (validUntilSeconds <= nowSeconds() || validUntilSeconds > verifiedAtSeconds + LEASE_SECONDS) return this.finishError(409);
+      if (validUntilSeconds <= nowSeconds()) return this.finishError(409);
       const validUntil = profile === "headline-plus-freshness/v1" && payload.valid_until
         ? payload.valid_until
         : new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
+      const persistedValidUntilSeconds = parseDateSeconds(validUntil);
+      if (!persistedValidUntilSeconds
+        || persistedValidUntilSeconds <= nowSeconds()
+        || persistedValidUntilSeconds > horizonSeconds
+        || persistedValidUntilSeconds > maxLease
+        || persistedValidUntilSeconds > verifiedAtSeconds + LEASE_SECONDS) return this.finishError(409);
       this.sql.exec("UPDATE relay_challenges SET consumed = 1 WHERE id = ? AND consumed = 0", challenge.id).toArray();
       this.sql.exec(`UPDATE relay_state SET status='ready', profile=?, generation=?, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0, last_renewed_at=?
         WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0 AND status <> 'revoked'`, profile, newGeneration, body.canonical_bytes, body.canonical_digest, verifiedAt, validUntil, horizon, nowSeconds(), body.expected_generation, body.expected_revocation_epoch).toArray();
