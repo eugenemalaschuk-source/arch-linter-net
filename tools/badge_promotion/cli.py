@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import base64
 from datetime import datetime, timedelta, timezone
+import fnmatch
 import hashlib
 import io
 import json
@@ -100,16 +101,54 @@ def _parse_time(value: Any) -> datetime:
         raise ProviderFailure("semantic_evidence_unavailable") from error
 
 
-def _required_gate(api: GitHubApi, repository: str, check_name: str) -> bool:
+def _required_gate(
+    api: GitHubApi,
+    repository: str,
+    check_name: str,
+    check_app_id: int,
+    base_ref: str = "main",
+) -> bool:
     def has_required_check(document: Any) -> bool:
-        if not isinstance(document, dict):
+        if not isinstance(document, dict) or document.get("type") != "required_status_checks":
             return False
-        parameters = document.get("parameters", {})
-        checks = parameters.get("required_status_checks", []) if isinstance(parameters, dict) else []
-        if isinstance(checks, list) and any(isinstance(check, dict) and check.get("context") == check_name for check in checks):
-            return True
-        rules = document.get("rules", [])
-        return isinstance(rules, list) and any(has_required_check(rule) for rule in rules)
+        parameters = document.get("parameters")
+        if not isinstance(parameters, dict) or parameters.get("strict_required_status_checks_policy") is not True:
+            return False
+        checks = parameters.get("required_status_checks")
+        if not isinstance(checks, list):
+            return False
+        return any(
+            isinstance(check, dict)
+            and check.get("context") == check_name
+            and not isinstance(check.get("integration_id"), bool)
+            and check.get("integration_id") == check_app_id
+            for check in checks
+        )
+
+    def applies_to_base_ref(document: Any) -> bool:
+        if not isinstance(document, dict) or document.get("target") != "branch" or document.get("enforcement") != "active":
+            return False
+        conditions = document.get("conditions")
+        ref_name = conditions.get("ref_name") if isinstance(conditions, dict) else None
+        if not isinstance(ref_name, dict) or not isinstance(ref_name.get("include"), list) or not isinstance(ref_name.get("exclude"), list):
+            return False
+        ref = f"refs/heads/{base_ref}"
+        default_branch = None
+        if "~DEFAULT_BRANCH" in ref_name["include"] or "~DEFAULT_BRANCH" in ref_name["exclude"]:
+            try:
+                repository_info = api.request(f"/repos/{repository_path}")
+            except ProviderFailure:
+                return False
+            default_branch = repository_info.get("default_branch") if isinstance(repository_info, dict) else None
+
+        def matches(pattern: Any) -> bool:
+            if not isinstance(pattern, str):
+                return False
+            if pattern == "~DEFAULT_BRANCH":
+                return default_branch == base_ref
+            return fnmatch.fnmatchcase(ref, pattern) or fnmatch.fnmatchcase(base_ref, pattern)
+
+        return any(matches(pattern) for pattern in ref_name["include"]) and not any(matches(pattern) for pattern in ref_name["exclude"])
 
     repository_path = _repository_path(repository)
     try:
@@ -133,12 +172,19 @@ def _required_gate(api: GitHubApi, repository: str, check_name: str) -> bool:
                 if detail_error.reason == "required_capability_unavailable":
                     continue
                 raise
-            if has_required_check(detail):
+            detail_rules = detail.get("rules") if isinstance(detail, dict) else None
+            if (
+                isinstance(detail, dict)
+                and detail.get("id") == ruleset_id
+                and applies_to_base_ref(detail)
+                and isinstance(detail_rules, list)
+                and any(has_required_check(rule) for rule in detail_rules)
+            ):
                 return True
         return False
-    if has_required_check({"rules": rules}):
-        return True
-    return False
+    if not isinstance(rules, list):
+        return False
+    return any(has_required_check(rule) for rule in rules)
 
 
 def _workflow_blob_sha(api: GitHubApi, repository: str, workflow_path: str, ref: str) -> str:
@@ -148,6 +194,23 @@ def _workflow_blob_sha(api: GitHubApi, repository: str, workflow_path: str, ref:
     if not isinstance(workflow, dict) or workflow.get("type") != "file":
         raise ProviderFailure("workflow_mismatch")
     return _sha(workflow.get("sha"))
+
+
+def _read_bounded_zip_member(opened: zipfile.ZipFile, name: str, max_bytes: int) -> bytes:
+    try:
+        info = opened.getinfo(name)
+    except KeyError as error:
+        raise ProviderFailure("semantic_evidence_unavailable") from error
+    if info.file_size > max_bytes or info.compress_size > max_bytes:
+        raise ProviderFailure("semantic_evidence_oversized")
+    try:
+        with opened.open(info) as member:
+            data = member.read(max_bytes + 1)
+    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as error:
+        raise ProviderFailure("semantic_evidence_unavailable") from error
+    if len(data) > max_bytes:
+        raise ProviderFailure("semantic_evidence_oversized")
+    return data
 
 
 def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
@@ -182,6 +245,9 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     successful_checks = [item for item in checks.get("check_runs", []) if item.get("name") == config.producer.check_name and item.get("status") == "completed" and item.get("conclusion") == "success" and item.get("app", {}).get("slug") == config.producer.check_app]
     if len(successful_checks) != 1:
         raise ProviderFailure("required_gate_not_successful")
+    check_app_id = successful_checks[0].get("app", {}).get("id")
+    if isinstance(check_app_id, bool) or not isinstance(check_app_id, int) or check_app_id <= 0:
+        raise ProviderFailure("check_app_unresolved")
     details = successful_checks[0].get("details_url", "")
     run_match = re.search(r"/runs/(\d+)(?:/|$)", details)
     if run_match is None:
@@ -210,7 +276,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     evidence_archive = api.download(str(evidence_artifacts[0].get("archive_download_url", "")))
     try:
         with zipfile.ZipFile(io.BytesIO(evidence_archive)) as opened:
-            health = json.loads(opened.read("architecture-health.json").decode("utf-8"))
+            health = json.loads(_read_bounded_zip_member(opened, "architecture-health.json", config.limits.max_member_bytes).decode("utf-8"))
         semantic_value = health["report_evidence"]["publication_evidence"]["semantic_horizon"]
         semantic_horizon = _parse_time(semantic_value)
     except (KeyError, TypeError, ValueError, UnicodeError, zipfile.BadZipFile) as error:
@@ -220,7 +286,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
         head_sha=head_sha, head_tree_sha=head_tree, pr_number=pr_number, event=config.producer.event,
         merged=True, workflow_path=config.producer.workflow_path, workflow_sha=workflow_sha,
         check_name=config.producer.check_name, check_app=config.producer.check_app, check_status="completed",
-        check_conclusion="success", required_gate_present=_required_gate(api, repository, config.producer.check_name), run_id=run_id,
+        check_conclusion="success", required_gate_present=_required_gate(api, repository, config.producer.check_name, check_app_id, config.base_ref), run_id=run_id,
         run_attempt=int(run.get("run_attempt", 0)), job_id=int(job.get("id", 0)), job_name=job.get("name", ""),
         artifact_id=int(artifact.get("id", 0)), artifact_name=artifact.get("name", ""), artifact_size=len(archive),
         artifact_expired=False, verified_at=verified_at, semantic_horizon=semantic_horizon,
