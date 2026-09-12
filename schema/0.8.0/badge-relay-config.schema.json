@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://archlinternet.dev/schema/0.8.0/badge-relay-config.schema.json",
+  "title": "Architecture Health Badge Relay setup configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "contract_version",
+    "mode",
+    "disclosure_profile",
+    "bundle",
+    "compatibility_plan",
+    "repository",
+    "destination",
+    "renewal",
+    "base_ref",
+    "project",
+    "producer",
+    "disclosure_approved",
+    "provider_plan"
+  ],
+  "properties": {
+    "schema_id": { "const": "badge-relay-config/v1" },
+    "contract_version": { "const": "v1" },
+    "mode": { "enum": ["none", "github-raw", "relay"] },
+    "disclosure_profile": { "enum": ["headline-only/v1", "headline-plus-freshness/v1"] },
+    "bundle": { "const": "badge-relay/v1" },
+    "compatibility_plan": { "const": "architecture-health-badge-relay/v1" },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "name", "visibility"],
+      "properties": {
+        "owner": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "maxLength": 100 },
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "maxLength": 100 },
+        "visibility": { "enum": ["public", "private"] },
+        "repository_id": { "type": ["integer", "null"], "minimum": 1, "maximum": 9007199254740991 },
+        "repository_owner_id": { "type": ["integer", "null"], "minimum": 1, "maximum": 9007199254740991 }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias"],
+      "properties": {
+        "alias": { "type": ["string", "null"], "pattern": "^a[0-9a-z]{7}$" },
+        "account": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{32}$" },
+        "endpoint": { "type": ["string", "null"], "format": "uri", "pattern": "^https://[^/?#]+/?$" },
+        "audience": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$" }
+      }
+    },
+    "pins": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "workflow_ref": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$" },
+        "workflow_sha": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+        "action_ref": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$" },
+        "bundle_digest": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "renewal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "cadence_minutes", "max_lease_minutes"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "cadence_minutes": { "type": "integer", "minimum": 30, "maximum": 1440 },
+        "max_lease_minutes": { "type": "integer", "minimum": 1, "maximum": 60 }
+      }
+    },
+    "managed_files": {
+      "type": ["array", "null"],
+      "items": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^(?!/)(?!.*\\.\\.)(?!.*//)(?!.*\\/$)[A-Za-z0-9._/-]+$" },
+      "uniqueItems": true,
+      "maxItems": 32
+    },
+    "base_ref": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*\\.\\.)(?!.*//)(?!.*\\/$)(?!.*\\.$)(?!.*\\/\\.)[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$",
+      "maxLength": 128
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_path", "solution_path"],
+      "properties": {
+        "policy_path": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^(?!/)(?!.*\\.\\.)(?!.*//)(?!.*\\/$)[A-Za-z0-9._/-]+$" },
+        "solution_path": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^(?!/)(?!.*\\.\\.)(?!.*//)(?!.*\\/$)[A-Za-z0-9._/-]+$" }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflow_path", "workflow_sha", "job_name", "check_name", "check_app", "event", "artifact_name", "evidence_artifact_name", "payload_path"],
+      "properties": {
+        "workflow_path": { "type": "string", "pattern": "^(?!.*\\.\\.)\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$" },
+        "workflow_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "job_name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,127}$" },
+        "check_name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,127}$" },
+        "check_app": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+        "event": { "const": "pull_request" },
+        "artifact_name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,127}$" },
+        "evidence_artifact_name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]{0,127}$" },
+        "payload_path": { "const": "architecture-health-badge.json" }
+      }
+    },
+    "disclosure_approved": { "type": "boolean" },
+    "provider_plan": { "type": ["string", "null"], "enum": ["free", "pro", "team", "enterprise", null] }
+  }
+}

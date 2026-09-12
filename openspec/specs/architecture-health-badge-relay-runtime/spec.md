@@ -28,24 +28,37 @@ without an explicit safe registration procedure.
 - **AND** it does not create a Durable Object or registry record for that alias
 
 ### Requirement: OIDC publisher authentication fails closed
-The Relay SHALL accept a publisher token only after bounded verification of the
-fixed GitHub issuer and JWKS endpoint, RS256 protected header, configured
-audience, signature, required time claims with contract skew, immutable IDs,
-event/ref, exact workflow path and SHA, and configured subject form. It SHALL
-not trust token-derived URLs, unapproved algorithms, unknown keys after one
-fixed-chain refresh, or missing/mismatched claims. Token and claim values SHALL
-not be exposed in public responses, redirects, headers, or telemetry.
+
+The Relay SHALL accept an initial publisher token only for the exact `push`
+event and configured branch ref. A metadata-only renewal token MAY use
+`schedule` only when the immutable registry entry explicitly allowlists that
+event and reaches only the `renew` operation; all other mutation operations
+require `push`. It SHALL still match the registered IDs, ref, exact workflow
+path and SHA, audience, subject, and bounded time claims. It SHALL not trust token-
+derived URLs, unapproved algorithms, unknown keys after one fixed-chain
+refresh, or missing/mismatched claims. Token and claim values SHALL not be
+exposed in public responses, redirects, headers, or telemetry.
 
 #### Scenario: Pin mismatch is rejected before a write
-- **WHEN** a signed token has a workflow reference or workflow SHA that differs
-  from its registry entry
+
+- **WHEN** a signed token has a workflow reference or workflow SHA that
+  differs from its registry entry
 - **THEN** the Relay rejects the request before state mutation
 - **AND** it returns only a redacted authorization failure
 
 #### Scenario: Key outage fails closed
+
 - **WHEN** the fixed JWKS endpoint cannot safely resolve the protected key
 - **THEN** the Relay rejects the publisher request with a bounded failure
-- **AND** it does not serve or create a new ready state as a fallback
+- **AND** it does not serve or create a new ready state
+
+#### Scenario: Renewal event is allowlisted without weakening identity
+
+- **WHEN** the registry explicitly allows `schedule` and a renewal token
+  presents the registered identity and workflow binding
+- **THEN** OIDC authentication accepts the event for metadata-only renewal
+- **AND** a `schedule` token is rejected when the registry does not explicitly
+  allow it or any other claim differs
 
 ### Requirement: Publication is challenge-bound and atomic
 The Relay SHALL bind a prepared publication to a one-use challenge, JTI hash,

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
+using ArchLinterNet.Cli.Commands.Badge.Application.Setup;
 
 namespace ArchLinterNet.Cli.Commands.Badge.Application;
 
@@ -11,6 +12,10 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
         "arch-linter-net badge architecture-health --input <architecture-health.json> [--output <badge.json>] "
         + "[--disclosure-profile <headline-only/v1|headline-plus-freshness/v1>] [--verified-at <UTC>] "
         + "[--verify-disclosure-profile]";
+
+    internal int ExecuteSetup(BadgeSetupCommandOptions options) => new BadgeSetupCommandHandler(console, fileSystem).ExecuteSetup(options);
+
+    internal int ExecuteDoctor(BadgeSetupCommandOptions options) => new BadgeSetupCommandHandler(console, fileSystem).ExecuteDoctor(options);
 
     public int Execute(BadgeCommandOptions options)
     {

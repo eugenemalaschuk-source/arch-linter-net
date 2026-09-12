@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-09-13
+goal: Make generated Relay renewal wiring and preview cost semantics agree for
+  every supported cadence.
