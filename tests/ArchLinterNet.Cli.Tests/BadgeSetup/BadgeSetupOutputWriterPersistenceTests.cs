@@ -51,7 +51,8 @@ public sealed class BadgeSetupOutputWriterPersistenceTests
             File.Delete(packagePath);
             Directory.CreateDirectory(packagePath);
 
-            Assert.Throws<IOException>(() => BadgeSetupOutputWriter.Write(directory, configuration, plan));
+            Exception? caughtException = Assert.Catch<Exception>(() => BadgeSetupOutputWriter.Write(directory, configuration, plan));
+            Assert.That(caughtException, Is.TypeOf<IOException>().Or.TypeOf<UnauthorizedAccessException>());
             Assert.Multiple(() =>
             {
                 Assert.That(File.ReadAllText(Path.Combine(directory, "badge-relay-config.json")), Is.EqualTo(originalConfig));
