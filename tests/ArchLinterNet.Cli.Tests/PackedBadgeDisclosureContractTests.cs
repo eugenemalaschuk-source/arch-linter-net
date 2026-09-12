@@ -30,6 +30,7 @@ public sealed class PackedBadgeDisclosureContractTests
             string packagePath = Directory.EnumerateFiles(feed, "ArchLinterNet.Cli.*.nupkg").Single();
 
             string prefix = "tools/net10.0/any/architecture-health-badge-relay/";
+            string setupPrefix = "tools/net10.0/any/architecture-health-badge-setup/";
             string[] requiredAssets =
             [
                 "README.md",
@@ -47,6 +48,18 @@ public sealed class PackedBadgeDisclosureContractTests
                     ZipArchiveEntry? entry = package.GetEntry(prefix + asset);
                     Assert.That(entry, Is.Not.Null, $"Missing packed contract asset '{asset}'.");
                     entry!.ExtractToFile(Path.Combine(extracted, asset));
+                }
+
+                foreach (string asset in new[]
+                {
+                    setupPrefix + "schema/0.8.0/badge-relay-config.schema.json",
+                    setupPrefix + "relay/src/index.ts",
+                    setupPrefix + "relay/package.json",
+                    setupPrefix + "relay/package-lock.json",
+                    setupPrefix + "relay/wrangler.jsonc",
+                })
+                {
+                    Assert.That(package.GetEntry(asset), Is.Not.Null, $"Missing packed setup asset '{asset}'.");
                 }
             }
 
@@ -88,6 +101,15 @@ public sealed class PackedBadgeDisclosureContractTests
             {
                 Assert.That(rejected.ExitCode, Is.EqualTo(2), rejected.Output + rejected.Error);
                 Assert.That(rejected.Output, Does.Contain("\"valid\":false"));
+            });
+
+            CommandResult setup = Run(installedTool, root,
+                "badge", "architecture-health", "setup", "--repository", "synthetic-owner/synthetic-repo",
+                "--visibility", "private", "--dry-run");
+            Assert.Multiple(() =>
+            {
+                Assert.That(setup.ExitCode, Is.EqualTo(0), setup.Output + setup.Error);
+                Assert.That(setup.Output, Does.Contain("\"Mode\":\"none\""));
             });
         }
         finally
@@ -136,10 +158,13 @@ public sealed class PackedBadgeDisclosureContractTests
         }
 
         using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException($"Could not start '{fileName}'.");
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> errorTask = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
-        return new CommandResult(process.ExitCode, output, error);
+        return new CommandResult(
+            process.ExitCode,
+            outputTask.GetAwaiter().GetResult(),
+            errorTask.GetAwaiter().GetResult());
     }
 
     private static void AssertSuccess(CommandResult result) =>

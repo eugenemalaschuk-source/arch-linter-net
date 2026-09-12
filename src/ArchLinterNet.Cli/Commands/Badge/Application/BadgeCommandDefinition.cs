@@ -1,4 +1,5 @@
 using System.CommandLine;
+using ArchLinterNet.Cli.Commands.Badge.Application.Setup;
 
 namespace ArchLinterNet.Cli.Commands.Badge.Application;
 
@@ -35,6 +36,41 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
             result.GetValue(disclosureProfile),
             result.GetValue(verifiedAt),
             result.GetValue(verifyDisclosureProfile))));
+        Command setup = new("setup", "Preview or generate a versioned consumer badge setup.");
+        Option<string> setupInput = new("--input");
+        Option<string> setupOutput = new("--output");
+        Option<string> setupRepository = new("--repository");
+        Option<string> setupVisibility = new("--visibility");
+        Option<string> setupMode = new("--mode");
+        Option<string> setupProfile = new("--disclosure-profile");
+        Option<string> setupAccount = new("--account");
+        Option<string> setupAlias = new("--alias");
+        Option<string> setupEndpoint = new("--endpoint");
+        Option<string> setupPlan = new("--provider-plan");
+        Option<int?> cadence = new("--cadence-minutes");
+        Option<int?> lease = new("--max-lease-minutes");
+        Option<bool> renewal = new("--renewal");
+        Option<bool> dryRun = new("--dry-run");
+        Option<string> setupFormat = new("--format") { DefaultValueFactory = _ => "json" };
+        Option<bool> setupHelp = new("--help");
+        setupHelp.Aliases.Add("-h");
+        foreach (Option option in new Option[] { setupInput, setupOutput, setupRepository, setupVisibility, setupMode, setupProfile, setupAccount, setupAlias, setupEndpoint, setupPlan, cadence, lease, renewal, dryRun, setupFormat, setupHelp }) setup.Options.Add(option);
+        setup.SetAction(result => handler.ExecuteSetup(new BadgeSetupCommandOptions(
+            result.GetValue(setupInput), result.GetValue(setupOutput), result.GetValue(setupRepository), result.GetValue(setupVisibility),
+            result.GetValue(setupMode), result.GetValue(setupProfile), result.GetValue(setupAccount), result.GetValue(setupAlias), result.GetValue(setupEndpoint), result.GetValue(setupPlan),
+            result.GetValue(cadence), result.GetValue(lease), result.GetValue(renewal), result.GetValue(dryRun), false, result.GetValue(setupFormat) ?? "json", result.GetValue(setupHelp))));
+        Command doctor = new("doctor", "Diagnose a versioned badge setup without writing.");
+        Option<string> doctorInput = new("--input");
+        Option<bool> publicDiagnostics = new("--public");
+        Option<string> doctorFormat = new("--format") { DefaultValueFactory = _ => "json" };
+        Option<bool> doctorHelp = new("--help");
+        doctorHelp.Aliases.Add("-h");
+        foreach (Option option in new Option[] { doctorInput, publicDiagnostics, doctorFormat, doctorHelp }) doctor.Options.Add(option);
+        doctor.SetAction(result => handler.ExecuteDoctor(new BadgeSetupCommandOptions(
+            result.GetValue(doctorInput), null, null, null, null, null, null, null, null, null, null, null, false, true,
+            result.GetValue(publicDiagnostics), result.GetValue(doctorFormat) ?? "json", result.GetValue(doctorHelp))));
+        health.Subcommands.Add(setup);
+        health.Subcommands.Add(doctor);
         badge.Subcommands.Add(policy);
         badge.Subcommands.Add(health);
         return badge;
