@@ -1,0 +1,92 @@
+{
+  "schema": "architecture-health-badge-promotion/registry/v1",
+  "configurations": {
+    "reference-public-raw": {
+      "schema_id": "architecture-health-badge-promotion/v1",
+      "repository": "eugenemalaschuk-source/arch-linter-net",
+      "repository_visibility": "public",
+      "base_ref": "main",
+      "producer": {
+        "workflow_path": ".github/workflows/ci.yml",
+        "workflow_sha": "27e933c2bb3e0931f706a6662f388eeeb8e1acb6",
+        "job_name": "Architecture Coverage",
+        "check_name": "Architecture Coverage",
+        "check_app": "github-actions",
+        "event": "pull_request",
+        "artifact_name": "architecture-health-badge-v1",
+        "evidence_artifact_name": "architecture-health",
+        "payload_path": "architecture-health-badge.json"
+      },
+      "destination": {
+        "adapter": "github-raw",
+        "branch": "architecture-health-badge",
+        "endpoint_path": "architecture-health.json"
+      },
+      "disclosure_profile": "headline-only/v1",
+      "validity": { "max_lease_seconds": 3600 },
+      "limits": {
+        "max_archive_bytes": 65536,
+        "max_member_bytes": 16384,
+        "max_payload_bytes": 16384,
+        "max_members": 2
+      }
+    },
+    "reference-relay": {
+      "schema_id": "architecture-health-badge-promotion/v1",
+      "repository": "synthetic-owner/synthetic-repo",
+      "repository_visibility": "private",
+      "base_ref": "main",
+      "producer": {
+        "workflow_path": ".github/workflows/ci.yml",
+        "workflow_sha": "27e933c2bb3e0931f706a6662f388eeeb8e1acb6",
+        "job_name": "Architecture Coverage",
+        "check_name": "Architecture Coverage",
+        "check_app": "github-actions",
+        "event": "pull_request",
+        "artifact_name": "architecture-health-badge-v1",
+        "evidence_artifact_name": "architecture-health",
+        "payload_path": "architecture-health-badge.json"
+      },
+      "destination": {
+        "adapter": "relay",
+        "alias": "a7f4k2m9",
+        "endpoint": "https://relay.example.invalid",
+        "audience": "architecture-health-badge-relay-fixture"
+      },
+      "disclosure_profile": "headline-only/v1",
+      "validity": { "max_lease_seconds": 3600 },
+      "limits": {
+        "max_archive_bytes": 65536,
+        "max_member_bytes": 16384,
+        "max_payload_bytes": 16384,
+        "max_members": 2
+      }
+    },
+    "reference-none": {
+      "schema_id": "architecture-health-badge-promotion/v1",
+      "repository": "eugenemalaschuk-source/arch-linter-net",
+      "repository_visibility": "public",
+      "base_ref": "main",
+      "producer": {
+        "workflow_path": ".github/workflows/ci.yml",
+        "workflow_sha": "27e933c2bb3e0931f706a6662f388eeeb8e1acb6",
+        "job_name": "Architecture Coverage",
+        "check_name": "Architecture Coverage",
+        "check_app": "github-actions",
+        "event": "pull_request",
+        "artifact_name": "architecture-health-badge-v1",
+        "evidence_artifact_name": "architecture-health",
+        "payload_path": "architecture-health-badge.json"
+      },
+      "destination": { "adapter": "none" },
+      "disclosure_profile": "headline-only/v1",
+      "validity": { "max_lease_seconds": 3600 },
+      "limits": {
+        "max_archive_bytes": 65536,
+        "max_member_bytes": 16384,
+        "max_payload_bytes": 16384,
+        "max_members": 2
+      }
+    }
+  }
+}

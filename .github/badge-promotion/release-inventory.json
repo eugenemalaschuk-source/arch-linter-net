@@ -1,0 +1,25 @@
+{
+  "schema": "architecture-health-badge-release-inventory/v1",
+  "lifecycle": "milestone-6/v0.8.x-completeness",
+  "release_authority": "#806",
+  "publication": "not-authorized",
+  "components": [
+    {
+      "kind": "reusable-workflow",
+      "path": ".github/workflows/architecture-health-badge-promotion.yml",
+      "approved_source_sha": "27e933c2bb3e0931f706a6662f388eeeb8e1acb6"
+    },
+    {
+      "kind": "composite-action",
+      "path": ".github/actions/architecture-health-badge-promotion/action.yml",
+      "approved_source_sha": "b400bd026eb8a7ab6e7d55619f0d39cfc65111e6"
+    },
+    {
+      "kind": "configuration-registry",
+      "path": ".github/badge-promotion/registry.json",
+      "approved_source_sha": "d0e6054e1af1682772521d2b504ee7defb0edc94"
+    }
+  ],
+  "excluded": ["v0.9-performance", "#650", "#787"],
+  "handoff": "#825 -> #806 reviewed candidate scope and released-artifact verification"
+}

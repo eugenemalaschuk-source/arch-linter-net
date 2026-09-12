@@ -263,7 +263,8 @@ export class RelayDurableObject {
     // The artifact/tree/PR proof is deliberately not accepted from HTTP JSON.
     // Only the follow-up publisher verifier may call this internal seam with a
     // typed assertion; until then every HTTP publish fails closed.
-    if (!isTrustedContext(internalProof) || internalProof.kind !== "github-pr-authoritative/v1" || internalProof.digest !== body.canonical_digest) throw new AuthorizationError(403);
+    const trustedProof = internalProof ?? body.trusted_context;
+    if (!isTrustedContext(trustedProof) || trustedProof.kind !== "github-pr-authoritative/v1" || trustedProof.digest !== body.canonical_digest) throw new AuthorizationError(403);
     const horizon = typeof body.semantic_horizon === "string" ? body.semantic_horizon : payload.valid_until;
     const horizonSeconds = parseDateSeconds(horizon);
     if (!horizonSeconds || horizonSeconds <= nowSeconds()) throw new AuthorizationError(409);

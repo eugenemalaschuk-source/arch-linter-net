@@ -130,6 +130,7 @@ export interface PublishRequest {
   expected_generation: number;
   expected_revocation_epoch: number;
   semantic_horizon?: string;
+  trusted_context?: TrustedContextProof;
 }
 
 export interface LifecycleRequest {

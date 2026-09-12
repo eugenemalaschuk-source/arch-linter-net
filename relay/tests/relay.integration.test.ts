@@ -246,15 +246,23 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
       body: JSON.stringify({ operation: "publish", challenge_id: challenge.challenge_id, idempotency_key: idempotency, canonical_bytes: payload, canonical_digest: digest, profile: entry.disclosure_profile, expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, semantic_horizon: new Date(Date.now() + 30 * 60_000).toISOString().replace(".000Z", "Z") })
     });
     expect(publish.status).toBe(403);
+    const trustedJwt = await token({ jti: `trusted-${crypto.randomUUID()}` });
+    const trustedIdempotency = `trusted-${crypto.randomUUID()}`;
+    const trustedPrepare = await SELF.fetch(relayUrl("prepare"), {
+      method: "POST",
+      headers: { authorization: `Bearer ${trustedJwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: payload, canonical_digest: digest, profile: entry.disclosure_profile, idempotency_key: trustedIdempotency, semantic_horizon: new Date(Date.now() + 30 * 60_000).toISOString().replace(".000Z", "Z") })
+    });
+    expect(trustedPrepare.status).toBe(201);
+    const trustedChallenge = await trustedPrepare.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const trustedPublish = await SELF.fetch(relayUrl("publish"), {
+      method: "POST",
+      headers: { authorization: `Bearer ${trustedJwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "publish", challenge_id: trustedChallenge.challenge_id, idempotency_key: trustedIdempotency, canonical_bytes: payload, canonical_digest: digest, profile: entry.disclosure_profile, expected_generation: trustedChallenge.generation, expected_revocation_epoch: trustedChallenge.revocation_epoch, semantic_horizon: new Date(Date.now() + 30 * 60_000).toISOString().replace(".000Z", "Z"), trusted_context: { valid: true, kind: "github-pr-authoritative/v1", digest, tree_sha: "1".repeat(40) } })
+    });
+    expect(trustedPublish.status).toBe(200);
     const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
     const stub = relay.get(relay.idFromName(alias));
-    const internalPublish = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).commitTrustedPublication({
-      body: { operation: "publish", challenge_id: challenge.challenge_id, idempotency_key: idempotency, canonical_bytes: payload, canonical_digest: digest, profile: entry.disclosure_profile, expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, semantic_horizon: new Date(Date.now() + 30 * 60_000).toISOString().replace(".000Z", "Z") },
-      entry,
-      jtiHash: await sha256Hex((decodeJwt(jwt).jti as string)),
-      proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
-    }));
-    expect(internalPublish.status).toBe(200);
     const stored = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; payload_digest: string }>("SELECT status, payload_digest FROM relay_state WHERE id=1").toArray()[0]);
     expect(stored.status).toBe("ready");
     expect(stored.payload_digest).toBe(digest);

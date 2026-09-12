@@ -1,0 +1,30 @@
+{
+  "schema_id": "architecture-health-badge-promotion/v1",
+  "repository": "synthetic-owner/synthetic-repo",
+  "repository_visibility": "public",
+  "base_ref": "main",
+  "producer": {
+    "workflow_path": ".github/workflows/ci.yml",
+    "workflow_sha": "2222222222222222222222222222222222222222",
+    "job_name": "Architecture Coverage",
+    "check_name": "Architecture Coverage",
+    "check_app": "github-actions",
+    "event": "pull_request",
+    "artifact_name": "architecture-health-badge-v1",
+    "evidence_artifact_name": "architecture-health",
+    "payload_path": "architecture-health-badge.json"
+  },
+  "destination": {
+    "adapter": "none"
+  },
+  "disclosure_profile": "headline-only/v1",
+  "validity": {
+    "max_lease_seconds": 3600
+  },
+  "limits": {
+    "max_archive_bytes": 65536,
+    "max_member_bytes": 16384,
+    "max_payload_bytes": 16384,
+    "max_members": 2
+  }
+}

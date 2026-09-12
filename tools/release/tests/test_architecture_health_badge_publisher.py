@@ -1,680 +1,80 @@
 from __future__ import annotations
 
-import base64
-import hashlib
 import json
-import os
-import subprocess
-import tempfile
-from collections.abc import Mapping
-from datetime import datetime
 from pathlib import Path
 
-import pytest
 
-
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-_WORKFLOW = _REPOSITORY_ROOT / ".github" / "workflows" / "publish-architecture-health-badge.yml"
-_REPOSITORY = "eugenemalaschuk-source/arch-linter-net"
-_MAIN_SHA = "b" * 40
-_BASE_SHA = "c" * 40
-_HEAD_SHA = "a" * 40
-_TREE_SHA = "d" * 40
-_RUN_ID = 123456
-_RUN_ATTEMPT = 2
-_PUBLISHER_RUN_ID = 987654
-_PUBLISHER_RUN_ATTEMPT = 3
-_UNAVAILABLE_PAYLOAD_PATH = "architecture/architecture-health-badge-unavailable.json"
-
-
-_NODE_HARNESS = r"""
-import { createRequire } from 'node:module';
-
-const require = createRequire(import.meta.url);
-const script = Buffer.from(process.env.WORKFLOW_SCRIPT_B64, 'base64').toString('utf8');
-const fixture = JSON.parse(Buffer.from(process.env.WORKFLOW_FIXTURE_B64, 'base64').toString('utf8'));
-const outputs = {};
-const calls = [];
-const missing = () => Object.assign(new Error('not found'), { status: 404 });
-const failWhen = (name) => {
-  if (fixture.failAt === name) {
-    const error = new Error(`simulated failure at ${name}`);
-    if (fixture.failStatus !== undefined) error.status = fixture.failStatus;
-    throw error;
-  }
-};
-const core = {
-  setOutput(name, value) { outputs[name] = String(value); },
-  warning() {},
-  notice() {},
-};
-const github = {
-  request: async (route, parameters) => {
-    calls.push({ type: 'request', route, parameters });
-    if (route === 'GET /repos/{owner}/{repo}/rules/branches/{branch}') {
-      return { data: fixture.effectiveRules ?? [] };
-    }
-    throw new Error(`unexpected request: ${route}`);
-  },
-  paginate: async (method, parameters) => {
-    calls.push({ type: 'paginate', method: method.name, parameters });
-    if (method === github.rest.repos.listPullRequestsAssociatedWithCommit) return fixture.associated ?? [];
-    if (method === github.rest.actions.listWorkflowRunsForRepo) return fixture.runs ?? [];
-    if (method === github.rest.actions.listJobsForWorkflowRun) return fixture.jobs ?? [];
-    if (method === github.rest.actions.listWorkflowRunArtifacts) return fixture.artifacts ?? [];
-    throw new Error(`unexpected paginated method: ${method.name}`);
-  },
-  rest: {
-    repos: {
-      listPullRequestsAssociatedWithCommit: async function listPullRequestsAssociatedWithCommit() {},
-      getCommit: async (parameters) => {
-        calls.push({ type: 'repos.getCommit', parameters });
-        if (parameters.ref === process.env.MAIN_SHA) {
-          return { data: fixture.mainCommit ?? { commit: { tree: { sha: 'd'.repeat(40) } } } };
-        }
-        if (parameters.ref === fixture.pullRequest?.head?.sha) return { data: fixture.headCommit };
-        if (parameters.ref === fixture.publicationRefSha) return { data: fixture.publicationCommit };
-        throw missing();
-      },
-      getContent: async (parameters) => {
-        calls.push({ type: 'repos.getContent', parameters });
-        if (fixture.contents?.[parameters.path]) return { data: fixture.contents[parameters.path] };
-        throw missing();
-      },
-    },
-    pulls: {
-      get: async (parameters) => {
-        calls.push({ type: 'pulls.get', parameters });
-        return { data: fixture.pullRequest };
-      },
-    },
-    checks: {
-      listForRef: async (parameters) => {
-        calls.push({ type: 'checks.listForRef', parameters });
-        return { data: { check_runs: fixture.checkRuns ?? [] } };
-      },
-    },
-    actions: {
-      listWorkflowRunsForRepo: async function listWorkflowRunsForRepo() {},
-      listJobsForWorkflowRun: async function listJobsForWorkflowRun() {},
-      listWorkflowRunArtifacts: async function listWorkflowRunArtifacts() {},
-    },
-      git: {
-        getRef: async (parameters) => {
-          calls.push({ type: 'git.getRef', parameters });
-          if (parameters.ref === 'heads/main') {
-            return { data: { object: { sha: fixture.currentMainSha ?? process.env.MAIN_SHA } } };
-          }
-          if (parameters.ref === 'heads/architecture-health-badge' && fixture.branchExists) {
-            return { data: { object: { sha: fixture.publicationRefSha ?? process.env.MAIN_SHA } } };
-          }
-          throw missing();
-        },
-        createRef: async (parameters) => {
-          calls.push({ type: 'git.createRef', parameters });
-          failWhen('git.createRef');
-          return { data: {} };
-        },
-        updateRef: async (parameters) => {
-          calls.push({ type: 'git.updateRef', parameters });
-          failWhen('git.updateRef');
-          return { data: {} };
-        },
-        createBlob: async (parameters) => {
-          calls.push({ type: 'git.createBlob', parameters });
-          failWhen('git.createBlob');
-          return { data: { sha: `${calls.length}`.padStart(40, '0') } };
-        },
-        createTree: async (parameters) => {
-          calls.push({ type: 'git.createTree', parameters });
-          failWhen('git.createTree');
-          return { data: { sha: '1'.repeat(40) } };
-        },
-        createCommit: async (parameters) => {
-          calls.push({ type: 'git.createCommit', parameters });
-          failWhen('git.createCommit');
-          return { data: { sha: '2'.repeat(40) } };
-        },
-      },
-  },
-};
-const context = { repo: { owner: 'eugenemalaschuk-source', repo: 'arch-linter-net' } };
-
-try {
-  const execute = new Function('require', 'github', 'core', 'context', `return (async () => {\n${script}\n})()`);
-  await execute(require, github, core, context);
-  process.stdout.write(JSON.stringify({ outputs, calls }));
-} catch (error) {
-  if (fixture.expectError) {
-    process.stdout.write(JSON.stringify({ outputs, calls, error: error.message }));
-  } else {
-    process.stderr.write(error.stack ?? String(error));
-    process.exitCode = 1;
-  }
-}
-"""
-
-
-def _workflow() -> str:
-    return _WORKFLOW.read_text(encoding="utf-8")
-
-
-def _script(step_name: str) -> str:
-    workflow = _workflow()
-    step_start = workflow.index(f"      - name: {step_name}\n")
-    script_start = workflow.index("          script: |\n", step_start) + len("          script: |\n")
-    next_step = workflow.find("      - name: ", script_start)
-    return "".join(
-        line[12:] if line.startswith("            ") else line
-        for line in workflow[script_start : None if next_step == -1 else next_step].splitlines(keepends=True)
-    )
-
-
-def _run_script(
-    step_name: str,
-    fixture: Mapping[str, object],
-    *,
-    environment: Mapping[str, str] | None = None,
-    files: Mapping[str, bytes] | None = None,
-) -> dict[str, object]:
-    with tempfile.TemporaryDirectory() as directory:
-        root = Path(directory)
-        (root / "runner.mjs").write_text(_NODE_HARNESS, encoding="utf-8")
-        for relative_path, contents in (files or {}).items():
-            path = root / relative_path
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(contents)
-        process_environment = os.environ | {
-            "WORKFLOW_SCRIPT_B64": base64.b64encode(_script(step_name).encode()).decode(),
-            "WORKFLOW_FIXTURE_B64": base64.b64encode(json.dumps(fixture).encode()).decode(),
-            "MAIN_SHA": _MAIN_SHA,
-        }
-        process_environment.update(environment or {})
-        completed = subprocess.run(
-            ["node", "runner.mjs"],
-            cwd=root,
-            env=process_environment,
-            capture_output=True,
-            check=False,
-            encoding="utf-8",
-        )
-        assert completed.returncode == 0, completed.stderr
-        return json.loads(completed.stdout)
-
-
-def _fixture(*, head_tree: str = _TREE_SHA, artifacts: list[dict[str, object]] | None = None) -> dict[str, object]:
-    return {
-        "mainCommit": {"commit": {"tree": {"sha": _TREE_SHA}}, "parents": [{"sha": _BASE_SHA}]},
-        "headCommit": {"commit": {"tree": {"sha": head_tree}}},
-        "associated": [{"number": 759}],
-        "pullRequest": {
-            "number": 759,
-            "base": {"ref": "main", "repo": {"full_name": _REPOSITORY}},
-            "head": {"sha": _HEAD_SHA},
-            "merged": True,
-            "merge_commit_sha": _MAIN_SHA,
-        },
-        "rulesets": [{"id": 1, "enforcement": "active"}],
-        "effectiveRules": [
-            {
-                "type": "required_status_checks",
-                "parameters": {
-                    "strict_required_status_checks_policy": True,
-                    "required_status_checks": [{"context": "Architecture Coverage"}],
-                },
-            }
-        ],
-        "checkRuns": [
-            {
-                "name": "Architecture Coverage",
-                "status": "completed",
-                "conclusion": "success",
-                "app": {"slug": "github-actions"},
-                "details_url": f"https://github.com/{_REPOSITORY}/actions/runs/{_RUN_ID}/job/1",
-            }
-        ],
-        "runs": [
-            {
-                "id": _RUN_ID,
-                "run_attempt": _RUN_ATTEMPT,
-                "path": ".github/workflows/ci.yml",
-                "event": "pull_request",
-                "head_sha": _HEAD_SHA,
-                "conclusion": "success",
-            }
-        ],
-        "jobs": [{"name": "Architecture Coverage", "conclusion": "success"}],
-        "artifacts": artifacts
-        if artifacts is not None
-        else [{"id": 42, "name": "architecture-health-badge-v1", "expired": False, "size_in_bytes": 1024}],
-    }
-
-
-def _payload() -> bytes:
-    return b'{"schemaVersion":1,"label":"architecture","message":"DEBT \\u00b7 7 ignores \\u00b7 42 rules","color":"yellow"}'
-
-
-def _unavailable_content() -> dict[str, str]:
-    payload = (_REPOSITORY_ROOT / _UNAVAILABLE_PAYLOAD_PATH).read_bytes()
-    return {
-        "type": "file",
-        "encoding": "base64",
-        "content": base64.b64encode(payload).decode(),
-    }
-
-
-def _manifest(badge_payload: bytes, **overrides: object) -> bytes:
-    context = {
-        "repository": _REPOSITORY,
-        "pr_number": "759",
-        "base_ref": "main",
-        "base_sha": _BASE_SHA,
-        "head_sha": _HEAD_SHA,
-        "head_tree_sha": _TREE_SHA,
-        "run_id": str(_RUN_ID),
-        "run_attempt": str(_RUN_ATTEMPT),
-    }
-    context.update(overrides.pop("context", {}))
-    document: dict[str, object] = {
-        "schema": "architecture-health-badge-promotion/v1",
-        "kind": "architecture-health-badge",
-        "context": context,
-        "payload": {
-            "path": "architecture-health-badge.json",
-            "bytes": len(badge_payload),
-            "sha256": hashlib.sha256(badge_payload).hexdigest(),
-        },
-    }
-    document.update(overrides)
-    return json.dumps(document, separators=(",", ":")).encode()
-
-
-def _validation_environment() -> dict[str, str]:
-    return {
-        "EXPECTED_BASE_SHA": _BASE_SHA,
-        "EXPECTED_HEAD_SHA": _HEAD_SHA,
-        "EXPECTED_HEAD_TREE_SHA": _TREE_SHA,
-        "EXPECTED_PR_NUMBER": "759",
-        "EXPECTED_REPOSITORY": _REPOSITORY,
-        "EXPECTED_RUN_ATTEMPT": str(_RUN_ATTEMPT),
-        "EXPECTED_RUN_ID": str(_RUN_ID),
-    }
-
-
-def _artifact_files(badge_payload: bytes, **overrides: object) -> dict[str, bytes]:
-    return {
-        "incoming-health-badge/architecture-health-badge.json": badge_payload,
-        "incoming-health-badge/architecture-health-badge.manifest.json": _manifest(badge_payload, **overrides),
-    }
-
-
-def _receipt(result: dict[str, object]) -> dict[str, object]:
-    blobs = [call["parameters"] for call in result["calls"] if call["type"] == "git.createBlob"]
-    assert len(blobs) == 2
-    return json.loads(base64.b64decode(blobs[1]["content"]).decode("utf-8"))
-
-
-def _publisher_environment() -> dict[str, str]:
-    return {
-        "PUBLISHER_RUN_ID": str(_PUBLISHER_RUN_ID),
-        "PUBLISHER_RUN_ATTEMPT": str(_PUBLISHER_RUN_ATTEMPT),
-    }
-
-
-def test_resolve_accepts_required_successful_pr_evidence_with_matching_squash_tree() -> None:
-    result = _run_script("Resolve required PR evidence for the merged tree", _fixture())
-
-    assert result["outputs"] == {
-        "reason": "ready",
-        "artifact_id": "42",
-        "base_sha": _BASE_SHA,
-        "head_sha": _HEAD_SHA,
-        "head_tree_sha": _TREE_SHA,
-        "main_tree_sha": _TREE_SHA,
-        "pr_number": "759",
-        "producer_run_attempt": str(_RUN_ATTEMPT),
-        "producer_run_id": str(_RUN_ID),
-    }
-    effective_rule_request = next(call for call in result["calls"] if call["type"] == "request")
-    assert effective_rule_request == {
-        "type": "request",
-        "route": "GET /repos/{owner}/{repo}/rules/branches/{branch}",
-        "parameters": {"owner": "eugenemalaschuk-source", "repo": "arch-linter-net", "branch": "main"},
-    }
-
-
-def test_resolve_rejects_matching_metadata_with_a_different_merged_tree() -> None:
-    result = _run_script("Resolve required PR evidence for the merged tree", _fixture(head_tree="e" * 40))
-
-    assert result["outputs"] == {
-        "reason": "merged_tree_mismatch",
-        "base_sha": _BASE_SHA,
-        "main_tree_sha": _TREE_SHA,
-        "pr_number": "759",
-        "head_sha": _HEAD_SHA,
-        "producer_run_attempt": str(_RUN_ATTEMPT),
-        "producer_run_id": str(_RUN_ID),
-        "head_tree_sha": "e" * 40,
-    }
-
-
-@pytest.mark.parametrize(
-    ("fixture", "reason"),
-    [
-        (_fixture(artifacts=[]), "badge_artifact_missing"),
-        (
-            _fixture(artifacts=[{"id": 42, "name": "architecture-health-badge-v1", "expired": True, "size_in_bytes": 1}]),
-            "badge_artifact_invalid",
-        ),
-    ],
-)
-def test_resolve_fails_closed_when_promotion_artifact_is_unavailable(
-    fixture: dict[str, object],
-    reason: str,
-) -> None:
-    result = _run_script("Resolve required PR evidence for the merged tree", fixture)
-
-    assert result["outputs"] == {
-        "reason": reason,
-        "base_sha": _BASE_SHA,
-        "main_tree_sha": _TREE_SHA,
-        "pr_number": "759",
-        "head_sha": _HEAD_SHA,
-        "producer_run_attempt": str(_RUN_ATTEMPT),
-        "producer_run_id": str(_RUN_ID),
-        "head_tree_sha": _TREE_SHA,
-    }
-
-
-def test_rejected_resolution_preserves_known_provenance_in_the_unassessable_receipt() -> None:
-    resolution = _run_script("Resolve required PR evidence for the merged tree", _fixture(artifacts=[]))
-    workflow = _workflow()
-
-    assert "MAIN_TREE_SHA: ${{ steps.resolve.outputs.main_tree_sha }}" in workflow
-    assert "ANALYZED_BASE_SHA: ${{ steps.resolve.outputs.base_sha }}" in workflow
-    assert "ANALYZED_HEAD_SHA: ${{ steps.resolve.outputs.head_sha }}" in workflow
-    assert "ANALYZED_HEAD_TREE_SHA: ${{ steps.resolve.outputs.head_tree_sha }}" in workflow
-    assert "PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}" in workflow
-    assert "PRODUCER_RUN_ID: ${{ steps.resolve.outputs.producer_run_id }}" in workflow
-    assert "PRODUCER_RUN_ATTEMPT: ${{ steps.resolve.outputs.producer_run_attempt }}" in workflow
-
-    receipt_result = _run_script(
-        "Publish fixed badge endpoint and metadata",
-        {"branchExists": False, "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()}},
-        environment={
-            **_publisher_environment(),
-            "MAIN_SHA": _MAIN_SHA,
-            "MAIN_TREE_SHA": str(resolution["outputs"]["main_tree_sha"]),
-            "ANALYZED_BASE_SHA": str(resolution["outputs"]["base_sha"]),
-            "ANALYZED_HEAD_SHA": str(resolution["outputs"]["head_sha"]),
-            "ANALYZED_HEAD_TREE_SHA": str(resolution["outputs"]["head_tree_sha"]),
-            "PR_NUMBER": str(resolution["outputs"]["pr_number"]),
-            "PRODUCER_RUN_ID": str(resolution["outputs"]["producer_run_id"]),
-            "PRODUCER_RUN_ATTEMPT": str(resolution["outputs"]["producer_run_attempt"]),
-            "PUBLICATION_REASON": str(resolution["outputs"]["reason"]),
-            "PUBLICATION_STATUS": "unassessable",
-            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
-        },
-    )
-
-    receipt = _receipt(receipt_result)
-    assert receipt["status"] == "unassessable"
-    assert receipt["reason"] == "badge_artifact_missing"
-    assert receipt["base_sha"] == _BASE_SHA
-    assert receipt["head_sha"] == _HEAD_SHA
-    assert receipt["head_tree_sha"] == _TREE_SHA
-    assert receipt["main_sha"] == _MAIN_SHA
-    assert receipt["main_tree_sha"] == _TREE_SHA
-    assert receipt["pr_number"] == "759"
-    assert receipt["producer_run_id"] == str(_RUN_ID)
-    assert receipt["producer_run_attempt"] == str(_RUN_ATTEMPT)
-
-
-@pytest.mark.parametrize(
-    ("payload", "overrides", "reason"),
-    [
-        (b"not-json", {}, "badge_payload_parse_failed"),
-        (_payload(), {"context": {"head_tree_sha": "e" * 40}}, "badge_manifest_binding_invalid"),
-        (_payload(), {"payload": {"sha256": "0" * 64}}, "badge_manifest_binding_invalid"),
-    ],
-)
-def test_validate_rejects_bad_badge_artifact_bindings(
-    payload: bytes,
-    overrides: dict[str, object],
-    reason: str,
-) -> None:
-    result = _run_script(
-        "Validate inert badge payload and manifest",
-        {},
-        environment=_validation_environment(),
-        files=_artifact_files(payload, **overrides),
-    )
-
-    assert result["outputs"] == {"status": "rejected", "reason": reason}
-
-
-def test_validate_accepts_exact_cli_payload_without_interpreting_health_semantics() -> None:
-    result = _run_script(
-        "Validate inert badge payload and manifest",
-        {},
-        environment=_validation_environment(),
-        files=_artifact_files(_payload()),
-    )
-
-    assert result["outputs"]["status"] == "ready"
-    assert result["outputs"]["reason"] == "ready"
-    assert result["outputs"]["payload_path"].endswith("architecture-health-badge.json")
-
-
-def test_static_publisher_creates_one_atomic_commit_for_the_fixed_paths() -> None:
-    result = _run_script(
-        "Publish fixed badge endpoint and metadata",
-        {"branchExists": False},
-        environment={
-            **_publisher_environment(),
-            "MAIN_SHA": _MAIN_SHA,
-            "MAIN_TREE_SHA": _TREE_SHA,
-            "ANALYZED_BASE_SHA": _BASE_SHA,
-            "ANALYZED_HEAD_SHA": _HEAD_SHA,
-            "ANALYZED_HEAD_TREE_SHA": _TREE_SHA,
-            "PAYLOAD_PATH": "payload.json",
-            "PR_NUMBER": "759",
-            "PRODUCER_RUN_ID": str(_RUN_ID),
-            "PRODUCER_RUN_ATTEMPT": str(_RUN_ATTEMPT),
-            "PUBLICATION_REASON": "ready",
-            "PUBLICATION_STATUS": "ready",
-        },
-        files={"payload.json": _payload()},
-    )
-
-    tree = next(call["parameters"] for call in result["calls"] if call["type"] == "git.createTree")
-    assert [entry["path"] for entry in tree["tree"]] == [
-        "architecture-health.json",
-        "architecture-health-publication.json",
-    ]
-    assert len([call for call in result["calls"] if call["type"] == "git.createCommit"]) == 1
-    assert len([call for call in result["calls"] if call["type"] == "git.createRef"]) == 1
-    assert not [call for call in result["calls"] if call["type"] == "repos.createOrUpdateFileContents"]
-    assert result["outputs"] == {"status": "ready"}
-
-    receipt = _receipt(result)
-    assert receipt == {
-        "schema": "architecture-health-badge-publication/v2",
-        "status": "ready",
-        "reason": "ready",
-        "repository": _REPOSITORY,
-        "base_sha": _BASE_SHA,
-        "head_sha": _HEAD_SHA,
-        "head_tree_sha": _TREE_SHA,
-        "main_sha": _MAIN_SHA,
-        "main_tree_sha": _TREE_SHA,
-        "pr_number": "759",
-        "producer_run_id": str(_RUN_ID),
-        "producer_run_attempt": str(_RUN_ATTEMPT),
-        "publisher_run_id": str(_PUBLISHER_RUN_ID),
-        "publisher_run_attempt": str(_PUBLISHER_RUN_ATTEMPT),
-        "payload_sha256": hashlib.sha256(_payload()).hexdigest(),
-        "published_at": receipt["published_at"],
-    }
-    datetime.fromisoformat(str(receipt["published_at"]).replace("Z", "+00:00"))
-
-
-def test_static_publisher_falls_back_to_reviewed_receipt_without_a_cli_payload() -> None:
-    result = _run_script(
-        "Publish fixed badge endpoint and metadata",
-        {"branchExists": False, "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()}},
-        environment={
-            **_publisher_environment(),
-            "MAIN_SHA": _MAIN_SHA,
-            "MAIN_TREE_SHA": _TREE_SHA,
-            "PUBLICATION_REASON": "badge_artifact_missing",
-            "PUBLICATION_STATUS": "unassessable",
-            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
-        },
-    )
-
-    blobs = [call["parameters"] for call in result["calls"] if call["type"] == "git.createBlob"]
-    reviewed_payload = (_REPOSITORY_ROOT / _UNAVAILABLE_PAYLOAD_PATH).read_bytes()
-    assert any(call["content"] == base64.b64encode(reviewed_payload).decode() for call in blobs)
-    assert result["outputs"] == {"status": "unassessable"}
-    assert any(call["type"] == "git.createRef" for call in result["calls"])
-
-    reviewed_payload = (_REPOSITORY_ROOT / _UNAVAILABLE_PAYLOAD_PATH).read_bytes()
-    receipt = _receipt(result)
-    assert receipt["schema"] == "architecture-health-badge-publication/v2"
-    assert receipt["status"] == "unassessable"
-    assert receipt["reason"] == "badge_artifact_missing"
-    assert receipt["repository"] == _REPOSITORY
-    assert receipt["base_sha"] is None
-    assert receipt["head_sha"] is None
-    assert receipt["head_tree_sha"] is None
-    assert receipt["main_sha"] == _MAIN_SHA
-    assert receipt["main_tree_sha"] == _TREE_SHA
-    assert receipt["pr_number"] is None
-    assert receipt["producer_run_id"] is None
-    assert receipt["producer_run_attempt"] is None
-    assert receipt["publisher_run_id"] == str(_PUBLISHER_RUN_ID)
-    assert receipt["publisher_run_attempt"] == str(_PUBLISHER_RUN_ATTEMPT)
-    assert receipt["payload_sha256"] == hashlib.sha256(reviewed_payload).hexdigest()
-    datetime.fromisoformat(str(receipt["published_at"]).replace("Z", "+00:00"))
-
-
-def test_static_publisher_stale_main_event_makes_no_publication_write() -> None:
-    result = _run_script(
-        "Publish fixed badge endpoint and metadata",
-        {
-            "branchExists": False,
-            "currentMainSha": "e" * 40,
-            "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()},
-        },
-        environment={
-            **_publisher_environment(),
-            "MAIN_SHA": _MAIN_SHA,
-            "PUBLICATION_STATUS": "unassessable",
-            "PUBLICATION_REASON": "badge_artifact_missing",
-            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
-        },
-    )
-
-    writes = {"git.createBlob", "git.createTree", "git.createCommit", "git.createRef", "git.updateRef"}
-    assert result["outputs"] == {"status": "stale_main"}
-    assert not [call for call in result["calls"] if call["type"] in writes]
-
-
-def test_static_publisher_never_moves_the_ref_when_atomic_tree_creation_fails() -> None:
-    result = _run_script(
-        "Publish fixed badge endpoint and metadata",
-        {
-            "branchExists": False,
-            "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()},
-            "failAt": "git.createTree",
-            "expectError": True,
-        },
-        environment={
-            **_publisher_environment(),
-            "MAIN_SHA": _MAIN_SHA,
-            "PUBLICATION_STATUS": "unassessable",
-            "PUBLICATION_REASON": "badge_artifact_missing",
-            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
-        },
-    )
-
-    assert result["error"] == "simulated failure at git.createTree"
-    assert not [call for call in result["calls"] if call["type"] in {"git.createRef", "git.updateRef"}]
-
-
-def test_static_publisher_loses_compare_and_swap_without_creating_a_new_ref() -> None:
-    result = _run_script(
-        "Publish fixed badge endpoint and metadata",
-        {
-            "branchExists": True,
-            "publicationRefSha": "e" * 40,
-            "publicationCommit": {"commit": {"tree": {"sha": "f" * 40}}},
-            "contents": {_UNAVAILABLE_PAYLOAD_PATH: _unavailable_content()},
-            "failAt": "git.updateRef",
-            "failStatus": 422,
-        },
-        environment={
-            **_publisher_environment(),
-            "MAIN_SHA": _MAIN_SHA,
-            "MAIN_TREE_SHA": _TREE_SHA,
-            "PUBLICATION_STATUS": "unassessable",
-            "PUBLICATION_REASON": "badge_artifact_missing",
-            "UNAVAILABLE_PAYLOAD_PATH": _UNAVAILABLE_PAYLOAD_PATH,
-        },
-    )
-
-    assert result["outputs"] == {"status": "publication_race_lost"}
-    assert len([call for call in result["calls"] if call["type"] == "git.updateRef"]) == 1
-    assert not [call for call in result["calls"] if call["type"] == "git.createRef"]
-
-
-def test_resolve_rejects_unrelated_active_ruleset_when_main_has_no_effective_gate() -> None:
-    fixture = _fixture()
-    fixture["effectiveRules"] = []
-
-    result = _run_script("Resolve required PR evidence for the merged tree", fixture)
-
-    assert result["outputs"] == {
-        "reason": "required_architecture_gate_missing",
-        "base_sha": _BASE_SHA,
-        "main_tree_sha": _TREE_SHA,
-        "pr_number": "759",
-        "head_sha": _HEAD_SHA,
-    }
-
-
-def test_ci_producer_generates_a_bound_cli_payload_without_badge_semantics_in_workflow() -> None:
-    workflow = (_REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-
-    assert "badge architecture-health" in workflow
-    assert "architecture-health-badge-promotion/v1" in workflow
-    assert "architecture-health-badge-v1" in workflow
-    assert "architecture/architecture-health-badge-unavailable.json" in workflow
-    assert "cmp --silent" in workflow
-    assert '"head_tree_sha"' in workflow
-    assert "Architecture Health badge manifest is unavailable" in workflow
+ROOT = Path(__file__).resolve().parents[3]
+WORKFLOWS = ROOT / ".github" / "workflows"
+
+
+def read_workflow(name: str) -> str:
+    return (WORKFLOWS / name).read_text(encoding="utf-8")
+
+
+def test_reference_publisher_delegates_to_one_reusable_workflow() -> None:
+    workflow = read_workflow("publish-architecture-health-badge.yml")
+    assert "uses: ./.github/workflows/architecture-health-badge-promotion.yml" in workflow
+    assert "configuration-id: reference-public-raw" in workflow
+    assert "adapter: github-raw" in workflow
+    assert "actions/github-script" not in workflow
+    assert "actions/checkout" not in workflow
+
+
+def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_boundary() -> None:
+    workflow = read_workflow("architecture-health-badge-promotion.yml")
+    assert "workflow_call:" in workflow
+    assert "configuration-id:" in workflow
+    assert "adapter:" in workflow
+    assert "operation:" in workflow
+    assert "id-token: write" in workflow
+    assert "actions: read" in workflow
+    assert "checks: read" in workflow
+    assert "pull-requests: read" in workflow
+    assert "secrets: inherit" not in workflow
+    assert "actions/checkout" not in workflow
+    assert "run-url" not in workflow
+    assert "artifact-url" not in workflow
+
+
+def test_action_runs_repository_owned_code_and_has_redacted_outputs() -> None:
+    action = (ROOT / ".github" / "actions" / "architecture-health-badge-promotion" / "action.yml").read_text(encoding="utf-8")
+    assert "using: composite" in action
+    assert "tools.badge_promotion.cli" in action
+    assert "configuration-id" in action
+    assert "head-sha" in action
+    assert "reason" in action
+    assert "GITHUB_TOKEN: ${{ github.token }}" in action
+    assert "secrets: inherit" not in action
+
+
+def test_registry_is_closed_and_public_raw_is_not_available_for_private_repositories() -> None:
+    registry = json.loads((ROOT / ".github" / "badge-promotion" / "registry.json").read_text(encoding="utf-8"))
+    assert registry["schema"] == "architecture-health-badge-promotion/registry/v1"
+    assert set(registry["configurations"]) >= {"reference-public-raw", "reference-none"}
+    for config in registry["configurations"].values():
+        assert config["destination"]["adapter"] in {"github-raw", "relay", "none"}
+        if config["destination"]["adapter"] == "github-raw":
+            assert config["repository_visibility"] == "public"
+        assert "url" not in config["destination"]
+        assert "callback" not in config["destination"]
+
+
+def test_release_inventory_is_candidate_only_and_excludes_unrelated_work() -> None:
+    inventory = json.loads((ROOT / ".github" / "badge-promotion" / "release-inventory.json").read_text(encoding="utf-8"))
+    assert inventory["release_authority"] == "#806"
+    assert inventory["publication"] == "not-authorized"
+    assert inventory["lifecycle"] == "milestone-6/v0.8.x-completeness"
+    assert "#650" in inventory["excluded"]
+    assert "#787" in inventory["excluded"]
+    for component in inventory["components"]:
+        assert len(component["approved_source_sha"]) == 40
+
+
+def test_ci_keeps_the_exact_two_file_badge_artifact_contract() -> None:
+    workflow = read_workflow("ci.yml")
+    assert 'name: architecture-health-badge-v1' in workflow
+    assert "architecture-health-badge.json" in workflow
+    assert "architecture-health-badge.manifest.json" in workflow
+    assert "head_tree_sha" in workflow
     assert "pull-requests: write" not in workflow
-
-
-def test_badge_workflow_has_a_serialized_static_only_publication_boundary() -> None:
-    workflow = _workflow()
-
-    assert "push:\n    branches: [main]" in workflow
-    assert "group: architecture-health-badge-publication" in workflow
-    assert "cancel-in-progress: false" in workflow
-    assert "contents: write" in workflow
-    assert "architecture-health-badge" in workflow
-    assert "architecture-health.json" in workflow
-    assert "architecture-health-publication.json" in workflow
-    assert "GET /repos/{owner}/{repo}/rules/branches/{branch}" in workflow
-    assert "getRef('heads/main')" in workflow
-    assert "createTree" in workflow
-    assert "createCommit" in workflow
-    assert "updateRef" in workflow
-    assert "Checkout trusted main for unavailable payload" not in workflow
-    assert "Setup .NET for unavailable payload" not in workflow
-    assert "dotnet" not in workflow.lower()
-    assert "make acceptance" not in workflow
-    assert "deploy-pages" not in workflow
-    assert "mkdocs" not in workflow.lower()
