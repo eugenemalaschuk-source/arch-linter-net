@@ -12,6 +12,7 @@ import {
 } from "./types";
 import { AuthorizationError, getBearerToken, isTrustedContext, sha256Hex, verifyOidcToken } from "./security";
 import { canonicalPayloadDigest, PayloadError, validateCanonicalPayload } from "./payload";
+import { readPublicRepresentation, type PublicRepresentation } from "./read";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 
@@ -100,6 +101,15 @@ function parseDateSeconds(value: unknown): number | undefined {
   if (typeof value !== "string") return undefined;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : undefined;
+}
+
+function parseCanonicalDateSeconds(value: unknown): number | undefined {
+  if (typeof value !== "string" || !/^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u.test(value)) return undefined;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  const seconds = parsed / 1000;
+  if (!Number.isSafeInteger(seconds)) return undefined;
+  return new Date(parsed).toISOString().replace(".000Z", "Z") === value ? seconds : undefined;
 }
 
 export class RelayDurableObject {
@@ -231,6 +241,19 @@ export class RelayDurableObject {
     return genericError(status);
   }
 
+  private async read(request: Request, kind: PublicRepresentation, entry: RegistryEntry): Promise<Response> {
+    // Public reads are strictly read-only. In particular, do not call
+    // ensureRegistered here: a registered alias may legitimately have no
+    // publication row yet, and a GET must not create or repair one.
+    let current: StateRow | undefined;
+    try {
+      current = this.sql.exec<StateRow>("SELECT * FROM relay_state WHERE id = 1").toArray()[0];
+    } catch {
+      return readPublicRepresentation(request, undefined, kind, entry, true);
+    }
+    return readPublicRepresentation(request, current, kind, entry);
+  }
+
   private async publish(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "publish" | "renew" | "recover", internalProof?: unknown): Promise<Response> {
     this.validateOperationBasics(body, operation);
     const profile = asProfile(body.profile);
@@ -245,8 +268,8 @@ export class RelayDurableObject {
     const horizonSeconds = parseDateSeconds(horizon);
     if (!horizonSeconds || horizonSeconds <= nowSeconds()) throw new AuthorizationError(409);
     if (profile === "headline-plus-freshness/v1") {
-      const payloadHorizon = parseDateSeconds(payload.valid_until);
-      if (!payloadHorizon || payloadHorizon <= nowSeconds() || payloadHorizon !== horizonSeconds || payloadHorizon > nowSeconds() + LEASE_SECONDS) throw new AuthorizationError(409);
+      const payloadHorizon = parseCanonicalDateSeconds(payload.valid_until);
+      if (!payloadHorizon || payloadHorizon <= nowSeconds() || payloadHorizon > horizonSeconds || payloadHorizon > nowSeconds() + LEASE_SECONDS) return genericError(409);
     }
     if (!safeInteger(body.expected_generation) || !safeInteger(body.expected_revocation_epoch)) throw new PayloadError();
     const idempotencyHash = await sha256Hex(body.idempotency_key);
@@ -260,11 +283,23 @@ export class RelayDurableObject {
       if (challenge.jti_hash !== publisher.jtiHash || current.generation !== body.expected_generation || current.revocation_epoch !== body.expected_revocation_epoch || current.status === "revoked" || current.tombstoned) return this.finishError(409);
       if (operation === "renew" && current.last_renewed_at !== null && nowSeconds() - current.last_renewed_at < RENEWAL_MINIMUM_SECONDS) return this.finishError(409);
       const newGeneration = current.generation + 1;
-      const verifiedAt = new Date(nowSeconds() * 1000).toISOString().replace(".000Z", "Z");
+      const verifiedAt = profile === "headline-plus-freshness/v1" && payload.verified_at
+        ? payload.verified_at
+        : new Date(nowSeconds() * 1000).toISOString().replace(".000Z", "Z");
+      const verifiedAtSeconds = parseCanonicalDateSeconds(verifiedAt);
+      if (!verifiedAtSeconds || verifiedAtSeconds > nowSeconds()) return this.finishError(409);
       const maxLease = nowSeconds() + LEASE_SECONDS;
       const validUntilSeconds = Math.min(maxLease, horizonSeconds);
       if (validUntilSeconds <= nowSeconds()) return this.finishError(409);
-      const validUntil = new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
+      const validUntil = profile === "headline-plus-freshness/v1" && payload.valid_until
+        ? payload.valid_until
+        : new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
+      const persistedValidUntilSeconds = parseCanonicalDateSeconds(validUntil);
+      if (!persistedValidUntilSeconds
+        || persistedValidUntilSeconds <= nowSeconds()
+        || persistedValidUntilSeconds > horizonSeconds
+        || persistedValidUntilSeconds > maxLease
+        || persistedValidUntilSeconds > verifiedAtSeconds + LEASE_SECONDS) return this.finishError(409);
       this.sql.exec("UPDATE relay_challenges SET consumed = 1 WHERE id = ? AND consumed = 0", challenge.id).toArray();
       this.sql.exec(`UPDATE relay_state SET status='ready', profile=?, generation=?, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0, last_renewed_at=?
         WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0 AND status <> 'revoked'`, profile, newGeneration, body.canonical_bytes, body.canonical_digest, verifiedAt, validUntil, horizon, nowSeconds(), body.expected_generation, body.expected_revocation_epoch).toArray();
@@ -307,7 +342,11 @@ export class RelayDurableObject {
       let entry: RegistryEntry;
       try { entry = JSON.parse(entryHeader) as RegistryEntry; } catch { return genericError(404); }
       const pathname = new URL(request.url).pathname;
-      const operation = pathname.split("/").filter(Boolean).at(-1) ?? "";
+      const pathParts = pathname.split("/").filter(Boolean);
+      const operation = pathParts.at(-1) ?? "";
+      if ((request.method === "GET" || request.method === "HEAD") && pathParts.at(-2) === "read" && (operation === "json" || operation === "svg")) {
+        return await this.read(request, operation, entry);
+      }
       this.ensureRegistered(entry);
       if (request.method !== "POST") return genericError(404);
       const body = await readBoundedJson(request);

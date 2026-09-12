@@ -143,6 +143,13 @@ describe("relay contract helpers", () => {
   it("fails closed for malformed or unavailable public routes", async () => {
     const unavailable = {} as RelayEnvironment;
     expect((await worker.fetch(new Request("https://relay.test/not-a-route"), unavailable)).status).toBe(404);
+    expect((await worker.fetch(new Request("https://relay.test/badge-relay/v1/a7f4k2m9.json"), unavailable)).status).toBe(503);
+    expect((await worker.fetch(new Request("https://relay.test/badge-relay/v1/a7f4k2m9.svg"), unavailable)).status).toBe(503);
+    expect((await worker.fetch(new Request("https://relay.test/badge-relay/v1/a7f4k2m9/svg"), unavailable)).status).toBe(503);
+    expect((await worker.fetch(new Request("https://relay.test/badge-relay/v1/a7f4k2m9/json"), unavailable)).status).toBe(503);
+    expect((await worker.fetch(new Request("https://relay.test/badge-relay/v1/a7f4k2m9x.svg"), unavailable)).status).toBe(404);
+    expect((await worker.fetch(new Request("https://relay.test/badge-relay/v1/a7f4k2m9.txt"), unavailable)).status).toBe(404);
+    expect((await worker.fetch(new Request("https://relay.test/badge-relay/v1/admin/unknown"), unavailable)).status).toBe(404);
     expect((await worker.fetch(new Request("https://relay.test/badge-relay/v1/a7f4k2m9/prepare", { method: "POST" }), unavailable)).status).toBe(503);
     expect((await worker.fetch(new Request("https://relay.test/badge-relay/v1/admin/register", { method: "POST" }), unavailable)).status).toBe(401);
     const authorized = { ...unavailable, ADMIN_TOKEN: "admin" };

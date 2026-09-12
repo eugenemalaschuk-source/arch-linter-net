@@ -196,6 +196,39 @@ Generation/epoch and the tombstone defeat these cases:
 
 ## Origin, cache, SVG, and response contract
 
+### Fixed public routes and layout
+
+After the outer Worker has looked up a registered alias (and before it calls
+`idFromName`), the public route family is fixed:
+
+| Route | Allowed methods | Representation selection |
+| --- | --- | --- |
+| `/badge-relay/v1/{alias}` | `GET`, `HEAD` | Profile-selected default: strict local SVG for `headline-plus-freshness/v1`; exact JSON snapshot compatibility for `headline-only/v1` |
+| `/badge-relay/v1/{alias}.json` | `GET`, `HEAD` | Exact canonical JSON for the registered profile; no implicit profile upgrade or added freshness fields |
+| `/badge-relay/v1/{alias}.svg` | `GET`, `HEAD` | Fixed local SVG only for `headline-plus-freshness/v1`; a headline-only registration cannot claim a bounded-current SVG |
+| `/badge-relay/v1/{alias}/json` or `/badge-relay/v1/{alias}/svg` | `GET`, `HEAD` | Segment aliases for the same explicit JSON/SVG selections above; they do not add representations |
+
+The alias is the only route-derived public identifier and is opaque. Unknown,
+malformed, unsupported, or tombstoned aliases and unsupported methods return a
+generic `404` without allocating a Durable Object. Public `GET` and `HEAD`
+share one read seam: it validates the persisted closed payload and compares
+the trusted UTC clock with `valid_until` before choosing a body, creating an
+ETag, or evaluating `If-None-Match`. `HEAD` has the same status and headers as
+`GET` and omits the body. A matching conditional request can return `304` only
+while the representation is still ready (`now < valid_until`).
+
+Ready JSON is the stored canonical UTF-8 byte string verbatim. The fixed
+unavailable projection is the exact `UNASSESSABLE · ? ignores · ? rules`
+representation and never includes a private reason. The strict SVG is a
+small local template: it displays the canonical label, message, Health-owned
+color, and absolute UTC `verified at` / `valid until` text together as one
+readable badge. Only already validated closed values enter text or attributes;
+XML escaping is defense in depth. No alias, provenance, URL, SHA, PR/run,
+JWT, arbitrary metadata, `script`, event handler, `foreignObject`, link, or
+external asset can enter the markup. The headline-only profile therefore
+remains a JSON/Shields snapshot view and cannot be presented as bounded-current
+through a default SVG route.
+
 Ready responses use a bounded `Cache-Control: public, max-age=N, must-revalidate`, where `N` is no greater than the remaining lease. Expired,
 unavailable, revoked, and storage-uncertain responses use `Cache-Control: no-store` and do not carry a ready representation. ETag identifies the complete
 public representation: profile, exact payload bytes, generation, state, and

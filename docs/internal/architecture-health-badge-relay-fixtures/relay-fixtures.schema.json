@@ -601,13 +601,61 @@
         "profile": {
           "$ref": "#/$defs/profile"
         },
+        "representation": {
+          "type": "string",
+          "enum": [
+            "json",
+            "svg"
+          ]
+        },
         "payload": {
           "$ref": "#/$defs/publicPayload"
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "body_assertions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "template": {
+              "type": "string",
+              "const": "fixed-local-svg/v1"
+            },
+            "must_include": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "maxLength": 240
+              }
+            },
+            "must_exclude": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "maxLength": 240
+              }
+            }
+          }
         },
         "headers": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "content_type": {
+              "type": "string",
+              "enum": [
+                "application/json; charset=utf-8",
+                "image/svg+xml; charset=utf-8"
+              ]
+            },
+            "x_content_type_options": {
+              "type": "string",
+              "const": "nosniff"
+            },
             "cache_control": {
               "type": "string",
               "pattern": "^(public, max-age=[0-9]{1,5}, must-revalidate|no-store)$"
@@ -622,7 +670,8 @@
                 200,
                 304,
                 404,
-                410
+                410,
+                503
               ]
             }
           }
@@ -655,7 +704,8 @@
             "freshness",
             "lifecycle",
             "recovery",
-            "cache"
+            "cache",
+            "rendering"
           ]
         },
         "purpose": {
