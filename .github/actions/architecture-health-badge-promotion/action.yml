@@ -1,0 +1,54 @@
+name: Architecture Health trusted promotion
+description: Run the versioned, repository-owned trusted badge promotion contract.
+inputs:
+  configuration-id:
+    description: Approved registry configuration identifier.
+    required: true
+  adapter:
+    description: Approved adapter; github-raw, relay, or none.
+    required: true
+  operation:
+    description: Publish or metadata-only renew.
+    required: false
+    default: publish
+outputs:
+  status:
+    description: ready, private, or unavailable.
+    value: ${{ steps.promote.outputs.status }}
+  reason:
+    description: Fixed redacted promotion reason.
+    value: ${{ steps.promote.outputs.reason }}
+  head-sha:
+    description: Validated producer head SHA when available.
+    value: ${{ steps.promote.outputs.head_sha }}
+  head-tree-sha:
+    description: Validated producer head tree SHA when available.
+    value: ${{ steps.promote.outputs.head_tree_sha }}
+  run-id:
+    description: Validated producer run identifier when available.
+    value: ${{ steps.promote.outputs.run_id }}
+  run-attempt:
+    description: Validated producer run attempt when available.
+    value: ${{ steps.promote.outputs.run_attempt }}
+runs:
+  using: composite
+  steps:
+    - id: promote
+      name: Resolve and publish exact trusted evidence
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        CONFIGURATION_ID: ${{ inputs.configuration-id }}
+        ADAPTER: ${{ inputs.adapter }}
+        OPERATION: ${{ inputs.operation }}
+      run: |
+        set +e
+        trusted_root="${GITHUB_ACTION_PATH}/../../.."
+        cd "$trusted_root"
+        python -m tools.badge_promotion.cli \
+          --configuration-id "$CONFIGURATION_ID" \
+          --adapter "$ADAPTER" \
+          --operation "$OPERATION"
+        status=$?
+        echo "exit_status=$status" >> "$GITHUB_OUTPUT"
+        exit "$status"

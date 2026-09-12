@@ -144,6 +144,42 @@ mutate canonical payload values to make transport refreshes visible. The
 receipt and raw payload are the evidence for publication freshness; Shields
 and README/Camo are downstream rendering layers.
 
+### Reusable trusted promotion
+
+Consumers that need the same provenance contract can call the versioned
+reusable workflow at an approved immutable reference:
+
+```yaml
+jobs:
+  badge:
+    uses: eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml@<reviewed-sha>
+    with:
+      configuration-id: <approved-registry-entry>
+      adapter: relay # github-raw, relay, or none
+      operation: publish # renew performs metadata-only revalidation
+```
+
+The configuration ID resolves to reviewed repository IDs, event/ref, producer
+workflow/job/check, artifact contract, disclosure profile, and adapter. It is
+not an arbitrary workflow, artifact, repository, URL, or source selector. The
+publisher never checks out or executes consumer main/PR code, generated
+artifacts, hooks, or inherited secrets. It validates the exact merged-tree
+relationship, workflow run and attempt, producer job, artifact bytes, manifest,
+digest, and canonical disclosure before publication.
+
+`github-raw` remains a public-repository snapshot adapter; private repositories
+must use an adopter-owned `relay` or select `none`. Renewal only revalidates
+fresh authorization, producer evidence, artifact retention, and the
+product-owned semantic horizon. It does not rerun architecture analysis or
+extend expired evidence. Missing gates, unsupported GitHub capability shapes,
+corruption, stale context, OIDC failure, and transport uncertainty produce an
+actionable unavailable result and never preserve an old ready result.
+
+The reusable workflow is a candidate component, not a publication authority.
+Its immutable component/configuration identity is handed to the existing #806
+release process; no package, tag, Relay deployment, or public release is
+created by this workflow alone.
+
 ## Legacy architecture-policy badge payload
 
 `arch-linter-net badge architecture-policy --input architecture-strict.json`

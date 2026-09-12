@@ -1,0 +1,9 @@
+# actionlint 1.7.x predates GitHub's self-repository ($/) action syntax.
+# GitHub resolves these references to the repository and commit of the
+# reusable workflow, so keep the runtime-correct form and filter only the
+# obsolete parser diagnostics until the bundled linter supports it.
+paths:
+  .github/workflows/**/*.{yml,yaml}:
+    ignore:
+      - 'specifying action "\$/.+" in invalid format because ref is missing'
+      - 'reusable workflow call "\$/.+" at "uses" is not following the format'

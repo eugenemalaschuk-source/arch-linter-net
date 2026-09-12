@@ -100,7 +100,7 @@ export interface CanonicalPayload {
 }
 
 export interface TrustedContextProof {
-  /** Opaque assertion supplied by the later artifact/context verifier only. */
+  /** Server-derived handoff or assertion supplied by an internal verifier. */
   valid: true;
   kind: "github-pr-authoritative/v1";
   digest?: string;

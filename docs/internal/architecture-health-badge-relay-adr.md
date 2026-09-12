@@ -1,9 +1,9 @@
 # ADR: Architecture Health Badge Relay contract
 
-Status: proposed design baseline for issue [#826](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/826), pending maintainer review
+Status: accepted design baseline for issue [#826](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/826)
 
 Date: 2026-09-09\
-Lifecycle: v0.8.x completeness-stabilization; implementation children remain blocked until this ADR is reviewed and merged.
+Lifecycle: v0.8.x completeness-stabilization; implementation children consume this reviewed contract. This ADR does not authorize publication or deployment.
 
 This is an internal decision record. It defines the product and security
 contract for a bounded-freshness badge transport. It does not implement or
