@@ -104,7 +104,7 @@ internal static partial class PrReportMarkdownRenderer
                     .OrderBy(item => item.Identity ?? item.ContractId, StringComparer.Ordinal)
                     .ThenBy(item => item.Status, StringComparer.Ordinal))
                 {
-                    blockers.Add($"baseline lifecycle `{Inline(entry.Status)}`: {FormatBaseline(entry)}");
+                    blockers.Add($"baseline lifecycle `{Inline(Bounded(entry.Status))}`: {FormatBaseline(entry)}");
                 }
             }
 
@@ -117,7 +117,7 @@ internal static partial class PrReportMarkdownRenderer
                 foreach (ArchitecturePrReportPolicyWeakeningFinding finding in weakening.Findings
                     .OrderBy(item => item.Identity, StringComparer.Ordinal))
                 {
-                    blockers.Add($"policy weakening `{Inline(finding.Identity)}`: {Text(finding.Classification)} {Text(finding.ControlIdentity)}");
+                    blockers.Add($"policy weakening `{Inline(Bounded(finding.Identity))}`: {Text(Bounded(finding.Classification))} {Text(Bounded(finding.ControlIdentity))}");
                 }
             }
 
@@ -129,7 +129,7 @@ internal static partial class PrReportMarkdownRenderer
                     .Where(item => blockingStates.Contains(item.State))
                     .OrderBy(item => item.Id, StringComparer.Ordinal))
                 {
-                    blockers.Add($"waiver `{Inline(waiver.Id)}`: lifecycle `{Inline(waiver.State)}` ({Text(waiver.ContractId ?? waiver.ContractName)})");
+                    blockers.Add($"waiver `{Inline(Bounded(waiver.Id))}`: lifecycle `{Inline(Bounded(waiver.State))}` ({Text(Bounded(waiver.ContractId ?? waiver.ContractName))})");
                 }
             }
 
@@ -142,7 +142,7 @@ internal static partial class PrReportMarkdownRenderer
                     .OrderBy(item => item.ContractId ?? item.ContractName, StringComparer.Ordinal)
                     .ThenBy(item => item.CanonicalIdentity, StringComparer.Ordinal))
                 {
-                    blockers.Add($"finding `{Inline(finding.CanonicalIdentity)}`: {Text(finding.MessageCode)} ({Text(finding.ContractId ?? finding.ContractName)})");
+                    blockers.Add($"finding `{Inline(Bounded(finding.CanonicalIdentity))}`: {Text(Bounded(finding.MessageCode))} ({Text(Bounded(finding.ContractId ?? finding.ContractName))})");
                 }
             }
         }
@@ -153,7 +153,7 @@ internal static partial class PrReportMarkdownRenderer
         {
             foreach (ArchitectureHealthReason reason in explanation.Reasons)
             {
-                blockers.Add($"{Text(explanation.Dimension)} `{DimensionToken(explanation.State)}`: {Text(reason.Code)}{FormatReasonIdentity(reason)}");
+                blockers.Add($"{Text(Bounded(explanation.Dimension))} `{DimensionToken(explanation.State)}`: {Text(Bounded(reason.Code))}{FormatReasonIdentity(reason)}");
             }
         }
 
@@ -347,7 +347,7 @@ internal static partial class PrReportMarkdownRenderer
         AppendChangeFindings(builder, "Existing findings", change.ExistingFindings, maxDetails);
         AppendChangeFindings(builder, "Resolved findings", change.ResolvedFindings, maxDetails);
         AppendBounded(builder, "Baseline debt identities", change.BaselineDebt.Count, change.BaselineDebt,
-            maxDetails, static item => $"- `{Inline(item)}`");
+            maxDetails, static item => $"- `{Inline(Bounded(item))}`");
         return true;
     }
 
@@ -399,7 +399,7 @@ internal static partial class PrReportMarkdownRenderer
         AppendBounded(builder, $"{title} surfaces", entries.Count,
             entries.OrderBy(item => item.Kind, StringComparer.Ordinal)
                 .ThenBy(item => item.Identity, StringComparer.Ordinal)
-                .Select(item => $"[{Text(item.Kind)}] `{Inline(item.Identity)}` — {Text(item.Display)}")
+            .Select(item => $"[{Text(Bounded(item.Kind))}] `{Inline(Bounded(item.Identity))}` — {Text(Bounded(item.Display))}")
                 .ToList(), maxDetails, static item => $"- {item}");
 
     private static void AppendChangeFindings(
@@ -410,7 +410,7 @@ internal static partial class PrReportMarkdownRenderer
         AppendBounded(builder, title, findings.Count,
             findings.OrderBy(item => item.Kind, StringComparer.Ordinal)
                 .ThenBy(item => item.Identity, StringComparer.Ordinal)
-                .Select(item => $"[{Text(item.Kind)}] `{Inline(item.Identity)}` — {Text(item.Display)}")
+                .Select(item => $"[{Text(Bounded(item.Kind))}] `{Inline(Bounded(item.Identity))}` — {Text(Bounded(item.Display))}")
                 .ToList(), maxDetails, static item => $"- {item}");
 
     private static void AppendBounded<T>(

@@ -32,9 +32,14 @@ internal static class PrReportMarkdownHealth
         section.AppendLine("## Health explanation");
         int sectionBytes = Encoding.UTF8.GetByteCount(section.ToString());
         int budgetMarkerBytes = Encoding.UTF8.GetByteCount(HealthBudgetMarker + Environment.NewLine);
+        List<string> minimumLines = explanations
+            .Select(FormatMinimumExplanationLine)
+            .ToList();
+        int minimumTailBytes = minimumLines.Sum(line => Encoding.UTF8.GetByteCount(line + Environment.NewLine));
         bool omitted = false;
-        foreach (HealthExplanationView explanation in explanations)
+        for (int index = 0; index < explanations.Count; index++)
         {
+            HealthExplanationView explanation = explanations[index];
             string classification = explanation.IsBlocking ? "blocking" : "advisory";
             List<string> formattedReasons = explanation.Reasons
                 .OrderBy(item => item.Code, StringComparer.Ordinal)
@@ -43,22 +48,24 @@ internal static class PrReportMarkdownHealth
                 .ToList();
             int shown = Math.Min(maxDetails, formattedReasons.Count);
             string line = FormatExplanationLine(explanation, classification, formattedReasons, shown);
-            while (shown > 0
-                && sectionBytes + Encoding.UTF8.GetByteCount(line + Environment.NewLine) + budgetMarkerBytes > MaxHealthExplanationBytes)
-            {
-                shown--;
-                line = FormatExplanationLine(explanation, classification, formattedReasons, shown);
-            }
-
             int lineBytes = Encoding.UTF8.GetByteCount(line + Environment.NewLine);
-            if (sectionBytes + lineBytes + budgetMarkerBytes > MaxHealthExplanationBytes)
+            int minimumLineBytes = Encoding.UTF8.GetByteCount(minimumLines[index] + Environment.NewLine);
+            int tailMinimumBytes = minimumTailBytes - minimumLineBytes;
+            if (sectionBytes + lineBytes + tailMinimumBytes + budgetMarkerBytes <= MaxHealthExplanationBytes)
             {
+                section.AppendLine(line);
+                sectionBytes += lineBytes;
+            }
+            else
+            {
+                // Every non-healthy dimension retains at least its canonical reason code. Only
+                // the optional source/identity detail is dropped when the shared budget is tight.
+                section.AppendLine(minimumLines[index]);
+                sectionBytes += minimumLineBytes;
                 omitted = true;
-                continue;
             }
 
-            section.AppendLine(line);
-            sectionBytes += lineBytes;
+            minimumTailBytes = tailMinimumBytes;
         }
 
         if (omitted)
@@ -86,6 +93,20 @@ internal static class PrReportMarkdownHealth
 
         return $"- `{Inline(Bounded(explanation.Dimension))}` state=`{DimensionToken(explanation.State)}` " +
             $"classification=`{classification}`: {reasons}";
+    }
+
+    private static string FormatMinimumExplanationLine(HealthExplanationView explanation)
+    {
+        ArchitectureHealthReason? reason = explanation.Reasons
+            .OrderBy(item => item.Code, StringComparer.Ordinal)
+            .ThenBy(item => item.Source, StringComparer.Ordinal)
+            .FirstOrDefault();
+        string canonicalCode = reason is null
+            ? "no canonical reason supplied"
+            : $"`{Inline(Bounded(reason.Code))}`";
+        string classification = explanation.IsBlocking ? "blocking" : "advisory";
+        return $"- `{Inline(Bounded(explanation.Dimension))}` state=`{DimensionToken(explanation.State)}` " +
+            $"classification=`{classification}`: {canonicalCode}";
     }
 
     internal static IReadOnlyList<HealthExplanationView> BuildHealthExplanations(
@@ -149,8 +170,6 @@ internal static class PrReportMarkdownHealth
         string identity = reason.EvidenceIdentity ?? reason.ControlIdentity ?? reason.PolicyIdentity ?? string.Empty;
         return string.IsNullOrWhiteSpace(identity) ? string.Empty : $" (`{Inline(Bounded(identity))}`)";
     }
-
-    private static string Bounded(string value) => value.Length <= 256 ? value : value[..253] + "...";
 
     private static bool IsBlockingState(ArchitectureHealthDimensionState state) =>
         state is ArchitectureHealthDimensionState.Fail or ArchitectureHealthDimensionState.Unassessable;

@@ -291,8 +291,9 @@ and SHA-256.
 
 The read-only producer passes trusted transport context to that CLI invocation. In GitHub Actions,
 the values are the repository base URL (`github.server_url/github.repository`), the pull request's
-current head (`github.event.pull_request.head.sha`), and the fixed run URL
-(`github.server_url/github.repository/actions/runs/github.run_id`):
+current head (`github.event.pull_request.head.sha`), and the immutable workflow-attempt URL
+(`github.server_url/github.repository/actions/runs/github.run_id/attempts/github.run_attempt`). The
+attempt component is required because GitHub reuses `run_id` when a workflow is re-run:
 
 ```bash
 dotnet run --no-build --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- report pr \

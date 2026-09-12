@@ -155,52 +155,52 @@ internal static class PrReportMarkdownFormatter
     };
 
     internal static string FormatWaiver(ArchitectureWaiverLifecycleRecord waiver) =>
-        $"`{Inline(waiver.Id)}` state=`{Inline(waiver.State)}` rule=`{Inline(waiver.ContractId ?? waiver.ContractName)}` " +
-        $"target=`{Inline(waiver.ForbiddenReference)}` reason={Text(waiver.Reason)} owner={Text(waiver.Owner ?? "-")} " +
-        $"issue={Text(waiver.Issue ?? "-")} expires={Text(waiver.Expires?.ToString("yyyy-MM-dd") ?? "-")}";
+        $"`{Inline(Bounded(waiver.Id))}` state=`{Inline(Bounded(waiver.State))}` rule=`{Inline(Bounded(waiver.ContractId ?? waiver.ContractName))}` " +
+        $"target=`{Inline(Bounded(waiver.ForbiddenReference))}` reason={Text(Bounded(waiver.Reason))} owner={Text(Bounded(waiver.Owner ?? "-"))} " +
+        $"issue={Text(Bounded(waiver.Issue ?? "-"))} expires={Text(waiver.Expires?.ToString("yyyy-MM-dd") ?? "-")}";
 
     internal static string FormatBaseline(ArchitecturePrReportBaselineEntry entry) =>
-        $"`{Inline(entry.Identity ?? entry.ContractId)}` status=`{Inline(entry.Status)}` {Text(entry.ContractGroup)} " +
-        $"{Text(entry.SourceType)} → {Text(entry.ForbiddenReference)}";
+        $"`{Inline(Bounded(entry.Identity ?? entry.ContractId))}` status=`{Inline(Bounded(entry.Status))}` {Text(Bounded(entry.ContractGroup))} " +
+        $"{Text(Bounded(entry.SourceType))} → {Text(Bounded(entry.ForbiddenReference))}";
 
     internal static string FormatApplicabilityControl(ArchitecturePrReportApplicabilityControl control) =>
-        $"`{Inline(control.ControlIdentity)}` state=`{Inline(control.State)}` membership=`{Inline(control.Membership ?? "-")}` " +
+        $"`{Inline(Bounded(control.ControlIdentity))}` state=`{Inline(Bounded(control.State))}` membership=`{Inline(Bounded(control.Membership ?? "-"))}` " +
         (control.IntegrityValid ? "integrity=valid" : "integrity=invalid");
 
     internal static string FormatApplicabilityReason(ArchitecturePrReportApplicabilityReason reason) =>
-        $"`{Inline(reason.Code)}`{FormatProvenance(reason.Provenance)}";
+        $"`{Inline(Bounded(reason.Code))}`{FormatProvenance(reason.Provenance)}";
 
     internal static string FormatTopologySubject(string control, ArchitecturePrReportTopologySubject subject) =>
-        $"control=`{Inline(control)}` `{Inline(subject.Identity)}` {Text(subject.Project)} / {Text(subject.Assembly)} " +
-        $"subject={Text(subject.Subject)} disposition=`{Inline(subject.Disposition)}`";
+        $"control=`{Inline(Bounded(control))}` `{Inline(Bounded(subject.Identity))}` {Text(Bounded(subject.Project))} / {Text(Bounded(subject.Assembly))} " +
+        $"subject={Text(Bounded(subject.Subject))} disposition=`{Inline(Bounded(subject.Disposition))}`";
 
     internal static string FormatExternalRequirement(ArchitecturePrReportExternalRequirement requirement) =>
-        $"`{Inline(requirement.Id)}` tool=`{Inline(requirement.Tool)}` format=`{Inline(requirement.Format)}` " +
-        $"required={requirement.Required} run=`{Inline(requirement.Run)}`";
+        $"`{Inline(Bounded(requirement.Id))}` tool=`{Inline(Bounded(requirement.Tool))}` format=`{Inline(Bounded(requirement.Format))}` " +
+        $"required={requirement.Required} run=`{Inline(Bounded(requirement.Run))}`";
 
     internal static string FormatExternalEvidenceTrustReceipt(ArchitecturePrReportExternalEvidenceTrustReceipt receipt)
     {
         string resultCount = receipt.ResultCount is null ? string.Empty : $" results=`{receipt.ResultCount}`";
-        string run = string.IsNullOrWhiteSpace(receipt.RunId) ? string.Empty : $" run=`{Inline(receipt.RunId)}`";
-        string artifact = string.IsNullOrWhiteSpace(receipt.ArtifactPath) ? string.Empty : $" artifact=`{Inline(receipt.ArtifactPath)}`";
-        return $"logical_evidence=`{Inline(receipt.LogicalId)}` state=`{TrustStateToken(receipt.State)}` " +
-            $"trust_status=`{TrustStatusToken(receipt.Status)}` reason=`{Inline(receipt.ReasonCode)}`{resultCount}{run}{artifact}" +
+        string run = string.IsNullOrWhiteSpace(receipt.RunId) ? string.Empty : $" run=`{Inline(Bounded(receipt.RunId))}`";
+        string artifact = string.IsNullOrWhiteSpace(receipt.ArtifactPath) ? string.Empty : $" artifact=`{Inline(Bounded(receipt.ArtifactPath))}`";
+        return $"logical_evidence=`{Inline(Bounded(receipt.LogicalId))}` state=`{TrustStateToken(receipt.State)}` " +
+            $"trust_status=`{TrustStatusToken(receipt.Status)}` reason=`{Inline(Bounded(receipt.ReasonCode))}`{resultCount}{run}{artifact}" +
             FormatExternalEvidenceContext(receipt.Context);
     }
 
     internal static string FormatFinding(ArchitecturePrReportFinding finding) =>
-        $"`{Inline(finding.CanonicalIdentity)}` {Text(finding.MessageCode)} ({Text(finding.ContractId ?? finding.ContractName)})";
+        $"`{Inline(Bounded(finding.CanonicalIdentity))}` {Text(Bounded(finding.MessageCode))} ({Text(Bounded(finding.ContractId ?? finding.ContractName))})";
 
     internal static string FormatRemediation(ArchitecturePrReportFinding finding)
     {
         ArchitecturePrReportRemediation remediation = finding.Remediation!;
-        return $"`{Inline(finding.CanonicalIdentity)}` category=`{Inline(remediation.Category)}` {Text(remediation.Summary)}";
+        return $"`{Inline(Bounded(finding.CanonicalIdentity))}` category=`{Inline(Bounded(remediation.Category))}` {Text(Bounded(remediation.Summary))}";
     }
 
     internal static string FormatReasonIdentity(ArchitectureHealthReason reason)
     {
         string identity = reason.EvidenceIdentity ?? reason.ControlIdentity ?? reason.PolicyIdentity ?? string.Empty;
-        return string.IsNullOrWhiteSpace(identity) ? string.Empty : $" (`{Inline(identity)}`)";
+        return string.IsNullOrWhiteSpace(identity) ? string.Empty : $" (`{Inline(Bounded(identity))}`)";
     }
 
     internal static string FormatProvenance(ArchitecturePrReportProvenanceReference provenance)
@@ -213,9 +213,12 @@ internal static class PrReportMarkdownFormatter
             provenance.EvidenceIdentity,
         ];
         return values.Any(value => !string.IsNullOrWhiteSpace(value))
-            ? $" ({string.Join(", ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => $"`{Inline(value!)}`"))})"
+            ? $" ({string.Join(", ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => $"`{Inline(Bounded(value!))}`"))})"
             : string.Empty;
     }
+
+    internal static string Bounded(string value, int maxLength = 256) =>
+        value.Length <= maxLength ? value : value[..(maxLength - 3)] + "...";
 
     internal static string Inline(string value) => PrReportMarkdownEscaping.EscapeInlineCode(value);
 
@@ -242,7 +245,7 @@ internal static class PrReportMarkdownFormatter
             return string.Empty;
         }
 
-        return $" repository=`{Inline(context.Repository ?? "-")}` revision=`{Inline(context.Revision ?? "-")}` " +
-            $"scope=`{Inline(context.Scope ?? "-")}`";
+        return $" repository=`{Inline(Bounded(context.Repository ?? "-"))}` revision=`{Inline(Bounded(context.Revision ?? "-"))}` " +
+            $"scope=`{Inline(Bounded(context.Scope ?? "-"))}`";
     }
 }

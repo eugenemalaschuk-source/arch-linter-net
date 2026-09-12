@@ -38,8 +38,8 @@ internal static class PrReportMarkdownNavigation
         string? repositoryRoot,
         ArchitecturePrReportNavigationContext? transportContext)
     {
-        string value = $"`{Inline(reference.Authority)}`" +
-            (string.IsNullOrWhiteSpace(reference.Identity) ? string.Empty : $" `{Inline(reference.Identity)}`");
+        string value = $"`{Inline(Bounded(reference.Authority))}`" +
+            (string.IsNullOrWhiteSpace(reference.Identity) ? string.Empty : $" `{Inline(Bounded(reference.Identity))}`");
         string? relativePath = PrReportTransportContext.RepositoryRelativePath(reference.Path, repositoryRoot);
         if (relativePath is null)
         {

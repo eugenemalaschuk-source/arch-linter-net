@@ -139,7 +139,36 @@ public sealed class PrReportMarkdownRendererTests
         {
             Assert.That(System.Text.Encoding.UTF8.GetByteCount(markdown), Is.LessThan(60_000));
             Assert.That(markdown, Does.Contain("Additional health explanations omitted due to publisher byte budget"));
-            Assert.That(markdown, Does.Contain("`dimension-00`"));
+            Assert.That(markdown.Split(Environment.NewLine)
+                .Count(line => line.StartsWith("- `dimension-", StringComparison.Ordinal)), Is.EqualTo(40));
+            Assert.That(markdown.Split("`metadata_incomplete`", StringSplitOptions.None).Length - 1,
+                Is.GreaterThanOrEqualTo(40));
+        });
+    }
+
+    [Test]
+    public void CriticalFindingSections_BoundIdentityFieldsForPublisherSafety()
+    {
+        string longIdentity = new('i', 10_000);
+        ArchitecturePrReportFinding[] strictFindings = Enumerable.Range(0, 20)
+            .Select(index => Finding($"{longIdentity}-{index:00}", "strict", "error", "strict-code"))
+            .ToArray();
+        ArchitecturePrReportFinding[] auditFindings = Enumerable.Range(0, 20)
+            .Select(index => Finding($"{longIdentity}-{index:00}", "audit", "warning", "audit-code"))
+            .ToArray();
+        ArchitecturePrReportEvidence evidence = Evidence(receipts:
+        [
+            Receipt("strict", strictFindings),
+            Receipt("audit", auditFindings),
+        ]);
+
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(evidence: evidence));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(System.Text.Encoding.UTF8.GetByteCount(markdown), Is.LessThan(60_000));
+            Assert.That(markdown, Does.Contain("### Audit/convention evidence (20)"));
+            Assert.That(markdown, Does.Not.Contain(longIdentity));
         });
     }
 

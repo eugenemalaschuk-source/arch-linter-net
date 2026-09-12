@@ -288,7 +288,7 @@ def test_ci_producer_passes_trusted_report_navigation_context_to_cli() -> None:
 
     assert "REPORT_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}" in producer
     assert "REPORT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}" in producer
-    assert "REPORT_ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" in producer
+    assert "REPORT_ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}" in producer
     assert '--repository-url "$REPORT_REPOSITORY_URL"' in producer
     assert '--head-sha "$REPORT_HEAD_SHA"' in producer
     assert '--artifact-url "$REPORT_ARTIFACT_URL"' in producer
