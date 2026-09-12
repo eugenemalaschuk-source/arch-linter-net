@@ -150,8 +150,12 @@ require an approved current publisher proof and SHALL not revive a previous
 ready payload or manufacture a current `main` result.
 
 The public HTTP `publish` and `renew` routes SHALL reject caller-supplied
-trusted-context proof. Only the internal verifier seam may pass a typed current
-publisher proof after the exact digest and challenge state have been checked.
+trusted-context proof. After OIDC validation and independent canonical-digest
+recomputation, the Worker MAY derive a narrow typed handoff from the pinned
+publisher identity and invoke the same commit seam; an internal verifier may
+also pass a typed current publisher proof after the exact digest and challenge
+state have been checked. No proof validity flag or proof object from request
+JSON may authorize a write.
 
 #### Scenario: Restore cannot resurrect revoked data
 - **WHEN** storage is restored to a state before a revocation
