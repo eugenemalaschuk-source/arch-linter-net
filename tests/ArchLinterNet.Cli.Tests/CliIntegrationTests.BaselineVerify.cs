@@ -2,7 +2,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliBaselineVerifyIntegrationTests : CliIntegrationTestBase
 {
     /* baseline verify */
 
@@ -13,11 +14,11 @@ public partial class CliIntegrationTests
         try
         {
             var (genExit, _, genStderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy, "--output", baselinePath);
+                "--config", GraphPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "verify",
-                "--config", _graphPolicy, "--baseline", baselinePath);
+                "--config", GraphPolicy, "--baseline", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -50,7 +51,7 @@ baseline:
 ");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "verify",
-                "--config", _passingWithIdsPolicy, "--baseline", baselinePath);
+                "--config", PassingWithIdsPolicy, "--baseline", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -75,9 +76,9 @@ baseline:
             File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
 
             var (humanExit, humanStdout, humanStderr) = RunCli("baseline", "verify",
-                "--config", _graphPolicy, "--baseline", baselinePath);
+                "--config", GraphPolicy, "--baseline", baselinePath);
             var (jsonExit, jsonStdout, jsonStderr) = RunCli("baseline", "verify",
-                "--config", _graphPolicy, "--baseline", baselinePath, "--json");
+                "--config", GraphPolicy, "--baseline", baselinePath, "--json");
 
             using var json = System.Text.Json.JsonDocument.Parse(jsonStdout);
             Assert.Multiple(() =>
@@ -115,7 +116,7 @@ baseline:
 ");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "verify",
-                "--config", _passingWithIdsPolicy, "--baseline", baselinePath);
+                "--config", PassingWithIdsPolicy, "--baseline", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -138,11 +139,11 @@ baseline:
         try
         {
             var (genExit, _, _) = RunCli("baseline", "generate",
-                "--config", _graphPolicy, "--output", baselinePath);
+                "--config", GraphPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0));
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "verify",
-                "--config", _graphPolicy, "--baseline", baselinePath, "--json");
+                "--config", GraphPolicy, "--baseline", baselinePath, "--json");
 
             Assert.That(exitCode, Is.EqualTo(0), $"Verify should pass, stderr: {stderr}");
 
@@ -165,7 +166,7 @@ baseline:
             File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
 
             var (exitCode, _, stderr) = RunCli("baseline", "verify",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--condition-set", "nonexistent");
+                "--config", PassingPolicy, "--baseline", baselinePath, "--condition-set", "nonexistent");
 
             Assert.Multiple(() =>
             {
@@ -188,11 +189,11 @@ baseline:
         try
         {
             var (genExit, _, genStderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy, "--output", baselinePath);
+                "--config", GraphPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
 
             var (exitCode, _, stderr) = RunCli("baseline", "verify",
-                "--config", _graphPolicy, "--baseline", baselinePath, "--contract", "missing-contract-id");
+                "--config", GraphPolicy, "--baseline", baselinePath, "--contract", "missing-contract-id");
 
             Assert.Multiple(() =>
             {
@@ -215,11 +216,11 @@ baseline:
         try
         {
             var (genExit, _, genStderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy, "--output", baselinePath);
+                "--config", GraphPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "verify",
-                "--policy", _graphPolicy, "--baseline", baselinePath);
+                "--policy", GraphPolicy, "--baseline", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -238,7 +239,7 @@ baseline:
     public void BaselineVerify_MissingBaselineFile_ExitsTwo()
     {
         var (exitCode, _, stderr) = RunCli("baseline", "verify",
-            "--config", _passingPolicy, "--baseline", "/nonexistent/baseline.yml");
+            "--config", PassingPolicy, "--baseline", "/nonexistent/baseline.yml");
 
         Assert.Multiple(() =>
         {

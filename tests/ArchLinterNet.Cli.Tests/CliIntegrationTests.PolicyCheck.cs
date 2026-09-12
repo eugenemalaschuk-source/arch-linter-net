@@ -3,12 +3,13 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliPolicyCheckIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void PolicyCheck_ValidPolicy_ReportsValidStaticConfiguration()
     {
-        var (exitCode, stdout, stderr) = RunCli("policy", "check", "--policy", _passingPolicy, "--format", "json");
+        var (exitCode, stdout, stderr) = RunCli("policy", "check", "--policy", PassingPolicy, "--format", "json");
 
         Assert.Multiple(() =>
         {
@@ -22,7 +23,7 @@ public partial class CliIntegrationTests
     public void PolicyCheck_AllIssueCoverageScopes_ReportsValidStaticConfiguration()
     {
         var (exitCode, stdout, stderr) = RunCli(
-            "policy", "check", "--policy", _allCoverageScopesPolicy, "--format", "json");
+            "policy", "check", "--policy", AllCoverageScopesPolicy, "--format", "json");
 
         Assert.Multiple(() =>
         {
@@ -82,7 +83,7 @@ public partial class CliIntegrationTests
     [Test]
     public void PolicyCheck_DeferredSarifResult_HasPrimaryPolicyLocation()
     {
-        var (exitCode, stdout, stderr) = RunCli("policy", "check", "--policy", _passingPolicy, "--format", "sarif");
+        var (exitCode, stdout, stderr) = RunCli("policy", "check", "--policy", PassingPolicy, "--format", "sarif");
 
         using JsonDocument document = JsonDocument.Parse(stdout);
         JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];

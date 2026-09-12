@@ -2,7 +2,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliBaselineValidationIntegrationTests : CliIntegrationTestBase
 {
     /* validate --baseline (coverage contracts) */
 
@@ -13,13 +14,13 @@ public partial class CliIntegrationTests
         try
         {
             var (genExit, genStdout, genStderr) = RunCli("baseline", "generate",
-                "--config", _coveragePolicy,
+                "--config", CoveragePolicyPath,
                 "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
             Assert.That(File.ReadAllText(baselinePath), Does.Contain("strict_coverage:"),
                 $"Expected coverage entries in generated baseline, stdout: {genStdout}");
 
-            var (exitCode, _, stderr) = RunCli("--policy", _coveragePolicy, "--strict",
+            var (exitCode, _, stderr) = RunCli("--policy", CoveragePolicyPath, "--strict",
                 "--baseline", baselinePath);
 
             Assert.That(exitCode, Is.EqualTo(0),
@@ -41,11 +42,11 @@ public partial class CliIntegrationTests
         try
         {
             var (genExit, _, _) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0), "Baseline generation should succeed");
 
-            var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--strict",
+            var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--strict",
                 "--baseline", baselinePath);
 
             Assert.Multiple(() =>
@@ -78,7 +79,7 @@ baseline:
           reason: stale
 ");
 
-            var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--strict",
+            var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--strict",
                 "--baseline", baselinePath);
 
             Assert.Multiple(() =>
@@ -98,7 +99,7 @@ baseline:
     [Test]
     public void ValidateWithBaseline_MissingBaselineFile_ExitsTwo()
     {
-        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--strict",
+        var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--strict",
             "--baseline", "/nonexistent/baseline.yml");
 
         Assert.Multiple(() =>

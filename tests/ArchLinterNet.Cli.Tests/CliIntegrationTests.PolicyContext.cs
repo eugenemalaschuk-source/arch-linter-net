@@ -4,12 +4,13 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliPolicyContextIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void PolicyContext_Json_ExportsOneVersionedToolDocument()
     {
-        var (exitCode, stdout, stderr) = RunCli("policy", "context", "--policy", _passingPolicy, "--format", "json");
+        var (exitCode, stdout, stderr) = RunCli("policy", "context", "--policy", PassingPolicy, "--format", "json");
 
         using JsonDocument document = JsonDocument.Parse(stdout);
         Assert.Multiple(() =>
@@ -26,7 +27,7 @@ public partial class CliIntegrationTests
     [Test]
     public void PolicyContext_DefaultMarkdown_DescribesEffectivePolicyWithoutClaimingValidation()
     {
-        var (exitCode, stdout, stderr) = RunCli("policy", "context", "--policy", _passingPolicy);
+        var (exitCode, stdout, stderr) = RunCli("policy", "context", "--policy", PassingPolicy);
 
         Assert.Multiple(() =>
         {
@@ -68,7 +69,7 @@ public partial class CliIntegrationTests
     [Test]
     public void PolicyWeakening_ExplicitContextArtifacts_ReportsErrorSeverityDowngradeAsJson()
     {
-        var (contextExit, contextJson, contextError) = RunCli("policy", "context", "--policy", _passingPolicy, "--format", "json");
+        var (contextExit, contextJson, contextError) = RunCli("policy", "context", "--policy", PassingPolicy, "--format", "json");
         JsonObject currentContext = JsonNode.Parse(contextJson)!.AsObject();
         JsonObject strictContract = currentContext["contracts"]!.AsArray()
             .Select(node => node!.AsObject())

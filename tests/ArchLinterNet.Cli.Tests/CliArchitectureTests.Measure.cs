@@ -7,7 +7,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class CliArchitectureTests
+[TestFixture]
+internal sealed class CliArchitectureMeasureTests : CliArchitectureTestBase
 {
     [TestCase("yaml", null, false, "Invalid format: yaml")]
     [TestCase("human", 0, false, "--max-contributors must be a positive integer.")]

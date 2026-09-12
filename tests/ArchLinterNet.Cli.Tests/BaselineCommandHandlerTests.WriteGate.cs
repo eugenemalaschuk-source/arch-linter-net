@@ -10,7 +10,8 @@ namespace ArchLinterNet.Cli.Tests;
 /// The gate between a proposed baseline document and the file system: preview, explicit overwrite
 /// intent, refusal on unpreservable comments, and atomic writes.
 /// </summary>
-public sealed partial class BaselineCommandHandlerTests
+[TestFixture]
+internal sealed class BaselineCommandWriteGateTests : BaselineCommandHandlerTestBase
 {
     [Test]
     public void BaselineGenerate_WithoutOutput_PreviewsToStdoutWithoutWriting()
@@ -24,7 +25,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineGenerateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineGenerateCommandOptions(
-                "policy.yml", null, _reasons, "all", null, "human", _write, Array.Empty<string>(), false));
+                "policy.yml", null, Reasons, "all", null, "human", WriteOptions, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -47,7 +48,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineGenerateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineGenerateCommandOptions(
-                "policy.yml", "generated.yml", _reasons, "all", null, "human", _write, Array.Empty<string>(), false));
+                "policy.yml", "generated.yml", Reasons, "all", null, "human", WriteOptions, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -69,8 +70,8 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineGenerateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineGenerateCommandOptions(
-                "policy.yml", "generated.yml", _reasons, "all", null, "human",
-                _write with { Force = true }, Array.Empty<string>(), false));
+                "policy.yml", "generated.yml", Reasons, "all", null, "human",
+                WriteOptions with { Force = true }, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -95,8 +96,8 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineGenerateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineGenerateCommandOptions(
-                "policy.yml", "generated.yml", _reasons, "all", null, "human",
-                _write with { Force = true }, Array.Empty<string>(), false));
+                "policy.yml", "generated.yml", Reasons, "all", null, "human",
+                WriteOptions with { Force = true }, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -124,8 +125,8 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineGenerateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineGenerateCommandOptions(
-                "policy.yml", "generated.yml", _reasons, "all", null, "json",
-                _write with { DryRun = true }, Array.Empty<string>(), false));
+                "policy.yml", "generated.yml", Reasons, "all", null, "json",
+                WriteOptions with { DryRun = true }, Array.Empty<string>(), false));
 
         using JsonDocument json = JsonDocument.Parse(console.OutputText);
 
@@ -154,7 +155,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineGenerateCommandHandler(runtime, console, new StubFileSystem("policy.yml")).Execute(
             new BaselineGenerateCommandOptions(
-                "policy.yml", "generated.yml", _reasons, "all", null, "human", _write, Array.Empty<string>(), false));
+                "policy.yml", "generated.yml", Reasons, "all", null, "human", WriteOptions, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -175,7 +176,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "baseline.yml", _reasons, "all", null, "human", _write,
+                "policy.yml", "baseline.yml", "baseline.yml", Reasons, "all", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -198,7 +199,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "other.yml", _reasons, "all", null, "human", _write,
+                "policy.yml", "baseline.yml", "other.yml", Reasons, "all", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -225,7 +226,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int refusal = new BaselineUpdateCommandHandler(runtime, refusalConsole, refusalFileSystem).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "baseline.yml", _reasons, "all", null, "human", _write,
+                "policy.yml", "baseline.yml", "baseline.yml", Reasons, "all", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -240,8 +241,8 @@ public sealed partial class BaselineCommandHandlerTests
 
         int dryRun = new BaselineUpdateCommandHandler(runtime, dryRunConsole, dryRunFileSystem).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "baseline.yml", _reasons, "all", null, "human",
-                _write with { DryRun = true }, Array.Empty<string>(), false));
+                "policy.yml", "baseline.yml", "baseline.yml", Reasons, "all", null, "human",
+                WriteOptions with { DryRun = true }, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -273,7 +274,7 @@ public sealed partial class BaselineCommandHandlerTests
         int result = new BaselinePruneCommandHandler(runtime, console, fileSystem).Execute(
             new BaselinePruneCommandOptions(
                 "policy.yml", "baseline.yml", "baseline.yml", "all", null, "human",
-                _write with { DryRun = true }, Array.Empty<string>(), false));
+                WriteOptions with { DryRun = true }, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -371,7 +372,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "BASELINE.yml", _reasons, "all", null, "human", _write,
+                "policy.yml", "baseline.yml", "BASELINE.yml", Reasons, "all", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
