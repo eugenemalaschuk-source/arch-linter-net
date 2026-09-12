@@ -5,4 +5,7 @@ internal sealed record PrReportCommandOptions(
     string ChangePath,
     string? OutputPath,
     int MaxDetails,
-    bool ShowHelp);
+    bool ShowHelp,
+    string? RepositoryUrl = null,
+    string? HeadSha = null,
+    string? ArtifactUrl = null);

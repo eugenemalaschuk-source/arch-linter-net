@@ -20,7 +20,7 @@ public sealed class ReportCommandHandlerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success), console.ErrorOutput);
             Assert.That(console.Output, Does.Contain("arch-linter-net report pr"));
         });
     }
@@ -37,6 +37,29 @@ public sealed class ReportCommandHandlerTests
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.ErrorOutput, Does.Contain("positive --max-details"));
+        });
+    }
+
+    [Test]
+    public void Execute_InvalidTransportNavigation_FailsBeforeReadingInputs()
+    {
+        FakeConsole console = new();
+
+        int exitCode = CreateHandler(console, new FakeFileSystem()).Execute(
+            new PrReportCommandOptions(
+                "health.json",
+                "change.json",
+                null,
+                20,
+                false,
+                "https://example.invalid/owner/repository",
+                new string('a', 40),
+                "https://example.invalid/owner/repository/actions/runs/123"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorOutput, Does.Contain("HTTPS GitHub repository URL"));
         });
     }
 
@@ -151,6 +174,33 @@ public sealed class ReportCommandHandlerTests
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
             Assert.That(console.Output, Does.Contain("Report availability: `unavailable`"));
+            Assert.That(console.ErrorOutput, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Definition_PrSubcommand_ParsesTransportNavigationOptions()
+    {
+        const string Health =
+            "{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\",\"dimensions\":[]}";
+        FakeConsole console = new();
+        FakeFileSystem fileSystem = new(
+            ("health.json", Health),
+            ("change.json", EmptyChange()));
+        RootCommand root = new();
+        root.Subcommands.Add(new ReportCommandDefinition(CreateHandler(console, fileSystem)).Create());
+
+        int exitCode = root.Parse([
+            "report", "pr", "--health", "health.json", "--change", "change.json",
+            "--repository-url", "https://github.com/owner/repository",
+            "--head-sha", new string('a', 40),
+            "--artifact-url", "https://github.com/owner/repository/actions/runs/123/artifacts/456"])
+            .Invoke();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success), console.ErrorOutput);
+            Assert.That(console.Output, Does.Contain("Open full report bundle"));
             Assert.That(console.ErrorOutput, Is.Empty);
         });
     }

@@ -168,9 +168,34 @@ The Architecture Health badge is distinct from the legacy `badge architecture-po
 arch-linter-net report pr \
   --health architecture-health.json \
   --change architecture-change.json \
+  --repository-url https://github.com/example/repository \
+  --head-sha "$GITHUB_PR_HEAD_SHA" \
+  --artifact-url https://github.com/example/repository/actions/runs/123456789 \
   --output architecture-pr-report.md
 ```
 
 The Health reporting evidence and change report must carry the same non-empty execution context and selected mode. Because a failing or unassessable Health gate exits `1` or `2` while still producing a valid document, a CI report producer should retain and schema-check the JSON before a separate required gate blocks the pull request. It must not convert the underlying architecture decision into a pass.
+
+The report keeps Gate and Health independent. Gate is the architecture acceptance decision
+(`pass`, `fail`, or `unassessable`); Health describes the overall state (`healthy`, `debt`,
+`degrading`, `failing`, or `unassessable`). A passing Gate can therefore have debt-bearing or
+degrading Health. `Blockers` contains only canonical blocking reasons, while the Health explanation
+section describes every non-healthy dimension, including advisory waiver or finding debt, without
+turning advisory state into a blocker.
+
+Use `--max-details <positive-count>` to bound each ordinary report section independently. The
+report retains canonical totals and deterministic shown/omitted counts for blockers, debt,
+applicability, topology, external evidence, change, remediation, and navigation. The full report
+bundle link is not one of those bounded rows: when the producer supplies a validated transport set
+of repository URL, current head SHA, and HTTPS GitHub Actions run/artifact URL, the report keeps
+that link visible regardless of the detail bound. This URL is display-only transport context; it
+cannot change Gate, Health, evidence availability, or any canonical report section.
+
+The transport set is optional for local and historical artifacts. If it is absent, the source
+artifact has no compatible context, or the producer cannot prove the link's repository/run binding,
+the report labels full bundle navigation `unavailable` rather than fabricating a link. A malformed
+supplied transport value fails closed. The sticky publisher still validates the manifest, current
+PR head, producer run/attempt, report shape, size, and hash, then moves the exact inert Markdown
+bytes; it does not interpret or regenerate navigation.
 
 A publisher may carry the inert Markdown to one sticky pull-request comment only after validating its repository/PR/head/run/schema/size/hash transport evidence. The publisher must not execute PR content, compute report sections, or infer Architecture Health from arbitrary workflow status.

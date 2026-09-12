@@ -20,6 +20,10 @@ internal sealed class ReportCommandHandler(
           --change <path>       Canonical architecture-change report artifact (required)
           --output <path>       Write Markdown to this path (default: standard output)
           --max-details <count> Maximum entries per detail section (default: 20)
+          --repository-url <url> GitHub repository base URL for commit-bound source links
+          --head-sha <sha>      40-character head commit SHA for source links
+          --artifact-url <url>  GitHub Actions run/artifact URL for the full immutable report
+                                (alias: --run-url)
           -h, --help            Show this help message
 
         The report is a local projection of the supplied canonical artifacts. It performs no
@@ -47,6 +51,17 @@ internal sealed class ReportCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (!PrReportTransportContext.TryCreate(
+                options.RepositoryUrl,
+                options.HeadSha,
+                options.ArtifactUrl,
+                out ArchitecturePrReportNavigationContext? navigationContext,
+                out string? navigationError))
+        {
+            console.Error.WriteLine(navigationError);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
             string? collision = FindOutputCollision(options);
@@ -70,8 +85,9 @@ internal sealed class ReportCommandHandler(
 
             ArchitecturePrReportProjection projection = ArchitecturePrReportProjector.ReadAndProject(
                 fileSystem.ReadAllText(options.HealthPath),
-                fileSystem.ReadAllText(options.ChangePath));
-            string markdown = PrReportMarkdownRenderer.Render(projection, options.MaxDetails);
+                fileSystem.ReadAllText(options.ChangePath),
+                navigationContext);
+            string markdown = PrReportMarkdownRenderer.Render(projection, options.MaxDetails, navigationContext);
             if (options.OutputPath is null)
             {
                 console.Out.Write(markdown);
