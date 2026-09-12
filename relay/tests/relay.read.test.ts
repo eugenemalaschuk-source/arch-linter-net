@@ -92,7 +92,7 @@ describe("public Relay read seam", () => {
     expect((await readPublicRepresentation(new Request("https://relay.test"), wrongProfile, "json", entry)).status).toBe(404);
 
     const wrongEpoch = await state(headlineBytes);
-    wrongEpoch.revocation_epoch = 2;
+    wrongEpoch.revocation_epoch = 0;
     expect((await readPublicRepresentation(new Request("https://relay.test"), wrongEpoch, "json", entry)).status).toBe(404);
 
     const beyondHorizon = await state(headlineBytes);

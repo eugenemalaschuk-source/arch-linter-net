@@ -123,7 +123,7 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
   function relayUrl(operation: string): string { return `https://relay.test/badge-relay/v1/${alias}/${operation}`; }
 
   function futureHorizon(): string {
-    return new Date(Date.now() + 30 * 60_000).toISOString().replace(".000Z", "Z");
+    return new Date(Math.floor((Date.now() + 30 * 60_000) / 1000) * 1000).toISOString().replace(".000Z", "Z");
   }
 
   async function prepareRemote(jwt: string, idempotencyKey: string, bytes = payload): Promise<{ response: Response; challenge?: { challenge_id: string; generation: number; revocation_epoch: number; deadline: string } }> {
@@ -420,6 +420,17 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(row.status).toBe("unavailable");
     expect(row.generation).toBe(challenge.generation + 1);
     expect(row.revocation_epoch).toBe(challenge.revocation_epoch + 1);
+
+    const freshJwt = await token({ jti: "fresh-writer-jti" });
+    const freshKey = "fresh-writer-key";
+    const freshPrepared = await prepareRemote(freshJwt, freshKey);
+    expect(freshPrepared.response.status).toBe(201);
+    const freshChallenge = freshPrepared.challenge as { challenge_id: string; generation: number; revocation_epoch: number };
+    const freshCommit = await commitInternal(relay.get(relay.idFromName(alias)), freshJwt, freshChallenge, "publish", payload, freshKey);
+    expect(freshCommit.status).toBe(200);
+    const publicRead = await SELF.fetch(`https://relay.test/badge-relay/v1/${alias}`);
+    expect(publicRead.status).toBe(200);
+    expect(await publicRead.text()).toBe(payload);
   });
 
   it("gives revoke precedence over a delayed publish and preserves its tombstone", async () => {

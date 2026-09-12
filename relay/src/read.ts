@@ -119,7 +119,7 @@ async function validateReadState(state: PublicReadState, entry: RegistryEntry): 
   if (!profile || typeof state.payload !== "string" || typeof state.payload_digest !== "string" || typeof state.verified_at !== "string" || typeof state.valid_until !== "string") return undefined;
   if (profile !== entry.disclosure_profile) return undefined;
   const expectedEpoch = entry.initial_state?.revocation_epoch ?? 1;
-  if (!Number.isSafeInteger(expectedEpoch) || state.revocation_epoch !== expectedEpoch) return undefined;
+  if (!Number.isSafeInteger(expectedEpoch) || !Number.isSafeInteger(state.revocation_epoch) || state.revocation_epoch < expectedEpoch) return undefined;
   if (typeof state.semantic_horizon !== "string") return undefined;
   if (state.payload.length === 0 || new TextEncoder().encode(state.payload).byteLength > MAX_PUBLIC_PAYLOAD_BYTES) return undefined;
   const generation = state.generation;
