@@ -5,10 +5,12 @@ using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureMetricApplicabilityTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureMetricApplicabilityTests
+[TestFixture]
+public sealed class ArchitectureMetricApplicabilityProjectTopologyTests
 {
     [Test]
     public void Evaluate_ProjectTopologyWithDistinctArtifactsSharingOutputName_IsUnassessableWithoutMergingOwners()

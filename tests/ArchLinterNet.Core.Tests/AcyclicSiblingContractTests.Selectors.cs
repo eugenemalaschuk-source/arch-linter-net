@@ -6,8 +6,27 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class AcyclicSiblingContractTests
+[TestFixture]
+public sealed class AcyclicSiblingSelectorTests
 {
+    private string _tempDir = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-acyclic-sibling-selector-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempDir);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_tempDir))
+        {
+            Directory.Delete(_tempDir, true);
+        }
+    }
+
     [Test]
     public void CheckCycleContract_SelectorOnlyTargetLayer_FormsCycle()
     {

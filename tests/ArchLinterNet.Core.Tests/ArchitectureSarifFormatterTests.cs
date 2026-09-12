@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class ArchitectureSarifFormatterTests
+public sealed class ArchitectureSarifFormatterTests
 {
     private static readonly string[] _value = { "line 42: Forbidden.Call -> Forbidden.Type.Call" };
     private static readonly string[] _value1 = { "not a line reference" };
@@ -19,9 +19,9 @@ public sealed partial class ArchitectureSarifFormatterTests
     private static readonly string[] _value7 = { "ref-a" };
     private static readonly string[] _value8 = { "ref-b" };
     private static readonly string[] _value9 = { "a-rule", "b-rule", "m-rule" };
-    private static readonly ArchitectureSarifFormatter _formatter = new();
-    private static readonly string[] _ref1 = { "ref1" };
-    private static readonly string[] _ref2 = { "ref2" };
+    internal static readonly ArchitectureSarifFormatter Formatter = new();
+    internal static readonly string[] Ref1 = { "ref1" };
+    internal static readonly string[] Ref2 = { "ref2" };
     private static readonly string[] _newtonsoftJsonReference = { "Newtonsoft.Json" };
     private static readonly string[] _approvedInfraGroup = { "approved_infra" };
 
@@ -30,7 +30,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string>? cycles = null)
     {
-        string json = _formatter.FormatResultAsSarif(mode, violations, cycles ?? Array.Empty<string>(), "1.2.3");
+        string json = Formatter.FormatResultAsSarif(mode, violations, cycles ?? Array.Empty<string>(), "1.2.3");
         return JsonDocument.Parse(json).RootElement;
     }
 
@@ -164,7 +164,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         using JsonDocument ci = JsonDocument.Parse(
             ciFormatter.FormatResultForCiArtifacts("strict", false, [violation], Array.Empty<string>()));
         using JsonDocument sarif = JsonDocument.Parse(
-            _formatter.FormatResultAsSarif("strict", [violation], Array.Empty<string>(), "1.2.3"));
+            Formatter.FormatResultAsSarif("strict", [violation], Array.Empty<string>(), "1.2.3"));
 
         JsonNode? ciFinding = JsonNode.Parse(ci.RootElement.GetProperty("violations")[0].GetRawText());
         JsonNode? sarifFinding = JsonNode.Parse(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")[0]
@@ -188,7 +188,7 @@ public sealed partial class ArchitectureSarifFormatterTests
             Array.Empty<ArchitectureClassificationRoleFact>(),
             classificationPathDeferred: null,
             preflightDiagnostics: [preflight]));
-        using JsonDocument sarif = JsonDocument.Parse(_formatter.FormatResultAsSarif(
+        using JsonDocument sarif = JsonDocument.Parse(Formatter.FormatResultAsSarif(
             "strict",
             Array.Empty<ArchitectureViolation>(),
             Array.Empty<string>(),
@@ -222,7 +222,7 @@ public sealed partial class ArchitectureSarifFormatterTests
             ]
         };
 
-        string json = _formatter.FormatResultAsSarif(
+        string json = Formatter.FormatResultAsSarif(
             "strict",
             Array.Empty<ArchitectureViolation>(),
             Array.Empty<string>(),
@@ -246,7 +246,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("My Contract", "my-rule", "Source.Type", "Forbidden.Namespace", _ref1)
+            new("My Contract", "my-rule", "Source.Type", "Forbidden.Namespace", Ref1)
         };
 
         JsonElement root = Run("strict", violations);
@@ -263,7 +263,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         // empty source/forbidden-namespace/references triple instead of the real violation data.
         var violations = new List<ArchitectureViolation>
         {
-            new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", _ref1)
+            new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", Ref1)
             {
                 Payload = new ContextDependencyPayload()
             }
@@ -280,7 +280,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", _ref1)
+            new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", Ref1)
             {
                 Payload = new ContextDependencyPayload()
                 {
@@ -307,7 +307,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", _ref1)
+            new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", Ref1)
             {
                 Payload = new ContextDependencyPayload()
             }
@@ -323,7 +323,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("<configuration>", null, "Source.Type", "Forbidden.Namespace", _ref1)
+            new("<configuration>", null, "Source.Type", "Forbidden.Namespace", Ref1)
         };
 
         JsonElement root = Run("strict", violations);
@@ -337,8 +337,8 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("My Contract", "my-rule", "Source.A", "Forbidden.Namespace", _ref1),
-            new("My Contract", "my-rule", "Source.B", "Forbidden.Namespace", _ref2)
+            new("My Contract", "my-rule", "Source.A", "Forbidden.Namespace", Ref1),
+            new("My Contract", "my-rule", "Source.B", "Forbidden.Namespace", Ref2)
         };
 
         JsonElement root = Run("strict", violations);
@@ -356,8 +356,8 @@ public sealed partial class ArchitectureSarifFormatterTests
         // rule entries sharing one id, which SARIF consumers can reject as invalid.
         var violations = new List<ArchitectureViolation>
         {
-            new("My Contract", "my-rule", "Source.A", "Forbidden.Namespace", _ref1),
-            new("My Contract (renamed)", "my-rule", "Source.B", "Forbidden.Namespace", _ref2)
+            new("My Contract", "my-rule", "Source.A", "Forbidden.Namespace", Ref1),
+            new("My Contract (renamed)", "my-rule", "Source.B", "Forbidden.Namespace", Ref2)
         };
 
         JsonElement root = Run("strict", violations);
@@ -372,7 +372,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("layout-rule", "layout-id", "Layout.Source", "forbidden type kind 'interface'", _ref1)
+            new("layout-rule", "layout-id", "Layout.Source", "forbidden type kind 'interface'", Ref1)
             { Payload = new LayoutConventionPayload(MatchedFilePath: "src/App/Services/Bad.cs") }
         };
 
@@ -390,7 +390,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("layout-rule", "layout-id", "Layout.Source", "expected at most 1 source declaration(s), found 2", _ref1)
+            new("layout-rule", "layout-id", "Layout.Source", "expected at most 1 source declaration(s), found 2", Ref1)
             {
                 Payload = new LayoutConventionPayload(MatchedFilePath: "src/App/Services/OrderService.Part1.cs")
                 {
@@ -423,7 +423,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("layout-rule", "layout-id", "Layout.Source", "forbidden type kind 'interface'", _ref1)
+            new("layout-rule", "layout-id", "Layout.Source", "forbidden type kind 'interface'", Ref1)
             { Payload = new LayoutConventionPayload(MatchedFilePath: "src/App/Services/Bad.cs") }
         };
 
@@ -449,7 +449,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("layout-rule", "layout-id", "Layout.Source", "path-based layout checks unavailable", _ref1)
+            new("layout-rule", "layout-id", "Layout.Source", "path-based layout checks unavailable", Ref1)
             { Payload = new LayoutConventionPayload(DataUnavailable: true) }
         };
 
@@ -464,7 +464,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", "my-rule", "Source.Type", "Forbidden.Namespace", _ref1)
+            new("contract", "my-rule", "Source.Type", "Forbidden.Namespace", Ref1)
         };
 
         JsonElement root = Run("strict", violations);
@@ -478,7 +478,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", "my-rule", "Source.Type", "Forbidden.Namespace", _ref1)
+            new("contract", "my-rule", "Source.Type", "Forbidden.Namespace", Ref1)
         };
 
         JsonElement root = Run("audit", violations);
@@ -532,7 +532,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("layer-rule", "layer-rule", "MyApp.Web.Foo", "protected layer 'Core'", _ref1)
+            new("layer-rule", "layer-rule", "MyApp.Web.Foo", "protected layer 'Core'", Ref1)
         };
 
         JsonElement root = Run("strict", violations);
@@ -657,7 +657,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("type-placement-rule", "type-placement-rule", "MyApp.Foo", "expected-location", _ref1)
+            new("type-placement-rule", "type-placement-rule", "MyApp.Foo", "expected-location", Ref1)
             {
                 Payload = new TypePlacementPayload(ExpectedTypeLocation: "MyApp.Correct")
             }
@@ -754,9 +754,9 @@ public sealed partial class ArchitectureSarifFormatterTests
         var violationB = new ArchitectureViolation("b-contract", "b-rule", "Source.B", "Forbidden.B", _value8);
         var cycle = "[m-rule] X -> Y -> X";
 
-        string inOriginalOrder = _formatter.FormatResultAsSarif(
+        string inOriginalOrder = Formatter.FormatResultAsSarif(
             "strict", new[] { violationB, violationA }, new[] { cycle }, "1.0.0");
-        string inReversedOrder = _formatter.FormatResultAsSarif(
+        string inReversedOrder = Formatter.FormatResultAsSarif(
             "strict", new[] { violationA, violationB }, new[] { cycle }, "1.0.0");
 
         Assert.That(inOriginalOrder, Is.EqualTo(inReversedOrder));

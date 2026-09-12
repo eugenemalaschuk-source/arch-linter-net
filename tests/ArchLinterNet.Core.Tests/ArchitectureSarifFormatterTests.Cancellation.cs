@@ -1,10 +1,11 @@
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureSarifFormatterTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureSarifFormatterTests
+public sealed class ArchitectureSarifFormatterCancellationTests
 {
     // PR #375 review: the final OrderBy/ThenBy/ToList over the assembled ResultEntry list used to
     // run without any token checks, so cancellation during the sort of a large report was only
@@ -18,8 +19,8 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("z-contract", "z-rule", "Source.Z", "Forbidden.Z", _ref1),
-            new("a-contract", "a-rule", "Source.A", "Forbidden.A", _ref2),
+            new("z-contract", "z-rule", "Source.Z", "Forbidden.Z", Ref1),
+            new("a-contract", "a-rule", "Source.A", "Forbidden.A", Ref2),
         };
         var preflightDiagnostics = new[]
         {
@@ -34,7 +35,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         using CancellationTokenSource cts = new();
         collection.CancellationTokenSource = cts;
 
-        Assert.Throws<OperationCanceledException>(() => _formatter.FormatResultAsSarif(
+        Assert.Throws<OperationCanceledException>(() => Formatter.FormatResultAsSarif(
             "strict",
             violations,
             Array.Empty<string>(),

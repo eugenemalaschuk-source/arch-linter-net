@@ -12,48 +12,12 @@ namespace ArchLinterNet.Core.Tests;
 // matching. Uses the real YAML-load pipeline (ArchitecturePolicyDocumentLoader) so `When` is
 // compiled exactly as production policies compile it, then exercises matching through
 // ArchitectureAnalysisSession/ArchitectureContractRunner - not the matcher in isolation.
-// Split across two files (this one: layer selectors + stale-coverage; the
-// .ContextualContracts.cs partial: contextual dependency/allow-only + remaining regressions) to
+// Split into focused fixtures (this one: layer selectors + stale-coverage; the
+// .ContextualContracts.cs companion: contextual dependency/allow-only + remaining regressions) to
 // stay under the repo's file-size threshold - see AGENTS.md.
 [TestFixture]
-public sealed partial class CelSelectorContextualIntegrationTests
+public sealed class CelSelectorContextualIntegrationTests : CelSelectorContextualIntegrationTestSupport
 {
-    private string _tempDir = null!;
-
-    [SetUp]
-    public void SetUp()
-    {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-cel-selector-contextual-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempDir);
-    }
-
-    [TearDown]
-    public void TearDown()
-    {
-        if (Directory.Exists(_tempDir))
-        {
-            Directory.Delete(_tempDir, true);
-        }
-    }
-
-    private string WritePolicy(string yaml)
-    {
-        string path = Path.Combine(_tempDir, "dependencies.arch.yml");
-        File.WriteAllText(path, yaml);
-        return path;
-    }
-
-    private static string AssemblyName => typeof(CelSelectorContextualIntegrationTests).Assembly.GetName().Name!;
-
-    private static ArchitectureAnalysisContext CreateContext()
-    {
-        return new ArchitectureAnalysisContext(
-            "/tmp", new[] { typeof(CelSelectorContextualIntegrationTests).Assembly }, Array.Empty<string>(), Array.Empty<string>());
-    }
-
-    private ArchitectureContractDocument Load(string yaml) =>
-        new ArchitecturePolicyDocumentLoader().Load(WritePolicy(yaml));
-
     // --- Layer selector `When` ---
 
     [Test]
@@ -312,18 +276,4 @@ public sealed partial class CelSelectorContextualIntegrationTests
         });
     }
 
-    // --- helpers (shared with the .ContextualContracts.cs partial) ---
-
-    private static Type[] TypesMatchingLayer(ArchitectureAnalysisSession session, ArchitectureLayer layer)
-    {
-        return typeof(CelSelectorContextualIntegrationTests).Assembly.GetTypes()
-            .Where(t => ArchitectureLayerMatchesForTest(session, layer, t))
-            .ToArray();
-    }
-
-    private static bool ArchitectureLayerMatchesForTest(ArchitectureAnalysisSession session, ArchitectureLayer layer, Type type)
-    {
-        return ArchLinterNet.Core.Execution.ArchitectureLayerTypeMatcher.Matches(
-            layer, type, session.RoleIndex, session.ExpressionFacts);
-    }
 }

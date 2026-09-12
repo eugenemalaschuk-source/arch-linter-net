@@ -1,10 +1,11 @@
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureHealthProjectorTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureHealthProjectorTests
+public sealed class ArchitectureHealthProjectorAuthorityTests
 {
     private static readonly string[] _expectedExternalReasonCodes =
     [

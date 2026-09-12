@@ -5,10 +5,11 @@ using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureBaselineApplicationServiceBuildStateTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureBaselineApplicationServiceBuildStateTests
+public sealed class ArchitectureBaselineApplicationServiceBuildStateCoverageTests
 {
     [Test]
     public void Verify_EnsureBuiltProjectOnlyPolicy_SkipsBuildStatePreparation()

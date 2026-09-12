@@ -9,13 +9,13 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
+public sealed class ExternalDiagnosticsFederationSelectionTests : ExternalDiagnosticsFederationReferenceScenarioTestSupport
 {
     [Test]
     public void PolicyAuthorizedRuleIds_ExcludeUnlistedDiagnosticsFromEveryProjection()
     {
         ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan", ruleIds: ["SEC100"]);
-        _repository.AddUtf8File("evidence/filtered.sarif", Sarif(Results(
+        Repository.AddUtf8File("evidence/filtered.sarif", Sarif(Results(
             Result("SEC100", "error", "src/App/One.cs", "allowed", fingerprint: "{\"stable\":\"allowed\"}"),
             Result("PUBLICAPI001", "error", "src/App/Two.cs", "excluded", fingerprint: "{\"stable\":\"excluded\"}"))));
 

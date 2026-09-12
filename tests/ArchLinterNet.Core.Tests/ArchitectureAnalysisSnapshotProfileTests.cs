@@ -1,9 +1,11 @@
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureAnalysisSnapshotTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureAnalysisSnapshotTests
+[TestFixture]
+public sealed class ArchitectureAnalysisSnapshotProfileTests
 {
     [Test]
     public void Counters_CancelledDuringContractExecution_RetainsPartialFamilyResults()

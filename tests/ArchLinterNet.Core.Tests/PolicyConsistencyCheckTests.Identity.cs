@@ -4,6 +4,7 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.PolicyConsistencyCheckTests;
 
 namespace ArchLinterNet.Core.Tests;
 
@@ -12,7 +13,7 @@ namespace ArchLinterNet.Core.Tests;
 // on a finding's own semantic content — never on a position in a YAML list the policy author can
 // reorder without changing meaning. Split out of PolicyConsistencyCheckTests.cs to keep both files
 // under the repository's 800-line hard limit.
-public sealed partial class PolicyConsistencyCheckTests
+public sealed class PolicyConsistencyIdentityTests
 {
     [Test]
     public void IndependenceConflict_TwoConflictingContractsSharingDuplicateId_GetDistinctIdentities()
