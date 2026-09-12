@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import urllib.error
+
 import pytest
 
 from badge_promotion.adapters import AdapterError, HttpRelayClient, NoneAdapter, require_supported_adapter
@@ -57,3 +59,34 @@ def test_relay_http_commit_requests_do_not_carry_forged_trusted_context(monkeypa
     client.publish(b"{}", "a" * 64, **kwargs)
     client.renew(b"{}", "a" * 64, **kwargs)
     assert all("trusted_context" not in body for body in bodies)
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [
+        (401, "relay_authorization_rejected"),
+        (403, "relay_authorization_rejected"),
+        (409, "relay_cas_conflict"),
+    ],
+)
+def test_relay_http_statuses_become_redacted_adapter_diagnostics(
+    monkeypatch: pytest.MonkeyPatch, status: int, reason: str
+) -> None:
+    def reject(*_: object, **__: object) -> None:
+        raise urllib.error.HTTPError("https://relay.example", status, "private detail", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", reject)
+    client = HttpRelayClient("https://relay.example", "alias", "headline-only/v1")
+    with pytest.raises(AdapterError) as error:
+        client.publish(
+            b"{}",
+            "a" * 64,
+            challenge_id="challenge",
+            idempotency_key="key",
+            generation=4,
+            revocation_epoch=2,
+            oidc_token="token",
+            semantic_horizon="2026-09-12T11:00:00Z",
+        )
+    assert error.value.reason == reason
+    assert str(error.value) == reason

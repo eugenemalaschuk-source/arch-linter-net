@@ -4,7 +4,9 @@ import io
 import inspect
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 import zipfile
 
 import pytest
@@ -12,8 +14,18 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from badge_promotion import cli
-from badge_promotion.cli import ProviderFailure, _publish_raw, _read_bounded_zip_member, _required_gate, _workflow_blob_sha  # noqa: E402
+from badge_promotion.adapters import AdapterError  # noqa: E402
 from badge_promotion.config import parse_config  # noqa: E402
+from badge_promotion.cli import (  # noqa: E402
+    ProviderFailure,
+    _publish_raw,
+    _read_bounded_zip_member,
+    _required_gate,
+    _validate_invocation,
+    _workflow_blob_sha,
+)
+from badge_promotion.decision import DecisionDisposition, PromotionDecision  # noqa: E402
+from badge_promotion.model import PromotionStatus, ReasonCode  # noqa: E402
 
 
 class FakeApi:
@@ -111,6 +123,69 @@ def test_main_ref_guard_uses_configured_base_ref(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
     monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
     assert cli.main() == 1
+
+
+def test_renewal_accepts_scheduled_invocation_for_configured_base_ref(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw = json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text())
+    raw["base_ref"] = "develop"
+    config = parse_config(raw)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "schedule")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/develop")
+    _validate_invocation(config, "renew")
+    with pytest.raises(ProviderFailure, match="event_or_ref_mismatch"):
+        _validate_invocation(config, "publish")
+
+
+def test_adapter_error_becomes_fixed_cli_output(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    raw = json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text())
+    raw["destination"] = {
+        "adapter": "relay",
+        "alias": "alias",
+        "endpoint": "https://relay.example",
+        "audience": "audience",
+    }
+    config = parse_config(raw)
+    evidence = SimpleNamespace(
+        head_sha="b" * 40,
+        head_tree_sha="c" * 40,
+        run_id=1,
+        run_attempt=1,
+        semantic_horizon=datetime(2026, 9, 12, 11, tzinfo=timezone.utc),
+    )
+    decision = PromotionDecision(
+        PromotionStatus.READY,
+        ReasonCode.READY,
+        DecisionDisposition.COMMIT,
+        1,
+        0,
+        b"{}",
+        "a" * 64,
+        None,
+    )
+    output = tmp_path / "github-output"
+    monkeypatch.setattr(cli, "_load_config", lambda _: config)
+    monkeypatch.setattr(cli, "GitHubApi", lambda: object())
+    monkeypatch.setattr(cli, "resolve_evidence", lambda *_: (evidence, b"archive"))
+    monkeypatch.setattr(cli, "decide_promotion", lambda *_: decision)
+    monkeypatch.setattr(cli, "issue_github_oidc_token", lambda *_: "token")
+    def fail_prepare(*_: object, **__: object) -> object:
+        raise AdapterError("relay_cas_conflict")
+
+    monkeypatch.setattr(cli.HttpRelayClient, "prepare", fail_prepare)
+    monkeypatch.setattr(sys, "argv", ["cli", "--configuration-id", "fixture", "--adapter", "relay"])
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    assert cli.main() == 1
+    assert "status=unavailable" in output.read_text()
+    assert "reason=relay_cas_conflict" in output.read_text()
+    assert "Traceback" not in capsys.readouterr().err
 
 
 def test_raw_publication_stale_cas_uses_configured_base_ref(monkeypatch: pytest.MonkeyPatch) -> None:

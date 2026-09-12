@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 import os
 import json
 from typing import Protocol
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -19,7 +20,9 @@ from .model import AdapterKind, PromotionStatus
 
 
 class AdapterError(RuntimeError):
-    pass
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
 
 
 class RelayClient(Protocol):
@@ -73,8 +76,22 @@ class HttpRelayClient:
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 result = json.loads(response.read().decode("utf-8"))
-        except (OSError, UnicodeError, ValueError) as error:
+        except urllib.error.HTTPError as error:
+            if error.code in {401, 403}:
+                raise AdapterError("relay_authorization_rejected") from error
+            if error.code == 409:
+                raise AdapterError("relay_cas_conflict") from error
+            if error.code == 413:
+                raise AdapterError("relay_payload_rejected") from error
+            if error.code == 429:
+                raise AdapterError("relay_rate_limited") from error
+            if error.code >= 500:
+                raise AdapterError("relay_service_unavailable") from error
+            raise AdapterError("relay_request_rejected") from error
+        except OSError as error:
             raise AdapterError("relay_transport_unavailable") from error
+        except (UnicodeError, ValueError) as error:
+            raise AdapterError("relay_response_invalid") from error
         if not isinstance(result, dict) or response.status >= 400:
             raise AdapterError("relay_publication_rejected")
         return result

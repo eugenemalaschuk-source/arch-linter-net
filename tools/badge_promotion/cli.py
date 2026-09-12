@@ -26,7 +26,7 @@ from typing import Any
 
 from .config import ConfigValidationError, parse_config
 from .decision import PromotionRequest, decide_promotion
-from .adapters import HttpRelayClient, NoneAdapter, issue_github_oidc_token
+from .adapters import AdapterError, HttpRelayClient, NoneAdapter, issue_github_oidc_token
 from .model import EvidenceContext, PromotionStatus, ReasonCode
 
 
@@ -364,6 +364,13 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
         raise ProviderFailure("publication_race_lost") from error
 
 
+def _validate_invocation(config, operation: str) -> None:
+    expected_event = "push" if operation == "publish" else "schedule"
+    expected_ref = f"refs/heads/{config.base_ref}"
+    if os.environ.get("GITHUB_EVENT_NAME") != expected_event or os.environ.get("GITHUB_REF") != expected_ref:
+        raise ProviderFailure("event_or_ref_mismatch")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configuration-id", required=True)
@@ -374,8 +381,7 @@ def main() -> int:
         config = _load_config(args.configuration_id)
         if config.destination.adapter.value != args.adapter:
             raise ProviderFailure("adapter_configuration_mismatch")
-        if os.environ.get("GITHUB_EVENT_NAME") != "push" or os.environ.get("GITHUB_REF") != f"refs/heads/{config.base_ref}":
-            raise ProviderFailure("event_or_ref_mismatch")
+        _validate_invocation(config, args.operation)
         api = GitHubApi()
         evidence, archive = resolve_evidence(api, config)
         request = PromotionRequest(
@@ -423,7 +429,7 @@ def main() -> int:
         _write_outputs({**output_metadata, "status": "ready"})
         _publish_raw(api, config, decision.payload or b"", evidence=evidence, status="ready", reason=decision.reason.value)
         return 0
-    except ProviderFailure as error:
+    except (ProviderFailure, AdapterError) as error:
         if "config" in locals() and config.destination.adapter.value == "github-raw":
             try:
                 api = locals().get("api") or GitHubApi()
