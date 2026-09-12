@@ -7,7 +7,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class BaselineCommandHandlerTests
+[TestFixture]
+internal sealed class BaselineCommandFormatTests : BaselineCommandHandlerTestBase
 {
     [Test]
     public void BaselineHelpTexts_DocumentSarifFormatForComparisonCommands()

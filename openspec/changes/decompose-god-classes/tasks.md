@@ -86,7 +86,7 @@
 
 ## 3. Test-suite cleanup
 
-- [ ] 3.1 Split unrelated CLI test aggregates into focused fixtures without changing scenario coverage (#821).
+- [x] 3.1 Split unrelated CLI test aggregates into focused fixtures without changing scenario coverage (#821).
 - [ ] 3.2 Split unrelated Core test aggregates into focused fixtures; retain only dedicated partial-language source fixtures (#822).
   - [x] Extract the v0.8 full-cycle Checkpoint B scenario's orchestration, phase-trace/restore-reuse
     state, and validation/policy-weakening/health-matrix/Unity/reporting phases out of the shared

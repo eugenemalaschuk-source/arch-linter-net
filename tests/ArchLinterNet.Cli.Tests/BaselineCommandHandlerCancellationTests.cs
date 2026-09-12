@@ -9,8 +9,9 @@ namespace ArchLinterNet.Cli.Tests;
 // OperationCanceledException with its generic catch (Exception), reporting real cancellation as a
 // "<command> error", and never re-checked the token between Core returning an outcome and the
 // handler's own write/publish step. Shares BaselineCommandHandlerTests' StubRuntime/StubFileSystem/
-// RecordingConsole fixtures via the partial class.
-public sealed partial class BaselineCommandHandlerTests
+// RecordingConsole fixtures via the shared support base.
+[TestFixture]
+internal sealed class BaselineCommandCancellationTests : BaselineCommandHandlerTestBase
 {
     [Test]
     public void BaselineUpdate_CoreThrowsOperationCanceled_ReportsTypedCancelledStatusNotGenericError()

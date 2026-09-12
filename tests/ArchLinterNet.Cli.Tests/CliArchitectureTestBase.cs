@@ -1,26 +1,40 @@
 using System.Text;
 using System.Text.Json;
+using ArchLinterNet.Cli;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands.Badge.EntryPoint;
+using ArchLinterNet.Cli.Commands.Baseline;
+using ArchLinterNet.Cli.Commands.Cache;
+using ArchLinterNet.Cli.Commands.Change.EntryPoint;
+using ArchLinterNet.Cli.Commands.Coverage.EntryPoint;
+using ArchLinterNet.Cli.Commands.Explain;
+using ArchLinterNet.Cli.Commands.Gate.EntryPoint;
+using ArchLinterNet.Cli.Commands.Graph;
+using ArchLinterNet.Cli.Commands.Health.EntryPoint;
+using ArchLinterNet.Cli.Commands.Measure.EntryPoint;
+using ArchLinterNet.Cli.Commands.Policy;
+using ArchLinterNet.Cli.Commands.PublicApi;
+using ArchLinterNet.Cli.Commands.Schema;
 using ArchLinterNet.Cli.Commands.Validate;
+using ArchLinterNet.Cli.Commands.Validate.EntryPoint;
+using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
+using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-// Split out of ValidateCommandHandlerReportModeTests.cs (which grew past the file-size lint
-// threshold) — the shared ICliRuntime/ICliConsole/IFileSystem test doubles every partial file of
-// this class uses, kept together as the single-responsibility "fakes" concern the lint failure's
-// own guidance calls for.
-public sealed partial class ValidateCommandHandlerReportModeTests
+internal abstract class CliArchitectureTestBase
 {
-    private sealed class FakeCliRuntime : ICliRuntime
+    protected static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "gate", "health", "history", "measure", "policy", "public-api", "report", "scaffold", "schema", "topology" };
+    protected static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
+    protected static readonly string[] _value2 = { "rule-1" };
+    protected sealed class FakeCliRuntime : ICliRuntime
     {
-        public int ValidationCallCount { get; private set; }
-
         public string Version => "1.2.3";
 
         public ValidationRequest? LastValidationRequest { get; private set; }
@@ -29,10 +43,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 
         public ValidationOutcome? ForcedOutcome { get; init; }
 
-        // null preserves every existing test's hardcoded empty-runs default; set this to supply a
-        // native SARIF document a test needs to assert against (e.g. a native rule/result the CLI's
-        // imported-diagnostics merge must not collide with — see ExternalEvidence tests).
-        public string? ForcedSarif { get; init; }
+        public ArchitectureMetricMeasurementOutcome? ForcedMeasurementOutcome { get; init; }
 
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
@@ -42,7 +53,6 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)
         {
-            ValidationCallCount++;
             LastValidationRequest = request;
             if (ExceptionToThrow is not null)
             {
@@ -72,6 +82,11 @@ public sealed partial class ValidateCommandHandlerReportModeTests
         public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
             throw new NotSupportedException();
 
+        public ArchitectureMetricMeasurementOutcome Measure(
+            ArchitectureMetricMeasurementRequest request,
+            ValidationTiming? timing) =>
+            ForcedMeasurementOutcome ?? throw ExceptionToThrow ?? new NotSupportedException();
+
         public string FormatResultForCiArtifacts(
             string mode,
             bool passed,
@@ -88,7 +103,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
         {
-            return JsonSerializer.Serialize(new { mode, passed, violation_count = violations.Count });
+            throw new NotSupportedException();
         }
 
         public string FormatClassificationFactsForHumans(
@@ -111,7 +126,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
         {
-            return ForcedSarif ?? "{\"version\":\"2.1.0\",\"runs\":[]}";
+            return "{\"version\":\"2.1.0\",\"runs\":[]}";
         }
 
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
@@ -177,69 +192,27 @@ public sealed partial class ValidateCommandHandlerReportModeTests
         public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request) => throw new NotSupportedException();
     }
 
-    private sealed class FakeCliConsole(int errorWriteFailures = 0, int outputWriteFailures = 0) : ICliConsole
+    protected sealed class FakeCliConsole : ICliConsole
     {
         private readonly StringBuilder _stdout = new();
         private readonly StringBuilder _stderr = new();
-        private int _errorWriteFailuresRemaining = errorWriteFailures;
-        private int _outputWriteFailuresRemaining = outputWriteFailures;
 
-        public TextWriter Out => new FailingStringWriter(_stdout, this, isError: false);
+        public TextWriter Out => new StringWriter(_stdout);
 
-        public TextWriter Error => new FailingStringWriter(_stderr, this, isError: true);
+        public TextWriter Error => new StringWriter(_stderr);
 
         public string StdOut => _stdout.ToString();
 
         public string StdErr => _stderr.ToString();
-
-        private bool ConsumeWriteFailure(bool isError)
-        {
-            if (isError)
-            {
-                if (_errorWriteFailuresRemaining == 0)
-                {
-                    return false;
-                }
-
-                _errorWriteFailuresRemaining--;
-                return true;
-            }
-
-            if (_outputWriteFailuresRemaining == 0)
-            {
-                return false;
-            }
-
-            _outputWriteFailuresRemaining--;
-            return true;
-        }
-
-        private sealed class FailingStringWriter(StringBuilder builder, FakeCliConsole owner, bool isError) : StringWriter(builder)
-        {
-            public override void WriteLine(string? value)
-            {
-                if (owner.ConsumeWriteFailure(isError))
-                {
-                    throw new IOException(isError ? "stderr is closed" : "stdout is closed");
-                }
-
-                base.WriteLine(value);
-            }
-        }
     }
 
-    private sealed class FakeFileSystem(bool exists) : IFileSystem
+    protected sealed class FakeFileSystem(bool exists) : IFileSystem
     {
         private readonly Dictionary<string, string> _tempContents = new();
 
         public HashSet<string> FailOnWrite { get; } = new();
 
         public List<string> CommittedPaths { get; } = new();
-
-        // Issue #375 PR #416 review: lets a test simulate cancellation racing with (rather than
-        // preceding) a real file-system operation — e.g. cancelling right as a temp file write
-        // succeeds — without the write itself failing.
-        public Action? OnWriteAllTextToTemp { get; set; }
 
         public bool FileExists(string path)
         {
@@ -264,7 +237,6 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 
             string tempPath = targetPath + ".tmp";
             _tempContents[tempPath] = contents;
-            OnWriteAllTextToTemp?.Invoke();
             return tempPath;
         }
 
@@ -273,13 +245,24 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             CommittedPaths.Add(targetPath);
         }
 
-        public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => !FileExists(targetPath);
+        public bool TryRenameTempToNewTarget(string tempPath, string targetPath)
+        {
+            if (FileExists(targetPath))
+            {
+                return false;
+            }
+
+            RenameTempToTarget(tempPath, targetPath);
+            return true;
+        }
 
         public void DeleteFile(string path)
         {
             _tempContents.Remove(path);
         }
+
         public bool TryCreateNewFile(string path) => true;
+
         public bool DirectoryExists(string path) => true;
 
         public void DeleteDirectoryIfEmpty(string path) { }

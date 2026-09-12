@@ -8,7 +8,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class ValidateCommandHandlerReportModeTests
+[TestFixture]
+internal sealed class ValidateCommandAssessmentCompletionTests : ValidateCommandHandlerTestBase
 {
     [TestCase(ArchitectureAssessmentCompletionState.Pass, true, CliExitCodes.Success)]
     [TestCase(ArchitectureAssessmentCompletionState.Pass, false, CliExitCodes.ValidationFailure)]

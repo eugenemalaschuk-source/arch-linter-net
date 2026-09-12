@@ -9,31 +9,9 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed partial class PublicApiCommandHandlerTests
+internal sealed class PublicApiCommandHandlerTests : PublicApiCommandHandlerTestBase
 {
-    private static readonly string[] _value = { "class Acme.Gone" };
-    private static readonly string[] _value1 = { "class Acme.New" };
-    private static readonly string[] _value2 = { "class Acme.Gone" };
-    private static readonly string[] _value3 = { "class Acme.Gone" };
-    private const string PolicyPath = "architecture/dependencies.arch.yml";
-    private const string SnapshotPath = "architecture/api/module-api.txt";
-    private const string ContractId = "module-api";
-    private const string CapturedSnapshot = "@format arch-linter-net/public-api-snapshot\n@version 1\n";
-
-    private static PublicApiDelta DriftDelta()
-    {
-        return new PublicApiDelta(
-            new[] { new PublicApiDeltaEntry(PublicApiDeltaKind.Added, "Acme", "class Acme.New", null) },
-            new[] { new PublicApiDeltaEntry(PublicApiDeltaKind.Removed, "Acme", "class Acme.Gone", "class Acme.Gone") },
-            new[]
-            {
-                new PublicApiDeltaEntry(
-                    PublicApiDeltaKind.Changed, "Acme",
-                    "method Acme.Thing.Do(): System.Boolean", "method Acme.Thing.Do(): System.Void"),
-            });
-    }
-
-    [Test]
+[Test]
     public void Capture_WritesSnapshotWhenTargetDoesNotExist()
     {
         StubFileSystem fileSystem = new(PolicyPath);

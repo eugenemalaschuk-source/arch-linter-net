@@ -4,7 +4,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliCombinedSnapshotIntegrationTests : CliIntegrationTestBase
 {
     // #656 acceptance criterion: combined strict+audit must be equivalent to two standalone runs,
     // not merely "produce two result objects". combined-equivalence-policy.yml deliberately forbids

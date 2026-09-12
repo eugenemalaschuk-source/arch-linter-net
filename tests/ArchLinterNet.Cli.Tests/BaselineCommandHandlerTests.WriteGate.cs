@@ -10,7 +10,8 @@ namespace ArchLinterNet.Cli.Tests;
 /// The gate between a proposed baseline document and the file system: preview, explicit overwrite
 /// intent, refusal on unpreservable comments, and atomic writes.
 /// </summary>
-public sealed partial class BaselineCommandHandlerTests
+[TestFixture]
+internal sealed class BaselineCommandWriteGateTests : BaselineCommandHandlerTestBase
 {
     [Test]
     public void BaselineGenerate_WithoutOutput_PreviewsToStdoutWithoutWriting()

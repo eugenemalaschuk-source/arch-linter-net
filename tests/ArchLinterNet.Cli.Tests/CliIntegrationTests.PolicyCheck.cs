@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliPolicyCheckIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void PolicyCheck_ValidPolicy_ReportsValidStaticConfiguration()

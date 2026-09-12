@@ -17,7 +17,7 @@ namespace ArchLinterNet.Cli.Tests;
 // errors — the report-mode error-routing surface added and hardened across #364's review
 // iterations.
 [TestFixture]
-public sealed partial class ValidateCommandHandlerReportModeTests
+internal sealed class ValidateCommandHandlerReportModeTests : ValidateCommandHandlerTestBase
 {
     [Test]
     public void ValidateHandler_ReportMode_PolicyErrorRoutesJsonToFileSink()
@@ -530,6 +530,4 @@ public sealed partial class ValidateCommandHandlerReportModeTests
         });
     }
 
-    [System.Text.RegularExpressions.GeneratedRegex("Architecture validation passed.")]
-    private static partial System.Text.RegularExpressions.Regex ArchitectureValidationPassedRegex();
 }

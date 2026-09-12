@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliPolicyConsistencyIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void DuplicateContractId_DefaultsToError_ExitsOneAndReportsFinding()

@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliHealthIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void Health_InSyncBaseline_ProjectsHumanAndJsonAndExitsZero()
@@ -123,11 +124,4 @@ public partial class CliIntegrationTests
         }
     }
 
-    private static void DeleteIfPresent(string path)
-    {
-        if (File.Exists(path))
-        {
-            File.Delete(path);
-        }
-    }
 }

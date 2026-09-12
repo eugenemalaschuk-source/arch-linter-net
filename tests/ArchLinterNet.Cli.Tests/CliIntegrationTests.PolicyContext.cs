@@ -4,7 +4,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliPolicyContextIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void PolicyContext_Json_ExportsOneVersionedToolDocument()

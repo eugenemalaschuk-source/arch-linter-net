@@ -7,7 +7,8 @@ namespace ArchLinterNet.Cli.Tests;
 
 // Source-set expansion projections for `explain`, split from ExplainCommandHandlerTests to keep
 // each file under the repository file-size threshold.
-public sealed partial class ExplainCommandHandlerTests
+[TestFixture]
+internal sealed class ExplainSourceExpansionTests : ExplainCommandHandlerTestBase
 {
     [Test]
     public void Json_SourceSetExpansion_EmitsAuthoredSetAndResolvedSource()

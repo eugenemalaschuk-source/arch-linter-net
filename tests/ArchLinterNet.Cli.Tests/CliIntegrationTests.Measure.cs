@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliMeasureIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void Measure_Help_ShowsMeasureSpecificOptionsAndExitsZero()

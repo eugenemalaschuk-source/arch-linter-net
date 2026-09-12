@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliGateIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void Gate_InSyncBaseline_ProjectsHumanJsonAndSarif()
