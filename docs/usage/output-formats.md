@@ -127,17 +127,45 @@ workflow execution identifier and condition-set scope when the Health envelope i
 Malformed, incomplete supplied envelopes and incompatible artifacts fail closed. A legacy Health
 artifact that has no reporting-evidence envelope remains a valid input, but the report renders its
 headline with report availability `unavailable` and no fabricated evidence detail. The command consumes
-those artifacts only:
-it does not rerun or recreate analysis, reopen snapshots, inspect GitHub, or publish a pull-request
-comment. Use `--output <architecture-pr-report.md>` to write the Markdown file; otherwise it is
-written to standard output.
+those artifacts only: it does not rerun or recreate analysis, reopen snapshots, inspect GitHub, or
+publish a pull-request comment. Use `--output <architecture-pr-report.md>` to write the Markdown
+file; otherwise it is written to standard output.
+
+An automated producer may supply one trusted, optional navigation set:
+
+```bash
+arch-linter-net report pr \
+  --health architecture-health.json \
+  --change architecture-change.json \
+  --repository-url https://github.com/example/repository \
+  --head-sha "$GITHUB_PR_HEAD_SHA" \
+  --artifact-url https://github.com/example/repository/actions/runs/123456789 \
+  --output architecture-pr-report.md
+```
+
+The repository URL, current head SHA, and GitHub Actions run/artifact URL are transport context,
+not governance evidence. The CLI accepts a link only when the HTTPS GitHub Actions URL is bound to
+the supplied repository and run context; it never uses the values to recalculate Gate, Health,
+coverage, debt, or change semantics. The report keeps the resulting full-report link outside the
+ordinary bounded detail lists, so it remains available when `--max-details` omits rows. Local or
+historical invocations may omit the set; the report then labels full bundle navigation
+`unavailable` instead of inventing a URL. An invalid supplied context fails closed.
 
 Use `--max-details <positive-count>` to bound each detailed evidence family independently. Canonical
 totals and omitted counts remain visible, and ordering is stable across runs. The report combines
 neither evidence nor authority: its headline repeats direct Health/projection `gate` and `health`
-facts and is not a score, percentage, grade, or compensating quality calculation. Effective rule
-counts, applicability completeness, topology evidence, and external evidence remain distinct report
-sections. Change details likewise retain the canonical added, continuing, and resolved evidence
+facts and is not a score, percentage, grade, or compensating quality calculation. Gate and Health
+remain independent: `gate=pass` can legitimately accompany `health=debt` or `health=degrading`.
+`Blockers` contains only canonical blocking reasons; a separate Health explanation identifies every
+non-healthy dimension, including advisory debt, without relabeling it as a Gate failure.
+
+Effective rule counts, applicability completeness, topology evidence, external evidence, waiver
+lifecycle detail, architecture change, remediation, and canonical navigation remain separate
+sections. Each ordinary detail section is bounded independently and reports its total, shown rows,
+and omitted rows; bounded Markdown is not a replacement for the canonical JSON artifacts. The full
+immutable report bundle/run link is transport navigation and is always shown when validated, outside
+those bounds. A missing required authority remains unavailable or unassessable, never an implied
+zero or pass. Change details likewise retain the canonical added, continuing, and resolved evidence
 supplied by the change report.
 
 Missing or incomplete canonical evidence is represented as unavailable or unassessable, never as a

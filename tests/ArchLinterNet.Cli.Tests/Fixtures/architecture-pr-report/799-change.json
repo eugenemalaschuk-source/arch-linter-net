@@ -1,0 +1,11 @@
+{
+  "kind": "architecture-change-report",
+  "schema_version": 2,
+  "execution_context": { "execution_id": "run-799", "mode": "strict", "condition_set": "strict" },
+  "added": [],
+  "removed": [],
+  "new_findings": [],
+  "existing_findings": [],
+  "resolved_findings": [],
+  "baseline_debt": []
+}

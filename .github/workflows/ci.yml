@@ -415,6 +415,9 @@ jobs:
         env:
           BASE_WORKTREE: ${{ steps.architecture_report_base.outputs.path }}
           EXECUTION_CONTEXT: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          REPORT_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+          REPORT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPORT_ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         shell: bash
         run: |
           cli_project="$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj"
@@ -525,7 +528,10 @@ jobs:
             --health "$output_directory/architecture-health.json" \
             --change "$output_directory/architecture-change.json" \
             --output "$output_directory/architecture-pr-report.md" \
-            --max-details 20
+            --max-details 20 \
+            --repository-url "$REPORT_REPOSITORY_URL" \
+            --head-sha "$REPORT_HEAD_SHA" \
+            --artifact-url "$REPORT_ARTIFACT_URL"
 
       - name: Verify reviewed unavailable Architecture Health badge receipt
         id: architecture_health_badge_unavailable

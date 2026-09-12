@@ -7,7 +7,16 @@ namespace ArchLinterNet.Core.Reporting;
 public static class ArchitecturePrReportProjector
 {
     /// <summary>Creates the typed projection consumed by a presentation adapter.</summary>
-    public static ArchitecturePrReportProjection Project(ArchitecturePrReportInput input)
+    public static ArchitecturePrReportProjection Project(ArchitecturePrReportInput input) =>
+        Project(input, input?.NavigationContext);
+
+    /// <summary>
+    /// Creates the typed projection with optional producer-supplied transport navigation metadata.
+    /// The metadata is not evidence and cannot alter the canonical Gate, Health, or availability.
+    /// </summary>
+    public static ArchitecturePrReportProjection Project(
+        ArchitecturePrReportInput input,
+        ArchitecturePrReportNavigationContext? navigationContext)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArchitecturePrReportAvailability availability = ResolveAvailability(input);
@@ -15,17 +24,59 @@ public static class ArchitecturePrReportProjector
             input.Summary.Gate,
             input.Summary.Health,
             availability,
-            input.Summary.Dimensions);
+            input.Summary.Dimensions)
+        {
+            DimensionExplanations = BuildDimensionExplanations(input.Summary.Dimensions),
+        };
+
+        ArchitecturePrReportNavigationContext? safeNavigationContext =
+            ArchitecturePrReportNavigationContext.TryNormalize(navigationContext,
+                out ArchitecturePrReportNavigationContext? normalized)
+                ? normalized
+                : null;
         return new ArchitecturePrReportProjection(
             headline,
             input.Evidence,
             input.Change,
-            BuildNavigation(input));
+            BuildNavigation(input))
+        {
+            NavigationContext = safeNavigationContext,
+        };
     }
 
     /// <summary>Reads and projects canonical local Health and change artifacts in one call.</summary>
     public static ArchitecturePrReportProjection ReadAndProject(string healthJson, string changeJson) =>
         Project(ArchitecturePrReportReader.Read(healthJson, changeJson));
+
+    /// <summary>Reads and projects canonical artifacts with optional transport navigation metadata.</summary>
+    public static ArchitecturePrReportProjection ReadAndProject(
+        string healthJson,
+        string changeJson,
+        ArchitecturePrReportNavigationContext? navigationContext) =>
+        Project(ArchitecturePrReportReader.Read(healthJson, changeJson), navigationContext);
+
+    private static IReadOnlyList<ArchitecturePrReportDimensionExplanation> BuildDimensionExplanations(
+        IReadOnlyList<ArchitectureHealthDimension> dimensions) =>
+        dimensions
+            .Where(dimension => dimension.State is not ArchitectureHealthDimensionState.Pass
+                and not ArchitectureHealthDimensionState.NotConfigured
+                and not ArchitectureHealthDimensionState.NotApplicable)
+            .SelectMany(dimension => dimension.Reasons.Select(reason =>
+                new ArchitecturePrReportDimensionExplanation(
+                    dimension.Name,
+                    dimension.State,
+                    reason,
+                    dimension.State is ArchitectureHealthDimensionState.Fail
+                        or ArchitectureHealthDimensionState.Unassessable)))
+            .OrderBy(explanation => explanation.Dimension, StringComparer.Ordinal)
+            .ThenBy(explanation => explanation.State)
+            .ThenBy(explanation => explanation.Code, StringComparer.Ordinal)
+            .ThenBy(explanation => explanation.Source, StringComparer.Ordinal)
+            .ThenBy(explanation => explanation.Family, StringComparer.Ordinal)
+            .ThenBy(explanation => explanation.ControlIdentity, StringComparer.Ordinal)
+            .ThenBy(explanation => explanation.PolicyIdentity, StringComparer.Ordinal)
+            .ThenBy(explanation => explanation.EvidenceIdentity, StringComparer.Ordinal)
+            .ToArray();
 
     private static ArchitecturePrReportAvailability ResolveAvailability(ArchitecturePrReportInput input)
     {

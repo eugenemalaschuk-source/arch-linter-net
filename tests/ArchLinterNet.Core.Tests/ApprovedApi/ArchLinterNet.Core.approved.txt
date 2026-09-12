@@ -5756,6 +5756,26 @@ sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter :
   property System.Collections.Generic.IReadOnlyList<string> RuleIds {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> RuleTags {get;init;}
   property bool RequireMatches {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation>
+  ctor(string Dimension, ArchLinterNet.Core.Model.ArchitectureHealthDimensionState State, ArchLinterNet.Core.Model.ArchitectureHealthReason Reason, bool IsBlocking)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Dimension, out ArchLinterNet.Core.Model.ArchitectureHealthDimensionState State, out ArchLinterNet.Core.Model.ArchitectureHealthReason Reason, out bool IsBlocking)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation? right)
+  property ArchLinterNet.Core.Model.ArchitectureHealthDimensionState State {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureHealthReason Reason {get;init;}
+  property bool IsBlocking {get;init;}
+  property string Code {get;}
+  property string Dimension {get;init;}
+  property string Source {get;}
+  property string? ControlIdentity {get;}
+  property string? EvidenceIdentity {get;}
+  property string? Family {get;}
+  property string? PolicyIdentity {get;}
 sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence>
   ctor(int SchemaVersion, string Kind, ArchLinterNet.Core.Model.ArchitectureHealthGate Gate, ArchLinterNet.Core.Model.ArchitectureHealthState Health, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt> ValidationOutcomes, ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt DebtGate)
   field const int CurrentSchemaVersion = 2
@@ -5909,6 +5929,7 @@ sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline : System.
   property ArchLinterNet.Core.Model.ArchitectureHealthState Health {get;init;}
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability Availability {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthDimension> Dimensions {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation> DimensionExplanations {get;init;}
 sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportInput : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportInput>
   ctor(ArchLinterNet.Core.Model.ArchitectureHealthSummary Summary, ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? Evidence, ArchLinterNet.Core.Reporting.ArchitecturePrReportChange Change)
   method ArchLinterNet.Core.Reporting.ArchitecturePrReportInput <Clone>$()
@@ -5922,6 +5943,7 @@ sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportInput : System.IEq
   property ArchLinterNet.Core.Model.ArchitectureHealthSummary Summary {get;init;}
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportChange Change {get;init;}
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? Evidence {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext? NavigationContext {get;init;}
 sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric>
   ctor(string MetricId, string Kind, string? NativeSubject, string? Unit, string EffectiveScope, int? Value, System.Collections.Generic.IReadOnlyList<string>? Contributors)
   method ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric <Clone>$()
@@ -5939,6 +5961,21 @@ sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric : System.IE
   property string MetricId {get;init;}
   property string? NativeSubject {get;init;}
   property string? Unit {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext>
+  ctor(string RepositoryUrl, string HeadSha, string? ArtifactUrl)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method string? GetSourceUrl(string? relativePath)
+  method void Deconstruct(out string RepositoryUrl, out string HeadSha, out string? ArtifactUrl)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext? right)
+  property bool IsUsable {get;}
+  property string HeadSha {get;init;}
+  property string RepositoryUrl {get;init;}
+  property string? ArtifactUrl {get;init;}
 sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference>
   ctor(string Authority, string? Identity, string? Path)
   method ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference <Clone>$()
@@ -6033,11 +6070,14 @@ sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection : Syste
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportChange Change {get;init;}
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? Evidence {get;init;}
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline Headline {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext? NavigationContext {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference> Navigation {get;init;}
   property bool IsAvailable {get;}
 static class ArchLinterNet.Core.Reporting.ArchitecturePrReportProjector
   method static ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection Project(ArchLinterNet.Core.Reporting.ArchitecturePrReportInput input)
+  method static ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection Project(ArchLinterNet.Core.Reporting.ArchitecturePrReportInput input, ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext? navigationContext)
   method static ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection ReadAndProject(string healthJson, string changeJson)
+  method static ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection ReadAndProject(string healthJson, string changeJson, ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext? navigationContext)
 sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance>
   ctor(string RepositoryRoot, System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths, System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths, System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths)
   method ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance <Clone>$()

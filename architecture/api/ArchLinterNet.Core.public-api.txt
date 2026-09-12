@@ -418,6 +418,7 @@ class ArchLinterNet.Core.Reporting.ArchitecturePrReportChange [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter [sealed]
+class ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext [sealed]
@@ -429,6 +430,7 @@ class ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportInput [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric [sealed]
+class ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance [sealed]
@@ -1205,6 +1207,7 @@ ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportChange(ArchLinterNet.Core.
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation(System.Boolean, System.String, System.Boolean, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding])
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt(System.Boolean, System.Boolean, ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation, ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter(System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.String], System.Boolean)
+ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation(System.String, ArchLinterNet.Core.Model.ArchitectureHealthDimensionState, ArchLinterNet.Core.Model.ArchitectureHealthReason, System.Boolean)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence(System.Int32, System.String, ArchLinterNet.Core.Model.ArchitectureHealthGate, ArchLinterNet.Core.Model.ArchitectureHealthState, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt], ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact(System.String, System.String)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext(System.String, System.String)
@@ -1216,6 +1219,7 @@ ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding(System.Int32, Syst
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline(ArchLinterNet.Core.Model.ArchitectureHealthGate, ArchLinterNet.Core.Model.ArchitectureHealthState, ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureHealthDimension])
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportInput(ArchLinterNet.Core.Model.ArchitectureHealthSummary, ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence, ArchLinterNet.Core.Reporting.ArchitecturePrReportChange)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric(System.String, System.String, System.String, System.String, System.String, System.Nullable`1[System.Int32], System.Collections.Generic.IReadOnlyList`1[System.String])
+ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext(System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference(System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt(System.Boolean, System.Boolean, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding])
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance(System.String, System.String, System.String, System.String, System.Int32)
@@ -1857,8 +1861,11 @@ method ArchLinterNet.Core.Reporting.ArchitectureFindingMapper.Order(System.Colle
 method ArchLinterNet.Core.Reporting.ArchitectureFindingMapper.Order(System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Model.ArchitectureFinding], System.Threading.CancellationToken): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureFinding] [static]
 method ArchLinterNet.Core.Reporting.ArchitectureImportedDiagnosticProjector.Project(ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult, System.Threading.CancellationToken): ArchLinterNet.Core.Model.ImportedExternalDiagnosticProjection [static]
 method ArchLinterNet.Core.Reporting.ArchitectureImportedDiagnosticProjector.ToFinding(ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic): ArchLinterNet.Core.Model.ArchitectureFinding [static]
+method ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext.GetSourceUrl(System.String): System.String
 method ArchLinterNet.Core.Reporting.ArchitecturePrReportProjector.Project(ArchLinterNet.Core.Reporting.ArchitecturePrReportInput): ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection [static]
+method ArchLinterNet.Core.Reporting.ArchitecturePrReportProjector.Project(ArchLinterNet.Core.Reporting.ArchitecturePrReportInput, ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext): ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection [static]
 method ArchLinterNet.Core.Reporting.ArchitecturePrReportProjector.ReadAndProject(System.String, System.String): ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection [static]
+method ArchLinterNet.Core.Reporting.ArchitecturePrReportProjector.ReadAndProject(System.String, System.String, ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext): ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection [static]
 method ArchLinterNet.Core.Reporting.ArchitecturePrReportReader.Deserialize(System.String, System.String): ArchLinterNet.Core.Reporting.ArchitecturePrReportInput [static]
 method ArchLinterNet.Core.Reporting.ArchitecturePrReportReader.Read(System.String, System.String): ArchLinterNet.Core.Reporting.ArchitecturePrReportInput [static]
 method ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter.FormatFindingsAsSarif(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureFinding], System.String, System.Threading.CancellationToken): System.String [static]
@@ -4225,6 +4232,16 @@ property ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter.Requi
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter.RuleIds: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter.RuleTags: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter.Severity: System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.String] [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.Code: System.String [get]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.ControlIdentity: System.String [get]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.Dimension: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.EvidenceIdentity: System.String [get]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.Family: System.String [get]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.IsBlocking: System.Boolean [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.PolicyIdentity: System.String [get]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.Reason: ArchLinterNet.Core.Model.ArchitectureHealthReason [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.Source: System.String [get]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation.State: ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence.DebtGate: ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence.ExecutionContext: ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence.Gate: ArchLinterNet.Core.Model.ArchitectureHealthGate [get, init]
@@ -4276,11 +4293,13 @@ property ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding.SchemaVersion:
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding.Severity: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding.SourceLocation: ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline.Availability: ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline.DimensionExplanations: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportDimensionExplanation] [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline.Dimensions: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureHealthDimension] [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline.Gate: ArchLinterNet.Core.Model.ArchitectureHealthGate [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline.Health: ArchLinterNet.Core.Model.ArchitectureHealthState [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportInput.Change: ArchLinterNet.Core.Reporting.ArchitecturePrReportChange [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportInput.Evidence: ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportInput.NavigationContext: ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportInput.Summary: ArchLinterNet.Core.Model.ArchitectureHealthSummary [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric.Contributors: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric.EffectiveScope: System.String [get, init]
@@ -4289,6 +4308,10 @@ property ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric.MetricId: Syste
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric.NativeSubject: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric.Unit: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric.Value: System.Nullable`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext.ArtifactUrl: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext.HeadSha: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext.IsUsable: System.Boolean [get]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext.RepositoryUrl: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference.Authority: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference.Identity: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference.Path: System.String [get, init]
@@ -4325,6 +4348,7 @@ property ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection.Evidence: A
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection.Headline: ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection.IsAvailable: System.Boolean [get]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection.Navigation: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference] [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection.NavigationContext: ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationContext [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance.DiscoveredProjectPaths: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance.PolicyImportPaths: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance.RepositoryRoot: System.String [get, init]

@@ -10,9 +10,15 @@ namespace ArchLinterNet.Cli.Commands.Report.Application;
 /// Renders the Core PR-report projection as architecture-only Markdown.
 /// This type deliberately has no access to policy, analysis, SARIF, or network services.
 /// </summary>
-internal static class PrReportMarkdownRenderer
+internal static partial class PrReportMarkdownRenderer
 {
     public static string Render(ArchitecturePrReportProjection projection, int maxDetails = 20)
+        => Render(projection, maxDetails, null);
+
+    internal static string Render(
+        ArchitecturePrReportProjection projection,
+        int maxDetails,
+        ArchitecturePrReportNavigationContext? transportContext)
     {
         ArgumentNullException.ThrowIfNull(projection);
         if (maxDetails <= 0)
@@ -20,12 +26,22 @@ internal static class PrReportMarkdownRenderer
             throw new ArgumentOutOfRangeException(nameof(maxDetails), "The report detail bound must be positive.");
         }
 
+        // Renderers are also exercised directly by hosts and tests. Re-check the Core-owned
+        // allowlist here so an untrusted caller cannot smuggle an arbitrary Markdown destination
+        // past the command-boundary validation.
+        transportContext = transportContext?.IsUsable == true ? transportContext : null;
+
         var builder = new StringBuilder();
         builder.AppendLine("# Architecture PR report");
         builder.AppendLine();
         AppendHeadline(builder, projection);
         builder.AppendLine();
         if (AppendBlockers(builder, projection, maxDetails))
+        {
+            builder.AppendLine();
+        }
+
+        if (PrReportMarkdownHealth.AppendHealthExplanation(builder, projection, maxDetails))
         {
             builder.AppendLine();
         }
@@ -47,7 +63,7 @@ internal static class PrReportMarkdownRenderer
             builder.AppendLine();
         }
 
-        AppendNavigation(builder, projection, maxDetails);
+        PrReportMarkdownNavigation.AppendNavigation(builder, projection, maxDetails, transportContext);
         return builder.ToString().TrimEnd() + Environment.NewLine;
     }
 
@@ -88,7 +104,7 @@ internal static class PrReportMarkdownRenderer
                     .OrderBy(item => item.Identity ?? item.ContractId, StringComparer.Ordinal)
                     .ThenBy(item => item.Status, StringComparer.Ordinal))
                 {
-                    blockers.Add($"baseline lifecycle `{Inline(entry.Status)}`: {FormatBaseline(entry)}");
+                    blockers.Add($"baseline lifecycle `{Inline(Bounded(entry.Status))}`: {FormatBaseline(entry)}");
                 }
             }
 
@@ -101,7 +117,7 @@ internal static class PrReportMarkdownRenderer
                 foreach (ArchitecturePrReportPolicyWeakeningFinding finding in weakening.Findings
                     .OrderBy(item => item.Identity, StringComparer.Ordinal))
                 {
-                    blockers.Add($"policy weakening `{Inline(finding.Identity)}`: {Text(finding.Classification)} {Text(finding.ControlIdentity)}");
+                    blockers.Add($"policy weakening `{Inline(Bounded(finding.Identity))}`: {Text(Bounded(finding.Classification))} {Text(Bounded(finding.ControlIdentity))}");
                 }
             }
 
@@ -113,7 +129,7 @@ internal static class PrReportMarkdownRenderer
                     .Where(item => blockingStates.Contains(item.State))
                     .OrderBy(item => item.Id, StringComparer.Ordinal))
                 {
-                    blockers.Add($"waiver `{Inline(waiver.Id)}`: lifecycle `{Inline(waiver.State)}` ({Text(waiver.ContractId ?? waiver.ContractName)})");
+                    blockers.Add($"waiver `{Inline(Bounded(waiver.Id))}`: lifecycle `{Inline(Bounded(waiver.State))}` ({Text(Bounded(waiver.ContractId ?? waiver.ContractName))})");
                 }
             }
 
@@ -126,18 +142,18 @@ internal static class PrReportMarkdownRenderer
                     .OrderBy(item => item.ContractId ?? item.ContractName, StringComparer.Ordinal)
                     .ThenBy(item => item.CanonicalIdentity, StringComparer.Ordinal))
                 {
-                    blockers.Add($"finding `{Inline(finding.CanonicalIdentity)}`: {Text(finding.MessageCode)} ({Text(finding.ContractId ?? finding.ContractName)})");
+                    blockers.Add($"finding `{Inline(Bounded(finding.CanonicalIdentity))}`: {Text(Bounded(finding.MessageCode))} ({Text(Bounded(finding.ContractId ?? finding.ContractName))})");
                 }
             }
         }
 
-        foreach (ArchitectureHealthDimension dimension in projection.Headline.Dimensions
-            .Where(item => item.State is ArchitectureHealthDimensionState.Fail or ArchitectureHealthDimensionState.Unassessable)
-            .OrderBy(item => item.Name, StringComparer.Ordinal))
+        foreach (PrReportMarkdownHealth.HealthExplanationView explanation in PrReportMarkdownHealth.BuildHealthExplanations(projection)
+            .Where(item => item.IsBlocking)
+            .OrderBy(item => item.Dimension, StringComparer.Ordinal))
         {
-            foreach (ArchitectureHealthReason reason in dimension.Reasons)
+            foreach (ArchitectureHealthReason reason in explanation.Reasons)
             {
-                blockers.Add($"{Text(dimension.Name)} `{DimensionToken(dimension.State)}`: {Text(reason.Code)}{FormatReasonIdentity(reason)}");
+                blockers.Add($"{Text(Bounded(explanation.Dimension))} `{DimensionToken(explanation.State)}`: {Text(Bounded(reason.Code))}{FormatReasonIdentity(reason)}");
             }
         }
 
@@ -184,7 +200,15 @@ internal static class PrReportMarkdownRenderer
             .Select(FormatBaseline)
             .ToList();
 
-        if (waiverDebt is not null && waivers.Count == 0 && baseline.Count == 0)
+        List<string> auditEvidence = evidence.ValidationOutcomes
+            .Where(item => string.Equals(item.Mode, "audit", StringComparison.Ordinal))
+            .SelectMany(item => item.Findings)
+            .OrderBy(item => item.ContractId ?? item.ContractName, StringComparer.Ordinal)
+            .ThenBy(item => item.CanonicalIdentity, StringComparer.Ordinal)
+            .Select(FormatFinding)
+            .ToList();
+
+        if (waiverDebt is not null && waivers.Count == 0 && baseline.Count == 0 && auditEvidence.Count == 0)
         {
             return false;
         }
@@ -196,6 +220,8 @@ internal static class PrReportMarkdownRenderer
         AppendBounded(builder, "Waiver lifecycle detail", waivers.Count, waivers, maxDetails,
             static item => $"- {item}");
         AppendBounded(builder, "Existing baseline/finding debt", baseline.Count, baseline, maxDetails,
+            static item => $"- {item}");
+        AppendBounded(builder, "Audit/convention evidence", auditEvidence.Count, auditEvidence, maxDetails,
             static item => $"- {item}");
         return true;
     }
@@ -216,7 +242,10 @@ internal static class PrReportMarkdownRenderer
         ArchitecturePrReportApplicability? applicability = receipt.Applicability;
         if (applicability is null)
         {
-            builder.AppendLine("- Applicability: `unavailable`");
+            string token = DimensionToken(projection, "applicability");
+            builder.AppendLine(token == "not_configured"
+                ? "- Applicability: `not_configured` — canonical applicability receipt not configured."
+                : $"- Applicability: `{token}`");
         }
         else
         {
@@ -318,7 +347,7 @@ internal static class PrReportMarkdownRenderer
         AppendChangeFindings(builder, "Existing findings", change.ExistingFindings, maxDetails);
         AppendChangeFindings(builder, "Resolved findings", change.ResolvedFindings, maxDetails);
         AppendBounded(builder, "Baseline debt identities", change.BaselineDebt.Count, change.BaselineDebt,
-            maxDetails, static item => $"- `{Inline(item)}`");
+            maxDetails, static item => $"- `{Inline(Bounded(item))}`");
         return true;
     }
 
@@ -331,6 +360,7 @@ internal static class PrReportMarkdownRenderer
             ? new()
             : AllFindings(projection.Evidence)
                 .Where(item => item.Remediation is not null)
+                .Where(item => !IsCurrentBuildStatePreflight(item))
                 .GroupBy(item => item.CanonicalIdentity, StringComparer.Ordinal)
                 .Select(group => group.First())
                 .OrderBy(item => item.Remediation!.Category, StringComparer.Ordinal)
@@ -348,22 +378,17 @@ internal static class PrReportMarkdownRenderer
         return true;
     }
 
-    private static void AppendNavigation(
-        StringBuilder builder,
-        ArchitecturePrReportProjection projection,
-        int maxDetails)
+    private static bool IsCurrentBuildStatePreflight(ArchitecturePrReportFinding finding)
     {
-        builder.AppendLine("## Canonical navigation");
-        List<string> references = projection.Navigation
-            .OrderBy(item => item.Authority, StringComparer.Ordinal)
-            .ThenBy(item => item.Identity, StringComparer.Ordinal)
-            .ThenBy(item => item.Path, StringComparer.Ordinal)
-            .Select(item => $"`{Inline(item.Authority)}`" +
-                (string.IsNullOrWhiteSpace(item.Identity) ? string.Empty : $" `{Inline(item.Identity)}`") +
-                (string.IsNullOrWhiteSpace(item.Path) ? string.Empty : $" ({Text(item.Path)})"))
-            .ToList();
-        AppendBounded(builder, "References", references.Count, references, maxDetails,
-            static item => $"- {item}");
+        if (!string.Equals(finding.Kind, "build_state_preflight", StringComparison.Ordinal)
+            || finding.Details.ValueKind != System.Text.Json.JsonValueKind.Object
+            || !finding.Details.TryGetProperty("state", out System.Text.Json.JsonElement state))
+        {
+            return false;
+        }
+
+        return state.ValueKind == System.Text.Json.JsonValueKind.String
+            && string.Equals(state.GetString(), "current", StringComparison.Ordinal);
     }
 
     private static void AppendChangeEntries(
@@ -374,7 +399,7 @@ internal static class PrReportMarkdownRenderer
         AppendBounded(builder, $"{title} surfaces", entries.Count,
             entries.OrderBy(item => item.Kind, StringComparer.Ordinal)
                 .ThenBy(item => item.Identity, StringComparer.Ordinal)
-                .Select(item => $"[{Text(item.Kind)}] `{Inline(item.Identity)}` — {Text(item.Display)}")
+            .Select(item => $"[{Text(Bounded(item.Kind))}] `{Inline(Bounded(item.Identity))}` — {Text(Bounded(item.Display))}")
                 .ToList(), maxDetails, static item => $"- {item}");
 
     private static void AppendChangeFindings(
@@ -385,7 +410,7 @@ internal static class PrReportMarkdownRenderer
         AppendBounded(builder, title, findings.Count,
             findings.OrderBy(item => item.Kind, StringComparer.Ordinal)
                 .ThenBy(item => item.Identity, StringComparer.Ordinal)
-                .Select(item => $"[{Text(item.Kind)}] `{Inline(item.Identity)}` — {Text(item.Display)}")
+                .Select(item => $"[{Text(Bounded(item.Kind))}] `{Inline(Bounded(item.Identity))}` — {Text(Bounded(item.Display))}")
                 .ToList(), maxDetails, static item => $"- {item}");
 
     private static void AppendBounded<T>(
