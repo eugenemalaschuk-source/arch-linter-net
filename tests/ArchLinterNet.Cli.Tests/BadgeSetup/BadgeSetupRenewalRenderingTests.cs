@@ -111,6 +111,7 @@ public sealed class BadgeSetupRenewalRenderingTests
     private static string[] CronEntries(string workflow) => workflow
         .Split('\n', StringSplitOptions.RemoveEmptyEntries)
         .Where(static line => line.Contains("- cron:", StringComparison.Ordinal))
+        .Select(static line => line.TrimEnd('\r'))
         .ToArray();
 
     private static int CountCronSlots(IEnumerable<string> entries) => entries.Sum(static entry =>
