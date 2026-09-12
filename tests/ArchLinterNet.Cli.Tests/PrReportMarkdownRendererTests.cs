@@ -115,6 +115,35 @@ public sealed class PrReportMarkdownRendererTests
     }
 
     [Test]
+    public void HealthExplanation_UsesOneByteBudgetAcrossDimensions()
+    {
+        ArchitectureHealthDimension[] dimensions = Enumerable.Range(0, 40)
+            .Select(index => new ArchitectureHealthDimension(
+                $"dimension-{index:00}",
+                ArchitectureHealthDimensionState.Degrading,
+                Enumerable.Range(0, 20)
+                    .Select(reasonIndex => new ArchitectureHealthReason("metadata_incomplete", "waiver_lifecycle")
+                    {
+                        EvidenceIdentity = $"waiver-{index:00}-{reasonIndex:00}-{new string('x', 256)}",
+                        Source = new string('s', 256),
+                    })
+                    .ToArray()))
+            .ToArray();
+        ArchitecturePrReportProjection projection = CreateProjection(
+            dimensions: dimensions,
+            health: ArchitectureHealthState.Degrading);
+
+        string markdown = PrReportMarkdownRenderer.Render(projection, 20);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(System.Text.Encoding.UTF8.GetByteCount(markdown), Is.LessThan(60_000));
+            Assert.That(markdown, Does.Contain("Additional health explanations omitted due to publisher byte budget"));
+            Assert.That(markdown, Does.Contain("`dimension-00`"));
+        });
+    }
+
+    [Test]
     public void MissingApplicabilityReceipt_PreservesCanonicalNotConfiguredState()
     {
         ArchitecturePrReportEvidence evidence = Evidence(receipts:

@@ -8,13 +8,19 @@ using static PrReportMarkdownFormatter;
 
 internal static class PrReportMarkdownHealth
 {
+    private const int MaxHealthExplanationBytes = 16 * 1024;
+    private const string HealthBudgetMarker = "- Additional health explanations omitted due to publisher byte budget; see immutable bundle.";
+
     internal static bool AppendHealthExplanation(
         StringBuilder builder,
         ArchitecturePrReportProjection projection,
         int maxDetails)
     {
         List<HealthExplanationView> explanations = BuildHealthExplanations(projection)
-            .OrderBy(item => item.Dimension, StringComparer.Ordinal)
+            // Keep blocking canonical dimensions ahead of advisory dimensions when the
+            // publisher byte budget requires omitting the tail of this section.
+            .OrderByDescending(item => item.IsBlocking)
+            .ThenBy(item => item.Dimension, StringComparer.Ordinal)
             .ThenBy(item => item.State)
             .ToList();
         if (explanations.Count == 0)
@@ -22,7 +28,11 @@ internal static class PrReportMarkdownHealth
             return false;
         }
 
-        builder.AppendLine("## Health explanation");
+        StringBuilder section = new();
+        section.AppendLine("## Health explanation");
+        int sectionBytes = Encoding.UTF8.GetByteCount(section.ToString());
+        int budgetMarkerBytes = Encoding.UTF8.GetByteCount(HealthBudgetMarker + Environment.NewLine);
+        bool omitted = false;
         foreach (HealthExplanationView explanation in explanations)
         {
             string classification = explanation.IsBlocking ? "blocking" : "advisory";
@@ -32,19 +42,50 @@ internal static class PrReportMarkdownHealth
                 .Select(FormatHealthReason)
                 .ToList();
             int shown = Math.Min(maxDetails, formattedReasons.Count);
-            string reasons = formattedReasons.Count == 0
-                ? "no canonical reason supplied"
-                : string.Join(", ", formattedReasons.Take(shown));
-            if (formattedReasons.Count > shown)
+            string line = FormatExplanationLine(explanation, classification, formattedReasons, shown);
+            while (shown > 0
+                && sectionBytes + Encoding.UTF8.GetByteCount(line + Environment.NewLine) + budgetMarkerBytes > MaxHealthExplanationBytes)
             {
-                reasons += $"; {formattedReasons.Count - shown} more reason(s) omitted (see immutable bundle)";
+                shown--;
+                line = FormatExplanationLine(explanation, classification, formattedReasons, shown);
             }
-            builder.AppendLine(
-                $"- `{Inline(explanation.Dimension)}` state=`{DimensionToken(explanation.State)}` " +
-                $"classification=`{classification}`: {reasons}");
+
+            int lineBytes = Encoding.UTF8.GetByteCount(line + Environment.NewLine);
+            if (sectionBytes + lineBytes + budgetMarkerBytes > MaxHealthExplanationBytes)
+            {
+                omitted = true;
+                continue;
+            }
+
+            section.AppendLine(line);
+            sectionBytes += lineBytes;
         }
 
+        if (omitted)
+        {
+            section.AppendLine(HealthBudgetMarker);
+        }
+
+        builder.Append(section);
         return true;
+    }
+
+    private static string FormatExplanationLine(
+        HealthExplanationView explanation,
+        string classification,
+        IReadOnlyList<string> formattedReasons,
+        int shown)
+    {
+        string reasons = formattedReasons.Count == 0
+            ? "no canonical reason supplied"
+            : string.Join(", ", formattedReasons.Take(shown));
+        if (formattedReasons.Count > shown)
+        {
+            reasons += $"; {formattedReasons.Count - shown} more reason(s) omitted (see immutable bundle)";
+        }
+
+        return $"- `{Inline(Bounded(explanation.Dimension))}` state=`{DimensionToken(explanation.State)}` " +
+            $"classification=`{classification}`: {reasons}";
     }
 
     internal static IReadOnlyList<HealthExplanationView> BuildHealthExplanations(
