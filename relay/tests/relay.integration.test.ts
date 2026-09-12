@@ -54,6 +54,19 @@ const freshnessPayload = canonicalizePayload({
   verified_at: "2026-09-12T10:00:00Z",
   valid_until: "2026-09-12T10:30:00Z"
 }, "headline-plus-freshness/v1");
+const futureAlias = "a7f4k2p9";
+const futureEntry: RegistryEntry = {
+  ...freshnessEntry,
+  destination_alias: futureAlias
+};
+const futurePayload = canonicalizePayload({
+  schemaVersion: 1,
+  label: "architecture",
+  message: "PASS · HEALTHY · 0 ignores · 42 rules",
+  color: "brightgreen",
+  verified_at: "2026-09-12T10:10:00Z",
+  valid_until: "2026-09-12T10:30:00Z"
+}, "headline-plus-freshness/v1");
 
 describe("badge-relay/v1 local SQLite Durable Object", () => {
   let privateKey: CryptoKey;
@@ -273,6 +286,33 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
       expect(body).toContain("verified at 2026-09-12T10:00:00Z");
       expect(body).toContain("valid until 2026-09-12T10:30:00Z");
     }
+  });
+
+  it("rejects a freshness publication whose verified_at is in the Relay future", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:02:00Z"));
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(futureEntry))).toBe(true);
+
+    const jwt = await token({ jti: "future-freshness-e2e-jti" });
+    const digest = await canonicalPayloadDigest(futurePayload);
+    const horizon = "2026-09-12T10:30:00Z";
+    const prepare = await SELF.fetch(`https://relay.test/badge-relay/v1/${futureAlias}/prepare`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: futurePayload, canonical_digest: digest, profile: futureEntry.disclosure_profile, idempotency_key: "future-freshness-e2e-key", semantic_horizon: horizon })
+    });
+    expect(prepare.status).toBe(201);
+    const challenge = await prepare.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const committed = await runInDurableObject(relay.get(relay.idFromName(futureAlias)), async (instance) => (instance as unknown as RelayDurableObject).commitTrustedPublication({
+      body: { operation: "publish", challenge_id: challenge.challenge_id, idempotency_key: "future-freshness-e2e-key", canonical_bytes: futurePayload, canonical_digest: digest, profile: futureEntry.disclosure_profile, expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, semantic_horizon: horizon },
+      entry: futureEntry,
+      jtiHash: await sha256Hex(decodeJwt(jwt).jti as string),
+      proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
+    }));
+    expect(committed.status).toBe(409);
   });
 
   it("rejects issuer, algorithm, identity, and workflow-pin failures without mutation", async () => {

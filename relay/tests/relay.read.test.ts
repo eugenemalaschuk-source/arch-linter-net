@@ -84,6 +84,27 @@ describe("public Relay read seam", () => {
     expect(await svg.text()).toContain("UNASSESSABLE");
   });
 
+  it("fails closed when registry identity or the validity envelope does not match", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:15:00Z"));
+
+    const wrongProfile = await state(headlineBytes, "headline-plus-freshness/v1");
+    expect((await readPublicRepresentation(new Request("https://relay.test"), wrongProfile, "json", entry)).status).toBe(404);
+
+    const wrongEpoch = await state(headlineBytes);
+    wrongEpoch.revocation_epoch = 2;
+    expect((await readPublicRepresentation(new Request("https://relay.test"), wrongEpoch, "json", entry)).status).toBe(404);
+
+    const beyondHorizon = await state(headlineBytes);
+    beyondHorizon.valid_until = "2026-09-12T11:30:00Z";
+    expect((await readPublicRepresentation(new Request("https://relay.test"), beyondHorizon, "json", entry)).status).toBe(404);
+
+    const beyondLease = await state(headlineBytes);
+    beyondLease.valid_until = "2026-09-12T11:30:00Z";
+    beyondLease.semantic_horizon = "2026-09-12T12:00:00Z";
+    expect((await readPublicRepresentation(new Request("https://relay.test"), beyondLease, "json", entry)).status).toBe(404);
+  });
+
   it("renders a fixed freshness SVG with safe text and a visible UTC boundary", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-12T10:15:00Z"));

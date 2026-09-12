@@ -281,7 +281,7 @@ export class RelayDurableObject {
       if (!verifiedAtSeconds || verifiedAtSeconds > nowSeconds()) return this.finishError(409);
       const maxLease = nowSeconds() + LEASE_SECONDS;
       const validUntilSeconds = Math.min(maxLease, horizonSeconds);
-      if (validUntilSeconds <= nowSeconds()) return this.finishError(409);
+      if (validUntilSeconds <= nowSeconds() || validUntilSeconds > verifiedAtSeconds + LEASE_SECONDS) return this.finishError(409);
       const validUntil = profile === "headline-plus-freshness/v1" && payload.valid_until
         ? payload.valid_until
         : new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
