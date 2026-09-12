@@ -41,7 +41,7 @@ tool executable invoked directly rather than through a repository tool
 manifest. It deliberately omits `--enrich-dotnet`, so the retained JSON has the
 deterministic enrichment status `not_requested`.
 
-Canonical artifact SHA-256: `635b723b0184062febfa058f5070603da0cff2e0d0e11f004dfb44b5a5dfc9f9`
+Canonical artifact SHA-256: `adfda105c0f125319f5e5d8e71050268c39b4eac6750e4005b2790dd3c8e6d0e`
 
 The raw JSON stream was regenerated into a separate file from the same clean
 checkout and had the identical digest. `make lint-docs` runs
