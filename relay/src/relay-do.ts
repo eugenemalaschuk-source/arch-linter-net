@@ -103,6 +103,15 @@ function parseDateSeconds(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : undefined;
 }
 
+function parseCanonicalDateSeconds(value: unknown): number | undefined {
+  if (typeof value !== "string" || !/^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u.test(value)) return undefined;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  const seconds = parsed / 1000;
+  if (!Number.isSafeInteger(seconds)) return undefined;
+  return new Date(parsed).toISOString().replace(".000Z", "Z") === value ? seconds : undefined;
+}
+
 export class RelayDurableObject {
   private readonly state: RelayStateLike;
   private readonly sql: RelayStateLike["storage"]["sql"];
@@ -259,7 +268,7 @@ export class RelayDurableObject {
     const horizonSeconds = parseDateSeconds(horizon);
     if (!horizonSeconds || horizonSeconds <= nowSeconds()) throw new AuthorizationError(409);
     if (profile === "headline-plus-freshness/v1") {
-      const payloadHorizon = parseDateSeconds(payload.valid_until);
+      const payloadHorizon = parseCanonicalDateSeconds(payload.valid_until);
       if (!payloadHorizon || payloadHorizon <= nowSeconds() || payloadHorizon > horizonSeconds || payloadHorizon > nowSeconds() + LEASE_SECONDS) return genericError(409);
     }
     if (!safeInteger(body.expected_generation) || !safeInteger(body.expected_revocation_epoch)) throw new PayloadError();
@@ -277,7 +286,7 @@ export class RelayDurableObject {
       const verifiedAt = profile === "headline-plus-freshness/v1" && payload.verified_at
         ? payload.verified_at
         : new Date(nowSeconds() * 1000).toISOString().replace(".000Z", "Z");
-      const verifiedAtSeconds = parseDateSeconds(verifiedAt);
+      const verifiedAtSeconds = parseCanonicalDateSeconds(verifiedAt);
       if (!verifiedAtSeconds || verifiedAtSeconds > nowSeconds()) return this.finishError(409);
       const maxLease = nowSeconds() + LEASE_SECONDS;
       const validUntilSeconds = Math.min(maxLease, horizonSeconds);
@@ -285,7 +294,7 @@ export class RelayDurableObject {
       const validUntil = profile === "headline-plus-freshness/v1" && payload.valid_until
         ? payload.valid_until
         : new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
-      const persistedValidUntilSeconds = parseDateSeconds(validUntil);
+      const persistedValidUntilSeconds = parseCanonicalDateSeconds(validUntil);
       if (!persistedValidUntilSeconds
         || persistedValidUntilSeconds <= nowSeconds()
         || persistedValidUntilSeconds > horizonSeconds
