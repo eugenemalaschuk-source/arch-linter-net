@@ -3,8 +3,7 @@ import { sha256Hex } from "./security";
 import { MAX_PUBLIC_PAYLOAD_BYTES, type CanonicalPayload, type DisclosureProfile } from "./types";
 
 /** The product-owned unavailable bytes. Keep this byte string stable. */
-export const UNAVAILABLE_CANONICAL_BYTES =
-  '{"schemaVersion":1,"label":"architecture","message":"UNASSESSABLE \\u00B7 ? ignores \\u00B7 ? rules","color":"lightgrey"}';
+export const UNAVAILABLE_CANONICAL_BYTES = String.raw`{"schemaVersion":1,"label":"architecture","message":"UNASSESSABLE \u00B7 ? ignores \u00B7 ? rules","color":"lightgrey"}`;
 
 export type PublicRepresentation = "json" | "svg";
 
@@ -30,7 +29,7 @@ interface ValidatedReadState {
   validUntilSeconds: number;
 }
 
-const UTC_TIMESTAMP = /^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/u;
+const UTC_TIMESTAMP = /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u;
 const COLOR_BY_NAME: Record<CanonicalPayload["color"], string> = {
   brightgreen: "#4c1",
   yellow: "#dfb317",
@@ -154,7 +153,7 @@ export async function readPublicRepresentation(
 
   // Expiry is intentionally checked before constructing or comparing an ETag.
   const now = Date.now() / 1000;
-  if (!(now < validated.validUntilSeconds)) return unavailableResponse(request, kind, 404);
+  if (now >= validated.validUntilSeconds) return unavailableResponse(request, kind, 404);
   if (kind === "svg" && validated.profile !== "headline-plus-freshness/v1") return unavailableResponse(request, kind, 404);
 
   const representation = kind === "json"

@@ -1265,7 +1265,7 @@
         "invalid_payload": {
           "schemaVersion": 1,
           "label": "architecture",
-          "message": "PASS · HEALTHY · 0 ignores · 42 rules ‮",
+          "message": "PASS · HEALTHY · 0 ignores · 42 rules \u202E",
           "color": "brightgreen"
         },
         "unicode_inputs": [

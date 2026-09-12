@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { canonicalPayloadDigest, canonicalizePayload } from "../src/payload";
-import { readPublicRepresentation, UNAVAILABLE_CANONICAL_BYTES, type PublicReadState } from "../src/read";
+import { publicUnavailableResponse, readPublicRepresentation, UNAVAILABLE_CANONICAL_BYTES, type PublicReadState } from "../src/read";
 
 const headlineBytes = canonicalizePayload({
   schemaVersion: 1,
@@ -88,5 +88,12 @@ describe("public Relay read seam", () => {
     expect(body).toContain("verified at 2026-09-12T10:00:00Z");
     expect(body).toContain("valid until 2026-09-12T11:00:00Z");
     expect(body).not.toMatch(/<script|<foreignObject|<a\b|on[a-z]+=|href=|xlink:href=/iu);
+  });
+
+  it("exposes a fixed unavailable response for outer-router storage failures", async () => {
+    const response = publicUnavailableResponse(new Request("https://relay.test"), "json");
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.text()).toBe(UNAVAILABLE_CANONICAL_BYTES);
   });
 });
