@@ -126,6 +126,12 @@ async function validateReadState(state: PublicReadState, entry: RegistryEntry): 
   if (state.payload.length === 0 || new TextEncoder().encode(state.payload).byteLength > MAX_PUBLIC_PAYLOAD_BYTES) return undefined;
   const generation = state.generation;
   if (typeof generation !== "number" || !Number.isSafeInteger(generation) || generation <= 0) return undefined;
+  const initialGeneration = entry.initial_state?.generation;
+  if (typeof initialGeneration === "number" && Number.isSafeInteger(initialGeneration)) {
+    const generationDelta = generation - initialGeneration;
+    const epochDelta = stateEpoch - expectedEpoch;
+    if (generationDelta < 0 || epochDelta < 0 || epochDelta > generationDelta) return undefined;
+  }
   const payload = (() => {
     try { return validateCanonicalPayload(state.payload as string, profile); } catch { return undefined; }
   })();

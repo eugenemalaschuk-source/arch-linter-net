@@ -34,8 +34,8 @@ async function state(bytes: string, profile: "headline-only/v1" | "headline-plus
   };
 }
 
-const entry = { disclosure_profile: "headline-only/v1", initial_state: { revocation_epoch: 1 } } as unknown as RegistryEntry;
-const freshnessEntry = { disclosure_profile: "headline-plus-freshness/v1", initial_state: { revocation_epoch: 1 } } as unknown as RegistryEntry;
+const entry = { disclosure_profile: "headline-only/v1", initial_state: { generation: 7, revocation_epoch: 1 } } as unknown as RegistryEntry;
+const freshnessEntry = { disclosure_profile: "headline-plus-freshness/v1", initial_state: { generation: 7, revocation_epoch: 1 } } as unknown as RegistryEntry;
 
 describe("public Relay read seam", () => {
   afterEach(() => vi.useRealTimers());
@@ -94,6 +94,15 @@ describe("public Relay read seam", () => {
     const wrongEpoch = await state(headlineBytes);
     wrongEpoch.revocation_epoch = 0;
     expect((await readPublicRepresentation(new Request("https://relay.test"), wrongEpoch, "json", entry)).status).toBe(404);
+
+    const impossibleEpoch = await state(headlineBytes);
+    impossibleEpoch.revocation_epoch = 2;
+    expect((await readPublicRepresentation(new Request("https://relay.test"), impossibleEpoch, "json", entry)).status).toBe(404);
+
+    const postInvalidationState = await state(headlineBytes);
+    postInvalidationState.generation = 8;
+    postInvalidationState.revocation_epoch = 2;
+    expect((await readPublicRepresentation(new Request("https://relay.test"), postInvalidationState, "json", entry)).status).toBe(200);
 
     const beyondHorizon = await state(headlineBytes);
     beyondHorizon.valid_until = "2026-09-12T11:30:00Z";
