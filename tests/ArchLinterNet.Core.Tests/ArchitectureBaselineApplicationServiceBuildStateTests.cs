@@ -14,7 +14,7 @@ namespace ArchLinterNet.Core.Tests;
 // construction, RunBuildStatePreflight's short-circuit branches, and CollectCandidatesCore's
 // post-build preflight and prepared-runner materialization.
 [TestFixture]
-public sealed partial class ArchitectureBaselineApplicationServiceBuildStateTests
+public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
 {
     private static readonly string[] _value = { "net10.0" };
     private static readonly string[] _value1 = { "Fixture" };
@@ -29,7 +29,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceBuildStateTest
         { "PrepareRunner", "PrepareBuild", "VerifyPostBuild", "MaterializePreparedRunner" };
     private static readonly string[] _fallbackCallOrder = { "PrepareRunner", "BuildRunner" };
 
-    private sealed class FakeBuildStatePreparationService : IBuildStatePreparationService
+    internal sealed class FakeBuildStatePreparationService : IBuildStatePreparationService
     {
         public int PrepareCallCount { get; private set; }
 
@@ -53,9 +53,9 @@ public sealed partial class ArchitectureBaselineApplicationServiceBuildStateTest
         }
     }
 
-    private static ArchitectureContractDocument CreateDocument() => new() { Version = 1, Name = "Fake" };
+    internal static ArchitectureContractDocument CreateDocument() => new() { Version = 1, Name = "Fake" };
 
-    private static ArchitectureDiscoveredProject FixtureProject() =>
+    internal static ArchitectureDiscoveredProject FixtureProject() =>
         new("Fixture.csproj", "Fixture", _value);
 
     private static ArchitectureRunnerPreparation CreatePreparedRunner(ProjectDiscoveryResult discovery) => new(
@@ -71,7 +71,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceBuildStateTest
         MissingAssemblyNames: Array.Empty<string>(),
         IsMetadataReferenceClosureComplete: true);
 
-    private static ArchitectureAnalysisSession CreateSession(
+    internal static ArchitectureAnalysisSession CreateSession(
         ArchitectureContractDocument document,
         ProjectDiscoveryResult? projectDiscovery = null,
         IReadOnlyCollection<string>? missingAssemblyNames = null)

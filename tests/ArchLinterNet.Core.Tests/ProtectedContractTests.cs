@@ -11,12 +11,12 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class ProtectedContractTests
+public sealed class ProtectedContractTests
 {
-    private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+    internal static readonly ArchitectureDiagnosticFormatter Formatter = new();
 
-    private static Assembly CoreAssembly => typeof(ArchitecturePolicyDocumentLoader).Assembly;
-    private static Assembly TestAssembly => typeof(ProtectedContractTests).Assembly;
+    internal static Assembly CoreAssembly => typeof(ArchitecturePolicyDocumentLoader).Assembly;
+    internal static Assembly TestAssembly => typeof(ProtectedContractTests).Assembly;
 
     [Test]
     public void CheckProtectedContract_AllowedImporter_NoViolations()
@@ -438,5 +438,31 @@ public sealed partial class ProtectedContractTests
         Assert.That((violation.Payload as DependencyPayload)?.AllowedImporters, Is.Not.Null);
         Assert.That((violation.Payload as DependencyPayload)?.AllowedImporters, Is.Empty);
         Assert.That(violation.ForbiddenNamespace, Does.Contain("protected layer 'execution'"));
+    }
+
+    // Public nested fixtures are consumed by NamespaceViolationFinderGlobTests. Keep them on
+    // the canonical family fixture after edge-case scenarios move to their own fixture type.
+    public sealed class ExecutionUser
+    {
+        private readonly ArchitectureContractRunner _runner;
+
+        public ExecutionUser(ArchitectureContractRunner runner)
+        {
+            _runner = runner;
+        }
+
+        public ArchitectureContractRunner Runner => _runner;
+    }
+
+    public sealed class PermittedConsumer
+    {
+        private readonly ArchitectureContractRunner _runner;
+
+        public PermittedConsumer(ArchitectureContractRunner runner)
+        {
+            _runner = runner;
+        }
+
+        public ArchitectureContractRunner Runner => _runner;
     }
 }

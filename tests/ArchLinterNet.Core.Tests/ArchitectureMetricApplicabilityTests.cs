@@ -10,7 +10,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class ArchitectureMetricApplicabilityTests
+public sealed class ArchitectureMetricApplicabilityTests
 {
     [Test]
     public void Evaluate_AmbiguousTopologyTarget_IsUnassessableWithoutPartialValue()
@@ -645,10 +645,10 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         });
     }
 
-    private static ArchitectureAnalysisContext CreateContext(params Assembly[] assemblies) => new(
+    internal static ArchitectureAnalysisContext CreateContext(params Assembly[] assemblies) => new(
         Path.GetTempPath(), assemblies, Array.Empty<string>(), Array.Empty<string>());
 
-    private static void AssertUnassessable(ArchitectureMetricMeasurement measurement)
+    internal static void AssertUnassessable(ArchitectureMetricMeasurement measurement)
     {
         Assert.Multiple(() =>
         {
@@ -659,32 +659,32 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         });
     }
 
-    private static ArchitectureMetricDefinition TopologyMetric(string id, string kind, string node) => new()
+    internal static ArchitectureMetricDefinition TopologyMetric(string id, string kind, string node) => new()
     {
         Id = id,
         Kind = kind,
         TopologyNode = node,
     };
 
-    private static ArchitectureTopologyNode Node(string id, string @namespace) => new()
+    internal static ArchitectureTopologyNode Node(string id, string @namespace) => new()
     {
         Id = id,
         Mappings = [new ArchitectureTopologySubjectSelector { Namespace = @namespace }],
     };
 
-    private static ArchitectureTopologyNode ProjectNode(string id, string project) => new()
+    internal static ArchitectureTopologyNode ProjectNode(string id, string project) => new()
     {
         Id = id,
         Mappings = [new ArchitectureTopologySubjectSelector { Project = project }],
     };
 
-    private static ArchitectureTopologyNode AssemblyNode(string id, string assembly) => new()
+    internal static ArchitectureTopologyNode AssemblyNode(string id, string assembly) => new()
     {
         Id = id,
         Mappings = [new ArchitectureTopologySubjectSelector { Assembly = assembly }],
     };
 
-    private static ArchitectureTopologyObservedSubject NamespaceSubject(
+    internal static ArchitectureTopologyObservedSubject NamespaceSubject(
         ArchitectureAnalysisSession session,
         Type type)
     {
@@ -704,7 +704,7 @@ public sealed partial class ArchitectureMetricApplicabilityTests
             ProjectSelectorIdentity: assembly);
     }
 
-    private static ArchitectureTopologyObservedSubject AssemblySubject(
+    internal static ArchitectureTopologyObservedSubject AssemblySubject(
         string id,
         string assembly,
         string canonicalAssembly,
@@ -716,14 +716,14 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         CanonicalAssemblyIdentity: canonicalAssembly,
         AssemblyReferenceIdentity: assemblyReference);
 
-    private static Type CreateDynamicType(string assemblyPrefix, string typeName)
+    internal static Type CreateDynamicType(string assemblyPrefix, string typeName)
     {
         AssemblyName name = new($"{assemblyPrefix}-{Guid.NewGuid():N}");
         AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(name, AssemblyBuilderAccess.Run);
         return assembly.DefineDynamicModule(name.Name!).DefineType(typeName).CreateType()!;
     }
 
-    private static Assembly CreateEmptyDynamicAssembly(string assemblyPrefix)
+    internal static Assembly CreateEmptyDynamicAssembly(string assemblyPrefix)
     {
         AssemblyName name = new($"{assemblyPrefix}-{Guid.NewGuid():N}");
         AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(name, AssemblyBuilderAccess.Run);
@@ -731,7 +731,7 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         return assembly;
     }
 
-    private static ArchitectureTopology TypeTopology() => new()
+    internal static ArchitectureTopology TypeTopology() => new()
     {
         Mode = "partial",
         SubjectKind = "type",
@@ -742,7 +742,7 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         Nodes = [Node("model", "ArchLinterNet.Core.Model")],
     };
 
-    private static ArchitectureTopology EmptyTypeTopology(bool allowEmpty) => new()
+    internal static ArchitectureTopology EmptyTypeTopology(bool allowEmpty) => new()
     {
         Mode = "partial",
         SubjectKind = "type",
@@ -754,7 +754,7 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         Nodes = [Node("empty", "Metric.No.Types")],
     };
 
-    private static ArchitectureTopology EmptySelectedNodeTopology() => new()
+    internal static ArchitectureTopology EmptySelectedNodeTopology() => new()
     {
         Mode = "partial",
         SubjectKind = "type",
@@ -766,7 +766,7 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         Nodes = [Node("empty", "Metric.No.Types")],
     };
 
-    private static ArchitectureTopologyObservedSubject TypeSubject(string canonicalAssembly) => new(
+    internal static ArchitectureTopologyObservedSubject TypeSubject(string canonicalAssembly) => new(
         ArchitectureTopologyMetricObserver.BuildMetricSubjectIdentity(
             "type", "Shared", "Shared", canonicalAssembly, "Metric.Shared.Type"),
         "Shared",

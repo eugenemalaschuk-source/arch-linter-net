@@ -9,34 +9,15 @@ namespace ArchLinterNet.Core.Tests;
 // ArchLinterNet.CEL at policy-load time, context-schema selection, compiled-predicate caching, the
 // literal-only fast path, and the port-boundary/adapter-binding scope boundary (Decision D4).
 [TestFixture]
-public sealed partial class ExpressionCompilationValidatorTests
+public sealed class ExpressionCompilationValidatorTests : ExpressionCompilationValidatorTestSupport
 {
     private string _tempDir = null!;
 
     [SetUp]
-    public void SetUp()
+    public void CaptureTempDirectory()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-expression-compilation-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempDir);
+        _tempDir = TempDirectory;
     }
-
-    [TearDown]
-    public void TearDown()
-    {
-        if (Directory.Exists(_tempDir))
-        {
-            Directory.Delete(_tempDir, true);
-        }
-    }
-
-    private string WritePolicy(string yaml, string fileName = "dependencies.arch.yml")
-    {
-        string path = Path.Combine(_tempDir, fileName);
-        File.WriteAllText(path, yaml);
-        return path;
-    }
-
-    private static string AssemblyName => typeof(ExpressionCompilationValidatorTests).Assembly.GetName().Name!;
 
     [Test]
     public void Load_LayerSelectorWhen_CompilesAndCaches()

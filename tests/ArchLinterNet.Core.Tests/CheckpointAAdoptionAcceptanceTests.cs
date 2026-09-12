@@ -84,7 +84,7 @@ public sealed class CheckpointAAdoptionAcceptanceTests
                     "Synthetic.Product.Generated"), Is.False);
                 break;
             case "package-evidence":
-                new ArchitectureDiagnosticFormatterTests()
+                new ArchitectureDiagnosticFormatterPackageTests()
                     .GroupedPackageViolation_EachAdapterAlignsEvidenceWithCanonicalIdentity();
                 break;
             case "framework-reference-evidence":
@@ -92,7 +92,7 @@ public sealed class CheckpointAAdoptionAcceptanceTests
                 {
                     fixture.Build();
                 }
-                new ArchitectureDiagnosticFormatterTests()
+                new ArchitectureDiagnosticFormatterFrameworkReferenceTests()
                     .FrameworkReferenceViolation_WithEvidence_HumanJsonAndSarifRenderStructuredFields();
                 break;
             case "assembly-aware-composition":

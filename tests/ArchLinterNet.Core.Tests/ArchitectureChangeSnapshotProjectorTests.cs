@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class ArchitectureChangeSnapshotProjectorTests
+public sealed class ArchitectureChangeSnapshotProjectorTests
 {
     private static readonly string[] _violationEvidence = ["Acme.Service.Run: System.Console.WriteLine"];
 
@@ -365,13 +365,13 @@ public sealed partial class ArchitectureChangeSnapshotProjectorTests
         }));
     }
 
-    private static ArchitectureGraphOutcome EmptyGraph() => new(new ArchitectureDependencyGraph(
+    internal static ArchitectureGraphOutcome EmptyGraph() => new(new ArchitectureDependencyGraph(
         Array.Empty<ArchitectureGraphNode>(), Array.Empty<ArchitectureGraphEdge>()));
 
-    private static ArchitectureGraphOutcome Graph(ArchitectureGraphNode node, ArchitectureGraphEdge edge) => new(
+    internal static ArchitectureGraphOutcome Graph(ArchitectureGraphNode node, ArchitectureGraphEdge edge) => new(
         new ArchitectureDependencyGraph(new[] { node }, new[] { edge }));
 
-    private static ArchitectureViolationIdentity Identity(int occurrence) => new(
+    internal static ArchitectureViolationIdentity Identity(int occurrence) => new(
         ArchitectureViolationIdentity.CurrentVersion,
         "method_body",
         "call",
@@ -384,7 +384,7 @@ public sealed partial class ArchitectureChangeSnapshotProjectorTests
         "WriteLine",
         occurrence);
 
-    private static ArchitectureViolation Violation(ArchitectureViolationIdentity identity) => new(
+    internal static ArchitectureViolation Violation(ArchitectureViolationIdentity identity) => new(
         "forbidden-call",
         "forbidden-call",
         "Acme.Service",
@@ -394,7 +394,7 @@ public sealed partial class ArchitectureChangeSnapshotProjectorTests
         Identity = identity,
     };
 
-    private static ValidationOutcome Outcome(
+    internal static ValidationOutcome Outcome(
         string repositoryRoot,
         string projectPath,
         IReadOnlyCollection<ArchitectureViolation>? violations = null,

@@ -10,7 +10,7 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class LayoutConventionContractTests
+public sealed class LayoutConventionContractTests
 {
     private string _tempDir = null!;
 
@@ -95,7 +95,7 @@ public sealed partial class LayoutConventionContractTests
             projectDiscovery: null);
     }
 
-    private static ArchitectureContractDocument CreateDocument(
+    internal static ArchitectureContractDocument CreateDocument(
         ArchitectureLayoutConventionContract contract,
         bool audit = false,
         bool withSourceRoots = true,

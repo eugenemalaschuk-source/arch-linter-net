@@ -13,15 +13,15 @@ namespace ArchLinterNet.Core.Tests;
 
 // Fake-composition tests for baseline application-service orchestration.
 [TestFixture]
-public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositionTests
+public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
-    private static readonly string[] _value = { "strict", "audit" };
-    private static readonly bool[] _value1 = { true };
-    private static readonly string[] _value2 = { "fake" };
-    private static readonly bool[] _value3 = { true };
-    private static readonly string[] _value4 = { "missing-rule" };
-    private static readonly bool[] _value5 = { false };
-    private static readonly string[] _knownRule = { "known-rule" };
+    internal static readonly string[] Value = { "strict", "audit" };
+    internal static readonly bool[] Value1 = { true };
+    internal static readonly string[] Value2 = { "fake" };
+    internal static readonly bool[] Value3 = { true };
+    internal static readonly string[] Value4 = { "missing-rule" };
+    internal static readonly bool[] Value5 = { false };
+    internal static readonly string[] KnownRule = { "known-rule" };
 
     [Test]
     public void Generate_FakeCollaborators_ProducesBaselineWithoutRealInfrastructure()
@@ -49,8 +49,8 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         Assert.That(outcome.Yaml, Is.EqualTo("fake-baseline-yaml"));
         Assert.That(baselineGenerator.BuildFromEntriesWasCalled, Is.True);
         Assert.That(baselineGenerator.EntriesReceived!.Select(e => e.Reason), Is.All.EqualTo("fake reason"));
-        Assert.That(contractExecutor.ModesReceived, Is.EquivalentTo(_value));
-        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(_value1));
+        Assert.That(contractExecutor.ModesReceived, Is.EquivalentTo(Value));
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(Value1));
         Assert.That(runnerSetupService.ModeReceived, Is.Null);
     }
 
@@ -63,7 +63,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         {
             ConfigurationViolationsToReturn = new List<ArchitectureViolation>
             {
-                new("<configuration>", null, "fake-subject", "fake-configuration-violation", _value2),
+                new("<configuration>", null, "fake-subject", "fake-configuration-violation", Value2),
             },
         };
         runnerSetupService.RunnerToReturn = runner;
@@ -81,7 +81,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         Assert.That(outcome.ConfigurationViolations, Has.Count.EqualTo(1));
         Assert.That(contractExecutor.ModesReceived, Is.Empty);
         Assert.That(baselineGenerator.WasCalled, Is.False);
-        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(_value3));
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(Value3));
     }
 
     [Test]
@@ -123,7 +123,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             {
                 PolicyPath = "unused-by-fakes.arch.yml",
                 Mode = "all",
-                ContractIds = _value4,
+                ContractIds = Value4,
             }));
 
         Assert.That(ex!.Message, Does.Contain("Unknown contract IDs"));
@@ -178,12 +178,12 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
 
         Assert.That(outcome.Succeeded, Is.True);
         Assert.That(outcome.InSync, Is.True);
-        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(_value5));
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(Value5));
         Assert.That(runnerSetupService.ModeReceived, Is.EqualTo("audit"));
     }
 
     // Mixed baseline: frozen + resolved + configuration-error + new candidate.
-    private static ArchitectureContractDocument CreateDocumentWith_knownRule()
+    internal static ArchitectureContractDocument CreateDocumentWith_knownRule()
     {
         return new ArchitectureContractDocument
         {
@@ -199,7 +199,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         };
     }
 
-    private static ArchitectureBaselineDocument CreateMixedBaseline()
+    internal static ArchitectureBaselineDocument CreateMixedBaseline()
     {
         return new ArchitectureBaselineDocument
         {
@@ -230,7 +230,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         };
     }
 
-    private static (FakeRunnerSetupService RunnerSetupService, FakeContractExecutor ContractExecutor,
+    internal static (FakeRunnerSetupService RunnerSetupService, FakeContractExecutor ContractExecutor,
         FakeBaselineGenerator BaselineGenerator, FakeBaselineLoadingService BaselineLoadingService)
         CreateMixedScenarioCollaborators()
     {
@@ -450,7 +450,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
     }
 
     // Scoped update/prune must preserve out-of-scope entries untouched.
-    private static ArchitectureContractDocument CreateDocumentWithTwoContractRules()
+    internal static ArchitectureContractDocument CreateDocumentWithTwoContractRules()
     {
         return new ArchitectureContractDocument
         {
@@ -467,7 +467,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         };
     }
 
-    private static ArchitectureBaselineDocument CreateBaselineWithTwoContractRules()
+    internal static ArchitectureBaselineDocument CreateBaselineWithTwoContractRules()
     {
         return new ArchitectureBaselineDocument
         {
@@ -521,7 +521,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             Mode = "all",
-            ContractIds = _knownRule,
+            ContractIds = KnownRule,
         });
 
         Assert.That(outcome.Succeeded, Is.True);
@@ -556,7 +556,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             Mode = "all",
-            ContractIds = _knownRule,
+            ContractIds = KnownRule,
         });
 
         Assert.Multiple(() =>
@@ -570,7 +570,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         });
     }
 
-    private static ArchitectureContractDocument CreateDocumentWithStrictAndAuditRules()
+    internal static ArchitectureContractDocument CreateDocumentWithStrictAndAuditRules()
     {
         return new ArchitectureContractDocument
         {
@@ -590,7 +590,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         };
     }
 
-    private static ArchitectureBaselineDocument CreateBaselineWithStrictAndAuditEntries()
+    internal static ArchitectureBaselineDocument CreateBaselineWithStrictAndAuditEntries()
     {
         return new ArchitectureBaselineDocument
         {

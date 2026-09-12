@@ -3,11 +3,70 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.LayoutConventionContractTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class LayoutConventionContractTests
+[TestFixture]
+public sealed class LayoutConventionExclusionTests
 {
+    private string _tempDir = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-layout-convention-exclusion-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempDir);
+        WriteFixtureFile("Services/OrderService.cs",
+            "namespace LayoutConventionContractTestFixtures.Services { public sealed class OrderService { } }");
+        WriteFixtureFile("Services/PaymentService.cs",
+            "namespace LayoutConventionContractTestFixtures.Services { public sealed class PaymentService { } }");
+        WriteFixtureFile("Services/PartialOffender.Part1.cs",
+            "namespace LayoutConventionContractTestFixtures.AmbiguousFolder { public sealed class PartialOffender { } }");
+        WriteFixtureFile("Elsewhere/PartialOffender.Part2.cs",
+            "namespace LayoutConventionContractTestFixtures.AmbiguousFolder { public sealed class PartialOffender { } }");
+        WriteFixtureFile("Services/IWronglyPlacedService.cs",
+            "namespace LayoutConventionContractTestFixtures.Services { public interface IWronglyPlacedService { } }");
+        WriteFixtureFile("Interfaces/IOrderService.cs",
+            "namespace LayoutConventionContractTestFixtures.Interfaces { public interface IOrderService { } }");
+        WriteFixtureFile("Interfaces/WronglyPlacedClass.cs",
+            "namespace LayoutConventionContractTestFixtures.Interfaces { public sealed class WronglyPlacedClass { } }");
+        WriteFixtureFile("WhenRefinement/IncludedByWhen.cs",
+            "namespace LayoutConventionContractTestFixtures.WhenRefinement { public sealed class IncludedByWhen { } }");
+        WriteFixtureFile("WhenRefinement/ExcludedByWhen.cs",
+            "namespace LayoutConventionContractTestFixtures.WhenRefinement { public sealed class ExcludedByWhen { } }");
+        WriteFixtureFile("MixedNamespaceFile/Mixed.cs", "namespace LayoutConventionContractTestFixtures.MixedNamespaceFile { public sealed class ServiceInMatchingNamespace { } }\nnamespace LayoutConventionContractTestFixtures.MixedNamespaceFileOther { public interface IEscapingInterface { } }");
+        WriteFixtureFile("AbstractServices/AbstractBaseService.cs",
+            "namespace LayoutConventionContractTestFixtures.AbstractServices { public abstract class AbstractBaseService { } }");
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_tempDir))
+        {
+            Directory.Delete(_tempDir, true);
+        }
+    }
+
+    private void WriteFixtureFile(string relativePath, string content)
+    {
+        string fullPath = Path.Combine(_tempDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        File.WriteAllText(fullPath, content);
+    }
+
+    private ArchitectureAnalysisContext CreateContext()
+    {
+        return new ArchitectureAnalysisContext(
+            _tempDir,
+            new[] { typeof(LayoutConventionContractTests).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            null,
+            projectDiscovery: null);
+    }
+
     [Test]
     public void CheckLayoutConventionsContract_ExcludeWhen_SubtractsMatchedDeclaredTypes()
     {

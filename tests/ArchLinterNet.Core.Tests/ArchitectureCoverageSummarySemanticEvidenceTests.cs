@@ -3,10 +3,12 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureCoverageSummaryTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureCoverageSummaryTests
+[TestFixture]
+public sealed class ArchitectureCoverageSummarySemanticEvidenceTests
 {
     [Test]
     public void BuildCoverageSummary_SemanticRoleScope_ExplainsGovernanceAndExclusionFacts()

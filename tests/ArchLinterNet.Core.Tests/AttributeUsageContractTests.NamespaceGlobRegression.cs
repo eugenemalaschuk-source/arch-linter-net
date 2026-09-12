@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.AttributeUsageContractTests;
 
 namespace ArchLinterNet.Core.Tests;
 
@@ -10,8 +11,33 @@ namespace ArchLinterNet.Core.Tests;
 // glob-grammar semantics): glob-pattern matching, invalid-pattern/blank-entry rejection at load
 // time, and composed (imported-fragment) policy paths. Split out of AttributeUsageContractTests.cs
 // to stay under the file-size lint gate.
-public sealed partial class AttributeUsageContractTests
+public sealed class AttributeUsageNamespaceGlobRegressionTests
 {
+    private string _tempDir = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-attribute-usage-glob-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempDir);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_tempDir))
+        {
+            Directory.Delete(_tempDir, true);
+        }
+    }
+
+    private string WritePolicy(string yaml)
+    {
+        string path = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(path, yaml);
+        return path;
+    }
+
     [Test]
     public void CheckAttributeUsageContract_AllowedOnlyInNamespacesGlobPattern_MatchesMiddleSegment()
     {

@@ -2,10 +2,11 @@ using System.Text.Json;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureDiagnosticFormatterTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureDiagnosticFormatterTests
+public sealed class ArchitectureDiagnosticFormatterCoverageTests
 {
     [Test]
     public void FormatCoverageAndPolicyResults_IncludesSortedDetails()
@@ -13,11 +14,11 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
         var summary = new ArchitectureCoverageSummary(
             "coverage", "coverage-id", "namespace",
             new ArchitectureCoverageSummaryCounts(1, 1, 1, 1, 1),
-            _excludedCoverageItems,
-            _uncoveredCoverageItems,
-            _staleCoverageItems,
-            _unknownCoverageItems,
-            _coveredCoverageItems)
+            ExcludedCoverageItems,
+            UncoveredCoverageItems,
+            StaleCoverageItems,
+            UnknownCoverageItems,
+            CoveredCoverageItems)
         {
             OptionalEmptyItems =
             [
@@ -32,17 +33,17 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
         };
         var policy = new PolicyConsistencyDiagnostic(
             "policy", "policy-id", "duplicate", "conflicting rules",
-            _firstPolicyId, _policyContractNames, _policyLayers)
+            FirstPolicyId, PolicyContractNames, PolicyLayers)
         { RepresentativeType = "Core.Representative" };
 
-        Assert.That(_formatter.FormatCoverageForHumans(_coverageFinding), Does.StartWith("Coverage findings:"));
-        string humanSummary = _formatter.FormatCoverageSummaryForHumans(new List<ArchitectureCoverageSummary> { summary });
+        Assert.That(Formatter.FormatCoverageForHumans(CoverageFinding), Does.StartWith("Coverage findings:"));
+        string humanSummary = Formatter.FormatCoverageSummaryForHumans(new List<ArchitectureCoverageSummary> { summary });
         Assert.That(humanSummary, Does.Contain("covered=1 excluded=1 uncovered=1 stale=1 unknown=1"));
         Assert.That(humanSummary, Does.Contain("uncovered: a-uncovered (a-evidence)"));
-        Assert.That(_formatter.FormatPolicyConsistencyForHumans(new List<PolicyConsistencyDiagnostic> { policy }),
+        Assert.That(Formatter.FormatPolicyConsistencyForHumans(new List<PolicyConsistencyDiagnostic> { policy }),
             Does.Contain("Core.Representative").Or.Contain("conflicting rules"));
 
-        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var json = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
             policyConsistencyFindings: new List<PolicyConsistencyDiagnostic> { policy },
             coverageSummaries: new List<ArchitectureCoverageSummary> { summary }));

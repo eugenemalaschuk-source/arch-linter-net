@@ -11,7 +11,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class ArchitectureMetricMeasurementTests
+public sealed class ArchitectureMetricMeasurementTests
 {
     private string _temporaryDirectory = null!;
     private string _policyPath = null!;

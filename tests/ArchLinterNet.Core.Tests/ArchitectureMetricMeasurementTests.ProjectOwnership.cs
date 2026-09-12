@@ -5,8 +5,50 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureMetricMeasurementTests
+[TestFixture]
+public sealed class ArchitectureMetricMeasurementProjectOwnershipTests
 {
+    private string _temporaryDirectory = null!;
+    private string _policyPath = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-metrics-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_temporaryDirectory);
+        _policyPath = Path.Combine(_temporaryDirectory, "dependencies.arch.yml");
+        File.WriteAllText(_policyPath, """
+            version: 1
+            name: Metric measurement test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            topology:
+              mode: partial
+              subject_kind: namespace
+              scope:
+                selectors:
+                  - namespace: ArchLinterNet.Core.Model
+              nodes:
+                - id: model
+                  mappings:
+                    - namespace: ArchLinterNet.Core.Model
+            metrics:
+              - id: model-external-groups
+                kind: external_dependency_group_count
+                topology_node: model
+            contracts: {}
+            """);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_temporaryDirectory))
+        {
+            Directory.Delete(_temporaryDirectory, recursive: true);
+        }
+    }
+
     [Test]
     public void Measure_SelectedNonProjectMetric_DoesNotRequireAnUnselectedProjectMetricArtifact()
     {

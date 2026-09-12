@@ -2,12 +2,14 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureBaselineApplicationServiceFakeCompositionTests;
 
 namespace ArchLinterNet.Core.Tests;
 
 // Fake-composition tests for ArchitectureBaselineApplicationService.Migrate — split out to keep
 // the main fake-composition test file under the file-size lint threshold.
-public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositionTests
+[TestFixture]
+public sealed class ArchitectureBaselineApplicationServiceMigrateTests
 {
     [Test]
     public void Migrate_MixedScenario_ClassifiesMatchedAndStaleEntries()
