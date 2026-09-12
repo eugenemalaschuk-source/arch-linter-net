@@ -8,8 +8,11 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureSourceFileFactIndexEdgeCaseTests : ArchitectureSourceFileFactIndexTestBase
+public sealed class ArchitectureSourceFileFactIndexEdgeCaseTests : ArchitectureSourceFileFactIndexTestSupport
 {
+    private static readonly Assembly _testAssembly = TestAssembly;
+    private static readonly Assembly[] _testAssemblyOnly = [TestAssembly];
+    private static readonly string[] _singleSourceRoot = SingleSourceRoot;
     private static readonly string[] _partialFixtureDeclarationPaths =
     [
         "src/PartialFixture.Part1.cs",

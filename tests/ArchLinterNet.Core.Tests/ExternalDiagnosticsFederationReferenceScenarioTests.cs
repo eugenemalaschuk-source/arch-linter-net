@@ -11,16 +11,9 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
+[TestFixture]
+public sealed class ExternalDiagnosticsFederationReferenceScenarioTests : ExternalDiagnosticsFederationReferenceScenarioTestSupport
 {
-    private protected SarifEvidenceTestRepository _repository = null!;
-
-    [SetUp]
-    public void SetUp() => _repository = new SarifEvidenceTestRepository();
-
-    [TearDown]
-    public void TearDown() => _repository.Dispose();
-
     [Test]
     public void CurrentContext_ComposesTrustSelectionFindingBaselineOutputsTestingAndApplicability()
     {
@@ -35,7 +28,7 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
             Results(
                 Result("SEC100", "error", "src/App/One.cs", "source finding", fingerprint: "{\"stable\":\"source-42\"}"),
                 Result("PUBLICAPI001", "warning", "src/App/Two.cs", "fallback compatibility finding", partialFingerprint: "{\"partial\":\"ignored-for-selection\"}")));
-        string path = _repository.AddUtf8File("evidence/current.sarif", sarif);
+        string path = Repository.AddUtf8File("evidence/current.sarif", sarif);
         SarifEvidenceReadResult read = Read(
             requirement,
             "evidence/current.sarif",
@@ -52,7 +45,7 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
         };
         var baselineGenerator = new ArchitectureBaselineGenerator();
         ArchitectureBaselineDocument baseline = baselineGenerator.Generate(baselinePolicy, [strictBaseline]);
-        string baselinePath = _repository.GetPath("evidence/baseline.yml");
+        string baselinePath = Repository.GetPath("evidence/baseline.yml");
         File.WriteAllText(baselinePath, baselineGenerator.Serialize(baseline));
         ArchitectureBaselineDocument loadedBaseline = new ArchitectureBaselineLoadingService().LoadFromPath(baselinePath);
         ArchitectureBaselineLoadingService.MergeAndValidate(baselinePolicy, loadedBaseline);
@@ -136,7 +129,7 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
     public void TrustedZeroResult_IsEvaluableAndDistinctFromMissingEvidence()
     {
         ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan");
-        _repository.AddUtf8File("evidence/zero.sarif", Sarif("[]"));
+        Repository.AddUtf8File("evidence/zero.sarif", Sarif("[]"));
         SarifEvidenceReadResult valid = Read(requirement, "evidence/zero.sarif");
         SarifExternalDiagnosticSelectionResult selection = Select(valid);
         ImportedExternalDiagnosticProjection projection = ArchitectureImportedDiagnosticProjector.Project(selection);
@@ -146,7 +139,7 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
         ArchitectureAssessmentCompletionEvidence completion = ArchitectureApplicabilityEvaluator.Evaluate(
             expected, records, conformancePassed: true)!;
         SarifEvidenceReadResult missing = new SarifEvidenceReader().Read(
-            requirement, _repository.Root, artifact: null,
+            requirement, Repository.Root, artifact: null,
             new SarifEvidenceAssessmentContext("repo", "revision"));
         (_, IReadOnlyList<ArchitectureApplicabilityRecord> missingRecords) =
             ArchitectureExternalEvidenceApplicabilityProjector.Project([requirement], [missing]);
@@ -246,7 +239,7 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
                     includeInvocations);
             }
 
-            _repository.AddUtf8File("evidence/input.sarif", content);
+            Repository.AddUtf8File("evidence/input.sarif", content);
             artifact ??= new SarifEvidenceArtifactReference("evidence/input.sarif", "external.scan", producer);
             if (producer is not null)
             {
@@ -256,7 +249,7 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
 
         SarifEvidenceReadResult read = new SarifEvidenceReader().Read(
             requirement,
-            _repository.Root,
+            Repository.Root,
             artifact,
             new SarifEvidenceAssessmentContext("repo", "revision", "scope"));
         (_, IReadOnlyList<ArchitectureApplicabilityRecord> records) =
@@ -285,8 +278,8 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
         string fallback = Result("SEC100", "error", "src/App/Two.cs", "distinct location");
         string firstPath = "evidence/first.sarif";
         string secondPath = "evidence/second.sarif";
-        _repository.AddUtf8File(firstPath, Sarif(Results(repeated, repeated, fallback), marker: "first"));
-        _repository.AddUtf8File(secondPath, Sarif(Results(fallback, repeated), marker: "second"));
+        Repository.AddUtf8File(firstPath, Sarif(Results(repeated, repeated, fallback), marker: "first"));
+        Repository.AddUtf8File(secondPath, Sarif(Results(fallback, repeated), marker: "second"));
         SarifEvidenceReadResult first = Read(requirement, firstPath);
         SarifEvidenceReadResult second = Read(requirement, secondPath);
         SarifExternalDiagnosticSelectionResult forward = new SarifExternalDiagnosticSelector().Select(
@@ -330,8 +323,8 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
         ArchitectureExternalEvidenceRequirement firstRequirement = Requirement("external.scan");
         ArchitectureExternalEvidenceRequirement secondRequirement = Requirement("external.other");
         string content = Sarif(Results(Result("SEC100", "error", "src/App/One.cs", "same", fingerprint: "{\"stable\":\"same\"}")));
-        _repository.AddUtf8File("evidence/first.sarif", content);
-        _repository.AddUtf8File("evidence/second.sarif", content);
+        Repository.AddUtf8File("evidence/first.sarif", content);
+        Repository.AddUtf8File("evidence/second.sarif", content);
         SarifEvidenceReadResult first = Read(firstRequirement, "evidence/first.sarif");
         SarifEvidenceReadResult second = Read(secondRequirement, "evidence/second.sarif");
         SarifExternalDiagnosticSelectionResult selection = new SarifExternalDiagnosticSelector().Select(
@@ -354,7 +347,7 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
         ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan");
         requirement.DiagnosticFilter!.Projects = ["App"];
         requirement.DiagnosticFilter.PathPrefixes = ["src/App"];
-        _repository.AddUtf8File("evidence/windows-path.sarif", Sarif(
+        Repository.AddUtf8File("evidence/windows-path.sarif", Sarif(
             Results(Result("SEC100", "error", "src\\\\App\\\\One.cs", "windows path"))));
 
         SarifEvidenceReadResult read = Read(requirement, "evidence/windows-path.sarif");
@@ -373,7 +366,7 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
     public void NativeAndImportedFindings_CoexistInDeterministicNormalAndTestingOutputs()
     {
         ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan");
-        _repository.AddUtf8File("evidence/input.sarif", Sarif(
+        Repository.AddUtf8File("evidence/input.sarif", Sarif(
             Results(Result("SEC100", "error", "src/App/One.cs", "imported", fingerprint: "{\"stable\":\"imported\"}"))));
         ImportedExternalDiagnosticProjection imported = ArchitectureImportedDiagnosticProjector.Project(
             Select(Read(requirement, "evidence/input.sarif")));
@@ -406,92 +399,5 @@ public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
         });
     }
 
-    protected SarifEvidenceReadResult Read(
-        ArchitectureExternalEvidenceRequirement requirement,
-        string path,
-        SarifEvidenceProducerContext? producer = null,
-        string assessmentScope = "scope")
-    {
-        producer ??= new SarifEvidenceProducerContext(requirement.Id, "repo", "revision", assessmentScope);
-        return new SarifEvidenceReader().Read(
-            requirement,
-            _repository.Root,
-            new SarifEvidenceArtifactReference(path, requirement.Id, producer),
-            new SarifEvidenceAssessmentContext("repo", "revision", assessmentScope));
-    }
 
-    protected static SarifExternalDiagnosticSelectionResult Select(SarifEvidenceReadResult read) =>
-        new SarifExternalDiagnosticSelector().Select([new SarifExternalDiagnosticSelectionInput(read)]);
-
-    protected static ArchitectureExternalEvidenceRequirement Requirement(
-        string id,
-        Dictionary<string, string>? severity = null,
-        IReadOnlyList<string>? ruleIds = null) => new()
-        {
-            Id = id,
-            Format = "sarif",
-            Required = true,
-            Tool = "Synthetic.Scanner",
-            ToolVersion = "1.0",
-            Run = "assessment-42",
-            RequireRepository = true,
-            RequireRevision = true,
-            RequireScope = true,
-            DiagnosticFilter = new ArchitectureExternalEvidenceDiagnosticFilter
-            {
-                RuleIds = ruleIds?.ToList() ?? [],
-                Severity = severity ?? new Dictionary<string, string> { ["error"] = "strict" },
-            },
-        };
-
-    protected static string Results(params string[] results) => "[" + string.Join(",", results) + "]";
-
-    protected static string Result(
-        string ruleId,
-        string level,
-        string path,
-        string message,
-        string? fingerprint = null,
-        string? partialFingerprint = null) =>
-        "{\"ruleId\":\"" + ruleId + "\",\"message\":{\"text\":\"" + message + "\"},\"level\":\"" + level
-        + "\",\"properties\":{\"project\":\"App\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"uri\":\""
-        + path + "\"},\"region\":{\"startLine\":7,\"startColumn\":3}}}]"
-        + (fingerprint is null ? string.Empty : ",\"fingerprints\":" + fingerprint)
-        + (partialFingerprint is null ? string.Empty : ",\"partialFingerprints\":" + partialFingerprint)
-        + "}";
-
-    protected static string Sarif(
-        string results,
-        string? repository = "repo",
-        string? revision = "revision",
-        string invocation = "true",
-        bool includeInvocations = true,
-        string? marker = null)
-    {
-        string[] bindings = [];
-        if (repository is not null)
-        {
-            bindings = [.. bindings, "\"repositoryUri\":\"" + repository + "\""];
-        }
-
-        if (revision is not null)
-        {
-            bindings = [.. bindings, "\"revisionId\":\"" + revision + "\""];
-        }
-
-        string provenance = bindings.Length == 0 ? "[]" : "[{" + string.Join(",", bindings) + "}]";
-        string invocationJson = includeInvocations
-            ? "\"invocations\":[{\"executionSuccessful\":" + invocation + "}],"
-            : string.Empty;
-        string markerJson = marker is null ? string.Empty : ",\"properties\":{\"marker\":\"" + marker + "\"}";
-        return "{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"Synthetic.Scanner\",\"version\":\"1.0\","
-            + "\"rules\":[{\"id\":\"SEC100\",\"properties\":{\"tags\":[\"security\"]}},{\"id\":\"PUBLICAPI001\",\"properties\":{\"tags\":[\"compatibility\"]}}]}},"
-            + "\"automationDetails\":{\"id\":\"assessment-42\"}," + invocationJson
-            + "\"versionControlProvenance\":" + provenance + markerJson + ",\"results\":" + results + "}]}";
-    }
-}
-
-[TestFixture]
-public sealed class ExternalDiagnosticsFederationReferenceScenarioTests : ExternalDiagnosticsFederationReferenceScenarioTestBase
-{
 }

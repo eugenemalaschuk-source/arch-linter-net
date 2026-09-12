@@ -11,13 +11,13 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureCoverageSummaryTests
 {
-    internal static readonly string[] _value = { "audio-rule", "video-to-ghost-rule", "typo-rule" };
-    internal static readonly string[] _value1 = { "audio-rule", "video-to-ghost-rule" };
-    internal static readonly string[] _value2 = { "audio-rule" };
-    internal static readonly string[] _value3 = { "video-to-ghost-rule", "typo-rule" };
+    internal static readonly string[] Value = { "audio-rule", "video-to-ghost-rule", "typo-rule" };
+    internal static readonly string[] Value1 = { "audio-rule", "video-to-ghost-rule" };
+    internal static readonly string[] Value2 = { "audio-rule" };
+    internal static readonly string[] Value3 = { "video-to-ghost-rule", "typo-rule" };
     internal const string FeatureRoot = "ArchLinterNet.Core.Tests.NamespaceCoverageFixtures.Features";
     internal const string RuleInputFixtureRoot = "ArchLinterNet.Core.Tests.RuleInputCoverageFixtures";
-    internal static readonly string[] _someOtherContractId = { "some-other-contract-id" };
+    internal static readonly string[] SomeOtherContractId = { "some-other-contract-id" };
 
     internal static ArchitectureAnalysisContext CreateContext(Type fixtureType)
     {
@@ -138,7 +138,7 @@ public sealed class ArchitectureCoverageSummaryTests
     {
         ArchitectureContractDocument document = CreateRuleInputDocument();
         ArchitectureCoverageContract contract = CreateRuleInputContract(
-            _value);
+            Value);
 
         ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
 
@@ -164,7 +164,7 @@ public sealed class ArchitectureCoverageSummaryTests
     {
         ArchitectureContractDocument document = CreateRuleInputDocument();
         ArchitectureCoverageContract contract = CreateRuleInputContract(
-            _value1);
+            Value1);
         contract.OptionalInputs.Add(new ArchitectureOptionalRuleInput
         {
             ContractId = "video-to-ghost-rule",
@@ -196,7 +196,7 @@ public sealed class ArchitectureCoverageSummaryTests
     public void BuildCoverageSummary_RuleInputScope_OptionalInputWithMatchingCode_TransitionsToCovered()
     {
         ArchitectureContractDocument document = CreateRuleInputDocument();
-        ArchitectureCoverageContract contract = CreateRuleInputContract(_value2);
+        ArchitectureCoverageContract contract = CreateRuleInputContract(Value2);
         contract.OptionalInputs.Add(new ArchitectureOptionalRuleInput
         {
             ContractId = "audio-rule",
@@ -223,7 +223,7 @@ public sealed class ArchitectureCoverageSummaryTests
     {
         ArchitectureContractDocument document = CreateRuleInputDocument();
         ArchitectureCoverageContract contract = CreateRuleInputContract(
-            _value3,
+            Value3,
             new[]
             {
                 new ArchitectureCoverageExclusion

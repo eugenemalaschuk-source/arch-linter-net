@@ -12,7 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class AttributeUsageContractTests
 {
-    internal static readonly string[] _value = { "does_not_exist_layer" };
+    internal static readonly string[] Value = { "does_not_exist_layer" };
     internal const string TestMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.TestMarkerAttribute";
     internal const string SecondMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.SecondMarkerAttribute";
     internal const string PrefixedNamespace = "AttributeUsageContractTestFixtures.Markers.Prefixed.";
@@ -627,7 +627,7 @@ public sealed class AttributeUsageContractTests
         Assert.That(outcome.Violations, Is.Empty);
         Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
         Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
-        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(_value));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(Value));
     }
 
     [Test]

@@ -13,7 +13,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class TypePlacementContractTests
 {
-    internal static readonly string[] _value = { "does_not_exist_layer" };
+    internal static readonly string[] Value = { "does_not_exist_layer" };
     private string _tempDir = null!;
 
     [SetUp]
@@ -654,7 +654,7 @@ public sealed class TypePlacementContractTests
         Assert.That(outcome.Violations, Is.Empty);
         Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
         Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
-        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(_value));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(Value));
     }
 
     [Test]

@@ -13,7 +13,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ProtectedContractTests
 {
-    internal static readonly ArchitectureDiagnosticFormatter _formatter = new();
+    internal static readonly ArchitectureDiagnosticFormatter Formatter = new();
 
     internal static Assembly CoreAssembly => typeof(ArchitecturePolicyDocumentLoader).Assembly;
     internal static Assembly TestAssembly => typeof(ProtectedContractTests).Assembly;

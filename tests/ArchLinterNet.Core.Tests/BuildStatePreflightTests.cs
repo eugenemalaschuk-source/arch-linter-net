@@ -8,8 +8,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-[Category("E2E")]
-public abstract class BuildStatePreflightTestBase
+[TestFixture, Category("E2E")]
+public sealed class BuildStatePreflightTests : BuildStatePreflightTestSupport
 {
     private static readonly string[] _value = { "Fixture" };
     private static readonly string[] _value1 = { "Fixture" };
@@ -25,39 +25,12 @@ public abstract class BuildStatePreflightTestBase
     private static readonly string[] _value11 = { "net10.0" };
     private static readonly string[] _value12 = { "GraphApp", "GraphLib" };
     private static readonly string[] _staleManifestReasons = { "evaluated-msbuild-evidence-incomplete" };
-    protected string _repoRoot = null!;
+    private string _repoRoot = null!;
 
     [SetUp]
-    public void SetUp()
+    public void CaptureRepositoryRoot()
     {
-        _repoRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-buildstate-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_repoRoot);
-    }
-
-    [TearDown]
-    public void TearDown()
-    {
-        if (!Directory.Exists(_repoRoot))
-        {
-            return;
-        }
-
-        try
-        {
-            Directory.Delete(_repoRoot, true);
-        }
-        catch (IOException)
-        {
-            // Best-effort cleanup: on Windows, Assembly.LoadFrom (used by
-            // BuildStateRuntimeBuildPreparation.ResolveBuiltAssemblies, exercised by the
-            // ensure-built integration test below) keeps its backing .dll file locked for the
-            // lifetime of this process's default AssemblyLoadContext — the OS temp directory is
-            // cleaned up independently, so a leftover locked file here is not a test failure.
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // See above.
-        }
+        _repoRoot = RepositoryRoot;
     }
 
     [Test]
@@ -727,74 +700,4 @@ public abstract class BuildStatePreflightTestBase
         Assert.That(secondBuild.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
     }
 
-    protected string CreateProjectFixture(string assemblyName, string sourceContent)
-    {
-        string projectDirectory = Path.Combine(_repoRoot, "src", assemblyName);
-        Directory.CreateDirectory(projectDirectory);
-        string projectPath = Path.Combine(projectDirectory, $"{assemblyName}.csproj");
-        File.WriteAllText(projectPath, "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>" +
-            "<TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
-        File.WriteAllText(Path.Combine(projectDirectory, "Class1.cs"), sourceContent);
-        return projectPath;
-    }
-
-    protected string CreateFakeAssemblyFile(string assemblyName)
-    {
-        string binDirectory = Path.Combine(_repoRoot, "src", assemblyName, "bin", "Debug", "net10.0");
-        Directory.CreateDirectory(binDirectory);
-        string assemblyPath = Path.Combine(binDirectory, $"{assemblyName}.dll");
-        File.WriteAllBytes(assemblyPath, System.Text.Encoding.UTF8.GetBytes($"fake-assembly-bytes:{assemblyName}"));
-        return assemblyPath;
-    }
-
-    protected static ProjectDiscoveryResult SingleProjectDiscovery(
-        string projectPath, string assemblyName, string targetFramework = "net10.0")
-    {
-        return new ProjectDiscoveryResult(
-            new[] { assemblyName }, Array.Empty<string>(), Array.Empty<string>(),
-            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
-        {
-            DiscoveredProjects = new[]
-            {
-                new ArchitectureDiscoveredProject(projectPath, assemblyName, new[] { targetFramework })
-            }
-        };
-    }
-
-    protected static BuildStateResolvedAssemblies SingleAssemblyResolution(string assemblyPath)
-    {
-        return new BuildStateResolvedAssemblies(new[] { LoadFakeAssembly(assemblyPath) }, Array.Empty<string>());
-    }
-
-    // A real Assembly with a Location pointing at our fake .dll bytes, without requiring the
-    // fixture to be a loadable managed assembly — this test's own assembly, reflection-only
-    // "loaded" via LoadFrom is unnecessary: Assembly.Location is what the evaluator reads, and
-    // .NET allows constructing a lightweight in-memory stand-in via Assembly.LoadFile only for
-    // real PE files, so instead we reflect against this test assembly itself and override
-    // nothing — callers only need GetName().Name and Location, both of which the currently
-    // executing test assembly provides after being copied to the fixture path.
-    private static FakeAssembly LoadFakeAssembly(string assemblyPath)
-    {
-        return new FakeAssembly(assemblyPath);
-    }
-
-    private sealed class FakeAssembly : Assembly
-    {
-        private readonly string _location;
-        private readonly AssemblyName _name;
-
-        public FakeAssembly(string location)
-        {
-            _location = location;
-            _name = new AssemblyName(Path.GetFileNameWithoutExtension(location));
-        }
-
-        public override string Location => _location;
-
-        public override AssemblyName GetName() => _name;
-
-        public override AssemblyName GetName(bool copiedName) => _name;
-    }
 }
-[TestFixture, Category("E2E")]
-public sealed class BuildStatePreflightTests : BuildStatePreflightTestBase { }

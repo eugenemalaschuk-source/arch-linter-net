@@ -15,44 +15,9 @@ namespace ArchLinterNet.Core.Tests;
 // Split into focused fixtures (this one: layer selectors + stale-coverage; the
 // .ContextualContracts.cs companion: contextual dependency/allow-only + remaining regressions) to
 // stay under the repo's file-size threshold - see AGENTS.md.
-public abstract class CelSelectorContextualIntegrationTestBase
+[TestFixture]
+public sealed class CelSelectorContextualIntegrationTests : CelSelectorContextualIntegrationTestSupport
 {
-    private string _tempDir = null!;
-
-    [SetUp]
-    public void SetUp()
-    {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-cel-selector-contextual-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempDir);
-    }
-
-    [TearDown]
-    public void TearDown()
-    {
-        if (Directory.Exists(_tempDir))
-        {
-            Directory.Delete(_tempDir, true);
-        }
-    }
-
-    private string WritePolicy(string yaml)
-    {
-        string path = Path.Combine(_tempDir, "dependencies.arch.yml");
-        File.WriteAllText(path, yaml);
-        return path;
-    }
-
-    protected static string AssemblyName => typeof(CelSelectorContextualIntegrationTestBase).Assembly.GetName().Name!;
-
-    protected static ArchitectureAnalysisContext CreateContext()
-    {
-        return new ArchitectureAnalysisContext(
-            "/tmp", new[] { typeof(CelSelectorContextualIntegrationTests).Assembly }, Array.Empty<string>(), Array.Empty<string>());
-    }
-
-    protected ArchitectureContractDocument Load(string yaml) =>
-        new ArchitecturePolicyDocumentLoader().Load(WritePolicy(yaml));
-
     // --- Layer selector `When` ---
 
     [Test]
@@ -311,23 +276,4 @@ public abstract class CelSelectorContextualIntegrationTestBase
         });
     }
 
-    // --- helpers (shared with the .ContextualContracts.cs partial) ---
-
-    protected static Type[] TypesMatchingLayer(ArchitectureAnalysisSession session, ArchitectureLayer layer)
-    {
-        return typeof(CelSelectorContextualIntegrationTests).Assembly.GetTypes()
-            .Where(t => ArchitectureLayerMatchesForTest(session, layer, t))
-            .ToArray();
-    }
-
-    protected static bool ArchitectureLayerMatchesForTest(ArchitectureAnalysisSession session, ArchitectureLayer layer, Type type)
-    {
-        return ArchLinterNet.Core.Execution.ArchitectureLayerTypeMatcher.Matches(
-            layer, type, session.RoleIndex, session.ExpressionFacts);
-    }
-}
-
-[TestFixture]
-public sealed class CelSelectorContextualIntegrationTests : CelSelectorContextualIntegrationTestBase
-{
 }

@@ -14,7 +14,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class CompositionContractTests
 {
-    internal static readonly int[] _value = { 0, 1 };
+    internal static readonly int[] Value = { 0, 1 };
     internal const string CompositionNamespace = "CompositionContractTestFixtures.Composition";
     internal const string ApplicationNamespace = "CompositionContractTestFixtures.Application";
     internal const string GetServiceApi = "CompositionContractTestFixtures.Fakes.IFakeServiceProvider.GetService";
@@ -584,7 +584,7 @@ public sealed class CompositionContractTests
 
         Assert.That(
             repeatedViolation.Identities.Select(identity => identity.Occurrence),
-            Is.EqualTo(_value),
+            Is.EqualTo(Value),
             "The normalized producer must retain both authoritative call-site identities even though the legacy violation is grouped.");
 
         var contractWithBaseline = new ArchitectureCompositionContract

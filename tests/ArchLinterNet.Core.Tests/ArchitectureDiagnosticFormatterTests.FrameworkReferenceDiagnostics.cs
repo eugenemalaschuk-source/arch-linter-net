@@ -24,7 +24,7 @@ public sealed class ArchitectureDiagnosticFormatterFrameworkReferenceTests
             }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
 
         Assert.That(human, Does.Contain("MyApp.Domain"));
         Assert.That(human, Does.Contain("framework group 'forbidden_web'"));
@@ -43,7 +43,7 @@ public sealed class ArchitectureDiagnosticFormatterFrameworkReferenceTests
             }
         };
 
-        using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var document = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement violation = document.RootElement.GetProperty("violations")[0];
 
@@ -67,7 +67,7 @@ public sealed class ArchitectureDiagnosticFormatterFrameworkReferenceTests
             }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
 
         Assert.That(human, Does.Contain("MyApp.Domain"));
         Assert.That(human, Does.Contain("outside allowed framework groups"));
@@ -86,7 +86,7 @@ public sealed class ArchitectureDiagnosticFormatterFrameworkReferenceTests
             }
         };
 
-        using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var document = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement violation = document.RootElement.GetProperty("violations")[0];
 
@@ -143,9 +143,9 @@ public sealed class ArchitectureDiagnosticFormatterFrameworkReferenceTests
             }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
 
-        using JsonDocument jsonDocument = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using JsonDocument jsonDocument = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement jsonViolation = jsonDocument.RootElement.GetProperty("violations")[0];
 
@@ -185,12 +185,12 @@ public sealed class ArchitectureDiagnosticFormatterFrameworkReferenceTests
             }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
         Assert.That(human, Does.Contain("net10.0"));
         Assert.That(human, Does.Contain("explicit"));
         Assert.That(human, Does.Contain("/src/MyApp.Domain/MyApp.Domain.csproj"));
 
-        using JsonDocument jsonDocument = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using JsonDocument jsonDocument = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement jsonEvidence = jsonDocument.RootElement.GetProperty("violations")[0].GetProperty("evidence")[0];
         Assert.That(jsonEvidence.GetProperty("framework_name").GetString(), Is.EqualTo("Microsoft.AspNetCore.App"));
@@ -229,10 +229,10 @@ public sealed class ArchitectureDiagnosticFormatterFrameworkReferenceTests
             }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
         Assert.That(human, Does.Contain("implicit"));
 
-        using JsonDocument jsonDocument = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using JsonDocument jsonDocument = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement jsonEvidence = jsonDocument.RootElement.GetProperty("violations")[0].GetProperty("evidence")[0];
         Assert.That(jsonEvidence.GetProperty("explicit").GetBoolean(), Is.False);

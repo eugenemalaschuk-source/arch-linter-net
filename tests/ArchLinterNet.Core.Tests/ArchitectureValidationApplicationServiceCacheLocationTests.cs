@@ -26,10 +26,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
 {
-    internal static readonly string[] _value = { "SomethingMissing" };
-    internal static readonly string[] _value1 = { "Fixture" };
-    internal static readonly string[] _value2 = { "net10.0" };
-    internal static readonly string[] _value3 = { "/fake/repository/root/bin/Fixture.dll" };
+    internal static readonly string[] Value = { "SomethingMissing" };
+    internal static readonly string[] Value1 = { "Fixture" };
+    internal static readonly string[] Value2 = { "net10.0" };
+    internal static readonly string[] Value3 = { "/fake/repository/root/bin/Fixture.dll" };
     internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
     {
         public int BuildRunnerCallCount { get; private set; }
@@ -345,7 +345,7 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
         var runnerSetupService = new FakeRunnerSetupService
         {
             DocumentToReturn = document,
-            PreparationProvider = _ => CreatePreparation(missingAssemblyNames: _value),
+            PreparationProvider = _ => CreatePreparation(missingAssemblyNames: Value),
             RunnerToReturn = new FakeContractRunner(CreateEmptySession(document)),
         };
         var applicationService = new ArchitectureValidationApplicationService(
@@ -409,7 +409,7 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
             [new ArchitectureProjectDiscoveryDiagnostic(
                 "stale project build output", projectPath, "Timestamp heuristic marked the output stale.")])
         {
-            DiscoveredProjects = [new ArchitectureDiscoveredProject("fixture/Fixture.csproj", "Fixture", _value2)],
+            DiscoveredProjects = [new ArchitectureDiscoveredProject("fixture/Fixture.csproj", "Fixture", Value2)],
             ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["Fixture"] = Path.Combine("/fake/repository/root", "fixture", "bin", "Debug", "net10.0", "Fixture.dll"),
@@ -455,17 +455,17 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
     {
         var document = CreateDocument();
         var discovery = new ProjectDiscoveryResult(
-            _value1, Array.Empty<string>(), Array.Empty<string>(),
+            Value1, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
-            DiscoveredProjects = new[] { new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value2) },
+            DiscoveredProjects = new[] { new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", Value2) },
             ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["Fixture"] = "/fake/repository/root/bin/Fixture.dll",
             },
         };
         ArchitectureRunnerPreparation preparation = CreatePreparation(
-            discovery: discovery, selectedPaths: _value3);
+            discovery: discovery, selectedPaths: Value3);
         var runnerSetupService = new FakeRunnerSetupService
         {
             DocumentToReturn = document,
@@ -504,10 +504,10 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
         document.Analysis.Configuration = "Release";
         document.Analysis.TargetFramework = "net10.0";
         var discovery = new ProjectDiscoveryResult(
-            _value1, Array.Empty<string>(), Array.Empty<string>(),
+            Value1, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
-            DiscoveredProjects = [new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value2)],
+            DiscoveredProjects = [new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", Value2)],
             ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["Fixture"] = "/fake/repository/root/bin/Release/net10.0/Fixture.dll",

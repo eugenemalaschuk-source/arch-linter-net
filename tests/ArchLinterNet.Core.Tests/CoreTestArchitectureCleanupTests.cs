@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
@@ -15,11 +14,11 @@ public sealed class CoreTestArchitectureCleanupTests
     [Test]
     public void PartialLanguageFixture_RemainsDiscoverableWithEveryDeclarationPath()
     {
-        const string part = "namespace Fixture { public partial class IntentionalFixture { } }";
+        const string Part = "namespace Fixture { public partial class IntentionalFixture { } }";
         var fileSystem = new FakeArchitectureFileSystem();
         fileSystem.AddDirectory("/fake/src");
-        fileSystem.AddFile("/fake/src/IntentionalFixture.Part1.cs", part, DateTime.UtcNow);
-        fileSystem.AddFile("/fake/src/IntentionalFixture.Part2.cs", part, DateTime.UtcNow);
+        fileSystem.AddFile("/fake/src/IntentionalFixture.Part1.cs", Part, DateTime.UtcNow);
+        fileSystem.AddFile("/fake/src/IntentionalFixture.Part2.cs", Part, DateTime.UtcNow);
 
         var index = new ArchitectureSourceFileFactIndex(
             [typeof(CoreTestArchitectureCleanupTests).Assembly],
@@ -43,22 +42,31 @@ public sealed class CoreTestArchitectureCleanupTests
     public void ProductionPartialDeclarations_DoNotSpanMultipleSourceFiles()
     {
         string repositoryRoot = SelfPolicyRepository.FindRepositoryRoot();
-        var declarations = new Regex(
-                @"(?m)^\s*(?:(?:public|internal|private|protected|static|sealed|abstract)\s+)*partial\s+(?:class|record|struct|interface)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)")
-            .Matches(string.Join(
-                Environment.NewLine,
-                Directory.EnumerateFiles(Path.Combine(repositoryRoot, "src"), "*.cs", SearchOption.AllDirectories)
-                    .SelectMany(File.ReadLines)))
-            .Cast<Match>()
-            .Select(match => match.Groups["name"].Value)
-            .GroupBy(name => name, StringComparer.Ordinal)
-            .Where(group => group.Count() > 1)
-            .Select(group => group.Key)
-            .OrderBy(name => name, StringComparer.Ordinal)
+        var sourceIndex = new ArchitectureSourceFileFactIndex(
+            [typeof(ArchitectureSourceFileFactIndex).Assembly],
+            repositoryRoot,
+            ["src"]);
+        var declarations = sourceIndex.SourceDeclarations
+            .Where(declaration => declaration.IsPartial)
+            .GroupBy(declaration => (declaration.AssemblyName, declaration.FullTypeName))
+            .Select(group => new
+            {
+                group.Key.AssemblyName,
+                group.Key.FullTypeName,
+                SourcePaths = group
+                    .Select(declaration => declaration.SourceFilePath)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(path => path, StringComparer.Ordinal)
+                    .ToArray(),
+            })
+            .Where(group => group.SourcePaths.Length > 1)
+            .OrderBy(group => group.AssemblyName, StringComparer.Ordinal)
+            .ThenBy(group => group.FullTypeName, StringComparer.Ordinal)
             .ToArray();
 
         Assert.That(declarations, Is.Empty,
             "A production type may use a generated partial declaration, but must not span multiple source files: "
-            + string.Join(", ", declarations));
+            + string.Join(", ", declarations.Select(group =>
+                $"{group.AssemblyName}:{group.FullTypeName} ({string.Join(", ", group.SourcePaths)})")));
     }
 }

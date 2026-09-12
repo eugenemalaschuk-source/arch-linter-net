@@ -12,9 +12,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitecturePublicApiApplicationServiceBuildStateTests
 {
-    internal static readonly string[] _value = { "net10.0" };
-    internal static readonly string[] _value1 = { "Release", "Release" };
-    internal static readonly string[] _value2 = { "net10.0", "net10.0" };
+    internal static readonly string[] TargetFrameworks = { "net10.0" };
+    internal static readonly string[] Configurations = { "Release", "Release" };
+    internal static readonly string[] ResolvedTargetFrameworks = { "net10.0", "net10.0" };
     [Test]
     public void Capture_EnsureBuilt_RecreatesRunnerAndReverifiesPostBuildArtifacts()
     {
@@ -25,7 +25,7 @@ public sealed class ArchitecturePublicApiApplicationServiceBuildStateTests
         {
             DiscoveredProjects = new[]
             {
-                new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, _value),
+                new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, TargetFrameworks),
             },
             ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -69,9 +69,9 @@ public sealed class ArchitecturePublicApiApplicationServiceBuildStateTests
             }));
             Assert.That(preparation.Requests, Is.All.Property(nameof(BuildStatePreflightRequest.NoRestore)).True);
             Assert.That(preparation.Requests.Select(request => request.RequestedConfiguration),
-                Is.EqualTo(_value1));
+                Is.EqualTo(Configurations));
             Assert.That(preparation.Requests.Select(request => request.RequestedTargetFramework),
-                Is.EqualTo(_value2));
+                Is.EqualTo(ResolvedTargetFrameworks));
             Assert.That(preparation.Requests.Select(request => request.Resolution.ResolvedAssemblyPaths[AssemblyName]),
                 Is.EqualTo(new[] { ArtifactPath, ArtifactPath }));
         });

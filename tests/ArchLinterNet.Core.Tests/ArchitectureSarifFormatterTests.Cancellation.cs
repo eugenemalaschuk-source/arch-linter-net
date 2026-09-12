@@ -19,8 +19,8 @@ public sealed class ArchitectureSarifFormatterCancellationTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("z-contract", "z-rule", "Source.Z", "Forbidden.Z", _ref1),
-            new("a-contract", "a-rule", "Source.A", "Forbidden.A", _ref2),
+            new("z-contract", "z-rule", "Source.Z", "Forbidden.Z", Ref1),
+            new("a-contract", "a-rule", "Source.A", "Forbidden.A", Ref2),
         };
         var preflightDiagnostics = new[]
         {
@@ -35,7 +35,7 @@ public sealed class ArchitectureSarifFormatterCancellationTests
         using CancellationTokenSource cts = new();
         collection.CancellationTokenSource = cts;
 
-        Assert.Throws<OperationCanceledException>(() => _formatter.FormatResultAsSarif(
+        Assert.Throws<OperationCanceledException>(() => Formatter.FormatResultAsSarif(
             "strict",
             violations,
             Array.Empty<string>(),

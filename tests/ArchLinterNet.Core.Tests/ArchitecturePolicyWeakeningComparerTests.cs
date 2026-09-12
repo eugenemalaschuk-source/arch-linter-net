@@ -11,7 +11,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     [Test]
     public void Compare_StrictToSameControlAudit_ReportsSemanticDowngradeWithImportedProvenance()
     {
-        ArchitecturePolicyContextExport baseline = Context(contracts: [Contract("strict", "dependency", "layer-boundary", provenance: _importedProvenance)]);
+        ArchitecturePolicyContextExport baseline = Context(contracts: [Contract("strict", "dependency", "layer-boundary", provenance: ImportedProvenance)]);
         ArchitecturePolicyContextExport current = Context(contracts: [Contract("audit", "dependency", "layer-boundary")]);
 
         ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)).Findings.Single();
@@ -21,7 +21,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
             Assert.That(finding.Kind, Is.EqualTo("strict_to_audit"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
             Assert.That(finding.ControlIdentity, Is.EqualTo("dependency:layer-boundary"));
-            Assert.That(finding.BaseProvenance, Is.EqualTo(_importedProvenance));
+            Assert.That(finding.BaseProvenance, Is.EqualTo(ImportedProvenance));
         });
     }
 
@@ -43,14 +43,14 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     [Test]
     public void Compare_RemovedImportedStrictControl_PreservesTheBaseAuthoredProvenance()
     {
-        ArchitecturePolicyContextExport baseline = Context(contracts: [Contract("strict", "dependency", "imported-boundary", provenance: _importedProvenance)]);
+        ArchitecturePolicyContextExport baseline = Context(contracts: [Contract("strict", "dependency", "imported-boundary", provenance: ImportedProvenance)]);
 
         ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, Context())).Findings.Single();
 
         Assert.Multiple(() =>
         {
             Assert.That(finding.Kind, Is.EqualTo("strict_control_removed"));
-            Assert.That(finding.BaseProvenance, Is.EqualTo(_importedProvenance));
+            Assert.That(finding.BaseProvenance, Is.EqualTo(ImportedProvenance));
             Assert.That(finding.CurrentProvenance, Is.Null);
         });
     }
@@ -80,7 +80,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
             ]);
         ArchitecturePolicyContextExport baseline = Context(
             contracts: [baselineContract],
-            sourceSets: [new ArchitecturePolicyContextSourceSet("hosts", "explicit", ["Sample.Host", "Sample.Worker"], false, "", _importedProvenance)],
+        sourceSets: [new ArchitecturePolicyContextSourceSet("hosts", "explicit", ["Sample.Host", "Sample.Worker"], false, "", ImportedProvenance)],
             analysis: Analysis(projects: ["src/Sample.Host/Sample.Host.csproj", "src/Sample.Worker/Sample.Worker.csproj"]));
         ArchitecturePolicyContextExport current = Context(
             contracts: [currentContract],
@@ -89,7 +89,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current));
 
-        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(_staticScopeAndPredicateChangeFindingKinds));
+        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(StaticScopeAndPredicateChangeFindingKinds));
     }
 
     [Test]
@@ -102,7 +102,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         ArchitecturePolicyContextSourceExpansion currentExpansion = baselineExpansion with
         {
             Instances = [],
-            Exclusions = [new ArchitecturePolicyContextExpandedExclusion("Sample.Core", null, null, true, false, "", _importedProvenance)],
+            Exclusions = [new ArchitecturePolicyContextExpandedExclusion("Sample.Core", null, null, true, false, "", ImportedProvenance)],
         };
         ArchitecturePolicyContextExport baseline = Context(contracts: [contract], expansions: [baselineExpansion]);
         ArchitecturePolicyContextExport current = Context(
@@ -118,7 +118,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current));
 
-        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(_matchedSubtractionAndUniversalIgnoreFindingKinds));
+        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(MatchedSubtractionAndUniversalIgnoreFindingKinds));
         Assert.That(result.Findings.All(finding => finding.Classification == "semantic"), Is.True);
     }
 
@@ -174,7 +174,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     [Test]
     public void Compare_SourceSetMadeOptionalWithUnchangedMembers_IsSemanticWeakening()
     {
-        ArchitecturePolicyContextSourceSet required = new("hosts", "explicit", ["Sample.Host"], false, "", _importedProvenance);
+        ArchitecturePolicyContextSourceSet required = new("hosts", "explicit", ["Sample.Host"], false, "", ImportedProvenance);
         ArchitecturePolicyContextSourceSet optional = required with { Optional = true, Reason = "Future extraction" };
 
         ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
@@ -185,8 +185,8 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         {
             Assert.That(finding.Kind, Is.EqualTo("source_set_made_optional"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
-            Assert.That(finding.BaseValues, Is.EqualTo(_requiredValue));
-            Assert.That(finding.CurrentValues, Is.EqualTo(_optionalValue));
+            Assert.That(finding.BaseValues, Is.EqualTo(RequiredValue));
+            Assert.That(finding.CurrentValues, Is.EqualTo(OptionalValue));
         });
     }
 
@@ -194,7 +194,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     public void Compare_SourceExpansionMadeEmptyTolerant_IsSemanticWeakening()
     {
         ArchitecturePolicyContextSourceExpansion required = new(
-            "strict_dependency", "boundary", "boundary", "fan_out", null, [], false, "", _importedProvenance,
+            "strict_dependency", "boundary", "boundary", "fan_out", null, [], false, "", ImportedProvenance,
             [Expanded("Sample.Application")], [Expanded("Sample.Application")], []);
         ArchitecturePolicyContextSourceExpansion optional = required with { OptionalEmpty = true, OptionalReason = "Planned split" };
 
@@ -206,8 +206,8 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         {
             Assert.That(finding.Kind, Is.EqualTo("source_expansion_made_empty_tolerant"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
-            Assert.That(finding.BaseValues, Is.EqualTo(_requiredValue));
-            Assert.That(finding.CurrentValues, Is.EqualTo(_optionalEmptyValue));
+            Assert.That(finding.BaseValues, Is.EqualTo(RequiredValue));
+            Assert.That(finding.CurrentValues, Is.EqualTo(OptionalEmptyValue));
         });
     }
 
@@ -220,7 +220,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(_projectGlobChangeFindingKinds));
+            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(ProjectGlobChangeFindingKinds));
             Assert.That(result.Findings.All(finding => finding.Classification == "impact_not_proven"), Is.True);
         });
     }
@@ -271,7 +271,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
             Context(contracts: [baseline]),
             Context(contracts: [current])));
 
-        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(_requiredTemplateLayerAndCoverageInputFindingKinds));
+        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(RequiredTemplateLayerAndCoverageInputFindingKinds));
     }
 
     [Test]
@@ -313,8 +313,8 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         {
             Assert.That(finding.Kind, Is.EqualTo("prohibition_removed"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
-            Assert.That(finding.BaseValues, Is.EqualTo(_trueValue));
-            Assert.That(finding.CurrentValues, Is.EqualTo(_falseValue));
+            Assert.That(finding.BaseValues, Is.EqualTo(TrueValue));
+            Assert.That(finding.CurrentValues, Is.EqualTo(FalseValue));
         });
     }
 
@@ -499,7 +499,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         {
             Assert.That(finding.Kind, Is.EqualTo("selector_scope_reduced"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
-            Assert.That(finding.AffectedSubjects, Is.EqualTo(_legacyContractSubject));
+            Assert.That(finding.AffectedSubjects, Is.EqualTo(LegacyContractSubject));
         });
     }
 
@@ -532,7 +532,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
             "strict_assembly_dependency", "expansion-control", "expansion-control", "fan_out", null, [], false, "", null,
             [], [], []);
         ArchitecturePolicyContextExpandedExclusion duplicateExclusion = new(
-            "Sample.B", null, null, true, false, "", _importedProvenance);
+            "Sample.B", null, null, true, false, "", ImportedProvenance);
         ArchitecturePolicyContextExport baseline = Context(
             contracts: [Contract("strict", "dependency", "control")],
             sourceSets: [new ArchitecturePolicyContextSourceSet("hosts", "explicit", ["Sample.A", "Sample.B"], false, "", null)],
@@ -555,7 +555,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EqualTo(_crossFamilyFindingKinds));
+            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EqualTo(CrossFamilyFindingKinds));
             Assert.That(result.Findings.Count(finding => finding.Identity == exclusionFinding.Identity), Is.EqualTo(1));
             Assert.That(human, Does.Contain("[source_exclusion_added] source_expansion:expansion-control"));
             Assert.That(jsonFinding.GetProperty("identity").GetString(), Is.EqualTo(exclusionFinding.Identity));
@@ -670,7 +670,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         "2026-08-01",
         expires,
         "Temporary extraction waiver",
-        _importedProvenance);
+        ImportedProvenance);
 
     internal static ArchitecturePolicyContextAnalysis Analysis(
         IReadOnlyList<string>? targetAssemblies = null,
@@ -722,10 +722,10 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         true,
         [new ArchitecturePolicyContractMembership("public_api_surface", "Api", subjects)]);
 
-    internal static readonly ArchitecturePolicyContextProvenance _importedProvenance = new(
+    internal static readonly ArchitecturePolicyContextProvenance ImportedProvenance = new(
         "architecture/policy/contracts.yml", "architecture/policy.yml", "fragment", "contracts.strict[0]", 1);
 
-    internal static readonly string[] _staticScopeAndPredicateChangeFindingKinds =
+    internal static readonly string[] StaticScopeAndPredicateChangeFindingKinds =
     [
         "analysis_project_exclude_impact_not_proven",
         "analysis_projects_impact_not_proven",
@@ -735,38 +735,38 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         "typed_fact_impact_not_proven",
     ];
 
-    internal static readonly string[] _matchedSubtractionAndUniversalIgnoreFindingKinds =
+    internal static readonly string[] MatchedSubtractionAndUniversalIgnoreFindingKinds =
     [
         "effective_source_removed",
         "source_exclusion_added",
         "universal_exception_added",
     ];
 
-    internal static readonly string[] _requiredValue = ["required"];
+    internal static readonly string[] RequiredValue = ["required"];
 
-    internal static readonly string[] _optionalValue = ["optional"];
+    internal static readonly string[] OptionalValue = ["optional"];
 
-    internal static readonly string[] _optionalEmptyValue = ["optional_empty"];
+    internal static readonly string[] OptionalEmptyValue = ["optional_empty"];
 
-    internal static readonly string[] _projectGlobChangeFindingKinds =
+    internal static readonly string[] ProjectGlobChangeFindingKinds =
     [
         "analysis_project_exclude_impact_not_proven",
         "analysis_project_include_impact_not_proven",
     ];
 
-    internal static readonly string[] _requiredTemplateLayerAndCoverageInputFindingKinds =
+    internal static readonly string[] RequiredTemplateLayerAndCoverageInputFindingKinds =
     [
         "required_input_made_optional",
         "required_layer_made_optional",
     ];
 
-    internal static readonly string[] _trueValue = ["true"];
+    internal static readonly string[] TrueValue = ["true"];
 
-    internal static readonly string[] _falseValue = ["false"];
+    internal static readonly string[] FalseValue = ["false"];
 
-    internal static readonly string[] _legacyContractSubject = ["Sample.Api:Sample.Api.LegacyContract"];
+    internal static readonly string[] LegacyContractSubject = ["Sample.Api:Sample.Api.LegacyContract"];
 
-    internal static readonly string[] _crossFamilyFindingKinds =
+    internal static readonly string[] CrossFamilyFindingKinds =
     [
         "analysis_projects_impact_not_proven",
         "source_exclusion_added",

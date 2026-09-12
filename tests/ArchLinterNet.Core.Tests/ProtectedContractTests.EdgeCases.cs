@@ -36,7 +36,7 @@ public sealed class ProtectedContractEdgeCaseTests
                 AllowedImporters: _value1)
         };
 
-        string json = _formatter.FormatResultForCiArtifacts(
+        string json = Formatter.FormatResultForCiArtifacts(
             "strict", false,
             new[] { violation },
             Array.Empty<string>());
@@ -155,7 +155,7 @@ public sealed class ProtectedContractEdgeCaseTests
             "Infrastructure",
             _value2);
 
-        string json = _formatter.FormatResultForCiArtifacts(
+        string json = Formatter.FormatResultForCiArtifacts(
             "strict", false,
             new[] { violation },
             Array.Empty<string>());

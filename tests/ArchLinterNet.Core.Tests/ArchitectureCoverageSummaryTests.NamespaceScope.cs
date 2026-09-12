@@ -159,7 +159,7 @@ public sealed class ArchitectureCoverageSummaryNamespaceScopeTests
         ArchitectureContractRunner runner = new(
             CreateContext(typeof(ArchitectureCoverageSummaryTests)),
             document,
-            selectedContractIds: new HashSet<string>(_someOtherContractId, StringComparer.OrdinalIgnoreCase));
+            selectedContractIds: new HashSet<string>(SomeOtherContractId, StringComparer.OrdinalIgnoreCase));
 
         ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
 

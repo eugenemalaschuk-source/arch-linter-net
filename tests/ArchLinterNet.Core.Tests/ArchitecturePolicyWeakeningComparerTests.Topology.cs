@@ -14,9 +14,9 @@ public sealed class ArchitecturePolicyWeakeningTopologyTests
         ArchitecturePolicyContextTopology currentTopology = Topology([
             new ArchitecturePolicyContextTopologyOutOfScope(
                 "generated",
-                new ArchitecturePolicyContextTopologySelector("namespace", "Sample.Generated", "", null, _importedProvenance),
+                new ArchitecturePolicyContextTopologySelector("namespace", "Sample.Generated", "", null, ImportedProvenance),
                 "Generated code is separately reviewed.",
-                _importedProvenance),
+                ImportedProvenance),
         ]);
 
         ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
@@ -28,7 +28,7 @@ public sealed class ArchitecturePolicyWeakeningTopologyTests
             Assert.That(finding.Kind, Is.EqualTo("topology_out_of_scope_added"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
             Assert.That(finding.ControlIdentity, Is.EqualTo("topology:generated"));
-            Assert.That(finding.CurrentProvenance, Is.EqualTo(_importedProvenance));
+            Assert.That(finding.CurrentProvenance, Is.EqualTo(ImportedProvenance));
         });
     }
 
@@ -38,16 +38,16 @@ public sealed class ArchitecturePolicyWeakeningTopologyTests
         ArchitecturePolicyContextTopology baselineTopology = Topology([
             new ArchitecturePolicyContextTopologyOutOfScope(
                 "generated",
-                new ArchitecturePolicyContextTopologySelector("namespace", "Sample.Generated.Proxy", "", null, _importedProvenance),
+                new ArchitecturePolicyContextTopologySelector("namespace", "Sample.Generated.Proxy", "", null, ImportedProvenance),
                 "Generated code is separately reviewed.",
-                _importedProvenance),
+                ImportedProvenance),
         ]);
         ArchitecturePolicyContextTopology currentTopology = Topology([
             new ArchitecturePolicyContextTopologyOutOfScope(
                 "generated",
-                new ArchitecturePolicyContextTopologySelector("namespace", "Sample.Generated", "", null, _importedProvenance),
+                new ArchitecturePolicyContextTopologySelector("namespace", "Sample.Generated", "", null, ImportedProvenance),
                 "Generated code is separately reviewed.",
-                _importedProvenance),
+                ImportedProvenance),
         ]);
 
         ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
@@ -69,7 +69,7 @@ public sealed class ArchitecturePolicyWeakeningTopologyTests
                 "generated",
                 ContextSelector(new Dictionary<string, string>(StringComparer.Ordinal) { ["a"] = "b,c=d" }),
                 "Generated code is separately reviewed.",
-                _importedProvenance),
+                ImportedProvenance),
         ]);
         ArchitecturePolicyContextTopology currentTopology = Topology([
             new ArchitecturePolicyContextTopologyOutOfScope(
@@ -80,7 +80,7 @@ public sealed class ArchitecturePolicyWeakeningTopologyTests
                     ["c"] = "d",
                 }),
                 "Generated code is separately reviewed.",
-                _importedProvenance),
+                ImportedProvenance),
         ]);
 
         ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
@@ -101,12 +101,12 @@ public sealed class ArchitecturePolicyWeakeningTopologyTests
         "exhaustive",
         "type",
         false,
-        [new ArchitecturePolicyContextTopologySelector("layer", "application", "", null, _importedProvenance)],
-        [new ArchitecturePolicyContextTopologyNode("application", [], _importedProvenance)],
+        [new ArchitecturePolicyContextTopologySelector("layer", "application", "", null, ImportedProvenance)],
+        [new ArchitecturePolicyContextTopologyNode("application", [], ImportedProvenance)],
         [],
         outOfScope,
         false,
-        _importedProvenance);
+        ImportedProvenance);
 
     private static ArchitecturePolicyContextTopologySelector ContextSelector(
         IReadOnlyDictionary<string, string> metadata) => new(
@@ -114,5 +114,5 @@ public sealed class ArchitecturePolicyWeakeningTopologyTests
         string.Empty,
         string.Empty,
         new ArchitecturePolicyContextSelector("context", "DomainLayer", metadata, null),
-        _importedProvenance);
+        ImportedProvenance);
 }

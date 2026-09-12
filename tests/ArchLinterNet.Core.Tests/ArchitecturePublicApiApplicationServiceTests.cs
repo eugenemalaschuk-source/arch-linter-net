@@ -177,7 +177,7 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
             DiscoveredProjects = new[]
             {
                 new ArchitectureDiscoveredProject(
-                    "Test.csproj", AssemblyName, ArchitecturePublicApiApplicationServiceBuildStateTests._value),
+                    "Test.csproj", AssemblyName, ArchitecturePublicApiApplicationServiceBuildStateTests.TargetFrameworks),
             },
         };
 

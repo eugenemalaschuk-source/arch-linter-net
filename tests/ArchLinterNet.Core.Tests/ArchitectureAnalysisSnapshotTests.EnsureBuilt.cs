@@ -22,16 +22,16 @@ public sealed class ArchitectureAnalysisSnapshotEnsureBuiltTests
         var runnerSetupService = new EnsureBuiltMetadataRunnerSetupService { DocumentToReturn = document };
 
         var discovery = new ProjectDiscoveryResult(
-            _value3, Array.Empty<string>(), Array.Empty<string>(),
+            Value3, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
             DiscoveredProjects = new[]
             {
-                new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value4)
+                new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", Value4)
             }
         };
         var context = new ArchitectureAnalysisContext(
-            "/fake/repository/root", Array.Empty<Assembly>(), _value5, Array.Empty<string>(),
+            "/fake/repository/root", Array.Empty<Assembly>(), Value5, Array.Empty<string>(),
             projectDiscovery: discovery);
         var session = new ArchitectureAnalysisSession(
             context, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: true,

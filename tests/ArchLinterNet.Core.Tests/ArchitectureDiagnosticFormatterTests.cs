@@ -9,48 +9,48 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureDiagnosticFormatterTests
 {
-    internal static readonly ArchitectureDiagnosticFormatter _formatter = new();
-    internal static readonly string[] _reference1 = ["ref1"];
-    internal static readonly string[] _allowedApiImporters = ["Api"];
-    internal static readonly IReadOnlyCollection<string>[] _dependencyPaths = [["Source.Type", "Mid", "Forbidden.Namespace"]];
-    internal static readonly string[] _forbiddenNamespaceInternal = ["Forbidden.Namespace.Internal"];
-    internal static readonly string[] _coreInternal = ["Core.Internal"];
-    internal static readonly string[] _forbiddenApiReference = ["Forbidden.Api"];
-    internal static readonly string[] _typeReferences = ["Type.Ref"];
-    internal static readonly string[] _apiReferences = ["Api.Ref"];
-    internal static readonly string[] _attributeReferences = ["Attribute.Ref"];
-    internal static readonly string[] _inheritanceReferences = ["Inheritance.Ref"];
-    internal static readonly string[] _interfaceReferences = ["Interface.Ref"];
-    internal static readonly string[] _compositionReferences = ["Composition.Ref"];
-    internal static readonly string[] _projectReferences = ["Project.Ref"];
-    internal static readonly string[] _externalReferences = ["External.Ref"];
-    internal static readonly string[] _layoutConventionReferences = ["Layout.Ref"];
-    internal static readonly ArchitectureCoverageSummaryExcludedItem[] _excludedCoverageItems = [new("z-excluded", "generated")];
-    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] _uncoveredCoverageItems = [new("a-uncovered", "a-evidence")];
-    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] _staleCoverageItems = [new("b-stale", "b-evidence")];
-    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] _unknownCoverageItems = [new("c-unknown", "c-evidence")];
-    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] _coveredCoverageItems = [new("d-covered", "d-evidence")];
-    internal static readonly string[] _expectedRoleSubjectsSorted = ["MyApp.Alpha", "MyApp.Zeta"];
-    internal static readonly string[] _firstPolicyId = ["first-id"];
-    internal static readonly string[] _policyContractNames = ["first", "second"];
-    internal static readonly string[] _policyLayers = ["Core"];
-    internal static readonly ArchitectureViolation[] _coverageFinding = [new("coverage", "coverage-id", "Source", "Forbidden", ["Reference"])];
+    internal static readonly ArchitectureDiagnosticFormatter Formatter = new();
+    internal static readonly string[] Reference1 = ["ref1"];
+    internal static readonly string[] AllowedApiImporters = ["Api"];
+    internal static readonly IReadOnlyCollection<string>[] DependencyPaths = [["Source.Type", "Mid", "Forbidden.Namespace"]];
+    internal static readonly string[] ForbiddenNamespaceInternal = ["Forbidden.Namespace.Internal"];
+    internal static readonly string[] CoreInternal = ["Core.Internal"];
+    internal static readonly string[] ForbiddenApiReference = ["Forbidden.Api"];
+    internal static readonly string[] TypeReferences = ["Type.Ref"];
+    internal static readonly string[] ApiReferences = ["Api.Ref"];
+    internal static readonly string[] AttributeReferences = ["Attribute.Ref"];
+    internal static readonly string[] InheritanceReferences = ["Inheritance.Ref"];
+    internal static readonly string[] InterfaceReferences = ["Interface.Ref"];
+    internal static readonly string[] CompositionReferences = ["Composition.Ref"];
+    internal static readonly string[] ProjectReferences = ["Project.Ref"];
+    internal static readonly string[] ExternalReferences = ["External.Ref"];
+    internal static readonly string[] LayoutConventionReferences = ["Layout.Ref"];
+    internal static readonly ArchitectureCoverageSummaryExcludedItem[] ExcludedCoverageItems = [new("z-excluded", "generated")];
+    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] UncoveredCoverageItems = [new("a-uncovered", "a-evidence")];
+    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] StaleCoverageItems = [new("b-stale", "b-evidence")];
+    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] UnknownCoverageItems = [new("c-unknown", "c-evidence")];
+    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] CoveredCoverageItems = [new("d-covered", "d-evidence")];
+    internal static readonly string[] ExpectedRoleSubjectsSorted = ["MyApp.Alpha", "MyApp.Zeta"];
+    internal static readonly string[] FirstPolicyId = ["first-id"];
+    internal static readonly string[] PolicyContractNames = ["first", "second"];
+    internal static readonly string[] PolicyLayers = ["Core"];
+    internal static readonly ArchitectureViolation[] CoverageFinding = [new("coverage", "coverage-id", "Source", "Forbidden", ["Reference"])];
 
     [Test]
     public void FormatViolationsForHumans_DependencyDiagnostic_IncludesLayerContext()
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", null, "Source.Type", "protected layer 'Core'", _reference1)
+            new("contract", null, "Source.Type", "protected layer 'Core'", Reference1)
             {
                 Payload = new DependencyPayload(
                     SourceLayer: "Web",
                     TargetLayer: "Core",
-                    AllowedImporters: _allowedApiImporters)
+                    AllowedImporters: AllowedApiImporters)
             }
         };
 
-        string output = _formatter.FormatViolationsForHumans(violations);
+        string output = Formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("source_layer: Web"));
         Assert.That(output, Does.Contain("target_layer: Core"));
@@ -62,7 +62,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", null, "Source.Type", "role:DomainLayer", _reference1)
+            new("contract", null, "Source.Type", "role:DomainLayer", Reference1)
             {
                 Payload = new ContextDependencyPayload { WhenExpressions = new[] {
                     new ExpressionParticipation("contract", "forbidden",
@@ -71,7 +71,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string output = _formatter.FormatViolationsForHumans(violations);
+        string output = Formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("when (forbidden): target.metadataText[\"domain\"] != source.metadataText[\"domain\"] (matched)"));
     }
@@ -81,7 +81,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", "contract-id", "Source.Type", "role:DomainLayer", _reference1)
+            new("contract", "contract-id", "Source.Type", "role:DomainLayer", Reference1)
             {
                 Payload = new ContextDependencyPayload { WhenExpressions = new[] {
                     new ExpressionParticipation("contract", "forbidden",
@@ -90,7 +90,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string json = _formatter.FormatViolationsForCiArtifacts("contract", "contract-id", violations);
+        string json = Formatter.FormatViolationsForCiArtifacts("contract", "contract-id", violations);
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement whenExpression = document.RootElement.GetProperty("violations")[0].GetProperty("when_expressions")[0];
 
@@ -110,13 +110,13 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", "contract-id", "Source.Type", "role:DomainLayer", _reference1)
+            new("contract", "contract-id", "Source.Type", "role:DomainLayer", Reference1)
             {
                 Payload = new ContextDependencyPayload()
             }
         };
 
-        string json = _formatter.FormatViolationsForCiArtifacts("contract", "contract-id", violations);
+        string json = Formatter.FormatViolationsForCiArtifacts("contract", "contract-id", violations);
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement violation = document.RootElement.GetProperty("violations")[0];
 
@@ -128,14 +128,14 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", null, "Source.Type", "Forbidden.Namespace", _reference1)
+            new("contract", null, "Source.Type", "Forbidden.Namespace", Reference1)
             {
                 Payload = new ConfigurationPayload(
-                    DependencyPaths: _dependencyPaths)
+                    DependencyPaths: DependencyPaths)
             }
         };
 
-        string output = _formatter.FormatViolationsForHumans(violations);
+        string output = Formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("via: Source.Type -> Mid -> Forbidden.Namespace"));
     }
@@ -145,13 +145,13 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", null, "Source.Type", "Forbidden.Namespace", _reference1)
+            new("contract", null, "Source.Type", "Forbidden.Namespace", Reference1)
             {
-                MatchedNamespacePrefixes = _forbiddenNamespaceInternal
+                MatchedNamespacePrefixes = ForbiddenNamespaceInternal
             }
         };
 
-        string output = _formatter.FormatViolationsForHumans(violations);
+        string output = Formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("matched Forbidden.Namespace.Internal"));
     }
@@ -161,7 +161,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", null, "Source.Type", "Forbidden.Namespace", _reference1)
+            new("contract", null, "Source.Type", "Forbidden.Namespace", Reference1)
             {
                 Payload = new ConfigurationPayload(
                     TemplateName: "asmdef-template",
@@ -169,7 +169,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string json = _formatter.FormatResultForCiArtifacts(
+        string json = Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>());
 
         using var doc = JsonDocument.Parse(json);
@@ -183,17 +183,17 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", null, "Source.Type", "protected layer 'Core'", _reference1)
+            new("contract", null, "Source.Type", "protected layer 'Core'", Reference1)
             {
                 Payload = new DependencyPayload(
                     SourceLayer: "Web",
                     TargetLayer: "Core",
-                    AllowedImporters: _allowedApiImporters),
-                MatchedNamespacePrefixes = _coreInternal
+                    AllowedImporters: AllowedApiImporters),
+                MatchedNamespacePrefixes = CoreInternal
             }
         };
 
-        string json = _formatter.FormatResultForCiArtifacts(
+        string json = Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>());
 
         using var doc = JsonDocument.Parse(json);
@@ -207,7 +207,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("composition", null, "Source.Type", "Forbidden.Api", _forbiddenApiReference)
+            new("composition", null, "Source.Type", "Forbidden.Api", ForbiddenApiReference)
             {
                 Payload = new CompositionPayload(
                     SourceMember: "Source.Type.Configure",
@@ -216,7 +216,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string output = _formatter.FormatViolationsForHumans(violations);
+        string output = Formatter.FormatViolationsForHumans(violations);
 
         Assert.Multiple(() =>
         {
@@ -230,7 +230,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("composition", null, "Source.Type", "Forbidden.Api", _forbiddenApiReference)
+            new("composition", null, "Source.Type", "Forbidden.Api", ForbiddenApiReference)
             {
                 Payload = new CompositionPayload(
                     SourceMember: "Source.Type.Configure",
@@ -238,7 +238,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string json = _formatter.FormatResultForCiArtifacts(
+        string json = Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>());
 
         using var doc = JsonDocument.Parse(json);
@@ -251,23 +251,23 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("type", "type-id", "Type.Source", "Type.Forbidden", _typeReferences)
+            new("type", "type-id", "Type.Source", "Type.Forbidden", TypeReferences)
             { Payload = new TypePlacementPayload("Expected.Location", "Actual.Location", "Expected.Name", "Actual.Name") },
-            new("api", "api-id", "Api.Source", "Api.Forbidden", _apiReferences)
+            new("api", "api-id", "Api.Source", "Api.Forbidden", ApiReferences)
             { Payload = new PublicApiSurfacePayload("public void Api()", true, "Api.Assembly", "public") },
-            new("attribute", "attribute-id", "Attribute.Source", "Attribute.Forbidden", _attributeReferences)
+            new("attribute", "attribute-id", "Attribute.Source", "Attribute.Forbidden", AttributeReferences)
             { Payload = new AttributeUsagePayload("ObsoleteAttribute", "forbidden", "Expected.Attribute", "Actual.Attribute") },
-            new("inheritance", "inheritance-id", "Inheritance.Source", "Inheritance.Forbidden", _inheritanceReferences)
+            new("inheritance", "inheritance-id", "Inheritance.Source", "Inheritance.Forbidden", InheritanceReferences)
             { Payload = new InheritancePayload("Forbidden.Base", "public_api") },
-            new("interface", "interface-id", "Interface.Source", "Interface.Forbidden", _interfaceReferences)
+            new("interface", "interface-id", "Interface.Source", "Interface.Forbidden", InterfaceReferences)
             { Payload = new InterfaceImplementationPayload("IForbidden", "missing", "Expected.Interface", "Actual.Interface") },
-            new("composition", "composition-id", "Composition.Source", "Composition.Forbidden", _compositionReferences)
+            new("composition", "composition-id", "Composition.Source", "Composition.Forbidden", CompositionReferences)
             { Payload = new CompositionPayload("Composition.Configure", "Forbidden.Api", "Composition boundary") },
-            new("project", "project-id", "Project.Source", "Project.Forbidden", _projectReferences)
+            new("project", "project-id", "Project.Source", "Project.Forbidden", ProjectReferences)
             { Payload = new ProjectMetadataPayload("forbidden_property", "Nullable", "enable", "disable", "src/App.csproj") },
-            new("external", "external-id", "External.Source", "External.Forbidden", _externalReferences)
+            new("external", "external-id", "External.Source", "External.Forbidden", ExternalReferences)
             { Payload = new ExternalDependencyPayload("vendor_sdk") },
-            new("layout", "layout-id", "Layout.Source", "Layout.Forbidden", _layoutConventionReferences)
+            new("layout", "layout-id", "Layout.Source", "Layout.Forbidden", LayoutConventionReferences)
             { Payload = new LayoutConventionPayload(
                 MatchedFilePath: "src/App/Services/OrderService.cs",
                 ExpectedTypeKind: "class",
@@ -282,7 +282,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             } }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
         Assert.That(human, Does.Contain("expected_location: Expected.Location"));
         Assert.That(human, Does.Contain("reason: forbidden_public_constant"));
         Assert.That(human, Does.Contain("attribute: ObsoleteAttribute"));
@@ -298,7 +298,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(human, Does.Contain("expected_declaration_count: <= 1, actual_declaration_count: 2"));
         Assert.That(human, Does.Contain("declaration_paths: src/App/Services/OrderService.Part1.cs"));
 
-        using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var document = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement serialized = document.RootElement.GetProperty("violations");
         Assert.That(serialized.ToString(), Does.Contain("expected_type_location"));
@@ -322,14 +322,14 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("layout", "layout-id", "layout-rule", "path-based layout checks unavailable", _layoutConventionReferences)
+            new("layout", "layout-id", "layout-rule", "path-based layout checks unavailable", LayoutConventionReferences)
             { Payload = new LayoutConventionPayload(DataUnavailable: true) }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
         Assert.That(human, Does.Contain("path-based layout checks unavailable"));
 
-        using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var document = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement violation = document.RootElement.GetProperty("violations")[0];
         Assert.That(violation.GetProperty("data_unavailable").GetBoolean(), Is.True);
@@ -338,7 +338,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     [Test]
     public void FormatClassificationFactsForHumans_EmptyFacts_ReturnsEmptyString()
     {
-        string output = _formatter.FormatClassificationFactsForHumans(
+        string output = Formatter.FormatClassificationFactsForHumans(
             Array.Empty<Model.ArchitectureClassificationConflict>(),
             Array.Empty<Model.ArchitectureClassificationMetadataFailure>());
 
@@ -350,7 +350,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var notice = new Model.ArchitectureClassificationPathDeferredNotice(3);
 
-        string human = _formatter.FormatClassificationFactsForHumans(
+        string human = Formatter.FormatClassificationFactsForHumans(
             Array.Empty<Model.ArchitectureClassificationConflict>(),
             Array.Empty<Model.ArchitectureClassificationMetadataFailure>(),
             notice);
@@ -359,7 +359,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(human, Does.Contain("classification.path declares 3 entries"));
         Assert.That(human, Does.Contain("#171"));
 
-        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var json = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
             classificationRoles: Array.Empty<Model.ArchitectureClassificationRoleFact>(),
             classificationPathDeferred: notice));
@@ -371,7 +371,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     [Test]
     public void FormatResultForCiArtifacts_NoPathDeferredNotice_OmitsClassificationPathDeferred()
     {
-        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var json = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>()));
 
         Assert.That(json.RootElement.GetProperty("classification_path_deferred").ValueKind, Is.EqualTo(JsonValueKind.Null));
@@ -391,7 +391,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
                 "MyApp.Order", Model.ArchitectureClassificationSource.TypeAttribute, "module", "named argument 'Module' was not explicitly supplied")
         };
 
-        string human = _formatter.FormatClassificationFactsForHumans(conflicts, failures);
+        string human = Formatter.FormatClassificationFactsForHumans(conflicts, failures);
 
         Assert.That(human, Does.StartWith("Classification findings:"));
         Assert.That(human, Does.Contain("MyApp.Order"));
@@ -399,7 +399,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(human, Does.Contain("module"));
         Assert.That(human, Does.Contain("named argument 'Module' was not explicitly supplied"));
 
-        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var json = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
             classificationConflicts: conflicts, classificationMetadataFailures: failures));
         Assert.That(json.RootElement.GetProperty("classification_conflicts")[0].GetProperty("subject").GetString(), Is.EqualTo("MyApp.Order"));
@@ -432,13 +432,13 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string human = _formatter.FormatClassificationFactsForHumans(conflicts, failures);
+        string human = Formatter.FormatClassificationFactsForHumans(conflicts, failures);
 
         Assert.That(human, Does.Contain("policy: architecture/classification.yml:classification.namespace[0]"));
         Assert.That(human, Does.Contain("related: architecture/classification.yml:classification.namespace[1]"));
         Assert.That(human, Does.Contain("classification.namespace[0].metadata.module"));
 
-        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var json = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
             classificationConflicts: conflicts, classificationMetadataFailures: failures));
         Assert.That(
@@ -461,12 +461,12 @@ public sealed class ArchitectureDiagnosticFormatterTests
                 "domain: 'Sales' vs 'Marketing'")
         };
 
-        string human = _formatter.FormatClassificationFactsForHumans(conflicts, Array.Empty<Model.ArchitectureClassificationMetadataFailure>());
+        string human = Formatter.FormatClassificationFactsForHumans(conflicts, Array.Empty<Model.ArchitectureClassificationMetadataFailure>());
 
         Assert.That(human, Does.Contain("kept 'DomainLayer', discarded 'DomainLayer'"));
         Assert.That(human, Does.Contain("domain: 'Sales' vs 'Marketing'"));
 
-        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var json = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
             classificationConflicts: conflicts));
         Assert.That(
@@ -487,9 +487,9 @@ public sealed class ArchitectureDiagnosticFormatterTests
                 "domain: 'Sales' vs 'Engineering'")
         };
 
-        string firstOrder = _formatter.FormatClassificationFactsForHumans(
+        string firstOrder = Formatter.FormatClassificationFactsForHumans(
             conflicts, Array.Empty<Model.ArchitectureClassificationMetadataFailure>());
-        string reversedOrder = _formatter.FormatClassificationFactsForHumans(
+        string reversedOrder = Formatter.FormatClassificationFactsForHumans(
             conflicts.Reverse().ToArray(), Array.Empty<Model.ArchitectureClassificationMetadataFailure>());
 
         Assert.That(firstOrder, Is.EqualTo(reversedOrder));
@@ -505,7 +505,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
                 "MyApp.DomainMarkerAttribute", new Dictionary<string, object> { ["domain"] = "Sales" })
         };
 
-        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var json = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
             classificationRoles: roles));
 
@@ -520,7 +520,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     [Test]
     public void FormatResultForCiArtifacts_NoClassificationRoles_IncludesEmptyArray()
     {
-        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var json = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>()));
 
         Assert.That(json.RootElement.GetProperty("classification_roles").GetArrayLength(), Is.EqualTo(0));
@@ -537,13 +537,13 @@ public sealed class ArchitectureDiagnosticFormatterTests
                 "MyApp.Alpha", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>())
         };
 
-        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var json = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
             classificationRoles: roles));
 
         JsonElement.ArrayEnumerator classificationRoles = json.RootElement.GetProperty("classification_roles").EnumerateArray();
         List<string?> subjects = classificationRoles.Select(r => r.GetProperty("subject").GetString()).ToList();
-        Assert.That(subjects, Is.EqualTo(_expectedRoleSubjectsSorted));
+        Assert.That(subjects, Is.EqualTo(ExpectedRoleSubjectsSorted));
     }
 
     // Guards against the roles-overload silently resolving to IArchitectureDiagnosticFormatter's
@@ -658,7 +658,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var cycles = new[] { "Z -> Y -> Z", "A -> B -> A" };
 
-        string output = _formatter.FormatCyclesForHumans(cycles);
+        string output = Formatter.FormatCyclesForHumans(cycles);
 
         Assert.That(output, Is.EqualTo("- A -> B -> A" + Environment.NewLine + "- Z -> Y -> Z"));
     }
@@ -668,7 +668,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var cycles = new[] { "A -> B -> A" };
 
-        string json = _formatter.FormatCyclesForCiArtifacts("cycle-contract", "cycle-check", cycles);
+        string json = Formatter.FormatCyclesForCiArtifacts("cycle-contract", "cycle-check", cycles);
 
         using var doc = JsonDocument.Parse(json);
         Assert.That(doc.RootElement.GetProperty("cycles")[0].GetString(), Is.EqualTo("A -> B -> A"));
@@ -678,7 +678,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     [Test]
     public void FormatUnmatchedForHumans_NoEntries_ReturnsEmptyString()
     {
-        string output = _formatter.FormatUnmatchedForHumans(
+        string output = Formatter.FormatUnmatchedForHumans(
             Array.Empty<ArchitectureUnmatchedIgnoredViolation>());
 
         Assert.That(output, Is.Empty);
@@ -692,7 +692,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             new("contract", "contract-id", 0, "Source.Type", "Forbidden.Ref", "stale ignore")
         };
 
-        string output = _formatter.FormatUnmatchedForHumans(unmatched);
+        string output = Formatter.FormatUnmatchedForHumans(unmatched);
 
         Assert.That(output, Does.Contain("source_type: Source.Type"));
         Assert.That(output, Does.Contain("forbidden_reference: Forbidden.Ref"));
@@ -706,7 +706,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             "architecture/fragments/policy.yml", "contracts.strict[10]", sourceOrdinal: 1, encounterOrdinal: 10);
         ArchitecturePolicySourceLocation related = CreatePolicyLocation(
             "architecture/fragments/policy.yml", "contracts.strict[2]", sourceOrdinal: 1, encounterOrdinal: 2);
-        var violation = new ArchitectureViolation("contract", "contract-id", "Source.Type", "Forbidden.Namespace", _reference1)
+        var violation = new ArchitectureViolation("contract", "contract-id", "Source.Type", "Forbidden.Namespace", Reference1)
         {
             PolicyLocation = primary,
             RelatedPolicyLocations = [related]
@@ -729,13 +729,13 @@ public sealed class ArchitectureDiagnosticFormatterTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(_formatter.FormatViolationsForHumans([violation]), Does.Contain(
+            Assert.That(Formatter.FormatViolationsForHumans([violation]), Does.Contain(
                 "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
-            Assert.That(_formatter.FormatViolationsForHumans([violation]), Does.Contain(
+            Assert.That(Formatter.FormatViolationsForHumans([violation]), Does.Contain(
                 "related: architecture/fragments/policy.yml:contracts.strict[2]"));
-            Assert.That(_formatter.FormatUnmatchedForHumans([unmatched]), Does.Contain(
+            Assert.That(Formatter.FormatUnmatchedForHumans([unmatched]), Does.Contain(
                 "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
-            Assert.That(_formatter.FormatPolicyConsistencyForHumans([consistency]), Does.Contain(
+            Assert.That(Formatter.FormatPolicyConsistencyForHumans([consistency]), Does.Contain(
                 "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
             Assert.That(ArchitectureDiagnosticFormatter.FormatCyclesForHumans([cycle]), Does.Contain(
                 "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
