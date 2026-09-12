@@ -23,7 +23,8 @@ relay code, a real adopter identity, a secret, or a JWT.
 - `conformance-vectors.json` covers accepted bytes and malformed/disclosing
   bytes, OIDC claim and pin checks, replay/idempotency and CAS ordering,
   deadlines, expiry, semantic horizons, lifecycle/recovery, and cache/ETag/
-  HEAD behavior. Protected JOSE headers (`alg`, `kid`) are separate from signed
+  HEAD behavior, storage-safe fallback, and fixed-template SVG rendering.
+  Protected JOSE headers (`alg`, `kid`) are separate from signed
   claims (`nbf`, `iat`, `exp`); `kid` selects a key only from the fixed GitHub
   JWKS endpoint, with at most one bounded refresh for an unknown key. The
   registry permits only `push` on `refs/heads/main`.
@@ -33,6 +34,27 @@ The relay never reconstructs Gate, Health, counts, message, or color. The
 `headline-plus-freshness/v1` profile adds only `verified_at` and `valid_until`.
 Freshness is bounded by the 60-minute lease, optional 30-minute renewal, and
 the semantic horizon; OIDC validation alone has a five-minute clock skew.
+
+Public-read vectors use the registered alias route family:
+`/badge-relay/v1/{alias}` is the profile-selected default, while
+`/badge-relay/v1/{alias}.json` and `/badge-relay/v1/{alias}.svg` are explicit
+representations; `/badge-relay/v1/{alias}/json` and
+`/badge-relay/v1/{alias}/svg` are equivalent segment aliases. The default is
+the strict fixed SVG only when the registered profile is
+`headline-plus-freshness/v1`; `headline-only/v1` remains JSON snapshot
+compatibility. A ready SVG visibly includes the canonical label,
+message, color, absolute UTC `verified at`, and absolute UTC `valid until`.
+`body_assertions` records the required fixed-template inclusions/exclusions
+without embedding an implementation-specific SVG byte string.
+
+Every origin read performs the trusted-clock check before ETag or `304`
+handling, including `HEAD`. A stopped publisher therefore expires at the
+stored `valid_until` without a cron job, and storage uncertainty returns the
+fixed unavailable body with `no-store`, no ready ETag, and no private reason.
+Ready cache lifetime is never greater than whole seconds remaining in the
+lease. A later generation or lease changes the ETag even when headline bytes
+are identical. Browser, Camo, proxy, and offline copies are not universally
+recallable; they are observed cache delay and never origin freshness proof.
 
 ## Checks
 

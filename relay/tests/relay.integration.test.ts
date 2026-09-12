@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { decodeJwt, generateKeyPair, SignJWT, exportJWK } from "jose";
 import { env, SELF, evictDurableObject, listDurableObjectIds, runInDurableObject } from "cloudflare:test";
 import {
@@ -40,10 +40,47 @@ const alternatePayload = canonicalizePayload({
   message: "PASS · HEALTHY · 1 ignores · 42 rules",
   color: "brightgreen"
 }, "headline-only/v1");
+const freshnessAlias = "a7f4k2n9";
+const freshnessEntry: RegistryEntry = {
+  ...entry,
+  destination_alias: freshnessAlias,
+  disclosure_profile: "headline-plus-freshness/v1"
+};
+const freshnessPayload = canonicalizePayload({
+  schemaVersion: 1,
+  label: "architecture",
+  message: "PASS · HEALTHY · 0 ignores · 42 rules",
+  color: "brightgreen",
+  verified_at: "2026-09-12T10:00:00Z",
+  valid_until: "2026-09-12T10:30:00Z"
+}, "headline-plus-freshness/v1");
+const futureAlias = "a7f4k2p9";
+const futureEntry: RegistryEntry = {
+  ...freshnessEntry,
+  destination_alias: futureAlias
+};
+const futurePayload = canonicalizePayload({
+  schemaVersion: 1,
+  label: "architecture",
+  message: "PASS · HEALTHY · 0 ignores · 42 rules",
+  color: "brightgreen",
+  verified_at: "2026-09-12T10:10:00Z",
+  valid_until: "2026-09-12T10:30:00Z"
+}, "headline-plus-freshness/v1");
+const overLeasePayload = canonicalizePayload({
+  schemaVersion: 1,
+  label: "architecture",
+  message: "PASS · HEALTHY · 0 ignores · 42 rules",
+  color: "brightgreen",
+  verified_at: "2026-09-12T10:00:00Z",
+  valid_until: "2026-09-12T11:30:00Z"
+}, "headline-plus-freshness/v1");
 
 describe("badge-relay/v1 local SQLite Durable Object", () => {
   let privateKey: CryptoKey;
   let publicJwk: Record<string, unknown>;
+
+  afterEach(() => vi.useRealTimers());
 
   beforeEach(async () => {
     clearJwksCacheForTests();
@@ -86,7 +123,7 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
   function relayUrl(operation: string): string { return `https://relay.test/badge-relay/v1/${alias}/${operation}`; }
 
   function futureHorizon(): string {
-    return new Date(Date.now() + 30 * 60_000).toISOString().replace(".000Z", "Z");
+    return new Date(Math.floor((Date.now() + 30 * 60_000) / 1000) * 1000).toISOString().replace(".000Z", "Z");
   }
 
   async function prepareRemote(jwt: string, idempotencyKey: string, bytes = payload): Promise<{ response: Response; challenge?: { challenge_id: string; generation: number; revocation_epoch: number; deadline: string } }> {
@@ -117,6 +154,38 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "unknown_route" });
     expect((await listDurableObjectIds(relay)).length).toBe(before);
+  });
+
+  it("expires a ready public GET before conditional handling without a publisher or scheduler", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:00:00Z"));
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(alias));
+    const prepared = await prepareRemote(await token(), `public-read-${crypto.randomUUID()}`);
+    expect(prepared.response.status).toBe(201);
+    const digest = await canonicalPayloadDigest(payload);
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE relay_state SET status='ready', generation=7, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0 WHERE id=1",
+        payload,
+        digest,
+        "2026-09-12T10:00:00Z",
+        "2026-09-12T10:01:00Z",
+        "2026-09-12T10:01:00Z");
+    });
+    const ready = await SELF.fetch(`https://relay.test/badge-relay/v1/${alias}`);
+    const etag = ready.headers.get("etag") as string;
+    expect(ready.status).toBe(200);
+    expect(await ready.text()).toBe(payload);
+
+    vi.setSystemTime(new Date("2026-09-12T10:01:00Z"));
+    const expired = await SELF.fetch(`https://relay.test/badge-relay/v1/${alias}`, {
+      headers: { "if-none-match": etag }
+    });
+    expect(expired.status).toBe(404);
+    expect(await expired.text()).toContain("UNASSESSABLE");
+    expect(expired.headers.get("etag")).toBeNull();
+    expect(expired.headers.get("cache-control")).toBe("no-store");
   });
 
   it("persists private registry entries and tombstones across invocation eviction", async () => {
@@ -191,6 +260,102 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(stored.payload_digest).toBe(digest);
   });
 
+  it("preserves product-owned freshness timestamps through trusted publish and public SVG reads", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:02:00Z"));
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(freshnessEntry))).toBe(true);
+
+    const jwt = await token({ jti: "freshness-e2e-jti" });
+    const digest = await canonicalPayloadDigest(freshnessPayload);
+    const horizon = "2026-09-12T10:30:00Z";
+    const prepare = await SELF.fetch(`https://relay.test/badge-relay/v1/${freshnessAlias}/prepare`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: freshnessPayload, canonical_digest: digest, profile: freshnessEntry.disclosure_profile, idempotency_key: "freshness-e2e-key", semantic_horizon: horizon })
+    });
+    expect(prepare.status).toBe(201);
+    const challenge = await prepare.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(freshnessAlias));
+    const committed = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).commitTrustedPublication({
+      body: { operation: "publish", challenge_id: challenge.challenge_id, idempotency_key: "freshness-e2e-key", canonical_bytes: freshnessPayload, canonical_digest: digest, profile: freshnessEntry.disclosure_profile, expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, semantic_horizon: horizon },
+      entry: freshnessEntry,
+      jtiHash: await sha256Hex(decodeJwt(jwt).jti as string),
+      proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
+    }));
+    expect(committed.status).toBe(200);
+
+    for (const path of [`${freshnessAlias}`, `${freshnessAlias}.svg`]) {
+      const response = await SELF.fetch(`https://relay.test/badge-relay/v1/${path}`);
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      expect(body).toContain("verified at 2026-09-12T10:00:00Z");
+      expect(body).toContain("valid until 2026-09-12T10:30:00Z");
+    }
+  });
+
+  it("rejects a freshness publication whose verified_at is in the Relay future", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:02:00Z"));
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(futureEntry))).toBe(true);
+
+    const jwt = await token({ jti: "future-freshness-e2e-jti" });
+    const digest = await canonicalPayloadDigest(futurePayload);
+    const horizon = "2026-09-12T10:30:00Z";
+    const prepare = await SELF.fetch(`https://relay.test/badge-relay/v1/${futureAlias}/prepare`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: futurePayload, canonical_digest: digest, profile: futureEntry.disclosure_profile, idempotency_key: "future-freshness-e2e-key", semantic_horizon: horizon })
+    });
+    expect(prepare.status).toBe(201);
+    const challenge = await prepare.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const committed = await runInDurableObject(relay.get(relay.idFromName(futureAlias)), async (instance) => (instance as unknown as RelayDurableObject).commitTrustedPublication({
+      body: { operation: "publish", challenge_id: challenge.challenge_id, idempotency_key: "future-freshness-e2e-key", canonical_bytes: futurePayload, canonical_digest: digest, profile: futureEntry.disclosure_profile, expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, semantic_horizon: horizon },
+      entry: futureEntry,
+      jtiHash: await sha256Hex(decodeJwt(jwt).jti as string),
+      proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
+    }));
+    expect(committed.status).toBe(409);
+  });
+
+  it.each([
+    { alias: "a7f4k2q9", bytes: freshnessPayload, horizon: "2026-09-12T10:15:00Z", jti: "over-horizon-jti", key: "over-horizon-key" },
+    { alias: "a7f4k2r9", bytes: overLeasePayload, horizon: "2026-09-12T11:30:00Z", jti: "over-lease-jti", key: "over-lease-key" }
+  ])("rejects freshness publication with a saved validity envelope outside $alias bounds", async ({ alias: targetAlias, bytes, horizon, jti, key }) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:02:00Z"));
+    const targetEntry: RegistryEntry = { ...freshnessEntry, destination_alias: targetAlias };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(targetEntry))).toBe(true);
+
+    const jwt = await token({ jti });
+    const digest = await canonicalPayloadDigest(bytes);
+    const prepare = await SELF.fetch(`https://relay.test/badge-relay/v1/${targetAlias}/prepare`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: bytes, canonical_digest: digest, profile: targetEntry.disclosure_profile, idempotency_key: key, semantic_horizon: horizon })
+    });
+    expect(prepare.status).toBe(201);
+    const challenge = await prepare.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const committed = await runInDurableObject(relay.get(relay.idFromName(targetAlias)), async (instance) => (instance as unknown as RelayDurableObject).commitTrustedPublication({
+      body: { operation: "publish", challenge_id: challenge.challenge_id, idempotency_key: key, canonical_bytes: bytes, canonical_digest: digest, profile: targetEntry.disclosure_profile, expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, semantic_horizon: horizon },
+      entry: targetEntry,
+      jtiHash: await sha256Hex(decodeJwt(jwt).jti as string),
+      proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
+    }));
+    expect(committed.status).toBe(409);
+    const state = await runInDurableObject(relay.get(relay.idFromName(targetAlias)), async (_instance, durableState) => durableState.storage.sql.exec<{ generation: number; payload: string | null }>("SELECT generation, payload FROM relay_state WHERE id=1").toArray()[0]);
+    expect(state.generation).toBe(challenge.generation);
+    expect(state.payload).toBeNull();
+  });
+
   it("rejects issuer, algorithm, identity, and workflow-pin failures without mutation", async () => {
     const cases = [
       { iss: "https://issuer.invalid" },
@@ -255,6 +420,17 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(row.status).toBe("unavailable");
     expect(row.generation).toBe(challenge.generation + 1);
     expect(row.revocation_epoch).toBe(challenge.revocation_epoch + 1);
+
+    const freshJwt = await token({ jti: "fresh-writer-jti" });
+    const freshKey = "fresh-writer-key";
+    const freshPrepared = await prepareRemote(freshJwt, freshKey);
+    expect(freshPrepared.response.status).toBe(201);
+    const freshChallenge = freshPrepared.challenge as { challenge_id: string; generation: number; revocation_epoch: number };
+    const freshCommit = await commitInternal(relay.get(relay.idFromName(alias)), freshJwt, freshChallenge, "publish", payload, freshKey);
+    expect(freshCommit.status).toBe(200);
+    const publicRead = await SELF.fetch(`https://relay.test/badge-relay/v1/${alias}`);
+    expect(publicRead.status).toBe(200);
+    expect(await publicRead.text()).toBe(payload);
   });
 
   it("gives revoke precedence over a delayed publish and preserves its tombstone", async () => {

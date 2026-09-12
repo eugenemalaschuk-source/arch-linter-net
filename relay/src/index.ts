@@ -2,6 +2,7 @@ import { RelayDurableObject } from "./relay-do";
 import { REGISTRY_OBJECT_NAME, RelayRegistryDurableObject } from "./registry-do";
 import { validateRegistryEntry, isOpaqueAlias } from "./registry";
 import { FIXED_GITHUB_ISSUER, FIXED_GITHUB_JWKS, MAX_REQUEST_BYTES, type RegistryEntry, type RelayEnvironment } from "./types";
+import { publicUnavailableResponse, type PublicRepresentation } from "./read";
 
 export { RelayDurableObject };
 export { RelayRegistryDurableObject, REGISTRY_OBJECT_NAME };
@@ -82,38 +83,112 @@ function registryEntryFromConfig(env: RelayEnvironment, entry: RegistryEntry): R
   return entry;
 }
 
+interface PublicRoute {
+  alias: string;
+  representation?: PublicRepresentation;
+}
+
+function publicRoute(pathname: string): PublicRoute | undefined {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts[0] !== "badge-relay" || parts[1] !== "v1") return undefined;
+  // The extension form is accepted for compatibility with image URLs while
+  // the segment form keeps the versioned route easy to compose.
+  if (parts.length === 3 && isOpaqueAlias(parts[2])) return { alias: parts[2] };
+  if (parts.length === 4 && isOpaqueAlias(parts[2]) && (parts[3] === "json" || parts[3] === "svg")) return { alias: parts[2], representation: parts[3] };
+  if (parts.length === 3) {
+    let representation: PublicRepresentation | undefined;
+    let suffixLength = 0;
+    if (parts[2].endsWith(".json")) {
+      representation = "json";
+      suffixLength = ".json".length;
+    } else if (parts[2].endsWith(".svg")) {
+      representation = "svg";
+      suffixLength = ".svg".length;
+    }
+    const alias = parts[2].slice(0, -suffixLength);
+    if (representation && isOpaqueAlias(alias)) return { alias, representation };
+  }
+  return undefined;
+}
+
+interface RegistryLookup {
+  entry?: RegistryEntry;
+  storageUnavailable: boolean;
+}
+
+async function lookupEntry(env: RelayEnvironment, alias: string): Promise<RegistryLookup> {
+  try {
+    const result = await registryCall(env, "lookup", { alias });
+    const candidate = result.status === 200 ? result.body.entry : undefined;
+    return {
+      entry: validateRegistryEntry(candidate) ? candidate as RegistryEntry : undefined,
+      storageUnavailable: result.status === 503
+    };
+  } catch {
+    return { storageUnavailable: true };
+  }
+}
+
+function representationFor(entry: RegistryEntry, route: PublicRoute): PublicRepresentation {
+  if (route.representation) return route.representation;
+  return entry.disclosure_profile === "headline-plus-freshness/v1" ? "svg" : "json";
+}
+
+async function forwardPublicRead(request: Request, env: RelayEnvironment, route: PublicRoute): Promise<Response> {
+  const lookup = await lookupEntry(env, route.alias);
+  if (lookup.storageUnavailable) return publicUnavailableResponse(request, route.representation ?? "json", 503);
+  if (!lookup.entry) return unknownRoute();
+  const entry = registryEntryFromConfig(env, lookup.entry);
+  const representation = representationFor(entry, route);
+  if (!env.RELAY || typeof env.RELAY.idFromName !== "function") return publicUnavailableResponse(request, representation, 503);
+
+  const target = new URL(request.url);
+  target.pathname = "/internal/" + route.alias + "/read/" + representation;
+  const headers = new Headers(request.headers);
+  headers.set("x-relay-registry", entryForHeader(entry));
+  const stub = env.RELAY.get(env.RELAY.idFromName(route.alias));
+  return (stub.fetch as unknown as (input: unknown) => Promise<Response>)(new Request(target, { method: request.method, headers }));
+}
+
+async function forwardMutation(request: Request, env: RelayEnvironment, parts: string[]): Promise<Response> {
+  if (request.method !== "POST" || parts.length < 4 || !isOpaqueAlias(parts[2])) return unknownRoute();
+  const alias = parts[2];
+  const lookup = await lookupEntry(env, alias);
+  if (lookup.storageUnavailable) throw new Error("registry unavailable");
+  if (!lookup.entry) return unknownRoute();
+  if (!env.RELAY || typeof env.RELAY.idFromName !== "function") return json(503, { error: "storage_unavailable" });
+
+  const entry = registryEntryFromConfig(env, lookup.entry);
+  const target = new URL(request.url);
+  target.pathname = "/internal/" + alias + "/" + parts[3];
+  const headers = new Headers(request.headers);
+  headers.set("x-relay-registry", entryForHeader(entry));
+  const stub = env.RELAY.get(env.RELAY.idFromName(alias));
+  return (stub.fetch as unknown as (input: unknown) => Promise<Response>)(new Request(target, { method: request.method, headers, body: request.body }));
+}
+
+async function handleAdminRoute(request: Request, env: RelayEnvironment, parts: string[]): Promise<Response> {
+  if (parts[3] === "register" && request.method === "POST") return adminRegister(request, env);
+  if (parts[3] === "revoke" && request.method === "POST") return adminRevoke(request, env);
+  return unknownRoute();
+}
+
+async function handleRequest(request: Request, env: RelayEnvironment): Promise<Response> {
+  const url = new URL(request.url);
+  const parts = url.pathname.split("/").filter(Boolean);
+  const isAdmin = parts[0] === "badge-relay" && parts[1] === "v1" && parts[2] === "admin";
+  if (isAdmin) return handleAdminRoute(request, env, parts);
+  if (request.method === "GET" || request.method === "HEAD") {
+    const route = publicRoute(url.pathname);
+    return route ? forwardPublicRead(request, env, route) : unknownRoute();
+  }
+  return forwardMutation(request, env, parts);
+}
+
 export default {
   async fetch(request: Request, env: RelayEnvironment): Promise<Response> {
     try {
-      const url = new URL(request.url);
-      const parts = url.pathname.split("/").filter(Boolean);
-      // Admin mutations operate only on the private registry; they never use
-      // idFromName and therefore cannot allocate an alias object accidentally.
-      if (parts[0] === "badge-relay" && parts[1] === "v1" && parts[2] === "admin") {
-        if (parts[3] === "register" && request.method === "POST") return await adminRegister(request, env);
-        if (parts[3] === "revoke" && request.method === "POST") return await adminRevoke(request, env);
-        return unknownRoute();
-      }
-      // Public GET/HEAD and a bare alias are intentionally outside this
-      // change. The later read/render child owns that route; rejecting here
-      // also prevents a public alias from allocating a Durable Object.
-      if (parts.length < 4 || parts[0] !== "badge-relay" || parts[1] !== "v1" || !isOpaqueAlias(parts[2])) return unknownRoute();
-      const lookup = await registryCall(env, "lookup", { alias: parts[2] });
-      const configured = lookup.status === 200 && lookup.body.entry && typeof lookup.body.entry === "object" ? lookup.body.entry as RegistryEntry : undefined;
-      if (!configured) return unknownRoute();
-      // This lookup deliberately precedes idFromName. Unknown public aliases
-      // are indistinguishable 404s and cannot allocate Durable Objects.
-      if (!env.RELAY || typeof env.RELAY.idFromName !== "function") return json(503, { error: "storage_unavailable" });
-      const entry = registryEntryFromConfig(env, configured);
-      const id = env.RELAY.idFromName(parts[2]);
-      const stub = env.RELAY.get(id);
-      if (request.method !== "POST") return unknownRoute();
-      const operation = parts[3];
-      const target = new URL(request.url);
-      target.pathname = `/internal/${parts[2]}/${operation}`;
-      const headers = new Headers(request.headers);
-      headers.set("x-relay-registry", entryForHeader(entry));
-      return (stub.fetch as unknown as (input: unknown) => Promise<Response>)(new Request(target, { method: request.method, headers, body: request.body }));
+      return await handleRequest(request, env);
     } catch {
       return json(503, { error: "storage_unavailable" });
     }
