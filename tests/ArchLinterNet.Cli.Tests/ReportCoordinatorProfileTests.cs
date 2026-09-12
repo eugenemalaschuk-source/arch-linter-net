@@ -4,7 +4,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class ReportCoordinatorTests
+[TestFixture]
+internal sealed class ReportCoordinatorProfileTests : ReportCoordinatorTestBase
 {
     private static readonly string[] _allReportFormats = { "human", "json", "sarif" };
 

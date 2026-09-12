@@ -9,8 +9,9 @@ namespace ArchLinterNet.Cli.Tests;
 
 // Split out of ValidateCommandHandlerReportModeTests.cs (which grew past the file-size lint
 // threshold) — issue #375's cancellation completion-status coverage. Shares that file's private
-// FakeCliRuntime/FakeCliConsole/FakeFileSystem fixtures via the partial class.
-public sealed partial class ValidateCommandHandlerReportModeTests
+// FakeCliRuntime/FakeCliConsole/FakeFileSystem fixtures via the shared support base.
+[TestFixture]
+internal sealed class ValidateCommandCancellationTests : ValidateCommandHandlerTestBase
 {
     // Issue #375: cancellation exits via the same numeric category as any other execution error
     // (CliExitCodes.InvalidArgumentsOrRuntimeError) but must carry a distinct "cancelled"

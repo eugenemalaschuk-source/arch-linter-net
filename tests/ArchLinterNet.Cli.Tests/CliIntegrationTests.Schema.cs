@@ -2,7 +2,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliSchemaIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void SchemaList_UsesThePackagedReleaseRegistry()

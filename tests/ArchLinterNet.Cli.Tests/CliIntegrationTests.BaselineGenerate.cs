@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBase
 {
     /* baseline generate */
 
@@ -14,7 +15,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath);
 
             Assert.Multiple(() =>
@@ -42,7 +43,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--reason", "my custom reason");
 
@@ -60,7 +61,7 @@ public partial class CliIntegrationTests
     public void BaselineGenerate_MissingOutput_PreviewsToStdout()
     {
         var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-            "--config", _passingPolicy);
+            "--config", PassingPolicy);
 
         Assert.Multiple(() =>
         {
@@ -78,7 +79,7 @@ public partial class CliIntegrationTests
             File.WriteAllText(outputPath, "# reviewed baseline\nversion: 2\nbaseline: {}\n");
 
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy, "--output", outputPath);
+                "--config", PassingPolicy, "--output", outputPath);
 
             Assert.Multiple(() =>
             {
@@ -88,7 +89,7 @@ public partial class CliIntegrationTests
             });
 
             var (forcedExit, _, forcedStderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy, "--output", outputPath, "--force");
+                "--config", PassingPolicy, "--output", outputPath, "--force");
 
             Assert.Multiple(() =>
             {
@@ -110,7 +111,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy, "--output", outputPath, "--dry-run");
+                "--config", PassingPolicy, "--output", outputPath, "--dry-run");
 
             Assert.Multiple(() =>
             {
@@ -170,7 +171,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--mode", "strict");
 
@@ -195,7 +196,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--mode", "audit");
 
@@ -220,7 +221,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--mode", "invalid");
 
@@ -241,7 +242,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--condition-set", "nonexistent");
 
@@ -266,7 +267,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _failingPolicy,
+                "--config", FailingPolicy,
                 "--output", outputPath);
 
             Assert.Multiple(() =>
@@ -292,7 +293,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _coveragePolicy,
+                "--config", CoveragePolicyPath,
                 "--output", outputPath);
 
             Assert.Multiple(() =>
@@ -321,7 +322,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy,
+                "--config", GraphPolicy,
                 "--output", outputPath,
                 "--contract", "no-execution-to-contracts");
 
@@ -348,7 +349,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy,
+                "--config", GraphPolicy,
                 "--output", outputPath,
                 "--contract", "missing-contract-id");
 
@@ -373,7 +374,7 @@ public partial class CliIntegrationTests
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--policy", _passingPolicy,
+                "--policy", PassingPolicy,
                 "--output", outputPath);
 
             Assert.Multiple(() =>

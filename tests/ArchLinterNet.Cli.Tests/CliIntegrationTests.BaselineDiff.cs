@@ -2,7 +2,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliBaselineDiffIntegrationTests : CliIntegrationTestBase
 {
     /* baseline diff */
 
@@ -13,11 +14,11 @@ public partial class CliIntegrationTests
         try
         {
             var (genExit, _, genStderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy, "--output", baselinePath);
+                "--config", GraphPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "diff",
-                "--config", _graphPolicy, "--baseline", baselinePath);
+                "--config", GraphPolicy, "--baseline", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -58,7 +59,7 @@ baseline:
 ");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "diff",
-                "--config", _passingWithIdsPolicy, "--baseline", baselinePath);
+                "--config", PassingWithIdsPolicy, "--baseline", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -99,7 +100,7 @@ baseline:
 ");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "diff",
-                "--config", _passingWithIdsPolicy, "--baseline", baselinePath,
+                "--config", PassingWithIdsPolicy, "--baseline", baselinePath,
                 "--contract", "core-no-forbidden");
 
             Assert.Multiple(() =>
@@ -126,7 +127,7 @@ baseline:
             File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
 
             var (exitCode, _, stderr) = RunCli("baseline", "diff",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--condition-set", "nonexistent");
+                "--config", PassingPolicy, "--baseline", baselinePath, "--condition-set", "nonexistent");
 
             Assert.Multiple(() =>
             {
@@ -146,7 +147,7 @@ baseline:
     public void BaselineDiff_MissingBaselineFile_ExitsTwo()
     {
         var (exitCode, _, stderr) = RunCli("baseline", "diff",
-            "--config", _passingPolicy, "--baseline", "/nonexistent/baseline.yml");
+            "--config", PassingPolicy, "--baseline", "/nonexistent/baseline.yml");
 
         Assert.Multiple(() =>
         {
@@ -158,7 +159,7 @@ baseline:
     [Test]
     public void BaselineDiff_MissingBaselineFlag_ExitsTwo()
     {
-        var (exitCode, _, stderr) = RunCli("baseline", "diff", "--config", _passingPolicy);
+        var (exitCode, _, stderr) = RunCli("baseline", "diff", "--config", PassingPolicy);
 
         Assert.Multiple(() =>
         {
