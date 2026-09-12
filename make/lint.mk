@@ -124,13 +124,14 @@ test-coverage-badge-script:  ## Run tests for the test-coverage badge Markdown g
 test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-python.xml)
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/release/tests \
+		tools/badge_promotion/tests \
 		tools/scripts/tests/test_calculate_version.py \
 		tools/scripts/tests/test_check_dogfood_reference_evidence.py \
 		tools/scripts/tests/test_check_evergreen_docs.py \
 		tools/scripts/tests/test_check_evergreen_docs_edges.py \
 		tools/scripts/tests/test_test_coverage_badge.py \
 		tools/scripts/tests/test_verify_core_unit_shards.py \
-		--cov=tools/release --cov=tools/scripts \
+		--cov=tools/release --cov=tools/scripts --cov=tools/badge_promotion \
 		--cov-report=xml:coverage-python.xml --cov-report=term-missing
 
 # --ensure-built prepares and verifies the analysed project graph; the policy declares
