@@ -34,3 +34,26 @@ def test_relay_prepare_does_not_send_local_cas_defaults(monkeypatch: pytest.Monk
     assert calls[0][0] == "prepare"
     assert "expected_generation" not in calls[0][1]
     assert "expected_revocation_epoch" not in calls[0][1]
+
+
+def test_relay_http_commit_requests_do_not_carry_forged_trusted_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    bodies: list[dict[str, object]] = []
+
+    def record(self: HttpRelayClient, operation: str, body: dict[str, object], token: str) -> dict[str, object]:
+        bodies.append(body)
+        return {"ok": True}
+
+    monkeypatch.setattr(HttpRelayClient, "_post", record)
+    client = HttpRelayClient("https://relay.example", "alias", "headline-only/v1")
+    kwargs = {
+        "challenge_id": "challenge",
+        "idempotency_key": "key",
+        "generation": 4,
+        "revocation_epoch": 2,
+        "oidc_token": "token",
+        "semantic_horizon": "2026-09-12T11:00:00Z",
+        "tree_sha": "c" * 40,
+    }
+    client.publish(b"{}", "a" * 64, **kwargs)
+    client.renew(b"{}", "a" * 64, **kwargs)
+    assert all("trusted_context" not in body for body in bodies)

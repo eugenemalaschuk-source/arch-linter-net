@@ -94,10 +94,10 @@ class HttpRelayClient:
         return self._post("prepare", body, oidc_token)
 
     def publish(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str, tree_sha: str | None = None) -> dict[str, object]:
-        return self._post("publish", {"operation": "publish", "challenge_id": challenge_id, "idempotency_key": idempotency_key, "canonical_bytes": payload.decode("utf-8"), "canonical_digest": digest, "profile": self.profile, "expected_generation": generation, "expected_revocation_epoch": revocation_epoch, "semantic_horizon": semantic_horizon, "trusted_context": {"valid": True, "kind": "github-pr-authoritative/v1", "digest": digest, "tree_sha": tree_sha, "semantic_horizon": semantic_horizon}}, oidc_token)
+        return self._post("publish", {"operation": "publish", "challenge_id": challenge_id, "idempotency_key": idempotency_key, "canonical_bytes": payload.decode("utf-8"), "canonical_digest": digest, "profile": self.profile, "expected_generation": generation, "expected_revocation_epoch": revocation_epoch, "semantic_horizon": semantic_horizon}, oidc_token)
 
     def renew(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str, tree_sha: str | None = None) -> dict[str, object]:
-        body = {"operation": "renew", "challenge_id": challenge_id, "idempotency_key": idempotency_key, "canonical_bytes": payload.decode("utf-8"), "canonical_digest": digest, "profile": self.profile, "expected_generation": generation, "expected_revocation_epoch": revocation_epoch, "semantic_horizon": semantic_horizon, "trusted_context": {"valid": True, "kind": "github-pr-authoritative/v1", "digest": digest, "tree_sha": tree_sha, "semantic_horizon": semantic_horizon}}
+        body = {"operation": "renew", "challenge_id": challenge_id, "idempotency_key": idempotency_key, "canonical_bytes": payload.decode("utf-8"), "canonical_digest": digest, "profile": self.profile, "expected_generation": generation, "expected_revocation_epoch": revocation_epoch, "semantic_horizon": semantic_horizon}
         return self._post("renew", body, oidc_token)
 
 

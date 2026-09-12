@@ -255,14 +255,16 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     });
     expect(trustedPrepare.status).toBe(201);
     const trustedChallenge = await trustedPrepare.json() as { challenge_id: string; generation: number; revocation_epoch: number };
-    const trustedPublish = await SELF.fetch(relayUrl("publish"), {
+    const spoofedPublish = await SELF.fetch(relayUrl("publish"), {
       method: "POST",
       headers: { authorization: `Bearer ${trustedJwt}`, "content-type": "application/json" },
       body: JSON.stringify({ operation: "publish", challenge_id: trustedChallenge.challenge_id, idempotency_key: trustedIdempotency, canonical_bytes: payload, canonical_digest: digest, profile: entry.disclosure_profile, expected_generation: trustedChallenge.generation, expected_revocation_epoch: trustedChallenge.revocation_epoch, semantic_horizon: new Date(Date.now() + 30 * 60_000).toISOString().replace(".000Z", "Z"), trusted_context: { valid: true, kind: "github-pr-authoritative/v1", digest, tree_sha: "1".repeat(40) } })
     });
-    expect(trustedPublish.status).toBe(200);
+    expect(spoofedPublish.status).toBe(403);
     const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
     const stub = relay.get(relay.idFromName(alias));
+    const trustedPublish = await commitInternal(stub, trustedJwt, trustedChallenge, "publish", payload, trustedIdempotency);
+    expect(trustedPublish.status).toBe(200);
     const stored = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; payload_digest: string }>("SELECT status, payload_digest FROM relay_state WHERE id=1").toArray()[0]);
     expect(stored.status).toBe("ready");
     expect(stored.payload_digest).toBe(digest);
