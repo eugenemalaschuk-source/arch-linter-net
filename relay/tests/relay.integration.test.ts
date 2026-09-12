@@ -487,6 +487,19 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(challengeCount).toBe(0);
   });
 
+  it("does not let an allowlisted scheduled token reach initial publish", async () => {
+    const scheduledEntry: RegistryEntry = { ...entry, permitted_events: ["push", "schedule"] };
+    const jwt = await token({ event_name: "schedule" });
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const response = await (relay.get(relay.idFromName(alias)).fetch as unknown as (input: unknown) => Promise<Response>)(new Request("https://relay.test/internal/a7f4k2m9/publish", {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json", "x-relay-registry": JSON.stringify(scheduledEntry) },
+      body: JSON.stringify({ operation: "publish" }),
+    }));
+
+    expect(response.status).toBe(403);
+  });
+
   it("keeps the original challenge deadline immutable", async () => {
     const jwt = await token({ jti: "deadline-jti" });
     const idempotencyKey = "deadline-key";

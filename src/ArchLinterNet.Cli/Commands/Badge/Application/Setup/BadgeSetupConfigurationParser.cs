@@ -24,6 +24,7 @@ internal static class BadgeSetupConfigurationParser
             RejectUnknownProperties(root, [
                 "schema_id", "contract_version", "mode", "disclosure_profile", "bundle",
                 "compatibility_plan", "repository", "destination", "renewal", "pins", "managed_files",
+                "base_ref", "project", "producer", "disclosure_approved", "provider_plan",
             ], diagnostics);
 
             string? schemaId = ReadRequiredString(root, "schema_id", diagnostics);
@@ -37,6 +38,11 @@ internal static class BadgeSetupConfigurationParser
             BadgeSetupConfigurationRenewal? renewal = ReadRenewal(root, diagnostics);
             BadgeSetupPins? pins = ReadPins(root, diagnostics);
             IReadOnlyList<string>? managedFiles = ReadManagedFiles(root, diagnostics);
+            string? baseRef = ReadRequiredString(root, "base_ref", diagnostics);
+            BadgeSetupProject? project = ReadProject(root, diagnostics);
+            BadgeSetupProducer? producer = ReadProducer(root, diagnostics);
+            bool? disclosureApproved = ReadBoolean(root, "disclosure_approved", diagnostics);
+            string? providerPlan = ReadNullableString(root, "provider_plan", diagnostics, required: true);
 
             if (diagnostics.Count != 0
                 || schemaId is null
@@ -47,7 +53,11 @@ internal static class BadgeSetupConfigurationParser
                 || compatibilityPlan is null
                 || repository is null
                 || destination is null
-                || renewal is null)
+                || renewal is null
+                || baseRef is null
+                || project is null
+                || producer is null
+                || disclosureApproved is null)
             {
                 return new(false, null, diagnostics);
             }
@@ -65,7 +75,12 @@ internal static class BadgeSetupConfigurationParser
                     destination,
                     renewal,
                     pins,
-                    managedFiles),
+                    managedFiles,
+                    baseRef,
+                    project,
+                    producer,
+                    disclosureApproved.Value,
+                    providerPlan),
                 []);
         }
         catch (JsonException exception)
@@ -83,11 +98,13 @@ internal static class BadgeSetupConfigurationParser
             return null;
         }
 
-        RejectUnknownProperties(value, ["owner", "name", "visibility"], diagnostics);
+        RejectUnknownProperties(value, ["owner", "name", "visibility", "repository_id", "repository_owner_id"], diagnostics);
         string? owner = ReadRequiredString(value, "owner", diagnostics);
         string? name = ReadRequiredString(value, "name", diagnostics);
         string? visibility = ReadRequiredString(value, "visibility", diagnostics);
-        return owner is null || name is null || visibility is null ? null : new(owner, name, visibility);
+        long? repositoryId = ReadNullableLong(value, "repository_id", diagnostics);
+        long? repositoryOwnerId = ReadNullableLong(value, "repository_owner_id", diagnostics);
+        return owner is null || name is null || visibility is null ? null : new(owner, name, visibility, repositoryId, repositoryOwnerId);
     }
 
     private static BadgeSetupConfigurationDestination? ReadDestination(
@@ -99,11 +116,55 @@ internal static class BadgeSetupConfigurationParser
             return null;
         }
 
-        RejectUnknownProperties(value, ["alias", "account", "endpoint"], diagnostics);
+        RejectUnknownProperties(value, ["alias", "account", "endpoint", "audience"], diagnostics);
         string? alias = ReadNullableString(value, "alias", diagnostics, required: true);
         string? account = ReadNullableString(value, "account", diagnostics);
         string? endpoint = ReadNullableString(value, "endpoint", diagnostics);
-        return new(alias, account, endpoint);
+        string? audience = ReadNullableString(value, "audience", diagnostics);
+        return new(alias, account, endpoint, audience);
+    }
+
+    private static BadgeSetupProject? ReadProject(
+        JsonElement root,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
+        if (!TryGetObject(root, "project", out JsonElement value, diagnostics))
+        {
+            return null;
+        }
+
+        RejectUnknownProperties(value, ["policy_path", "solution_path"], diagnostics);
+        string? policyPath = ReadRequiredString(value, "policy_path", diagnostics);
+        string? solutionPath = ReadRequiredString(value, "solution_path", diagnostics);
+        return policyPath is null || solutionPath is null ? null : new(policyPath, solutionPath);
+    }
+
+    private static BadgeSetupProducer? ReadProducer(
+        JsonElement root,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
+        if (!TryGetObject(root, "producer", out JsonElement value, diagnostics))
+        {
+            return null;
+        }
+
+        RejectUnknownProperties(value, [
+            "workflow_path", "workflow_sha", "job_name", "check_name", "check_app", "event",
+            "artifact_name", "evidence_artifact_name", "payload_path",
+        ], diagnostics);
+        string? workflowPath = ReadRequiredString(value, "workflow_path", diagnostics);
+        string? workflowSha = ReadRequiredString(value, "workflow_sha", diagnostics);
+        string? jobName = ReadRequiredString(value, "job_name", diagnostics);
+        string? checkName = ReadRequiredString(value, "check_name", diagnostics);
+        string? checkApp = ReadRequiredString(value, "check_app", diagnostics);
+        string? producerEvent = ReadRequiredString(value, "event", diagnostics);
+        string? artifactName = ReadRequiredString(value, "artifact_name", diagnostics);
+        string? evidenceArtifactName = ReadRequiredString(value, "evidence_artifact_name", diagnostics);
+        string? payloadPath = ReadRequiredString(value, "payload_path", diagnostics);
+        return workflowPath is null || workflowSha is null || jobName is null || checkName is null || checkApp is null
+            || producerEvent is null || artifactName is null || evidenceArtifactName is null || payloadPath is null
+            ? null
+            : new(workflowPath, workflowSha, jobName, checkName, checkApp, producerEvent, artifactName, evidenceArtifactName, payloadPath);
     }
 
     private static BadgeSetupConfigurationRenewal? ReadRenewal(
@@ -260,6 +321,28 @@ internal static class BadgeSetupConfigurationParser
         if (!root.TryGetProperty(name, out JsonElement value) || !value.TryGetInt32(out int parsed))
         {
             AddInvalid(diagnostics, $"{name} must be an integer.");
+            return null;
+        }
+
+        return parsed;
+    }
+
+    private static long? ReadNullableLong(JsonElement root, string name, List<BadgeSetupDiagnostic> diagnostics)
+    {
+        if (!root.TryGetProperty(name, out JsonElement value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (!value.TryGetInt64(out long parsed))
+        {
+            AddInvalid(diagnostics, $"{name} must be an integer or null.");
+            return null;
+        }
+
+        if (parsed is <= 0 or > 9_007_199_254_740_991)
+        {
+            AddInvalid(diagnostics, $"{name} must be a positive safe integer or null.");
             return null;
         }
 

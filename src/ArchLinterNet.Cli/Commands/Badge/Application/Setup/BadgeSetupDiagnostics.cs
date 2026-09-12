@@ -25,6 +25,13 @@ internal static class BadgeSetupDiagnosticCodes
     internal const string ValidityExpired = "validity-expired";
     internal const string DestinationRevoked = "destination-revoked";
     internal const string ProviderQuotaFailure = "provider-quota-failure";
+    internal const string InvalidPin = "invalid-pin";
+    internal const string InvalidManagedPath = "invalid-managed-path";
+    internal const string InvalidEndpoint = "invalid-endpoint";
+    internal const string InvalidProject = "invalid-project";
+    internal const string InvalidObservation = "invalid-observation";
+    internal const string DisclosureApprovalRequired = "disclosure-approval-required";
+    internal const string CacheStale = "cache-stale";
 }
 
 internal sealed record BadgeSetupDiagnostic(
@@ -184,6 +191,48 @@ internal static class BadgeSetupDiagnosticCatalog
                 code,
                 "The provider quota or storage capability is unavailable.",
                 "Increase available quota or disable optional renewal, then run doctor again.",
+                severity,
+                privateDetail),
+            BadgeSetupDiagnosticCodes.InvalidPin => Diagnostic(
+                code,
+                "A workflow or bundle pin is invalid.",
+                "Use an exact approved workflow/action reference and a lowercase 40- or 64-character digest.",
+                severity,
+                privateDetail),
+            BadgeSetupDiagnosticCodes.InvalidManagedPath => Diagnostic(
+                code,
+                "A managed output path is invalid.",
+                "Use a unique repository-relative path without traversal or absolute path segments.",
+                severity,
+                privateDetail),
+            BadgeSetupDiagnosticCodes.InvalidEndpoint => Diagnostic(
+                code,
+                "The Relay endpoint is invalid.",
+                "Provide an HTTPS origin without query or fragment components.",
+                severity,
+                privateDetail),
+            BadgeSetupDiagnosticCodes.InvalidProject => Diagnostic(
+                code,
+                "The consumer project inputs are invalid.",
+                "Provide repository-relative policy and solution paths that exist before applying setup.",
+                severity,
+                privateDetail),
+            BadgeSetupDiagnosticCodes.InvalidObservation => Diagnostic(
+                code,
+                "The doctor observation is invalid or stale.",
+                "Generate a fresh bounded observation from the approved inspector and run doctor again.",
+                severity,
+                privateDetail),
+            BadgeSetupDiagnosticCodes.DisclosureApprovalRequired => Diagnostic(
+                code,
+                "Explicit disclosure approval is required before Relay files are written.",
+                "Review the preview and rerun setup with --approve-disclosure.",
+                severity,
+                privateDetail),
+            BadgeSetupDiagnosticCodes.CacheStale => Diagnostic(
+                code,
+                "A downstream badge cache is stale or could not be verified.",
+                "Compare the origin payload with Shields/Camo and wait for normal cache expiry; do not treat a cached image as fresh evidence.",
                 severity,
                 privateDetail),
             _ => Diagnostic(

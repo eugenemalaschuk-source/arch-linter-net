@@ -22,7 +22,8 @@ export interface RegistryEntry {
   repository?: string;
   destination_alias: string;
   permitted_event: "push";
-  permitted_ref: "refs/heads/main";
+  permitted_events?: Array<"push" | "schedule">;
+  permitted_ref: string;
   job_workflow_ref: string;
   job_workflow_sha: string;
   disclosure_profile: DisclosureProfile;

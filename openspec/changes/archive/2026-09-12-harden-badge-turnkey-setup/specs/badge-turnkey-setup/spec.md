@@ -1,27 +1,21 @@
-# badge-turnkey-setup Specification
+## ADDED Requirements
 
-## Purpose
-Provides a versioned, reviewable setup and doctor workflow that lets consumers configure the supported Architecture Health badge transports, generate the adopter-owned Relay assets, and recover from unsupported or incomplete prerequisites without exposing private source metadata.
+### Requirement: Setup proves capabilities fail-closed
 
-## Requirements
+Setup SHALL treat provider-plan declarations as cost metadata only. Required
+checks, Rules API access, OIDC availability/claims, provider quota, account
+identity, and deployment capability SHALL come from approved live or
+shape-validated capability evidence. Missing or contradictory evidence SHALL
+prevent non-dry-run writes and SHALL produce stable diagnostics.
 
-### Requirement: Setup exposes explicit supported modes and bounded choices
-The setup command SHALL inspect the target repository visibility and capabilities before any write and SHALL require an explicit mode from `none`, public `github-raw`, or adopter-owned `relay`. It SHALL require an explicit disclosure profile, target account/owner where applicable, opaque alias for Relay, and renewal cadence/cost choice before registration or file generation. Private repositories SHALL default to `none`; public `github-raw` behavior SHALL remain compatible; private `github-raw` SHALL be rejected with an actionable diagnostic. Custom or arbitrary authenticated transports SHALL not be presented as turnkey options.
+#### Scenario: Declared plan is insufficient proof
 
-#### Scenario: Private repository defaults to no disclosure
-- **WHEN** setup inspects a private repository without an explicit transport choice
-- **THEN** the preview selects `none`
-- **AND** it performs no external hosting call and requests no hosting credential
+- **WHEN** a user supplies `--provider-plan pro` without capability evidence
+- **THEN** Relay setup remains unavailable
+- **AND** it does not mark required check, Rules API, OIDC, or quota prerequisites
+  as satisfied
 
-#### Scenario: Private raw publication is rejected
-- **WHEN** a private repository selects `github-raw`
-- **THEN** setup returns a machine-readable visibility conflict with a concise migration fix
-- **AND** it writes no registry, workflow, README, or destination state
-
-#### Scenario: Relay cost and cadence are explicit
-- **WHEN** a user selects `relay` with renewal enabled
-- **THEN** setup reports the resulting jobs-per-day/month, GitHub private-minute implications, and provider quota assumptions before registration
-- **AND** it never silently selects a fifteen-minute scheduler or increases the lease to hide failed jobs
+## MODIFIED Requirements
 
 ### Requirement: Setup generates deterministic versioned configuration and deployable assets
 
@@ -73,24 +67,6 @@ and the Relay stamped SVG route for freshness output.
 - **WHEN** setup generates the producer workflow and registry
 - **THEN** `producer.workflow_sha` equals the Git blob SHA of the generated producer file byte-for-byte
 - **AND** the reusable publisher commit pin is not substituted for that hash
-
-### Requirement: Writes are dry-run safe, idempotent, and recoverable
-Dry-run and doctor SHALL be read-only. A real setup SHALL write through temporary files and an atomic commit boundary, preserve existing manual settings and protected branch/ruleset/secrets, and record enough manifest state to retry or roll back. Repeating setup with the same approved identity SHALL not create another alias or overwrite manual changes. Conflicts, partial failures, unsupported account/plan limits, and retries SHALL leave the public destination unavailable or unregistered rather than half-authorized.
-
-#### Scenario: Dry-run does not mutate
-- **WHEN** a user runs setup in dry-run mode or runs doctor
-- **THEN** no local file, registry entry, hosting resource, workflow, or README is written
-- **AND** the command reports the planned changes and prerequisites
-
-#### Scenario: Repeated setup preserves identity
-- **WHEN** setup is rerun against an existing deployment with the same approved configuration
-- **THEN** it reuses the existing alias and deployment identity
-- **AND** it preserves manual workflow, ruleset, secret, and README edits outside its managed regions
-
-#### Scenario: Partial failure fails closed
-- **WHEN** deployment or registration fails after a temporary or remote step has started
-- **THEN** setup reports a bounded failure and leaves the destination unavailable or rolls back managed temporary state
-- **AND** a retry can resume deterministically without creating a second authorized destination
 
 ### Requirement: Doctor provides bounded redacted diagnostics
 
@@ -165,18 +141,3 @@ immutable IDs, and escaping or duplicate managed paths.
 - **WHEN** configuration contains an invalid endpoint, pin, ID, bound, or managed path
 - **THEN** setup returns a stable configuration diagnostic
 - **AND** it writes no workflow, README, registry, Relay, or manifest file
-
-### Requirement: Setup proves capabilities fail-closed
-
-Setup SHALL treat provider-plan declarations as cost metadata only. Required
-checks, Rules API access, OIDC availability/claims, provider quota, account
-identity, and deployment capability SHALL come from approved live or
-shape-validated capability evidence. Missing or contradictory evidence SHALL
-prevent non-dry-run writes and SHALL produce stable diagnostics.
-
-#### Scenario: Declared plan is insufficient proof
-
-- **WHEN** a user supplies `--provider-plan pro` without capability evidence
-- **THEN** Relay setup remains unavailable
-- **AND** it does not mark required check, Rules API, OIDC, or quota prerequisites
-  as satisfied

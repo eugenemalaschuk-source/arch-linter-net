@@ -36,11 +36,24 @@ internal static class BadgeSetupContract
     internal const string HeadlineOnlyProfile = "headline-only/v1";
     internal const string HeadlinePlusFreshnessProfile = "headline-plus-freshness/v1";
     internal const int MaximumRenewalJobsPerDay = 48;
+    internal const int MaximumRenewalCadenceMinutes = 1440;
     internal const int MaximumLeaseMinutes = 60;
     internal const int MinimumRenewalCadenceMinutes = 30;
     internal const int DefaultRenewalCadenceMinutes = 1440;
     internal const int DefaultLeaseMinutes = MaximumLeaseMinutes;
     internal const int PrivateMinutesPerRenewalJob = 1;
+    internal const string DefaultPublisherWorkflowRef = "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml";
+    internal const string DefaultPublisherWorkflowSha = "ff9b19bfe5abcab233d490ea53f55a387dc4a8db";
+    internal const string DefaultActionRef = "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@ff9b19bfe5abcab233d490ea53f55a387dc4a8db";
+    internal const string DefaultProducerWorkflowPath = ".github/workflows/architecture-health-badge-producer.yml";
+    internal const string DefaultRenewalWorkflowPath = ".github/workflows/architecture-health-badge-renewal.yml";
+    internal const string DefaultCheckName = "Architecture Coverage";
+    internal const string DefaultCheckApp = "github-actions";
+    internal const string DefaultArtifactName = "architecture-health-badge-v1";
+    internal const string DefaultEvidenceArtifactName = "architecture-health";
+    internal const string DefaultPayloadPath = "architecture-health-badge.json";
+    internal const string CapabilityEvidenceSchemaId = "badge-relay-capability-evidence/v1";
+    internal const string DoctorObservationSchemaId = "badge-relay-doctor-observation/v1";
 
     internal static string ToWireValue(this BadgeSetupMode mode) => mode switch
     {
@@ -91,7 +104,12 @@ internal sealed record BadgeSetupCapabilities(
     bool CanUseOidc = false,
     bool CanUseGithubRaw = false,
     bool CanUseRelay = false,
-    string? ProviderPlan = null);
+    string? ProviderPlan = null,
+    long? RepositoryId = null,
+    long? RepositoryOwnerId = null,
+    bool ProviderQuotaAvailable = false,
+    string? CapabilitySource = null,
+    DateTimeOffset? ObservedAt = null);
 
 internal sealed record BadgeSetupExistingState(
     bool HasDeployment,
@@ -108,6 +126,7 @@ internal sealed record BadgeSetupRequest(
     bool RenewalEnabled = false,
     int? RenewalCadenceMinutes = null,
     int? MaxLeaseMinutes = null,
+    string? ProviderPlan = null,
     string SchemaId = BadgeSetupContract.SchemaId,
     string ContractVersion = BadgeSetupContract.ContractVersion,
     string Bundle = BadgeSetupContract.Bundle,
@@ -125,17 +144,25 @@ internal sealed record BadgeSetupConfiguration(
     [property: JsonPropertyName("destination")] BadgeSetupConfigurationDestination Destination,
     [property: JsonPropertyName("renewal")] BadgeSetupConfigurationRenewal Renewal,
     [property: JsonPropertyName("pins")] BadgeSetupPins? Pins = null,
-    [property: JsonPropertyName("managed_files")] IReadOnlyList<string>? ManagedFiles = null);
+    [property: JsonPropertyName("managed_files")] IReadOnlyList<string>? ManagedFiles = null,
+    [property: JsonPropertyName("base_ref")] string BaseRef = "main",
+    [property: JsonPropertyName("project")] BadgeSetupProject? Project = null,
+    [property: JsonPropertyName("producer")] BadgeSetupProducer? Producer = null,
+    [property: JsonPropertyName("disclosure_approved")] bool DisclosureApproved = false,
+    [property: JsonPropertyName("provider_plan")] string? ProviderPlan = null);
 
 internal sealed record BadgeSetupConfigurationRepository(
     [property: JsonPropertyName("owner")] string Owner,
     [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("visibility")] string Visibility);
+    [property: JsonPropertyName("visibility")] string Visibility,
+    [property: JsonPropertyName("repository_id")] long? RepositoryId = null,
+    [property: JsonPropertyName("repository_owner_id")] long? RepositoryOwnerId = null);
 
 internal sealed record BadgeSetupConfigurationDestination(
     [property: JsonPropertyName("alias")] string? Alias,
     [property: JsonPropertyName("account")] string? Account = null,
-    [property: JsonPropertyName("endpoint")] string? Endpoint = null);
+    [property: JsonPropertyName("endpoint")] string? Endpoint = null,
+    [property: JsonPropertyName("audience")] string? Audience = null);
 
 internal sealed record BadgeSetupConfigurationRenewal(
     [property: JsonPropertyName("enabled")] bool Enabled,
@@ -147,6 +174,21 @@ internal sealed record BadgeSetupPins(
     [property: JsonPropertyName("workflow_sha")] string? WorkflowSha = null,
     [property: JsonPropertyName("action_ref")] string? ActionRef = null,
     [property: JsonPropertyName("bundle_digest")] string? BundleDigest = null);
+
+internal sealed record BadgeSetupProject(
+    [property: JsonPropertyName("policy_path")] string PolicyPath,
+    [property: JsonPropertyName("solution_path")] string SolutionPath);
+
+internal sealed record BadgeSetupProducer(
+    [property: JsonPropertyName("workflow_path")] string WorkflowPath,
+    [property: JsonPropertyName("workflow_sha")] string WorkflowSha,
+    [property: JsonPropertyName("job_name")] string JobName,
+    [property: JsonPropertyName("check_name")] string CheckName,
+    [property: JsonPropertyName("check_app")] string CheckApp,
+    [property: JsonPropertyName("event")] string Event,
+    [property: JsonPropertyName("artifact_name")] string ArtifactName,
+    [property: JsonPropertyName("evidence_artifact_name")] string EvidenceArtifactName,
+    [property: JsonPropertyName("payload_path")] string PayloadPath);
 
 internal sealed record BadgeSetupPrerequisite(
     string Code,
@@ -205,6 +247,12 @@ internal sealed record BadgeDoctorObservations(
     bool ValidityCurrent = true,
     bool DestinationRevoked = false,
     bool ProviderQuotaAvailable = true,
+    bool IdentityValid = true,
+    bool PinsValid = true,
+    bool OidcValid = true,
+    bool RequiredCheckAvailable = true,
+    bool RulesApiAvailable = true,
+    bool CacheFresh = true,
     string? PrivateContext = null,
     string? Token = null,
     string? RawProviderResponse = null);
