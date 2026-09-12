@@ -6,7 +6,7 @@ Provides one versioned, reusable trusted-promotion contract for private and publ
 ## Requirements
 
 ### Requirement: Promotion uses approved configuration and exact producer provenance
-The reusable promotion capability SHALL obtain repository, workflow, job, check, artifact, branch, event, and adapter selection from an approved configuration or registry that is independent of consumer-controlled pull-request artifacts. It SHALL prove the exact merged commit, base/head/tree relation, required check identity, workflow run and attempt, producer job, artifact identity, size, schema, digest, and canonical bytes before a ready publication. Names, conclusions, arbitrary URLs, or a generic workflow success SHALL not establish those facts.
+The reusable promotion capability SHALL obtain repository, workflow, job, check, artifact, branch, event, and adapter selection from an approved configuration or registry that is independent of consumer-controlled pull-request artifacts. It SHALL prove the exact merged commit, base/head/tree relation, required check identity, workflow run and attempt, producer job, artifact identity, size, schema, digest, and canonical bytes before a ready publication. The resolver SHALL obtain the workflow file SHA from the provider's immutable content response at the verified producer revision and compare it with the approved pin; it SHALL not populate evidence by copying the expected pin. Names, conclusions, arbitrary URLs, or a generic workflow success SHALL not establish those facts.
 
 #### Scenario: Mismatched producer evidence fails closed
 - **WHEN** a producer run, check, artifact, tree, attempt, job, repository, or merge relation differs from approved configuration or the merged commit
@@ -32,7 +32,7 @@ The privileged promotion path SHALL treat downloaded artifacts and manifests as 
 - **AND** the promotion layer does not recalculate Gate, Health, counts, color, or the semantic validity horizon
 
 ### Requirement: Adapters are explicit and bounded
-The capability SHALL provide only the approved `github-raw`, `relay`, and `none` adapters. Adapter selection SHALL be typed and configuration-bound; arbitrary destination URLs, callback URLs, provider catalogues, private-repository raw publication, and unsupported authenticated/custom transports SHALL be rejected. The legacy public raw endpoint and its semantic bytes SHALL remain compatible.
+The capability SHALL provide only the approved `github-raw`, `relay`, and `none` adapters. Adapter selection SHALL be typed and configuration-bound; arbitrary destination URLs, callback URLs, provider catalogues, private-repository raw publication, and unsupported authenticated/custom transports SHALL be rejected. The legacy public raw endpoint and its semantic bytes SHALL remain compatible. The `none` adapter SHALL report a successful private outcome after valid evidence without contacting a destination.
 
 #### Scenario: Private raw publication is rejected
 - **WHEN** a private repository selects the raw adapter or a raw configuration targets a private/public-disclosure Relay mode
@@ -42,10 +42,11 @@ The capability SHALL provide only the approved `github-raw`, `relay`, and `none`
 #### Scenario: None adapter records no public disclosure
 - **WHEN** the approved `none` adapter is selected
 - **THEN** promotion records only the private outcome needed by the caller
+- **AND** the caller receives a successful `private` result
 - **AND** it emits no public payload, URL, source identity, token, or private provenance
 
 ### Requirement: Publication and renewal are monotonic and metadata-only
-Push/squash publication, bounded retry/recovery, and scheduled renewal SHALL use conditional writes bound to the current target context, generation, revocation epoch, idempotency key, and fixed deadline. Renewal SHALL revalidate current authorization, producer identity, required gate, artifact availability, and the product-owned semantic validity horizon without rerunning Architecture Health analysis on main. Older, cancelled, revoked, expired, or out-of-order operations SHALL not overwrite a newer or unavailable state.
+Push/squash publication, bounded retry/recovery, and scheduled renewal SHALL use conditional writes bound to the current target context, generation, revocation epoch, idempotency key, and fixed deadline. The initial Relay prepare SHALL observe Relay-owned generation and revocation epoch without sending local defaults; subsequent publish or renew requests SHALL use the counters returned by that prepare. Renewal SHALL revalidate current authorization, producer identity, required gate, artifact availability, and the product-owned semantic validity horizon without rerunning Architecture Health analysis on main. Older, cancelled, revoked, expired, or out-of-order operations SHALL not overwrite a newer or unavailable state.
 
 #### Scenario: Renewal cannot extend elapsed semantic evidence
 - **WHEN** a same-tree renewal is attempted after the stored product-owned validity horizon or after artifact retention/revocation invalidates the evidence

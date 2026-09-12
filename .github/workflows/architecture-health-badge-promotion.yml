@@ -37,7 +37,7 @@ jobs:
     steps:
       - name: Run pinned trusted promotion contract
         id: promotion
-        uses: ./.github/actions/architecture-health-badge-promotion # zizmor: ignore[self-repository] — shipped with the immutable reusable workflow reference.
+        uses: $/.github/actions/architecture-health-badge-promotion
         with:
           configuration-id: ${{ inputs.configuration-id }}
           adapter: ${{ inputs.adapter }}

@@ -7,7 +7,7 @@ reference Worker; the workflow supplies the approved deployment binding.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import os
 import json
 from typing import Protocol
@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 
 from .decision import PromotionDecision
-from .model import AdapterKind
+from .model import AdapterKind, PromotionStatus
 
 
 class AdapterError(RuntimeError):
@@ -23,7 +23,7 @@ class AdapterError(RuntimeError):
 
 
 class RelayClient(Protocol):
-    def prepare(self, payload: bytes, digest: str, *, idempotency_key: str, generation: int, revocation_epoch: int, semantic_horizon: str, oidc_token: str) -> dict[str, object]: ...
+    def prepare(self, payload: bytes, digest: str, *, idempotency_key: str, generation: int | None, revocation_epoch: int | None, semantic_horizon: str, oidc_token: str) -> dict[str, object]: ...
     def publish(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str, tree_sha: str | None = None) -> dict[str, object]: ...
     def renew(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str, tree_sha: str | None = None) -> dict[str, object]: ...
 
@@ -79,8 +79,19 @@ class HttpRelayClient:
             raise AdapterError("relay_publication_rejected")
         return result
 
-    def prepare(self, payload: bytes, digest: str, *, idempotency_key: str, generation: int, revocation_epoch: int, semantic_horizon: str, oidc_token: str) -> dict[str, object]:
-        return self._post("prepare", {"operation": "prepare", "canonical_bytes": payload.decode("utf-8"), "canonical_digest": digest, "profile": self.profile, "idempotency_key": idempotency_key, "expected_generation": generation, "expected_revocation_epoch": revocation_epoch, "semantic_horizon": semantic_horizon}, oidc_token)
+    def prepare(self, payload: bytes, digest: str, *, idempotency_key: str, generation: int | None, revocation_epoch: int | None, semantic_horizon: str, oidc_token: str) -> dict[str, object]:
+        body: dict[str, object] = {
+            "operation": "prepare", "canonical_bytes": payload.decode("utf-8"),
+            "canonical_digest": digest, "profile": self.profile,
+            "idempotency_key": idempotency_key, "semantic_horizon": semantic_horizon,
+        }
+        # The Relay is the authority for these counters.  Optional expectations
+        # are reserved for a caller that has already observed the Relay state.
+        if generation is not None:
+            body["expected_generation"] = generation
+        if revocation_epoch is not None:
+            body["expected_revocation_epoch"] = revocation_epoch
+        return self._post("prepare", body, oidc_token)
 
     def publish(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str, tree_sha: str | None = None) -> dict[str, object]:
         return self._post("publish", {"operation": "publish", "challenge_id": challenge_id, "idempotency_key": idempotency_key, "canonical_bytes": payload.decode("utf-8"), "canonical_digest": digest, "profile": self.profile, "expected_generation": generation, "expected_revocation_epoch": revocation_epoch, "semantic_horizon": semantic_horizon, "trusted_context": {"valid": True, "kind": "github-pr-authoritative/v1", "digest": digest, "tree_sha": tree_sha, "semantic_horizon": semantic_horizon}}, oidc_token)
@@ -94,9 +105,11 @@ class HttpRelayClient:
 class NoneAdapter:
     kind: AdapterKind = AdapterKind.NONE
 
-    def commit(self, decision: PromotionDecision) -> None:
-        if decision.status.value == "ready":
-            raise AdapterError("none_adapter_cannot_publish")
+    def commit(self, decision: PromotionDecision) -> PromotionDecision:
+        """Record a successful private outcome without contacting a destination."""
+        if decision.status.value != "ready":
+            return decision
+        return replace(decision, status=PromotionStatus.PRIVATE)
 
 
 @dataclass(frozen=True, slots=True)

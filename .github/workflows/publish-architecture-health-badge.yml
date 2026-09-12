@@ -19,7 +19,7 @@ jobs:
       contents: write
       id-token: write
       pull-requests: read
-    uses: ./.github/workflows/architecture-health-badge-promotion.yml # zizmor: ignore[self-repository] — pinned candidate for this reference repository.
+    uses: $/.github/workflows/architecture-health-badge-promotion.yml
     with:
       configuration-id: reference-public-raw
       adapter: github-raw

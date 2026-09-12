@@ -25,7 +25,7 @@ from typing import Any
 
 from .config import ConfigValidationError, parse_config
 from .decision import PromotionRequest, decide_promotion
-from .adapters import HttpRelayClient, issue_github_oidc_token
+from .adapters import HttpRelayClient, NoneAdapter, issue_github_oidc_token
 from .model import EvidenceContext, PromotionStatus, ReasonCode
 
 
@@ -101,23 +101,53 @@ def _parse_time(value: Any) -> datetime:
 
 
 def _required_gate(api: GitHubApi, repository: str, check_name: str) -> bool:
+    def has_required_check(document: Any) -> bool:
+        if not isinstance(document, dict):
+            return False
+        parameters = document.get("parameters", {})
+        checks = parameters.get("required_status_checks", []) if isinstance(parameters, dict) else []
+        if isinstance(checks, list) and any(isinstance(check, dict) and check.get("context") == check_name for check in checks):
+            return True
+        rules = document.get("rules", [])
+        return isinstance(rules, list) and any(has_required_check(rule) for rule in rules)
+
+    repository_path = _repository_path(repository)
     try:
-        rules = api.request(f"/repos/{_repository_path(repository)}/rules/branches/main")
+        rules = api.request(f"/repos/{repository_path}/rules/branches/main")
     except ProviderFailure as error:
         if error.reason != "required_capability_unavailable":
             raise
         try:
-            rules = api.request(f"/repos/{_repository_path(repository)}/rulesets?includes_parents=true&includes_inherited=true&per_page=100")
+            rules = api.request(f"/repos/{repository_path}/rulesets?includes_parents=true&includes_inherited=true&per_page=100")
         except ProviderFailure:
             return False
-    if not isinstance(rules, list):
+        if not isinstance(rules, list):
+            return False
+        for summary in rules:
+            ruleset_id = summary.get("id") if isinstance(summary, dict) else None
+            if not isinstance(ruleset_id, int) or ruleset_id <= 0:
+                continue
+            try:
+                detail = api.request(f"/repos/{repository_path}/rulesets/{ruleset_id}")
+            except ProviderFailure as detail_error:
+                if detail_error.reason == "required_capability_unavailable":
+                    continue
+                raise
+            if has_required_check(detail):
+                return True
         return False
-    for rule in rules:
-        parameters = rule.get("parameters", {}) if isinstance(rule, dict) else {}
-        checks = parameters.get("required_status_checks", [])
-        if isinstance(checks, list) and any(isinstance(check, dict) and check.get("context") == check_name for check in checks):
-            return True
+    if has_required_check({"rules": rules}):
+        return True
     return False
+
+
+def _workflow_blob_sha(api: GitHubApi, repository: str, workflow_path: str, ref: str) -> str:
+    path = urllib.parse.quote(workflow_path, safe="/")
+    reference = urllib.parse.quote(ref, safe="")
+    workflow = api.request(f"/repos/{_repository_path(repository)}/contents/{path}?ref={reference}")
+    if not isinstance(workflow, dict) or workflow.get("type") != "file":
+        raise ProviderFailure("workflow_mismatch")
+    return _sha(workflow.get("sha"))
 
 
 def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
@@ -144,6 +174,9 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     head_tree = _sha(head_commit.get("commit", {}).get("tree", {}).get("sha"))
     if head_tree != main_tree:
         raise ProviderFailure("merged_tree_mismatch")
+    workflow_sha = _workflow_blob_sha(api, repository, config.producer.workflow_path, head_sha)
+    if workflow_sha != config.producer.workflow_sha:
+        raise ProviderFailure("workflow_mismatch")
     check_name = urllib.parse.quote(config.producer.check_name, safe="")
     checks = api.request(f"/repos/{_repository_path(repository)}/commits/{head_sha}/check-runs?check_name={check_name}&filter=latest&per_page=100")
     successful_checks = [item for item in checks.get("check_runs", []) if item.get("name") == config.producer.check_name and item.get("status") == "completed" and item.get("conclusion") == "success" and item.get("app", {}).get("slug") == config.producer.check_app]
@@ -185,7 +218,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     evidence = EvidenceContext(
         repository=repository, base_ref="main", base_sha=base_sha, main_tree_sha=main_tree,
         head_sha=head_sha, head_tree_sha=head_tree, pr_number=pr_number, event=config.producer.event,
-        merged=True, workflow_path=config.producer.workflow_path, workflow_sha=config.producer.workflow_sha,
+        merged=True, workflow_path=config.producer.workflow_path, workflow_sha=workflow_sha,
         check_name=config.producer.check_name, check_app=config.producer.check_app, check_status="completed",
         check_conclusion="success", required_gate_present=_required_gate(api, repository, config.producer.check_name), run_id=run_id,
         run_attempt=int(run.get("run_attempt", 0)), job_id=int(job.get("id", 0)), job_name=job.get("name", ""),
@@ -286,23 +319,27 @@ def main() -> int:
         # The Relay challenge is the deadline authority. A raw publication uses
         # the same pure decision and remains a fixed snapshot adapter.
         decision = decide_promotion(config, request)
-        _write_outputs({"status": decision.status.value, "reason": decision.reason.value, "head_sha": evidence.head_sha, "head_tree_sha": evidence.head_tree_sha, "run_id": evidence.run_id, "run_attempt": evidence.run_attempt})
+        output_metadata = {"reason": decision.reason.value, "head_sha": evidence.head_sha, "head_tree_sha": evidence.head_tree_sha, "run_id": evidence.run_id, "run_attempt": evidence.run_attempt}
         if decision.status is PromotionStatus.UNAVAILABLE:
+            _write_outputs({**output_metadata, "status": "unavailable"})
             if config.destination.adapter.value == "github-raw":
                 unavailable = Path(__file__).resolve().parents[2] / "architecture" / "architecture-health-badge-unavailable.json"
                 _publish_raw(api, config, unavailable.read_bytes(), evidence=evidence, status="unassessable", reason=decision.reason.value)
             print(json.dumps({"status": "unavailable", "reason": decision.reason.value}, separators=(",", ":")), file=sys.stderr)
             return 1
         if config.destination.adapter.value == "none":
-            _write_outputs({"status": "unavailable", "reason": "none_adapter"})
-            print(json.dumps({"status": "unavailable", "reason": "none_adapter"}, separators=(",", ":")), file=sys.stderr)
-            return 1
+            private_decision = NoneAdapter().commit(decision)
+            _write_outputs({**output_metadata, "status": private_decision.status.value})
+            print(json.dumps({"status": private_decision.status.value, "reason": private_decision.reason.value}, separators=(",", ":")))
+            return 0
         if config.destination.adapter.value == "relay":
             digest = hashlib.sha256(decision.payload or b"").hexdigest()
             horizon = evidence.semantic_horizon.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             client = HttpRelayClient(config.destination.endpoint or "", config.destination.alias or "", config.disclosure_profile)
             token = issue_github_oidc_token(config.destination.audience or "")
-            prepared = client.prepare(decision.payload or b"", digest, idempotency_key=request.idempotency_key, generation=request.generation, revocation_epoch=request.revocation_epoch, semantic_horizon=horizon, oidc_token=token)
+            # The first prepare is an observation of Relay-owned state.  Local
+            # PromotionRequest defaults are never sent as CAS expectations.
+            prepared = client.prepare(decision.payload or b"", digest, idempotency_key=request.idempotency_key, generation=None, revocation_epoch=None, semantic_horizon=horizon, oidc_token=token)
             challenge_id = prepared.get("challenge_id")
             generation = prepared.get("generation")
             revocation_epoch = prepared.get("revocation_epoch")
@@ -313,6 +350,7 @@ def main() -> int:
             else:
                 client.publish(decision.payload or b"", digest, challenge_id=challenge_id, idempotency_key=request.idempotency_key, generation=generation, revocation_epoch=revocation_epoch, oidc_token=token, semantic_horizon=horizon, tree_sha=evidence.head_tree_sha)
             return 0
+        _write_outputs({**output_metadata, "status": "ready"})
         _publish_raw(api, config, decision.payload or b"", evidence=evidence, status="ready", reason=decision.reason.value)
         return 0
     except ProviderFailure as error:

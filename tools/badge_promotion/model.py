@@ -25,6 +25,7 @@ class AdapterKind(StrEnum):
 
 class PromotionStatus(StrEnum):
     READY = "ready"
+    PRIVATE = "private"
     UNAVAILABLE = "unavailable"
 
 

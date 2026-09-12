@@ -7,7 +7,7 @@
     {
       "kind": "reusable-workflow",
       "path": ".github/workflows/architecture-health-badge-promotion.yml",
-      "approved_source_sha": "27e933c2bb3e0931f706a6662f388eeeb8e1acb6"
+      "approved_source_sha": "88d05c010023488c29225dda8391ec43268a443b"
     },
     {
       "kind": "composite-action",
@@ -17,7 +17,7 @@
     {
       "kind": "configuration-registry",
       "path": ".github/badge-promotion/registry.json",
-      "approved_source_sha": "d0e6054e1af1682772521d2b504ee7defb0edc94"
+      "approved_source_sha": "07e7fbda7c62ea0c36281441970e64c4bb3ba6f2"
     }
   ],
   "excluded": ["v0.9-performance", "#650", "#787"],

@@ -14,11 +14,17 @@ def read_workflow(name: str) -> str:
 
 def test_reference_publisher_delegates_to_one_reusable_workflow() -> None:
     workflow = read_workflow("publish-architecture-health-badge.yml")
-    assert "uses: ./.github/workflows/architecture-health-badge-promotion.yml" in workflow
+    assert "uses: $/.github/workflows/architecture-health-badge-promotion.yml" in workflow
     assert "configuration-id: reference-public-raw" in workflow
     assert "adapter: github-raw" in workflow
     assert "actions/github-script" not in workflow
     assert "actions/checkout" not in workflow
+
+
+def test_reusable_workflow_resolves_its_action_from_the_workflow_repository() -> None:
+    workflow = read_workflow("architecture-health-badge-promotion.yml")
+    assert "uses: $/.github/actions/architecture-health-badge-promotion" in workflow
+    assert "uses: ./.github/actions/architecture-health-badge-promotion" not in workflow
 
 
 def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_boundary() -> None:
