@@ -72,16 +72,9 @@ public sealed class PrReportMarkdownRendererTests
     }
 
     [Test]
-    public void PublicSafeReproducer799_PassDegradingMetadataDebt_IsExplainedAsAdvisory()
+    public void PublicSafeReproducer799_CanonicalFixtureUsesReaderProjectorAndRenderer()
     {
-        ArchitectureHealthReason reason = new("metadata_incomplete", "waiver_lifecycle")
-        {
-            EvidenceIdentity = "waiver-1",
-        };
-        ArchitecturePrReportProjection projection = CreateProjection(
-            dimensions: [new ArchitectureHealthDimension(
-                "waivers", ArchitectureHealthDimensionState.Degrading, [reason])],
-            health: ArchitectureHealthState.Degrading);
+        ArchitecturePrReportProjection projection = ReadCanonicalReproducer799();
 
         string markdown = PrReportMarkdownRenderer.Render(projection);
 
@@ -92,9 +85,72 @@ public sealed class PrReportMarkdownRendererTests
             Assert.That(markdown, Does.Contain("## Health explanation"));
             Assert.That(markdown, Does.Contain("`waivers` state=`degrading` classification=`advisory`"));
             Assert.That(markdown, Does.Contain("`metadata_incomplete`"));
-            Assert.That(markdown, Does.Contain("`waiver-1`"));
+            Assert.That(markdown, Does.Contain("`waiver-799-01`"));
             Assert.That(markdown, Does.Not.Contain("## Blockers"));
         });
+    }
+
+    [Test]
+    public void HealthExplanation_BoundsManyLongReasonsToPublisherSafeOutput()
+    {
+        ArchitectureHealthReason[] reasons = Enumerable.Range(0, 100)
+            .Select(index => new ArchitectureHealthReason("metadata_incomplete", "waiver_lifecycle")
+            {
+                EvidenceIdentity = $"waiver-{index}-{new string('x', 10_000)}",
+                Source = new string('s', 10_000),
+            })
+            .ToArray();
+        ArchitecturePrReportProjection projection = CreateProjection(
+            dimensions: [new ArchitectureHealthDimension("waivers", ArchitectureHealthDimensionState.Degrading, reasons)],
+            health: ArchitectureHealthState.Degrading);
+
+        string markdown = PrReportMarkdownRenderer.Render(projection, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(System.Text.Encoding.UTF8.GetByteCount(markdown), Is.LessThan(60_000));
+            Assert.That(markdown, Does.Contain("98 more reason(s) omitted"));
+            Assert.That(markdown, Does.Not.Contain(new string('s', 1_000)));
+        });
+    }
+
+    [Test]
+    public void MissingApplicabilityReceipt_PreservesCanonicalNotConfiguredState()
+    {
+        ArchitecturePrReportEvidence evidence = Evidence(receipts:
+        [
+            new ArchitecturePrReportValidationReceipt(
+                "strict", new Dictionary<string, string>(), Inventory(), new("strict", [], []), null, null, [], new("/repo", [], [], [])),
+        ]);
+        ArchitecturePrReportProjection projection = CreateProjection(
+            evidence: evidence,
+            dimensions: [Dimension("applicability", ArchitectureHealthDimensionState.NotConfigured)]);
+
+        string markdown = PrReportMarkdownRenderer.Render(projection);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("Control applicability/evaluability: `not_configured`"));
+            Assert.That(markdown, Does.Contain("- Applicability: `not_configured`"));
+            Assert.That(markdown, Does.Not.Contain("Applicability: `unavailable`"));
+        });
+    }
+
+    [Test]
+    public void CurrentBuildStatePreflight_IsNotPresentedAsSuppliedRemediation()
+    {
+        ArchitecturePrReportFinding currentPreflight = new(
+            3, "build_state_preflight", "preflight-current", "strict", "error", "build_state_preflight",
+            "Build state", "build_state_preflight", null, null,
+            new ArchitecturePrReportRemediation(
+                "build-state", "Restore the required project/build input before changing application structure.",
+                "build_state_preflight", "preflight-current", [], null, null, false),
+            JsonDocument.Parse("{\"state\":\"current\"}").RootElement.Clone());
+        ArchitecturePrReportEvidence evidence = Evidence(receipts: [Receipt("strict", [currentPreflight])]);
+
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(evidence: evidence));
+
+        Assert.That(markdown, Does.Not.Contain("## Supplied remediation"));
     }
 
     [Test]
@@ -161,6 +217,25 @@ public sealed class PrReportMarkdownRendererTests
             Assert.That(PrReportTransportContext.TryCreate(
                 "https://github.com/owner/repository", new string('a', 40),
                 "javascript:alert(1)", out _, out _), Is.False);
+        });
+    }
+
+    [Test]
+    public void NavigationContext_AcceptsAttemptBoundRunAndArtifactUrls()
+    {
+        const string Repository = "https://github.com/owner/repository";
+        const string Sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string RunUrl = Repository + "/actions/runs/123/attempts/2";
+        const string ArtifactUrl = RunUrl + "/artifacts/456";
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PrReportTransportContext.TryCreate(Repository, Sha, RunUrl,
+                out ArchitecturePrReportNavigationContext? runContext, out _), Is.True);
+            Assert.That(runContext!.ArtifactUrl, Is.EqualTo(RunUrl));
+            Assert.That(PrReportTransportContext.TryCreate(Repository, Sha, ArtifactUrl,
+                out ArchitecturePrReportNavigationContext? artifactContext, out _), Is.True);
+            Assert.That(artifactContext!.ArtifactUrl, Is.EqualTo(ArtifactUrl));
         });
     }
 
@@ -544,6 +619,15 @@ public sealed class PrReportMarkdownRendererTests
             Assert.That(markdown, Does.Contain("`a`"));
             Assert.That(markdown, Does.Not.Contain("`b`"));
         });
+    }
+
+    private static ArchitecturePrReportProjection ReadCanonicalReproducer799()
+    {
+        string fixtureRoot = Path.GetFullPath(Path.Combine(
+            TestContext.CurrentContext.TestDirectory, "..", "..", "..", "Fixtures", "architecture-pr-report"));
+        return ArchitecturePrReportProjector.ReadAndProject(
+            File.ReadAllText(Path.Combine(fixtureRoot, "799-health.json")),
+            File.ReadAllText(Path.Combine(fixtureRoot, "799-change.json")));
     }
 
     private static ArchitecturePrReportProjection CreateProjection(

@@ -41,7 +41,7 @@ internal static partial class PrReportMarkdownRenderer
             builder.AppendLine();
         }
 
-        if (PrReportMarkdownHealth.AppendHealthExplanation(builder, projection))
+        if (PrReportMarkdownHealth.AppendHealthExplanation(builder, projection, maxDetails))
         {
             builder.AppendLine();
         }
@@ -242,7 +242,10 @@ internal static partial class PrReportMarkdownRenderer
         ArchitecturePrReportApplicability? applicability = receipt.Applicability;
         if (applicability is null)
         {
-            builder.AppendLine("- Applicability: `unavailable`");
+            string token = DimensionToken(projection, "applicability");
+            builder.AppendLine(token == "not_configured"
+                ? "- Applicability: `not_configured` — canonical applicability receipt not configured."
+                : $"- Applicability: `{token}`");
         }
         else
         {
@@ -357,6 +360,7 @@ internal static partial class PrReportMarkdownRenderer
             ? new()
             : AllFindings(projection.Evidence)
                 .Where(item => item.Remediation is not null)
+                .Where(item => !IsCurrentBuildStatePreflight(item))
                 .GroupBy(item => item.CanonicalIdentity, StringComparer.Ordinal)
                 .Select(group => group.First())
                 .OrderBy(item => item.Remediation!.Category, StringComparer.Ordinal)
@@ -372,6 +376,19 @@ internal static partial class PrReportMarkdownRenderer
         AppendBounded(builder, "Remediation categories", entries.Count, entries, maxDetails,
             static item => $"- {item}");
         return true;
+    }
+
+    private static bool IsCurrentBuildStatePreflight(ArchitecturePrReportFinding finding)
+    {
+        if (!string.Equals(finding.Kind, "build_state_preflight", StringComparison.Ordinal)
+            || finding.Details.ValueKind != System.Text.Json.JsonValueKind.Object
+            || !finding.Details.TryGetProperty("state", out System.Text.Json.JsonElement state))
+        {
+            return false;
+        }
+
+        return state.ValueKind == System.Text.Json.JsonValueKind.String
+            && string.Equals(state.GetString(), "current", StringComparison.Ordinal);
     }
 
     private static void AppendChangeEntries(

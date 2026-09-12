@@ -10,7 +10,8 @@ internal static class PrReportMarkdownHealth
 {
     internal static bool AppendHealthExplanation(
         StringBuilder builder,
-        ArchitecturePrReportProjection projection)
+        ArchitecturePrReportProjection projection,
+        int maxDetails)
     {
         List<HealthExplanationView> explanations = BuildHealthExplanations(projection)
             .OrderBy(item => item.Dimension, StringComparer.Ordinal)
@@ -25,12 +26,19 @@ internal static class PrReportMarkdownHealth
         foreach (HealthExplanationView explanation in explanations)
         {
             string classification = explanation.IsBlocking ? "blocking" : "advisory";
-            string reasons = explanation.Reasons.Count == 0
+            List<string> formattedReasons = explanation.Reasons
+                .OrderBy(item => item.Code, StringComparer.Ordinal)
+                .ThenBy(item => item.Source, StringComparer.Ordinal)
+                .Select(FormatHealthReason)
+                .ToList();
+            int shown = Math.Min(maxDetails, formattedReasons.Count);
+            string reasons = formattedReasons.Count == 0
                 ? "no canonical reason supplied"
-                : string.Join(", ", explanation.Reasons
-                    .OrderBy(item => item.Code, StringComparer.Ordinal)
-                    .ThenBy(item => item.Source, StringComparer.Ordinal)
-                    .Select(FormatHealthReason));
+                : string.Join(", ", formattedReasons.Take(shown));
+            if (formattedReasons.Count > shown)
+            {
+                reasons += $"; {formattedReasons.Count - shown} more reason(s) omitted (see immutable bundle)";
+            }
             builder.AppendLine(
                 $"- `{Inline(explanation.Dimension)}` state=`{DimensionToken(explanation.State)}` " +
                 $"classification=`{classification}`: {reasons}");
@@ -92,8 +100,16 @@ internal static class PrReportMarkdownHealth
     }
 
     private static string FormatHealthReason(ArchitectureHealthReason reason) =>
-        $"`{Inline(reason.Code)}`{FormatReasonIdentity(reason)}" +
-        (string.IsNullOrWhiteSpace(reason.Source) ? string.Empty : $" source=`{Inline(reason.Source)}`");
+        $"`{Inline(Bounded(reason.Code))}`{FormatReasonIdentityBounded(reason)}" +
+        (string.IsNullOrWhiteSpace(reason.Source) ? string.Empty : $" source=`{Inline(Bounded(reason.Source))}`");
+
+    private static string FormatReasonIdentityBounded(ArchitectureHealthReason reason)
+    {
+        string identity = reason.EvidenceIdentity ?? reason.ControlIdentity ?? reason.PolicyIdentity ?? string.Empty;
+        return string.IsNullOrWhiteSpace(identity) ? string.Empty : $" (`{Inline(Bounded(identity))}`)";
+    }
+
+    private static string Bounded(string value) => value.Length <= 256 ? value : value[..253] + "...";
 
     private static bool IsBlockingState(ArchitectureHealthDimensionState state) =>
         state is ArchitectureHealthDimensionState.Fail or ArchitectureHealthDimensionState.Unassessable;

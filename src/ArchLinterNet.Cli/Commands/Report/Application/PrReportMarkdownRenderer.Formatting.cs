@@ -19,9 +19,15 @@ internal static class PrReportMarkdownFormatter
     internal static string ApplicabilityHeadline(ArchitecturePrReportProjection projection)
     {
         ArchitecturePrReportApplicability? applicability = PrimaryReceipt(projection)?.Applicability;
-        return applicability is null
-            ? "`unavailable`"
-            : $"`{Inline(applicability.State)}` — {applicability.Summary.RequiredEvaluable}/{applicability.Summary.Required} evaluable";
+        if (applicability is not null)
+        {
+            return $"`{Inline(applicability.State)}` — {applicability.Summary.RequiredEvaluable}/{applicability.Summary.Required} evaluable";
+        }
+
+        string token = DimensionToken(projection, "applicability");
+        return token == "not_configured"
+            ? "`not_configured` — canonical applicability receipt not configured"
+            : $"`{token}`";
     }
 
     internal static string TopologyHeadline(ArchitecturePrReportProjection projection)

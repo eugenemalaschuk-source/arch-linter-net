@@ -1,0 +1,70 @@
+{
+  "schema_id": "architecture-health/v1",
+  "gate": "pass",
+  "health": "degrading",
+  "dimensions": [
+    {
+      "name": "applicability",
+      "state": "not_configured",
+      "reasons": []
+    },
+    {
+      "name": "waivers",
+      "state": "degrading",
+      "reasons": [
+        {
+          "code": "metadata_incomplete",
+          "source": "waiver_lifecycle",
+          "evidence_identity": "waiver-799-01"
+        }
+      ]
+    }
+  ],
+  "report_evidence": {
+    "schema_version": 2,
+    "kind": "architecture-health-report-evidence",
+    "gate": "pass",
+    "health": "degrading",
+    "execution_context": { "execution_id": "run-799", "condition_set": "strict" },
+    "validation_outcomes": [
+      {
+        "mode": "strict",
+        "availability": {
+            "applicability": "unavailable",
+          "external_evidence": "not_configured",
+          "findings": "available",
+          "policy_inventory": "available",
+          "topology": "not_configured",
+          "waiver_lifecycle": "available"
+        },
+        "policy_inventory": {
+          "schema": "architecture-policy-inventory/v1",
+          "effective_rule_count": 1,
+          "rules": { "strict": 1, "audit": 0, "coverage": 0 },
+          "ignore_debt": { "total": 14, "active": 0, "stale": 0, "expired": 0, "metadata_incomplete": 14, "invalid": 0 },
+          "waivers": []
+        },
+        "waiver_lifecycle": { "profile": "strict", "records": [], "blocking_states": [] },
+        "findings": [],
+        "provenance": {
+          "repository_root": "/repo",
+          "policy_import_paths": [],
+          "resolved_assembly_paths": [],
+          "discovered_project_paths": []
+        }
+      }
+    ],
+    "debt_gate": {
+      "succeeded": true,
+      "passed": true,
+      "evaluation": {
+        "completed": true,
+        "mode": "strict",
+        "reused_analysis_snapshot": true,
+        "preflight_diagnostics": []
+      },
+      "persistent_debt": { "succeeded": true, "in_sync": true, "entries": [], "configuration_violations": [] },
+      "policy_weakening": { "requested": false }
+    }
+  }
+}

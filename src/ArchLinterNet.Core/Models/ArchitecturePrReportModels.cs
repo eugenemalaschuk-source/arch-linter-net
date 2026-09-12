@@ -407,16 +407,23 @@ public sealed record ArchitecturePrReportNavigationContext(
         }
 
         string[] segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
-        bool prefix = segments.Length is 5 or 7
+        bool prefix = segments.Length is 5 or 7 or 9
             && string.Equals(segments[0], repository[0], StringComparison.OrdinalIgnoreCase)
             && string.Equals(segments[1], repository[1], StringComparison.OrdinalIgnoreCase)
             && string.Equals(segments[2], "actions", StringComparison.Ordinal)
             && string.Equals(segments[3], "runs", StringComparison.Ordinal)
             && IsDigits(segments[4]);
+        bool attempt = segments.Length is 7 or 9
+            && string.Equals(segments[5], "attempts", StringComparison.Ordinal)
+            && IsDigits(segments[6]);
         bool artifact = segments.Length == 7
             && string.Equals(segments[5], "artifacts", StringComparison.Ordinal)
             && IsDigits(segments[6]);
-        return prefix && (segments.Length == 5 || artifact)
+        bool attemptArtifact = segments.Length == 9
+            && attempt
+            && string.Equals(segments[7], "artifacts", StringComparison.Ordinal)
+            && IsDigits(segments[8]);
+        return prefix && (segments.Length == 5 || artifact || attempt || attemptArtifact)
             ? $"https://github.com/{repository[0]}/{repository[1]}/{string.Join('/', segments[2..])}" : null;
     }
 
