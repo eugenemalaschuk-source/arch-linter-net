@@ -95,10 +95,18 @@ function publicRoute(pathname: string): PublicRoute | undefined {
   // the segment form keeps the versioned route easy to compose.
   if (parts.length === 3 && isOpaqueAlias(parts[2])) return { alias: parts[2] };
   if (parts.length === 4 && isOpaqueAlias(parts[2]) && (parts[3] === "json" || parts[3] === "svg")) return { alias: parts[2], representation: parts[3] };
-  if (parts.length === 3 && (parts[2].endsWith(".json") || parts[2].endsWith(".svg"))) {
-    const extension = parts[2].slice(-5);
-    const alias = parts[2].slice(0, -5);
-    if (isOpaqueAlias(alias)) return { alias, representation: extension === ".json" ? "json" : "svg" };
+  if (parts.length === 3) {
+    let representation: PublicRepresentation | undefined;
+    let suffixLength = 0;
+    if (parts[2].endsWith(".json")) {
+      representation = "json";
+      suffixLength = ".json".length;
+    } else if (parts[2].endsWith(".svg")) {
+      representation = "svg";
+      suffixLength = ".svg".length;
+    }
+    const alias = parts[2].slice(0, -suffixLength);
+    if (representation && isOpaqueAlias(alias)) return { alias, representation };
   }
   return undefined;
 }

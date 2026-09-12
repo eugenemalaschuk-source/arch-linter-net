@@ -274,11 +274,15 @@ export class RelayDurableObject {
       if (challenge.jti_hash !== publisher.jtiHash || current.generation !== body.expected_generation || current.revocation_epoch !== body.expected_revocation_epoch || current.status === "revoked" || current.tombstoned) return this.finishError(409);
       if (operation === "renew" && current.last_renewed_at !== null && nowSeconds() - current.last_renewed_at < RENEWAL_MINIMUM_SECONDS) return this.finishError(409);
       const newGeneration = current.generation + 1;
-      const verifiedAt = new Date(nowSeconds() * 1000).toISOString().replace(".000Z", "Z");
+      const verifiedAt = profile === "headline-plus-freshness/v1" && payload.verified_at
+        ? payload.verified_at
+        : new Date(nowSeconds() * 1000).toISOString().replace(".000Z", "Z");
       const maxLease = nowSeconds() + LEASE_SECONDS;
       const validUntilSeconds = Math.min(maxLease, horizonSeconds);
       if (validUntilSeconds <= nowSeconds()) return this.finishError(409);
-      const validUntil = new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
+      const validUntil = profile === "headline-plus-freshness/v1" && payload.valid_until
+        ? payload.valid_until
+        : new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
       this.sql.exec("UPDATE relay_challenges SET consumed = 1 WHERE id = ? AND consumed = 0", challenge.id).toArray();
       this.sql.exec(`UPDATE relay_state SET status='ready', profile=?, generation=?, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0, last_renewed_at=?
         WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0 AND status <> 'revoked'`, profile, newGeneration, body.canonical_bytes, body.canonical_digest, verifiedAt, validUntil, horizon, nowSeconds(), body.expected_generation, body.expected_revocation_epoch).toArray();

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { decodeJwt, generateKeyPair, SignJWT, exportJWK } from "jose";
 import { env, SELF, evictDurableObject, listDurableObjectIds, runInDurableObject } from "cloudflare:test";
 import {
@@ -40,10 +40,26 @@ const alternatePayload = canonicalizePayload({
   message: "PASS · HEALTHY · 1 ignores · 42 rules",
   color: "brightgreen"
 }, "headline-only/v1");
+const freshnessAlias = "a7f4k2n9";
+const freshnessEntry: RegistryEntry = {
+  ...entry,
+  destination_alias: freshnessAlias,
+  disclosure_profile: "headline-plus-freshness/v1"
+};
+const freshnessPayload = canonicalizePayload({
+  schemaVersion: 1,
+  label: "architecture",
+  message: "PASS · HEALTHY · 0 ignores · 42 rules",
+  color: "brightgreen",
+  verified_at: "2026-09-12T10:00:00Z",
+  valid_until: "2026-09-12T10:30:00Z"
+}, "headline-plus-freshness/v1");
 
 describe("badge-relay/v1 local SQLite Durable Object", () => {
   let privateKey: CryptoKey;
   let publicJwk: Record<string, unknown>;
+
+  afterEach(() => vi.useRealTimers());
 
   beforeEach(async () => {
     clearJwksCacheForTests();
@@ -220,6 +236,42 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     const stored = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; payload_digest: string }>("SELECT status, payload_digest FROM relay_state WHERE id=1").toArray()[0]);
     expect(stored.status).toBe("ready");
     expect(stored.payload_digest).toBe(digest);
+  });
+
+  it("preserves product-owned freshness timestamps through trusted publish and public SVG reads", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:02:00Z"));
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(freshnessEntry))).toBe(true);
+
+    const jwt = await token({ jti: "freshness-e2e-jti" });
+    const digest = await canonicalPayloadDigest(freshnessPayload);
+    const horizon = "2026-09-12T10:30:00Z";
+    const prepare = await SELF.fetch(`https://relay.test/badge-relay/v1/${freshnessAlias}/prepare`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: freshnessPayload, canonical_digest: digest, profile: freshnessEntry.disclosure_profile, idempotency_key: "freshness-e2e-key", semantic_horizon: horizon })
+    });
+    expect(prepare.status).toBe(201);
+    const challenge = await prepare.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(freshnessAlias));
+    const committed = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).commitTrustedPublication({
+      body: { operation: "publish", challenge_id: challenge.challenge_id, idempotency_key: "freshness-e2e-key", canonical_bytes: freshnessPayload, canonical_digest: digest, profile: freshnessEntry.disclosure_profile, expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, semantic_horizon: horizon },
+      entry: freshnessEntry,
+      jtiHash: await sha256Hex(decodeJwt(jwt).jti as string),
+      proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
+    }));
+    expect(committed.status).toBe(200);
+
+    for (const path of [`${freshnessAlias}`, `${freshnessAlias}.svg`]) {
+      const response = await SELF.fetch(`https://relay.test/badge-relay/v1/${path}`);
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      expect(body).toContain("verified at 2026-09-12T10:00:00Z");
+      expect(body).toContain("valid until 2026-09-12T10:30:00Z");
+    }
   });
 
   it("rejects issuer, algorithm, identity, and workflow-pin failures without mutation", async () => {
