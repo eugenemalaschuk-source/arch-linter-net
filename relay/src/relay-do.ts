@@ -232,7 +232,7 @@ export class RelayDurableObject {
     return genericError(status);
   }
 
-  private async read(request: Request, kind: PublicRepresentation): Promise<Response> {
+  private async read(request: Request, kind: PublicRepresentation, entry: RegistryEntry): Promise<Response> {
     // Public reads are strictly read-only. In particular, do not call
     // ensureRegistered here: a registered alias may legitimately have no
     // publication row yet, and a GET must not create or repair one.
@@ -240,9 +240,9 @@ export class RelayDurableObject {
     try {
       current = this.sql.exec<StateRow>("SELECT * FROM relay_state WHERE id = 1").toArray()[0];
     } catch {
-      return readPublicRepresentation(request, undefined, kind, true);
+      return readPublicRepresentation(request, undefined, kind, entry, true);
     }
-    return readPublicRepresentation(request, current, kind);
+    return readPublicRepresentation(request, current, kind, entry);
   }
 
   private async publish(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "publish" | "renew" | "recover", internalProof?: unknown): Promise<Response> {
@@ -277,6 +277,8 @@ export class RelayDurableObject {
       const verifiedAt = profile === "headline-plus-freshness/v1" && payload.verified_at
         ? payload.verified_at
         : new Date(nowSeconds() * 1000).toISOString().replace(".000Z", "Z");
+      const verifiedAtSeconds = parseDateSeconds(verifiedAt);
+      if (!verifiedAtSeconds || verifiedAtSeconds > nowSeconds()) return this.finishError(409);
       const maxLease = nowSeconds() + LEASE_SECONDS;
       const validUntilSeconds = Math.min(maxLease, horizonSeconds);
       if (validUntilSeconds <= nowSeconds()) return this.finishError(409);
@@ -328,7 +330,7 @@ export class RelayDurableObject {
       const pathParts = pathname.split("/").filter(Boolean);
       const operation = pathParts.at(-1) ?? "";
       if ((request.method === "GET" || request.method === "HEAD") && pathParts.at(-2) === "read" && (operation === "json" || operation === "svg")) {
-        return await this.read(request, operation);
+        return await this.read(request, operation, entry);
       }
       this.ensureRegistered(entry);
       if (request.method !== "POST") return genericError(404);

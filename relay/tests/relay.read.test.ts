@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { canonicalPayloadDigest, canonicalizePayload } from "../src/payload";
 import { publicUnavailableResponse, readPublicRepresentation, UNAVAILABLE_CANONICAL_BYTES, type PublicReadState } from "../src/read";
+import type { RegistryEntry } from "../src/types";
 
 const headlineBytes = canonicalizePayload({
   schemaVersion: 1,
@@ -27,9 +28,14 @@ async function state(bytes: string, profile: "headline-only/v1" | "headline-plus
     payload_digest: await canonicalPayloadDigest(bytes),
     verified_at: profile === "headline-plus-freshness/v1" ? "2026-09-12T10:00:00Z" : "2026-09-12T10:00:00Z",
     valid_until: "2026-09-12T11:00:00Z",
+    semantic_horizon: "2026-09-12T11:00:00Z",
+    revocation_epoch: 1,
     tombstoned: 0
   };
 }
+
+const entry = { disclosure_profile: "headline-only/v1", initial_state: { revocation_epoch: 1 } } as unknown as RegistryEntry;
+const freshnessEntry = { disclosure_profile: "headline-plus-freshness/v1", initial_state: { revocation_epoch: 1 } } as unknown as RegistryEntry;
 
 describe("public Relay read seam", () => {
   afterEach(() => vi.useRealTimers());
@@ -37,7 +43,7 @@ describe("public Relay read seam", () => {
   it("serves exact ready JSON and bounds cache by the remaining lease", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-12T10:15:00Z"));
-    const response = await readPublicRepresentation(new Request("https://relay.test/badge-relay/v1/a7f4k2m9/json"), await state(headlineBytes), "json");
+    const response = await readPublicRepresentation(new Request("https://relay.test/badge-relay/v1/a7f4k2m9/json"), await state(headlineBytes), "json", entry);
     expect(response.status).toBe(200);
     expect(await response.text()).toBe(headlineBytes);
     expect(response.headers.get("cache-control")).toBe("public, max-age=2700, must-revalidate");
@@ -49,15 +55,15 @@ describe("public Relay read seam", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-12T10:15:00Z"));
     const request = new Request("https://relay.test/badge-relay/v1/a7f4k2m9/json");
-    const first = await readPublicRepresentation(request, await state(headlineBytes), "json");
+    const first = await readPublicRepresentation(request, await state(headlineBytes), "json", entry);
     const etag = first.headers.get("etag") as string;
-    const conditional = await readPublicRepresentation(new Request(request, { headers: { "if-none-match": etag } }), await state(headlineBytes), "json");
+    const conditional = await readPublicRepresentation(new Request(request, { headers: { "if-none-match": etag } }), await state(headlineBytes), "json", entry);
     expect(conditional.status).toBe(304);
-    const head = await readPublicRepresentation(new Request(request, { method: "HEAD" }), await state(headlineBytes), "json");
+    const head = await readPublicRepresentation(new Request(request, { method: "HEAD" }), await state(headlineBytes), "json", entry);
     expect(head.status).toBe(200);
     expect(await head.text()).toBe("");
     vi.setSystemTime(new Date("2026-09-12T11:00:00Z"));
-    const expired = await readPublicRepresentation(new Request(request, { headers: { "if-none-match": etag } }), await state(headlineBytes), "json");
+    const expired = await readPublicRepresentation(new Request(request, { headers: { "if-none-match": etag } }), await state(headlineBytes), "json", entry);
     expect(expired.status).toBe(404);
     expect(await expired.text()).toBe(UNAVAILABLE_CANONICAL_BYTES);
     expect(expired.headers.get("etag")).toBeNull();
@@ -69,10 +75,10 @@ describe("public Relay read seam", () => {
     vi.setSystemTime(new Date("2026-09-12T10:15:00Z"));
     const corrupt = await state(headlineBytes);
     corrupt.payload_digest = "0".repeat(64);
-    const response = await readPublicRepresentation(new Request("https://relay.test"), corrupt, "json");
+    const response = await readPublicRepresentation(new Request("https://relay.test"), corrupt, "json", entry);
     expect(response.status).toBe(404);
     expect(await response.text()).toBe(UNAVAILABLE_CANONICAL_BYTES);
-    const svg = await readPublicRepresentation(new Request("https://relay.test"), await state(headlineBytes), "svg");
+    const svg = await readPublicRepresentation(new Request("https://relay.test"), await state(headlineBytes), "svg", entry);
     expect(svg.status).toBe(404);
     expect(svg.headers.get("content-type")).toContain("image/svg+xml");
     expect(await svg.text()).toContain("UNASSESSABLE");
@@ -81,7 +87,7 @@ describe("public Relay read seam", () => {
   it("renders a fixed freshness SVG with safe text and a visible UTC boundary", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-12T10:15:00Z"));
-    const response = await readPublicRepresentation(new Request("https://relay.test"), await state(freshnessBytes, "headline-plus-freshness/v1"), "svg");
+    const response = await readPublicRepresentation(new Request("https://relay.test"), await state(freshnessBytes, "headline-plus-freshness/v1"), "svg", freshnessEntry);
     const body = await response.text();
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("image/svg+xml");

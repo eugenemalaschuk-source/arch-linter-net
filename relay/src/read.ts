@@ -1,6 +1,6 @@
 import { canonicalPayloadDigest, validateCanonicalPayload } from "./payload";
 import { sha256Hex } from "./security";
-import { MAX_PUBLIC_PAYLOAD_BYTES, type CanonicalPayload, type DisclosureProfile } from "./types";
+import { LEASE_SECONDS, MAX_PUBLIC_PAYLOAD_BYTES, type CanonicalPayload, type DisclosureProfile, type RegistryEntry } from "./types";
 
 /** The product-owned unavailable bytes. Keep this byte string stable. */
 export const UNAVAILABLE_CANONICAL_BYTES = String.raw`{"schemaVersion":1,"label":"architecture","message":"UNASSESSABLE \u00B7 ? ignores \u00B7 ? rules","color":"lightgrey"}`;
@@ -15,6 +15,8 @@ export interface PublicReadState {
   payload_digest: unknown;
   verified_at: unknown;
   valid_until: unknown;
+  semantic_horizon: unknown;
+  revocation_epoch: unknown;
   tombstoned: unknown;
 }
 
@@ -111,10 +113,14 @@ function renderSvg(payload: CanonicalPayload, verifiedAt: string | undefined, va
   return `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="${height}" viewBox="0 0 420 ${height}"><rect width="420" height="${height}" rx="3" fill="#fff" stroke="#bbb"/><rect width="112" height="34" rx="3" fill="#555"/><rect x="112" width="308" height="34" rx="3" fill="${color}"/><text x="56" y="22" fill="#fff" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">${label}</text><text x="266" y="22" fill="#fff" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">${message}</text>${freshness}</svg>`;
 }
 
-async function validateReadState(state: PublicReadState): Promise<ValidatedReadState | undefined> {
+async function validateReadState(state: PublicReadState, entry: RegistryEntry): Promise<ValidatedReadState | undefined> {
   if (state.status !== "ready" || state.tombstoned !== 0) return undefined;
   const profile = state.profile === "headline-only/v1" || state.profile === "headline-plus-freshness/v1" ? state.profile : undefined;
   if (!profile || typeof state.payload !== "string" || typeof state.payload_digest !== "string" || typeof state.verified_at !== "string" || typeof state.valid_until !== "string") return undefined;
+  if (profile !== entry.disclosure_profile) return undefined;
+  const expectedEpoch = entry.initial_state?.revocation_epoch ?? 1;
+  if (!Number.isSafeInteger(expectedEpoch) || state.revocation_epoch !== expectedEpoch) return undefined;
+  if (typeof state.semantic_horizon !== "string") return undefined;
   if (state.payload.length === 0 || new TextEncoder().encode(state.payload).byteLength > MAX_PUBLIC_PAYLOAD_BYTES) return undefined;
   const generation = state.generation;
   if (typeof generation !== "number" || !Number.isSafeInteger(generation) || generation <= 0) return undefined;
@@ -124,7 +130,9 @@ async function validateReadState(state: PublicReadState): Promise<ValidatedReadS
   if (!payload) return undefined;
   const verifiedAtSeconds = timestampSeconds(state.verified_at);
   const validUntilSeconds = timestampSeconds(state.valid_until);
-  if (verifiedAtSeconds === undefined || validUntilSeconds === undefined || validUntilSeconds <= verifiedAtSeconds) return undefined;
+  const semanticHorizonSeconds = timestampSeconds(state.semantic_horizon);
+  if (verifiedAtSeconds === undefined || validUntilSeconds === undefined || semanticHorizonSeconds === undefined || validUntilSeconds <= verifiedAtSeconds) return undefined;
+  if (validUntilSeconds > semanticHorizonSeconds || validUntilSeconds > verifiedAtSeconds + LEASE_SECONDS) return undefined;
   if (profile === "headline-plus-freshness/v1" && (payload.verified_at !== state.verified_at || payload.valid_until !== state.valid_until)) return undefined;
   const payloadDigest = await canonicalPayloadDigest(state.payload);
   if (!/^[0-9a-f]{64}$/u.test(state.payload_digest) || payloadDigest !== state.payload_digest) return undefined;
@@ -145,10 +153,11 @@ export async function readPublicRepresentation(
   request: Request,
   state: PublicReadState | undefined,
   kind: PublicRepresentation,
+  entry: RegistryEntry,
   storageUncertain = false
 ): Promise<Response> {
   if (storageUncertain || !state) return unavailableResponse(request, kind, storageUncertain ? 503 : 404);
-  const validated = await validateReadState(state);
+  const validated = await validateReadState(state, entry);
   if (!validated) return unavailableResponse(request, kind, unavailableStatus(state));
 
   // Expiry is intentionally checked before constructing or comparing an ETag.

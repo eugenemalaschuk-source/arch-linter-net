@@ -145,10 +145,11 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     const digest = await canonicalPayloadDigest(payload);
     await runInDurableObject(stub, async (_instance, state) => {
       state.storage.sql.exec(
-        "UPDATE relay_state SET status='ready', generation=7, payload=?, payload_digest=?, verified_at=?, valid_until=?, tombstoned=0 WHERE id=1",
+        "UPDATE relay_state SET status='ready', generation=7, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0 WHERE id=1",
         payload,
         digest,
         "2026-09-12T10:00:00Z",
+        "2026-09-12T10:01:00Z",
         "2026-09-12T10:01:00Z");
     });
     const ready = await SELF.fetch(`https://relay.test/badge-relay/v1/${alias}`);
