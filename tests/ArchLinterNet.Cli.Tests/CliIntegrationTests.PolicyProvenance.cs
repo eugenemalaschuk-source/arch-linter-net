@@ -3,10 +3,11 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliPolicyProvenanceIntegrationTests : CliIntegrationTestBase
 {
     private static string ImportedProvenancePolicy => Path.Combine(
-        _repoRoot,
+        RepoRoot,
         "tests",
         "ArchLinterNet.Cli.Tests",
         "TestPolicies",

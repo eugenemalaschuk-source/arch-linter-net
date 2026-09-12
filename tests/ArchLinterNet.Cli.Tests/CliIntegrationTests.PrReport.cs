@@ -2,7 +2,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliPrReportIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void ReportPr_CanonicalHealthAndChangeArtifacts_RenderThroughBuiltCli()
@@ -15,16 +16,16 @@ public partial class CliIntegrationTests
         try
         {
             var (baselineExit, _, baselineError) = RunCli(
-                "baseline", "generate", "--policy", _passingPolicy, "--output", baselinePath);
+                "baseline", "generate", "--policy", PassingPolicy, "--output", baselinePath);
             Assert.That(baselineExit, Is.EqualTo(0), $"stderr: {baselineError}");
 
             var (baseSnapshotExit, _, baseSnapshotError) = RunCli(
-                "change", "snapshot", "--policy", _passingPolicy, "--baseline", baselinePath,
+                "change", "snapshot", "--policy", PassingPolicy, "--baseline", baselinePath,
                 "--mode", "strict", "--output", baseSnapshotPath);
             Assert.That(baseSnapshotExit, Is.EqualTo(0), $"stderr: {baseSnapshotError}");
 
             var (currentSnapshotExit, _, currentSnapshotError) = RunCli(
-                "change", "snapshot", "--policy", _passingPolicy, "--baseline", baselinePath,
+                "change", "snapshot", "--policy", PassingPolicy, "--baseline", baselinePath,
                 "--mode", "strict", "--output", currentSnapshotPath);
             Assert.That(currentSnapshotExit, Is.EqualTo(0), $"stderr: {currentSnapshotError}");
 
@@ -34,7 +35,7 @@ public partial class CliIntegrationTests
             Assert.That(changeExit, Is.EqualTo(0), $"stderr: {changeError}");
 
             var (healthExit, healthJson, healthError) = RunCli(
-                "health", "--policy", _passingPolicy, "--baseline", baselinePath, "--format", "json", "--execution-context", "run");
+                "health", "--policy", PassingPolicy, "--baseline", baselinePath, "--format", "json", "--execution-context", "run");
             Assert.That(healthExit, Is.EqualTo(0), $"stderr: {healthError}");
             File.WriteAllText(healthPath, healthJson);
 

@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliMeasureIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void Measure_Help_ShowsMeasureSpecificOptionsAndExitsZero()
@@ -23,7 +24,7 @@ public partial class CliIntegrationTests
     [Test]
     public void Measure_CompleteMetric_EmitsVersionedJsonAndExitsZero()
     {
-        string policy = Path.Combine(_repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-policy.yml");
+        string policy = Path.Combine(RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-policy.yml");
         var (exitCode, stdout, stderr) = RunCli("measure", "--policy", policy, "--format", "json");
 
         Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
@@ -48,7 +49,7 @@ public partial class CliIntegrationTests
     public void Measure_UnassessableMetric_EmitsTypedReportAndExitsTwo()
     {
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-unassessable-policy.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-unassessable-policy.yml");
         var (exitCode, stdout, stderr) = RunCli("measure", "--policy", policy, "--format", "json");
 
         Assert.That(exitCode, Is.EqualTo(2), $"stderr: {stderr}");
@@ -73,7 +74,7 @@ public partial class CliIntegrationTests
     public void Measure_ExplicitTargetAssemblyWithProjectMetricUsesTheDiscoveredProjectOutput()
     {
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-project-policy.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-project-policy.yml");
 
         var (exitCode, stdout, stderr) = RunCli("measure", "--policy", policy, "--format", "json");
 
@@ -94,7 +95,7 @@ public partial class CliIntegrationTests
     [Test]
     public void Measure_UnknownMetric_ReportsConfigurationErrorAndExitsTwo()
     {
-        string policy = Path.Combine(_repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-policy.yml");
+        string policy = Path.Combine(RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-policy.yml");
         var (exitCode, stdout, stderr) = RunCli(
             "measure", "--policy", policy, "--format", "json", "--metric", "missing-metric");
 

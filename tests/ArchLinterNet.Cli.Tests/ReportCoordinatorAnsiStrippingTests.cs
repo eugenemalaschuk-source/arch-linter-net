@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class ReportCoordinatorTests
+[TestFixture]
+internal sealed class ReportCoordinatorAnsiStrippingTests : ReportCoordinatorTestBase
 {
     [Test]
     public void StripAnsi_RemovesCsiAndOscSequencesFromHumanReports()

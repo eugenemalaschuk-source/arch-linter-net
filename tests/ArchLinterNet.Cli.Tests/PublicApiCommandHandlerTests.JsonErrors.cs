@@ -7,7 +7,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class PublicApiCommandHandlerTests
+[TestFixture]
+internal sealed class PublicApiCommandHandlerJsonErrorTests : PublicApiCommandHandlerTestBase
 {
     [Test]
     public void Capture_PreflightBlockedWithJson_WritesOneStructuredErrorDocument()

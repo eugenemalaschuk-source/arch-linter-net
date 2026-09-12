@@ -9,8 +9,9 @@ namespace ArchLinterNet.Cli.Tests;
 // OperationCanceledException with its generic catch (Exception), reporting real cancellation as a
 // "public-api <command> error", and never re-checked the token between Core returning an outcome
 // and the handler's own temp-write/rename publish step. Shares PublicApiCommandHandlerTests'
-// StubRuntime/StubFileSystem/RecordingConsole fixtures via the partial class.
-public sealed partial class PublicApiCommandHandlerTests
+// StubRuntime/StubFileSystem/RecordingConsole fixtures via the shared support base.
+[TestFixture]
+internal sealed class PublicApiCommandHandlerCancellationTests : PublicApiCommandHandlerTestBase
 {
     [Test]
     public void Update_CoreThrowsOperationCanceled_ReportsTypedCancelledStatusNotGenericError()

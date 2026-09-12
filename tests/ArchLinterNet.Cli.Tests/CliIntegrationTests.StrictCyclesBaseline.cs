@@ -4,7 +4,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliStrictCyclesBaselineIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void BaselineUpdateAndVerify_AcyclicStrictCycles_PersistsNoCycleEntries()

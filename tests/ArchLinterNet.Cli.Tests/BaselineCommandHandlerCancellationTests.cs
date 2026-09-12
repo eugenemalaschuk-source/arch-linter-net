@@ -9,8 +9,9 @@ namespace ArchLinterNet.Cli.Tests;
 // OperationCanceledException with its generic catch (Exception), reporting real cancellation as a
 // "<command> error", and never re-checked the token between Core returning an outcome and the
 // handler's own write/publish step. Shares BaselineCommandHandlerTests' StubRuntime/StubFileSystem/
-// RecordingConsole fixtures via the partial class.
-public sealed partial class BaselineCommandHandlerTests
+// RecordingConsole fixtures via the shared support base.
+[TestFixture]
+internal sealed class BaselineCommandCancellationTests : BaselineCommandHandlerTestBase
 {
     [Test]
     public void BaselineUpdate_CoreThrowsOperationCanceled_ReportsTypedCancelledStatusNotGenericError()
@@ -21,7 +22,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write,
+                "policy.yml", "baseline.yml", "updated.yml", Reasons, "strict", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -42,7 +43,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "json", _write,
+                "policy.yml", "baseline.yml", "updated.yml", Reasons, "strict", null, "json", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -70,7 +71,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem, cts.Token).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write,
+                "policy.yml", "baseline.yml", "updated.yml", Reasons, "strict", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -99,7 +100,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem, cts.Token).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write,
+                "policy.yml", "baseline.yml", "updated.yml", Reasons, "strict", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -125,7 +126,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         int result = new BaselineGenerateCommandHandler(runtime, console, fileSystem, cts.Token).Execute(
             new BaselineGenerateCommandOptions(
-                "policy.yml", "generated.yml", _reasons, "strict", null, "human", _write,
+                "policy.yml", "generated.yml", Reasons, "strict", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>

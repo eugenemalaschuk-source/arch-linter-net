@@ -6,7 +6,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class BaselineCommandHandlerTests
+[TestFixture]
+internal sealed class BaselineCommandMigrateTests : BaselineCommandHandlerTestBase
 {
     [Test]
     public void BaselineMigrate_Success_WritesYamlAndFormatsJsonAndHumanOutput()

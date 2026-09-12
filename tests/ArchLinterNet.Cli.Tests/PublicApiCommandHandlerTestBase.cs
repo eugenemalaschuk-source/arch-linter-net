@@ -1,16 +1,43 @@
 using System.Text;
+using System.Text.Json;
+using ArchLinterNet.Cli;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands.PublicApi;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
+using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class PublicApiCommandHandlerTests
+internal abstract class PublicApiCommandHandlerTestBase
 {
-    private sealed class StubFileSystem(params string[] existingPaths) : IFileSystem
+    protected static readonly string[] StaleEntries = { "class Acme.Gone" };
+    protected static readonly string[] UndeclaredEntries = { "class Acme.New" };
+    protected static readonly string[] AcceptedStaleEntries = { "class Acme.Gone" };
+    protected static readonly string[] AcceptedEntries = { "class Acme.Gone" };
+    protected const string PolicyPath = "architecture/dependencies.arch.yml";
+    protected const string SnapshotPath = "architecture/api/module-api.txt";
+    protected const string ContractId = "module-api";
+    protected const string CapturedSnapshot = "@format arch-linter-net/public-api-snapshot\n@version 1\n";
+
+    protected static PublicApiDelta DriftDelta()
+    {
+        return new PublicApiDelta(
+            new[] { new PublicApiDeltaEntry(PublicApiDeltaKind.Added, "Acme", "class Acme.New", null) },
+            new[] { new PublicApiDeltaEntry(PublicApiDeltaKind.Removed, "Acme", "class Acme.Gone", "class Acme.Gone") },
+            new[]
+            {
+                new PublicApiDeltaEntry(
+                    PublicApiDeltaKind.Changed, "Acme",
+                    "method Acme.Thing.Do(): System.Boolean", "method Acme.Thing.Do(): System.Void"),
+            });
+    }
+
+
+    protected sealed class StubFileSystem(params string[] existingPaths) : IFileSystem
     {
         private readonly HashSet<string> _existingPaths = new(existingPaths, StringComparer.Ordinal);
 
@@ -76,7 +103,7 @@ public sealed partial class PublicApiCommandHandlerTests
         public bool CanWriteToDirectory(string path) => true;
     }
 
-    private sealed class RecordingConsole : ICliConsole
+    protected sealed class RecordingConsole : ICliConsole
     {
         private readonly StringBuilder _output = new();
         private readonly StringBuilder _error = new();
@@ -96,7 +123,7 @@ public sealed partial class PublicApiCommandHandlerTests
         public string ErrorText => _error.ToString();
     }
 
-    private sealed class StubRuntime : ICliRuntime
+    protected sealed class StubRuntime : ICliRuntime
     {
         public PublicApiCaptureOutcome? CaptureOutcome { get; init; }
 
@@ -252,4 +279,5 @@ public sealed partial class PublicApiCommandHandlerTests
 
         public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request) => throw new NotSupportedException();
     }
+
 }

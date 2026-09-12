@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliPrReportExternalEvidenceIntegrationTests : CliIntegrationTestBase
 {
     [TestCase("revision", 0, "complete", "current")]
     [TestCase("other-revision", 2, "unassessable", "stale")]

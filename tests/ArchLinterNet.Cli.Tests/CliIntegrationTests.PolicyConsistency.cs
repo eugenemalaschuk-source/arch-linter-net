@@ -3,13 +3,14 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public partial class CliIntegrationTests
+[TestFixture]
+internal sealed class CliPolicyConsistencyIntegrationTests : CliIntegrationTestBase
 {
     [Test]
     public void DuplicateContractId_DefaultsToError_ExitsOneAndReportsFinding()
     {
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "policy-consistency-duplicate-id.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "policy-consistency-duplicate-id.yml");
         var (exitCode, stdout, _) = RunCli("--policy", policy, "--strict");
 
         Assert.Multiple(() =>
@@ -23,7 +24,7 @@ public partial class CliIntegrationTests
     public void DuplicateContractId_JsonOutput_IncludesPolicyConsistencyFindings()
     {
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "policy-consistency-duplicate-id.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "policy-consistency-duplicate-id.yml");
         var (exitCode, stdout, _) = RunCli("--policy", policy, "--strict", "--json");
 
         Assert.That(exitCode, Is.EqualTo(1));
@@ -39,7 +40,7 @@ public partial class CliIntegrationTests
     public void AllowForbidConflict_WithWarnSeverity_ExitsZeroButReportsFinding()
     {
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "policy-consistency-allow-forbid-conflict.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "policy-consistency-allow-forbid-conflict.yml");
         var (exitCode, stdout, _) = RunCli("--policy", policy, "--strict");
 
         Assert.Multiple(() =>
@@ -53,7 +54,7 @@ public partial class CliIntegrationTests
     public void UnmatchedLayerExclusion_DefaultsToError_ExitsOneAndReportsFinding()
     {
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies",
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies",
             "policy-consistency-unmatched-layer-exclusion.yml");
         var (exitCode, stdout, _) = RunCli("--policy", policy, "--strict");
 
@@ -72,7 +73,7 @@ public partial class CliIntegrationTests
         // layers.<name>.exclude[<index>] element, not just the owning layer, so JSON/SARIF/Testing
         // API consumers get typed provenance for the specific exclude entry.
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies",
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies",
             "policy-consistency-unmatched-layer-exclusion.yml");
         var (exitCode, stdout, _) = RunCli("--policy", policy, "--strict", "--json");
 
@@ -98,7 +99,7 @@ public partial class CliIntegrationTests
     public void InvalidPolicyConsistencyValue_ExitsWithError()
     {
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "invalid-policy-consistency-config.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "invalid-policy-consistency-config.yml");
         var (exitCode, _, stderr) = RunCli("--policy", policy, "--strict");
 
         Assert.Multiple(() =>

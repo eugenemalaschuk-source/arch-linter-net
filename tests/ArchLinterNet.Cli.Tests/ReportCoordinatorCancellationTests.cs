@@ -8,8 +8,9 @@ namespace ArchLinterNet.Cli.Tests;
 
 // Split out of ReportCoordinatorTests.cs (which grew past the file-size lint threshold) — issue
 // #375's multi-sink commit cancellation coverage. Shares that file's private StubFileSystem/
-// CountingRuntime/CapturingConsole/PassedOutcome fixtures via the partial class.
-public sealed partial class ReportCoordinatorTests
+// CountingRuntime/CapturingConsole/PassedOutcome fixtures via the shared support base.
+[TestFixture]
+internal sealed class ReportCoordinatorCancellationTests : ReportCoordinatorTestBase
 {
     private static readonly string[] _oneJsonPath = { "one.json" };
     private static readonly string[] _oneJsonAndTwoSarifPaths = { "one.json", "two.sarif" };

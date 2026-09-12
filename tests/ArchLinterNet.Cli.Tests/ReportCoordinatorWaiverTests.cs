@@ -7,7 +7,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class ReportCoordinatorTests
+[TestFixture]
+internal sealed class ReportCoordinatorWaiverTests : ReportCoordinatorTestBase
 {
     [Test]
     public void RouteSingleOutcome_WaiversAreIncludedInHumanAndJsonOutput()

@@ -3,7 +3,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
-public sealed partial class ValidateCommandHandlerReportModeTests
+[TestFixture]
+internal sealed class ValidateCommandCheckpointATests : ValidateCommandHandlerTestBase
 {
     private static readonly string[] _value = { "result.json", "result.sarif" };
     [Test]

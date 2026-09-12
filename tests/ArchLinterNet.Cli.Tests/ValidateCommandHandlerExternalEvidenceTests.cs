@@ -13,10 +13,11 @@ namespace ArchLinterNet.Cli.Tests;
 // bound through ValidateCommandHandler, proving the CLI option surface reaches
 // ArchitectureExternalEvidenceBinder and that its result correctly drives Human/JSON output and the
 // existing PASS/FAIL/UNASSESSABLE -> 0/1/2 exit-code contract. Reuses FakeCliRuntime/FakeCliConsole/
-// FakeFileSystem declared in ValidateCommandHandlerReportModeTests (partial class).
+// FakeFileSystem is provided by ValidateCommandHandlerTestBase.
 // See ArchitectureExternalEvidenceBinderTests (Core) for the underlying trust/selection/applicability
 // behavior and ValidateCommandExternalEvidenceDefinitionTests (Cli) for option-syntax parsing.
-public sealed partial class ValidateCommandHandlerReportModeTests
+[TestFixture]
+internal sealed class ValidateCommandExternalEvidenceTests : ValidateCommandHandlerTestBase
 {
     [Test]
     public void ExternalEvidence_RequiredArtifactWithFindings_AppearsInJsonOutputAndPasses()
