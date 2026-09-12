@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class BuildStatePreflightTests
+public sealed class BuildStatePreflightConsumedInputsTests : BuildStatePreflightTestBase
 {
     [Test]
     public void Evaluate_CurrentArtifact_ReportsExactConsumedProjectInputs()

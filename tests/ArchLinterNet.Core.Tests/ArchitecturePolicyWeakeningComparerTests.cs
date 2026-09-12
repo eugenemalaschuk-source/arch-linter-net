@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class ArchitecturePolicyWeakeningComparerTests
+public sealed class ArchitecturePolicyWeakeningComparerTests
 {
     [Test]
     public void Compare_StrictToSameControlAudit_ReportsSemanticDowngradeWithImportedProvenance()
@@ -631,7 +631,7 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
         Assert.That(result.Findings, Is.Empty);
     }
 
-    private static ArchitecturePolicyContextExport Context(
+    internal static ArchitecturePolicyContextExport Context(
         IReadOnlyList<ArchitecturePolicyContextContract>? contracts = null,
         IReadOnlyList<ArchitecturePolicyContextSourceSet>? sourceSets = null,
         IReadOnlyList<ArchitecturePolicyContextSourceExpansion>? expansions = null,
@@ -658,7 +658,7 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
             Waivers = waivers ?? [],
         };
 
-    private static ArchitecturePolicyContextWaiver Waiver(string id, string targetFingerprint, string expires = "2026-10-01") => new(
+    internal static ArchitecturePolicyContextWaiver Waiver(string id, string targetFingerprint, string expires = "2026-10-01") => new(
         "strict",
         "dependency",
         "boundary",
@@ -672,7 +672,7 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
         "Temporary extraction waiver",
         _importedProvenance);
 
-    private static ArchitecturePolicyContextAnalysis Analysis(
+    internal static ArchitecturePolicyContextAnalysis Analysis(
         IReadOnlyList<string>? targetAssemblies = null,
         IReadOnlyList<string>? projects = null,
         IReadOnlyList<string>? projectInclude = null,
@@ -680,7 +680,7 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
         IReadOnlyList<string>? sourceRoots = null) => new(
         targetAssemblies ?? [], projects ?? [], projectInclude ?? [], projectExclude ?? [], sourceRoots ?? []);
 
-    private static ArchitecturePolicyContextContract Contract(
+    internal static ArchitecturePolicyContextContract Contract(
         string mode,
         string family,
         string id,
@@ -700,32 +700,32 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
         [],
         provenance);
 
-    private static ArchitecturePolicyContextContract PublicApiContract(string id, string role) => Contract(
+    internal static ArchitecturePolicyContextContract PublicApiContract(string id, string role) => Contract(
         "strict",
         "public_api_surface",
         id,
         [new ArchitecturePolicyContextContractFact("surface_selector", [], [Fact("role", role)])]);
 
-    private static ArchitecturePolicyContextContractFact Fact(string name, params string[] values) => new(name, values, []);
+    internal static ArchitecturePolicyContextContractFact Fact(string name, params string[] values) => new(name, values, []);
 
-    private static ArchitecturePolicyContextContractFact FactItems(
+    internal static ArchitecturePolicyContextContractFact FactItems(
         string name,
         params ArchitecturePolicyContextContractFact[] items) => new(name, [], items);
 
-    private static ArchitecturePolicyContextExpandedInstance Expanded(string source) => new(
+    internal static ArchitecturePolicyContextExpandedInstance Expanded(string source) => new(
         "core-dependency", source, null, null, false, "", null, null, null);
 
-    private static ArchitecturePolicyMembershipEvidence Membership(ArchitecturePolicyContextExport context, IReadOnlyList<string> subjects) => new(
+    internal static ArchitecturePolicyMembershipEvidence Membership(ArchitecturePolicyContextExport context, IReadOnlyList<string> subjects) => new(
         ArchitecturePolicyMembershipEvidence.CurrentSchemaVersion,
         ArchitecturePolicyMembershipEvidence.EvidenceKind,
         ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(context),
         true,
         [new ArchitecturePolicyContractMembership("public_api_surface", "Api", subjects)]);
 
-    private static readonly ArchitecturePolicyContextProvenance _importedProvenance = new(
+    internal static readonly ArchitecturePolicyContextProvenance _importedProvenance = new(
         "architecture/policy/contracts.yml", "architecture/policy.yml", "fragment", "contracts.strict[0]", 1);
 
-    private static readonly string[] _staticScopeAndPredicateChangeFindingKinds =
+    internal static readonly string[] _staticScopeAndPredicateChangeFindingKinds =
     [
         "analysis_project_exclude_impact_not_proven",
         "analysis_projects_impact_not_proven",
@@ -735,38 +735,38 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
         "typed_fact_impact_not_proven",
     ];
 
-    private static readonly string[] _matchedSubtractionAndUniversalIgnoreFindingKinds =
+    internal static readonly string[] _matchedSubtractionAndUniversalIgnoreFindingKinds =
     [
         "effective_source_removed",
         "source_exclusion_added",
         "universal_exception_added",
     ];
 
-    private static readonly string[] _requiredValue = ["required"];
+    internal static readonly string[] _requiredValue = ["required"];
 
-    private static readonly string[] _optionalValue = ["optional"];
+    internal static readonly string[] _optionalValue = ["optional"];
 
-    private static readonly string[] _optionalEmptyValue = ["optional_empty"];
+    internal static readonly string[] _optionalEmptyValue = ["optional_empty"];
 
-    private static readonly string[] _projectGlobChangeFindingKinds =
+    internal static readonly string[] _projectGlobChangeFindingKinds =
     [
         "analysis_project_exclude_impact_not_proven",
         "analysis_project_include_impact_not_proven",
     ];
 
-    private static readonly string[] _requiredTemplateLayerAndCoverageInputFindingKinds =
+    internal static readonly string[] _requiredTemplateLayerAndCoverageInputFindingKinds =
     [
         "required_input_made_optional",
         "required_layer_made_optional",
     ];
 
-    private static readonly string[] _trueValue = ["true"];
+    internal static readonly string[] _trueValue = ["true"];
 
-    private static readonly string[] _falseValue = ["false"];
+    internal static readonly string[] _falseValue = ["false"];
 
-    private static readonly string[] _legacyContractSubject = ["Sample.Api:Sample.Api.LegacyContract"];
+    internal static readonly string[] _legacyContractSubject = ["Sample.Api:Sample.Api.LegacyContract"];
 
-    private static readonly string[] _crossFamilyFindingKinds =
+    internal static readonly string[] _crossFamilyFindingKinds =
     [
         "analysis_projects_impact_not_proven",
         "source_exclusion_added",

@@ -6,18 +6,22 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-[TestFixture]
-public sealed partial class ArchitectureSourceFileFactIndexTests
+/// <summary>
+/// Shared source-index test support and the core single-file/ambiguity scenarios. Edge cases live
+/// in a separate focused fixture so test responsibilities do not form a partial aggregate.
+/// </summary>
+public abstract class ArchitectureSourceFileFactIndexTestBase
 {
-    private static readonly Assembly _testAssembly = typeof(ArchitectureSourceFileFactIndexTests).Assembly;
-    private static readonly Assembly[] _testAssemblyOnly = [_testAssembly];
-    private const string TestAssemblyName = "ArchLinterNet.Core.Tests";
+    protected static readonly Assembly _testAssembly = typeof(ArchitectureSourceFileFactIndexTestBase).Assembly;
+    protected static readonly Assembly[] _testAssemblyOnly = [_testAssembly];
+    protected const string TestAssemblyName = "ArchLinterNet.Core.Tests";
 
-    private static readonly string[] _srcDomain = ["src", "Domain"];
-    private static readonly string[] _srcMyProjectDomain = ["src", "MyProject", "Domain"];
-    private static readonly string[] _srcRoot = ["src"];
-    private static readonly string[] _nsSegments = ["ArchLinterNet", "Core", "Tests", "SourceFactFixtures"];
-    private static readonly string[] _fileTypeNames =
+    protected static readonly string[] _srcDomain = ["src", "Domain"];
+    protected static readonly string[] _srcMyProjectDomain = ["src", "MyProject", "Domain"];
+    protected static readonly string[] _srcRoot = ["src"];
+    protected static readonly string[] _singleSourceRoot = ["src"];
+    protected static readonly string[] _nsSegments = ["ArchLinterNet", "Core", "Tests", "SourceFactFixtures"];
+    protected static readonly string[] _fileTypeNames =
     [
         "ArchLinterNet.Core.Tests.SourceFactFixtures.FileTypeA",
         "ArchLinterNet.Core.Tests.SourceFactFixtures.FileTypeB"
@@ -25,7 +29,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
 
     // Builds an index backed by FakeArchitectureFileSystem seeded with the given files.
     // sourceRoot is relative to repoRoot (e.g. "src").
-    private static ArchitectureSourceFileFactIndex BuildIndex(
+    private protected static ArchitectureSourceFileFactIndex BuildIndex(
         string repoRoot,
         string sourceRoot,
         Dictionary<string, string> files,
@@ -604,4 +608,9 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
 
         Assert.That(index.Ambiguities, Is.Empty);
     }
+}
+
+[TestFixture]
+public sealed class ArchitectureSourceFileFactIndexTests : ArchitectureSourceFileFactIndexTestBase
+{
 }

@@ -5,14 +5,16 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitecturePublicApiApplicationServiceTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitecturePublicApiApplicationServiceTests
+[TestFixture]
+public sealed class ArchitecturePublicApiApplicationServiceBuildStateTests
 {
-    private static readonly string[] _value = { "net10.0" };
-    private static readonly string[] _value1 = { "Release", "Release" };
-    private static readonly string[] _value2 = { "net10.0", "net10.0" };
+    internal static readonly string[] _value = { "net10.0" };
+    internal static readonly string[] _value1 = { "Release", "Release" };
+    internal static readonly string[] _value2 = { "net10.0", "net10.0" };
     [Test]
     public void Capture_EnsureBuilt_RecreatesRunnerAndReverifiesPostBuildArtifacts()
     {

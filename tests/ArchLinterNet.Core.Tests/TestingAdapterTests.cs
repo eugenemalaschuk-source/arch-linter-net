@@ -6,12 +6,12 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-[TestFixture]
-public sealed partial class TestingAdapterTests
+[Category("Core")]
+public abstract class TestingAdapterTestBase
 {
     private static readonly string[] _rulesFragmentPaths = { "architecture/rules.yml" };
     private static readonly string[] _selfForbiddenIds = { "self-forbidden" };
-    private string _tempDir = null!;
+    protected string _tempDir = null!;
 
     [SetUp]
     public void SetUp()
@@ -367,7 +367,7 @@ contracts:
         Assert.That(ex.Message, Does.Contain("contracts-no-forbidden"));
     }
 
-    private string WriteSelfForbiddenPolicy()
+    protected string WriteSelfForbiddenPolicy()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");
         Directory.CreateDirectory(contractDir);
@@ -788,4 +788,9 @@ contracts:
         var ex = Assert.Throws<InvalidOperationException>(() => result.ShouldPass());
         Assert.That(ex!.Message, Does.Contain("Coverage findings"));
     }
+}
+
+[TestFixture]
+public sealed class TestingAdapterTests : TestingAdapterTestBase
+{
 }

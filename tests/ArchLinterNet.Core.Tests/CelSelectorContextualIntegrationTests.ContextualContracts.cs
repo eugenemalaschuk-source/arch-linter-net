@@ -12,7 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 // `When` matching, the identity-collision and near-miss-evidence regressions, the
 // selector-without-`when` regression safety net, the Unity/client namespace-convention example,
 // JSON determinism, and the literal-only-overload structural guard.
-public sealed partial class CelSelectorContextualIntegrationTests
+public sealed class CelSelectorContextualContractTests : CelSelectorContextualIntegrationTestBase
 {
     // --- Contextual dependency `When` ---
 

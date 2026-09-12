@@ -11,9 +11,9 @@ using RoleFixtures = TypePlacementContractTestFixtures.Roles;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class TypePlacementContractTests
+public sealed class TypePlacementContractTests
 {
-    private static readonly string[] _value = { "does_not_exist_layer" };
+    internal static readonly string[] _value = { "does_not_exist_layer" };
     private string _tempDir = null!;
 
     [SetUp]
@@ -32,14 +32,14 @@ public sealed partial class TypePlacementContractTests
         }
     }
 
-    private string WritePolicy(string yaml)
+    internal string WritePolicy(string yaml)
     {
         string path = Path.Combine(_tempDir, "dependencies.arch.yml");
         File.WriteAllText(path, yaml);
         return path;
     }
 
-    private static ArchitectureAnalysisContext CreateContext(ProjectDiscoveryResult? projectDiscovery = null)
+    internal static ArchitectureAnalysisContext CreateContext(ProjectDiscoveryResult? projectDiscovery = null)
     {
         return new ArchitectureAnalysisContext(
             "/tmp",
@@ -50,7 +50,7 @@ public sealed partial class TypePlacementContractTests
             projectDiscovery);
     }
 
-    private static ArchitectureContractDocument CreateDocument(
+    internal static ArchitectureContractDocument CreateDocument(
         ArchitectureTypePlacementContract contract,
         Dictionary<string, ArchitectureLayer>? layers = null,
         bool audit = false)

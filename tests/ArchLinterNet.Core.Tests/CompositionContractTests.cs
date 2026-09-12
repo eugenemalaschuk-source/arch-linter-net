@@ -12,18 +12,18 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class CompositionContractTests
+public sealed class CompositionContractTests
 {
-    private static readonly int[] _value = { 0, 1 };
-    private const string CompositionNamespace = "CompositionContractTestFixtures.Composition";
-    private const string ApplicationNamespace = "CompositionContractTestFixtures.Application";
-    private const string GetServiceApi = "CompositionContractTestFixtures.Fakes.IFakeServiceProvider.GetService";
-    private const string AddSingletonApi = "CompositionContractTestFixtures.Fakes.IFakeServiceCollection.AddSingleton";
-    private const string AspNetServiceCollectionSelector =
+    internal static readonly int[] _value = { 0, 1 };
+    internal const string CompositionNamespace = "CompositionContractTestFixtures.Composition";
+    internal const string ApplicationNamespace = "CompositionContractTestFixtures.Application";
+    internal const string GetServiceApi = "CompositionContractTestFixtures.Fakes.IFakeServiceProvider.GetService";
+    internal const string AddSingletonApi = "CompositionContractTestFixtures.Fakes.IFakeServiceCollection.AddSingleton";
+    internal const string AspNetServiceCollectionSelector =
         "CompositionContractTestFixtures.Fakes.IFakeAspNetServiceCollection.";
-    private const string AspNetAddSingletonApi =
+    internal const string AspNetAddSingletonApi =
         "CompositionContractTestFixtures.Fakes.FakeServiceCollectionServiceExtensions.AddSingleton";
-    private const string ContainerNamespacePrefix = "CompositionContractTestFixtures.Fakes.";
+    internal const string ContainerNamespacePrefix = "CompositionContractTestFixtures.Fakes.";
 
     private string _tempDir = null!;
 
@@ -50,9 +50,9 @@ public sealed partial class CompositionContractTests
         return path;
     }
 
-    private static string AssemblyName => typeof(CompositionContractTests).Assembly.GetName().Name!;
+    internal static string AssemblyName => typeof(CompositionContractTests).Assembly.GetName().Name!;
 
-    private static ArchitectureAnalysisContext CreateContext()
+    internal static ArchitectureAnalysisContext CreateContext()
     {
         return new ArchitectureAnalysisContext(
             "/tmp",
@@ -63,7 +63,7 @@ public sealed partial class CompositionContractTests
             null);
     }
 
-    private static ArchitectureContractDocument CreateDocument(
+    internal static ArchitectureContractDocument CreateDocument(
         ArchitectureCompositionContract contract,
         bool audit = false)
     {

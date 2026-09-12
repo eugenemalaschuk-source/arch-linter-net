@@ -7,7 +7,7 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
+public sealed class ExternalDiagnosticsFederationIdentityTests : ExternalDiagnosticsFederationReferenceScenarioTestBase
 {
     [Test]
     public void DistinctScopeContexts_RemainDistinctWhenSourceResultsMatch()

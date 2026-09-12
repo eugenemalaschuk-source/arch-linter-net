@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class TestingAdapterTests
+public sealed class TestingAdapterApplicabilityTests
 {
     [Test]
     public void Result_ExposesUnassessableCompletionAndShouldPassDetailsWithoutViolation()

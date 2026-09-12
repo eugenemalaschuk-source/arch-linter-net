@@ -1,10 +1,11 @@
 using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.PolicyWeakening;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitecturePolicyWeakeningComparerTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitecturePolicyWeakeningComparerTests
+public sealed class ArchitecturePolicyWeakeningTopologyTests
 {
     [Test]
     public void Compare_AddedReviewedTopologyOutOfScope_IsSemanticWeakening()

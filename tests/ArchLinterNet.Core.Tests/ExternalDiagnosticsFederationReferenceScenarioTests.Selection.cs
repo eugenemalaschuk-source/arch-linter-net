@@ -9,7 +9,7 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
+public sealed class ExternalDiagnosticsFederationSelectionTests : ExternalDiagnosticsFederationReferenceScenarioTestBase
 {
     [Test]
     public void PolicyAuthorizedRuleIds_ExcludeUnlistedDiagnosticsFromEveryProjection()

@@ -10,13 +10,13 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class AttributeUsageContractTests
+public sealed class AttributeUsageContractTests
 {
-    private static readonly string[] _value = { "does_not_exist_layer" };
-    private const string TestMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.TestMarkerAttribute";
-    private const string SecondMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.SecondMarkerAttribute";
-    private const string PrefixedNamespace = "AttributeUsageContractTestFixtures.Markers.Prefixed.";
-    private const string ModuleMarkerAttributeName = "AttributeUsageContractTestFixtures.ModuleMarkers.ModuleMarkerAttribute";
+    internal static readonly string[] _value = { "does_not_exist_layer" };
+    internal const string TestMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.TestMarkerAttribute";
+    internal const string SecondMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.SecondMarkerAttribute";
+    internal const string PrefixedNamespace = "AttributeUsageContractTestFixtures.Markers.Prefixed.";
+    internal const string ModuleMarkerAttributeName = "AttributeUsageContractTestFixtures.ModuleMarkers.ModuleMarkerAttribute";
 
     private string _tempDir = null!;
 
@@ -43,9 +43,9 @@ public sealed partial class AttributeUsageContractTests
         return path;
     }
 
-    private static string AssemblyName => typeof(AttributeUsageContractTests).Assembly.GetName().Name!;
+    internal static string AssemblyName => typeof(AttributeUsageContractTests).Assembly.GetName().Name!;
 
-    private static ArchitectureAnalysisContext CreateContext(ProjectDiscoveryResult? projectDiscovery = null)
+    internal static ArchitectureAnalysisContext CreateContext(ProjectDiscoveryResult? projectDiscovery = null)
     {
         return new ArchitectureAnalysisContext(
             "/tmp",
@@ -56,7 +56,7 @@ public sealed partial class AttributeUsageContractTests
             projectDiscovery);
     }
 
-    private static ArchitectureContractDocument CreateDocument(
+    internal static ArchitectureContractDocument CreateDocument(
         ArchitectureAttributeUsageContract contract,
         Dictionary<string, ArchitectureLayer>? layers = null,
         bool audit = false)

@@ -2,10 +2,11 @@ using System.Text.Json;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureDiagnosticFormatterTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureDiagnosticFormatterTests
+public sealed class ArchitectureDiagnosticFormatterPackageTests
 {
     private static readonly string[] _packageDependencyReferences = ["Microsoft.EntityFrameworkCore@8.0.0"];
     private static readonly string[] _packageAllowOnlyReferences = ["Acme.Sdk@1.2.3"];

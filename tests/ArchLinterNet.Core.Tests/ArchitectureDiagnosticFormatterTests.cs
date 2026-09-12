@@ -7,34 +7,34 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class ArchitectureDiagnosticFormatterTests
+public sealed class ArchitectureDiagnosticFormatterTests
 {
-    private static readonly ArchitectureDiagnosticFormatter _formatter = new();
-    private static readonly string[] _reference1 = ["ref1"];
-    private static readonly string[] _allowedApiImporters = ["Api"];
-    private static readonly IReadOnlyCollection<string>[] _dependencyPaths = [["Source.Type", "Mid", "Forbidden.Namespace"]];
-    private static readonly string[] _forbiddenNamespaceInternal = ["Forbidden.Namespace.Internal"];
-    private static readonly string[] _coreInternal = ["Core.Internal"];
-    private static readonly string[] _forbiddenApiReference = ["Forbidden.Api"];
-    private static readonly string[] _typeReferences = ["Type.Ref"];
-    private static readonly string[] _apiReferences = ["Api.Ref"];
-    private static readonly string[] _attributeReferences = ["Attribute.Ref"];
-    private static readonly string[] _inheritanceReferences = ["Inheritance.Ref"];
-    private static readonly string[] _interfaceReferences = ["Interface.Ref"];
-    private static readonly string[] _compositionReferences = ["Composition.Ref"];
-    private static readonly string[] _projectReferences = ["Project.Ref"];
-    private static readonly string[] _externalReferences = ["External.Ref"];
-    private static readonly string[] _layoutConventionReferences = ["Layout.Ref"];
-    private static readonly ArchitectureCoverageSummaryExcludedItem[] _excludedCoverageItems = [new("z-excluded", "generated")];
-    private static readonly ArchitectureCoverageSummaryEvidenceItem[] _uncoveredCoverageItems = [new("a-uncovered", "a-evidence")];
-    private static readonly ArchitectureCoverageSummaryEvidenceItem[] _staleCoverageItems = [new("b-stale", "b-evidence")];
-    private static readonly ArchitectureCoverageSummaryEvidenceItem[] _unknownCoverageItems = [new("c-unknown", "c-evidence")];
-    private static readonly ArchitectureCoverageSummaryEvidenceItem[] _coveredCoverageItems = [new("d-covered", "d-evidence")];
-    private static readonly string[] _expectedRoleSubjectsSorted = ["MyApp.Alpha", "MyApp.Zeta"];
-    private static readonly string[] _firstPolicyId = ["first-id"];
-    private static readonly string[] _policyContractNames = ["first", "second"];
-    private static readonly string[] _policyLayers = ["Core"];
-    private static readonly ArchitectureViolation[] _coverageFinding = [new("coverage", "coverage-id", "Source", "Forbidden", ["Reference"])];
+    internal static readonly ArchitectureDiagnosticFormatter _formatter = new();
+    internal static readonly string[] _reference1 = ["ref1"];
+    internal static readonly string[] _allowedApiImporters = ["Api"];
+    internal static readonly IReadOnlyCollection<string>[] _dependencyPaths = [["Source.Type", "Mid", "Forbidden.Namespace"]];
+    internal static readonly string[] _forbiddenNamespaceInternal = ["Forbidden.Namespace.Internal"];
+    internal static readonly string[] _coreInternal = ["Core.Internal"];
+    internal static readonly string[] _forbiddenApiReference = ["Forbidden.Api"];
+    internal static readonly string[] _typeReferences = ["Type.Ref"];
+    internal static readonly string[] _apiReferences = ["Api.Ref"];
+    internal static readonly string[] _attributeReferences = ["Attribute.Ref"];
+    internal static readonly string[] _inheritanceReferences = ["Inheritance.Ref"];
+    internal static readonly string[] _interfaceReferences = ["Interface.Ref"];
+    internal static readonly string[] _compositionReferences = ["Composition.Ref"];
+    internal static readonly string[] _projectReferences = ["Project.Ref"];
+    internal static readonly string[] _externalReferences = ["External.Ref"];
+    internal static readonly string[] _layoutConventionReferences = ["Layout.Ref"];
+    internal static readonly ArchitectureCoverageSummaryExcludedItem[] _excludedCoverageItems = [new("z-excluded", "generated")];
+    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] _uncoveredCoverageItems = [new("a-uncovered", "a-evidence")];
+    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] _staleCoverageItems = [new("b-stale", "b-evidence")];
+    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] _unknownCoverageItems = [new("c-unknown", "c-evidence")];
+    internal static readonly ArchitectureCoverageSummaryEvidenceItem[] _coveredCoverageItems = [new("d-covered", "d-evidence")];
+    internal static readonly string[] _expectedRoleSubjectsSorted = ["MyApp.Alpha", "MyApp.Zeta"];
+    internal static readonly string[] _firstPolicyId = ["first-id"];
+    internal static readonly string[] _policyContractNames = ["first", "second"];
+    internal static readonly string[] _policyLayers = ["Core"];
+    internal static readonly ArchitectureViolation[] _coverageFinding = [new("coverage", "coverage-id", "Source", "Forbidden", ["Reference"])];
 
     [Test]
     public void FormatViolationsForHumans_DependencyDiagnostic_IncludesLayerContext()

@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class TestingAdapterTests
+public sealed class TestingAdapterPolicyContextTests : TestingAdapterTestBase
 {
     [Test]
     public void EvaluateDebtGate_AcceptsCliShapedSchemaFiveContexts()

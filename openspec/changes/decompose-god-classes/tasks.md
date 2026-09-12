@@ -87,12 +87,23 @@
 ## 3. Test-suite cleanup
 
 - [x] 3.1 Split unrelated CLI test aggregates into focused fixtures without changing scenario coverage (#821).
-- [ ] 3.2 Split unrelated Core test aggregates into focused fixtures; retain only dedicated partial-language source fixtures (#822).
+- [x] 3.2 Split unrelated Core test aggregates into focused fixtures; retain only dedicated partial-language source fixtures (#822).
   - [x] Extract the v0.8 full-cycle Checkpoint B scenario's orchestration, phase-trace/restore-reuse
     state, and validation/policy-weakening/health-matrix/Unity/reporting phases out of the shared
     `CheckpointBReleaseGateTests` partial aggregate into named `CheckpointBV08*` collaborator types,
     leaving `CheckpointBReleaseGateTests.V08FullCycle.cs` a thin NUnit entrypoint (#778).
-- [ ] 3.3 Add regression coverage proving intentional partial-language fixtures remain discoverable and production aggregates are not reintroduced (#822).
+  - [x] Split the remaining Core test responsibility groups into purpose-named fixtures for
+    snapshot/profile/metric, baseline build-state/lifecycle/migration, source-index edge cases,
+    formatter/SARIF, public-API/build-state, policy-contract, applicability/project-discovery,
+    CEL contextual, expression-compilation, Testing-adapter, build-state-preflight, external-
+    diagnostics, and source-layout/contract scenarios; keep shared setup in explicit base or
+    helper types rather than reintroducing partial aggregates (#822).
+- [x] 3.3 Add regression coverage proving intentional partial-language fixtures remain discoverable and production aggregates are not reintroduced (#822).
+  - [x] `CoreTestArchitectureCleanupTests` indexes a two-file `IntentionalFixture` source
+    language sample and asserts both stable declaration paths remain discoverable, while scanning
+    production `src/**/*.cs` declarations to fail if a handwritten type spans multiple files.
+    Generated interop/source-generator declarations and the cohesive Checkpoint B harness remain
+    explicit reviewed exceptions; no production aggregate is exempted by the regression.
 
 ## 4. Enforce and verify the final convention
 

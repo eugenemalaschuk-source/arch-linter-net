@@ -5,10 +5,12 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureAnalysisSnapshotTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureAnalysisSnapshotTests
+[TestFixture]
+public sealed class ArchitectureAnalysisSnapshotMetricsTests
 {
     [Test]
     public void Measure_MissingResolvedTargetAssembly_IsUnassessableForEverySelectedMetric()

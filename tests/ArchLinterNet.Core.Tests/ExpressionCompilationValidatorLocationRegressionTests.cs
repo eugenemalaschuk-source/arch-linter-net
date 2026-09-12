@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ExpressionCompilationValidatorTests
+public sealed class ExpressionCompilationValidatorLocationRegressionTests : ExpressionCompilationValidatorTestBase
 {
     // Regression coverage for PR #347 review findings (openspec/changes/core-cel-integration):
     // (1) 'when' outside the seven approved locations was silently dropped by

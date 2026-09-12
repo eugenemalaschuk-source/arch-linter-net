@@ -8,9 +8,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-[TestFixture]
 [Category("E2E")]
-public sealed partial class BuildStatePreflightTests
+public abstract class BuildStatePreflightTestBase
 {
     private static readonly string[] _value = { "Fixture" };
     private static readonly string[] _value1 = { "Fixture" };
@@ -26,8 +25,7 @@ public sealed partial class BuildStatePreflightTests
     private static readonly string[] _value11 = { "net10.0" };
     private static readonly string[] _value12 = { "GraphApp", "GraphLib" };
     private static readonly string[] _staleManifestReasons = { "evaluated-msbuild-evidence-incomplete" };
-
-    private string _repoRoot = null!;
+    protected string _repoRoot = null!;
 
     [SetUp]
     public void SetUp()
@@ -729,7 +727,7 @@ public sealed partial class BuildStatePreflightTests
         Assert.That(secondBuild.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
     }
 
-    private string CreateProjectFixture(string assemblyName, string sourceContent)
+    protected string CreateProjectFixture(string assemblyName, string sourceContent)
     {
         string projectDirectory = Path.Combine(_repoRoot, "src", assemblyName);
         Directory.CreateDirectory(projectDirectory);
@@ -740,7 +738,7 @@ public sealed partial class BuildStatePreflightTests
         return projectPath;
     }
 
-    private string CreateFakeAssemblyFile(string assemblyName)
+    protected string CreateFakeAssemblyFile(string assemblyName)
     {
         string binDirectory = Path.Combine(_repoRoot, "src", assemblyName, "bin", "Debug", "net10.0");
         Directory.CreateDirectory(binDirectory);
@@ -749,7 +747,7 @@ public sealed partial class BuildStatePreflightTests
         return assemblyPath;
     }
 
-    private static ProjectDiscoveryResult SingleProjectDiscovery(
+    protected static ProjectDiscoveryResult SingleProjectDiscovery(
         string projectPath, string assemblyName, string targetFramework = "net10.0")
     {
         return new ProjectDiscoveryResult(
@@ -763,7 +761,7 @@ public sealed partial class BuildStatePreflightTests
         };
     }
 
-    private static BuildStateResolvedAssemblies SingleAssemblyResolution(string assemblyPath)
+    protected static BuildStateResolvedAssemblies SingleAssemblyResolution(string assemblyPath)
     {
         return new BuildStateResolvedAssemblies(new[] { LoadFakeAssembly(assemblyPath) }, Array.Empty<string>());
     }
@@ -798,3 +796,5 @@ public sealed partial class BuildStatePreflightTests
         public override AssemblyName GetName(bool copiedName) => _name;
     }
 }
+[TestFixture, Category("E2E")]
+public sealed class BuildStatePreflightTests : BuildStatePreflightTestBase { }

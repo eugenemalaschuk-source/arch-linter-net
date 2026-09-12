@@ -10,7 +10,7 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class AcyclicSiblingContractTests
+public sealed class AcyclicSiblingContractTests
 {
     private string _tempDir = null!;
 

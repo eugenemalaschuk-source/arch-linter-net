@@ -7,10 +7,8 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-// Edge-case tests for ArchitectureSourceFileFactIndex split into a separate partial file
-// to keep each file under the 800-line decomposition limit.
 [TestFixture]
-public sealed partial class ArchitectureSourceFileFactIndexTests
+public sealed class ArchitectureSourceFileFactIndexEdgeCaseTests : ArchitectureSourceFileFactIndexTestBase
 {
     private static readonly string[] _partialFixtureDeclarationPaths =
     [
@@ -308,9 +306,8 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
     // risked reading a default(Assembly) if the compiler happened to initialize this file's fields
     // first.
     private static readonly Assembly[] _testAndCoreAssemblies =
-        [typeof(ArchitectureSourceFileFactIndexTests).Assembly, _coreAssembly];
+        [typeof(ArchitectureSourceFileFactIndexEdgeCaseTests).Assembly, _coreAssembly];
     private static readonly string[] _featureXSymbols = ["FEATURE_X"];
-    private static readonly string[] _singleSourceRoot = ["src"];
     private static readonly string[] _foreignSourceRoot = ["foreign"];
     private static readonly string[] _singleTestAssemblyName = [TestAssemblyName];
     private static readonly string[] _coreAndTestAssemblyNames = ["ArchLinterNet.Core.Tests", "ArchLinterNet.Core"];

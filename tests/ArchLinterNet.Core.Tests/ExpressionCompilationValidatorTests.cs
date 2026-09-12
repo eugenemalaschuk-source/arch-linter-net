@@ -8,10 +8,9 @@ namespace ArchLinterNet.Core.Tests;
 // Coverage for issue #163 (openspec/changes/core-cel-integration): compiling `when` fields through
 // ArchLinterNet.CEL at policy-load time, context-schema selection, compiled-predicate caching, the
 // literal-only fast path, and the port-boundary/adapter-binding scope boundary (Decision D4).
-[TestFixture]
-public sealed partial class ExpressionCompilationValidatorTests
+public abstract class ExpressionCompilationValidatorTestBase
 {
-    private string _tempDir = null!;
+    protected string _tempDir = null!;
 
     [SetUp]
     public void SetUp()
@@ -29,14 +28,14 @@ public sealed partial class ExpressionCompilationValidatorTests
         }
     }
 
-    private string WritePolicy(string yaml, string fileName = "dependencies.arch.yml")
+    protected string WritePolicy(string yaml, string fileName = "dependencies.arch.yml")
     {
         string path = Path.Combine(_tempDir, fileName);
         File.WriteAllText(path, yaml);
         return path;
     }
 
-    private static string AssemblyName => typeof(ExpressionCompilationValidatorTests).Assembly.GetName().Name!;
+    protected static string AssemblyName => typeof(ExpressionCompilationValidatorTestBase).Assembly.GetName().Name!;
 
     [Test]
     public void Load_LayerSelectorWhen_CompilesAndCaches()
@@ -587,4 +586,9 @@ public sealed partial class ExpressionCompilationValidatorTests
         Assert.That(document.Layers["sales"].Selector!.CompiledWhen, Is.Not.Null);
     }
 
+}
+
+[TestFixture]
+public sealed class ExpressionCompilationValidatorTests : ExpressionCompilationValidatorTestBase
+{
 }

@@ -4,6 +4,7 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureCoverageSummaryTests;
 
 namespace ArchLinterNet.Core.Tests;
 
@@ -11,7 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 // under the repository's 800-line file-size lint threshold. Shared fixtures/helpers
 // (CreateNamespaceContract, CreateNamespaceDocument, FeatureRoot, CreateContext,
 // RequireSummary) live in the main partial-class file and are used here as-is.
-public sealed partial class ArchitectureCoverageSummaryTests
+[TestFixture]
+public sealed class ArchitectureCoverageSummaryNamespaceScopeTests
 {
     [Test]
     public void BuildCoverageSummary_NamespaceScope_PartiallyCovered_ProducesExpectedCounts()

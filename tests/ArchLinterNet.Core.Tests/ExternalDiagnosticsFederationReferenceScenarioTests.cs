@@ -11,10 +11,9 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-[TestFixture]
-public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
+public abstract class ExternalDiagnosticsFederationReferenceScenarioTestBase
 {
-    private SarifEvidenceTestRepository _repository = null!;
+    private protected SarifEvidenceTestRepository _repository = null!;
 
     [SetUp]
     public void SetUp() => _repository = new SarifEvidenceTestRepository();
@@ -87,7 +86,8 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
         });
 
         string expectedHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(sarif)));
-        AssertOutputParity(strictDetail, strict, json, human, sarifResult, testing, expectedHash);
+        ExternalDiagnosticsOutputParityAssertions.AssertOutputParity(
+            strictDetail, strict, json, human, sarifResult, testing, expectedHash);
         Assert.Multiple(() =>
         {
             Assert.That(read.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid));
@@ -406,7 +406,7 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
         });
     }
 
-    private SarifEvidenceReadResult Read(
+    protected SarifEvidenceReadResult Read(
         ArchitectureExternalEvidenceRequirement requirement,
         string path,
         SarifEvidenceProducerContext? producer = null,
@@ -420,10 +420,10 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
             new SarifEvidenceAssessmentContext("repo", "revision", assessmentScope));
     }
 
-    private static SarifExternalDiagnosticSelectionResult Select(SarifEvidenceReadResult read) =>
+    protected static SarifExternalDiagnosticSelectionResult Select(SarifEvidenceReadResult read) =>
         new SarifExternalDiagnosticSelector().Select([new SarifExternalDiagnosticSelectionInput(read)]);
 
-    private static ArchitectureExternalEvidenceRequirement Requirement(
+    protected static ArchitectureExternalEvidenceRequirement Requirement(
         string id,
         Dictionary<string, string>? severity = null,
         IReadOnlyList<string>? ruleIds = null) => new()
@@ -444,9 +444,9 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
             },
         };
 
-    private static string Results(params string[] results) => "[" + string.Join(",", results) + "]";
+    protected static string Results(params string[] results) => "[" + string.Join(",", results) + "]";
 
-    private static string Result(
+    protected static string Result(
         string ruleId,
         string level,
         string path,
@@ -460,7 +460,7 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
         + (partialFingerprint is null ? string.Empty : ",\"partialFingerprints\":" + partialFingerprint)
         + "}";
 
-    private static string Sarif(
+    protected static string Sarif(
         string results,
         string? repository = "repo",
         string? revision = "revision",
@@ -489,4 +489,9 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
             + "\"automationDetails\":{\"id\":\"assessment-42\"}," + invocationJson
             + "\"versionControlProvenance\":" + provenance + markerJson + ",\"results\":" + results + "}]}";
     }
+}
+
+[TestFixture]
+public sealed class ExternalDiagnosticsFederationReferenceScenarioTests : ExternalDiagnosticsFederationReferenceScenarioTestBase
+{
 }

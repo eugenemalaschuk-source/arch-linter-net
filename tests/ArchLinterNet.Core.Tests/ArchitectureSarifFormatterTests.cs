@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class ArchitectureSarifFormatterTests
+public sealed class ArchitectureSarifFormatterTests
 {
     private static readonly string[] _value = { "line 42: Forbidden.Call -> Forbidden.Type.Call" };
     private static readonly string[] _value1 = { "not a line reference" };
@@ -19,9 +19,9 @@ public sealed partial class ArchitectureSarifFormatterTests
     private static readonly string[] _value7 = { "ref-a" };
     private static readonly string[] _value8 = { "ref-b" };
     private static readonly string[] _value9 = { "a-rule", "b-rule", "m-rule" };
-    private static readonly ArchitectureSarifFormatter _formatter = new();
-    private static readonly string[] _ref1 = { "ref1" };
-    private static readonly string[] _ref2 = { "ref2" };
+    internal static readonly ArchitectureSarifFormatter _formatter = new();
+    internal static readonly string[] _ref1 = { "ref1" };
+    internal static readonly string[] _ref2 = { "ref2" };
     private static readonly string[] _newtonsoftJsonReference = { "Newtonsoft.Json" };
     private static readonly string[] _approvedInfraGroup = { "approved_infra" };
 

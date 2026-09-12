@@ -7,11 +7,12 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ProtectedContractTests;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ProtectedContractTests
+public sealed class ProtectedContractEdgeCaseTests
 {
     private static readonly string[] _value = { "ArchLinterNet.Core.Execution.ArchitectureContractRunner" };
     private static readonly string[] _value1 = { "core" };

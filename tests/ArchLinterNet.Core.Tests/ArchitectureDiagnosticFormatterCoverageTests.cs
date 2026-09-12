@@ -2,10 +2,11 @@ using System.Text.Json;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureDiagnosticFormatterTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureDiagnosticFormatterTests
+public sealed class ArchitectureDiagnosticFormatterCoverageTests
 {
     [Test]
     public void FormatCoverageAndPolicyResults_IncludesSortedDetails()

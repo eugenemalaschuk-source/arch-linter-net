@@ -1,10 +1,11 @@
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureSarifFormatterTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureSarifFormatterTests
+public sealed class ArchitectureSarifFormatterCancellationTests
 {
     // PR #375 review: the final OrderBy/ThenBy/ToList over the assembled ResultEntry list used to
     // run without any token checks, so cancellation during the sort of a large report was only

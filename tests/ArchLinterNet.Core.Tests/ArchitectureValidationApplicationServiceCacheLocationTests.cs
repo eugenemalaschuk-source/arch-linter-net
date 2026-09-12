@@ -24,13 +24,13 @@ namespace ArchLinterNet.Core.Tests;
 // itself — not ArchitectureRunnerSetupService's own PE-reading internals, covered separately in
 // ArchitectureRunnerSetupServicePreparationTests — is what's under test.
 [TestFixture]
-public sealed partial class ArchitectureValidationApplicationServiceCacheLocationTests
+public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
 {
-    private static readonly string[] _value = { "SomethingMissing" };
-    private static readonly string[] _value1 = { "Fixture" };
-    private static readonly string[] _value2 = { "net10.0" };
-    private static readonly string[] _value3 = { "/fake/repository/root/bin/Fixture.dll" };
-    private sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
+    internal static readonly string[] _value = { "SomethingMissing" };
+    internal static readonly string[] _value1 = { "Fixture" };
+    internal static readonly string[] _value2 = { "net10.0" };
+    internal static readonly string[] _value3 = { "/fake/repository/root/bin/Fixture.dll" };
+    internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
     {
         public int BuildRunnerCallCount { get; private set; }
 
@@ -109,7 +109,7 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
         }
     }
 
-    private sealed class FakeContractRunner(ArchitectureAnalysisSession session) : IArchitectureContractRunner
+    internal sealed class FakeContractRunner(ArchitectureAnalysisSession session) : IArchitectureContractRunner
     {
         public ArchitectureAnalysisSession Session { get; } = session;
 
@@ -126,7 +126,7 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
         public List<PolicyConsistencyDiagnostic> CheckPolicyConsistency() => new();
     }
 
-    private sealed class FakeContractHandlerRegistry : IArchitectureContractHandlerRegistry
+    internal sealed class FakeContractHandlerRegistry : IArchitectureContractHandlerRegistry
     {
         public bool TryGetHandler(string family, out ArchitectureContractChecker? checker)
         {
@@ -141,7 +141,7 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
         }
     }
 
-    private sealed class FakeContractExecutor : IArchitectureContractExecutor
+    internal sealed class FakeContractExecutor : IArchitectureContractExecutor
     {
         public bool WasCalled { get; private set; }
 
@@ -158,7 +158,7 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
         }
     }
 
-    private sealed class FakeBuildStatePreparationService : IBuildStatePreparationService
+    internal sealed class FakeBuildStatePreparationService : IBuildStatePreparationService
     {
         public int PrepareCallCount { get; private set; }
 
@@ -185,7 +185,7 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
         }
     }
 
-    private static ArchitectureContractDocument CreateDocument() => new()
+    internal static ArchitectureContractDocument CreateDocument() => new()
     {
         Version = 1,
         Name = "Fake",
@@ -197,7 +197,7 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
         },
     };
 
-    private static ArchitectureAnalysisSession CreateEmptySession(
+    internal static ArchitectureAnalysisSession CreateEmptySession(
         ArchitectureContractDocument document, CancellationToken cancellationToken = default)
     {
         var context = new ArchitectureAnalysisContext(
@@ -210,7 +210,7 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
             context, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: true, preprocessorSymbols: null);
     }
 
-    private static ArchitectureRunnerPreparation CreatePreparation(
+    internal static ArchitectureRunnerPreparation CreatePreparation(
         string repositoryRoot = "/fake/repository/root",
         ProjectDiscoveryResult? discovery = null,
         IReadOnlyList<string>? selectedPaths = null,
