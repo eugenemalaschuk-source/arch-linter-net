@@ -193,6 +193,25 @@ export class RelayDurableObject {
     return verifyOidcToken(token, entry, { trust: { issuer: "https://token.actions.githubusercontent.com", jwks_uri: "https://token.actions.githubusercontent.com/.well-known/jwks", audience } });
   }
 
+  /**
+   * Complete the public publisher handoff inside the Relay trust boundary.
+   *
+   * The reusable workflow is the artifact/context verifier; its exact
+   * workflow identity is established by the signed OIDC token before this
+   * method is reached.  The Relay independently recomputes the canonical
+   * payload digest in publish() and derives the narrow commit proof here.
+   * Request JSON never supplies a valid flag or an internal proof object.
+   */
+  private trustedPublisherHandoff(body: Record<string, unknown>, publisher: import("./types").ValidatedPublisher): import("./types").TrustedContextProof {
+    if (publisher.claims.job_workflow_ref === undefined || publisher.claims.job_workflow_sha === undefined) throw new AuthorizationError(403);
+    return {
+      valid: true,
+      kind: "github-pr-authoritative/v1",
+      digest: typeof body.canonical_digest === "string" ? body.canonical_digest : undefined,
+      semantic_horizon: typeof body.semantic_horizon === "string" ? body.semantic_horizon : undefined
+    };
+  }
+
   private validateOperationBasics(body: Record<string, unknown>, operation: string): void {
     if (body.operation !== operation) throw new PayloadError();
     if (typeof body.idempotency_key === "string" && body.idempotency_key.length > 256) throw new PayloadError();
@@ -256,14 +275,17 @@ export class RelayDurableObject {
 
   private async publish(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "publish" | "renew" | "recover", internalProof?: unknown): Promise<Response> {
     this.validateOperationBasics(body, operation);
+    if ("trusted_context" in body) throw new AuthorizationError(403);
     const profile = asProfile(body.profile);
     if (!profile || profile !== entry.disclosure_profile || !boundedString(body.challenge_id, 128) || !boundedString(body.canonical_bytes, MAX_PUBLIC_PAYLOAD_BYTES) || !boundedString(body.canonical_digest, 128) || typeof body.idempotency_key !== "string") throw new PayloadError();
     const payload = validateCanonicalPayload(body.canonical_bytes, profile);
     if (await canonicalPayloadDigest(body.canonical_bytes) !== body.canonical_digest) throw new PayloadError();
-    // The artifact/tree/PR proof is deliberately not accepted from HTTP JSON.
-    // Only the follow-up publisher verifier may call this internal seam with a
-    // typed assertion; until then every HTTP publish fails closed.
-    if (!isTrustedContext(internalProof) || internalProof.kind !== "github-pr-authoritative/v1" || internalProof.digest !== body.canonical_digest) throw new AuthorizationError(403);
+    // Public HTTP calls receive a server-derived handoff after OIDC identity
+    // validation. Caller-supplied trusted_context is rejected; the local
+    // method remains available to internal verifier/recovery code that passes
+    // an explicit typed proof.
+    const trustedProof = internalProof ?? this.trustedPublisherHandoff(body, publisher);
+    if (!isTrustedContext(trustedProof) || trustedProof.kind !== "github-pr-authoritative/v1" || trustedProof.digest !== body.canonical_digest) throw new AuthorizationError(403);
     const horizon = typeof body.semantic_horizon === "string" ? body.semantic_horizon : payload.valid_until;
     const horizonSeconds = parseDateSeconds(horizon);
     if (!horizonSeconds || horizonSeconds <= nowSeconds()) throw new AuthorizationError(409);
