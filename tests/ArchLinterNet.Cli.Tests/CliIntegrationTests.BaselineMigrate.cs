@@ -26,7 +26,7 @@ baseline:
 ");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "migrate",
-                "--config", _passingWithIdsPolicy, "--baseline", baselinePath, "--output", outputPath);
+                "--config", PassingWithIdsPolicy, "--baseline", baselinePath, "--output", outputPath);
 
             Assert.Multiple(() =>
             {
@@ -62,7 +62,7 @@ baseline:
             File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
 
             var (exitCode, _, stderr) = RunCli("baseline", "migrate",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--dry-run", "--mode", "strict");
+                "--config", PassingPolicy, "--baseline", baselinePath, "--dry-run", "--mode", "strict");
 
             Assert.That(exitCode, Is.EqualTo(2), $"--mode should be rejected as an unrecognized option, stderr: {stderr}");
         }
@@ -98,7 +98,7 @@ baseline:
 ");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "migrate",
-                "--config", _passingWithIdsPolicy, "--baseline", baselinePath, "--output", outputPath);
+                "--config", PassingWithIdsPolicy, "--baseline", baselinePath, "--output", outputPath);
 
             Assert.Multiple(() =>
             {
@@ -135,7 +135,7 @@ baseline:
             File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "migrate",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--output", outputPath, "--dry-run");
+                "--config", PassingPolicy, "--baseline", baselinePath, "--output", outputPath, "--dry-run");
 
             Assert.Multiple(() =>
             {
@@ -162,7 +162,7 @@ baseline:
             File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
 
             var (exitCode, _, stderr) = RunCli("baseline", "migrate",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+                "--config", PassingPolicy, "--baseline", baselinePath, "--output", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -186,7 +186,7 @@ baseline:
             File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
 
             var (exitCode, _, stderr) = RunCli("baseline", "migrate",
-                "--config", _passingPolicy, "--baseline", baselinePath);
+                "--config", PassingPolicy, "--baseline", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -209,11 +209,11 @@ baseline:
         try
         {
             var (genExit, _, genStderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy, "--output", baselinePath);
+                "--config", PassingPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
 
             var (exitCode, _, stderr) = RunCli("baseline", "migrate",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--output", outputPath);
+                "--config", PassingPolicy, "--baseline", baselinePath, "--output", outputPath);
 
             Assert.Multiple(() =>
             {
@@ -234,7 +234,7 @@ baseline:
     public void BaselineMigrate_MissingBaselineFile_ExitsTwo()
     {
         var (exitCode, _, stderr) = RunCli("baseline", "migrate",
-            "--config", _passingPolicy, "--baseline", "/nonexistent/baseline.yml", "--output", "/tmp/out.yml");
+            "--config", PassingPolicy, "--baseline", "/nonexistent/baseline.yml", "--output", "/tmp/out.yml");
 
         Assert.Multiple(() =>
         {

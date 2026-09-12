@@ -13,13 +13,13 @@ internal sealed class CliHealthIntegrationTests : CliIntegrationTestBase
         try
         {
             var (generationExit, _, generationError) = RunCli(
-                "baseline", "generate", "--policy", _passingPolicy, "--output", baselinePath);
+                "baseline", "generate", "--policy", PassingPolicy, "--output", baselinePath);
             Assert.That(generationExit, Is.EqualTo(0), $"stderr: {generationError}");
 
             var (humanExit, human, humanError) = RunCli(
-                "health", "--policy", _passingPolicy, "--baseline", baselinePath);
+                "health", "--policy", PassingPolicy, "--baseline", baselinePath);
             var (jsonExit, json, jsonError) = RunCli(
-                "health", "--policy", _passingPolicy, "--baseline", baselinePath, "--format", "json");
+                "health", "--policy", PassingPolicy, "--baseline", baselinePath, "--format", "json");
             using JsonDocument document = JsonDocument.Parse(json);
 
             Assert.Multiple(() =>
@@ -49,7 +49,7 @@ internal sealed class CliHealthIntegrationTests : CliIntegrationTestBase
             File.WriteAllText(baselinePath, "version: 3\nbaseline: {}\nmetric_baselines: []\n");
 
             var (exitCode, json, error) = RunCli(
-                "health", "--policy", _graphPolicy, "--baseline", baselinePath, "--format", "json");
+                "health", "--policy", GraphPolicy, "--baseline", baselinePath, "--format", "json");
             using JsonDocument document = JsonDocument.Parse(json);
 
             Assert.Multiple(() =>
@@ -74,7 +74,7 @@ internal sealed class CliHealthIntegrationTests : CliIntegrationTestBase
             File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
 
             var (exitCode, output, error) = RunCli(
-                "health", "--policy", _passingPolicy, "--baseline", baselinePath,
+                "health", "--policy", PassingPolicy, "--baseline", baselinePath,
                 "--base-context", "base.json", "--format", "json");
             using JsonDocument document = JsonDocument.Parse(output);
 
@@ -97,7 +97,7 @@ internal sealed class CliHealthIntegrationTests : CliIntegrationTestBase
     public void Health_RequiredApplicabilityInputMissing_EmitsUnassessableHealthJson()
     {
         string policyPath = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-unassessable-policy.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-unassessable-policy.yml");
         string baselinePath = Path.Combine(Path.GetTempPath(), $"architecture-health-{Guid.NewGuid():N}.yml");
         try
         {

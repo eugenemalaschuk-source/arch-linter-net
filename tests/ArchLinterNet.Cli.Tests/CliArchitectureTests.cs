@@ -64,7 +64,7 @@ internal sealed class CliArchitectureTests : CliArchitectureTestBase
             }));
             Assert.That(
                 composition.RootCommandFactory.Create().Subcommands.Select(static command => command.Name),
-                Is.EquivalentTo(_value));
+                Is.EquivalentTo(CommandNames));
         });
     }
 
@@ -146,7 +146,7 @@ internal sealed class CliArchitectureTests : CliArchitectureTestBase
 
         var commandNames = module.CreateCommand(runtime, console, fileSystem).Subcommands.Select(static command => command.Name).ToArray();
 
-        Assert.That(commandNames, Is.EquivalentTo(_value1));
+        Assert.That(commandNames, Is.EquivalentTo(BaselineCommands));
     }
 
     [Test]
@@ -174,7 +174,7 @@ internal sealed class CliArchitectureTests : CliArchitectureTestBase
             Assert.That(runtime.LastValidationRequest!.PolicyPath, Is.EqualTo("policy.yml"));
             Assert.That(runtime.LastValidationRequest.ConditionSetName, Is.EqualTo("dev"));
             Assert.That(runtime.LastValidationRequest.BaselinePath, Is.EqualTo("baseline.yml"));
-            Assert.That(runtime.LastValidationRequest.ContractIds, Is.EqualTo(_value2));
+            Assert.That(runtime.LastValidationRequest.ContractIds, Is.EqualTo(ContractIds));
             Assert.That(console.StdOut, Does.Contain("Architecture validation passed."));
             Assert.That(console.StdErr, Is.Empty);
         });

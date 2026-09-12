@@ -223,7 +223,7 @@ internal sealed class ReportCoordinatorTests : ReportCoordinatorTestBase
         RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
 
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
-        Assert.That(result.FailedPaths, Is.EquivalentTo(_value));
+        Assert.That(result.FailedPaths, Is.EquivalentTo(FailedReportPaths));
     }
 
     [Test]
@@ -247,7 +247,7 @@ internal sealed class ReportCoordinatorTests : ReportCoordinatorTestBase
         // Phase 2: skipped entirely.
         // No file was renamed → no output published → OutputFailed, not PartialOutput.
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
-        Assert.That(result.FailedPaths, Is.EquivalentTo(_value1));
+        Assert.That(result.FailedPaths, Is.EquivalentTo(InvalidReportPaths));
     }
 
 
@@ -307,7 +307,7 @@ internal sealed class ReportCoordinatorTests : ReportCoordinatorTestBase
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.PartialOutput));
         Assert.That(result.CommittedPaths, Does.Contain("first.json"));
         Assert.That(result.FailedPaths, Does.Contain("second.sarif"));
-        Assert.That(result.StagedPaths, Is.EquivalentTo(_value2));
+        Assert.That(result.StagedPaths, Is.EquivalentTo(StagedReportPaths));
     }
 
     [Test]

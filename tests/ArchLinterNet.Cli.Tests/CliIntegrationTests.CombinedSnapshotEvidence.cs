@@ -17,11 +17,11 @@ internal sealed class CliCombinedSnapshotIntegrationTests : CliIntegrationTestBa
     public void CombinedMode_StrictAndAuditResults_MatchStandaloneRunsExactly()
     {
         (int standaloneStrictExit, string standaloneStrictJson, string standaloneStrictErr) = RunCli(
-            "--policy", _combinedEquivalencePolicy, "--mode", "strict", "--format", "json");
+            "--policy", CombinedEquivalencePolicy, "--mode", "strict", "--format", "json");
         (int standaloneAuditExit, string standaloneAuditJson, string standaloneAuditErr) = RunCli(
-            "--policy", _combinedEquivalencePolicy, "--mode", "audit", "--format", "json");
+            "--policy", CombinedEquivalencePolicy, "--mode", "audit", "--format", "json");
         (int combinedExit, string combinedJson, string combinedErr) = RunCli(
-            "--policy", _combinedEquivalencePolicy, "--mode", "strict,audit", "--format", "json");
+            "--policy", CombinedEquivalencePolicy, "--mode", "strict,audit", "--format", "json");
 
         Assert.That(standaloneStrictExit, Is.Not.EqualTo(0), $"stderr: {standaloneStrictErr}");
         Assert.That(standaloneAuditExit, Is.Not.EqualTo(0), $"stderr: {standaloneAuditErr}");
@@ -62,11 +62,11 @@ internal sealed class CliCombinedSnapshotIntegrationTests : CliIntegrationTestBa
     public void CombinedMode_StrictAndAuditSarifRuns_MatchStandaloneRunsExactly()
     {
         (int standaloneStrictExit, string standaloneStrictSarif, string standaloneStrictErr) = RunCli(
-            "--policy", _combinedEquivalencePolicy, "--mode", "strict", "--format", "sarif");
+            "--policy", CombinedEquivalencePolicy, "--mode", "strict", "--format", "sarif");
         (int standaloneAuditExit, string standaloneAuditSarif, string standaloneAuditErr) = RunCli(
-            "--policy", _combinedEquivalencePolicy, "--mode", "audit", "--format", "sarif");
+            "--policy", CombinedEquivalencePolicy, "--mode", "audit", "--format", "sarif");
         (int combinedExit, string combinedSarif, string combinedErr) = RunCli(
-            "--policy", _combinedEquivalencePolicy, "--mode", "strict,audit", "--format", "sarif");
+            "--policy", CombinedEquivalencePolicy, "--mode", "strict,audit", "--format", "sarif");
 
         Assert.That(standaloneStrictExit, Is.Not.EqualTo(0), $"stderr: {standaloneStrictErr}");
         Assert.That(standaloneAuditExit, Is.Not.EqualTo(0), $"stderr: {standaloneAuditErr}");
@@ -115,7 +115,7 @@ internal sealed class CliCombinedSnapshotIntegrationTests : CliIntegrationTestBa
         try
         {
             (int exitCode, string stdout, string stderr) = RunCli(
-                "--policy", _passingPolicy,
+                "--policy", PassingPolicy,
                 "--mode", "strict,audit",
                 "--ensure-built",
                 "--profile", profilePath,

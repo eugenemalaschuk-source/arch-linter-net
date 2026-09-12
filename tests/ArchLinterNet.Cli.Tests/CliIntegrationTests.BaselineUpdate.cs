@@ -15,11 +15,11 @@ internal sealed class CliBaselineUpdateIntegrationTests : CliIntegrationTestBase
         try
         {
             var (genExit, _, genStderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy, "--output", baselinePath);
+                "--config", GraphPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "update",
-                "--config", _graphPolicy, "--baseline", baselinePath, "--output", updatedPath);
+                "--config", GraphPolicy, "--baseline", baselinePath, "--output", updatedPath);
 
             Assert.Multiple(() =>
             {
@@ -46,7 +46,7 @@ internal sealed class CliBaselineUpdateIntegrationTests : CliIntegrationTestBase
         try
         {
             var (genExit, genStdout, _) = RunCli("baseline", "generate",
-                "--config", _graphPolicy, "--output", baselinePath);
+                "--config", GraphPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0));
 
             string generated = File.ReadAllText(baselinePath);
@@ -54,7 +54,7 @@ internal sealed class CliBaselineUpdateIntegrationTests : CliIntegrationTestBase
             File.WriteAllText(baselinePath, withCustomReason);
 
             var (exitCode, _, stderr) = RunCli("baseline", "update",
-                "--config", _graphPolicy, "--baseline", baselinePath, "--output", updatedPath);
+                "--config", GraphPolicy, "--baseline", baselinePath, "--output", updatedPath);
 
             Assert.That(exitCode, Is.EqualTo(0), $"Update should succeed, stderr: {stderr}");
             Assert.That(File.ReadAllText(updatedPath), Does.Contain("reason: my custom reason"));
@@ -78,7 +78,7 @@ internal sealed class CliBaselineUpdateIntegrationTests : CliIntegrationTestBase
             File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "update",
-                "--config", _graphPolicy, "--baseline", baselinePath, "--output", updatedPath,
+                "--config", GraphPolicy, "--baseline", baselinePath, "--output", updatedPath,
                 "--reason", "custom update reason");
 
             Assert.Multiple(() =>
@@ -104,7 +104,7 @@ internal sealed class CliBaselineUpdateIntegrationTests : CliIntegrationTestBase
     public void BaselineUpdate_MissingBaselineFlag_ExitsTwo()
     {
         var (exitCode, _, stderr) = RunCli("baseline", "update",
-            "--config", _passingPolicy, "--output", "out.yml");
+            "--config", PassingPolicy, "--output", "out.yml");
 
         Assert.Multiple(() =>
         {
@@ -122,7 +122,7 @@ internal sealed class CliBaselineUpdateIntegrationTests : CliIntegrationTestBase
             File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "update",
-                "--config", _passingPolicy, "--baseline", baselinePath);
+                "--config", PassingPolicy, "--baseline", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -147,7 +147,7 @@ internal sealed class CliBaselineUpdateIntegrationTests : CliIntegrationTestBase
             File.WriteAllText(baselinePath, "# Reviewed baseline — owned by platform\n# Tracked in #123\nversion: 2\nbaseline: {}\n");
 
             var (exitCode, _, stderr) = RunCli("baseline", "update",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+                "--config", PassingPolicy, "--baseline", baselinePath, "--output", baselinePath);
 
             string updated = File.ReadAllText(baselinePath);
             Assert.Multiple(() =>
@@ -175,7 +175,7 @@ internal sealed class CliBaselineUpdateIntegrationTests : CliIntegrationTestBase
             File.WriteAllText(baselinePath, Original);
 
             var (exitCode, _, stderr) = RunCli("baseline", "update",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+                "--config", PassingPolicy, "--baseline", baselinePath, "--output", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -186,7 +186,7 @@ internal sealed class CliBaselineUpdateIntegrationTests : CliIntegrationTestBase
             });
 
             var (dryRunExit, dryRunStdout, dryRunStderr) = RunCli("baseline", "update",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath, "--dry-run");
+                "--config", PassingPolicy, "--baseline", baselinePath, "--output", baselinePath, "--dry-run");
 
             Assert.Multiple(() =>
             {

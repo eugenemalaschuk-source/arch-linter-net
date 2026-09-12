@@ -13,12 +13,12 @@ namespace ArchLinterNet.Cli.Tests;
 
 internal abstract class BaselineCommandHandlerTestBase
 {
-    protected static readonly string[] _contractIds = ["rule-a", "rule-b"];
+    protected static readonly string[] ContractIds = ["rule-a", "rule-b"];
 
-    protected static readonly BaselineReasonOptions _reasons =
+    protected static readonly BaselineReasonOptions Reasons =
         new("reason", Array.Empty<string>(), Array.Empty<string>());
 
-    protected static readonly BaselineWriteOptions _write = new(DryRun: false, Force: false);
+    protected static readonly BaselineWriteOptions WriteOptions = new(DryRun: false, Force: false);
 
     protected static ArchitectureViolation CreateViolation(string sourceType, string forbiddenNamespace)
     {

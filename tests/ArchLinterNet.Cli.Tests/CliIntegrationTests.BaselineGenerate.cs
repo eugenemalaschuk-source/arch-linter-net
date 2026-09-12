@@ -15,7 +15,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath);
 
             Assert.Multiple(() =>
@@ -43,7 +43,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--reason", "my custom reason");
 
@@ -61,7 +61,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
     public void BaselineGenerate_MissingOutput_PreviewsToStdout()
     {
         var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-            "--config", _passingPolicy);
+            "--config", PassingPolicy);
 
         Assert.Multiple(() =>
         {
@@ -79,7 +79,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
             File.WriteAllText(outputPath, "# reviewed baseline\nversion: 2\nbaseline: {}\n");
 
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy, "--output", outputPath);
+                "--config", PassingPolicy, "--output", outputPath);
 
             Assert.Multiple(() =>
             {
@@ -89,7 +89,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
             });
 
             var (forcedExit, _, forcedStderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy, "--output", outputPath, "--force");
+                "--config", PassingPolicy, "--output", outputPath, "--force");
 
             Assert.Multiple(() =>
             {
@@ -111,7 +111,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy, "--output", outputPath, "--dry-run");
+                "--config", PassingPolicy, "--output", outputPath, "--dry-run");
 
             Assert.Multiple(() =>
             {
@@ -171,7 +171,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--mode", "strict");
 
@@ -196,7 +196,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--mode", "audit");
 
@@ -221,7 +221,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--mode", "invalid");
 
@@ -242,7 +242,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _passingPolicy,
+                "--config", PassingPolicy,
                 "--output", outputPath,
                 "--condition-set", "nonexistent");
 
@@ -267,7 +267,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _failingPolicy,
+                "--config", FailingPolicy,
                 "--output", outputPath);
 
             Assert.Multiple(() =>
@@ -293,7 +293,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _coveragePolicy,
+                "--config", CoveragePolicyPath,
                 "--output", outputPath);
 
             Assert.Multiple(() =>
@@ -322,7 +322,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy,
+                "--config", GraphPolicy,
                 "--output", outputPath,
                 "--contract", "no-execution-to-contracts");
 
@@ -349,7 +349,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, _, stderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy,
+                "--config", GraphPolicy,
                 "--output", outputPath,
                 "--contract", "missing-contract-id");
 
@@ -374,7 +374,7 @@ internal sealed class CliBaselineGenerateIntegrationTests : CliIntegrationTestBa
         try
         {
             var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
-                "--policy", _passingPolicy,
+                "--policy", PassingPolicy,
                 "--output", outputPath);
 
             Assert.Multiple(() =>

@@ -7,7 +7,7 @@ namespace ArchLinterNet.Cli.Tests;
 internal sealed class CliPolicyProvenanceIntegrationTests : CliIntegrationTestBase
 {
     private static string ImportedProvenancePolicy => Path.Combine(
-        _repoRoot,
+        RepoRoot,
         "tests",
         "ArchLinterNet.Cli.Tests",
         "TestPolicies",

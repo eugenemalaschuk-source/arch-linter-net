@@ -25,7 +25,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Graph_DefaultInvocation_ProducesJsonWithNodesAndEdges()
     {
-        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", _graphPolicy);
+        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", GraphPolicy);
 
         Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
 
@@ -42,7 +42,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Graph_NamespaceLevel_TagsViolatingEdgeWithContractId()
     {
-        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", _graphPolicy, "--level", "namespace");
+        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", GraphPolicy, "--level", "namespace");
 
         Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
 
@@ -61,7 +61,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Graph_DotFormat_ProducesGraphvizDigraph()
     {
-        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", _graphPolicy, "--format", "dot");
+        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", GraphPolicy, "--format", "dot");
 
         Assert.Multiple(() =>
         {
@@ -74,7 +74,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Graph_MermaidFormat_ProducesMermaidGraph()
     {
-        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", _graphPolicy, "--format", "mermaid");
+        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", GraphPolicy, "--format", "mermaid");
 
         Assert.Multiple(() =>
         {
@@ -86,7 +86,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Graph_AssemblyLevel_ProducesAssemblyNodes()
     {
-        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", _graphPolicy, "--level", "assembly");
+        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", GraphPolicy, "--level", "assembly");
 
         Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
 
@@ -99,7 +99,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Graph_InvalidLevel_ExitsWithError()
     {
-        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", _graphPolicy, "--level", "bogus");
+        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", GraphPolicy, "--level", "bogus");
 
         Assert.Multiple(() =>
         {
@@ -113,7 +113,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Graph_InvalidFormat_ExitsWithError()
     {
-        var (exitCode, _, stderr) = RunCli("graph", "--policy", _graphPolicy, "--format", "bogus");
+        var (exitCode, _, stderr) = RunCli("graph", "--policy", GraphPolicy, "--format", "bogus");
 
         Assert.Multiple(() =>
         {
@@ -139,7 +139,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     public void Graph_UnknownContractId_ExitsTwoWithDiagnostic()
     {
         var (exitCode, stdout, stderr) = RunCli(
-            "graph", "--policy", _graphPolicy, "--contract", "no-execution-to-contractss");
+            "graph", "--policy", GraphPolicy, "--contract", "no-execution-to-contractss");
 
         Assert.Multiple(() =>
         {
@@ -156,7 +156,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     public void Graph_ValidContractId_RestrictsExecutionAndSucceeds()
     {
         var (exitCode, stdout, stderr) = RunCli(
-            "graph", "--policy", _graphPolicy, "--contract", "no-execution-to-contracts", "--format", "json");
+            "graph", "--policy", GraphPolicy, "--contract", "no-execution-to-contracts", "--format", "json");
 
         Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
 
@@ -193,7 +193,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     public void Explain_DirectDependency_ReportsPathAndContractId()
     {
         var (exitCode, stdout, stderr) = RunCli(
-            "explain", "--policy", _graphPolicy,
+            "explain", "--policy", GraphPolicy,
             "--source", "ArchLinterNet.Core.Execution",
             "--target", "ArchLinterNet.Core.Contracts");
 
@@ -209,7 +209,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     public void Explain_NoPath_ReportsNoPathFoundAndExitsZero()
     {
         var (exitCode, stdout, stderr) = RunCli(
-            "explain", "--policy", _graphPolicy,
+            "explain", "--policy", GraphPolicy,
             "--source", "ArchLinterNet.Core.Contracts",
             "--target", "ArchLinterNet.Core.NonExistent");
 
@@ -224,7 +224,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     public void Explain_JsonFormat_ProducesValidJsonWithNullPathWhenUnreachable()
     {
         var (exitCode, stdout, stderr) = RunCli(
-            "explain", "--policy", _graphPolicy,
+            "explain", "--policy", GraphPolicy,
             "--source", "ArchLinterNet.Core.Contracts",
             "--target", "ArchLinterNet.Core.NonExistent",
             "--format", "json");
@@ -239,7 +239,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     public void Explain_AssemblyLevel_ExitsWithError()
     {
         var (exitCode, _, stderr) = RunCli(
-            "explain", "--policy", _graphPolicy,
+            "explain", "--policy", GraphPolicy,
             "--source", "ArchLinterNet.Core",
             "--target", "ArchLinterNet.Core",
             "--level", "assembly");
@@ -254,7 +254,7 @@ internal sealed class CliGraphIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Explain_MissingSourceOrTarget_ExitsWithError()
     {
-        var (exitCode, _, stderr) = RunCli("explain", "--policy", _graphPolicy, "--source", "ArchLinterNet.Core.Execution");
+        var (exitCode, _, stderr) = RunCli("explain", "--policy", GraphPolicy, "--source", "ArchLinterNet.Core.Execution");
 
         Assert.Multiple(() =>
         {

@@ -447,7 +447,7 @@ internal sealed class ExplainCommandHandlerTests : ExplainCommandHandlerTestBase
         Assert.Multiple(() =>
         {
             Assert.That(doc.RootElement.GetProperty("path").EnumerateArray().Select(e => e.GetString()).ToArray(),
-                Is.EqualTo(_value));
+                Is.EqualTo(SourceAndTarget));
             Assert.That(doc.RootElement.GetProperty("contractIds")[0].GetString(), Is.EqualTo("rule-1"));
             Assert.That(doc.RootElement.TryGetProperty("expressionParticipation", out _), Is.False,
                 "expressionParticipation must be absent when ExpressionParticipation is empty");

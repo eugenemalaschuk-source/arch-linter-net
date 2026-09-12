@@ -7,10 +7,10 @@ namespace ArchLinterNet.Cli.Tests;
 internal sealed class CliCoverageSummaryIntegrationTests : CliIntegrationTestBase
 {
     private static string CoveragePolicy => Path.Combine(
-        _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-policy.yml");
+        RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-policy.yml");
 
     private static string RuleInputCoveragePolicy => Path.Combine(
-        _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "rule-input-coverage-policy.yml");
+        RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "rule-input-coverage-policy.yml");
 
     private static readonly string[] _overlappingExclusionSourceFiles =
     {
@@ -159,7 +159,7 @@ internal sealed class CliCoverageSummaryIntegrationTests : CliIntegrationTestBas
     [Test]
     public static void CoverageSummary_NoCoverageContracts_OmitsSummarySection()
     {
-        var (exitCode, stdout, _) = RunCli("--policy", _passingPolicy, "--format", "human");
+        var (exitCode, stdout, _) = RunCli("--policy", PassingPolicy, "--format", "human");
 
         Assert.That(exitCode, Is.EqualTo(0));
         Assert.That(stdout, Does.Not.Contain("Coverage summary:"));
@@ -168,7 +168,7 @@ internal sealed class CliCoverageSummaryIntegrationTests : CliIntegrationTestBas
     [Test]
     public static void CoverageSummary_NoCoverageContracts_JsonStillReportsEmptyArray()
     {
-        var (exitCode, stdout, _) = RunCli("--policy", _passingPolicy, "--format", "json");
+        var (exitCode, stdout, _) = RunCli("--policy", PassingPolicy, "--format", "json");
 
         Assert.That(exitCode, Is.EqualTo(0));
 
@@ -213,7 +213,7 @@ internal sealed class CliCoverageSummaryIntegrationTests : CliIntegrationTestBas
         // mirroring PolicyConsistencyDiagnostic.PolicyLocation for the unmatched-layer-exclusion
         // finding.
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-layer-exclusion-provenance.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-layer-exclusion-provenance.yml");
         var (exitCode, stdout, _) = RunCli("--policy", policy, "--format", "json");
 
         Assert.That(exitCode, Is.EqualTo(0));
@@ -246,7 +246,7 @@ internal sealed class CliCoverageSummaryIntegrationTests : CliIntegrationTestBas
         // union-subtraction, especially across imported fragments where the first-found element
         // may not even belong to the same file as the second.
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies",
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies",
             "coverage-overlapping-layer-exclusion-root.yml");
         var (exitCode, stdout, _) = RunCli("--policy", policy, "--format", "json");
 

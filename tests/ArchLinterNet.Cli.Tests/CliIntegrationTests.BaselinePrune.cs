@@ -32,7 +32,7 @@ baseline:
 ");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "prune",
-                "--config", _passingWithIdsPolicy, "--baseline", baselinePath, "--output", prunedPath, "--json");
+                "--config", PassingWithIdsPolicy, "--baseline", baselinePath, "--output", prunedPath, "--json");
 
             Assert.That(exitCode, Is.EqualTo(0), $"Prune should succeed, stderr: {stderr}");
 
@@ -61,11 +61,11 @@ baseline:
         try
         {
             var (genExit, _, _) = RunCli("baseline", "generate",
-                "--config", _graphPolicy, "--output", baselinePath);
+                "--config", GraphPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0));
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "prune",
-                "--config", _graphPolicy, "--baseline", baselinePath, "--output", prunedPath);
+                "--config", GraphPolicy, "--baseline", baselinePath, "--output", prunedPath);
 
             Assert.Multiple(() =>
             {
@@ -93,11 +93,11 @@ baseline:
         try
         {
             var (genExit, _, genStderr) = RunCli("baseline", "generate",
-                "--config", _graphPolicy, "--output", baselinePath);
+                "--config", GraphPolicy, "--output", baselinePath);
             Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "prune",
-                "--config", _graphPolicy, "--baseline", baselinePath, "--output", prunedPath, "-f");
+                "--config", GraphPolicy, "--baseline", baselinePath, "--output", prunedPath, "-f");
 
             Assert.That(exitCode, Is.EqualTo(0), $"Prune should succeed, stderr: {stderr}");
 
@@ -117,7 +117,7 @@ baseline:
     public void BaselinePrune_MissingBaselineFlag_ExitsTwo()
     {
         var (exitCode, _, stderr) = RunCli("baseline", "prune",
-            "--config", _passingPolicy, "--output", "out.yml");
+            "--config", PassingPolicy, "--output", "out.yml");
 
         Assert.Multiple(() =>
         {
@@ -151,7 +151,7 @@ baseline:
             File.WriteAllText(baselinePath, Original);
 
             var (exitCode, _, stderr) = RunCli("baseline", "prune",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+                "--config", PassingPolicy, "--baseline", baselinePath, "--output", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -176,7 +176,7 @@ baseline:
             File.WriteAllBytes(baselinePath, original);
 
             var (exitCode, _, stderr) = RunCli("baseline", "prune",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+                "--config", PassingPolicy, "--baseline", baselinePath, "--output", baselinePath);
 
             Assert.Multiple(() =>
             {
@@ -202,7 +202,7 @@ baseline:
             File.WriteAllBytes(baselinePath, original);
 
             var (exitCode, _, stderr) = RunCli("baseline", "prune",
-                "--config", _passingPolicy, "--baseline", baselinePath, "--output", outputPath);
+                "--config", PassingPolicy, "--baseline", baselinePath, "--output", outputPath);
 
             Assert.Multiple(() =>
             {

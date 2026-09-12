@@ -12,9 +12,9 @@ namespace ArchLinterNet.Cli.Tests;
 
 internal abstract class ReportCoordinatorTestBase
 {
-    protected static readonly string[] _value = { "one.json", "two.sarif" };
-    protected static readonly string[] _value1 = { "bad.json" };
-    protected static readonly string[] _value2 = { "first.json", "second.sarif" };
+    protected static readonly string[] FailedReportPaths = { "one.json", "two.sarif" };
+    protected static readonly string[] InvalidReportPaths = { "bad.json" };
+    protected static readonly string[] StagedReportPaths = { "first.json", "second.sarif" };
     protected static ValidationOutcome PassedOutcome => new(
         true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
         Array.Empty<ArchitectureViolation>(), "off", Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),

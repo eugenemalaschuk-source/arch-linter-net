@@ -6,40 +6,40 @@ namespace ArchLinterNet.Cli.Tests;
 
 internal abstract class CliIntegrationTestBase
 {
-    protected static string _repoRoot = null!;
-    protected static string _cliDllPath = null!;
-    protected static string _passingPolicy = null!;
-    protected static string _failingPolicy = null!;
-    protected static string _coveragePolicy = null!;
-    protected static string _allCoverageScopesPolicy = null!;
-    protected static string _graphPolicy = null!;
-    protected static string _passingWithIdsPolicy = null!;
-    protected static string _combinedEquivalencePolicy = null!;
+    protected static string RepoRoot = null!;
+    protected static string CliDllPath = null!;
+    protected static string PassingPolicy = null!;
+    protected static string FailingPolicy = null!;
+    protected static string CoveragePolicyPath = null!;
+    protected static string AllCoverageScopesPolicy = null!;
+    protected static string GraphPolicy = null!;
+    protected static string PassingWithIdsPolicy = null!;
+    protected static string CombinedEquivalencePolicy = null!;
 
     [OneTimeSetUp]
     protected void OneTimeSetUp()
     {
-        _repoRoot = FindRepoRoot();
-        _cliDllPath = Path.Combine(AppContext.BaseDirectory, "ArchLinterNet.Cli.dll");
-        _passingPolicy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-policy.yml");
-        _failingPolicy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "failing-policy.yml");
-        _coveragePolicy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-policy.yml");
-        _allCoverageScopesPolicy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "all-coverage-scopes-policy.yml");
-        _graphPolicy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "graph-policy.yml");
-        _passingWithIdsPolicy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
-        _combinedEquivalencePolicy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "combined-equivalence-policy.yml");
+        RepoRoot = FindRepoRoot();
+        CliDllPath = Path.Combine(AppContext.BaseDirectory, "ArchLinterNet.Cli.dll");
+        PassingPolicy = Path.Combine(
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-policy.yml");
+        FailingPolicy = Path.Combine(
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "failing-policy.yml");
+        CoveragePolicyPath = Path.Combine(
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-policy.yml");
+        AllCoverageScopesPolicy = Path.Combine(
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "all-coverage-scopes-policy.yml");
+        GraphPolicy = Path.Combine(
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "graph-policy.yml");
+        PassingWithIdsPolicy = Path.Combine(
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+        CombinedEquivalencePolicy = Path.Combine(
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "combined-equivalence-policy.yml");
 
-        if (!File.Exists(_cliDllPath))
+        if (!File.Exists(CliDllPath))
         {
             throw new InvalidOperationException(
-                $"CLI artifact was not built by the test project: {_cliDllPath}");
+                $"CLI artifact was not built by the test project: {CliDllPath}");
         }
     }
 
@@ -59,10 +59,10 @@ internal abstract class CliIntegrationTestBase
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            WorkingDirectory = _repoRoot
+            WorkingDirectory = RepoRoot
         };
 
-        startInfo.ArgumentList.Add(_cliDllPath);
+        startInfo.ArgumentList.Add(CliDllPath);
         foreach (string argument in args)
         {
             startInfo.ArgumentList.Add(argument);

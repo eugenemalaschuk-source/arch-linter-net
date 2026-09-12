@@ -14,7 +14,7 @@ namespace ArchLinterNet.Cli.Tests;
 
 internal abstract class ExplainCommandHandlerTestBase
 {
-    protected static readonly string[] _value = { "A", "B" };
+    protected static readonly string[] SourceAndTarget = { "A", "B" };
     protected static ArchitecturePolicyLoadException PolicyException()
     {
         ArchitecturePolicySourceDescriptor source = new(

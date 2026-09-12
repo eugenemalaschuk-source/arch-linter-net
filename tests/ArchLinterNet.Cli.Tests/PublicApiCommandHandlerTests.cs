@@ -11,7 +11,7 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 internal sealed class PublicApiCommandHandlerTests : PublicApiCommandHandlerTestBase
 {
-[Test]
+    [Test]
     public void Capture_WritesSnapshotWhenTargetDoesNotExist()
     {
         StubFileSystem fileSystem = new(PolicyPath);
@@ -366,8 +366,8 @@ internal sealed class PublicApiCommandHandlerTests : PublicApiCommandHandlerTest
         {
             MigrateOutcome = new PublicApiMigrateOutcome(
                 false, null,
-                _value,
-                _value1,
+                StaleEntries,
+                UndeclaredEntries,
                 SnapshotPath,
                 Array.Empty<BuildStatePreflightDiagnostic>(),
                 "has 1 stale inline declaration(s)", PublicApiFailureKind.Drift),
@@ -394,7 +394,7 @@ internal sealed class PublicApiCommandHandlerTests : PublicApiCommandHandlerTest
         {
             MigrateOutcome = new PublicApiMigrateOutcome(
                 true, CapturedSnapshot,
-                _value2,
+                AcceptedStaleEntries,
                 Array.Empty<string>(),
                 SnapshotPath,
                 Array.Empty<BuildStatePreflightDiagnostic>()),
@@ -603,7 +603,7 @@ internal sealed class PublicApiCommandHandlerTests : PublicApiCommandHandlerTest
         StubRuntime runtime = new()
         {
             MigrateOutcome = new PublicApiMigrateOutcome(
-                true, CapturedSnapshot, _value3, Array.Empty<string>(), SnapshotPath,
+                true, CapturedSnapshot, AcceptedEntries, Array.Empty<string>(), SnapshotPath,
                 Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 

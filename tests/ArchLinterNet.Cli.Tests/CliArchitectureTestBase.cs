@@ -30,9 +30,9 @@ namespace ArchLinterNet.Cli.Tests;
 
 internal abstract class CliArchitectureTestBase
 {
-    protected static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "gate", "health", "history", "measure", "policy", "public-api", "report", "scaffold", "schema", "topology" };
-    protected static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
-    protected static readonly string[] _value2 = { "rule-1" };
+    protected static readonly string[] CommandNames = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "gate", "health", "history", "measure", "policy", "public-api", "report", "scaffold", "schema", "topology" };
+    protected static readonly string[] BaselineCommands = { "generate", "update", "prune", "diff", "verify", "migrate" };
+    protected static readonly string[] ContractIds = { "rule-1" };
     protected sealed class FakeCliRuntime : ICliRuntime
     {
         public string Version => "1.2.3";

@@ -14,10 +14,10 @@ namespace ArchLinterNet.Cli.Tests;
 
 internal abstract class PublicApiCommandHandlerTestBase
 {
-    protected static readonly string[] _value = { "class Acme.Gone" };
-    protected static readonly string[] _value1 = { "class Acme.New" };
-    protected static readonly string[] _value2 = { "class Acme.Gone" };
-    protected static readonly string[] _value3 = { "class Acme.Gone" };
+    protected static readonly string[] StaleEntries = { "class Acme.Gone" };
+    protected static readonly string[] UndeclaredEntries = { "class Acme.New" };
+    protected static readonly string[] AcceptedStaleEntries = { "class Acme.Gone" };
+    protected static readonly string[] AcceptedEntries = { "class Acme.Gone" };
     protected const string PolicyPath = "architecture/dependencies.arch.yml";
     protected const string SnapshotPath = "architecture/api/module-api.txt";
     protected const string ContractId = "module-api";

@@ -171,7 +171,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Version_WithAdditionalRootArguments_StillPrintsVersionAndExitsZero()
     {
-        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--version");
+        var (exitCode, stdout, stderr) = RunCli("--policy", PassingPolicy, "--version");
 
         Assert.Multiple(() =>
         {
@@ -184,7 +184,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Help_WithAdditionalRootArguments_StillPrintsHelpAndExitsZero()
     {
-        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--help");
+        var (exitCode, stdout, stderr) = RunCli("--policy", PassingPolicy, "--help");
 
         Assert.Multiple(() =>
         {
@@ -199,7 +199,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void CustomPolicyPath_WithValidPath_ExitsZero()
     {
-        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--strict");
+        var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--strict");
 
         Assert.That(exitCode, Is.EqualTo(0),
             $"Policy should pass, stderr: {stderr}");
@@ -208,7 +208,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void PolicyShortcut_WithValidPath_ExitsZero()
     {
-        var (exitCode, _, _) = RunCli("-p", _passingPolicy, "--strict");
+        var (exitCode, _, _) = RunCli("-p", PassingPolicy, "--strict");
 
         Assert.That(exitCode, Is.EqualTo(0));
     }
@@ -230,7 +230,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void StrictMode_ExitsZeroWhenPassing()
     {
-        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict");
+        var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--mode", "strict");
 
         Assert.That(exitCode, Is.EqualTo(0),
             $"Strict should pass, stderr: {stderr}");
@@ -239,7 +239,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void AuditMode_ExitsZeroWhenPassing()
     {
-        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--mode", "audit");
+        var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--mode", "audit");
 
         Assert.That(exitCode, Is.EqualTo(0),
             $"Audit should pass, stderr: {stderr}");
@@ -248,7 +248,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void AuditMode_ReportsDiagnostics()
     {
-        var (_, stdout, _) = RunCli("--policy", _passingPolicy, "--mode", "audit");
+        var (_, stdout, _) = RunCli("--policy", PassingPolicy, "--mode", "audit");
 
         Assert.That(stdout, Does.Contain("passed").Or.Contain("violation").Or.Contain("cycle"));
     }
@@ -256,8 +256,8 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void StrictShortcut_WorksLikeModeStrict()
     {
-        var (strictExit, _, _) = RunCli("--policy", _passingPolicy, "--strict");
-        var (modeExit, _, _) = RunCli("--policy", _passingPolicy, "--mode", "strict");
+        var (strictExit, _, _) = RunCli("--policy", PassingPolicy, "--strict");
+        var (modeExit, _, _) = RunCli("--policy", PassingPolicy, "--mode", "strict");
 
         Assert.That(strictExit, Is.EqualTo(modeExit));
     }
@@ -265,8 +265,8 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void AuditShortcut_WorksLikeModeAudit()
     {
-        var (auditExit, _, _) = RunCli("--policy", _passingPolicy, "--audit");
-        var (modeExit, _, _) = RunCli("--policy", _passingPolicy, "--mode", "audit");
+        var (auditExit, _, _) = RunCli("--policy", PassingPolicy, "--audit");
+        var (modeExit, _, _) = RunCli("--policy", PassingPolicy, "--mode", "audit");
 
         Assert.That(auditExit, Is.EqualTo(modeExit));
     }
@@ -276,7 +276,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void CombinedMode_ExitsZeroWhenBothModesPass()
     {
-        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,audit");
+        var (exitCode, stdout, stderr) = RunCli("--policy", PassingPolicy, "--mode", "strict,audit");
 
         Assert.Multiple(() =>
         {
@@ -288,8 +288,8 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void CombinedMode_FailsWhenEitherRequestedModeFails()
     {
-        var (combinedExit, _, _) = RunCli("--policy", _failingPolicy, "--mode", "strict,audit");
-        var (strictExit, _, _) = RunCli("--policy", _failingPolicy, "--mode", "strict");
+        var (combinedExit, _, _) = RunCli("--policy", FailingPolicy, "--mode", "strict,audit");
+        var (strictExit, _, _) = RunCli("--policy", FailingPolicy, "--mode", "strict");
 
         Assert.That(combinedExit, Is.EqualTo(strictExit).And.Not.EqualTo(0));
     }
@@ -297,7 +297,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void CombinedMode_InvalidModeInList_ReportsError()
     {
-        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,bogus");
+        var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--mode", "strict,bogus");
 
         Assert.Multiple(() =>
         {
@@ -315,7 +315,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void CombinedMode_JsonFormat_ProducesOneParseableDocumentWithOneResultPerMode()
     {
-        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,audit", "--format", "json");
+        var (exitCode, stdout, stderr) = RunCli("--policy", PassingPolicy, "--mode", "strict,audit", "--format", "json");
 
         Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
 
@@ -336,7 +336,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void CombinedMode_SarifFormat_ProducesOneParseableDocumentWithOneRunPerMode()
     {
-        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,audit", "--format", "sarif");
+        var (exitCode, stdout, stderr) = RunCli("--policy", PassingPolicy, "--mode", "strict,audit", "--format", "sarif");
 
         Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
 
@@ -354,10 +354,10 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void ValidateModeFlags_RespectLeftToRightPrecedence()
     {
-        var strictFromTail = RunCli("--policy", _failingPolicy, "--audit", "--mode", "strict");
-        var strictCanonical = RunCli("--policy", _failingPolicy, "--mode", "strict");
-        var auditFromTail = RunCli("--policy", _failingPolicy, "--mode", "strict", "--audit");
-        var auditCanonical = RunCli("--policy", _failingPolicy, "--mode", "audit");
+        var strictFromTail = RunCli("--policy", FailingPolicy, "--audit", "--mode", "strict");
+        var strictCanonical = RunCli("--policy", FailingPolicy, "--mode", "strict");
+        var auditFromTail = RunCli("--policy", FailingPolicy, "--mode", "strict", "--audit");
+        var auditCanonical = RunCli("--policy", FailingPolicy, "--mode", "audit");
 
         AssertCliResultEquals(strictCanonical, strictFromTail);
         AssertCliResultEquals(auditCanonical, auditFromTail);
@@ -366,10 +366,10 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void ValidateModeShortcuts_RespectLeftToRightPrecedence()
     {
-        var auditFromTail = RunCli("--policy", _failingPolicy, "--strict", "--audit");
-        var auditCanonical = RunCli("--policy", _failingPolicy, "--mode", "audit");
-        var strictFromTail = RunCli("--policy", _failingPolicy, "--audit", "--strict");
-        var strictCanonical = RunCli("--policy", _failingPolicy, "--mode", "strict");
+        var auditFromTail = RunCli("--policy", FailingPolicy, "--strict", "--audit");
+        var auditCanonical = RunCli("--policy", FailingPolicy, "--mode", "audit");
+        var strictFromTail = RunCli("--policy", FailingPolicy, "--audit", "--strict");
+        var strictCanonical = RunCli("--policy", FailingPolicy, "--mode", "strict");
 
         AssertCliResultEquals(auditCanonical, auditFromTail);
         AssertCliResultEquals(strictCanonical, strictFromTail);
@@ -380,7 +380,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void HumanFormat_ProducesReadableOutput()
     {
-        var (exitCode, stdout, _) = RunCli("--policy", _passingPolicy, "--format", "human");
+        var (exitCode, stdout, _) = RunCli("--policy", PassingPolicy, "--format", "human");
 
         Assert.Multiple(() =>
         {
@@ -392,7 +392,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void JsonOutput_IsValidJsonWithExpectedSchema()
     {
-        var (exitCode, stdout, _) = RunCli("--policy", _passingPolicy, "--format", "json");
+        var (exitCode, stdout, _) = RunCli("--policy", PassingPolicy, "--format", "json");
 
         Assert.That(exitCode, Is.EqualTo(0));
 
@@ -411,7 +411,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void JsonShortcut_ProducesValidJson()
     {
-        var (exitCode, stdout, _) = RunCli("--policy", _passingPolicy, "--json");
+        var (exitCode, stdout, _) = RunCli("--policy", PassingPolicy, "--json");
 
         Assert.That(exitCode, Is.EqualTo(0));
         Assert.DoesNotThrow(() => JsonDocument.Parse(stdout));
@@ -420,10 +420,10 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void ValidateFormatFlags_RespectLeftToRightPrecedence()
     {
-        var sarifFromTail = RunCli("--policy", _failingPolicy, "--json", "--format", "sarif", "--strict");
-        var sarifCanonical = RunCli("--policy", _failingPolicy, "--format", "sarif", "--strict");
-        var jsonFromTail = RunCli("--policy", _failingPolicy, "--format", "sarif", "--json", "--strict");
-        var jsonCanonical = RunCli("--policy", _failingPolicy, "--format", "json", "--strict");
+        var sarifFromTail = RunCli("--policy", FailingPolicy, "--json", "--format", "sarif", "--strict");
+        var sarifCanonical = RunCli("--policy", FailingPolicy, "--format", "sarif", "--strict");
+        var jsonFromTail = RunCli("--policy", FailingPolicy, "--format", "sarif", "--json", "--strict");
+        var jsonCanonical = RunCli("--policy", FailingPolicy, "--format", "json", "--strict");
 
         AssertCliResultEquals(sarifCanonical, sarifFromTail);
         AssertCliResultEquals(jsonCanonical, jsonFromTail);
@@ -434,7 +434,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void SarifOutput_IsValidSarifWithExpectedSchema()
     {
-        var (exitCode, stdout, _) = RunCli("--policy", _passingPolicy, "--format", "sarif");
+        var (exitCode, stdout, _) = RunCli("--policy", PassingPolicy, "--format", "sarif");
 
         Assert.That(exitCode, Is.EqualTo(0));
 
@@ -455,7 +455,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void SarifOutput_WithViolations_IncludesResultWithNormalizedRuleId()
     {
-        var (exitCode, stdout, _) = RunCli("--policy", _failingPolicy, "--format", "sarif", "--strict");
+        var (exitCode, stdout, _) = RunCli("--policy", FailingPolicy, "--format", "sarif", "--strict");
 
         Assert.That(exitCode, Is.EqualTo(1));
 
@@ -475,7 +475,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void StrictMode_WithViolations_ExitsOne()
     {
-        var (exitCode, _, stderr) = RunCli("--policy", _failingPolicy, "--strict");
+        var (exitCode, _, stderr) = RunCli("--policy", FailingPolicy, "--strict");
 
         Assert.Multiple(() =>
         {
@@ -516,7 +516,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     public void InvalidUnmatchedIgnoredViolationsValue_ExitsWithError()
     {
         string invalidPolicy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "invalid-unmatched-config.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "invalid-unmatched-config.yml");
         var (exitCode, _, stderr) = RunCli("--policy", invalidPolicy, "--strict");
 
         Assert.Multiple(() =>
@@ -531,7 +531,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void UnknownConditionSet_ExitsTwoWithDiagnostic()
     {
-        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--strict", "--condition-set", "nonexistent");
+        var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--strict", "--condition-set", "nonexistent");
 
         Assert.Multiple(() =>
         {
@@ -547,7 +547,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     public void SingleContract_SelectsMatchingContract()
     {
         string policyWithIds = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
         var (exitCode, stdout, stderr) = RunCli("--policy", policyWithIds, "--strict", "--contract", "core-no-forbidden");
 
         Assert.Multiple(() =>
@@ -561,7 +561,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     public void MultipleContracts_SelectsAll()
     {
         string policyWithIds = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
         var (exitCode, _, stderr) = RunCli("--policy", policyWithIds, "--strict",
             "--contract", "core-no-forbidden", "--contract", "no-non-existent");
 
@@ -573,7 +573,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     public void SingleContract_WithAuditMode_SelectsAuditContract()
     {
         string policyWithIds = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
         var (exitCode, _, stderr) = RunCli("--policy", policyWithIds, "--mode", "audit", "--contract", "audit-core-check");
 
         Assert.That(exitCode, Is.EqualTo(0),
@@ -584,7 +584,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     public void UnknownContractId_ExitsTwoWithDiagnostic()
     {
         string policyWithIds = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
         var (exitCode, _, stderr) = RunCli("--policy", policyWithIds, "--strict", "--contract", "nonexistent");
 
         Assert.Multiple(() =>
@@ -601,7 +601,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     public void UnknownExternalGroup_ReturnsValidationFailureInsteadOfRuntimeError()
     {
         string policy = Path.Combine(
-            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "unknown-external-group.yml");
+            RepoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "unknown-external-group.yml");
         var (exitCode, stdout, stderr) = RunCli("--policy", policy, "--strict");
 
         Assert.Multiple(() =>
@@ -618,7 +618,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     public void SamplePolicy_DetectsMissingAssemblies()
     {
         string samplePolicy = Path.Combine(
-            _repoRoot, "samples", "BasicCleanArchitecture", "architecture", "dependencies.arch.yml");
+            RepoRoot, "samples", "BasicCleanArchitecture", "architecture", "dependencies.arch.yml");
         var (exitCode, stdout, _) = RunCli("--policy", samplePolicy, "--strict");
 
         Assert.Multiple(() =>
@@ -633,7 +633,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Timings_PrintsPhaseNamesToStderr()
     {
-        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--strict", "--timings");
+        var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--strict", "--timings");
 
         Assert.Multiple(() =>
         {
@@ -650,8 +650,8 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Timings_ExitCodeMatchesNonTimings()
     {
-        var (normalExit, _, _) = RunCli("--policy", _passingPolicy, "--strict");
-        var (timingExit, _, _) = RunCli("--policy", _passingPolicy, "--strict", "--timings");
+        var (normalExit, _, _) = RunCli("--policy", PassingPolicy, "--strict");
+        var (timingExit, _, _) = RunCli("--policy", PassingPolicy, "--strict", "--timings");
 
         Assert.That(timingExit, Is.EqualTo(normalExit));
     }
@@ -659,7 +659,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Timings_WithJson_StdoutRemainsValidJson()
     {
-        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--json", "--timings");
+        var (exitCode, stdout, stderr) = RunCli("--policy", PassingPolicy, "--json", "--timings");
 
         Assert.Multiple(() =>
         {
@@ -672,8 +672,8 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Timings_StdoutUnchanged()
     {
-        var (normalExit, normalOut, normalErr) = RunCli("--policy", _passingPolicy, "--strict");
-        var (timingExit, timingOut, timingErr) = RunCli("--policy", _passingPolicy, "--strict", "--timings");
+        var (normalExit, normalOut, normalErr) = RunCli("--policy", PassingPolicy, "--strict");
+        var (timingExit, timingOut, timingErr) = RunCli("--policy", PassingPolicy, "--strict", "--timings");
 
         Assert.Multiple(() =>
         {
@@ -687,7 +687,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Timings_WithAudit_PrintsPhaseNames()
     {
-        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--audit", "--timings");
+        var (exitCode, _, stderr) = RunCli("--policy", PassingPolicy, "--audit", "--timings");
 
         Assert.Multiple(() =>
         {
@@ -701,7 +701,7 @@ internal sealed class CliIntegrationTests : CliIntegrationTestBase
     [Test]
     public void Timings_WithoutFlag_NoStderrOutput()
     {
-        var (_, _, stderr) = RunCli("--policy", _passingPolicy, "--strict");
+        var (_, _, stderr) = RunCli("--policy", PassingPolicy, "--strict");
 
         Assert.That(stderr, Is.Empty);
     }

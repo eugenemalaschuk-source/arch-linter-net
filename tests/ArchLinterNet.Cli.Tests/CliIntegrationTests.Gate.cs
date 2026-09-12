@@ -13,12 +13,12 @@ internal sealed class CliGateIntegrationTests : CliIntegrationTestBase
         try
         {
             var (generationExit, _, generationError) = RunCli(
-                "baseline", "generate", "--policy", _graphPolicy, "--output", baselinePath);
+                "baseline", "generate", "--policy", GraphPolicy, "--output", baselinePath);
             Assert.That(generationExit, Is.EqualTo(0), $"stderr: {generationError}");
 
-            var (humanExit, human, humanError) = RunCli("gate", "--policy", _graphPolicy, "--baseline", baselinePath);
-            var (jsonExit, json, jsonError) = RunCli("gate", "--policy", _graphPolicy, "--baseline", baselinePath, "--format", "json");
-            var (sarifExit, sarif, sarifError) = RunCli("gate", "--policy", _graphPolicy, "--baseline", baselinePath, "--format", "sarif");
+            var (humanExit, human, humanError) = RunCli("gate", "--policy", GraphPolicy, "--baseline", baselinePath);
+            var (jsonExit, json, jsonError) = RunCli("gate", "--policy", GraphPolicy, "--baseline", baselinePath, "--format", "json");
+            var (sarifExit, sarif, sarifError) = RunCli("gate", "--policy", GraphPolicy, "--baseline", baselinePath, "--format", "sarif");
             using JsonDocument jsonDocument = JsonDocument.Parse(json);
             using JsonDocument sarifDocument = JsonDocument.Parse(sarif);
 
@@ -51,9 +51,9 @@ internal sealed class CliGateIntegrationTests : CliIntegrationTestBase
         {
             File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
             var (debtExit, debtJson, debtError) = RunCli(
-                "gate", "--policy", _graphPolicy, "--baseline", baselinePath, "--format", "json");
+                "gate", "--policy", GraphPolicy, "--baseline", baselinePath, "--format", "json");
             var (contextExit, _, contextError) = RunCli(
-                "gate", "--policy", _graphPolicy, "--baseline", baselinePath, "--base-context", "base.json");
+                "gate", "--policy", GraphPolicy, "--baseline", baselinePath, "--base-context", "base.json");
             using JsonDocument document = JsonDocument.Parse(debtJson);
 
             Assert.Multiple(() =>

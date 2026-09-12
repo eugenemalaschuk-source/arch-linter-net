@@ -22,7 +22,7 @@ internal sealed class BaselineCommandCancellationTests : BaselineCommandHandlerT
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write,
+                "policy.yml", "baseline.yml", "updated.yml", Reasons, "strict", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -43,7 +43,7 @@ internal sealed class BaselineCommandCancellationTests : BaselineCommandHandlerT
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "json", _write,
+                "policy.yml", "baseline.yml", "updated.yml", Reasons, "strict", null, "json", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -71,7 +71,7 @@ internal sealed class BaselineCommandCancellationTests : BaselineCommandHandlerT
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem, cts.Token).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write,
+                "policy.yml", "baseline.yml", "updated.yml", Reasons, "strict", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -100,7 +100,7 @@ internal sealed class BaselineCommandCancellationTests : BaselineCommandHandlerT
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem, cts.Token).Execute(
             new BaselineUpdateCommandOptions(
-                "policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write,
+                "policy.yml", "baseline.yml", "updated.yml", Reasons, "strict", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -126,7 +126,7 @@ internal sealed class BaselineCommandCancellationTests : BaselineCommandHandlerT
 
         int result = new BaselineGenerateCommandHandler(runtime, console, fileSystem, cts.Token).Execute(
             new BaselineGenerateCommandOptions(
-                "policy.yml", "generated.yml", _reasons, "strict", null, "human", _write,
+                "policy.yml", "generated.yml", Reasons, "strict", null, "human", WriteOptions,
                 Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
