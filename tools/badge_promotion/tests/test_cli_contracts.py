@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import inspect
+import json
 import sys
 from pathlib import Path
 import zipfile
@@ -11,7 +12,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from badge_promotion import cli
-from badge_promotion.cli import ProviderFailure, _read_bounded_zip_member, _required_gate, _workflow_blob_sha  # noqa: E402
+from badge_promotion.cli import ProviderFailure, _publish_raw, _read_bounded_zip_member, _required_gate, _workflow_blob_sha  # noqa: E402
+from badge_promotion.config import parse_config  # noqa: E402
 
 
 class FakeApi:
@@ -39,7 +41,7 @@ def test_ruleset_fallback_fetches_details_instead_of_trusting_summaries() -> Non
         },
         failures={"/repos/owner/repo/rules/branches/main"},
     )
-    assert not _required_gate(api, "owner/repo", "Architecture Coverage", 15368)
+    assert not _required_gate(api, "owner/repo", "Architecture Coverage", 15368, "main")
     assert detail_path in api.paths
 
 
@@ -53,7 +55,7 @@ def test_ruleset_fallback_accepts_a_required_check_from_the_detail_document() ->
         },
         failures={"/repos/owner/repo/rules/branches/main"},
     )
-    assert _required_gate(api, "owner/repo", "Architecture Coverage", 15368)
+    assert _required_gate(api, "owner/repo", "Architecture Coverage", 15368, "main")
 
 
 @pytest.mark.parametrize(
@@ -80,7 +82,59 @@ def test_ruleset_fallback_requires_active_main_strict_matching_source(change: di
         {list_path: [{"id": 42}], detail_path: detail},
         failures={"/repos/owner/repo/rules/branches/main"},
     )
-    assert not _required_gate(api, "owner/repo", "Architecture Coverage", 15368)
+    assert not _required_gate(api, "owner/repo", "Architecture Coverage", 15368, "main")
+
+
+def test_ruleset_lookup_uses_configured_base_ref() -> None:
+    rules_path = "/repos/owner/repo/rules/branches/develop"
+    api = FakeApi(
+        {
+            rules_path: [{
+                "type": "required_status_checks",
+                "parameters": {
+                    "strict_required_status_checks_policy": True,
+                    "required_status_checks": [{"context": "Architecture Coverage", "integration_id": 15368}],
+                },
+            }],
+        },
+    )
+    assert _required_gate(api, "owner/repo", "Architecture Coverage", 15368, "develop")
+    assert api.paths == [rules_path]
+
+
+def test_main_ref_guard_uses_configured_base_ref(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text())
+    raw["base_ref"] = "develop"
+    config = parse_config(raw)
+    monkeypatch.setattr(cli, "_load_config", lambda _: config)
+    monkeypatch.setattr(sys, "argv", ["cli", "--configuration-id", "fixture", "--adapter", "none"])
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    assert cli.main() == 1
+
+
+def test_raw_publication_stale_cas_uses_configured_base_ref(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text())
+    raw["base_ref"] = "develop"
+    config = parse_config(raw)
+    repository = config.repository
+    main_sha = "a" * 40
+    parent_sha = "b" * 40
+    ref_path = f"/repos/{repository}/git/ref/heads/architecture-health-badge"
+    base_ref_path = f"/repos/{repository}/git/ref/heads/develop"
+    api = FakeApi(
+        {
+            ref_path: {"object": {"sha": parent_sha}},
+            base_ref_path: {"object": {"sha": main_sha}},
+            f"/repos/{repository}/git/commits/{parent_sha}": {"tree": {"sha": "c" * 40}},
+            f"/repos/{repository}/git/blobs": {"sha": "d" * 40},
+            f"/repos/{repository}/git/trees": {"sha": "e" * 40},
+            f"/repos/{repository}/git/commits": {"sha": "f" * 40},
+        }
+    )
+    monkeypatch.setenv("GITHUB_SHA", main_sha)
+    _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
+    assert base_ref_path in api.paths
 
 
 def test_semantic_evidence_member_is_bounded_before_decompression() -> None:

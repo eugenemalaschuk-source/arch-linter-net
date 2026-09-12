@@ -106,7 +106,7 @@ def _required_gate(
     repository: str,
     check_name: str,
     check_app_id: int,
-    base_ref: str = "main",
+    base_ref: str,
 ) -> bool:
     def has_required_check(document: Any) -> bool:
         if not isinstance(document, dict) or document.get("type") != "required_status_checks":
@@ -152,7 +152,8 @@ def _required_gate(
 
     repository_path = _repository_path(repository)
     try:
-        rules = api.request(f"/repos/{repository_path}/rules/branches/main")
+        branch_path = urllib.parse.quote(base_ref, safe="")
+        rules = api.request(f"/repos/{repository_path}/rules/branches/{branch_path}")
     except ProviderFailure as error:
         if error.reason != "required_capability_unavailable":
             raise
@@ -215,6 +216,7 @@ def _read_bounded_zip_member(opened: zipfile.ZipFile, name: str, max_bytes: int)
 
 def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     repository = os.environ.get("GITHUB_REPOSITORY", "")
+    base_ref = config.base_ref
     main_sha = _sha(os.environ.get("GITHUB_SHA"))
     if repository != config.repository:
         raise ProviderFailure("repository_mismatch")
@@ -230,7 +232,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     pr_number = associated[0]["number"]
     pull = api.request(f"/repos/{_repository_path(repository)}/pulls/{pr_number}")
     base = pull.get("base", {})
-    if base.get("repo", {}).get("full_name") != repository or base.get("ref") != "main" or pull.get("merged") is not True or pull.get("merge_commit_sha") != main_sha:
+    if base.get("repo", {}).get("full_name") != repository or base.get("ref") != base_ref or pull.get("merged") is not True or pull.get("merge_commit_sha") != main_sha:
         raise ProviderFailure("merged_pull_request_invalid")
     head_sha = _sha(pull.get("head", {}).get("sha"))
     head_commit = api.request(f"/repos/{_repository_path(repository)}/commits/{head_sha}")
@@ -282,7 +284,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     except (KeyError, TypeError, ValueError, UnicodeError, zipfile.BadZipFile) as error:
         raise ProviderFailure("semantic_evidence_unavailable") from error
     evidence = EvidenceContext(
-        repository=repository, base_ref="main", base_sha=base_sha, main_tree_sha=main_tree,
+        repository=repository, base_ref=base_ref, base_sha=base_sha, main_tree_sha=main_tree,
         head_sha=head_sha, head_tree_sha=head_tree, pr_number=pr_number, event=config.producer.event,
         merged=True, workflow_path=config.producer.workflow_path, workflow_sha=workflow_sha,
         check_name=config.producer.check_name, check_app=config.producer.check_app, check_status="completed",
@@ -326,9 +328,10 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
     parent = current_ref.get("object", {}).get("sha") if current_ref else os.environ.get("GITHUB_SHA")
     if not isinstance(parent, str):
         raise ProviderFailure("publication_parent_unavailable")
-    main_ref = api.request(f"/repos/{repository}/git/ref/heads/main")
-    if main_ref.get("object", {}).get("sha") != os.environ.get("GITHUB_SHA"):
-        raise ProviderFailure("stale_main")
+    configured_ref = urllib.parse.quote(config.base_ref, safe="/")
+    base_ref = api.request(f"/repos/{repository}/git/ref/heads/{configured_ref}")
+    if base_ref.get("object", {}).get("sha") != os.environ.get("GITHUB_SHA"):
+        raise ProviderFailure("stale_base_ref")
     parent_commit = api.request(f"/repos/{repository}/git/commits/{parent}")
     base_tree = parent_commit.get("tree", {}).get("sha")
     if not isinstance(base_tree, str):
@@ -371,7 +374,7 @@ def main() -> int:
         config = _load_config(args.configuration_id)
         if config.destination.adapter.value != args.adapter:
             raise ProviderFailure("adapter_configuration_mismatch")
-        if os.environ.get("GITHUB_EVENT_NAME") != "push" or os.environ.get("GITHUB_REF") != "refs/heads/main":
+        if os.environ.get("GITHUB_EVENT_NAME") != "push" or os.environ.get("GITHUB_REF") != f"refs/heads/{config.base_ref}":
             raise ProviderFailure("event_or_ref_mismatch")
         api = GitHubApi()
         evidence, archive = resolve_evidence(api, config)

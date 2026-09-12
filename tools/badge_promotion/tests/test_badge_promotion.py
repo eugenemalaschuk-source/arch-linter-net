@@ -146,6 +146,12 @@ def test_config_parser_rejects_duplicate_keys_and_private_raw() -> None:
         parse_config(raw)
 
 
+def test_config_parser_accepts_an_approved_non_main_base_ref() -> None:
+    raw = json.loads((ROOT / "fixtures" / "approved-config.json").read_text())
+    raw["base_ref"] = "develop"
+    assert parse_config(raw).base_ref == "develop"
+
+
 def test_valid_artifact_returns_exact_canonical_bytes() -> None:
     artifact = validate_artifact(archive_bytes(), CONFIG, evidence())
     assert artifact.payload == payload_bytes()

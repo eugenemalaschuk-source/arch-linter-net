@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from urllib.parse import urlparse
 from typing import Any, Mapping
 
@@ -32,6 +33,7 @@ _MAX_MEMBER_BYTES = 65_536
 _MAX_PAYLOAD_BYTES = 16_384
 _MAX_MEMBERS = 2
 _MAX_LEASE_SECONDS = 3_600
+_BASE_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$")
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -97,8 +99,17 @@ def parse_config(source: str | bytes | Mapping[str, Any]) -> PromotionConfig:
     if visibility not in {"public", "private"}:
         raise ConfigValidationError("repository_visibility is unsupported")
     base_ref = _string(raw["base_ref"], "base_ref")
-    if base_ref != "main":
-        raise ConfigValidationError("only the approved main base is supported")
+    if (
+        _BASE_REF_PATTERN.fullmatch(base_ref) is None
+        or base_ref in {".", ".."}
+        or ".." in base_ref
+        or "//" in base_ref
+        or "/." in base_ref
+        or base_ref.endswith(".")
+        or base_ref.endswith("/")
+        or "@{" in base_ref
+    ):
+        raise ConfigValidationError("base_ref is not a safe branch name")
 
     producer_raw = _object(raw["producer"], "producer")
     _keys(producer_raw, {"workflow_path", "workflow_sha", "job_name", "check_name", "check_app", "event", "artifact_name", "evidence_artifact_name", "payload_path"}, "producer")
