@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+import inspect
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from badge_promotion import cli
 from badge_promotion.cli import ProviderFailure, _required_gate, _workflow_blob_sha  # noqa: E402
 
 
@@ -61,3 +63,11 @@ def test_workflow_sha_resolution_rejects_a_directory_response() -> None:
     api = FakeApi({path: [{"type": "file", "sha": "b" * 40}]})
     with pytest.raises(ProviderFailure, match="workflow_mismatch"):
         _workflow_blob_sha(api, "owner/repo", ".github/workflows", "a" * 40)
+
+
+def test_relay_success_writes_ready_output_before_returning() -> None:
+    source = inspect.getsource(cli.main)
+    relay_start = source.index('if config.destination.adapter.value == "relay":')
+    ready_write = source.index('_write_outputs({**output_metadata, "status": "ready"})', relay_start)
+    relay_return = source.index("            return 0", ready_write)
+    assert source.index("client.publish", relay_start) < ready_write < relay_return

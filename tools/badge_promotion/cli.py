@@ -349,6 +349,7 @@ def main() -> int:
                 client.renew(decision.payload or b"", digest, challenge_id=challenge_id, idempotency_key=request.idempotency_key, generation=generation, revocation_epoch=revocation_epoch, oidc_token=token, semantic_horizon=horizon, tree_sha=evidence.head_tree_sha)
             else:
                 client.publish(decision.payload or b"", digest, challenge_id=challenge_id, idempotency_key=request.idempotency_key, generation=generation, revocation_epoch=revocation_epoch, oidc_token=token, semantic_horizon=horizon, tree_sha=evidence.head_tree_sha)
+            _write_outputs({**output_metadata, "status": "ready"})
             return 0
         _write_outputs({**output_metadata, "status": "ready"})
         _publish_raw(api, config, decision.payload or b"", evidence=evidence, status="ready", reason=decision.reason.value)
