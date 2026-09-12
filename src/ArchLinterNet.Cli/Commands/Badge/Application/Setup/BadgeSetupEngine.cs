@@ -1,3 +1,5 @@
+using static ArchLinterNet.Cli.Commands.Badge.Application.Setup.BadgeSetupValidationHelpers;
+
 namespace ArchLinterNet.Cli.Commands.Badge.Application.Setup;
 
 internal static class BadgeSetupEngine
@@ -6,7 +8,7 @@ internal static class BadgeSetupEngine
     {
         ArgumentNullException.ThrowIfNull(request);
         List<BadgeSetupDiagnostic> diagnostics = [];
-        string modeValue = SelectMode(request, diagnostics);
+        string modeValue = SelectMode(request);
         string profileValue = request.DisclosureProfile
             ?? BadgeSetupContract.HeadlineOnlyProfile;
 
@@ -167,11 +169,11 @@ internal static class BadgeSetupEngine
         return new(plan, diagnostics);
     }
 
-    private static string SelectMode(BadgeSetupRequest request, List<BadgeSetupDiagnostic> diagnostics)
+    private static string SelectMode(BadgeSetupRequest request)
     {
-        if (!string.IsNullOrWhiteSpace(request.Mode))
+        if (request.Mode is { } mode && !string.IsNullOrWhiteSpace(mode))
         {
-            return request.Mode!;
+            return mode;
         }
 
         if (string.Equals(request.Repository.Visibility, "private", StringComparison.Ordinal))
@@ -237,83 +239,118 @@ internal static class BadgeSetupEngine
 
         if (mode == BadgeSetupMode.Relay)
         {
-            if (configuration.Destination.Account is null || configuration.Destination.Alias is null)
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                    BadgeSetupDiagnosticCodes.MalformedIdentity,
-                    privateDetail: "Relay account or alias is missing or malformed."));
-            }
-
-            if (!IsPositive(configuration.Repository.RepositoryId) || !IsPositive(configuration.Repository.RepositoryOwnerId))
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                    BadgeSetupDiagnosticCodes.MalformedIdentity,
-                    privateDetail: "Relay setup requires immutable repository and owner IDs."));
-            }
-
-            if ((repository.Capabilities.RepositoryId is long repositoryId
-                    && configuration.Repository.RepositoryId != repositoryId)
-                || (repository.Capabilities.RepositoryOwnerId is long repositoryOwnerId
-                    && configuration.Repository.RepositoryOwnerId != repositoryOwnerId))
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                    BadgeSetupDiagnosticCodes.MalformedIdentity,
-                    privateDetail: "Configured immutable repository IDs do not match the inspected repository."));
-            }
-
-            if (configuration.Pins is null
-                || configuration.Pins.WorkflowRef is null
-                || configuration.Pins.WorkflowSha is null
-                || configuration.Pins.ActionRef is null)
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                    BadgeSetupDiagnosticCodes.InvalidPin,
-                    privateDetail: "Relay setup requires complete reusable-workflow and action pins."));
-            }
-
-            if (configuration.ProviderPlan is null)
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                    BadgeSetupDiagnosticCodes.UnsupportedPlan,
-                    privateDetail: "Relay setup requires an explicit supported provider plan."));
-            }
-
-            if (configuration.Destination.Endpoint is null)
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                    BadgeSetupDiagnosticCodes.InvalidEndpoint,
-                    privateDetail: "Relay endpoint must be an HTTPS origin without query or fragment."));
-            }
-
-            if (configuration.Destination.Audience is null)
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                    BadgeSetupDiagnosticCodes.InvalidEndpoint,
-                    privateDetail: "Relay audience is missing or contains unsafe characters."));
-            }
+            ValidateRelayIdentity(configuration, repository, diagnostics);
         }
     }
+
+    private static void ValidateRelayIdentity(
+        BadgeSetupConfiguration configuration,
+        BadgeSetupRepositoryContext repository,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
+        if (configuration.Destination.Account is null || configuration.Destination.Alias is null)
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.MalformedIdentity,
+                privateDetail: "Relay account or alias is missing or malformed."));
+        }
+
+        if (!IsPositive(configuration.Repository.RepositoryId) || !IsPositive(configuration.Repository.RepositoryOwnerId))
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.MalformedIdentity,
+                privateDetail: "Relay setup requires immutable repository and owner IDs."));
+        }
+
+        if (RepositoryIdsContradict(configuration, repository))
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.MalformedIdentity,
+                privateDetail: "Configured immutable repository IDs do not match the inspected repository."));
+        }
+
+        if (configuration.Pins is null
+            || configuration.Pins.WorkflowRef is null
+            || configuration.Pins.WorkflowSha is null
+            || configuration.Pins.ActionRef is null)
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.InvalidPin,
+                privateDetail: "Relay setup requires complete reusable-workflow and action pins."));
+        }
+
+        if (configuration.ProviderPlan is null)
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.UnsupportedPlan,
+                privateDetail: "Relay setup requires an explicit supported provider plan."));
+        }
+
+        if (configuration.Destination.Endpoint is null)
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.InvalidEndpoint,
+                privateDetail: "Relay endpoint must be an HTTPS origin without query or fragment."));
+        }
+
+        if (configuration.Destination.Audience is null)
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.InvalidEndpoint,
+                privateDetail: "Relay audience is missing or contains unsafe characters."));
+        }
+    }
+
+    private static bool RepositoryIdsContradict(
+        BadgeSetupConfiguration configuration,
+        BadgeSetupRepositoryContext repository) =>
+        repository.Capabilities.RepositoryId is long repositoryId
+            && configuration.Repository.RepositoryId != repositoryId
+        || repository.Capabilities.RepositoryOwnerId is long repositoryOwnerId
+            && configuration.Repository.RepositoryOwnerId != repositoryOwnerId;
 
     private static void ValidateProjectAndPins(
         BadgeSetupConfiguration configuration,
         List<BadgeSetupDiagnostic> diagnostics)
     {
-        if ((configuration.Repository.RepositoryId is not null && !IsSafePositiveId(configuration.Repository.RepositoryId))
-            || (configuration.Repository.RepositoryOwnerId is not null && !IsSafePositiveId(configuration.Repository.RepositoryOwnerId)))
+        ValidateRepositoryIds(configuration, diagnostics);
+        ValidateProviderPlan(configuration, diagnostics);
+        ValidateDestination(configuration, diagnostics);
+        ValidateProject(configuration, diagnostics);
+        ValidatePins(configuration, diagnostics);
+        ValidateManagedFiles(configuration, diagnostics);
+        ValidateProducer(configuration, diagnostics);
+    }
+
+    private static void ValidateRepositoryIds(
+        BadgeSetupConfiguration configuration,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
+        if (configuration.Repository.RepositoryId is not null && !IsSafePositiveId(configuration.Repository.RepositoryId)
+            || configuration.Repository.RepositoryOwnerId is not null && !IsSafePositiveId(configuration.Repository.RepositoryOwnerId))
         {
             diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
                 BadgeSetupDiagnosticCodes.MalformedIdentity,
-                privateDetail: "Immutable repository IDs must be positive safe integers.")
-            );
+                privateDetail: "Immutable repository IDs must be positive safe integers."));
         }
+    }
 
+    private static void ValidateProviderPlan(
+        BadgeSetupConfiguration configuration,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
         if (configuration.ProviderPlan is not null && !IsSupportedPlan(configuration.ProviderPlan))
         {
             diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
                 BadgeSetupDiagnosticCodes.UnsupportedPlan,
                 privateDetail: "The provider plan is outside the shipped closed set."));
         }
+    }
 
+    private static void ValidateDestination(
+        BadgeSetupConfiguration configuration,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
         if (configuration.Destination.Alias is not null && !IsOpaqueAlias(configuration.Destination.Alias))
         {
             diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
@@ -341,7 +378,12 @@ internal static class BadgeSetupEngine
                 BadgeSetupDiagnosticCodes.InvalidEndpoint,
                 privateDetail: "The destination audience contains unsupported characters."));
         }
+    }
 
+    private static void ValidateProject(
+        BadgeSetupConfiguration configuration,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
         if (!IsSafeRef(configuration.BaseRef))
         {
             diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
@@ -356,45 +398,59 @@ internal static class BadgeSetupEngine
                 BadgeSetupDiagnosticCodes.InvalidProject,
                 privateDetail: "Policy or solution path is not repository-relative and safe."));
         }
+    }
 
-        if (configuration.Pins is not null)
+    private static void ValidatePins(
+        BadgeSetupConfiguration configuration,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
+        if (configuration.Pins is null)
         {
-            if (configuration.Pins.WorkflowRef is not null && !IsReusableWorkflowReference(configuration.Pins.WorkflowRef))
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Reusable workflow reference is malformed."));
-            }
-
-            if (configuration.Pins.WorkflowSha is not null && !IsSha(configuration.Pins.WorkflowSha, 40))
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Reusable workflow pin is not a lowercase 40-character SHA."));
-            }
-
-            if (configuration.Pins.ActionRef is not null && !IsPinnedActionReference(configuration.Pins.ActionRef))
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Action reference is malformed."));
-            }
-
-            if (configuration.Pins.BundleDigest is not null && !IsSha(configuration.Pins.BundleDigest, 64))
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Bundle digest is not a lowercase 64-character SHA."));
-            }
+            return;
         }
 
-        if (configuration.ManagedFiles is not null)
+        if (configuration.Pins.WorkflowRef is not null && !IsReusableWorkflowReference(configuration.Pins.WorkflowRef))
         {
-            if (configuration.ManagedFiles.Count > 32
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Reusable workflow reference is malformed."));
+        }
+
+        if (configuration.Pins.WorkflowSha is not null && !IsSha(configuration.Pins.WorkflowSha, 40))
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Reusable workflow pin is not a lowercase 40-character SHA."));
+        }
+
+        if (configuration.Pins.ActionRef is not null && !IsPinnedActionReference(configuration.Pins.ActionRef))
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Action reference is malformed."));
+        }
+
+        if (configuration.Pins.BundleDigest is not null && !IsSha(configuration.Pins.BundleDigest, 64))
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Bundle digest is not a lowercase 64-character SHA."));
+        }
+    }
+
+    private static void ValidateManagedFiles(
+        BadgeSetupConfiguration configuration,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
+        if (configuration.ManagedFiles is not null
+            && (configuration.ManagedFiles.Count > 32
                 || configuration.ManagedFiles.Count != configuration.ManagedFiles.Distinct(StringComparer.Ordinal).Count()
-                || configuration.ManagedFiles.Any(static path => !IsSafeRepositoryPath(path)))
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                    BadgeSetupDiagnosticCodes.InvalidManagedPath,
-                    privateDetail: "Managed file paths must be unique, relative, and traversal-free."));
-            }
-        }
-
-        if (configuration.Producer is not null)
+                || configuration.ManagedFiles.Any(static path => !IsSafeRepositoryPath(path))))
         {
-            if (!IsWorkflowPath(configuration.Producer.WorkflowPath)
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.InvalidManagedPath,
+                privateDetail: "Managed file paths must be unique, relative, and traversal-free."));
+        }
+    }
+
+    private static void ValidateProducer(
+        BadgeSetupConfiguration configuration,
+        List<BadgeSetupDiagnostic> diagnostics)
+    {
+        if (configuration.Producer is not null
+            && (!IsWorkflowPath(configuration.Producer.WorkflowPath)
                 || !IsSha(configuration.Producer.WorkflowSha, 40)
                 || configuration.Producer.Event != "pull_request"
                 || configuration.Producer.PayloadPath != BadgeSetupContract.DefaultPayloadPath
@@ -403,12 +459,11 @@ internal static class BadgeSetupEngine
                 || !IsSafeName(configuration.Producer.CheckName)
                 || !IsSafeCheckApp(configuration.Producer.CheckApp)
                 || !IsSafeName(configuration.Producer.ArtifactName)
-                || !IsSafeName(configuration.Producer.EvidenceArtifactName))
-            {
-                diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                    BadgeSetupDiagnosticCodes.InvalidPin,
-                    privateDetail: "Producer metadata is not an approved immutable binding."));
-            }
+                || !IsSafeName(configuration.Producer.EvidenceArtifactName)))
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.InvalidPin,
+                privateDetail: "Producer metadata is not an approved immutable binding."));
         }
     }
 
@@ -473,9 +528,14 @@ internal static class BadgeSetupEngine
             diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.LeaseExceeded));
         }
 
-        int jobsPerDay = renewal.CadenceMinutes <= 0
-            ? int.MaxValue
-            : (int)Math.Min(int.MaxValue, (1440L + renewal.CadenceMinutes - 1) / renewal.CadenceMinutes);
+        if (renewal.CadenceMinutes <= 0)
+        {
+            return BadgeSetupCostEstimate.None;
+        }
+
+        int jobsPerDay = (int)Math.Min(
+            int.MaxValue,
+            (1440L + renewal.CadenceMinutes - 1) / renewal.CadenceMinutes);
         if (jobsPerDay > BadgeSetupContract.MaximumRenewalJobsPerDay)
         {
             diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.RenewalCostExceeded));
@@ -484,16 +544,21 @@ internal static class BadgeSetupEngine
         int privateMinutesPerDay = visibility == BadgeRepositoryVisibility.Private
             ? jobsPerDay * BadgeSetupContract.PrivateMinutesPerRenewalJob
             : 0;
+        int jobsPerThirtyDayMonth = SaturatingProduct(jobsPerDay, 30);
+        int privateMinutesPerThirtyDayMonth = SaturatingProduct(privateMinutesPerDay, 30);
         return new(
             true,
             renewal.CadenceMinutes,
             renewal.MaxLeaseMinutes,
             jobsPerDay,
-            jobsPerDay * 30,
+            jobsPerThirtyDayMonth,
             privateMinutesPerDay,
-            privateMinutesPerDay * 30,
+            privateMinutesPerThirtyDayMonth,
             "Assumes one metadata-only provider request and one billed private GitHub minute per renewal job; verify adopter plan quota before registration.");
     }
+
+    private static int SaturatingProduct(int left, int right) =>
+        (int)Math.Min(int.MaxValue, (long)left * right);
 
     private static void BuildPrerequisites(
         BadgeSetupConfiguration configuration,
@@ -674,107 +739,4 @@ internal static class BadgeSetupEngine
         }
     }
 
-    private static bool IsSupportedPlan(string? plan) => plan is "free" or "pro" or "team" or "enterprise";
-
-    private static bool IsPositive(long? value) => value is > 0;
-
-    private static bool IsSafePositiveId(long? value) => value is > 0 and <= 9_007_199_254_740_991;
-
-    private static bool IsCloudflareAccountId(string? value) =>
-        value is not null
-        && value.Length == 32
-        && value.All(static character => char.IsAsciiHexDigit(character));
-
-    private static bool IsHttpsOrigin(string? value)
-    {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? uri))
-        {
-            return false;
-        }
-
-        return uri.Scheme == Uri.UriSchemeHttps
-            && !string.IsNullOrEmpty(uri.Host)
-            && string.IsNullOrEmpty(uri.UserInfo)
-            && (uri.AbsolutePath is "" or "/")
-            && string.IsNullOrEmpty(uri.Query)
-            && string.IsNullOrEmpty(uri.Fragment);
-    }
-
-    private static bool IsSha(string? value, int length) =>
-        value is not null
-        && value.Length == length
-        && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
-
-    private static bool IsReusableWorkflowReference(string value) =>
-        IsSafeRepositoryPath(value)
-        && value.Split('/', StringSplitOptions.None) is [var owner, var repository, ".github", "workflows", var workflow]
-        && IsIdentity(owner)
-        && IsIdentity(repository)
-        && IsSafeWorkflowFileName(workflow);
-
-    private static bool IsPinnedActionReference(string value)
-    {
-        int separator = value.LastIndexOf('@');
-        return separator > 0
-            && IsSha(value[(separator + 1)..], 40)
-            && IsSafeRepositoryPath(value[..separator])
-            && value[..separator].Contains("/", StringComparison.Ordinal);
-    }
-
-    private static bool IsSafeRepositoryPath(string? value) =>
-        IsSafePath(value)
-        && value!.Length <= 256
-        && !value.StartsWith("/", StringComparison.Ordinal)
-        && !value.Contains("..", StringComparison.Ordinal)
-        && !value.Contains("//", StringComparison.Ordinal)
-        && !value.EndsWith("/", StringComparison.Ordinal)
-        && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.' or '/');
-
-    private static bool IsSafePath(string? value) => !string.IsNullOrWhiteSpace(value);
-
-    private static bool IsSafeRef(string? value) =>
-        IsSafeRepositoryPath(value)
-        && value!.Length <= 128
-        && char.IsAsciiLetterOrDigit(value[0])
-        && !value.Contains("/.", StringComparison.Ordinal)
-        && !value.EndsWith(".", StringComparison.Ordinal);
-
-    private static bool IsWorkflowPath(string? value) =>
-        IsSafeRepositoryPath(value)
-        && value!.Split('/', StringSplitOptions.None) is [".github", "workflows", var workflow]
-        && IsSafeWorkflowFileName(workflow);
-
-    private static bool IsSafeWorkflowFileName(string value) =>
-        (value.EndsWith(".yml", StringComparison.Ordinal) || value.EndsWith(".yaml", StringComparison.Ordinal))
-        && value[..value.LastIndexOf('.')].Length > 0
-        && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.');
-
-    private static bool IsSafeName(string? value) =>
-        !string.IsNullOrWhiteSpace(value)
-        && value.Length <= 128
-        && char.IsAsciiLetterOrDigit(value[0])
-        && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is ' ' or '_' or '-' or '.');
-
-    private static bool IsSafeCheckApp(string? value) =>
-        !string.IsNullOrWhiteSpace(value)
-        && value.Length is >= 2 and <= 64
-        && (value[0] is >= 'a' and <= 'z' || value[0] is >= '0' and <= '9')
-        && value.All(static character => character is >= 'a' and <= 'z' || character is >= '0' and <= '9' || character == '-');
-
-    private static bool IsSafeAudience(string? value) =>
-        !string.IsNullOrWhiteSpace(value)
-        && value.Length <= 256
-        && char.IsAsciiLetterOrDigit(value[0])
-        && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.' or ':' or '/');
-
-    private static bool IsIdentity(string? value) =>
-        !string.IsNullOrWhiteSpace(value)
-        && value.Length <= 100
-        && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.');
-
-    private static bool IsOpaqueAlias(string? value) =>
-        value is not null
-        && value.Length == 8
-        && value[0] == 'a'
-        && value[1..].All(static character => char.IsLower(character) || char.IsDigit(character));
 }

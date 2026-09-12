@@ -106,9 +106,16 @@ shall remain clearly separated.
 
 Doctor SHALL evaluate configuration identity, pins, OIDC binding, required
 checks/rules, artifact/evidence, validity, revocation, quota, and cache state
-from a fresh identity-bound observation. A fresh destination with no qualifying
-first evidence SHALL be unavailable. A healthy installation with a valid
-bounded observation SHALL be reportable as available.
+from a fresh identity-bound observation or from its bounded read-only live
+inspector. A fresh destination with no qualifying first evidence SHALL be
+unavailable. A healthy installation with a valid bounded observation SHALL be
+reportable as available.
+
+#### Scenario: Doctor performs a bounded live inspection
+
+- **WHEN** doctor runs without an observation file for a generated public raw or Relay configuration
+- **THEN** it verifies the local producer blob pin, configured capabilities, and the selected endpoint using bounded read-only requests
+- **AND** it reports a valid current artifact as available without fabricating first evidence
 
 #### Scenario: Unsupported prerequisites are actionable
 

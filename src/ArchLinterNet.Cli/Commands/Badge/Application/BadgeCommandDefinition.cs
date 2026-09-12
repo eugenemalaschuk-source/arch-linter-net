@@ -5,23 +5,26 @@ namespace ArchLinterNet.Cli.Commands.Badge.Application;
 
 internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
 {
+    private const string InputOptionName = "--input";
+    private const string HelpOptionName = "--help";
+
     public Command Create()
     {
         Command badge = new("badge", "Generate architecture validation badge payloads.");
         Command policy = new("architecture-policy", "Write Shields endpoint JSON from strict validation JSON.");
         Command health = new("architecture-health", "Write Shields endpoint JSON from canonical Architecture Health JSON.");
-        Option<string> input = new("--input");
-        Option<bool> help = new("--help");
+        Option<string> input = new(InputOptionName);
+        Option<bool> help = new(HelpOptionName);
         help.Aliases.Add("-h");
         policy.Options.Add(input);
         policy.Options.Add(help);
         policy.SetAction(result => handler.Execute(new BadgeCommandOptions(result.GetValue(input) ?? string.Empty, result.GetValue(help))));
-        Option<string> healthInput = new("--input");
+        Option<string> healthInput = new(InputOptionName);
         Option<string> output = new("--output");
         Option<string> disclosureProfile = new("--disclosure-profile");
         Option<string> verifiedAt = new("--verified-at");
         Option<bool> verifyDisclosureProfile = new("--verify-disclosure-profile");
-        Option<bool> healthHelp = new("--help");
+        Option<bool> healthHelp = new(HelpOptionName);
         healthHelp.Aliases.Add("-h");
         health.Options.Add(healthInput);
         health.Options.Add(output);
@@ -37,7 +40,7 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
             result.GetValue(verifiedAt),
             result.GetValue(verifyDisclosureProfile))));
         Command setup = new("setup", "Preview or generate a versioned consumer badge setup.");
-        Option<string> setupInput = new("--input");
+        Option<string> setupInput = new(InputOptionName);
         Option<string> setupOutput = new("--output");
         Option<string> setupRepository = new("--repository");
         Option<string> setupVisibility = new("--visibility");
@@ -66,7 +69,7 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
         Option<bool> renewal = new("--renewal");
         Option<bool> dryRun = new("--dry-run");
         Option<string> setupFormat = new("--format") { DefaultValueFactory = _ => "json" };
-        Option<bool> setupHelp = new("--help");
+        Option<bool> setupHelp = new(HelpOptionName);
         setupHelp.Aliases.Add("-h");
         foreach (Option option in new Option[] { setupInput, setupOutput, setupRepository, setupVisibility, setupMode, setupProfile, setupAccount, setupAlias, setupEndpoint, setupAudience, setupPlan, setupRepositoryId, setupRepositoryOwnerId, setupBaseRef, setupPolicy, setupSolution, setupCapabilities, approveDisclosure, producerWorkflow, producerJobName, checkName, checkApp, artifactName, evidenceArtifactName, cadence, lease, renewal, dryRun, setupFormat, setupHelp }) setup.Options.Add(option);
         setup.SetAction(result => handler.ExecuteSetup(new BadgeSetupCommandOptions(
@@ -76,12 +79,12 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
             result.GetValue(setupRepositoryId), result.GetValue(setupRepositoryOwnerId), result.GetValue(setupBaseRef), result.GetValue(setupPolicy), result.GetValue(setupSolution), result.GetValue(setupCapabilities), null, result.GetValue(approveDisclosure),
             result.GetValue(producerWorkflow), result.GetValue(producerJobName), result.GetValue(checkName), result.GetValue(checkApp), result.GetValue(artifactName), result.GetValue(evidenceArtifactName), result.GetValue(setupAudience))));
         Command doctor = new("doctor", "Diagnose a versioned badge setup without writing.");
-        Option<string> doctorInput = new("--input");
+        Option<string> doctorInput = new(InputOptionName);
         Option<bool> publicDiagnostics = new("--public");
         Option<string> doctorFormat = new("--format") { DefaultValueFactory = _ => "json" };
         Option<string> doctorCapabilities = new("--capability-evidence");
         Option<string> doctorObservation = new("--observation");
-        Option<bool> doctorHelp = new("--help");
+        Option<bool> doctorHelp = new(HelpOptionName);
         doctorHelp.Aliases.Add("-h");
         foreach (Option option in new Option[] { doctorInput, publicDiagnostics, doctorFormat, doctorCapabilities, doctorObservation, doctorHelp }) doctor.Options.Add(option);
         doctor.SetAction(result => handler.ExecuteDoctor(new BadgeSetupCommandOptions(

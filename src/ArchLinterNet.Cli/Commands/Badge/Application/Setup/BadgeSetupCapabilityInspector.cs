@@ -13,14 +13,16 @@ internal static class BadgeSetupCapabilityInspector
 {
     private const string EvidenceSource = "live-github-provider-inspector/v1";
     private const string GitHubApi = "https://api.github.com";
-    private const string CloudflareApi = "https://api.cloudflare.com/client/v4";
+    private const string CloudflareApi = "https://api.cloudflare.com";
+    private const string CloudflareApiPath = "/client/v4";
     private static readonly TimeSpan _requestTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan _evidenceLifetime = TimeSpan.FromMinutes(15);
 
     internal static BadgeSetupCapabilityInspectionResult Inspect(
         BadgeSetupConfiguration configuration,
         BadgeSetupCommandOptions options,
-        IFileSystem fileSystem)
+        IFileSystem fileSystem,
+        Func<string, string?, HttpClient>? clientFactory = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(options);
@@ -41,12 +43,12 @@ internal static class BadgeSetupCapabilityInspector
             return Success(configuration, new());
         }
 
-        if (!string.IsNullOrWhiteSpace(options.CapabilityEvidencePath))
+        if (options.CapabilityEvidencePath is { } evidencePath && !string.IsNullOrWhiteSpace(evidencePath))
         {
-            return ReadEvidence(configuration, fileSystem.ReadAllText(options.CapabilityEvidencePath!));
+            return ReadEvidence(configuration, fileSystem.ReadAllText(evidencePath));
         }
 
-        return InspectLive(configuration);
+        return InspectLive(configuration, clientFactory ?? CreateClient);
     }
 
     private static BadgeSetupCapabilityInspectionResult ReadEvidence(
@@ -87,6 +89,8 @@ internal static class BadgeSetupCapabilityInspector
                 || observedAt < now - _evidenceLifetime
                 || observedAt > now.AddMinutes(5)
                 || repository != $"{configuration.Repository.Owner}/{configuration.Repository.Name}"
+                || configuration.Repository.RepositoryId is long configuredRepositoryId && repositoryId != configuredRepositoryId
+                || configuration.Repository.RepositoryOwnerId is long configuredRepositoryOwnerId && repositoryOwnerId != configuredRepositoryOwnerId
                 || visibility != configuration.Repository.Visibility
                 || baseRef != configuration.BaseRef
                 || providerPlan != configuration.ProviderPlan
@@ -114,7 +118,9 @@ internal static class BadgeSetupCapabilityInspector
         }
     }
 
-    private static BadgeSetupCapabilityInspectionResult InspectLive(BadgeSetupConfiguration configuration)
+    private static BadgeSetupCapabilityInspectionResult InspectLive(
+        BadgeSetupConfiguration configuration,
+        Func<string, string?, HttpClient> clientFactory)
     {
         string? githubToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN")
             ?? Environment.GetEnvironmentVariable("GH_TOKEN");
@@ -130,8 +136,8 @@ internal static class BadgeSetupCapabilityInspector
 
         try
         {
-            using HttpClient github = CreateClient(GitHubApi, githubToken);
-            using HttpClient cloudflare = CreateClient(CloudflareApi, providerToken);
+            using HttpClient github = clientFactory(GitHubApi, githubToken);
+            using HttpClient cloudflare = clientFactory(CloudflareApi, providerToken);
             bool repositoryIdentity = TryInspectGitHub(
                 github,
                 configuration,
@@ -139,7 +145,7 @@ internal static class BadgeSetupCapabilityInspector
                 out long repositoryOwnerId,
                 out bool requiredCheck,
                 out bool rulesApi);
-            bool oidc = TryInspectOidc(configuration);
+            bool oidc = TryInspectOidc(configuration, clientFactory);
             bool provider = TryInspectProvider(
                 cloudflare,
                 configuration,
@@ -204,85 +210,151 @@ internal static class BadgeSetupCapabilityInspector
         }
 
         repositoryId = ReadPositiveLong(root, "id");
-        if (root.TryGetProperty("owner", out JsonElement owner) && owner.ValueKind == JsonValueKind.Object)
-        {
-            repositoryOwnerId = ReadPositiveLong(owner, "id");
-        }
-
-        string visibility = root.TryGetProperty("visibility", out JsonElement visibilityElement)
-            && visibilityElement.ValueKind == JsonValueKind.String
-            ? visibilityElement.GetString() ?? string.Empty
-            : root.TryGetProperty("private", out JsonElement privateElement) && privateElement.ValueKind == JsonValueKind.True
-                ? "private"
-                : "public";
-        bool identity = repositoryId > 0
-            && repositoryOwnerId > 0
-            && visibility == configuration.Repository.Visibility;
-        if (!identity)
+        repositoryOwnerId = ReadOwnerId(root);
+        if (!RepositoryIdentityMatches(root, configuration, repositoryId, repositoryOwnerId))
         {
             return false;
         }
 
         using JsonDocument? branch = GetJson(client, $"{repositoryPath}/branches/{Uri.EscapeDataString(configuration.BaseRef)}");
-        bool branchMatches = branch is not null
-            && branch.RootElement.ValueKind == JsonValueKind.Object
-            && branch.RootElement.TryGetProperty("name", out JsonElement branchName)
-            && branchName.ValueKind == JsonValueKind.String
-            && branchName.GetString() == configuration.BaseRef;
-        if (!branchMatches)
+        if (!BranchMatches(branch, configuration.BaseRef))
         {
             return false;
         }
 
-        using JsonDocument? rules = GetJson(client, $"{repositoryPath}/rules/branches/{Uri.EscapeDataString(configuration.BaseRef)}");
-        if (rules is not null)
-        {
-            rulesApi = true;
-            requiredCheck = ContainsRequiredCheck(rules.RootElement, configuration.Producer?.CheckName ?? BadgeSetupContract.DefaultCheckName);
-        }
-        else
-        {
-            using JsonDocument? rulesets = GetJson(client, $"{repositoryPath}/rulesets?includes_parents=true&includes_inherited=true&per_page=100");
-            if (rulesets is not null && rulesets.RootElement.ValueKind == JsonValueKind.Array)
-            {
-                rulesApi = true;
-                foreach (JsonElement summary in rulesets.RootElement.EnumerateArray())
-                {
-                    if (!summary.TryGetProperty("id", out JsonElement id)
-                        || !id.TryGetInt64(out long rulesetId)
-                        || rulesetId <= 0)
-                    {
-                        continue;
-                    }
-
-                    using JsonDocument? detail = GetJson(client, $"{repositoryPath}/rulesets/{rulesetId}");
-                    if (detail is not null
-                        && RulesetAppliesToBaseRef(detail.RootElement, configuration.BaseRef, root)
-                        && ContainsRequiredCheck(detail.RootElement, configuration.Producer?.CheckName ?? BadgeSetupContract.DefaultCheckName))
-                    {
-                        requiredCheck = true;
-                        break;
-                    }
-                }
-            }
-        }
+        (rulesApi, requiredCheck) = InspectRules(
+            client,
+            repositoryPath,
+            configuration,
+            root);
 
         return true;
     }
 
-    private static bool TryInspectOidc(BadgeSetupConfiguration configuration)
+    private static long ReadOwnerId(JsonElement repository)
     {
-        string? requestUrl = Environment.GetEnvironmentVariable("ACTIONS_ID_TOKEN_REQUEST_URL");
-        string? requestToken = Environment.GetEnvironmentVariable("ACTIONS_ID_TOKEN_REQUEST_TOKEN");
-        if (string.IsNullOrWhiteSpace(requestUrl) || string.IsNullOrWhiteSpace(requestToken) || string.IsNullOrWhiteSpace(configuration.Destination.Audience))
+        return repository.TryGetProperty("owner", out JsonElement owner) && owner.ValueKind == JsonValueKind.Object
+            ? ReadPositiveLong(owner, "id")
+            : 0;
+    }
+
+    private static bool RepositoryIdentityMatches(
+        JsonElement repository,
+        BadgeSetupConfiguration configuration,
+        long repositoryId,
+        long repositoryOwnerId)
+    {
+        string visibility = ReadVisibility(repository);
+        return repositoryId > 0
+            && repositoryOwnerId > 0
+            && visibility == configuration.Repository.Visibility
+            && (!configuration.Repository.RepositoryId.HasValue
+                || configuration.Repository.RepositoryId.Value == repositoryId)
+            && (!configuration.Repository.RepositoryOwnerId.HasValue
+                || configuration.Repository.RepositoryOwnerId.Value == repositoryOwnerId);
+    }
+
+    private static bool BranchMatches(JsonDocument? branch, string baseRef) =>
+        branch is not null
+        && branch.RootElement.ValueKind == JsonValueKind.Object
+        && branch.RootElement.TryGetProperty("name", out JsonElement branchName)
+        && branchName.ValueKind == JsonValueKind.String
+        && branchName.GetString() == baseRef;
+
+    private static string ReadVisibility(JsonElement repository)
+    {
+        if (repository.TryGetProperty("visibility", out JsonElement visibility)
+            && visibility.ValueKind == JsonValueKind.String)
+        {
+            return visibility.GetString() ?? string.Empty;
+        }
+
+        if (repository.TryGetProperty("private", out JsonElement isPrivate)
+            && isPrivate.ValueKind == JsonValueKind.True)
+        {
+            return "private";
+        }
+
+        return "public";
+    }
+
+    private static (bool RulesApi, bool RequiredCheck) InspectRules(
+        HttpClient client,
+        string repositoryPath,
+        BadgeSetupConfiguration configuration,
+        JsonElement repository)
+    {
+        string checkName = configuration.Producer?.CheckName ?? BadgeSetupContract.DefaultCheckName;
+        using JsonDocument? rules = GetJson(client, $"{repositoryPath}/rules/branches/{Uri.EscapeDataString(configuration.BaseRef)}");
+        if (rules is not null)
+        {
+            return (true, ContainsRequiredCheck(rules.RootElement, checkName));
+        }
+
+        using JsonDocument? rulesets = GetJson(client, $"{repositoryPath}/rulesets?includes_parents=true&includes_inherited=true&per_page=100");
+        if (rulesets is null || rulesets.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return (false, false);
+        }
+
+        return (true, ContainsRequiredRuleset(client, repositoryPath, configuration, repository, rulesets.RootElement, checkName));
+    }
+
+    private static bool ContainsRequiredRuleset(
+        HttpClient client,
+        string repositoryPath,
+        BadgeSetupConfiguration configuration,
+        JsonElement repository,
+        JsonElement rulesets,
+        string checkName)
+    {
+        foreach (JsonElement summary in rulesets.EnumerateArray())
+        {
+            if (!TryGetPositiveId(summary, out long rulesetId))
+            {
+                continue;
+            }
+
+            using JsonDocument? detail = GetJson(client, $"{repositoryPath}/rulesets/{rulesetId}");
+            if (detail is not null
+                && RulesetAppliesToBaseRef(detail.RootElement, configuration.BaseRef, repository)
+                && ContainsRequiredCheck(detail.RootElement, checkName))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetPositiveId(JsonElement value, out long id)
+    {
+        id = 0;
+        return value.TryGetProperty("id", out JsonElement element)
+            && element.TryGetInt64(out id)
+            && id > 0;
+    }
+
+    private static bool TryInspectOidc(
+        BadgeSetupConfiguration configuration,
+        Func<string, string?, HttpClient> clientFactory)
+    {
+        string? requestUrlValue = Environment.GetEnvironmentVariable("ACTIONS_ID_TOKEN_REQUEST_URL");
+        string? requestTokenValue = Environment.GetEnvironmentVariable("ACTIONS_ID_TOKEN_REQUEST_TOKEN");
+        if (string.IsNullOrWhiteSpace(requestUrlValue)
+            || string.IsNullOrWhiteSpace(requestTokenValue)
+            || string.IsNullOrWhiteSpace(configuration.Destination.Audience))
         {
             return false;
         }
 
         try
         {
-            using HttpClient client = new() { Timeout = _requestTimeout };
-            using HttpRequestMessage request = new(HttpMethod.Get, AddQuery(requestUrl, "audience", configuration.Destination.Audience!));
+            string requestUrl = requestUrlValue;
+            string requestToken = requestTokenValue;
+            string audience = configuration.Destination.Audience ?? throw new InvalidOperationException("Relay audience is required.");
+            using HttpClient client = clientFactory(requestUrl, requestToken);
+            using HttpRequestMessage request = new(HttpMethod.Get, AddQuery(requestUrl, "audience", audience));
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", requestToken);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/jwt"));
             using HttpResponseMessage response = client.Send(request);
@@ -317,7 +389,8 @@ internal static class BadgeSetupCapabilityInspector
             return false;
         }
 
-        using JsonDocument? account = GetJson(client, $"/accounts/{Uri.EscapeDataString(configuration.Destination.Account)}");
+        string accountPath = $"{CloudflareApiPath}/accounts/{Uri.EscapeDataString(configuration.Destination.Account)}";
+        using JsonDocument? account = GetJson(client, accountPath);
         if (account is null)
         {
             return false;
@@ -345,51 +418,47 @@ internal static class BadgeSetupCapabilityInspector
             observedPlan = slug.GetString();
         }
 
-        using JsonDocument? workers = GetJson(client, $"/accounts/{Uri.EscapeDataString(configuration.Destination.Account)}/workers/scripts");
-        using JsonDocument? durableObjects = GetJson(client, $"/accounts/{Uri.EscapeDataString(configuration.Destination.Account)}/workers/durable_objects/namespaces");
+        using JsonDocument? workers = GetJson(client, $"{accountPath}/workers/scripts");
+        using JsonDocument? durableObjects = GetJson(client, $"{accountPath}/workers/durable_objects/namespaces");
         quotaAvailable = workers is not null && durableObjects is not null;
         return observedPlan is not null;
     }
 
     private static bool ContainsRequiredCheck(JsonElement root, string checkName)
     {
-        IEnumerable<JsonElement> candidates = root.ValueKind switch
+        foreach (JsonElement rule in RequiredCheckCandidates(root))
         {
-            JsonValueKind.Array => root.EnumerateArray(),
-            JsonValueKind.Object when root.TryGetProperty("rules", out JsonElement rules) && rules.ValueKind == JsonValueKind.Array => rules.EnumerateArray(),
-            _ => [],
-        };
-        foreach (JsonElement rule in candidates)
-        {
-            if (!rule.TryGetProperty("type", out JsonElement type)
-                || type.ValueKind != JsonValueKind.String
-                || type.GetString() != "required_status_checks")
-            {
-                continue;
-            }
-
-            if (!rule.TryGetProperty("parameters", out JsonElement parameters) || parameters.ValueKind != JsonValueKind.Object)
-            {
-                continue;
-            }
-
-            if (!parameters.TryGetProperty("strict_required_status_checks_policy", out JsonElement strict)
-                || strict.ValueKind != JsonValueKind.True)
-            {
-                continue;
-            }
-
-            if (parameters.TryGetProperty("required_status_checks", out JsonElement checks) && checks.ValueKind == JsonValueKind.Array
-                && checks.EnumerateArray().Any(check => check.ValueKind == JsonValueKind.Object
-                    && check.TryGetProperty("context", out JsonElement context)
-                    && context.ValueKind == JsonValueKind.String
-                    && context.GetString() == checkName))
+            if (IsRequiredCheckRule(rule, checkName))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static IEnumerable<JsonElement> RequiredCheckCandidates(JsonElement root) => root.ValueKind switch
+    {
+        JsonValueKind.Array => root.EnumerateArray(),
+        JsonValueKind.Object when root.TryGetProperty("rules", out JsonElement rules)
+            && rules.ValueKind == JsonValueKind.Array => rules.EnumerateArray(),
+        _ => [],
+    };
+
+    private static bool IsRequiredCheckRule(JsonElement rule, string checkName)
+    {
+        if (!StringPropertyEquals(rule, "type", "required_status_checks")
+            || !rule.TryGetProperty("parameters", out JsonElement parameters)
+            || parameters.ValueKind != JsonValueKind.Object
+            || !parameters.TryGetProperty("strict_required_status_checks_policy", out JsonElement strict)
+            || strict.ValueKind != JsonValueKind.True)
+        {
+            return false;
+        }
+
+        return parameters.TryGetProperty("required_status_checks", out JsonElement checks)
+            && checks.ValueKind == JsonValueKind.Array
+            && checks.EnumerateArray().Any(check => StringPropertyEquals(check, "context", checkName));
     }
 
     private static bool RulesetAppliesToBaseRef(JsonElement ruleset, string baseRef, JsonElement repository)
@@ -432,12 +501,13 @@ internal static class BadgeSetupCapabilityInspector
         List<string> result = [];
         foreach (JsonElement item in value.EnumerateArray())
         {
-            if (item.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(item.GetString()))
+            string? itemValue = item.ValueKind == JsonValueKind.String ? item.GetString() : null;
+            if (string.IsNullOrWhiteSpace(itemValue))
             {
                 return false;
             }
 
-            result.Add(item.GetString()!);
+            result.Add(itemValue);
         }
 
         values = [.. result];
@@ -462,11 +532,15 @@ internal static class BadgeSetupCapabilityInspector
         return Regex.IsMatch(value, regex, RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
     }
 
-    private static HttpClient CreateClient(string baseAddress, string token)
+    private static HttpClient CreateClient(string baseAddress, string? token)
     {
         HttpClient client = new() { BaseAddress = new Uri(baseAddress), Timeout = _requestTimeout };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("arch-linter-net-badge-setup/0.8");
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return client;
     }
@@ -485,27 +559,11 @@ internal static class BadgeSetupCapabilityInspector
     }
 
     private static string AddQuery(string uri, string name, string value) =>
-        uri + (uri.Contains("?", StringComparison.Ordinal) ? "&" : "?") + Uri.EscapeDataString(name) + "=" + Uri.EscapeDataString(value);
+        uri + (uri.Contains('?') ? "&" : "?") + Uri.EscapeDataString(name) + "=" + Uri.EscapeDataString(value);
 
     private static bool HasExpectedOidcClaims(string response, BadgeSetupConfiguration configuration)
     {
-        string? token = response.Trim();
-        if (token.Count(static character => character == '.') != 2)
-        {
-            try
-            {
-                using JsonDocument envelope = JsonDocument.Parse(response);
-                token = envelope.RootElement.ValueKind == JsonValueKind.Object
-                    && envelope.RootElement.TryGetProperty("value", out JsonElement value)
-                    && value.ValueKind == JsonValueKind.String
-                    ? value.GetString()
-                    : null;
-            }
-            catch (JsonException)
-            {
-                return false;
-            }
-        }
+        string? token = ExtractOidcToken(response);
 
         if (string.IsNullOrWhiteSpace(token) || token.Length > 16 * 1024)
         {
@@ -544,6 +602,32 @@ internal static class BadgeSetupCapabilityInspector
         catch (Exception exception) when (exception is FormatException or JsonException or InvalidOperationException)
         {
             return false;
+        }
+    }
+
+    private static string? ExtractOidcToken(string response)
+    {
+        string trimmed = response.Trim();
+        if (trimmed.Count(static character => character == '.') == 2)
+        {
+            return trimmed;
+        }
+
+        try
+        {
+            using JsonDocument envelope = JsonDocument.Parse(response);
+            if (envelope.RootElement.ValueKind != JsonValueKind.Object
+                || !envelope.RootElement.TryGetProperty("value", out JsonElement value)
+                || value.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            return value.GetString();
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
@@ -623,7 +707,7 @@ internal static class BadgeSetupCapabilityInspector
             throw new InvalidOperationException($"Missing {name}.");
         }
 
-        return value.GetString()!;
+        return value.GetString() ?? throw new InvalidOperationException($"Missing {name}.");
     }
 
     private static long RequiredPositiveLong(JsonElement root, string name)

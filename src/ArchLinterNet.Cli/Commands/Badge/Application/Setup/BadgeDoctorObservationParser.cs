@@ -89,7 +89,7 @@ internal static class BadgeDoctorObservationParser
             throw new InvalidOperationException($"Missing {name}.");
         }
 
-        return value.GetString()!;
+        return value.GetString() ?? throw new InvalidOperationException($"Missing {name}.");
     }
 
     private static long? ReadPositiveLong(JsonElement root, string name, bool required)

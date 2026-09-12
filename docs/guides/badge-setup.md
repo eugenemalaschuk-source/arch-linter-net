@@ -99,9 +99,12 @@ profile, required-check/rules API visibility, OIDC audience/ref/workflow
 claims, destination reachability, artifact and evidence availability, expiry,
 revocation, storage/quota state, and origin-versus-Shields/Camo cache delay.
 
-For a newly generated `github-raw` or Relay configuration, doctor reports
-`unavailable` until it sees a real first-evidence observation. Pass a fresh,
-identity-bound observation to report a healthy installation:
+When no observation file is supplied, doctor performs a bounded read-only
+inspection of the local generated producer pin, configured capabilities, and
+the selected raw/Relay endpoint. A newly generated `github-raw` or Relay
+configuration reports `unavailable` until the endpoint serves real first
+evidence. In environments where the remote-only checks are performed by an
+approved inspector, pass its fresh identity-bound observation instead:
 
 ```text
 arch-linter-net badge architecture-health doctor \

@@ -4,6 +4,8 @@ namespace ArchLinterNet.Cli.Commands.Badge.Application.Setup;
 
 internal static class BadgeSetupConfigurationParser
 {
+    private const string WorkflowShaProperty = "workflow_sha";
+
     internal static BadgeSetupConfigurationParseResult Parse(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -37,7 +39,7 @@ internal static class BadgeSetupConfigurationParser
             BadgeSetupConfigurationDestination? destination = ReadDestination(root, diagnostics);
             BadgeSetupConfigurationRenewal? renewal = ReadRenewal(root, diagnostics);
             BadgeSetupPins? pins = ReadPins(root, diagnostics);
-            IReadOnlyList<string>? managedFiles = ReadManagedFiles(root, diagnostics);
+            List<string>? managedFiles = ReadManagedFiles(root, diagnostics);
             string? baseRef = ReadRequiredString(root, "base_ref", diagnostics);
             BadgeSetupProject? project = ReadProject(root, diagnostics);
             BadgeSetupProducer? producer = ReadProducer(root, diagnostics);
@@ -83,9 +85,9 @@ internal static class BadgeSetupConfigurationParser
                     providerPlan),
                 []);
         }
-        catch (JsonException exception)
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or OverflowException)
         {
-            return Invalid($"JSON parsing failed: {exception.GetType().Name}.");
+            return Invalid($"Configuration parsing failed: {exception.GetType().Name}.");
         }
     }
 
@@ -149,11 +151,11 @@ internal static class BadgeSetupConfigurationParser
         }
 
         RejectUnknownProperties(value, [
-            "workflow_path", "workflow_sha", "job_name", "check_name", "check_app", "event",
+            "workflow_path", WorkflowShaProperty, "job_name", "check_name", "check_app", "event",
             "artifact_name", "evidence_artifact_name", "payload_path",
         ], diagnostics);
         string? workflowPath = ReadRequiredString(value, "workflow_path", diagnostics);
-        string? workflowSha = ReadRequiredString(value, "workflow_sha", diagnostics);
+        string? workflowSha = ReadRequiredString(value, WorkflowShaProperty, diagnostics);
         string? jobName = ReadRequiredString(value, "job_name", diagnostics);
         string? checkName = ReadRequiredString(value, "check_name", diagnostics);
         string? checkApp = ReadRequiredString(value, "check_app", diagnostics);
@@ -201,15 +203,15 @@ internal static class BadgeSetupConfigurationParser
             return null;
         }
 
-        RejectUnknownProperties(value, ["workflow_ref", "workflow_sha", "action_ref", "bundle_digest"], diagnostics);
+        RejectUnknownProperties(value, ["workflow_ref", WorkflowShaProperty, "action_ref", "bundle_digest"], diagnostics);
         return new(
             ReadNullableString(value, "workflow_ref", diagnostics),
-            ReadNullableString(value, "workflow_sha", diagnostics),
+            ReadNullableString(value, WorkflowShaProperty, diagnostics),
             ReadNullableString(value, "action_ref", diagnostics),
             ReadNullableString(value, "bundle_digest", diagnostics));
     }
 
-    private static IReadOnlyList<string>? ReadManagedFiles(
+    private static List<string>? ReadManagedFiles(
         JsonElement root,
         List<BadgeSetupDiagnostic> diagnostics)
     {
@@ -238,7 +240,7 @@ internal static class BadgeSetupConfigurationParser
                 continue;
             }
 
-            files.Add(item.GetString()!);
+            files.Add(item.GetString() ?? throw new InvalidOperationException("managed_files entries must be strings."));
         }
 
         if (files.Count != files.Distinct(StringComparer.Ordinal).Count())
@@ -318,7 +320,9 @@ internal static class BadgeSetupConfigurationParser
 
     private static int? ReadInteger(JsonElement root, string name, List<BadgeSetupDiagnostic> diagnostics)
     {
-        if (!root.TryGetProperty(name, out JsonElement value) || !value.TryGetInt32(out int parsed))
+        if (!root.TryGetProperty(name, out JsonElement value)
+            || value.ValueKind != JsonValueKind.Number
+            || !value.TryGetInt32(out int parsed))
         {
             AddInvalid(diagnostics, $"{name} must be an integer.");
             return null;
@@ -334,7 +338,7 @@ internal static class BadgeSetupConfigurationParser
             return null;
         }
 
-        if (!value.TryGetInt64(out long parsed))
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out long parsed))
         {
             AddInvalid(diagnostics, $"{name} must be an integer or null.");
             return null;
@@ -355,12 +359,9 @@ internal static class BadgeSetupConfigurationParser
         List<BadgeSetupDiagnostic> diagnostics)
     {
         HashSet<string> seen = new(StringComparer.Ordinal);
-        foreach (JsonProperty property in objectElement.EnumerateObject())
+        foreach (JsonProperty property in objectElement.EnumerateObject().Where(property => !seen.Add(property.Name) || !allowed.Contains(property.Name)))
         {
-            if (!seen.Add(property.Name) || !allowed.Contains(property.Name))
-            {
-                AddInvalid(diagnostics, "The configuration contains an unknown or duplicate property.");
-            }
+            AddInvalid(diagnostics, "The configuration contains an unknown or duplicate property.");
         }
     }
 

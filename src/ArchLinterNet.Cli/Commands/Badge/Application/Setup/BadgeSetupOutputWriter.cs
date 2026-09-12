@@ -1,15 +1,33 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using static ArchLinterNet.Cli.Commands.Badge.Application.Setup.BadgeSetupOutputWriterPersistence;
 
 namespace ArchLinterNet.Cli.Commands.Badge.Application.Setup;
 
 internal static class BadgeSetupOutputWriter
 {
+    internal const string ReadmeFileName = "README.md";
+    private const string RelayMode = "relay";
+    private static readonly JsonSerializerOptions _serializerOptions = new() { WriteIndented = true };
+    private static readonly string[] _renewalPermittedEvents = ["push", "schedule"];
+    private static readonly string[] _pushPermittedEvents = ["push"];
+    private static readonly string[] _allowedOidcAlgorithms = ["RS256"];
+    private static readonly string[] _relayAssetNames = ["package.json", "package-lock.json", "tsconfig.json"];
+
     internal const string ReadmeStartMarker = "<!-- arch-linter-net:managed-badge-setup/v1:start -->";
     internal const string ReadmeEndMarker = "<!-- arch-linter-net:managed-badge-setup/v1:end -->";
 
     internal static void Write(string outputDirectory, BadgeSetupConfiguration configuration, BadgeSetupPlan plan)
+    {
+        ValidateWriteRequest(configuration, plan);
+        string root = Path.GetFullPath(outputDirectory);
+        Directory.CreateDirectory(root);
+        GeneratedSetup generated = GenerateSetup(root, configuration, plan);
+        WriteFiles(root, generated.Files);
+    }
+
+    private static void ValidateWriteRequest(BadgeSetupConfiguration configuration, BadgeSetupPlan plan)
     {
         if (!plan.IsValid)
         {
@@ -22,28 +40,28 @@ internal static class BadgeSetupOutputWriter
             throw new InvalidOperationException("The setup plan does not match the requested configuration.");
         }
 
-        if (configuration.Mode == BadgeSetupMode.Relay.ToWireValue() && !configuration.DisclosureApproved)
+        if (configuration.Mode == RelayMode && !configuration.DisclosureApproved)
         {
             throw new InvalidOperationException("Relay output requires explicit disclosure approval.");
         }
+    }
 
-        string root = Path.GetFullPath(outputDirectory);
-        Directory.CreateDirectory(root);
+    private static GeneratedSetup GenerateSetup(
+        string root,
+        BadgeSetupConfiguration configuration,
+        BadgeSetupPlan plan)
+    {
         BadgeSetupPins initialPins = ResolvePins(configuration.Pins, []);
         BadgeSetupConfiguration pinnedConfiguration = configuration with { Pins = initialPins };
-        IReadOnlyList<GeneratedFile> relayFiles = pinnedConfiguration.Mode == BadgeSetupMode.Relay.ToWireValue()
+        List<GeneratedFile> relayFiles = pinnedConfiguration.Mode == RelayMode
             ? ReadRelayBundle(pinnedConfiguration)
             : [];
         BadgeSetupProducer producer = ResolveProducer(pinnedConfiguration);
         string producerWorkflow = RenderProducerWorkflow(pinnedConfiguration, producer);
         string producerSha = ComputeGitBlobSha(producerWorkflow);
-        if (configuration.Producer is not null && configuration.Producer.WorkflowSha != new string('0', 40)
-            && configuration.Producer.WorkflowSha != producerSha)
-        {
-            throw new InvalidOperationException("Configured producer.workflow_sha does not match the generated producer workflow blob.");
-        }
-
+        ValidateConfiguredProducerSha(configuration, producerSha);
         producer = producer with { WorkflowSha = producerSha };
+
         BadgeSetupPins pins = ResolvePins(initialPins, relayFiles);
         BadgeSetupConfiguration effective = pinnedConfiguration with
         {
@@ -52,12 +70,48 @@ internal static class BadgeSetupOutputWriter
             Project = pinnedConfiguration.Project ?? new("architecture/dependencies.arch.yml", "ArchLinterNet.slnx"),
         };
         List<string> managedPaths = BuildManagedPaths(effective, relayFiles);
-        if (configuration.ManagedFiles is not null && !configuration.ManagedFiles.SequenceEqual(managedPaths, StringComparer.Ordinal))
+        ValidateConfiguredManagedFiles(configuration, managedPaths);
+        effective = effective with { ManagedFiles = managedPaths };
+        EnsureEffectivePlanIsValid(effective);
+
+        List<GeneratedFile> files = BuildFiles(root, effective, producerWorkflow, relayFiles);
+        ValidateGeneratedConfiguration(files[0].Contents);
+        string manifest = Serialize(new
+        {
+            schema_id = "badge-relay-manifest/v1",
+            bundle = effective.Bundle,
+            compatibility_plan = effective.CompatibilityPlan,
+            mode = plan.Mode,
+            files = files.Select(static file => FileEntry(file.Path, file.Contents)).ToArray(),
+        });
+        return new([.. files, new("badge-relay-manifest.json", manifest)]);
+    }
+
+    private static void ValidateConfiguredProducerSha(BadgeSetupConfiguration configuration, string producerSha)
+    {
+        if (configuration.Producer is not { WorkflowSha: var configuredSha }
+            || configuredSha == new string('0', 40)
+            || configuredSha == producerSha)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException("Configured producer.workflow_sha does not match the generated producer workflow blob.");
+    }
+
+    private static void ValidateConfiguredManagedFiles(
+        BadgeSetupConfiguration configuration,
+        IReadOnlyList<string> managedPaths)
+    {
+        if (configuration.ManagedFiles is not null
+            && !configuration.ManagedFiles.SequenceEqual(managedPaths, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Configured managed_files does not match the files produced by this setup.");
         }
+    }
 
-        effective = effective with { ManagedFiles = managedPaths };
+    private static void EnsureEffectivePlanIsValid(BadgeSetupConfiguration effective)
+    {
         BadgeSetupPlanResult effectivePlan = BadgeSetupEngine.BuildPlan(
             effective,
             new(
@@ -69,7 +123,7 @@ internal static class BadgeSetupOutputWriter
                     HasRulesApi: true,
                     CanUseGithubRaw: effective.Mode == BadgeSetupMode.GithubRaw.ToWireValue(),
                     CanUseOidc: true,
-                    CanUseRelay: effective.Mode == BadgeSetupMode.Relay.ToWireValue(),
+                    CanUseRelay: effective.Mode == RelayMode,
                     ProviderPlan: effective.ProviderPlan,
                     RepositoryId: effective.Repository.RepositoryId,
                     RepositoryOwnerId: effective.Repository.RepositoryOwnerId,
@@ -80,56 +134,75 @@ internal static class BadgeSetupOutputWriter
                 "Generated setup configuration does not satisfy the setup contract: "
                 + string.Join(", ", effectivePlan.Diagnostics.Select(static diagnostic => diagnostic.Code)));
         }
+    }
 
+    private static List<GeneratedFile> BuildFiles(
+        string root,
+        BadgeSetupConfiguration configuration,
+        string producerWorkflow,
+        IReadOnlyList<GeneratedFile> relayFiles)
+    {
+        BadgeSetupProducer producer = configuration.Producer
+            ?? throw new InvalidOperationException("Generated setup output requires producer metadata.");
         List<GeneratedFile> files =
         [
-            new("badge-relay-config.json", Serialize(effective)),
+            new("badge-relay-config.json", Serialize(configuration)),
             new(producer.WorkflowPath, producerWorkflow),
         ];
-        if (effective.Mode != BadgeSetupMode.None.ToWireValue())
-        {
-            files.Add(new(".github/workflows/architecture-health-badge-publisher.yml", RenderPublisherWorkflow(effective)));
-        }
-
+        AddPublisherFile(files, configuration);
         files.AddRange([
-            new(".github/badge-promotion/registry.json", RenderRegistry(effective)),
-            new("README.md", BuildReadme(root, effective)),
+            new(".github/badge-promotion/registry.json", RenderRegistry(configuration)),
+            new(ReadmeFileName, BuildReadme(root, configuration)),
             new("schema/0.8.0/badge-relay-config.schema.json", ReadAsset("schema/0.8.0/badge-relay-config.schema.json")),
         ]);
-        if (effective.Mode == BadgeSetupMode.Relay.ToWireValue())
+        AddRelayFiles(files, configuration, relayFiles);
+        return files;
+    }
+
+    private static void AddPublisherFile(List<GeneratedFile> files, BadgeSetupConfiguration configuration)
+    {
+        if (configuration.Mode != BadgeSetupMode.None.ToWireValue())
         {
-            files.Add(new(".github/workflows/architecture-health-badge-renewal.yml", RenderRenewalWorkflow(effective)));
+            files.Add(new(".github/workflows/architecture-health-badge-publisher.yml", RenderPublisherWorkflow(configuration)));
+        }
+    }
+
+    private static void AddRelayFiles(
+        List<GeneratedFile> files,
+        BadgeSetupConfiguration configuration,
+        IReadOnlyList<GeneratedFile> relayFiles)
+    {
+        if (configuration.Mode == RelayMode)
+        {
+            files.Add(new(".github/workflows/architecture-health-badge-renewal.yml", RenderRenewalWorkflow(configuration)));
             files.AddRange(relayFiles);
         }
+    }
 
+    private static void ValidateGeneratedConfiguration(string contents)
+    {
         // Validate the exact bytes that are about to be written. This catches drift between
         // the in-memory model and the shipped closed parser before any consumer file exists.
-        BadgeSetupConfigurationParseResult parsed = BadgeSetupConfigurationParser.Parse(files[0].Contents);
+        BadgeSetupConfigurationParseResult parsed = BadgeSetupConfigurationParser.Parse(contents);
         if (!parsed.IsValid || parsed.Configuration is null)
         {
             throw new InvalidOperationException(
                 "Generated setup configuration does not satisfy the shipped schema contract: "
                 + string.Join(", ", parsed.Diagnostics.Select(static diagnostic => diagnostic.Code)));
         }
+    }
 
-        string manifest = Serialize(new
-        {
-            schema_id = "badge-relay-manifest/v1",
-            bundle = effective.Bundle,
-            compatibility_plan = effective.CompatibilityPlan,
-            mode = plan.Mode,
-            files = files.Select(static file => FileEntry(file.Path, file.Contents)).ToArray(),
-        });
-        List<GeneratedFile> allFiles = [.. files, new("badge-relay-manifest.json", manifest)];
-        foreach (GeneratedFile file in allFiles)
+    private static void WriteFiles(string root, IReadOnlyList<GeneratedFile> files)
+    {
+        foreach (GeneratedFile file in files)
         {
             EnsureNoConflict(root, file.Path, file.Contents);
         }
 
-        OriginalFile[] originals = allFiles.Select(file => CaptureOriginal(root, file.Path)).ToArray();
+        OriginalFile[] originals = files.Select(file => CaptureOriginal(root, file.Path)).ToArray();
         try
         {
-            foreach (GeneratedFile file in allFiles)
+            foreach (GeneratedFile file in files)
             {
                 WriteManaged(root, file.Path, file.Contents);
             }
@@ -148,7 +221,9 @@ internal static class BadgeSetupOutputWriter
         byte[] blob = new byte[header.Length + payload.Length];
         Buffer.BlockCopy(header, 0, blob, 0, header.Length);
         Buffer.BlockCopy(payload, 0, blob, header.Length, payload.Length);
-        return Convert.ToHexString(SHA1.HashData(blob)).ToLowerInvariant();
+        // Git's content-addressed object ID is defined as SHA-1; this is an interoperability
+        // identifier, not a security digest or an authorization decision. // NOSONAR
+        return Convert.ToHexString(SHA1.HashData(blob)).ToLowerInvariant(); // NOSONAR: Git object IDs require SHA-1 for interoperability.
     }
 
     private static BadgeSetupProducer ResolveProducer(BadgeSetupConfiguration configuration) =>
@@ -189,16 +264,17 @@ internal static class BadgeSetupOutputWriter
         List<string> paths =
         [
             "badge-relay-config.json",
-            configuration.Producer!.WorkflowPath,
+            configuration.Producer?.WorkflowPath
+                ?? throw new InvalidOperationException("Generated setup output requires producer metadata."),
             ".github/badge-promotion/registry.json",
-            "README.md",
+            ReadmeFileName,
             "schema/0.8.0/badge-relay-config.schema.json",
         ];
         if (configuration.Mode != BadgeSetupMode.None.ToWireValue())
         {
             paths.Insert(2, ".github/workflows/architecture-health-badge-publisher.yml");
         }
-        if (configuration.Mode == BadgeSetupMode.Relay.ToWireValue())
+        if (configuration.Mode == RelayMode)
         {
             paths.Add(".github/workflows/architecture-health-badge-renewal.yml");
             paths.AddRange(relayFiles.Select(static file => file.Path));
@@ -420,22 +496,27 @@ jobs:
 
     private static string BuildReadme(string root, BadgeSetupConfiguration configuration)
     {
-        string existing = File.Exists(Path.Combine(root, "README.md"))
-            ? File.ReadAllText(Path.Combine(root, "README.md"), new UTF8Encoding(false))
+        string readmePath = Path.Combine(root, ReadmeFileName);
+        string existing = File.Exists(readmePath)
+            ? File.ReadAllText(readmePath, new UTF8Encoding(false))
             : string.Empty;
         int startCount = Count(existing, ReadmeStartMarker);
         int endCount = Count(existing, ReadmeEndMarker);
         if (startCount != endCount || startCount > 1)
         {
-            throw new IOException("README.md contains an ambiguous managed badge region.");
+            throw new IOException($"{ReadmeFileName} contains an ambiguous managed badge region.");
         }
 
         string block = ReadmeStartMarker + "\n" + RenderReadmeBlock(configuration) + "\n" + ReadmeEndMarker;
         if (startCount == 0)
         {
-            return existing.Length == 0
-                ? block + "\n"
-                : existing + (existing.EndsWith("\n", StringComparison.Ordinal) ? "\n" : "\n\n") + block + "\n";
+            if (existing.Length == 0)
+            {
+                return block + "\n";
+            }
+
+            string separator = existing.EndsWith('\n') ? "\n" : "\n\n";
+            return existing + separator + block + "\n";
         }
 
         int start = existing.IndexOf(ReadmeStartMarker, StringComparison.Ordinal);
@@ -453,7 +534,7 @@ jobs:
 
         string origin = configuration.Mode == BadgeSetupMode.GithubRaw.ToWireValue()
             ? $"https://raw.githubusercontent.com/{configuration.Repository.Owner}/{configuration.Repository.Name}/architecture-health-badge/architecture-health.json"
-            : $"{configuration.Destination.Endpoint!.TrimEnd('/')}/badge-relay/v1/{configuration.Destination.Alias}";
+            : RelayOrigin(configuration);
         if (configuration.Mode == BadgeSetupMode.Relay.ToWireValue()
             && configuration.DisclosureProfile == BadgeSetupContract.HeadlinePlusFreshnessProfile)
         {
@@ -465,13 +546,22 @@ jobs:
         return $"![Architecture Health]({shields})";
     }
 
+    private static string RelayOrigin(BadgeSetupConfiguration configuration)
+    {
+        string endpoint = configuration.Destination.Endpoint
+            ?? throw new InvalidOperationException("Relay output requires a destination endpoint.");
+        string alias = configuration.Destination.Alias
+            ?? throw new InvalidOperationException("Relay output requires a destination alias.");
+        return $"{endpoint.TrimEnd('/')}/badge-relay/v1/{alias}";
+    }
+
     private static string RenderRegistry(BadgeSetupConfiguration configuration)
     {
         string adapter = configuration.Mode;
         object destination = adapter switch
         {
             "github-raw" => new { adapter, branch = "architecture-health-badge", endpoint_path = "architecture-health.json" },
-            "relay" => new
+            RelayMode => new
             {
                 adapter,
                 alias = configuration.Destination.Alias,
@@ -480,7 +570,8 @@ jobs:
             },
             _ => new { adapter },
         };
-        BadgeSetupProducer producer = configuration.Producer!;
+        BadgeSetupProducer producer = configuration.Producer
+            ?? throw new InvalidOperationException("Generated setup output requires producer metadata.");
         return Serialize(new
         {
             schema = "architecture-health-badge-promotion/registry/v1",
@@ -502,9 +593,9 @@ jobs:
         });
     }
 
-    private static IReadOnlyList<GeneratedFile> ReadRelayBundle(BadgeSetupConfiguration configuration)
+    private static List<GeneratedFile> ReadRelayBundle(BadgeSetupConfiguration configuration)
     {
-        string? root = FindRepositoryPath("relay", "architecture-health-badge-setup") ?? FindRepositoryPath("relay", string.Empty);
+        string? root = FindRepositoryPath(RelayMode, "architecture-health-badge-setup") ?? FindRepositoryPath(RelayMode, string.Empty);
         if (root is null)
         {
             throw new IOException("The shipped badge Relay bundle is missing.");
@@ -516,7 +607,7 @@ jobs:
             files.Add(new("relay/src/" + Path.GetFileName(source), ReadText(source)));
         }
 
-        foreach (string fileName in new[] { "package.json", "package-lock.json", "tsconfig.json" })
+        foreach (string fileName in _relayAssetNames)
         {
             files.Add(new("relay/" + fileName, ReadText(Path.Combine(root, fileName))));
         }
@@ -532,19 +623,30 @@ jobs:
             throw new IOException("The shipped Relay template contains fixture identity and cannot be used for an adopter bundle.");
         }
 
-        string alias = configuration.Destination.Alias!;
+        string alias = configuration.Destination.Alias
+            ?? throw new InvalidOperationException("Relay output requires a destination alias.");
+        long repositoryId = configuration.Repository.RepositoryId
+            ?? throw new InvalidOperationException("Relay output requires a repository ID.");
+        long repositoryOwnerId = configuration.Repository.RepositoryOwnerId
+            ?? throw new InvalidOperationException("Relay output requires a repository owner ID.");
+        BadgeSetupPins pins = configuration.Pins
+            ?? throw new InvalidOperationException("Relay output requires workflow pins.");
+        string workflowRef = pins.WorkflowRef
+            ?? throw new InvalidOperationException("Relay output requires a workflow reference.");
+        string workflowSha = pins.WorkflowSha
+            ?? throw new InvalidOperationException("Relay output requires a workflow SHA.");
         string registryEntry = Serialize(new
         {
-            repository_id = configuration.Repository.RepositoryId!.Value,
-            repository_owner_id = configuration.Repository.RepositoryOwnerId!.Value,
+            repository_id = repositoryId,
+            repository_owner_id = repositoryOwnerId,
             owner = configuration.Repository.Owner,
             repository = configuration.Repository.Name,
             destination_alias = alias,
             permitted_event = "push",
-            permitted_events = configuration.Renewal.Enabled ? new[] { "push", "schedule" } : new[] { "push" },
+            permitted_events = configuration.Renewal.Enabled ? _renewalPermittedEvents : _pushPermittedEvents,
             permitted_ref = $"refs/heads/{configuration.BaseRef}",
-            job_workflow_ref = $"{configuration.Pins!.WorkflowRef}@{configuration.Pins.WorkflowSha}",
-            job_workflow_sha = configuration.Pins.WorkflowSha,
+            job_workflow_ref = $"{workflowRef}@{workflowSha}",
+            job_workflow_sha = workflowSha,
             disclosure_profile = configuration.DisclosureProfile,
             audience = configuration.Destination.Audience,
             consent = configuration.DisclosureApproved,
@@ -552,14 +654,14 @@ jobs:
         string config = Serialize(new
         {
             schema_id = "architecture-health-badge-relay-config/v1",
-            mode = "relay",
+            mode = RelayMode,
             bundle = configuration.Bundle,
             oidc_trust = new
             {
                 issuer = "https://token.actions.githubusercontent.com",
                 jwks_uri = "https://token.actions.githubusercontent.com/.well-known/jwks",
                 audience = configuration.Destination.Audience,
-                allowed_algorithms = new[] { "RS256" },
+                allowed_algorithms = _allowedOidcAlgorithms,
             },
             registry_entry = JsonSerializer.Deserialize<JsonElement>(registryEntry),
         });
@@ -572,7 +674,7 @@ jobs:
         }
 
         string body = result[..finalBrace].TrimEnd();
-        if (!body.EndsWith(",", StringComparison.Ordinal))
+        if (!body.EndsWith(','))
         {
             body += ",";
         }
@@ -622,84 +724,14 @@ jobs:
         ? File.ReadAllText(path, new UTF8Encoding(false))
         : throw new IOException($"The shipped setup asset '{Path.GetFileName(path)}' is missing.");
 
-    private static string Serialize<T>(T value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine;
+    private static string Serialize<T>(T value) => JsonSerializer.Serialize(value, _serializerOptions) + Environment.NewLine;
 
     private static object FileEntry(string path, string contents) => new { path, sha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(contents))).ToLowerInvariant() };
 
-    private static void EnsureNoConflict(string root, string relativePath, string contents)
-    {
-        string path = SafePath(root, relativePath);
-        if (relativePath == "README.md" || !File.Exists(path))
-        {
-            return;
-        }
+    private sealed record GeneratedSetup(IReadOnlyList<GeneratedFile> Files);
 
-        if (File.ReadAllText(path, new UTF8Encoding(false)) != contents)
-        {
-            throw new IOException($"Managed output conflict at '{relativePath}'. Review or remove the existing managed file before retrying.");
-        }
-    }
+    internal sealed record GeneratedFile(string Path, string Contents);
 
-    private static void WriteManaged(string root, string relativePath, string contents)
-    {
-        string path = SafePath(root, relativePath);
-        string? directory = Path.GetDirectoryName(path);
-        if (directory is not null) Directory.CreateDirectory(directory);
-        string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        File.WriteAllText(temporary, contents, new UTF8Encoding(false));
-        File.Move(temporary, path, overwrite: true);
-    }
+    internal sealed record OriginalFile(string Path, bool Exists, byte[]? Contents);
 
-    private static string SafePath(string root, string relativePath)
-    {
-        if (Path.IsPathRooted(relativePath) || relativePath.Contains("..", StringComparison.Ordinal))
-        {
-            throw new IOException("Managed output path escapes the setup directory.");
-        }
-
-        string path = Path.GetFullPath(Path.Combine(root, relativePath));
-        return path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            ? path
-            : throw new IOException("Managed output path escapes the setup directory.");
-    }
-
-    private static OriginalFile CaptureOriginal(string root, string relativePath)
-    {
-        string path = SafePath(root, relativePath);
-        return new(relativePath, File.Exists(path), File.Exists(path) ? File.ReadAllBytes(path) : null);
-    }
-
-    private static void RestoreOriginals(string root, IReadOnlyList<OriginalFile> originals)
-    {
-        foreach (OriginalFile original in originals.Reverse())
-        {
-            string path = SafePath(root, original.Path);
-            if (original.Exists)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllBytes(path, original.Contents!);
-            }
-            else if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-    }
-
-    private static int Count(string source, string value)
-    {
-        int count = 0;
-        int offset = 0;
-        while ((offset = source.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            offset += value.Length;
-        }
-
-        return count;
-    }
-
-    private sealed record GeneratedFile(string Path, string Contents);
-
-    private sealed record OriginalFile(string Path, bool Exists, byte[]? Contents);
 }

@@ -23,7 +23,9 @@ internal sealed class BadgeSetupCommandHandler(ICliConsole console, IFileSystem 
             BadgeSetupConfiguration? configuration = ReadOrCreateConfiguration(options, out BadgeSetupPlanResult? parseFailure);
             if (configuration is null)
             {
-                return WriteResult(parseFailure!, options.Format);
+                BadgeSetupPlanResult failure = parseFailure
+                    ?? throw new InvalidOperationException("Configuration parsing failed without a diagnostic result.");
+                return WriteResult(failure, options.Format);
             }
 
             (configuration, BadgeSetupPlanResult result) = Prepare(configuration, options);
@@ -64,7 +66,7 @@ internal sealed class BadgeSetupCommandHandler(ICliConsole console, IFileSystem 
             return CliExitCodes.Success;
         }
 
-        if (string.IsNullOrWhiteSpace(options.InputPath))
+        if (options.InputPath is not { } inputPath || string.IsNullOrWhiteSpace(inputPath))
         {
             console.Error.WriteLine("Doctor requires --input <badge-relay-config.json>.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -72,7 +74,7 @@ internal sealed class BadgeSetupCommandHandler(ICliConsole console, IFileSystem 
 
         try
         {
-            BadgeSetupConfigurationParseResult parsed = BadgeSetupConfigurationParser.Parse(fileSystem.ReadAllText(options.InputPath));
+            BadgeSetupConfigurationParseResult parsed = BadgeSetupConfigurationParser.Parse(fileSystem.ReadAllText(inputPath));
             if (!parsed.IsValid || parsed.Configuration is null)
             {
                 return WriteDoctor(new BadgeDoctorReport(false, parsed.Diagnostics), options);
@@ -80,9 +82,9 @@ internal sealed class BadgeSetupCommandHandler(ICliConsole console, IFileSystem 
 
             BadgeSetupConfiguration config = parsed.Configuration;
             BadgeDoctorObservationParseResult? parsedObservation = null;
-            if (!string.IsNullOrWhiteSpace(options.ObservationPath))
+            if (options.ObservationPath is { } observationPath && !string.IsNullOrWhiteSpace(observationPath))
             {
-                parsedObservation = BadgeDoctorObservationParser.Parse(fileSystem.ReadAllText(options.ObservationPath!), config);
+                parsedObservation = BadgeDoctorObservationParser.Parse(fileSystem.ReadAllText(observationPath), config);
                 if (!parsedObservation.IsValid || parsedObservation.Observations is null)
                 {
                     return WriteDoctor(new BadgeDoctorReport(false, parsedObservation.Diagnostics), options);
@@ -97,13 +99,16 @@ internal sealed class BadgeSetupCommandHandler(ICliConsole console, IFileSystem 
             }
             else
             {
-                (config, plan) = Prepare(config, options);
+                BadgeDoctorInspectionResult inspected = BadgeDoctorInspector.Inspect(
+                    config,
+                    options,
+                    inputPath,
+                    fileSystem);
+                plan = inspected.Plan;
+                return WriteDoctor(BadgeSetupEngine.RunDoctor(plan, inspected.Observations), options);
             }
 
-            BadgeDoctorObservations observations = parsedObservation?.Observations
-                ?? (config.Mode == BadgeSetupMode.None.ToWireValue()
-                    ? new()
-                    : new(FirstEvidenceAvailable: false, ArtifactValid: false));
+            BadgeDoctorObservations observations = parsedObservation?.Observations ?? new();
             return WriteDoctor(BadgeSetupEngine.RunDoctor(plan, observations), options);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException)
