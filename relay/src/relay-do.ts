@@ -583,7 +583,7 @@ export class RelayDurableObject {
       const active = before.active_digest ?? before.bundle_digest;
       const requested = typeof body.bundle_digest === "string" ? body.bundle_digest : undefined;
       const known = requested === undefined || isKnownBundleDigest(requested, this.shippedDigests, active);
-      if (!known || (operation === "upgrade-activate" && requested === undefined && !before.staged_digest)) return response(409, { error: "compatibility_conflict" });
+      if (!known || (operation === "upgrade-activate" && !before.staged_digest)) return response(409, { error: "compatibility_conflict" });
       if (body.to_bundle !== undefined && body.to_bundle !== SUPPORTED_BUNDLE) return response(409, { error: "compatibility_conflict" });
 
       let target: string | null = requested ?? null;
@@ -598,6 +598,7 @@ export class RelayDurableObject {
       } else {
         target = target ?? (operation === "upgrade-rollback" ? before.previous_verified_digest : before.staged_digest);
         if (!target || !isKnownBundleDigest(target, this.shippedDigests, active)) return response(409, { error: "compatibility_conflict" });
+        if (operation === "upgrade-activate" && before.staged_digest !== null && target !== before.staged_digest) return response(409, { error: "compatibility_conflict" });
         if (operation === "upgrade-rollback" && target !== before.previous_verified_digest) return response(409, { error: "compatibility_conflict" });
         this.sql.exec("UPDATE relay_state SET status='unavailable', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, bundle=?, contract_version=?, compatibility_plan=?, bundle_digest=?, active_digest=?, staged_digest=NULL, previous_verified_digest=?, updated_at=? WHERE id=1", SUPPORTED_BUNDLE, SUPPORTED_CONTRACT_VERSION, SUPPORTED_COMPATIBILITY_PLAN, target, target, active, nowSeconds()).toArray();
         this.sql.exec("DELETE FROM relay_challenges WHERE consumed=0").toArray();
