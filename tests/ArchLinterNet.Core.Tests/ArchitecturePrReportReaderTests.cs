@@ -243,6 +243,7 @@ public sealed class ArchitecturePrReportReaderTests
         receipt["waiver_lifecycle"] = new JsonObject
         {
             ["profile"] = "strict",
+            ["evaluation_date"] = "2026-09-01",
             ["blocking_states"] = new JsonArray("expired", "stale"),
             ["records"] = new JsonArray(FullWaiver()),
         };
@@ -382,6 +383,7 @@ public sealed class ArchitecturePrReportReaderTests
         {
             Assert.That(parsed.PolicyInventory!.Waivers.Single().PolicyLocation!.YamlPath, Is.EqualTo("rules[0]"));
             Assert.That(parsed.WaiverLifecycle!.BlockingStates, Is.EqualTo(["expired", "stale"]));
+            Assert.That(parsed.WaiverLifecycle.EvaluationDate, Is.EqualTo(new DateOnly(2026, 9, 1)));
             Assert.That(parsed.Applicability!.Controls.Single().Record!.Topology!.Subjects.Single().NodeIds,
                 Is.EqualTo(["Api"]));
             Assert.That(parsed.Applicability.Controls.Single().Record!.Metric!.Contributors,

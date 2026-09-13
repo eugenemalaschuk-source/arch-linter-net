@@ -137,7 +137,35 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
             ? Array.Empty<ArchitectureWaiverLifecycleRecord>()
             : lifecycle.Records.Where(record => record is not null).ToArray();
 
-        if (records.Length == 0)
+        if (lifecycle.EvaluationDate is { } lifecycleEvaluationDate)
+        {
+            if (lifecycleEvaluationDate == DateOnly.MinValue)
+            {
+                add(InvalidEvaluationDate, $"The '{mode}' waiver lifecycle receipt has an invalid evaluation date.");
+            }
+            else
+            {
+                if (evaluationDate is null)
+                {
+                    evaluationDate = lifecycleEvaluationDate;
+                }
+                else if (evaluationDate.Value != lifecycleEvaluationDate)
+                {
+                    add(InconsistentEvaluationDate, "Waiver lifecycle receipts do not share one evaluation date.");
+                }
+
+                if (!TryGetNextUtcDay(lifecycleEvaluationDate, out DateTimeOffset lifecycleHorizon))
+                {
+                    add(InvalidEvaluationDate, "The waiver evaluation date cannot produce a finite UTC horizon.");
+                }
+                else
+                {
+                    horizon = horizon is null || lifecycleHorizon < horizon.Value ? lifecycleHorizon : horizon;
+                }
+            }
+        }
+
+        if (records.Length == 0 && lifecycle.EvaluationDate is null)
         {
             add(MissingEvaluationDate, $"The '{mode}' waiver lifecycle receipt has no explicit evaluation date.");
         }

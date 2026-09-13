@@ -10,6 +10,12 @@ public sealed record ArchitectureWaiverLifecycleAssessment(
     IReadOnlyList<ArchitectureWaiverLifecycleRecord> Records,
     IReadOnlyList<string> BlockingStates)
 {
+    /// <summary>
+    /// Retains the evaluation date for an empty waiver set so publication evidence still has a
+    /// bounded semantic horizon.
+    /// </summary>
+    internal DateOnly? EvaluationDate { get; init; }
+
     public IReadOnlyList<ArchitectureWaiverLifecycleRecord> Records { get; init; } =
         (Records ?? throw new ArgumentNullException(nameof(Records)))
         .OrderBy(record => record.Id, StringComparer.Ordinal)
