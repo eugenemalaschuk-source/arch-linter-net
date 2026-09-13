@@ -1,18 +1,18 @@
 {
   "schema": "architecture-health-badge-publication/v2",
   "status": "unassessable",
-  "reason": "run_mismatch",
+  "reason": "payload_invalid",
   "repository": "eugenemalaschuk-source/arch-linter-net",
-  "base_sha": "91b273967d5d7eca93aa7eab12ee870b96c6196b",
-  "head_sha": "41e3e40e47e5208354a4027400e6a50bd015f187",
-  "head_tree_sha": "1b84066b3b4c1540305d9fd36ca8ae6145ef0a6d",
-  "main_sha": "97c8e36d53c0c08933044371b1c552c14b478389",
-  "main_tree_sha": "1b84066b3b4c1540305d9fd36ca8ae6145ef0a6d",
-  "pr_number": "871",
-  "producer_run_id": "34765194094",
+  "base_sha": "97c8e36d53c0c08933044371b1c552c14b478389",
+  "head_sha": "c4ba6207a489da89a7c01b95b562baf1fdef5446",
+  "head_tree_sha": "4fe4002749407685e37ce722f2832718b5fbbcb0",
+  "main_sha": "dae520be768f30c5bd3ddf2908349a92e323faa6",
+  "main_tree_sha": "4fe4002749407685e37ce722f2832718b5fbbcb0",
+  "pr_number": "873",
+  "producer_run_id": "34766195602",
   "producer_run_attempt": "1",
-  "publisher_run_id": "34765891005",
+  "publisher_run_id": "34766793491",
   "publisher_run_attempt": "1",
   "payload_sha256": "da2189f448656c69dbed7a7cd9f903372b290e0c7693a68f3e8dbf00bccf327e",
-  "published_at": "2026-09-13T15:32:40Z"
+  "published_at": "2026-09-13T15:50:53Z"
 }
