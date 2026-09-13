@@ -162,7 +162,7 @@ def _validate_canonical_payload(payload: bytes, max_payload_bytes: int) -> None:
     # System.Text.Json emits the canonical disclosure's middle-dot escape with an
     # uppercase hexadecimal digit. Preserve that existing producer convention.
     canonical = json.dumps(document, ensure_ascii=True, separators=(",", ":"), sort_keys=False).replace("\\u00b7", "\\u00B7").encode("utf-8")
-    if canonical != payload:
+    if payload not in {canonical, canonical + b"\n"}:
         raise ArtifactValidationError("payload bytes are not canonical")
 
 
