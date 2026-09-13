@@ -54,6 +54,13 @@ function integerClaim(claims: OidcClaims, key: "iat" | "exp" | "nbf"): number {
   return value;
 }
 
+function repositoryIdClaim(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isSafeInteger(value) && value > 0 ? value : undefined;
+  if (typeof value !== "string" || !/^[1-9][0-9]*$/u.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 && String(parsed) === value ? parsed : undefined;
+}
+
 function exactSubject(entry: RegistryEntry, trust: OidcTrust): string {
   if (entry.subject) return entry.subject;
   if (trust.subject) return trust.subject;
@@ -81,7 +88,7 @@ export function validateOidcClaims(claims: OidcClaims, entry: RegistryEntry, now
   if (exp < now - CLOCK_SKEW_SECONDS || exp <= iat || exp - iat > 10 * 60) throw new AuthorizationError(401);
   if (typeof claims.jti !== "string" || claims.jti.length === 0 || claims.jti.length > 256) throw new AuthorizationError(401);
 
-  if (claims.repository_id !== entry.repository_id || claims.repository_owner_id !== entry.repository_owner_id) throw new AuthorizationError(403);
+  if (repositoryIdClaim(claims.repository_id) !== entry.repository_id || repositoryIdClaim(claims.repository_owner_id) !== entry.repository_owner_id) throw new AuthorizationError(403);
   const permittedEvents = entry.permitted_events ?? [entry.permitted_event];
   if (typeof claims.event_name !== "string" || !permittedEvents.includes(claims.event_name as "push" | "schedule") || claims.ref !== entry.permitted_ref) throw new AuthorizationError(403);
   if (claims.job_workflow_ref !== entry.job_workflow_ref || claims.job_workflow_sha !== entry.job_workflow_sha) throw new AuthorizationError(403);

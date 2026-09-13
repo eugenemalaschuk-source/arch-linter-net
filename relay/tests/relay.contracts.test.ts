@@ -13,6 +13,10 @@ import worker, {
   validateCanonicalPayload,
   validateOidcClaims,
   validateRegistryEntry,
+  isIdentityPreserving,
+  isSupportedCompatibility,
+  redactStatus,
+  validateDisplayIdentity,
   type OidcClaims,
   type RegistryEntry,
   type RelayEnvironment
@@ -102,6 +106,30 @@ describe("relay contract helpers", () => {
     expect(profileFromEntry(entry)).toBe("headline-only/v1");
   });
 
+  it("keeps lifecycle compatibility and status diagnostics closed", () => {
+    expect(isSupportedCompatibility({ bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1" })).toBe(true);
+    expect(isSupportedCompatibility({ bundle: "badge-relay/v2", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1" })).toBe(false);
+    expect(isSupportedCompatibility({ bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1", bundle_digest: "BAD" })).toBe(false);
+    expect(isIdentityPreserving({ repository_id: 1, repository_owner_id: 2 }, { repository_id: 1, repository_owner_id: 2 })).toBe(true);
+    expect(isIdentityPreserving({ repository_id: 1, repository_owner_id: 2 }, { repository_id: 9, repository_owner_id: 2 })).toBe(false);
+    expect(validateDisplayIdentity("owner-name")).toBe(true);
+    expect(validateDisplayIdentity("owner/name")).toBe(false);
+
+    const status = redactStatus({
+      state: "ready",
+      generation: 4,
+      revocation_epoch: 2,
+      profile: "headline-only/v1",
+      payload: "private-payload",
+      source: "https://private.example",
+      token: "secret"
+    });
+    expect(status).toMatchObject({ state: "ready", generation: 4, profile: "headline-only/v1" });
+    expect(status).not.toHaveProperty("payload");
+    expect(status).not.toHaveProperty("source");
+    expect(status).not.toHaveProperty("token");
+  });
+
   it("accepts only canonical closed payloads", () => {
     const headline = canonicalizePayload({ schemaVersion: 1, label: "architecture", message: "PASS · HEALTHY · 0 ignores · 42 rules", color: "brightgreen" }, "headline-only/v1");
     expect(validateCanonicalPayload(headline, "headline-only/v1").message).toContain("HEALTHY");
@@ -133,11 +161,12 @@ describe("relay contract helpers", () => {
     }
 
     validateOidcClaims(claims(), entry, 1_100);
+    validateOidcClaims(claims({ repository_id: String(entry.repository_id), repository_owner_id: String(entry.repository_owner_id) }), entry, 1_100);
     validateOidcClaims(claims({ event_name: "schedule" }), { ...entry, permitted_events: ["push", "schedule"] }, 1_100);
     validateOidcClaims(claims({ aud: ["another", entry.audience] }), entry, 1_100);
     for (const invalid of [
       { iss: "https://issuer.invalid" }, { aud: "other" }, { iat: "1000" }, { iat: 1_500 }, { nbf: 1_500 }, { exp: 900 }, { exp: 2_000 }, { jti: "" },
-      { repository_id: 1 }, { repository_owner_id: 1 }, { event_name: "workflow_dispatch" }, { ref: "refs/heads/dev" }, { job_workflow_ref: "other" }, { job_workflow_sha: "other" }, { sub: "other" }
+      { repository_id: 1 }, { repository_id: "0700042" }, { repository_owner_id: 1 }, { event_name: "workflow_dispatch" }, { ref: "refs/heads/dev" }, { job_workflow_ref: "other" }, { job_workflow_sha: "other" }, { sub: "other" }
     ]) expect(() => validateOidcClaims(claims(invalid), entry, 1_100)).toThrow(AuthorizationError);
     expect(() => validateOidcClaims(claims(), entry, 1_100, { issuer: "https://issuer.invalid", jwks_uri: "https://token.actions.githubusercontent.com/.well-known/jwks", audience: "architecture-health-badge-relay-fixture" })).toThrow(AuthorizationError);
     expect(isTrustedContext({ valid: true, kind: "github-pr-authoritative/v1" })).toBe(true);

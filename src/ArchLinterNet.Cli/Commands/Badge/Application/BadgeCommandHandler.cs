@@ -17,6 +17,8 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
 
     internal int ExecuteDoctor(BadgeSetupCommandOptions options) => new BadgeSetupCommandHandler(console, fileSystem).ExecuteDoctor(options);
 
+    internal int ExecuteLifecycle(BadgeLifecycleCommandOptions options) => new BadgeLifecycleCommandHandler(console, fileSystem).Execute(options);
+
     public int Execute(BadgeCommandOptions options)
     {
         if (options.ShowHelp)

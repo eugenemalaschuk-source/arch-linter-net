@@ -107,8 +107,67 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
             ShowHelp: result.GetValue(doctorHelp),
             CapabilityEvidencePath: result.GetValue(doctorCapabilities),
             ObservationPath: result.GetValue(doctorObservation))));
+        Command lifecycle = new("lifecycle", "Inspect or mutate an authenticated badge Relay registration.");
+        Option<string> lifecycleOperation = new("--operation") { DefaultValueFactory = _ => "status" };
+        Option<string> lifecycleInput = new(InputOptionName);
+        Option<string> lifecycleAlias = new("--alias");
+        Option<bool> lifecycleDryRun = new("--dry-run");
+        Option<string> lifecycleFormat = new("--format") { DefaultValueFactory = _ => "json" };
+        Option<long?> lifecycleGeneration = new("--expected-generation");
+        Option<long?> lifecycleEpoch = new("--expected-epoch");
+        Option<long?> lifecycleRegistryRevision = new("--expected-registry-revision");
+        Option<long?> lifecycleBarrierEpoch = new("--expected-barrier-epoch");
+        Option<string> lifecycleNewOwner = new("--new-owner");
+        Option<string> lifecycleNewRepository = new("--new-repository");
+        Option<string> lifecycleNewAlias = new("--new-alias");
+        Option<string> lifecycleWorkflowSha = new("--workflow-sha");
+        Option<string> lifecycleWorkflowRef = new("--workflow-ref");
+        Option<string> lifecycleAudience = new("--audience");
+        Option<string> lifecycleBundle = new("--bundle");
+        Option<string> lifecycleContractVersion = new("--contract-version");
+        Option<string> lifecycleCompatibilityPlan = new("--compatibility-plan");
+        Option<string> lifecycleManifest = new("--manifest");
+        Option<string> lifecycleTargetDigest = new("--to");
+        Option<bool> lifecycleApproveWithdrawal = new("--approve-withdrawal");
+        Option<bool> lifecycleApproveRecovery = new("--approve-recovery");
+        Option<bool> lifecycleHelp = new(HelpOptionName);
+        lifecycleHelp.Aliases.Add("-h");
+        foreach (Option option in new Option[]
+        {
+            lifecycleOperation, lifecycleInput, lifecycleAlias, lifecycleDryRun, lifecycleFormat,
+            lifecycleGeneration, lifecycleEpoch, lifecycleRegistryRevision, lifecycleBarrierEpoch,
+            lifecycleNewOwner, lifecycleNewRepository, lifecycleNewAlias, lifecycleWorkflowSha,
+            lifecycleWorkflowRef,
+            lifecycleAudience, lifecycleBundle, lifecycleContractVersion, lifecycleCompatibilityPlan,
+            lifecycleManifest, lifecycleTargetDigest, lifecycleApproveWithdrawal, lifecycleApproveRecovery, lifecycleHelp,
+        }) lifecycle.Options.Add(option);
+        lifecycle.SetAction(result => handler.ExecuteLifecycle(new BadgeLifecycleCommandOptions(
+            Operation: result.GetValue(lifecycleOperation) ?? "status",
+            InputPath: result.GetValue(lifecycleInput),
+            Alias: result.GetValue(lifecycleAlias),
+            DryRun: result.GetValue(lifecycleDryRun),
+            Format: result.GetValue(lifecycleFormat) ?? "json",
+            ShowHelp: result.GetValue(lifecycleHelp),
+            ExpectedGeneration: result.GetValue(lifecycleGeneration),
+            ExpectedRevocationEpoch: result.GetValue(lifecycleEpoch),
+            ExpectedRegistryRevision: result.GetValue(lifecycleRegistryRevision),
+            ExpectedBarrierEpoch: result.GetValue(lifecycleBarrierEpoch),
+            NewOwner: result.GetValue(lifecycleNewOwner),
+            NewRepository: result.GetValue(lifecycleNewRepository),
+            NewAlias: result.GetValue(lifecycleNewAlias),
+            WorkflowSha: result.GetValue(lifecycleWorkflowSha),
+            Audience: result.GetValue(lifecycleAudience),
+            Bundle: result.GetValue(lifecycleBundle),
+            ContractVersion: result.GetValue(lifecycleContractVersion),
+            CompatibilityPlan: result.GetValue(lifecycleCompatibilityPlan),
+            Manifest: result.GetValue(lifecycleManifest),
+            TargetDigest: result.GetValue(lifecycleTargetDigest),
+            ApproveWithdrawal: result.GetValue(lifecycleApproveWithdrawal),
+            ApproveRecovery: result.GetValue(lifecycleApproveRecovery),
+            WorkflowRef: result.GetValue(lifecycleWorkflowRef))));
         health.Subcommands.Add(setup);
         health.Subcommands.Add(doctor);
+        health.Subcommands.Add(lifecycle);
         badge.Subcommands.Add(policy);
         badge.Subcommands.Add(health);
         return badge;
