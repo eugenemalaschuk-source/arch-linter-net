@@ -287,9 +287,46 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
 
     const missingOperationId = await admin("revoke", { method: "POST", body: JSON.stringify({ confirm: true }) });
     expect(missingOperationId.status).toBe(413);
-    expect((await admin("status", { method: "GET" })).status).toBe(200);
+    const beforeRevokeResponse = await admin("status", { method: "GET" });
+    expect(beforeRevokeResponse.status).toBe(200);
+    const beforeRevoke = await beforeRevokeResponse.json() as Record<string, number>;
+    const staleRegistryRevoke = await admin("revoke", {
+      method: "POST",
+      body: JSON.stringify({
+        confirm: true,
+        operation_id: "revoke-stale-registry-833",
+        expected_generation: beforeRevoke.generation,
+        expected_revocation_epoch: beforeRevoke.revocation_epoch,
+        expected_registry_revision: beforeRevoke.registry_revision + 1,
+        expected_barrier_epoch: beforeRevoke.barrier_epoch
+      })
+    });
+    expect(staleRegistryRevoke.status).toBe(409);
+    const staleRevoke = await admin("revoke", {
+      method: "POST",
+      body: JSON.stringify({
+        confirm: true,
+        operation_id: "revoke-stale-833",
+        expected_generation: beforeRevoke.generation - 1,
+        expected_revocation_epoch: beforeRevoke.revocation_epoch - 1,
+        expected_registry_revision: beforeRevoke.registry_revision,
+        expected_barrier_epoch: beforeRevoke.barrier_epoch
+      })
+    });
+    expect(staleRevoke.status).toBe(409);
+    expect(await (await admin("status", { method: "GET" })).json()).toMatchObject({ state: "unavailable", tombstoned: false, generation: beforeRevoke.generation, revocation_epoch: beforeRevoke.revocation_epoch });
 
-    const revoke = await admin("revoke", { method: "POST", body: JSON.stringify({ confirm: true, operation_id: "revoke-833" }) });
+    const revoke = await admin("revoke", {
+      method: "POST",
+      body: JSON.stringify({
+        confirm: true,
+        operation_id: "revoke-833",
+        expected_generation: beforeRevoke.generation,
+        expected_revocation_epoch: beforeRevoke.revocation_epoch,
+        expected_registry_revision: beforeRevoke.registry_revision,
+        expected_barrier_epoch: beforeRevoke.barrier_epoch
+      })
+    });
     expect(revoke.status).toBe(200);
     expect((await SELF.fetch(`https://relay.test/badge-relay/v1/${lifecycleAlias}`)).status).toBe(404);
 
@@ -312,6 +349,40 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(response.status).toBe(409);
     const state = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; generation: number; registry_revision: number }>("SELECT status,generation,registry_revision FROM relay_state WHERE id=1").toArray()[0]);
     expect(state).toEqual({ status: "ready", generation: 7, registry_revision: 2 });
+  });
+
+  it("honors caller registry CAS values and requires operation IDs for admin mutations", async () => {
+    const casAlias = "a833cas1";
+    const casEntry: RegistryEntry = { ...entry, destination_alias: casAlias, consent: true };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(casEntry))).toBe(true);
+    const testEnv = { ...(env as unknown as Record<string, unknown>), ADMIN_TOKEN: "admin" } as unknown as RelayEnvironment;
+    const admin = (path: string, init: RequestInit = {}) => worker.fetch(
+      new Request(`https://relay.test/badge-relay/v1/admin/${casAlias}/${path}`, {
+        ...init,
+        headers: { authorization: "Bearer admin", "content-type": "application/json", ...(init.headers ?? {}) },
+      }),
+      testEnv);
+
+    const initial = await admin("status", { method: "GET" });
+    expect(initial.status).toBe(200);
+    const stateBefore = await initial.json() as Record<string, number>;
+    const staleRevision = await admin("invalidate", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "cas-stale-833", expected_registry_revision: stateBefore.registry_revision + 1, expected_barrier_epoch: stateBefore.barrier_epoch })
+    });
+    expect(staleRevision.status).toBe(409);
+    expect(await (await admin("status", { method: "GET" })).json()).toMatchObject({ state: "unavailable", generation: stateBefore.generation, revocation_epoch: stateBefore.revocation_epoch });
+
+    for (const operation of ["invalidate", "recover/open", "upgrade", "rotate"]) {
+      const missingOperationId = await admin(operation, {
+        method: "POST",
+        body: JSON.stringify({ confirm: true, bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1" })
+      });
+      expect(missingOperationId.status).toBe(413);
+    }
+    expect(await (await admin("status", { method: "GET" })).json()).toMatchObject({ state: "unavailable", generation: stateBefore.generation, revocation_epoch: stateBefore.revocation_epoch });
   });
 
   it("bounds the private operation journal by age and count", async () => {

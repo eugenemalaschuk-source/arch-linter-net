@@ -142,13 +142,13 @@ export class RelayRegistryDurableObject {
     });
   }
 
-  async reconcileIdentity(alias: string, owner: string, repository: string, repositoryId: number, ownerId: number, expectedRevision?: number): Promise<RegistryBinding | undefined> {
+  async reconcileIdentity(alias: string, owner: string, repository: string, repositoryId: number, ownerId: number, expectedRevision?: number, expectedBarrierEpoch?: number): Promise<RegistryBinding | undefined> {
     await this.initialized;
     if (!isOpaqueAlias(alias) || !validateDisplayIdentity(owner) || !validateDisplayIdentity(repository)) return undefined;
     return this.state.storage.transactionSync(() => {
       const existing = this.row(alias);
       const binding = existing && this.parseBinding(existing);
-      if (!binding || binding.tombstoned || !Number.isSafeInteger(expectedRevision ?? binding.revision) || (expectedRevision !== undefined && expectedRevision !== binding.revision)) return undefined;
+      if (!binding || binding.tombstoned || !Number.isSafeInteger(expectedRevision ?? binding.revision) || (expectedRevision !== undefined && expectedRevision !== binding.revision) || (expectedBarrierEpoch !== undefined && expectedBarrierEpoch !== binding.barrier_epoch)) return undefined;
       if (!isIdentityPreserving({ repository_id: binding.entry.repository_id, repository_owner_id: binding.entry.repository_owner_id }, { repository_id: repositoryId, repository_owner_id: ownerId })) return undefined;
       const updated: RegistryEntry = { ...binding.entry, owner, repository };
       const revision = binding.revision + 1;
@@ -157,13 +157,13 @@ export class RelayRegistryDurableObject {
     });
   }
 
-  async rotateEntry(alias: string, entry: RegistryEntry, expectedRevision?: number): Promise<RegistryBinding | undefined> {
+  async rotateEntry(alias: string, entry: RegistryEntry, expectedRevision?: number, expectedBarrierEpoch?: number): Promise<RegistryBinding | undefined> {
     await this.initialized;
     if (!isOpaqueAlias(alias) || !validateRegistryEntry(entry) || entry.destination_alias !== alias) return undefined;
     return this.state.storage.transactionSync(() => {
       const existing = this.row(alias);
       const binding = existing && this.parseBinding(existing);
-      if (!binding || binding.tombstoned || (expectedRevision !== undefined && expectedRevision !== binding.revision)) return undefined;
+      if (!binding || binding.tombstoned || (expectedRevision !== undefined && expectedRevision !== binding.revision) || (expectedBarrierEpoch !== undefined && expectedBarrierEpoch !== binding.barrier_epoch)) return undefined;
       if (!isIdentityPreserving(binding.entry, entry)) return undefined;
       const revision = binding.revision + 1;
       const barrier = binding.barrier_epoch + 1;
@@ -172,15 +172,17 @@ export class RelayRegistryDurableObject {
     });
   }
 
-  async revokeAlias(alias: string): Promise<boolean> {
+  async revokeAlias(alias: string, expectedRevision?: number, expectedBarrierEpoch?: number): Promise<boolean | "conflict"> {
     await this.initialized;
     if (!isOpaqueAlias(alias)) return false;
     return this.state.storage.transactionSync(() => {
       const existing = this.row(alias);
       if (!existing) return false;
+      if ((expectedRevision !== undefined && expectedRevision !== existing.revision)
+        || (expectedBarrierEpoch !== undefined && expectedBarrierEpoch !== existing.barrier_epoch)) return "conflict";
       if (existing.tombstoned) return true;
       const now = Math.floor(Date.now() / 1000);
-      this.sql.exec("UPDATE relay_registry SET tombstoned=1, tombstoned_at=?, revision=revision+1, barrier_epoch=barrier_epoch+1, updated_at=? WHERE alias=? AND tombstoned=0", now, now, alias).toArray();
+      this.sql.exec("UPDATE relay_registry SET tombstoned=1, tombstoned_at=?, revision=revision+1, barrier_epoch=barrier_epoch+1, updated_at=? WHERE alias=? AND tombstoned=0 AND revision=? AND barrier_epoch=?", now, now, alias, existing.revision, existing.barrier_epoch).toArray();
       return true;
     });
   }
@@ -196,13 +198,19 @@ export class RelayRegistryDurableObject {
         return binding ? json(200, { found: true, ...binding }) : json(404, { found: false });
       }
       if (operation === "register" && validateRegistryEntry(body.entry)) return json(await this.registerEntry(body.entry) ? 201 : 409, { ok: true });
-      if (operation === "revoke" && typeof body.alias === "string") return json(await this.revokeAlias(body.alias) ? 200 : 404, { ok: true });
+      if (operation === "revoke" && typeof body.alias === "string") {
+        const result = await this.revokeAlias(
+          body.alias,
+          Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined,
+          Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
+        return json(result === "conflict" ? 409 : result ? 200 : 404, { ok: result === true });
+      }
       if (operation === "reconcile-identity" && typeof body.alias === "string" && typeof body.owner === "string" && typeof body.repository === "string" && Number.isSafeInteger(body.repository_id) && Number.isSafeInteger(body.repository_owner_id)) {
-        const binding = await this.reconcileIdentity(body.alias, body.owner, body.repository, body.repository_id as number, body.repository_owner_id as number, Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined);
+        const binding = await this.reconcileIdentity(body.alias, body.owner, body.repository, body.repository_id as number, body.repository_owner_id as number, Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined, Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
         return binding ? json(200, { ok: true, ...binding }) : json(409, { error: "identity_mismatch" });
       }
       if (operation === "rotate" && typeof body.alias === "string" && validateRegistryEntry(body.entry)) {
-        const binding = await this.rotateEntry(body.alias, body.entry, Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined);
+        const binding = await this.rotateEntry(body.alias, body.entry, Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined, Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
         return binding ? json(200, { ok: true, ...binding }) : json(409, { error: "rotation_conflict" });
       }
       return json(404, { error: "unknown_route" });

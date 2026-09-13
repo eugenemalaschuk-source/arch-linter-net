@@ -35,6 +35,17 @@ binding can be created.
 - **THEN** the delayed operation receives a conflict and changes no state
 - **AND** public reads expose no prior ready payload
 
+#### Scenario: Destructive admin CAS is checked before the Registry barrier
+- **WHEN** an authenticated revoke, remove, or transfer carries an operation ID and the current generation, revocation epoch, registry revision, and barrier epoch
+- **THEN** all caller preconditions are validated before the Registry tombstone is committed
+- **AND** a stale generation, epoch, revision, or barrier receives `409` with the Registry and Relay state unchanged
+- **AND** a successful request returns success after the Registry barrier and Relay revocation transition, without comparing caller expectations against the post-barrier counters
+
+#### Scenario: Admin mutations preserve caller expectations and operation identity
+- **WHEN** an authenticated invalidate, recovery-open, rename, rotate, upgrade, activate, or rollback supplies an expected registry revision or barrier epoch
+- **THEN** the supplied values are compared with authoritative state and are never replaced by a fresh lookup
+- **AND** every mutating admin request without an explicit operation ID is rejected before state mutation
+
 #### Scenario: Recovery finalization requires a fresh publisher proof
 - **WHEN** an authenticated admin opens recovery
 - **THEN** the alias enters `needs-recovery` and remains unavailable

@@ -42,13 +42,17 @@ not duplicate #828 storage or #831 read semantics.
 2. **Rename is metadata-only.** An admin may change the private display owner or
    repository only when both immutable IDs match the registered entry. The alias,
    state, generation, epoch, and public bytes do not change.
-3. **The Registry is the lifecycle barrier.** Every forwarded read/mutation
-   carries the registry revision and barrier epoch. An older caller is rejected
-   without mutation; a revision-only rename synchronizes metadata while
-   preserving ready data; a newer barrier clears ready data and enters
-   `needs-recovery`, so a stale Durable Object backup or delayed publisher cannot
-   win. Registry revocation first advances the barrier and is
-   idempotent; Durable Object cleanup is retried afterward. Transfer,
+ 3. **The Registry is the lifecycle barrier.** Every forwarded read/mutation
+    carries the registry revision and barrier epoch. An older caller is rejected
+    without mutation; a revision-only rename synchronizes metadata while
+    preserving ready data; a newer barrier clears ready data and enters
+    `needs-recovery`, so a stale Durable Object backup or delayed publisher cannot
+    win. Caller CAS values are compared with the authoritative pre-change
+    snapshot and are never replaced by a later lookup. Registry revocation
+    validates generation/epoch and Registry revision/barrier first, then
+    advances the barrier; Durable Object cleanup uses the pre-barrier counters
+    as its witness so irreversible revocation cannot be reported as a conflict.
+    Transfer,
    removal, and revocation tombstone the old alias. Transfer returns an explicit
    `registration_required` result; it never creates a new binding or carries
    consent to another owner. A tombstone and its monotonic revocation barrier

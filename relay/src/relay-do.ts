@@ -527,7 +527,10 @@ export class RelayDurableObject {
     }));
   }
 
-  private adminMutation(body: Record<string, unknown>, operation: "admin-invalidate" | "admin-revoke" | "admin-recover-open" | "admin-uninstall"): Response {
+  private adminMutation(
+    body: Record<string, unknown>,
+    operation: "admin-invalidate" | "admin-revoke" | "admin-recover-open" | "admin-uninstall",
+    preBarrier?: Pick<StateRow, "generation" | "revocation_epoch" | "registry_revision" | "barrier_epoch">): Response {
     if (typeof body.operation_id !== "string" || body.operation_id.length === 0 || body.operation_id.length > 128) return genericError(413);
     return this.state.storage.transactionSync(() => {
       const current = this.row();
@@ -536,10 +539,15 @@ export class RelayDurableObject {
         if (prior.operation !== operation) return this.finishError(409);
         return response(200, { ok: true, state: prior.status, generation: prior.generation, revocation_epoch: prior.revocation_epoch, operation_id: body.operation_id });
       }
-      if (safeInteger(body.expected_registry_revision) && body.expected_registry_revision !== current.registry_revision) return this.finishError(409);
-      if (safeInteger(body.expected_barrier_epoch) && body.expected_barrier_epoch !== current.barrier_epoch) return this.finishError(409);
-      if (safeInteger(body.expected_generation) && body.expected_generation !== current.generation) return this.finishError(409);
-      if (safeInteger(body.expected_revocation_epoch) && body.expected_revocation_epoch !== current.revocation_epoch) return this.finishError(409);
+      const expected = preBarrier ?? current;
+      if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+        && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== expected.registry_revision)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+        && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== expected.barrier_epoch)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_generation")
+        && (!safeInteger(body.expected_generation) || body.expected_generation !== expected.generation)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_revocation_epoch")
+        && (!safeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== expected.revocation_epoch)) return this.finishError(409);
       if (current.tombstoned !== 0 && operation !== "admin-revoke" && operation !== "admin-uninstall") return this.finishError(409);
       if (operation === "admin-revoke" || operation === "admin-uninstall") {
         this.sql.exec("UPDATE relay_state SET status='revoked', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=1, last_renewed_at=NULL, updated_at=? WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0", nowSeconds(), current.generation, current.revocation_epoch).toArray();
@@ -572,6 +580,14 @@ export class RelayDurableObject {
         if (prior.operation !== operation) return this.finishError(409);
         return response(200, { ok: true, state: prior.status, generation: prior.generation, revocation_epoch: prior.revocation_epoch, operation_id: operationIdValue });
       }
+      if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+        && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== before.registry_revision)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+        && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== before.barrier_epoch)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_generation")
+        && (!safeInteger(body.expected_generation) || body.expected_generation !== before.generation)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_revocation_epoch")
+        && (!safeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== before.revocation_epoch)) return this.finishError(409);
       const active = before.active_digest ?? before.bundle_digest;
       const requested = typeof body.bundle_digest === "string" ? body.bundle_digest : undefined;
       const known = requested === undefined || isKnownBundleDigest(requested, this.shippedDigests, active);
@@ -639,10 +655,14 @@ export class RelayDurableObject {
         }
         const body = await readBoundedJson(request);
         if (operation === "admin-sync") return this.adminSyncBarrier(body, entry);
+        const preBarrier = { generation: current.generation, revocation_epoch: current.revocation_epoch, registry_revision: current.registry_revision, barrier_epoch: current.barrier_epoch };
         const barrierResult = this.checkRegistryBarrier(request, current, entry);
         if (barrierResult !== "ok" && request.headers.get("x-relay-registry-tombstoned") !== "true") return genericError(409);
         if (operation === "admin-upgrade" || operation === "admin-rollback") return this.adminUpgrade({ ...body, operation: operation === "admin-rollback" ? "upgrade-rollback" : body.operation ?? "upgrade-stage" });
-        if (operation === "admin-invalidate" || operation === "admin-revoke" || operation === "admin-recover-open" || operation === "admin-uninstall") return this.adminMutation(body, operation);
+        if (operation === "admin-invalidate" || operation === "admin-revoke" || operation === "admin-recover-open" || operation === "admin-uninstall") {
+          const baseline = (operation === "admin-revoke" || operation === "admin-uninstall") && barrierResult === "advanced" ? preBarrier : undefined;
+          return this.adminMutation(body, operation, baseline);
+        }
       }
       if (this.checkRegistryBarrier(request, current, entry) !== "ok") return genericError(409);
       if (request.method !== "POST") return genericError(404);

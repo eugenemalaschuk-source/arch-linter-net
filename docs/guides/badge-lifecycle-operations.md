@@ -57,7 +57,11 @@ redacted status contract.
 Every mutation advances the generation/revocation epoch and is guarded by the
 registry revision and barrier epoch. A delayed writer therefore loses to a
 revocation, rotation, restore, or recovery transition. Registry and Relay
-state are reconciled before a subsequent publish is accepted.
+state are reconciled before a subsequent publish is accepted. When using
+optimistic concurrency, supply all four expected counters from the same private
+status snapshot; stale values fail with `409` before a Registry tombstone or
+other mutation is committed. Every mutation also requires its own explicit
+operation ID for retry tracing and idempotency.
 
 ## Recovery and rollback
 

@@ -88,14 +88,34 @@ async function relayAdminCall(env: RelayEnvironment, alias: string, binding: Reg
   const stub = env.RELAY.get(env.RELAY.idFromName(alias));
   const boundedBody = {
     ...body,
-    operation_id: operationId(body.operation_id) ?? `relay-${operation}-${binding.revision}-${binding.barrierEpoch}`,
-    expected_registry_revision: binding.revision,
-    expected_barrier_epoch: binding.barrierEpoch
+    operation_id: operationId(body.operation_id) ?? (operation === "status" || operation === "sync" ? `relay-${operation}-${binding.revision}-${binding.barrierEpoch}` : undefined),
+    expected_registry_revision: Object.prototype.hasOwnProperty.call(body, "expected_registry_revision") ? body.expected_registry_revision : binding.revision,
+    expected_barrier_epoch: Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch") ? body.expected_barrier_epoch : binding.barrierEpoch
   };
   const response = await (stub.fetch as unknown as (input: unknown) => Promise<Response>)(new Request(target, { method: "POST", headers, body: JSON.stringify(boundedBody) }));
   let parsed: Record<string, unknown> = {};
   try { parsed = await response.json() as Record<string, unknown>; } catch { /* generic response below */ }
   return { status: response.status, body: parsed };
+}
+
+function expectedRegistryStateMatches(body: Record<string, unknown>, binding: RegistryLookup): boolean {
+  if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+    && (!Number.isSafeInteger(body.expected_registry_revision) || body.expected_registry_revision !== binding.revision)) return false;
+  if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+    && (!Number.isSafeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== binding.barrierEpoch)) return false;
+  return true;
+}
+
+function expectedRelayStateMatches(body: Record<string, unknown>, status: Record<string, unknown>): boolean {
+  if (Object.prototype.hasOwnProperty.call(body, "expected_generation")
+    && (!Number.isSafeInteger(body.expected_generation) || body.expected_generation !== status.generation)) return false;
+  if (Object.prototype.hasOwnProperty.call(body, "expected_revocation_epoch")
+    && (!Number.isSafeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== status.revocation_epoch)) return false;
+  return true;
+}
+
+function requireMutationOperationId(body: Record<string, unknown>): Response | undefined {
+  return operationId(body.operation_id) ? undefined : json(413, { error: "invalid_operation_id" });
 }
 
 async function adminStatus(request: Request, env: RelayEnvironment, alias: string): Promise<Response> {
@@ -114,17 +134,42 @@ async function adminRevoke(request: Request, env: RelayEnvironment, alias: strin
   const body = await readAdminBody(request);
   if (!body) return json(413, { error: "request_too_large" });
   if ((operation === "revoke" || operation === "uninstall" || operation === "transfer") && body.confirm !== true) return json(409, { error: "explicit_confirmation_required" });
-  if (!operationId(body.operation_id)) return json(413, { error: "invalid_operation_id" });
+  const operationError = requireMutationOperationId(body);
+  if (operationError) return operationError;
   const lookup = await lookupEntry(env, alias, true);
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
   if (!lookup.entry) return unknownRoute();
-  const result = await registryCall(env, "revoke", { alias, operation_id: body.operation_id });
-  if (result.status !== 200) return result.status === 404 ? unknownRoute() : json(503, { error: "storage_unavailable" });
+  if (!expectedRegistryStateMatches(body, lookup)) return json(409, { error: "registry_conflict" });
+  const current = await relayAdminCall(env, alias, lookup, "status");
+  if (current.status !== 200) return json(current.status, current.body);
+  if (!expectedRelayStateMatches(body, current.body)) return json(409, { error: "state_conflict" });
+  const result = await registryCall(env, "revoke", {
+    alias,
+    operation_id: body.operation_id,
+    expected_revision: lookup.revision,
+    expected_barrier_epoch: lookup.barrierEpoch
+  });
+  if (result.status !== 200) return result.status === 404 ? unknownRoute() : result.status === 409 ? json(409, { error: "registry_conflict" }) : json(503, { error: "storage_unavailable" });
   // The registry barrier advances first. Public reads are now unavailable
   // even if Durable Object cleanup must be retried after a transient failure.
   const revokedLookup = await lookupEntry(env, alias, true);
   if (revokedLookup.storageUnavailable || !revokedLookup.entry) return json(503, { error: "storage_unavailable" });
-  const relay = await relayAdminCall(env, alias, revokedLookup, operation === "transfer" ? "revoke" : operation === "uninstall" ? "uninstall" : "revoke", body);
+  const cleanupBody = {
+    ...body,
+    expected_registry_revision: Object.prototype.hasOwnProperty.call(body, "expected_registry_revision") ? body.expected_registry_revision : lookup.revision,
+    expected_barrier_epoch: Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch") ? body.expected_barrier_epoch : lookup.barrierEpoch
+  };
+  const relay = await relayAdminCall(env, alias, revokedLookup, operation === "transfer" ? "revoke" : operation === "uninstall" ? "uninstall" : "revoke", cleanupBody);
+  if (relay.status === 409) {
+    // Registry revocation is intentionally irreversible. A concurrent Relay
+    // generation change can make the cleanup CAS stale after the Registry has
+    // already tombstoned the alias; report the committed barrier outcome
+    // instead of surfacing a false failure for an operation that succeeded.
+    const postRevokeStatus = await relayAdminCall(env, alias, revokedLookup, "status");
+    if (postRevokeStatus.status === 200 && postRevokeStatus.body.state === "revoked" && postRevokeStatus.body.tombstoned === true) {
+      return json(200, { ok: true, state: "revoked", tombstoned: true, operation: operation === "transfer" ? "registration_required" : operation });
+    }
+  }
   if (relay.status !== 200) return json(relay.status, relay.body);
   return json(200, { ok: true, state: "revoked", tombstoned: true, operation: operation === "transfer" ? "registration_required" : operation });
 }
@@ -133,6 +178,8 @@ async function adminInvalidate(request: Request, env: RelayEnvironment, alias: s
   if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
   const body = await readAdminBody(request);
   if (!body) return json(413, { error: "request_too_large" });
+  const operationError = requireMutationOperationId(body);
+  if (operationError) return operationError;
   const lookup = await lookupEntry(env, alias);
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
   if (!lookup.entry) return unknownRoute();
@@ -144,6 +191,8 @@ async function adminRecoverOpen(request: Request, env: RelayEnvironment, alias: 
   if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
   const body = await readAdminBody(request);
   if (!body) return json(413, { error: "request_too_large" });
+  const operationError = requireMutationOperationId(body);
+  if (operationError) return operationError;
   if (body.confirm !== true) return json(409, { error: "explicit_confirmation_required" });
   const lookup = await lookupEntry(env, alias);
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
@@ -165,6 +214,8 @@ async function adminUpgrade(request: Request, env: RelayEnvironment, alias: stri
   if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
   const body = await readAdminBody(request);
   if (!body) return json(413, { error: "request_too_large" });
+  const operationError = requireMutationOperationId(body);
+  if (operationError) return operationError;
   const lookup = await lookupEntry(env, alias);
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
   if (!lookup.entry) return unknownRoute();
@@ -183,7 +234,8 @@ async function adminReconcileIdentity(request: Request, env: RelayEnvironment, a
   const lookup = await lookupEntry(env, alias);
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
   if (!lookup.entry) return unknownRoute();
-  const result = await registryCall(env, "reconcile-identity", { ...body, alias, repository_id: Number.isSafeInteger(body.repository_id) ? body.repository_id : lookup.entry.repository_id, repository_owner_id: Number.isSafeInteger(body.repository_owner_id) ? body.repository_owner_id : lookup.entry.repository_owner_id, expected_revision: lookup.revision });
+  if (!expectedRegistryStateMatches(body, lookup)) return json(409, { error: "registry_conflict" });
+  const result = await registryCall(env, "reconcile-identity", { ...body, alias, repository_id: Number.isSafeInteger(body.repository_id) ? body.repository_id : lookup.entry.repository_id, repository_owner_id: Number.isSafeInteger(body.repository_owner_id) ? body.repository_owner_id : lookup.entry.repository_owner_id, expected_revision: Number.isSafeInteger(body.expected_registry_revision) ? body.expected_registry_revision : lookup.revision, expected_barrier_epoch: Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch : lookup.barrierEpoch });
   if (result.status !== 200) return json(result.status, { error: "identity_mismatch" });
   const updatedEntry = validateRegistryEntry(result.body.entry) ? result.body.entry as RegistryEntry : lookup.entry;
   const revision = typeof result.body.revision === "number" ? result.body.revision : lookup.revision + 1;
@@ -206,15 +258,18 @@ async function adminRotate(request: Request, env: RelayEnvironment, alias: strin
   if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
   const body = await readAdminBody(request);
   if (!body) return json(413, { error: "request_too_large" });
+  const operationError = requireMutationOperationId(body);
+  if (operationError) return operationError;
   const lookup = await lookupEntry(env, alias);
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
   if (!lookup.entry) return unknownRoute();
-  const rotateOperationId = operationId(body.operation_id) ?? `rotate-${Date.now()}`;
+  if (!expectedRegistryStateMatches(body, lookup)) return json(409, { error: "registry_conflict" });
+  const rotateOperationId = body.operation_id as string;
   const candidate: RegistryEntry = { ...lookup.entry, job_workflow_ref: typeof body.job_workflow_ref === "string" ? body.job_workflow_ref : lookup.entry.job_workflow_ref, job_workflow_sha: typeof body.job_workflow_sha === "string" ? body.job_workflow_sha : lookup.entry.job_workflow_sha, audience: typeof body.audience === "string" ? body.audience : lookup.entry.audience };
   if (!validateRegistryEntry(candidate) || typeof candidate.audience !== "string" || candidate.audience.length === 0 || candidate.audience.length > 256) return json(409, { error: "invalid_pin" });
   const invalidated = await relayAdminCall(env, alias, lookup, "invalidate", { ...body, operation_id: rotateOperationId });
   if (invalidated.status !== 200) return json(invalidated.status, invalidated.body);
-  const result = await registryCall(env, "rotate", { alias, entry: candidate, expected_revision: lookup.revision, operation_id: rotateOperationId });
+  const result = await registryCall(env, "rotate", { alias, entry: candidate, expected_revision: Number.isSafeInteger(body.expected_registry_revision) ? body.expected_registry_revision : lookup.revision, expected_barrier_epoch: Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch : lookup.barrierEpoch, operation_id: rotateOperationId });
   if (result.status !== 200) return json(409, { error: "rotation_conflict" });
   const revision = typeof result.body.revision === "number" ? result.body.revision : lookup.revision + 1;
   const barrierEpoch = typeof result.body.barrier_epoch === "number" ? result.body.barrier_epoch : lookup.barrierEpoch + 1;

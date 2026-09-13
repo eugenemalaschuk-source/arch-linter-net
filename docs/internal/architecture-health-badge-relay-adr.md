@@ -175,12 +175,16 @@ challenge-use, and idempotency together.
 | `renew` | Same two-phase flow as `publish`; fresh current proof and unpassed semantic horizon; same tree alone, retry, or read is insufficient | CAS to a new generation and lease, or reject without mutation. A failed or passed horizon cannot be revived by transport. |
 | `invalidate` | Publisher or owner action, or failed current evidence; expected generation/epoch | Atomically remove ready eligibility, advance generation/epoch as applicable, and enter `unavailable`. Delayed ready delivery then fails CAS. |
 | `read` | Public route lookup | Trusted-clock check happens before GET, HEAD, ETag validation, or 304. Only `ready` with `now < valid_until` is served; otherwise return expired/unavailable without recomputation or lease extension. |
-| `revoke` | Exact owner/registry authorization for delete, consent/visibility loss, transfer, uninstall, or pin rotation | Atomically remove ready data, advance revocation epoch and generation, enter `revoked`, and tombstone the alias. All old challenges and delayed writes fail. |
+| `revoke` | Exact owner/registry authorization for delete, consent/visibility loss, transfer, uninstall, or pin rotation; caller operation ID and expected generation/epoch/revision/barrier are checked before the Registry CAS | Advance the Registry barrier, then atomically remove ready data, advance revocation epoch and generation, enter `revoked`, and tombstone the alias. Relay cleanup witnesses the pre-barrier counters, so successful irreversible revocation cannot be reported as a post-barrier conflict. All old challenges and delayed writes fail. |
 | `recover` | Restore detected or `needs-recovery`; current registry/pin and a new PR-authoritative proof; no main reanalysis | Keep public state unavailable until a post-restore, greater-generation CAS succeeds. A backup never makes an old ready row current. |
 
 `publish` and `renew` use compare-and-set on both generation and epoch. A
 challenge cannot be replayed with another digest, state, generation, or JTI.
 The one-use deadline is not moved by delivery retry, queue delay, or a `429`.
+Admin mutation callers retain their expected Registry revision/barrier values;
+the Worker never replaces them with a fresh lookup, and every mutation carries
+an explicit operation ID rather than a synthesized ID that could be reused for
+a later state transition.
 Generation/epoch and the tombstone defeat these cases:
 
 - ABA or force-push back to a previously seen commit/tree: equal bytes do not
