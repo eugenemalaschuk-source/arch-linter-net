@@ -692,4 +692,15 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(recoveredState.status).toBe("ready");
     expect(recoveredState.generation).toBe(challenge.generation + 1);
   });
+
+  it("keeps admin recovery finalize as an authenticated proof-required guard", async () => {
+    const recoveryAlias = "a833rcvr";
+    const url = `https://relay.test/badge-relay/v1/admin/${recoveryAlias}/recover/finalize`;
+    const testEnv = { ...(env as unknown as Record<string, unknown>), ADMIN_TOKEN: "admin" } as unknown as RelayEnvironment;
+    const unauthorized = await worker.fetch(new Request(url, { method: "POST" }), testEnv);
+    expect(unauthorized.status).toBe(401);
+    const refused = await worker.fetch(new Request(url, { method: "POST", headers: { authorization: "Bearer admin" } }), testEnv);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({ error: "fresh_publisher_proof_required" });
+  });
 });

@@ -152,6 +152,15 @@ async function adminRecoverOpen(request: Request, env: RelayEnvironment, alias: 
   return json(result.status, result.body);
 }
 
+function adminRecoverFinalize(request: Request, env: RelayEnvironment): Response {
+  // Administrator credentials can open the recovery barrier, but they cannot
+  // manufacture the fresh publisher proof required to close it. Keep this
+  // route as an authenticated, fixed refusal so callers do not mistake an
+  // admin-only request for a completed recovery.
+  if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
+  return json(409, { error: "fresh_publisher_proof_required" });
+}
+
 async function adminUpgrade(request: Request, env: RelayEnvironment, alias: string, operation: "upgrade" | "rollback", phase?: "stage" | "activate"): Promise<Response> {
   if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
   const body = await readAdminBody(request);
@@ -335,7 +344,7 @@ async function handleAdminRoute(request: Request, env: RelayEnvironment, parts: 
   if (operation === "transfer" && request.method === "POST") return adminRevoke(request, env, alias, "transfer");
   if (operation === "invalidate" && request.method === "POST") return adminInvalidate(request, env, alias);
   if (operation === "recover" && parts[5] === "open" && request.method === "POST") return adminRecoverOpen(request, env, alias);
-  if (operation === "recover" && parts[5] === "finalize" && request.method === "POST") return json(409, { error: "fresh_publisher_proof_required" });
+  if (operation === "recover" && parts[5] === "finalize" && request.method === "POST") return adminRecoverFinalize(request, env);
   if (operation === "upgrade" && request.method === "POST" && (parts[5] === undefined || parts[5] === "stage" || parts[5] === "activate")) return adminUpgrade(request, env, alias, "upgrade", parts[5] as "stage" | "activate" | undefined);
   if (operation === "upgrade" && parts[5] === "rollback" && request.method === "POST") return adminUpgrade(request, env, alias, "rollback");
   if (operation === "rollback" && request.method === "POST") return adminUpgrade(request, env, alias, "rollback");

@@ -33,7 +33,8 @@ not duplicate #828 storage or #831 read semantics.
 1. **One private control plane, two authorities.** The outer Worker authenticates
    the adopter's short-lived admin bearer token and exposes only bounded private
    routes: `status`, `reconcile-identity`, `revoke`, `recover/open`,
-   `recover/finalize`, `upgrade/{stage|activate|rollback}`, and `uninstall`.
+   `recover/finalize` proof-required guard, `upgrade/{stage|activate|rollback}`,
+   and `uninstall`.
    It forwards an operation ID and expected registry revision/epoch to the
    Registry and per-alias Durable Object. Publisher OIDC remains the only
    source-publication credential. Admin calls never accept canonical payloads or
@@ -73,7 +74,10 @@ not duplicate #828 storage or #831 read semantics.
    from `ARCHLINTERNET_BADGE_ADMIN_ORIGIN`, exact-matches it to the generated
    config endpoint, and sends only approved JSON fields. `--dry-run` emits
    the operation plan without network access or writes. Destructive operations
-   require an explicit approval switch; recovery is an open/finalize pair.
+   require an explicit approval switch; recovery is opened by the admin and
+   finalized only through a fresh publisher `prepare`/`recover` challenge and
+   commit. The admin `/recover/finalize` route is an authenticated,
+   permanently-refusing guard and never claims to supply publisher proof.
 
 ## Risks / Trade-offs
 

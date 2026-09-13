@@ -50,7 +50,7 @@ redacted status contract.
 | Pin rotation | `--operation rotate --workflow-ref <ref> --workflow-sha <40-hex>` | Publish with the old workflow pin; expect authorization failure. |
 | Upgrade | `--operation upgrade --to <shipped-digest>` followed by `--operation activate --to <shipped-digest>` | Unknown bundle, contract, compatibility plan, or manifest digest; expect `compatibility_conflict`. |
 | Rollback | `--operation rollback --to <previous-verified-digest>` | Any unshipped or incompatible digest; expect a refused rollback. |
-| Recovery | `--operation recover` | Omit confirmation or try to publish before fresh proof; expect `explicit_confirmation_required` or `fresh_publisher_proof_required`. |
+| Recovery | `--operation recover` (open), then rerun the publisher workflow | Omit confirmation or try to publish before fresh proof; expect `explicit_confirmation_required` or `fresh_publisher_proof_required`. The admin `/recover/finalize` route is a proof-required guard, not a state transition. |
 | Status/outage | `--operation status` | Storage outage is reported as `storage_unavailable`; no private payload or token is returned. |
 | Abandoned alias | `--operation revoke` (or `remove`) | Re-registering the tombstoned alias is refused; allocate a new opaque alias instead. |
 
@@ -65,8 +65,10 @@ state are reconciled before a subsequent publish is accepted.
 1. If a restore, registry mismatch, or storage incident occurred, run
    `--operation recover --dry-run`, then repeat with the administrative token
    and explicit confirmation.
-1. Re-run the publisher workflow to obtain fresh OIDC identity and proof; a
-   backup payload, token, or old challenge is not a recovery proof.
+1. Re-run the publisher workflow to obtain fresh OIDC identity and proof; its
+   new `prepare`/`recover` challenge and commit finalize recovery. A backup
+   payload, token, or old challenge is not a recovery proof. The admin
+   `/recover/finalize` endpoint intentionally refuses without that proof.
 1. For upgrades, stage and activate the exact shipped bundle digest. Rollback
    is permitted only to the previous verified digest under the same v1
    compatibility plan; incompatible rollback is refused closed.

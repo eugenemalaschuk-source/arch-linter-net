@@ -8,7 +8,8 @@ operator CLI/runbook boundary.
 ## Requirements
 ### Requirement: Authenticated lifecycle administration preserves immutable identity
 The Relay SHALL expose a bounded private admin surface for status,
-reconcile-identity, revoke, recover/open, recover/finalize,
+reconcile-identity, revoke, recover/open, and the authenticated
+recover/finalize proof-required guard,
 upgrade/{stage|activate|rollback}, and uninstall. Admin authentication SHALL be
 separate from publisher OIDC, and every mutating request SHALL carry an
 operation ID plus expected registry revision/barrier epoch and use an atomic
@@ -39,6 +40,13 @@ binding can be created.
 - **WHEN** revoke or remove commits while a publish, renewal, or challenge uses the prior generation/epoch
 - **THEN** the delayed operation receives a conflict and changes no state
 - **AND** public reads expose no prior ready payload
+
+#### Scenario: Recovery finalization requires a fresh publisher proof
+- **WHEN** an authenticated admin opens recovery
+- **THEN** the alias enters `needs-recovery` and remains unavailable
+- **WHEN** an admin calls `recover/finalize` without a publisher proof
+- **THEN** the Relay returns `fresh_publisher_proof_required` with no state mutation
+- **AND** a fresh publisher OIDC identity must complete a new `prepare`/`recover` challenge and commit before the alias becomes ready
 
 ### Requirement: Pin rotation and bundle compatibility fail closed
 The lifecycle service SHALL rotate publisher workflow/audience pins by first
