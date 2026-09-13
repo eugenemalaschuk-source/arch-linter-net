@@ -16,13 +16,22 @@ internal static class ArchitectureHealthReportReceiptEvidenceWriter
                 .OrderBy(waiver => waiver.Id, StringComparer.Ordinal)
                 .ThenBy(waiver => waiver.ContractGroup, StringComparer.Ordinal));
 
-    internal static JsonObject BuildWaiverLifecycle(ArchitectureWaiverLifecycleAssessment assessment) =>
-        new()
+    internal static JsonObject BuildWaiverLifecycle(ArchitectureWaiverLifecycleAssessment assessment)
+    {
+        var result = new JsonObject
         {
             ["profile"] = assessment.Profile,
             ["blocking_states"] = ToStringArray(assessment.BlockingStates),
-            ["records"] = BuildWaivers(assessment.Records),
         };
+
+        if (assessment.EvaluationDate is { } evaluationDate)
+        {
+            result["evaluation_date"] = ArchitectureWaiverLifecycleRenderer.FormatDate(evaluationDate);
+        }
+
+        result["records"] = BuildWaivers(assessment.Records);
+        return result;
+    }
 
     private static JsonArray BuildWaivers(IEnumerable<ArchitectureWaiverLifecycleRecord> waivers)
     {

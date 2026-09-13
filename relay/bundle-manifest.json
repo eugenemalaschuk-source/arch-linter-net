@@ -1,0 +1,70 @@
+{
+  "schema_id": "badge-relay-bundle-manifest/v1",
+  "bundle": "badge-relay/v1",
+  "compatibility_plan": "architecture-health-badge-relay/v1",
+  "publisher_pins": {
+    "workflow_ref": "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml",
+    "workflow_sha": "ff9b19bfe5abcab233d490ea53f55a387dc4a8db",
+    "action_ref": "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@ff9b19bfe5abcab233d490ea53f55a387dc4a8db",
+    "action_sha": "ff9b19bfe5abcab233d490ea53f55a387dc4a8db",
+    "commit": "ff9b19bfe5abcab233d490ea53f55a387dc4a8db"
+  },
+  "files": [
+    {
+      "path": "src/index.ts",
+      "sha256": "76ab96f33e9cfc4ab3caa303e7024bf5ff34a99c09e737c617ceb4f76bdd9a7a"
+    },
+    {
+      "path": "src/payload.ts",
+      "sha256": "15d3ee1a79669dac0318ed3e4de6d72185e941baddfe39db320908b1cdec9159"
+    },
+    {
+      "path": "src/read.ts",
+      "sha256": "3de26d36a334be637848c9ea1a39451a9c86070a2cb9c821ded236aa71a1a986"
+    },
+    {
+      "path": "src/registry-do.ts",
+      "sha256": "f75ad2b8b435e32e110f8ac0a627956466cd6fd4e5c14922ec83fa8c58d4b2d4"
+    },
+    {
+      "path": "src/registry.ts",
+      "sha256": "4e73f37cdb7b17fa110edddff23268532ad0db5bf3f5793fd04c05b02c14081b"
+    },
+    {
+      "path": "src/relay-do.ts",
+      "sha256": "8a57497582962a6bb52bf9de838a3d018c72cd18196b32bb43e28a1bf7413d04"
+    },
+    {
+      "path": "src/security.ts",
+      "sha256": "5f15a7153e32f04bd3eab9ade2c992c4e3a71a5d2629824a40c9fa99afd7f2be"
+    },
+    {
+      "path": "src/types.ts",
+      "sha256": "3c4d61f8f27790f992f65280494780f742e2d89a40200b0b1bbd6f0f4b63535f"
+    },
+    {
+      "path": "package.json",
+      "sha256": "e5e90f777613c5b1e7a5733f2db4caa6174df8b5bf5b3444fb9f7af118d721a2"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "3cb2683ae9f78b893411b85a04873ee0c6a56c6dcf9ca36a0325ba3ae8436a7b"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "30fd7e296ae32a5daae13412b01cf95eaa27c93c414f6d292fb46b93c09e5cf1"
+    },
+    {
+      "path": "wrangler.jsonc",
+      "sha256": "bcd7d33f6a8eda6828de0c2a654aa6f9b4a3a85d14d78f178299356fee274377"
+    },
+    {
+      "path": "THIRD-PARTY-NOTICES.txt",
+      "sha256": "8aa8f443c77b381282161d35f1e4615c66e0063f6cc419f7d037186a1026542d"
+    },
+    {
+      "path": "schema/0.8.0/badge-relay-config.schema.json",
+      "sha256": "0641e3e021573ecaa70df30698a0c9adaac5bc33da15e5383ef278c6f2b014b2"
+    }
+  ]
+}

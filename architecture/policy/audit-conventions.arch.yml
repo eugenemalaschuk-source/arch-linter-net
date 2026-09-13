@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
 #
-# This fragment keeps remaining convention debt in audit mode while strict leaf and folder-purity
-# rules protect the conventions whose production migration has completed.
+# This fragment keeps remaining convention debt in audit mode while strict leaf, folder-purity, and
+# production declaration-count rules protect conventions whose migration has completed.
 contracts:
   strict_allow_only:
     - name: models-have-no-first-party-dependencies
@@ -34,29 +34,13 @@ contracts:
         allowed_roles: [Exception]
       reason: Exceptions directories contain only types classified by inheritance as Exception.
 
-    # #742 ratchet: production-types-have-one-source-declaration (below, in audit_layout_conventions)
-    # stays audit-only and keeps reporting the complete debt inventory that decompose-god-classes
-    # targets. This strict rule reuses the same max_declarations_per_type evidence to block any
-    # *new* or *grown* handwritten production partial aggregate immediately, while the
-    # ignored_violations entries below freeze today's 17 known aggregates as reviewed debt using
-    # their exact current declaration count and file list. Any added, removed, or renamed
-    # declaration changes that exact text, so a frozen entry only tolerates an unchanged aggregate;
-    # growth, a new offender, or an improvement all surface as a failing (or newly unmatched, itself
-    # failing) finding that requires a reviewed one-line policy update in the same change.
-    - name: production-partial-type-declaration-count-does-not-increase
-      id: production-partial-type-declaration-count-does-not-increase
-      files_matching:
-        folder_segment: src
-      max_declarations_per_type: 1
-      reason: New or grown handwritten production partial-type aggregates are blocked immediately; see #742 and the decompose-god-classes OpenSpec change for the full cleanup authority.
-  audit_layout_conventions:
     - name: production-types-have-one-source-declaration
       id: production-types-have-one-source-declaration
       files_matching:
         folder_segment: src
       max_declarations_per_type: 1
       reason: A production type must have one source declaration; extract collaborators instead of extending a type through partial files.
-
+  audit_layout_conventions:
     - name: production-interfaces-live-in-abstractions
       id: production-interfaces-live-in-abstractions
       files_matching:

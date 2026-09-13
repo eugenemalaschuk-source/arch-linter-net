@@ -36,6 +36,64 @@ public sealed class ArchitectureHealthPublicationEvidenceProjectorTests
     }
 
     [Test]
+    public void Project_UsesExplicitEvaluationDateWhenWaiverSetIsEmpty()
+    {
+        ArchitectureHealthPublicationEvidence evidence = ArchitectureHealthPublicationEvidenceProjector.Project(
+            OutcomeWithEvaluationDate(new DateOnly(2026, 9, 9)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(evidence.IsReady, Is.True);
+            Assert.That(evidence.SemanticHorizon,
+                Is.EqualTo(new DateTimeOffset(2026, 9, 10, 0, 0, 0, TimeSpan.Zero)));
+            Assert.That(evidence.Reasons, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Project_FailsClosedForInvalidExplicitEvaluationDate()
+    {
+        ArchitectureHealthPublicationEvidence evidence = ArchitectureHealthPublicationEvidenceProjector.Project(
+            OutcomeWithEvaluationDate(DateOnly.MinValue));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(evidence.IsReady, Is.False);
+            Assert.That(evidence.Reasons.Select(reason => reason.Code), Does.Contain("invalid_evaluation_date"));
+        });
+    }
+
+    [Test]
+    public void Project_FailsClosedWhenLifecycleReceiptsDisagreeOnEvaluationDate()
+    {
+        ArchitectureHealthOutcome first = OutcomeWithEvaluationDate(new DateOnly(2026, 9, 9));
+        ArchitectureHealthOutcome second = OutcomeWithEvaluationDate(new DateOnly(2026, 9, 10));
+        ArchitectureHealthPublicationEvidence evidence = ArchitectureHealthPublicationEvidenceProjector.Project(first with
+        {
+            ValidationOutcomes = [first.ValidationOutcomes[0], second.ValidationOutcomes[0]],
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(evidence.IsReady, Is.False);
+            Assert.That(evidence.Reasons.Select(reason => reason.Code), Does.Contain("inconsistent_evaluation_date"));
+        });
+    }
+
+    [Test]
+    public void Project_FailsClosedWhenExplicitEvaluationDateHasNoFiniteHorizon()
+    {
+        ArchitectureHealthPublicationEvidence evidence = ArchitectureHealthPublicationEvidenceProjector.Project(
+            OutcomeWithEvaluationDate(DateOnly.MaxValue));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(evidence.IsReady, Is.False);
+            Assert.That(evidence.Reasons.Select(reason => reason.Code), Does.Contain("invalid_evaluation_date"));
+        });
+    }
+
+    [Test]
     public void Project_FailsClosedForExpiredOrMissingValidityEvidence()
     {
         ArchitectureHealthPublicationEvidence expired = ArchitectureHealthPublicationEvidenceProjector.Project(
@@ -72,7 +130,17 @@ public sealed class ArchitectureHealthPublicationEvidenceProjectorTests
         });
     }
 
-    private static ArchitectureHealthOutcome Outcome(params ArchitectureWaiverLifecycleRecord[] waivers)
+    private static ArchitectureHealthOutcome Outcome(params ArchitectureWaiverLifecycleRecord[] waivers) =>
+        OutcomeCore(null, waivers);
+
+    private static ArchitectureHealthOutcome OutcomeWithEvaluationDate(
+        DateOnly evaluationDate,
+        params ArchitectureWaiverLifecycleRecord[] waivers) =>
+        OutcomeCore(evaluationDate, waivers);
+
+    private static ArchitectureHealthOutcome OutcomeCore(
+        DateOnly? evaluationDate,
+        params ArchitectureWaiverLifecycleRecord[] waivers)
     {
         ArchitecturePolicyInventory inventory = new(
             ArchitecturePolicyInventory.CurrentSchemaId,
@@ -84,7 +152,11 @@ public sealed class ArchitectureHealthPublicationEvidenceProjectorTests
             true, [], [], [], "off", [], "off", [], "off", [], [], [])
         {
             PolicyInventory = inventory,
-            WaiverLifecycleAssessment = new ArchitectureWaiverLifecycleAssessment("strict", waivers, ["expired", "invalid", "stale"]),
+            WaiverLifecycleAssessment = new ArchitectureWaiverLifecycleAssessment(
+                "strict", waivers, ["expired", "invalid", "stale"])
+            {
+                EvaluationDate = evaluationDate,
+            },
         };
         return new ArchitectureHealthOutcome(
             new ArchitectureHealthSummary(ArchitectureHealthSummary.CurrentSchemaId, ArchitectureHealthGate.Pass, ArchitectureHealthState.Healthy, []),
