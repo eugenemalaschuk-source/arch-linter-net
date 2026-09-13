@@ -9,6 +9,7 @@ internal static class BadgeRelayBundleIntegrityValidator
     internal static readonly string[] SourceNames =
     [
         "index.ts",
+        "lifecycle.ts",
         "payload.ts",
         "read.ts",
         "registry-do.ts",

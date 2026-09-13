@@ -1,4 +1,4 @@
-import { BUNDLE, FIXED_GITHUB_ISSUER, FIXED_GITHUB_JWKS, type DisclosureProfile, type RegistryEntry } from "./types";
+import { BUNDLE, COMPATIBILITY_PLAN, CONTRACT_VERSION, FIXED_GITHUB_ISSUER, FIXED_GITHUB_JWKS, type DisclosureProfile, type RegistryEntry } from "./types";
 
 const ALIAS = /^a[0-9a-z]{7}$/u;
 const SHA = /^[0-9a-f]{40}$/u;
@@ -27,7 +27,11 @@ export function validateRegistryEntry(value: unknown): value is RegistryEntry {
     && typeof entry.job_workflow_ref === "string" && entry.job_workflow_ref.length > 0 && entry.job_workflow_ref.length <= 512
     && typeof entry.job_workflow_sha === "string" && SHA.test(entry.job_workflow_sha)
     && (entry.disclosure_profile === "headline-only/v1" || entry.disclosure_profile === "headline-plus-freshness/v1")
-    && (entry.consent === undefined || entry.consent === true);
+    && (entry.consent === undefined || entry.consent === true)
+    && (entry.bundle === undefined || entry.bundle === BUNDLE)
+    && (entry.contract_version === undefined || entry.contract_version === CONTRACT_VERSION)
+    && (entry.compatibility_plan === undefined || entry.compatibility_plan === COMPATIBILITY_PLAN)
+    && (entry.bundle_digest === undefined || (typeof entry.bundle_digest === "string" && /^[0-9a-f]{64}$/u.test(entry.bundle_digest)));
 }
 
 export function registryEntriesFromConfig(config: unknown): RegistryEntry[] {
