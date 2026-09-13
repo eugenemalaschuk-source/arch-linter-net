@@ -73,6 +73,28 @@ def test_verified_subjects_include_every_package_and_outer_evidence(tmp_path: Pa
     ]
 
 
+def test_transport_subjects_extend_the_same_attestation_boundary(tmp_path: Path) -> None:
+    arguments = _arguments(tmp_path)
+    transport = tmp_path / "transport"
+    transport.mkdir()
+    archive = transport / "relay.tar.gz"
+    metadata = transport / "compatibility.json"
+    archive.write_bytes(b"relay")
+    metadata.write_bytes(b"metadata")
+    distribution_manifest = transport / "distribution.json"
+    distribution_checksums = transport / "checksums.txt"
+    distribution_manifest.write_text(json.dumps({"subjects": [{"file": archive.name}, {"file": metadata.name}]}))
+    distribution_checksums.write_text("checksums\n")
+    arguments.distribution_dir = transport
+    arguments.distribution_manifest = distribution_manifest
+    arguments.distribution_checksums = distribution_checksums
+
+    subjects, evidence = provenance._transport_subjects(arguments)
+
+    assert subjects == [archive, metadata]
+    assert evidence == [distribution_manifest, distribution_checksums]
+
+
 def test_main_authenticates_outer_evidence_before_deriving_package_inventory(tmp_path: Path, monkeypatch) -> None:
     arguments = _arguments(tmp_path)
     calls: list[list[str]] = []
