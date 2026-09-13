@@ -409,19 +409,11 @@ internal static class BadgeSetupEngine
             return;
         }
 
-        if (configuration.Pins.WorkflowRef is not null && !IsReusableWorkflowReference(configuration.Pins.WorkflowRef))
+        if (!AreTrustedPublisherPins(configuration.Pins))
         {
-            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Reusable workflow reference is malformed."));
-        }
-
-        if (configuration.Pins.WorkflowSha is not null && !IsSha(configuration.Pins.WorkflowSha, 40))
-        {
-            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Reusable workflow pin is not a lowercase 40-character SHA."));
-        }
-
-        if (configuration.Pins.ActionRef is not null && !IsPinnedActionReference(configuration.Pins.ActionRef))
-        {
-            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidPin, privateDetail: "Action reference is malformed."));
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.InvalidPin,
+                privateDetail: "v1 publisher and action pins must match the shipped BadgeSetupContract.Default* values."));
         }
 
         if (configuration.Pins.BundleDigest is not null && !IsSha(configuration.Pins.BundleDigest, 64))

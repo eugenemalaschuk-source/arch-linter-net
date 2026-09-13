@@ -109,7 +109,7 @@ internal static class BadgeDoctorInspector
         try
         {
             string root = Path.GetDirectoryName(Path.GetFullPath(configurationPath)) ?? Directory.GetCurrentDirectory();
-            string path = Path.Combine(root, producer.WorkflowPath);
+            string path = BadgeSetupOutputWriterPersistence.SafePath(root, producer.WorkflowPath);
             if (!fileSystem.FileExists(path))
             {
                 return false;

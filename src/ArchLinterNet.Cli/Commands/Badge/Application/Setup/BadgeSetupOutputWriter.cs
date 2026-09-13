@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using ArchLinterNet.Core.BuildState;
 using static ArchLinterNet.Cli.Commands.Badge.Application.Setup.BadgeSetupOutputWriterPersistence;
+using static ArchLinterNet.Cli.Commands.Badge.Application.Setup.BadgeSetupValidationHelpers;
 
 namespace ArchLinterNet.Cli.Commands.Badge.Application.Setup;
 
@@ -22,7 +24,9 @@ internal static class BadgeSetupOutputWriter
     {
         ValidateWriteRequest(configuration, plan);
         string root = Path.GetFullPath(outputDirectory);
+        _ = SafePath(root, ReadmeFileName);
         Directory.CreateDirectory(root);
+        _ = SafePath(root, ReadmeFileName);
         GeneratedSetup generated = GenerateSetup(root, configuration, plan);
         WriteFiles(root, generated.Files);
     }
@@ -43,6 +47,11 @@ internal static class BadgeSetupOutputWriter
         if (configuration.Mode == RelayMode && !configuration.DisclosureApproved)
         {
             throw new InvalidOperationException("Relay output requires explicit disclosure approval.");
+        }
+
+        if (!AreTrustedPublisherPins(configuration.Pins))
+        {
+            throw new InvalidOperationException("v1 publisher and action pins must match the shipped trusted contract.");
         }
     }
 
@@ -244,6 +253,11 @@ internal static class BadgeSetupOutputWriter
 
     private static BadgeSetupPins ResolvePins(BadgeSetupPins? configured, IReadOnlyList<GeneratedFile> relayFiles)
     {
+        if (!AreTrustedPublisherPins(configured))
+        {
+            throw new InvalidOperationException("v1 publisher and action pins must match the shipped trusted contract.");
+        }
+
         BadgeSetupPins pins = configured ?? new(
             BadgeSetupContract.DefaultPublisherWorkflowRef,
             BadgeSetupContract.DefaultPublisherWorkflowSha,
@@ -320,18 +334,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+      - name: Create trusted NuGet configuration
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/arch-linter-net-nuget.config" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+            </packageSources>
+          </configuration>
+          EOF
+      - name: Install ArchLinterNet
+        run: dotnet tool install --tool-path "$RUNNER_TEMP/arch-linter-net-tool" ArchLinterNet.Cli --version 0.8.0 --configfile "$RUNNER_TEMP/arch-linter-net-nuget.config"
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
-        with:
-          dotnet-version: 10.0.x
-      - name: Install ArchLinterNet
-        run: dotnet tool install --tool-path "$RUNNER_TEMP/arch-linter-net-tool" ArchLinterNet.Cli --version 0.8.0
       - name: Generate canonical Architecture Health artifacts
         id: produce
         shell: bash
@@ -525,7 +551,7 @@ jobs:
 
     private static string BuildReadme(string root, BadgeSetupConfiguration configuration)
     {
-        string readmePath = Path.Combine(root, ReadmeFileName);
+        string readmePath = SafePath(root, ReadmeFileName);
         string existing = File.Exists(readmePath)
             ? File.ReadAllText(readmePath, new UTF8Encoding(false))
             : string.Empty;

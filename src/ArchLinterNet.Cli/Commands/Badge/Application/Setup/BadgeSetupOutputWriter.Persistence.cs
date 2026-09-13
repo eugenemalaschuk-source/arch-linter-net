@@ -1,4 +1,5 @@
 using System.Text;
+using ArchLinterNet.Core.BuildState;
 
 namespace ArchLinterNet.Cli.Commands.Badge.Application.Setup;
 
@@ -23,8 +24,11 @@ internal static class BadgeSetupOutputWriterPersistence
         string path = SafePath(root, relativePath);
         string? directory = Path.GetDirectoryName(path);
         if (directory is not null) Directory.CreateDirectory(directory);
-        string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        path = SafePath(root, relativePath);
+        string temporaryRelativePath = relativePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        string temporary = SafePath(root, temporaryRelativePath);
         File.WriteAllText(temporary, contents, new UTF8Encoding(false));
+        path = SafePath(root, relativePath);
         File.Move(temporary, path, overwrite: true);
     }
 
@@ -35,10 +39,16 @@ internal static class BadgeSetupOutputWriterPersistence
             throw new IOException("Managed output path escapes the setup directory.");
         }
 
-        string path = Path.GetFullPath(Path.Combine(root, relativePath));
-        return path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            ? path
-            : throw new IOException("Managed output path escapes the setup directory.");
+        string canonicalRoot = Path.GetFullPath(root);
+        string path = Path.GetFullPath(Path.Combine(canonicalRoot, relativePath));
+        if (!FileSystemContainmentGuard.IsContained(path, canonicalRoot)
+            || FileSystemContainmentGuard.HasReparsePointAncestor(path, canonicalRoot)
+            || FileSystemContainmentGuard.IsReparsePoint(path))
+        {
+            throw new IOException("Managed output path crosses a symlink, junction, or reparse point.");
+        }
+
+        return path;
     }
 
     internal static BadgeSetupOutputWriter.OriginalFile CaptureOriginal(string root, string relativePath)
@@ -61,6 +71,7 @@ internal static class BadgeSetupOutputWriterPersistence
                 byte[] contents = original.Contents
                     ?? throw new IOException("Original managed file contents are missing.");
                 Directory.CreateDirectory(directory);
+                path = SafePath(root, original.Path);
                 File.WriteAllBytes(path, contents);
             }
             else if (File.Exists(path))

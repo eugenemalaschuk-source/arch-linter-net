@@ -49,9 +49,10 @@ instead of rounding to a more frequent hourly schedule.
 
 Relay setup is fail-closed. `--provider-plan` is cost metadata only; it cannot
 prove a required check, Rules API, OIDC, provider quota, or account capability.
-Before a non-dry-run Relay write, provide fresh capability evidence from the
-approved GitHub/provider inspector and explicitly approve disclosure. For
-example (with adopter-specific values):
+Before a non-dry-run Relay write, run the bounded live inspector with the
+operator's short-lived `GITHUB_TOKEN`/`GH_TOKEN`, `CF_API_TOKEN` (or
+`CLOUDFLARE_API_TOKEN`) and explicitly approve disclosure. For example (with
+adopter-specific values):
 
 ```text
 arch-linter-net badge architecture-health setup \
@@ -59,15 +60,17 @@ arch-linter-net badge architecture-health setup \
   --repository-id 123456 --repository-owner-id 654321 \
   --account 0123456789abcdef0123456789abcdef --alias a7f4k2m9 \
   --endpoint https://relay.example --audience architecture-health-badge-relay/a7f4k2m9 \
-  --provider-plan pro --capability-evidence ./badge-relay-capabilities.json \
+  --provider-plan pro \
   --approve-disclosure --output .
 ```
 
-Missing, stale, contradictory, or unproven capability evidence leaves the
-plan unavailable and produces no managed files. The evidence must bind the
-repository's immutable IDs, base ref, provider account, plan, required check,
-Rules API, OIDC, Relay capability, and quota; it is not a second place to
-declare those facts manually.
+Missing, stale, contradictory, or unproven live capability evidence leaves the
+plan unavailable and produces no managed files. A caller-authored JSON file
+passed through `--capability-evidence` is intentionally rejected in v1: shape
+and freshness do not authenticate its origin, so it cannot declare required
+checks, Rules API, OIDC, Relay capability, or quota. A future signed evidence
+protocol must define its issuer and key rotation before file-based evidence is
+re-enabled.
 
 Applying the reviewed plan generates, without custom server code:
 

@@ -1,4 +1,6 @@
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ArchLinterNet.Cli.Abstractions;
@@ -14,9 +16,10 @@ internal static class BadgeSetupCapabilityInspector
     private const string EvidenceSource = "live-github-provider-inspector/v1";
     private const string GitHubApi = "https://api.github.com";
     private const string CloudflareApi = "https://api.cloudflare.com";
+    private const string OidcIssuer = "https://token.actions.githubusercontent.com";
+    private const string OidcJwksPath = "/.well-known/jwks";
     private const string CloudflareApiPath = "/client/v4";
     private static readonly TimeSpan _requestTimeout = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan _evidenceLifetime = TimeSpan.FromMinutes(15);
 
     internal static BadgeSetupCapabilityInspectionResult Inspect(
         BadgeSetupConfiguration configuration,
@@ -43,79 +46,14 @@ internal static class BadgeSetupCapabilityInspector
             return Success(configuration, new());
         }
 
-        if (options.CapabilityEvidencePath is { } evidencePath && !string.IsNullOrWhiteSpace(evidencePath))
+        if (!string.IsNullOrWhiteSpace(options.CapabilityEvidencePath))
         {
-            return ReadEvidence(configuration, fileSystem.ReadAllText(evidencePath));
+            return InvalidEvidence(
+                configuration,
+                "Unsigned local capability evidence is not trusted; use the live inspector without --capability-evidence.");
         }
 
         return InspectLive(configuration, clientFactory ?? CreateClient);
-    }
-
-    private static BadgeSetupCapabilityInspectionResult ReadEvidence(
-        BadgeSetupConfiguration configuration,
-        string source)
-    {
-        try
-        {
-            using JsonDocument document = JsonDocument.Parse(source);
-            JsonElement root = document.RootElement;
-            HashSet<string> allowed = new(StringComparer.Ordinal)
-            {
-                "schema_id", "source", "observed_at", "repository", "repository_id", "repository_owner_id",
-                "visibility", "base_ref", "provider_plan", "provider_account", "required_check", "rules_api",
-                "oidc", "provider_quota", "relay",
-            };
-            HashSet<string> seen = new(StringComparer.Ordinal);
-            if (root.ValueKind != JsonValueKind.Object
-                || root.EnumerateObject().Any(property => !allowed.Contains(property.Name) || !seen.Add(property.Name)))
-            {
-                return InvalidEvidence(configuration, "Capability evidence has an unsupported or duplicate shape.");
-            }
-
-            string schema = RequiredString(root, "schema_id");
-            string evidenceSource = RequiredString(root, "source");
-            string observedAtText = RequiredString(root, "observed_at");
-            string repository = RequiredString(root, "repository");
-            long repositoryId = RequiredPositiveLong(root, "repository_id");
-            long repositoryOwnerId = RequiredPositiveLong(root, "repository_owner_id");
-            string visibility = RequiredString(root, "visibility");
-            string baseRef = RequiredString(root, "base_ref");
-            string providerPlan = RequiredString(root, "provider_plan");
-            string providerAccount = RequiredString(root, "provider_account");
-            DateTimeOffset observedAt = DateTimeOffset.Parse(observedAtText, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            if (schema != BadgeSetupContract.CapabilityEvidenceSchemaId
-                || evidenceSource != EvidenceSource
-                || observedAt < now - _evidenceLifetime
-                || observedAt > now.AddMinutes(5)
-                || repository != $"{configuration.Repository.Owner}/{configuration.Repository.Name}"
-                || configuration.Repository.RepositoryId is long configuredRepositoryId && repositoryId != configuredRepositoryId
-                || configuration.Repository.RepositoryOwnerId is long configuredRepositoryOwnerId && repositoryOwnerId != configuredRepositoryOwnerId
-                || visibility != configuration.Repository.Visibility
-                || baseRef != configuration.BaseRef
-                || providerPlan != configuration.ProviderPlan
-                || providerAccount != configuration.Destination.Account)
-            {
-                return InvalidEvidence(configuration, "Capability evidence is stale or contradicts the requested repository, plan, or account.");
-            }
-
-            BadgeSetupCapabilities capabilities = new(
-                HasRequiredCheck: RequiredBoolean(root, "required_check"),
-                HasRulesApi: RequiredBoolean(root, "rules_api"),
-                CanUseOidc: RequiredBoolean(root, "oidc"),
-                CanUseRelay: RequiredBoolean(root, "relay"),
-                ProviderPlan: providerPlan,
-                RepositoryId: repositoryId,
-                RepositoryOwnerId: repositoryOwnerId,
-                ProviderQuotaAvailable: RequiredBoolean(root, "provider_quota"),
-                CapabilitySource: EvidenceSource,
-                ObservedAt: observedAt);
-            return Success(configuration, capabilities);
-        }
-        catch (Exception exception) when (exception is FormatException or JsonException or KeyNotFoundException or InvalidOperationException or OverflowException)
-        {
-            return InvalidEvidence(configuration, $"Capability evidence could not be parsed ({exception.GetType().Name}).");
-        }
     }
 
     private static BadgeSetupCapabilityInspectionResult InspectLive(
@@ -364,13 +302,19 @@ internal static class BadgeSetupCapabilityInspector
             }
 
             string token = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            return token.Length <= 16 * 1024 && HasExpectedOidcClaims(token, configuration);
+            return token.Length <= 16 * 1024
+                && HasValidOidcSignature(token, clientFactory)
+                && HasExpectedOidcClaims(token, configuration);
         }
         catch (HttpRequestException)
         {
             return false;
         }
         catch (TaskCanceledException)
+        {
+            return false;
+        }
+        catch (Exception exception) when (exception is ArgumentException or CryptographicException or FormatException or JsonException or InvalidOperationException)
         {
             return false;
         }
@@ -561,6 +505,98 @@ internal static class BadgeSetupCapabilityInspector
     private static string AddQuery(string uri, string name, string value) =>
         uri + (uri.Contains('?') ? "&" : "?") + Uri.EscapeDataString(name) + "=" + Uri.EscapeDataString(value);
 
+    private static bool HasValidOidcSignature(
+        string response,
+        Func<string, string?, HttpClient> clientFactory)
+    {
+        string? token = ExtractOidcToken(response);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return false;
+        }
+
+        string[] segments = token.Split('.', StringSplitOptions.None);
+        if (segments.Length != 3
+            || segments.Any(string.IsNullOrEmpty)
+            || !TryDecodeBase64Url(segments[0], out byte[] headerBytes)
+            || !TryDecodeBase64Url(segments[2], out byte[] signatureBytes))
+        {
+            return false;
+        }
+
+        using JsonDocument headerDocument = JsonDocument.Parse(headerBytes);
+        JsonElement header = headerDocument.RootElement;
+        if (header.ValueKind != JsonValueKind.Object
+            || StringClaim(header, "alg") != "RS256"
+            || StringClaim(header, "kid") is not { Length: > 0 } keyId)
+        {
+            return false;
+        }
+
+        using HttpClient jwksClient = clientFactory(OidcIssuer, null);
+        using JsonDocument? jwks = GetJson(jwksClient, OidcJwksPath);
+        if (jwks?.RootElement is not { ValueKind: JsonValueKind.Object } jwksRoot
+            || !jwksRoot.TryGetProperty("keys", out JsonElement keys)
+            || keys.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        byte[] signingInput = Encoding.ASCII.GetBytes(segments[0] + "." + segments[1]);
+        foreach (JsonElement key in keys.EnumerateArray())
+        {
+            if (key.ValueKind != JsonValueKind.Object
+                || StringClaim(key, "kid") != keyId
+                || StringClaim(key, "kty") != "RSA"
+                || (key.TryGetProperty("alg", out JsonElement keyAlgorithm)
+                    && (keyAlgorithm.ValueKind != JsonValueKind.String || keyAlgorithm.GetString() != "RS256"))
+                || (key.TryGetProperty("use", out JsonElement use)
+                    && (use.ValueKind != JsonValueKind.String || use.GetString() != "sig"))
+                || StringClaim(key, "n") is not { Length: > 0 } modulusText
+                || StringClaim(key, "e") is not { Length: > 0 } exponentText
+                || !TryDecodeBase64Url(modulusText, out byte[] modulus)
+                || !TryDecodeBase64Url(exponentText, out byte[] exponent))
+            {
+                continue;
+            }
+
+            try
+            {
+                using RSA rsa = RSA.Create();
+                rsa.ImportParameters(new RSAParameters { Modulus = modulus, Exponent = exponent });
+                return rsa.VerifyData(signingInput, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            }
+            catch (CryptographicException)
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryDecodeBase64Url(string value, out byte[] bytes)
+    {
+        bytes = [];
+        if (value.Length == 0 || value.Any(static character =>
+                !(char.IsAsciiLetterOrDigit(character) || character is '-' or '_')) || value.Length % 4 == 1)
+        {
+            return false;
+        }
+
+        string encoded = value.Replace('-', '+').Replace('_', '/');
+        encoded += new string('=', (4 - encoded.Length % 4) % 4);
+        try
+        {
+            bytes = Convert.FromBase64String(encoded);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
     private static bool HasExpectedOidcClaims(string response, BadgeSetupConfiguration configuration)
     {
         string? token = ExtractOidcToken(response);
@@ -578,15 +614,17 @@ internal static class BadgeSetupCapabilityInspector
 
         try
         {
-            string encodedPayload = segments[1].Replace("-", "+", StringComparison.Ordinal).Replace("_", "/", StringComparison.Ordinal);
-            encodedPayload += new string('=', (4 - encodedPayload.Length % 4) % 4);
-            byte[] payload = Convert.FromBase64String(encodedPayload);
+            if (!TryDecodeBase64Url(segments[1], out byte[] payload))
+            {
+                return false;
+            }
+
             using JsonDocument document = JsonDocument.Parse(payload);
             JsonElement claims = document.RootElement;
             string expectedWorkflowRef = $"{configuration.Pins?.WorkflowRef}@{configuration.Pins?.WorkflowSha}";
             string expectedSubject = $"repo:{configuration.Repository.Owner}/{configuration.Repository.Name}:ref:refs/heads/{configuration.BaseRef}";
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            return StringClaim(claims, "iss") == "https://token.actions.githubusercontent.com"
+            return StringClaim(claims, "iss") == OidcIssuer
                 && AudienceClaimMatches(claims, configuration.Destination.Audience)
                 && PositiveClaim(claims, "repository_id") == configuration.Repository.RepositoryId
                 && PositiveClaim(claims, "repository_owner_id") == configuration.Repository.RepositoryOwnerId
@@ -608,7 +646,8 @@ internal static class BadgeSetupCapabilityInspector
     private static string? ExtractOidcToken(string response)
     {
         string trimmed = response.Trim();
-        if (trimmed.Count(static character => character == '.') == 2)
+        if ((trimmed.Length == 0 || trimmed[0] != '{')
+            && trimmed.Count(static character => character == '.') == 2)
         {
             return trimmed;
         }
@@ -699,34 +738,6 @@ internal static class BadgeSetupCapabilityInspector
                 RepositoryOwnerId: configuration.Repository.RepositoryOwnerId,
                 CapabilitySource: "invalid-evidence")),
         [BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.InvalidObservation, privateDetail: detail)]);
-
-    private static string RequiredString(JsonElement root, string name)
-    {
-        if (!root.TryGetProperty(name, out JsonElement value) || value.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(value.GetString()))
-        {
-            throw new InvalidOperationException($"Missing {name}.");
-        }
-
-        return value.GetString() ?? throw new InvalidOperationException($"Missing {name}.");
-    }
-
-    private static long RequiredPositiveLong(JsonElement root, string name)
-    {
-        long value = root.TryGetProperty(name, out JsonElement element) && element.TryGetInt64(out long parsed) ? parsed : 0;
-        return value is > 0 and <= 9_007_199_254_740_991
-            ? value
-            : throw new InvalidOperationException($"Invalid {name}.");
-    }
-
-    private static bool RequiredBoolean(JsonElement root, string name)
-    {
-        if (!root.TryGetProperty(name, out JsonElement element) || element.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
-        {
-            throw new InvalidOperationException($"Missing {name}.");
-        }
-
-        return element.GetBoolean();
-    }
 
     private static long ReadPositiveLong(JsonElement root, string name) =>
         root.TryGetProperty(name, out JsonElement value) && value.TryGetInt64(out long parsed) && parsed > 0 ? parsed : 0;

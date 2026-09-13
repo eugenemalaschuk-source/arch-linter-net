@@ -91,7 +91,7 @@ public sealed class BadgeSetupCommandHandlerTests
     }
 
     [Test]
-    public void InputConfigurationAndCapabilityEvidenceProduceReadyRelayPreview()
+    public void UnsignedCapabilityEvidenceCannotProduceReadyRelayPreview()
     {
         BadgeSetupConfiguration configuration = RelayConfiguration(disclosureApproved: true);
         RecordingConsole console = new();
@@ -105,9 +105,9 @@ public sealed class BadgeSetupCommandHandlerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.Output, Does.Contain("\"Mode\":\"relay\""));
-            Assert.That(console.Output, Does.Contain("\"relay-plan\""));
+            Assert.That(console.Output, Does.Contain(BadgeSetupDiagnosticCodes.InvalidObservation));
             Assert.That(console.ErrorText, Is.Empty);
         });
     }

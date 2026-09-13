@@ -28,6 +28,38 @@ public sealed class BadgeSetupOutputWriterPersistenceTests
     }
 
     [Test]
+    public void WriterRejectsCustomPublisherPinsEvenWhenPlanIsOtherwiseValid()
+    {
+        string directory = TemporaryDirectory();
+        BadgeSetupConfiguration configuration = NoneConfiguration() with
+        {
+            Pins = new(
+                "attacker/repository/.github/workflows/publish.yml",
+                new string('a', 40),
+                "attacker/repository/.github/actions/publish@" + new string('a', 40)),
+        };
+        BadgeSetupPlan plan = new(
+            IsValid: true,
+            Mode: BadgeSetupMode.None.ToWireValue(),
+            DisclosureProfile: BadgeSetupContract.HeadlineOnlyProfile,
+            ExternalCallsExpected: false,
+            PublicEndpointExpected: false,
+            Prerequisites: [],
+            Cost: BadgeSetupCostEstimate.None,
+            PlannedChanges: [],
+            Diagnostics: []);
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => BadgeSetupOutputWriter.Write(directory, configuration, plan));
+            Assert.That(Directory.EnumerateFileSystemEntries(directory), Is.Empty);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public void WriteFailureRestoresPreviouslyExistingFiles()
     {
         string directory = TemporaryDirectory();
@@ -65,6 +97,68 @@ public sealed class BadgeSetupOutputWriterPersistenceTests
         }
     }
 
+    [Test]
+    public void SymlinkedGithubDirectoryIsRejectedBeforeManagedWrites()
+    {
+        string directory = TemporaryDirectory();
+        string outside = TemporaryDirectory();
+        string link = Path.Combine(directory, ".github");
+        try
+        {
+            CreateDirectoryLinkOrIgnore(link, outside);
+            BadgeSetupPlan plan = BadgeSetupEngine.BuildPlan(
+                new BadgeSetupRequest(new("owner", "repo", "private", new()))).Plan;
+
+            Assert.Throws<IOException>(() => BadgeSetupOutputWriter.Write(directory, NoneConfiguration(), plan));
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.Exists(Path.Combine(directory, "badge-relay-config.json")), Is.False);
+                Assert.That(Directory.EnumerateFileSystemEntries(outside), Is.Empty);
+            });
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory, link);
+            DeleteTemporaryDirectory(outside);
+        }
+    }
+
+    [Test]
+    public void SymlinkedRelayDirectoryIsRejectedBeforeManagedWrites()
+    {
+        string directory = TemporaryDirectory();
+        string outside = TemporaryDirectory();
+        string link = Path.Combine(directory, "relay");
+        try
+        {
+            CreateDirectoryLinkOrIgnore(link, outside);
+            BadgeSetupConfiguration configuration = RelayConfiguration();
+            BadgeSetupPlan plan = BadgeSetupEngine.BuildPlan(
+                configuration,
+                new(
+                    "owner",
+                    "repo",
+                    "private",
+                    new(
+                        HasRequiredCheck: true,
+                        HasRulesApi: true,
+                        CanUseOidc: true,
+                        CanUseRelay: true,
+                        ProviderPlan: "pro",
+                        RepositoryId: 123,
+                        RepositoryOwnerId: 456,
+                        ProviderQuotaAvailable: true))).Plan;
+
+            Assert.Throws<IOException>(() => BadgeSetupOutputWriter.Write(directory, configuration, plan));
+            Assert.That(Directory.EnumerateFileSystemEntries(outside), Is.Empty);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory, link);
+            DeleteTemporaryDirectory(outside);
+        }
+    }
+
     private static string TemporaryDirectory()
     {
         string directory = Path.Combine(Path.GetTempPath(), "arch-linter-net-writer-" + Guid.NewGuid().ToString("N"));
@@ -98,4 +192,29 @@ public sealed class BadgeSetupOutputWriterPersistenceTests
         Project: new("architecture/dependencies.arch.yml", "ArchLinterNet.slnx"),
         DisclosureApproved: true,
         ProviderPlan: "pro");
+
+    private static void CreateDirectoryLinkOrIgnore(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            Assert.Ignore("Symbolic link creation is not permitted/supported in this environment.");
+        }
+    }
+
+    private static void DeleteTemporaryDirectory(string directory, string? link = null)
+    {
+        if (link is not null)
+        {
+            try { Directory.Delete(link); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

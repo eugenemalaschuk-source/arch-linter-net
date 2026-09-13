@@ -49,6 +49,12 @@ internal static class BadgeSetupValidationHelpers
             && value[..separator].Contains('/');
     }
 
+    internal static bool AreTrustedPublisherPins(BadgeSetupPins? pins) =>
+        pins is null
+        || (IsAbsentOrExact(pins.WorkflowRef, BadgeSetupContract.DefaultPublisherWorkflowRef)
+            && IsAbsentOrExact(pins.WorkflowSha, BadgeSetupContract.DefaultPublisherWorkflowSha)
+            && IsAbsentOrExact(pins.ActionRef, BadgeSetupContract.DefaultActionRef));
+
     internal static bool IsSafeRepositoryPath(string? value) =>
         value is { Length: > 0 and <= 256 } path
         && IsSafePath(path)
@@ -106,4 +112,7 @@ internal static class BadgeSetupValidationHelpers
         && value.Length == 8
         && value[0] == 'a'
         && value[1..].All(static character => char.IsLower(character) || char.IsDigit(character));
+
+    private static bool IsAbsentOrExact(string? value, string expected) =>
+        value is null || string.Equals(value, expected, StringComparison.Ordinal);
 }

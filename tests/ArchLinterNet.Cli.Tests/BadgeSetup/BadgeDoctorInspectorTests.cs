@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
@@ -47,7 +46,7 @@ public sealed class BadgeDoctorInspectorTests
     }
 
     [Test]
-    public void RelayFreshEvidenceIsInspectedAndCacheHeadersAreBounded()
+    public void UnsignedRelayCapabilityEvidenceLeavesDoctorUnavailable()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -55,14 +54,7 @@ public sealed class BadgeDoctorInspectorTests
             BadgeSetupConfiguration configuration = WriteProducer(directory, RelayConfiguration());
             string evidencePath = Path.Combine(directory, "capabilities.json");
             File.WriteAllText(evidencePath, CapabilityEvidence(configuration));
-            DateTimeOffset validUntil = DateTimeOffset.UtcNow.AddMinutes(30);
-            EndpointFactory factory = new(request =>
-            {
-                HttpResponseMessage response = Response(CanonicalFreshness(validUntil));
-                response.Headers.CacheControl = new CacheControlHeaderValue { MaxAge = TimeSpan.FromMinutes(5) };
-                response.Headers.Age = TimeSpan.FromSeconds(30);
-                return response;
-            });
+            EndpointFactory factory = new(_ => Response(CanonicalFreshness(DateTimeOffset.UtcNow.AddMinutes(30))));
 
             BadgeDoctorInspectionResult inspected = BadgeDoctorInspector.Inspect(
                 configuration,
@@ -74,14 +66,11 @@ public sealed class BadgeDoctorInspectorTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(report.Available, Is.True);
-                Assert.That(inspected.Observations.ValidityCurrent, Is.True);
-                Assert.That(inspected.Observations.CacheFresh, Is.True);
-                Assert.That(inspected.Observations.OidcValid, Is.True);
-                Assert.That(inspected.Observations.RequiredCheckAvailable, Is.True);
-                Assert.That(inspected.Observations.RulesApiAvailable, Is.True);
-                Assert.That(inspected.Observations.ProviderQuotaAvailable, Is.True);
-                Assert.That(factory.Requests.Single().RequestUri!.AbsolutePath, Is.EqualTo("/badge-relay/v1/a7f4k2m9.json"));
+                Assert.That(report.Available, Is.False);
+                Assert.That(inspected.Plan.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.InvalidObservation));
+                Assert.That(inspected.Observations.OidcValid, Is.False);
+                Assert.That(inspected.Observations.ArtifactValid, Is.False);
+                Assert.That(factory.Requests, Is.Empty);
             });
         }
         finally
@@ -91,19 +80,17 @@ public sealed class BadgeDoctorInspectorTests
     }
 
     [Test]
-    public void RelayUnavailableAndRevokedResponsesRemainUnavailable()
+    public void GithubRawUnavailableAndRevokedResponsesRemainUnavailable()
     {
         string directory = CreateTemporaryDirectory();
         try
         {
-            BadgeSetupConfiguration configuration = WriteProducer(directory, RelayConfiguration());
-            string evidencePath = Path.Combine(directory, "capabilities.json");
-            File.WriteAllText(evidencePath, CapabilityEvidence(configuration));
+            BadgeSetupConfiguration configuration = WriteProducer(directory, GithubRawConfiguration());
 
             EndpointFactory unavailable = new(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
             BadgeDoctorInspectionResult missing = BadgeDoctorInspector.Inspect(
                 configuration,
-                Options(evidencePath),
+                Options(),
                 Path.Combine(directory, "badge-relay-config.json"),
                 new FileSystem(),
                 unavailable.Create);
@@ -111,7 +98,7 @@ public sealed class BadgeDoctorInspectorTests
             EndpointFactory revoked = new(_ => new HttpResponseMessage(HttpStatusCode.Gone));
             BadgeDoctorInspectionResult revokedInspection = BadgeDoctorInspector.Inspect(
                 configuration,
-                Options(evidencePath),
+                Options(),
                 Path.Combine(directory, "badge-relay-config.json"),
                 new FileSystem(),
                 revoked.Create);
@@ -132,19 +119,19 @@ public sealed class BadgeDoctorInspectorTests
     }
 
     [Test]
-    public void ExpiredOrInvalidRelayArtifactFailsClosed()
+    public void ExpiredGithubRawArtifactFailsClosed()
     {
         string directory = CreateTemporaryDirectory();
         try
         {
-            BadgeSetupConfiguration configuration = WriteProducer(directory, RelayConfiguration());
-            string evidencePath = Path.Combine(directory, "capabilities.json");
-            File.WriteAllText(evidencePath, CapabilityEvidence(configuration));
+            BadgeSetupConfiguration configuration = WriteProducer(
+                directory,
+                GithubRawConfiguration() with { DisclosureProfile = BadgeSetupContract.HeadlinePlusFreshnessProfile });
             EndpointFactory factory = new(_ => Response(CanonicalFreshness(DateTimeOffset.UtcNow.AddMinutes(-1))));
 
             BadgeDoctorInspectionResult inspected = BadgeDoctorInspector.Inspect(
                 configuration,
-                Options(evidencePath),
+                Options(),
                 Path.Combine(directory, "badge-relay-config.json"),
                 new FileSystem(),
                 factory.Create);

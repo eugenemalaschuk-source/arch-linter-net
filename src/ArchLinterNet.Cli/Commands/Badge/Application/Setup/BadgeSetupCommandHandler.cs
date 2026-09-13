@@ -7,7 +7,7 @@ namespace ArchLinterNet.Cli.Commands.Badge.Application.Setup;
 internal sealed class BadgeSetupCommandHandler(ICliConsole console, IFileSystem fileSystem)
 {
     private const string SetupHelp = "arch-linter-net badge architecture-health setup --repository <owner/name> --visibility <public|private> [--mode <none|github-raw|relay>] [--account <provider-account>] [--alias <a.......>] [--endpoint <https-origin>] [--audience <oidc-audience>] [--provider-plan <plan>] [--base-ref <branch>] [--producer-workflow <path>] [--check-name <name>] [--output <directory>] [--dry-run] [--format <json|human>]";
-    private const string DoctorHelp = "arch-linter-net badge architecture-health doctor --input <badge-relay-config.json> [--capability-evidence <path>] [--observation <path>] [--public] [--format <json|human>]";
+    private const string DoctorHelp = "arch-linter-net badge architecture-health doctor --input <badge-relay-config.json> [--observation <path>] [--public] [--format <json|human>]";
 
     internal int ExecuteSetup(BadgeSetupCommandOptions options)
     {

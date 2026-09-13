@@ -54,9 +54,9 @@
       "type": ["object", "null"],
       "additionalProperties": false,
       "properties": {
-        "workflow_ref": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$" },
-        "workflow_sha": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
-        "action_ref": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$" },
+        "workflow_ref": { "enum": [null, "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml"] },
+        "workflow_sha": { "enum": [null, "ff9b19bfe5abcab233d490ea53f55a387dc4a8db"] },
+        "action_ref": { "enum": [null, "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@ff9b19bfe5abcab233d490ea53f55a387dc4a8db"] },
         "bundle_digest": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
       }
     },

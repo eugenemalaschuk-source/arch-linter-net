@@ -111,6 +111,39 @@ public sealed class BadgeSetupEngineTests
     }
 
     [Test]
+    public void SyntacticallyValidUntrustedPublisherPinsAreRejected()
+    {
+        BadgeSetupConfiguration configuration = RelayConfiguration(renewalEnabled: false, cadenceMinutes: 1440) with
+        {
+            Pins = new(
+                "attacker/repository/.github/workflows/publish.yml",
+                "0123456789abcdef0123456789abcdef01234567",
+                "attacker/repository/action@0123456789abcdef0123456789abcdef01234567"),
+        };
+        BadgeSetupPlanResult result = BadgeSetupEngine.BuildPlan(
+            configuration,
+            new(
+                "owner",
+                "repo",
+                "private",
+                new(
+                    HasRequiredCheck: true,
+                    HasRulesApi: true,
+                    CanUseOidc: true,
+                    CanUseRelay: true,
+                    ProviderPlan: "pro",
+                    RepositoryId: 123,
+                    RepositoryOwnerId: 456,
+                    ProviderQuotaAvailable: true)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsValid, Is.False);
+            Assert.That(result.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.InvalidPin));
+        });
+    }
+
+    [Test]
     public void RenewalAboveContractUpperBoundIsRejected()
     {
         BadgeSetupPlanResult result = BadgeSetupEngine.BuildPlan(

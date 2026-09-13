@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
@@ -40,52 +41,22 @@ public sealed class BadgeSetupCapabilityInspectorTests
     }
 
     [Test]
-    public void RelayEvidenceMustBeFreshExactAndComplete()
+    public void UnsignedRelayCapabilityEvidenceIsRejectedEvenWhenClaimsAreFresh()
     {
         BadgeSetupConfiguration configuration = Configuration("relay", "private");
         string valid = Evidence(configuration);
-        MemoryFileSystem fileSystem = new(("capabilities.json", valid));
-
-        BadgeSetupCapabilityInspectionResult accepted = BadgeSetupCapabilityInspector.Inspect(
+        BadgeSetupCapabilityInspectionResult result = BadgeSetupCapabilityInspector.Inspect(
             configuration,
             Options("capabilities.json"),
-            fileSystem);
-        BadgeSetupCapabilityInspectionResult unknown = BadgeSetupCapabilityInspector.Inspect(
-            configuration,
-            Options("capabilities.json"),
-            new MemoryFileSystem(("capabilities.json", valid[..^1] + ",\"unexpected\":true}")));
-        BadgeSetupCapabilityInspectionResult duplicate = BadgeSetupCapabilityInspector.Inspect(
-            configuration,
-            Options("capabilities.json"),
-            new MemoryFileSystem(("capabilities.json", """{"schema_id":"badge-relay-capability-evidence/v1","schema_id":"duplicate"}""")));
-        BadgeSetupCapabilityInspectionResult wrongIdentity = BadgeSetupCapabilityInspector.Inspect(
-            configuration,
-            Options("capabilities.json"),
-            new MemoryFileSystem(("capabilities.json", Evidence(configuration).Replace("\"repository_id\":123", "\"repository_id\":999", StringComparison.Ordinal))));
-        BadgeSetupCapabilityInspectionResult stale = BadgeSetupCapabilityInspector.Inspect(
-            configuration,
-            Options("capabilities.json"),
-            new MemoryFileSystem(("capabilities.json", Evidence(configuration, DateTimeOffset.UtcNow.AddHours(-1)))));
-        BadgeSetupCapabilityInspectionResult malformed = BadgeSetupCapabilityInspector.Inspect(
-            configuration,
-            Options("capabilities.json"),
-            new MemoryFileSystem(("capabilities.json", "{")));
-        BadgeSetupCapabilityInspectionResult incomplete = BadgeSetupCapabilityInspector.Inspect(
-            configuration,
-            Options("capabilities.json"),
-            new MemoryFileSystem(("capabilities.json", """{"schema_id":"badge-relay-capability-evidence/v1"}""")));
+            new MemoryFileSystem(("capabilities.json", valid)));
 
         Assert.Multiple(() =>
         {
-            Assert.That(accepted.Diagnostics, Is.Empty);
-            Assert.That(accepted.Repository.Capabilities.HasRequiredCheck, Is.True);
-            Assert.That(accepted.Repository.Capabilities.RepositoryId, Is.EqualTo(123));
-            Assert.That(unknown.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.InvalidObservation));
-            Assert.That(duplicate.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.InvalidObservation));
-            Assert.That(wrongIdentity.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.InvalidObservation));
-            Assert.That(stale.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.InvalidObservation));
-            Assert.That(malformed.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.InvalidObservation));
-            Assert.That(incomplete.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.InvalidObservation));
+            Assert.That(result.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.InvalidObservation));
+            Assert.That(result.Repository.Capabilities.HasRequiredCheck, Is.False);
+            Assert.That(result.Repository.Capabilities.CanUseOidc, Is.False);
+            Assert.That(result.Repository.Capabilities.CanUseRelay, Is.False);
+            Assert.That(result.Repository.Capabilities.CapabilitySource, Is.EqualTo("invalid-evidence"));
         });
     }
 
@@ -189,6 +160,22 @@ public sealed class BadgeSetupCapabilityInspectorTests
             Assert.That(result.Repository.Capabilities.ProviderQuotaAvailable, Is.False);
             Assert.That(result.Repository.Capabilities.CapabilitySource, Is.EqualTo("live-github-provider-inspector/v1"));
         });
+    }
+
+    [Test]
+    public void LiveInspectionRejectsJwtClaimsWithAnInvalidSignature()
+    {
+        BadgeSetupConfiguration configuration = Configuration("relay", "private");
+        using EnvironmentScope scope = LiveEnvironment();
+        HttpClientFactory invalidSignature = new(configuration, useRulesetFallback: false, invalidOidcSignature: true);
+
+        BadgeSetupCapabilityInspectionResult result = BadgeSetupCapabilityInspector.Inspect(
+            configuration,
+            Options(),
+            new MemoryFileSystem(),
+            invalidSignature.Create);
+
+        Assert.That(result.Repository.Capabilities.CanUseOidc, Is.False);
     }
 
     [Test]
@@ -341,8 +328,12 @@ public sealed class BadgeSetupCapabilityInspectorTests
         bool unavailableProvider = false,
         bool invalidOidc = false,
         bool missingBranch = false,
-        bool oidcEnvelope = false)
+        bool oidcEnvelope = false,
+        bool invalidOidcSignature = false)
     {
+        private const string OidcKeyId = "arch-linter-net-test-key";
+        private static readonly RSA _oidcSigningKey = RSA.Create(2048);
+
         public HttpClient Create(string baseAddress, string? token)
         {
             HttpClient client = new(new RoutingHandler(Respond))
@@ -404,8 +395,13 @@ public sealed class BadgeSetupCapabilityInspectorTests
                 }
 
                 return oidcEnvelope
-                    ? Json(JsonSerializer.Serialize(new { value = CreateJwt(configuration) }))
-                    : JsonToken(configuration);
+                    ? Json(JsonSerializer.Serialize(new { value = CreateJwt(configuration, !invalidOidcSignature) }))
+                    : JsonToken(configuration, !invalidOidcSignature);
+            }
+
+            if (path == "/.well-known/jwks")
+            {
+                return Json(CreateJwks());
             }
 
             return NotFound();
@@ -419,18 +415,18 @@ public sealed class BadgeSetupCapabilityInspectorTests
             Content = new StringContent(content, Encoding.UTF8, "application/json"),
         };
 
-        private static HttpResponseMessage JsonToken(BadgeSetupConfiguration configuration) =>
+        private static HttpResponseMessage JsonToken(BadgeSetupConfiguration configuration, bool validSignature) =>
             new(HttpStatusCode.OK)
             {
-                Content = new StringContent(CreateJwt(configuration), Encoding.UTF8, "application/jwt"),
+                Content = new StringContent(CreateJwt(configuration, validSignature), Encoding.UTF8, "application/jwt"),
             };
 
         private static HttpResponseMessage NotFound() => new(HttpStatusCode.NotFound);
 
-        private static string CreateJwt(BadgeSetupConfiguration configuration)
+        private static string CreateJwt(BadgeSetupConfiguration configuration, bool validSignature)
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            string header = Encode(new { alg = "RS256", typ = "JWT" });
+            string header = Encode(new { alg = "RS256", kid = OidcKeyId, typ = "JWT" });
             string payload = Encode(new
             {
                 iss = "https://token.actions.githubusercontent.com",
@@ -448,11 +444,40 @@ public sealed class BadgeSetupCapabilityInspectorTests
                 exp = now + 300,
                 nbf = now - 1,
             });
-            return $"{header}.{payload}.signature";
+            string signingInput = header + "." + payload;
+            byte[] signature = validSignature
+                ? _oidcSigningKey.SignData(Encoding.ASCII.GetBytes(signingInput), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)
+                : Encoding.UTF8.GetBytes("signature");
+            return $"{signingInput}.{EncodeBytes(signature)}";
+        }
+
+        private static string CreateJwks()
+        {
+            RSAParameters parameters = _oidcSigningKey.ExportParameters(includePrivateParameters: false);
+            return JsonSerializer.Serialize(new
+            {
+                keys = new[]
+                {
+                    new
+                    {
+                        kty = "RSA",
+                        use = "sig",
+                        kid = OidcKeyId,
+                        n = EncodeBytes(parameters.Modulus!),
+                        e = EncodeBytes(parameters.Exponent!),
+                    },
+                },
+            });
         }
 
         private static string Encode<T>(T value) =>
             Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value)))
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+
+        private static string EncodeBytes(byte[] value) =>
+            Convert.ToBase64String(value)
                 .TrimEnd('=')
                 .Replace('+', '-')
                 .Replace('/', '_');

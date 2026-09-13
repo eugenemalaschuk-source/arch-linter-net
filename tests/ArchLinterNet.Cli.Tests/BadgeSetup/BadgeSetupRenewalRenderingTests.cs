@@ -93,6 +93,50 @@ public sealed class BadgeSetupRenewalRenderingTests
         }
     }
 
+    [Test]
+    public void ProducerInstallsFromTrustedNugetConfigBeforePrCheckout()
+    {
+        string directory = TemporaryDirectory();
+        string maliciousNugetConfig = Path.Combine(directory, "NuGet.Config");
+        File.WriteAllText(maliciousNugetConfig, """
+            <configuration>
+              <packageSources>
+                <clear />
+                <add key="attacker" value="https://packages.example.invalid/v3/index.json" />
+              </packageSources>
+            </configuration>
+            """);
+        try
+        {
+            BadgeSetupConfiguration configuration = RelayConfiguration(renewalEnabled: false, cadenceMinutes: 1440);
+            BadgeSetupPlanResult result = BuildPlan(configuration);
+            Assert.That(result.IsValid, Is.True);
+
+            BadgeSetupOutputWriter.Write(directory, configuration, result.Plan);
+            string workflow = File.ReadAllText(Path.Combine(directory, ".github", "workflows", "architecture-health-badge-producer.yml"));
+            int setupDotnet = workflow.IndexOf("name: Setup .NET", StringComparison.Ordinal);
+            int trustedConfig = workflow.IndexOf("arch-linter-net-nuget.config", StringComparison.Ordinal);
+            int install = workflow.IndexOf("dotnet tool install", StringComparison.Ordinal);
+            int checkout = workflow.IndexOf("uses: actions/checkout@", StringComparison.Ordinal);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(trustedConfig, Is.GreaterThan(setupDotnet));
+                Assert.That(install, Is.GreaterThan(trustedConfig));
+                Assert.That(checkout, Is.GreaterThan(install));
+                Assert.That(workflow, Does.Contain("<clear />"));
+                Assert.That(workflow, Does.Contain("https://api.nuget.org/v3/index.json"));
+                Assert.That(workflow, Does.Contain("--configfile \"$RUNNER_TEMP/arch-linter-net-nuget.config\""));
+                Assert.That(workflow, Does.Not.Contain("ArchLinterNet.Cli --version 0.8.0\n"));
+                Assert.That(File.Exists(maliciousNugetConfig), Is.True);
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string[] ReadPermittedEvents(string directory)
     {
         using JsonDocument wrangler = JsonDocument.Parse(
