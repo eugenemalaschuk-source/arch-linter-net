@@ -71,6 +71,27 @@ public sealed class BadgeSetupEngineTests
     }
 
     [Test]
+    public void RelayAllowsNullProviderPlanWhenLiveCapabilitiesAreProven()
+    {
+        BadgeSetupPlanResult result = BadgeSetupEngine.BuildPlan(
+            RelayConfiguration(renewalEnabled: false, cadenceMinutes: 1440) with { ProviderPlan = null },
+            new(
+                "owner",
+                "repo",
+                "private",
+                new(
+                    HasRequiredCheck: true,
+                    HasRulesApi: true,
+                    CanUseOidc: true,
+                    CanUseRelay: true,
+                    RepositoryId: 123,
+                    RepositoryOwnerId: 456,
+                    ProviderQuotaAvailable: true)));
+
+        Assert.That(result.IsValid, Is.True);
+    }
+
+    [Test]
     public void RenewalBelowThirtyMinutesIsRejected()
     {
         BadgeSetupPlanResult result = BadgeSetupEngine.BuildPlan(

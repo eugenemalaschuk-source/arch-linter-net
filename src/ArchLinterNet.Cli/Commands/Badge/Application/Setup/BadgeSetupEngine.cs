@@ -279,13 +279,6 @@ internal static class BadgeSetupEngine
                 privateDetail: "Relay setup requires complete reusable-workflow and action pins."));
         }
 
-        if (configuration.ProviderPlan is null)
-        {
-            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                BadgeSetupDiagnosticCodes.UnsupportedPlan,
-                privateDetail: "Relay setup requires an explicit supported provider plan."));
-        }
-
         if (configuration.Destination.Endpoint is null)
         {
             diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
@@ -525,9 +518,7 @@ internal static class BadgeSetupEngine
             return BadgeSetupCostEstimate.None;
         }
 
-        int jobsPerDay = (int)Math.Min(
-            int.MaxValue,
-            (1440L + renewal.CadenceMinutes - 1) / renewal.CadenceMinutes);
+        int jobsPerDay = BadgeSetupContract.RenewalJobsPerDay(renewal.CadenceMinutes);
         if (jobsPerDay > BadgeSetupContract.MaximumRenewalJobsPerDay)
         {
             diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(BadgeSetupDiagnosticCodes.RenewalCostExceeded));
@@ -593,17 +584,10 @@ internal static class BadgeSetupEngine
                     prerequisites,
                     diagnostics,
                     "relay-account",
-                    "An adopter-owned Relay account and opaque alias are required.",
-                    IsCloudflareAccountId(configuration.Destination.Account) && IsOpaqueAlias(configuration.Destination.Alias),
-                    required: true);
-                AddCapability(
-                    prerequisites,
-                    diagnostics,
-                    "relay-plan",
-                    "A supported provider plan with sufficient quota is required.",
-                    repository.Capabilities.CanUseRelay
-                        && IsSupportedPlan(configuration.ProviderPlan)
-                        && string.Equals(configuration.ProviderPlan, repository.Capabilities.ProviderPlan, StringComparison.Ordinal),
+                    "A valid adopter-owned Relay account and opaque alias must be proven by the provider inspector.",
+                    IsCloudflareAccountId(configuration.Destination.Account)
+                        && IsOpaqueAlias(configuration.Destination.Alias)
+                        && repository.Capabilities.CanUseRelay,
                     required: true);
                 AddCapability(
                     prerequisites,
@@ -649,7 +633,7 @@ internal static class BadgeSetupEngine
         if (required && !satisfied)
         {
             diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
-                code == "relay-plan" ? BadgeSetupDiagnosticCodes.UnsupportedPlan : BadgeSetupDiagnosticCodes.MissingCapability,
+                BadgeSetupDiagnosticCodes.MissingCapability,
                 privateDetail: $"Prerequisite '{code}' was not proven."));
         }
     }

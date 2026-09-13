@@ -45,10 +45,15 @@ When renewal is disabled, setup emits no scheduled renewal workflow and does
 not allow `schedule` in the Relay registry entry. For enabled cadences that do
 not align to an hour, the generated workflow uses multiple explicit POSIX cron
 entries when necessary; their UTC slots match the previewed jobs-per-day bound
-instead of rounding to a more frequent hourly schedule.
+instead of rounding to a more frequent hourly schedule. The preview uses
+`floor(1440 / cadence_minutes)` slots; for a non-divisible cadence the final
+slot-to-next-day gap is longer so the cyclic interval never falls below the
+configured cadence.
 
-Relay setup is fail-closed. `--provider-plan` is cost metadata only; it cannot
-prove a required check, Rules API, OIDC, provider quota, or account capability.
+Relay setup is fail-closed. `--provider-plan` is optional cost metadata only;
+when supplied, it cannot prove a required check, Rules API, OIDC, provider
+quota, or account capability. A null plan label is valid when live inspection
+proves the required capabilities.
 Before a non-dry-run Relay write, run the bounded live inspector with the
 operator's short-lived `GITHUB_TOKEN`/`GH_TOKEN`, `CF_API_TOKEN` (or
 `CLOUDFLARE_API_TOKEN`) and explicitly approve disclosure. For example (with

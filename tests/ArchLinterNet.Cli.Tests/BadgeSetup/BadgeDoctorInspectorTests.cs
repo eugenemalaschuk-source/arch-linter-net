@@ -18,7 +18,9 @@ public sealed class BadgeDoctorInspectorTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            BadgeSetupConfiguration configuration = WriteProducer(directory, GithubRawConfiguration());
+            BadgeSetupConfiguration configuration = WriteProducer(
+                directory,
+                GithubRawConfiguration() with { BaseRef = "release" });
             EndpointFactory factory = new(_ => Response(CanonicalHeadline()));
 
             BadgeDoctorInspectionResult inspected = BadgeDoctorInspector.Inspect(
@@ -36,7 +38,9 @@ public sealed class BadgeDoctorInspectorTests
                 Assert.That(inspected.Observations.FirstEvidenceAvailable, Is.True);
                 Assert.That(inspected.Observations.ArtifactValid, Is.True);
                 Assert.That(inspected.Observations.PinsValid, Is.True);
-                Assert.That(factory.Requests.Single().RequestUri!.AbsolutePath, Does.Contain("/architecture-health-badge/architecture-health.json"));
+                Assert.That(
+                    factory.Requests.Single().RequestUri!.AbsolutePath,
+                    Is.EqualTo("/owner/repo/architecture-health-badge/architecture-health.json"));
             });
         }
         finally

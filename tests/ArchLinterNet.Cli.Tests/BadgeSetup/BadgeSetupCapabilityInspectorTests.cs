@@ -85,7 +85,7 @@ public sealed class BadgeSetupCapabilityInspectorTests
     }
 
     [Test]
-    public void LiveInspectionBindsRepositoryRulesProviderAndOidcClaims()
+    public void LiveInspectionUsesDocumentedAccountDetailsWithoutPlanSlug()
     {
         BadgeSetupConfiguration configuration = Configuration("relay", "private");
         using EnvironmentScope scope = LiveEnvironment();
@@ -105,7 +105,7 @@ public sealed class BadgeSetupCapabilityInspectorTests
             Assert.That(result.Repository.Capabilities.CanUseOidc, Is.True);
             Assert.That(result.Repository.Capabilities.CanUseRelay, Is.True);
             Assert.That(result.Repository.Capabilities.ProviderQuotaAvailable, Is.True);
-            Assert.That(result.Repository.Capabilities.ProviderPlan, Is.EqualTo("pro"));
+            Assert.That(result.Repository.Capabilities.ProviderPlan, Is.Null);
         });
     }
 
@@ -378,7 +378,7 @@ public sealed class BadgeSetupCapabilityInspectorTests
             {
                 return unavailableProvider
                     ? NotFound()
-                    : Json("""{"result":{"id":"0123456789abcdef0123456789abcdef","plan":{"slug":"pro"}}}""");
+                    : Json("""{"result":{"id":"0123456789abcdef0123456789abcdef","name":"Test Account","type":"standard"}}""");
             }
 
             if (path == "/client/v4/accounts/0123456789abcdef0123456789abcdef/workers/scripts"

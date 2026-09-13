@@ -201,7 +201,7 @@ internal static class BadgeDoctorInspector
     {
         if (configuration.Mode == BadgeSetupMode.GithubRaw.ToWireValue())
         {
-            return $"{GithubRawOrigin}/{configuration.Repository.Owner}/{configuration.Repository.Name}/{configuration.BaseRef}/architecture-health-badge/architecture-health.json";
+            return $"{GithubRawOrigin}/{configuration.Repository.Owner}/{configuration.Repository.Name}/{BadgeSetupContract.GithubRawPublicationBranch}/architecture-health.json";
         }
 
         if (configuration.Mode != BadgeSetupMode.Relay.ToWireValue()

@@ -368,6 +368,9 @@ jobs:
           HEALTH_ARTIFACT_DIRECTORY: ${{ runner.temp }}/architecture-health-artifact
           EXECUTION_CONTEXT: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -u
           mkdir -p "$ARTIFACT_DIRECTORY" "$HEALTH_ARTIFACT_DIRECTORY"
@@ -407,13 +410,13 @@ jobs:
               "kind": "architecture-health-badge",
               "context": {
                   "repository": os.environ["GITHUB_REPOSITORY"],
-                  "pr_number": os.environ["GITHUB_EVENT_NUMBER"],
-                  "base_ref": os.environ["GITHUB_BASE_REF"],
-                  "base_sha": os.environ["GITHUB_BASE_SHA"],
+                  "pr_number": int(os.environ["PR_NUMBER"]),
+                  "base_ref": os.environ["PR_BASE_REF"],
+                  "base_sha": os.environ["PR_BASE_SHA"],
                   "head_sha": os.environ["PR_HEAD_SHA"],
                   "head_tree_sha": os.environ["PR_HEAD_TREE_SHA"],
-                  "run_id": os.environ["GITHUB_RUN_ID"],
-                  "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                  "run_id": int(os.environ["GITHUB_RUN_ID"]),
+                  "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
               },
               "payload": {
                   "path": "architecture-health-badge.json",
@@ -427,14 +430,14 @@ jobs:
             exit 1
           fi
       - name: Upload bound Architecture Health badge
-        if: always() && hashFiles(format('${{ runner.temp }}/architecture-health-badge-artifact/architecture-health-badge.json')) != '' && hashFiles(format('${{ runner.temp }}/architecture-health-badge-artifact/architecture-health-badge.manifest.json')) != ''
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: __ARTIFACT_NAME__
           path: ${{ runner.temp }}/architecture-health-badge-artifact/*
           if-no-files-found: error
       - name: Upload semantic Architecture Health evidence
-        if: always() && hashFiles(format('${{ runner.temp }}/architecture-health-artifact/architecture-health.json')) != ''
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: __EVIDENCE_ARTIFACT_NAME__
@@ -529,8 +532,10 @@ jobs:
         }
 
         Dictionary<int, List<int>> hoursByMinute = [];
-        for (int elapsedMinutes = 0; elapsedMinutes < 1440; elapsedMinutes += cadenceMinutes)
+        int jobsPerDay = BadgeSetupContract.RenewalJobsPerDay(cadenceMinutes);
+        for (int slot = 0; slot < jobsPerDay; slot++)
         {
+            int elapsedMinutes = slot * cadenceMinutes;
             int minute = elapsedMinutes % 60;
             int hour = elapsedMinutes / 60;
             if (!hoursByMinute.TryGetValue(minute, out List<int>? hours))
@@ -588,7 +593,7 @@ jobs:
         }
 
         string origin = configuration.Mode == BadgeSetupMode.GithubRaw.ToWireValue()
-            ? $"https://raw.githubusercontent.com/{configuration.Repository.Owner}/{configuration.Repository.Name}/architecture-health-badge/architecture-health.json"
+            ? $"https://raw.githubusercontent.com/{configuration.Repository.Owner}/{configuration.Repository.Name}/{BadgeSetupContract.GithubRawPublicationBranch}/architecture-health.json"
             : RelayOrigin(configuration);
         if (configuration.Mode == BadgeSetupMode.Relay.ToWireValue()
             && configuration.DisclosureProfile == BadgeSetupContract.HeadlinePlusFreshnessProfile)
@@ -615,7 +620,7 @@ jobs:
         string adapter = configuration.Mode;
         object destination = adapter switch
         {
-            "github-raw" => new { adapter, branch = "architecture-health-badge", endpoint_path = "architecture-health.json" },
+            "github-raw" => new { adapter, branch = BadgeSetupContract.GithubRawPublicationBranch, endpoint_path = "architecture-health.json" },
             RelayMode => new
             {
                 adapter,

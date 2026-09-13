@@ -52,8 +52,11 @@ internal static class BadgeSetupContract
     internal const string DefaultArtifactName = "architecture-health-badge-v1";
     internal const string DefaultEvidenceArtifactName = "architecture-health";
     internal const string DefaultPayloadPath = "architecture-health-badge.json";
+    internal const string GithubRawPublicationBranch = "architecture-health-badge";
     internal const string CapabilityEvidenceSchemaId = "badge-relay-capability-evidence/v1";
     internal const string DoctorObservationSchemaId = "badge-relay-doctor-observation/v1";
+
+    internal static int RenewalJobsPerDay(int cadenceMinutes) => cadenceMinutes > 0 ? 1440 / cadenceMinutes : 0;
 
     internal static string ToWireValue(this BadgeSetupMode mode) => mode switch
     {

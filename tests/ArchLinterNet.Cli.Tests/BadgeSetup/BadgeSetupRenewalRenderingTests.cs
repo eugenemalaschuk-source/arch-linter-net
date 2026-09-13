@@ -93,6 +93,37 @@ public sealed class BadgeSetupRenewalRenderingTests
         }
     }
 
+    [TestCase(31, 46)]
+    [TestCase(59, 24)]
+    public void NonDivisibleRenewalPreservesCyclicMinimumAndPreviewCount(int cadenceMinutes, int expectedJobsPerDay)
+    {
+        string directory = TemporaryDirectory();
+        BadgeSetupConfiguration configuration = RelayConfiguration(renewalEnabled: true, cadenceMinutes: cadenceMinutes);
+        BadgeSetupPlanResult result = BuildPlan(configuration);
+        try
+        {
+            Assert.That(result.IsValid, Is.True);
+            BadgeSetupOutputWriter.Write(directory, configuration, result.Plan);
+            string workflow = File.ReadAllText(Path.Combine(directory, ".github", "workflows", "architecture-health-badge-renewal.yml"));
+            int[] slots = CronSlots(CronEntries(workflow));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(slots, Has.Length.EqualTo(expectedJobsPerDay));
+                Assert.That(slots.Length, Is.EqualTo(result.Plan.Cost.JobsPerDay));
+                for (int index = 0; index < slots.Length; index++)
+                {
+                    int next = index + 1 < slots.Length ? slots[index + 1] : slots[0] + 1440;
+                    Assert.That(next - slots[index], Is.GreaterThanOrEqualTo(cadenceMinutes));
+                }
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Test]
     public void ProducerInstallsFromTrustedNugetConfigBeforePrCheckout()
     {
@@ -127,6 +158,16 @@ public sealed class BadgeSetupRenewalRenderingTests
                 Assert.That(workflow, Does.Contain("<clear />"));
                 Assert.That(workflow, Does.Contain("https://api.nuget.org/v3/index.json"));
                 Assert.That(workflow, Does.Contain("--configfile \"$RUNNER_TEMP/arch-linter-net-nuget.config\""));
+                Assert.That(workflow, Does.Contain("PR_NUMBER: ${{ github.event.pull_request.number }}"));
+                Assert.That(workflow, Does.Contain("PR_BASE_REF: ${{ github.event.pull_request.base.ref }}"));
+                Assert.That(workflow, Does.Contain("PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}"));
+                Assert.That(workflow, Does.Contain("\"pr_number\": int(os.environ[\"PR_NUMBER\"]),"));
+                Assert.That(workflow, Does.Contain("\"run_id\": int(os.environ[\"GITHUB_RUN_ID\"]),"));
+                Assert.That(workflow, Does.Contain("\"run_attempt\": int(os.environ[\"GITHUB_RUN_ATTEMPT\"]),"));
+                Assert.That(workflow, Does.Not.Contain("GITHUB_EVENT_NUMBER"));
+                Assert.That(workflow, Does.Not.Contain("GITHUB_BASE_SHA"));
+                Assert.That(workflow, Does.Not.Contain("hashFiles("));
+                Assert.That(workflow, Does.Contain("if: always()"));
                 Assert.That(workflow, Does.Not.Contain("ArchLinterNet.Cli --version 0.8.0\n"));
                 Assert.That(File.Exists(maliciousNugetConfig), Is.True);
             });
@@ -165,6 +206,18 @@ public sealed class BadgeSetupRenewalRenderingTests
         string[] fields = entry[(firstQuote + 1)..lastQuote].Split(' ');
         return fields[0].Split(',').Length * fields[1].Split(',').Length;
     });
+
+    private static int[] CronSlots(IEnumerable<string> entries) => entries
+        .SelectMany(static entry =>
+        {
+            int firstQuote = entry.IndexOf('"');
+            int lastQuote = entry.LastIndexOf('"');
+            string[] fields = entry[(firstQuote + 1)..lastQuote].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            int minute = int.Parse(fields[0]);
+            return fields[1].Split(',').Select(hour => int.Parse(hour) * 60 + minute);
+        })
+        .OrderBy(static slot => slot)
+        .ToArray();
 
     private static BadgeSetupPlanResult BuildPlan(BadgeSetupConfiguration configuration) => BadgeSetupEngine.BuildPlan(
         configuration,

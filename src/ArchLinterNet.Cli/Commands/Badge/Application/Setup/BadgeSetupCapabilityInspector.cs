@@ -84,17 +84,12 @@ internal static class BadgeSetupCapabilityInspector
                 out bool requiredCheck,
                 out bool rulesApi);
             bool oidc = TryInspectOidc(configuration, clientFactory);
-            bool provider = TryInspectProvider(
-                cloudflare,
-                configuration,
-                out string? observedPlan,
-                out bool providerQuota);
+            bool provider = TryInspectProvider(cloudflare, configuration, out bool providerQuota);
             BadgeSetupCapabilities capabilities = new(
                 HasRequiredCheck: repositoryIdentity && requiredCheck,
                 HasRulesApi: repositoryIdentity && rulesApi,
                 CanUseOidc: oidc,
-                CanUseRelay: provider && string.Equals(observedPlan, configuration.ProviderPlan, StringComparison.Ordinal),
-                ProviderPlan: observedPlan,
+                CanUseRelay: provider,
                 RepositoryId: repositoryId > 0 ? repositoryId : configuration.Repository.RepositoryId,
                 RepositoryOwnerId: repositoryOwnerId > 0 ? repositoryOwnerId : configuration.Repository.RepositoryOwnerId,
                 ProviderQuotaAvailable: providerQuota,
@@ -323,10 +318,8 @@ internal static class BadgeSetupCapabilityInspector
     private static bool TryInspectProvider(
         HttpClient client,
         BadgeSetupConfiguration configuration,
-        out string? observedPlan,
         out bool quotaAvailable)
     {
-        observedPlan = null;
         quotaAvailable = false;
         if (string.IsNullOrWhiteSpace(configuration.Destination.Account))
         {
@@ -353,19 +346,10 @@ internal static class BadgeSetupCapabilityInspector
             return false;
         }
 
-        if (result.ValueKind == JsonValueKind.Object
-            && result.TryGetProperty("plan", out JsonElement plan)
-            && plan.ValueKind == JsonValueKind.Object
-            && plan.TryGetProperty("slug", out JsonElement slug)
-            && slug.ValueKind == JsonValueKind.String)
-        {
-            observedPlan = slug.GetString();
-        }
-
         using JsonDocument? workers = GetJson(client, $"{accountPath}/workers/scripts");
         using JsonDocument? durableObjects = GetJson(client, $"{accountPath}/workers/durable_objects/namespaces");
         quotaAvailable = workers is not null && durableObjects is not null;
-        return observedPlan is not null;
+        return true;
     }
 
     private static bool ContainsRequiredCheck(JsonElement root, string checkName)

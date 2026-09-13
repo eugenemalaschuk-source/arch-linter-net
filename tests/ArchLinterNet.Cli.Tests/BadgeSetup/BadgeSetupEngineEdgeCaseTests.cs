@@ -104,7 +104,7 @@ public sealed class BadgeSetupEngineEdgeCaseTests
             Assert.That(result.IsValid, Is.False);
             Assert.That(result.Plan.PlannedChanges, Is.Empty);
             Assert.That(result.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.ConfigurationConflict));
-            Assert.That(result.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.UnsupportedPlan));
+            Assert.That(result.Diagnostics.Select(static item => item.Code), Does.Not.Contain(BadgeSetupDiagnosticCodes.UnsupportedPlan));
             Assert.That(result.Diagnostics.Count(static item => item.Code == BadgeSetupDiagnosticCodes.MissingCapability), Is.GreaterThanOrEqualTo(4));
         });
     }
