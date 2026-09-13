@@ -32,8 +32,9 @@ from .model import EvidenceContext, PromotionStatus, ReasonCode
 
 
 class ProviderFailure(RuntimeError):
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, *, status_code: int | None = None) -> None:
         self.reason = reason
+        self.status_code = status_code
         super().__init__(reason)
 
 
@@ -92,7 +93,7 @@ class GitHubApi:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             if error.code in {403, 404}:
-                raise ProviderFailure("required_capability_unavailable") from error
+                raise ProviderFailure("required_capability_unavailable", status_code=error.code) from error
             raise ProviderFailure("github_api_unavailable") from error
         except (OSError, json.JSONDecodeError) as error:
             raise ProviderFailure("github_api_unavailable") from error
@@ -400,7 +401,8 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
             # GitHub may expose the newly created commit/tree slightly after the data API
             # accepts it. Give the ref service a bounded opportunity to observe those objects.
             print(
-                f"Architecture Health raw publication retry {attempt + 1}: {error.reason}",
+                f"Architecture Health raw publication retry {attempt + 1}: {error.reason}"
+                + (f" (http {error.status_code})" if error.status_code is not None else ""),
                 file=sys.stderr,
             )
             time.sleep(2**attempt)
