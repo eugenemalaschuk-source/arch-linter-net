@@ -56,6 +56,7 @@ _COMPATIBILITY_IDENTITIES = {
 _PACKAGE_IDS = list(package_manifest._PACKAGE_IDS)
 _WORKFLOW_PATH = ".github/workflows/architecture-health-badge-promotion.yml"
 _ACTION_PATH = ".github/actions/architecture-health-badge-promotion/action.yml"
+_ACTION_REF_PATH = ".github/actions/architecture-health-badge-promotion"
 
 # This is intentionally duplicated as a closed review boundary.  A caller cannot broaden the
 # shipped bundle by editing a caller-provided inventory file.
@@ -194,7 +195,7 @@ def _validate_inventory(value: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("The release inventory publisher paths are invalid.")
     if compatibility.get("workflow_ref") != f"{_PUBLISHER_REPOSITORY}/{_WORKFLOW_PATH}@{_APPROVED_PUBLISHER_COMMIT}":
         raise ValueError("The release inventory workflow reference is not immutable.")
-    if compatibility.get("action_ref") != f"{_PUBLISHER_REPOSITORY}/{_ACTION_PATH}@{_APPROVED_PUBLISHER_COMMIT}":
+    if compatibility.get("action_ref") != f"{_PUBLISHER_REPOSITORY}/{_ACTION_REF_PATH}@{_APPROVED_PUBLISHER_COMMIT}":
         raise ValueError("The release inventory action reference is not immutable.")
     for key in ("workflow_source_sha", "action_source_sha"):
         if not isinstance(compatibility.get(key), str) or not _GIT_BLOB_PATTERN.fullmatch(compatibility[key]):

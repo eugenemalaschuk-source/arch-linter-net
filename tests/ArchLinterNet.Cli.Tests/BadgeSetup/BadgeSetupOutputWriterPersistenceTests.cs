@@ -155,7 +155,6 @@ public sealed class BadgeSetupOutputWriterPersistenceTests
             Assert.That(File.Exists(Path.Combine(directory, "relay", "THIRD-PARTY-NOTICES.txt")), Is.True);
             Assert.That(File.Exists(Path.Combine(directory, "relay", "bundle-manifest.json")), Is.True);
             Assert.That(File.ReadAllText(Path.Combine(directory, "relay", "THIRD-PARTY-NOTICES.txt")), Is.EqualTo(File.ReadAllText(Path.Combine(RepositoryRoot(), "relay", "THIRD-PARTY-NOTICES.txt"))));
-            Assert.That(File.ReadAllText(Path.Combine(directory, "relay", "bundle-manifest.json")), Is.EqualTo(File.ReadAllText(Path.Combine(RepositoryRoot(), "relay", "bundle-manifest.json"))));
             string packagePath = Path.Combine(directory, "relay", "package.json");
             File.Delete(packagePath);
             Directory.CreateDirectory(packagePath);
@@ -167,6 +166,35 @@ public sealed class BadgeSetupOutputWriterPersistenceTests
                 Assert.That(File.ReadAllText(Path.Combine(directory, "badge-relay-config.json")), Is.EqualTo(originalConfig));
                 Assert.That(Directory.Exists(packagePath), Is.True);
             });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void GeneratedRelayManifestDescribesRenderedFiles()
+    {
+        string directory = TemporaryDirectory();
+        BadgeSetupConfiguration configuration = RelayConfiguration();
+        BadgeSetupPlan plan = BadgeSetupEngine.BuildPlan(
+            configuration,
+            new("owner", "repo", "private", new(
+                HasRequiredCheck: true,
+                HasRulesApi: true,
+                CanUseOidc: true,
+                CanUseRelay: true,
+                ProviderPlan: "pro",
+                RepositoryId: 123,
+                RepositoryOwnerId: 456,
+                ProviderQuotaAvailable: true))).Plan;
+        try
+        {
+            BadgeSetupOutputWriter.Write(directory, configuration, plan);
+
+            Assert.DoesNotThrow(() => BadgeRelayBundleIntegrityValidator.ValidateGenerated(
+                Path.Combine(directory, "relay"), configuration));
         }
         finally
         {

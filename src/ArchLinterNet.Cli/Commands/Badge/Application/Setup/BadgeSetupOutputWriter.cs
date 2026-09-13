@@ -14,7 +14,7 @@ internal static class BadgeSetupOutputWriter
     private static readonly string[] _renewalPermittedEvents = ["push", "schedule"];
     private static readonly string[] _pushPermittedEvents = ["push"];
     private static readonly string[] _allowedOidcAlgorithms = ["RS256"];
-    private static readonly string[] _relayAssetNames = ["package.json", "package-lock.json", "tsconfig.json", "THIRD-PARTY-NOTICES.txt", "bundle-manifest.json"];
+    private static readonly string[] _relayAssetNames = ["package.json", "package-lock.json", "tsconfig.json", "THIRD-PARTY-NOTICES.txt"];
     internal const string ReadmeStartMarker = "<!-- arch-linter-net:managed-badge-setup/v1:start -->";
     internal const string ReadmeEndMarker = "<!-- arch-linter-net:managed-badge-setup/v1:end -->";
     internal static void Write(string outputDirectory, BadgeSetupConfiguration configuration, BadgeSetupPlan plan)
@@ -623,7 +623,39 @@ jobs:
             files.Add(new("relay/" + fileName, ReadText(Path.Combine(root, fileName))));
         }
         files.Add(new("relay/wrangler.jsonc", RenderWrangler(configuration, ReadText(Path.Combine(root, "wrangler.jsonc")))));
+        files.Add(new("relay/bundle-manifest.json", RenderRelayBundleManifest(files)));
         return files;
+    }
+    private static string RenderRelayBundleManifest(IReadOnlyList<GeneratedFile> relayFiles)
+    {
+        const string SchemaPath = "schema/0.8.0/badge-relay-config.schema.json";
+        GeneratedFile[] manifestFiles = [.. relayFiles, new(SchemaPath, ReadAsset(SchemaPath))];
+        return Serialize(new
+        {
+            schema_id = "badge-relay-bundle-manifest/v1",
+            bundle = BadgeSetupContract.Bundle,
+            compatibility_plan = BadgeSetupContract.CompatibilityPlan,
+            publisher_pins = new
+            {
+                workflow_ref = BadgeSetupContract.DefaultPublisherWorkflowRef,
+                workflow_sha = BadgeSetupContract.DefaultPublisherWorkflowSha,
+                action_ref = BadgeSetupContract.DefaultActionRef,
+                action_sha = BadgeSetupContract.DefaultPublisherWorkflowSha,
+                commit = BadgeSetupContract.DefaultPublisherWorkflowSha,
+            },
+            files = manifestFiles
+                .Select(static file =>
+                {
+                    string path = file.Path.StartsWith("relay/", StringComparison.Ordinal) ? file.Path["relay/".Length..] : file.Path;
+                    return new
+                    {
+                        path,
+                        sha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(file.Contents))).ToLowerInvariant(),
+                    };
+                })
+                .OrderBy(static file => file.path, StringComparer.Ordinal)
+                .ToArray(),
+        });
     }
     private static string RenderWrangler(BadgeSetupConfiguration configuration, string template)
     {

@@ -5,6 +5,7 @@ import gzip
 import hashlib
 import io
 import json
+import re
 import subprocess
 import sys
 import tarfile
@@ -189,6 +190,7 @@ def test_metadata_binds_candidate_packages_and_exact_publisher_bytes(tmp_path: P
     assert metadata["approved_publisher_commit"] == distribution._APPROVED_PUBLISHER_COMMIT
     inventory = json.loads(INVENTORY.read_text(encoding="utf-8"))
     compatibility = inventory["compatibility"]
+    assert metadata["publisher"]["action"]["ref"] == compatibility["action_ref"]
     assert metadata["publisher"]["workflow"]["git_blob_sha"] == compatibility["workflow_source_sha"]
     assert metadata["publisher"]["action"]["git_blob_sha"] == compatibility["action_source_sha"]
     assert metadata["publisher"]["workflow"]["sha256"] == next(
@@ -199,6 +201,27 @@ def test_metadata_binds_candidate_packages_and_exact_publisher_bytes(tmp_path: P
         subject["sha256"] for subject in json.loads((transport / distribution._MANIFEST_FILE).read_text(encoding="utf-8"))["subjects"]
         if subject["kind"] == "publisher-action"
     )
+
+
+def test_inventory_action_ref_matches_badge_setup_contract() -> None:
+    inventory = json.loads(INVENTORY.read_text(encoding="utf-8"))
+    contract_path = (
+        ROOT
+        / "src"
+        / "ArchLinterNet.Cli"
+        / "Commands"
+        / "Badge"
+        / "Application"
+        / "Setup"
+        / "BadgeSetupModels.cs"
+    )
+    contract = contract_path.read_text(encoding="utf-8")
+    match = re.search(r'DefaultActionRef = "([^"]+)"', contract)
+
+    assert match is not None
+    action_ref = inventory["compatibility"]["action_ref"]
+    assert action_ref == match.group(1)
+    assert "/action.yml@" not in action_ref
 
 
 def test_verify_accepts_any_0_8_x_candidate_and_rejects_wrong_binding(tmp_path: Path) -> None:

@@ -18,7 +18,11 @@ internal static class BadgeRelayBundleIntegrityValidator
         "types.ts",
     ];
 
-    internal static void Validate(string root, BadgeSetupConfiguration configuration)
+    internal static void Validate(string root, BadgeSetupConfiguration configuration) => Validate(root, configuration, requireTrustedManifest: true);
+
+    internal static void ValidateGenerated(string root, BadgeSetupConfiguration configuration) => Validate(root, configuration, requireTrustedManifest: false);
+
+    private static void Validate(string root, BadgeSetupConfiguration configuration, bool requireTrustedManifest)
     {
         string manifestPath = Path.Combine(root, "bundle-manifest.json");
         if (!File.Exists(manifestPath) || new FileInfo(manifestPath).Attributes.HasFlag(FileAttributes.ReparsePoint))
@@ -28,7 +32,8 @@ internal static class BadgeRelayBundleIntegrityValidator
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(manifestPath));
+            byte[] manifestBytes = File.ReadAllBytes(manifestPath);
+            using JsonDocument document = JsonDocument.Parse(manifestBytes);
             JsonElement manifest = document.RootElement;
             RequireProperties(manifest, ["schema_id", "bundle", "compatibility_plan", "publisher_pins", "files"]);
             if (ManifestString(manifest, "schema_id") != "badge-relay-bundle-manifest/v1"
@@ -76,6 +81,7 @@ internal static class BadgeRelayBundleIntegrityValidator
             if (entries.ValueKind != JsonValueKind.Array) throw Integrity("files must be an array.");
             string[] expected = [.. SourceNames.Select(static name => "src/" + name), "package.json", "package-lock.json", "tsconfig.json", "wrangler.jsonc", "THIRD-PARTY-NOTICES.txt", "schema/0.8.0/badge-relay-config.schema.json"];
             HashSet<string> seen = [];
+            List<(string Path, string Digest)> manifestEntries = [];
             foreach (JsonElement entry in entries.EnumerateArray())
             {
                 RequireProperties(entry, ["path", "sha256"]);
@@ -86,6 +92,19 @@ internal static class BadgeRelayBundleIntegrityValidator
                     throw Integrity($"manifest contains an unsafe, duplicate, or unexpected path '{path}'.");
                 }
 
+                manifestEntries.Add((path, digest));
+            }
+
+            if (seen.Count != expected.Length) throw Integrity("manifest is missing one or more required files.");
+
+            if (requireTrustedManifest
+                && Convert.ToHexString(SHA256.HashData(manifestBytes)).ToLowerInvariant() != BadgeSetupContract.ShippedRelayBundleManifestSha256)
+            {
+                throw Integrity("bundle-manifest.json does not match the trusted shipped manifest.");
+            }
+
+            foreach ((string path, string digest) in manifestEntries)
+            {
                 string setupRoot = Directory.GetParent(root)?.FullName
                     ?? throw Integrity("Relay bundle parent directory is missing.");
                 string filePath = path.StartsWith("schema/", StringComparison.Ordinal)
@@ -99,8 +118,6 @@ internal static class BadgeRelayBundleIntegrityValidator
                 string actual = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(filePath))).ToLowerInvariant();
                 if (!IsSha(digest, 64) || actual != digest) throw Integrity($"digest mismatch for '{path}'.");
             }
-
-            if (seen.Count != expected.Length) throw Integrity("manifest is missing one or more required files.");
         }
         catch (JsonException exception)
         {

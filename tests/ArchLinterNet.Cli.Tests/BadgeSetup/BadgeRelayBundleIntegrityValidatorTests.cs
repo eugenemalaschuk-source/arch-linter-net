@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Cli.Commands.Badge.Application.Setup;
@@ -37,6 +38,32 @@ public sealed class BadgeRelayBundleIntegrityValidatorTests
     public void InvalidPublisherPinsShapeIsRejected()
     {
         AssertRejected(root => EditManifest(root, manifest => manifest["publisher_pins"] = new JsonObject()), "unknown or missing properties");
+    }
+
+    [Test]
+    public void TrustedManifestAnchorRejectsSelfConsistentTampering()
+    {
+        string root = CopyRelayBundle(out string temporary);
+        try
+        {
+            string sourcePath = Path.Combine(root, "src", "security.ts");
+            File.AppendAllText(sourcePath, "\nexport const tampered = true;\n");
+            EditManifest(root, manifest =>
+            {
+                JsonArray files = (JsonArray)manifest["files"]!;
+                JsonObject entry = files
+                    .OfType<JsonObject>()
+                    .Single(file => (string?)file["path"] == "src/security.ts");
+                entry["sha256"] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(sourcePath))).ToLowerInvariant();
+            });
+
+            IOException? exception = Assert.Throws<IOException>(() => BadgeRelayBundleIntegrityValidator.Validate(root, Configuration()));
+            Assert.That(exception!.Message, Does.Contain("trusted shipped manifest"));
+        }
+        finally
+        {
+            Directory.Delete(temporary, recursive: true);
+        }
     }
 
     [Test]
