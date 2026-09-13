@@ -130,7 +130,10 @@ internal static class ArchitectureAnalysisSnapshotEvaluationProjector
         var waiverLifecycleAssessment = new ArchitectureWaiverLifecycleAssessment(
             waiverProfile,
             waivers,
-            blockingWaiverStates);
+            blockingWaiverStates)
+        {
+            EvaluationDate = input.WaiverEvaluationDate,
+        };
         bool hasBlockingWaiver = waiverLifecycleAssessment.HasBlockingRecords;
 
         bool ordinaryPassed = allViolations.Count == 0 && execution.Cycles.Count == 0
