@@ -158,6 +158,32 @@ def test_valid_artifact_returns_exact_canonical_bytes() -> None:
     assert artifact.payload_sha256 == hashlib.sha256(payload_bytes()).hexdigest()
 
 
+def test_valid_artifact_accepts_stringified_github_identifier_context() -> None:
+    current = evidence()
+    payload = payload_bytes()
+    manifest = {
+        "schema": CONFIG.schema_id,
+        "kind": "architecture-health-badge",
+        "context": {
+            "repository": current.repository,
+            "base_ref": current.base_ref,
+            "base_sha": current.base_sha,
+            "head_sha": current.head_sha,
+            "head_tree_sha": current.head_tree_sha,
+            "pr_number": str(current.pr_number),
+            "run_id": str(current.run_id),
+            "run_attempt": str(current.run_attempt),
+        },
+        "payload": {
+            "path": CONFIG.producer.payload_path,
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        },
+    }
+    artifact = validate_artifact(archive_bytes(payload=payload, manifest=manifest), CONFIG, current)
+    assert artifact.payload == payload
+
+
 @pytest.mark.parametrize(
     "mutator, message",
     [

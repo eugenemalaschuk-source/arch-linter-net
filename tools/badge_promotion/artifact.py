@@ -88,6 +88,16 @@ def _manifest_context(manifest: Mapping[str, Any]) -> Mapping[str, Any]:
     return context
 
 
+def _manifest_value_matches(actual: Any, expected: Any) -> bool:
+    """Compare API integers with their string form emitted by Actions env vars."""
+    if isinstance(expected, int) and not isinstance(expected, bool):
+        return (
+            (isinstance(actual, int) and not isinstance(actual, bool) and actual == expected)
+            or (isinstance(actual, str) and actual == str(expected))
+        )
+    return actual == expected
+
+
 def _validate_manifest(manifest: Mapping[str, Any], config: PromotionConfig, evidence: EvidenceContext, payload: bytes) -> None:
     if set(manifest) != {"schema", "kind", "context", "payload"} or manifest.get("schema") != config.schema_id or manifest.get("kind") != "architecture-health-badge":
         raise ArtifactValidationError("manifest shape is invalid")
@@ -104,7 +114,11 @@ def _validate_manifest(manifest: Mapping[str, Any], config: PromotionConfig, evi
         "semantic_horizon": evidence.semantic_horizon.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     expected_context.update({key: value for key, value in optional_context.items() if key in context})
-    if dict(context) != expected_context:
+    mismatched_key = next(
+        (key for key, value in expected_context.items() if not _manifest_value_matches(context.get(key), value)),
+        None,
+    )
+    if set(context) != set(expected_context) or mismatched_key is not None:
         reason_by_field = {
             "workflow_path": ReasonCode.WORKFLOW_MISMATCH,
             "workflow_sha": ReasonCode.WORKFLOW_MISMATCH,
@@ -117,7 +131,7 @@ def _validate_manifest(manifest: Mapping[str, Any], config: PromotionConfig, evi
             "artifact_id": ReasonCode.ARTIFACT_MISMATCH,
             "artifact_name": ReasonCode.ARTIFACT_MISMATCH,
         }
-        reason = next((reason_by_field[key] for key in expected_context if context.get(key) != expected_context[key] and key in reason_by_field), None)
+        reason = reason_by_field.get(mismatched_key)
         raise ArtifactValidationError("manifest provenance binding is invalid", reason)
     payload_ref = manifest.get("payload")
     if not isinstance(payload_ref, dict) or set(payload_ref) != {"path", "bytes", "sha256"}:
