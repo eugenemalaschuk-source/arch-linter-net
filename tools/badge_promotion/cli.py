@@ -36,6 +36,33 @@ class ProviderFailure(RuntimeError):
         super().__init__(reason)
 
 
+class _ArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Follow GitHub's signed artifact redirect without forwarding the bearer token."""
+
+    def redirect_request(
+        self,
+        request: urllib.request.Request,
+        response: Any,
+        code: int,
+        message: str,
+        headers: Any,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        target = urllib.parse.urlparse(newurl)
+        if target.scheme != "https":
+            return None
+        redirected = super().redirect_request(request, response, code, message, headers, newurl)
+        if redirected is None:
+            return None
+        source_host = urllib.parse.urlparse(request.full_url).netloc
+        if target.netloc != source_host:
+            for header_map in (redirected.headers, redirected.unredirected_hdrs):
+                for header_name in list(header_map):
+                    if header_name.lower() == "authorization":
+                        del header_map[header_name]
+        return redirected
+
+
 class GitHubApi:
     def __init__(self) -> None:
         self.base = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
@@ -71,9 +98,10 @@ class GitHubApi:
         api_host = urllib.parse.urlparse(self.base).netloc
         if parsed.scheme != "https" or parsed.netloc not in {api_host, "api.github.com"}:
             raise ProviderFailure("artifact_url_unapproved")
-        request = urllib.request.Request(url, headers={"accept": "application/octet-stream", "authorization": f"Bearer {self.token}"})
+        request = urllib.request.Request(url, headers={"accept": "application/vnd.github+json", "authorization": f"Bearer {self.token}"})
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            opener = urllib.request.build_opener(_ArtifactRedirectHandler())
+            with opener.open(request, timeout=30) as response:
                 data = response.read(65_537)
         except (OSError, urllib.error.HTTPError) as error:
             raise ProviderFailure("artifact_download_failed") from error
