@@ -32,6 +32,8 @@ public sealed class ArchitectureHealthReportEvidenceTests
             Assert.That(evidence.GetProperty("health").GetString(), Is.EqualTo(root.GetProperty("health").GetString()));
             Assert.That(receipt.GetProperty("policy_inventory").GetProperty("effective_rule_count").GetInt32(), Is.EqualTo(3));
             Assert.That(receipt.GetProperty("waiver_lifecycle").GetProperty("records").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(receipt.GetProperty("waiver_lifecycle").GetProperty("evaluation_date").GetString(),
+                Is.EqualTo("2026-09-01"));
             Assert.That(receipt.GetProperty("applicability").GetProperty("controls").GetArrayLength(), Is.EqualTo(1));
             Assert.That(receipt.GetProperty("findings").GetArrayLength(), Is.GreaterThan(0));
             Assert.That(receipt.GetProperty("provenance").GetProperty("repository_root").GetString(), Is.EqualTo("/repo"));
@@ -184,6 +186,9 @@ public sealed class ArchitectureHealthReportEvidenceTests
             PolicyInventory = inventory,
             WaiverLifecycleAssessment = includeInventory
                 ? new ArchitectureWaiverLifecycleAssessment("strict", [Waiver()], ["expired"])
+                {
+                    EvaluationDate = new DateOnly(2026, 9, 1),
+                }
                 : null,
             ApplicabilityExpectedEntries = [expected],
             ApplicabilityRecords = [record],

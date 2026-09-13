@@ -95,7 +95,10 @@ internal static class ArchitecturePrReportReceiptParser
         return new ArchitectureWaiverLifecycleAssessment(
             RequiredString(element, "profile"),
             records.EnumerateArray().Select(ReadWaiver).ToArray(),
-            ReadStringArray(Required(element, "blocking_states", JsonValueKind.Array)));
+            ReadStringArray(Required(element, "blocking_states", JsonValueKind.Array)))
+        {
+            EvaluationDate = OptionalDate(element, "evaluation_date"),
+        };
     }
 
     internal static ArchitecturePrReportApplicability ReadApplicability(JsonElement element)

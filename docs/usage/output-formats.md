@@ -343,6 +343,10 @@ Baseline finding debt, ordinary findings, and intended scope exclusions are not
 waiver debt. Consumers must preserve a missing `policy_inventory` as missing
 evidence rather than interpreting it as zero rules or zero waivers.
 
+The Health report's `waiver_lifecycle.evaluation_date` is retained even when
+`records` is empty, so a zero-waiver run still carries the explicit evaluation
+date needed to establish a finite publication horizon.
+
 Example shape:
 
 ```json
