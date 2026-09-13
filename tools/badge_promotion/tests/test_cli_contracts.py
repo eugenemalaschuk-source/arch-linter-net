@@ -241,11 +241,14 @@ def test_raw_publication_retries_a_transient_ref_update_race(monkeypatch: pytest
         }
     )
     monkeypatch.setenv("GITHUB_SHA", main_sha)
+    sleeps: list[int] = []
+    monkeypatch.setattr(cli.time, "sleep", sleeps.append)
 
     _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
 
     assert api.patch_attempts == 2
     assert api.paths.count(ref_path) == 3
+    assert sleeps == [1]
 
 
 def test_semantic_evidence_member_is_bounded_before_decompression() -> None:
