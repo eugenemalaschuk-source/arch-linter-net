@@ -208,10 +208,10 @@ public sealed class SelfPolicyNegativeRegressionTests
         AssertFailedMentioning(result, "Exception");
     }
 
-    // ── #742 partial-declaration debt ratchet ───────────────────────────────
+    // ── Strict production declaration-count policy ─────────────────────────
     [TestCase("ArchLinterNet.Cli.Commands.Validate.Application.ValidateCommandHandler")]
     [TestCase("ArchLinterNet.Cli.Commands.Validate.Application.ReportCoordinator")]
-    public void PartialDeclarationRatchet_DoesNotRetainTheRemediatedValidateCommandWaiver(string remediatedType)
+    public void ProductionDeclarationPolicy_DoesNotRetainTheRemediatedValidateCommandWaiver(string remediatedType)
     {
         Assert.That(
             _policy,
@@ -244,7 +244,7 @@ public sealed class SelfPolicyNegativeRegressionTests
                     sarifOriginal,
                     $"public sealed class {SarifFormatter}",
                     $"public sealed partial class {SarifFormatter}"));
-            SelfPolicyRepository.WriteMutatedReportingSource(
+            string addedPath = SelfPolicyRepository.WriteMutatedReportingSource(
                 _repositoryRoot,
                 """
                 namespace ArchLinterNet.Core.Reporting;
@@ -260,10 +260,26 @@ public sealed class SelfPolicyNegativeRegressionTests
 
             ArchitectureValidationResult result = ValidateMutated(
                 _policy,
-                "production-partial-type-declaration-count-does-not-increase");
+                "production-types-have-one-source-declaration");
 
             AssertFailedMentioning(result, DiagnosticFormatter);
             AssertFailedMentioning(result, SarifFormatter);
+
+            LayoutConventionDiagnostic diagnosticFinding = FindLayoutFinding(
+                result,
+                "production-types-have-one-source-declaration",
+                $"ArchLinterNet.Core.Reporting.{DiagnosticFormatter}");
+            Assert.Multiple(() =>
+            {
+                Assert.That(diagnosticFinding.ExpectedDeclarationCount, Is.EqualTo(1));
+                Assert.That(diagnosticFinding.ActualDeclarationCount, Is.EqualTo(2));
+                Assert.That(
+                    diagnosticFinding.DeclarationPaths,
+                    Is.EqualTo(new[] { diagnosticPath, addedPath }
+                        .Select(path => SelfPolicyRepository.RelativePolicyPath(_repositoryRoot, path))
+                        .OrderBy(path => path, StringComparer.Ordinal)
+                        .ToArray()));
+            });
         }
         finally
         {
@@ -288,31 +304,9 @@ public sealed class SelfPolicyNegativeRegressionTests
 
         ArchitectureValidationResult result = ValidateMutated(
             _policy,
-            "production-partial-type-declaration-count-does-not-increase");
+            "production-types-have-one-source-declaration");
 
         AssertFailedMentioning(result, Scanner);
-    }
-
-    [Test]
-    public void PartialDeclarationRatchet_RejectsANewProductionAggregate()
-    {
-        const string Aggregate = "PartialDeclarationRatchetFixture";
-        const string Source = """
-            namespace ArchLinterNet.Core.Reporting;
-
-            internal static partial class PartialDeclarationRatchetFixture
-            {
-            }
-            """;
-
-        SelfPolicyRepository.WriteMutatedReportingSource(_repositoryRoot, Source);
-        SelfPolicyRepository.WriteMutatedReportingSource(_repositoryRoot, Source);
-
-        ArchitectureValidationResult result = ValidateMutated(
-            _policy,
-            "production-partial-type-declaration-count-does-not-increase");
-
-        AssertFailedMentioning(result, Aggregate);
     }
 
     [Test]

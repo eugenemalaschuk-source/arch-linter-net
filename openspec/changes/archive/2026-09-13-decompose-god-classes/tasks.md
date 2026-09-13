@@ -14,7 +14,7 @@
 - [x] 2.4 Replace `ArchitectureDiagnosticFormatter` and SARIF formatter partial aggregates with named renderers/projections while preserving human, JSON, and SARIF output parity.
   - [x] Extract the v0.8 applicability, waiver, imported-diagnostic, policy-inventory, and contract-surface projections behind compatibility façades, and move imported-diagnostic SARIF locations to a focused projection collaborator (#777).
   - [x] Extract the remaining diagnostic and SARIF responsibility families into top-level internal, non-partial renderers/projectors; retain one public compatibility façade per formatter, preserve output/cancellation parity, and remove the two exact declaration-count waivers (#802).
-- [ ] 2.5 Remove incidental production partial aggregates created by command, validation, policy-loading, and source-index splits; every replacement must have a named responsibility.
+- [x] 2.5 Remove incidental production partial aggregates created by command, validation, policy-loading, and source-index splits; every replacement must have a named responsibility.
   - [x] Replace the five-declaration `ValidateCommandHandler` and two-declaration `ReportCoordinator`
     aggregates with non-partial responsibility collaborators, preserve command/cache/cancellation/profile
     and sink-rendering semantics, and remove their exact declaration-count waivers (#803).
@@ -107,7 +107,7 @@
 
 ## 4. Enforce and verify the final convention
 
-- [ ] 4.1 Switch the production declaration-count self-policy from audit to strict with a maximum of one source declaration and add a negative regression (#805).
-- [ ] 4.2 Update architecture capability documentation and OpenSpec specifications with the final convention and any reviewed exceptions (#805).
-- [ ] 4.3 Run public API review, policy/lint gates, full tests, and OpenSpec validation; verify that no handwritten production partial aggregate remains (#805).
+- [x] 4.1 Switch the production declaration-count self-policy from audit to strict with a maximum of one source declaration and add a negative regression (#805).
+- [x] 4.2 Update architecture capability documentation and OpenSpec specifications with the final convention and any reviewed exceptions (#805).
+- [x] 4.3 Run public API review, policy/lint gates, full tests, and OpenSpec validation; verify that no handwritten production partial aggregate remains (#805).
 - [x] 4.4 Model direct CLI command folders as independent feature modules, retain recursive convention rules for their nested folders, and add a negative self-policy regression.

@@ -328,43 +328,49 @@ new contract family for this purpose.
 - **THEN** the strict self-policy reports a violation rather than allowing the
   CLI to bypass the reusable History composition/result seam
 
-### Requirement: New or grown production partial-type aggregates are blocked
+### Requirement: Production types are not handwritten partial aggregates
 
-The repository's architecture contract SHALL declare a strict `layout_conventions` rule reusing
-`max_declarations_per_type: 1` over production source (`folder_segment: src`), separate from the
-existing audit-only `production-types-have-one-source-declaration` rule, which remains unchanged as
-the full-debt inventory `decompose-god-classes` targets. The strict rule SHALL freeze today's
-reviewed offending types through exact-match `ignored_violations` entries (exact `source_type` and
-exact `forbidden_reference`, matching this repository's already-shipped ignore mechanism) rather
-than a new baseline file, metric kind, or per-type numeric-override schema field. Every reviewed
-entry SHALL be an exact snapshot of one type's current declaration count and file list.
+The repository self-policy SHALL strictly require every governed production `src` type to have at
+most one handwritten source declaration through the `production-types-have-one-source-declaration`
+layout-convention rule with `max_declarations_per_type: 1`. The rule SHALL be the sole production
+declaration-count authority: it SHALL not be duplicated as an audit-only rule, ratcheted through
+per-type `ignored_violations`, or weakened by a baseline. The rule SHALL not govern test fixtures,
+generated declarations, or language/interop samples that intentionally model C# partial-type
+semantics.
 
-#### Scenario: An unchanged known aggregate remains accepted debt
-- **WHEN** a reviewed type's declarations exactly match its frozen `ignored_violations` entry
-- **THEN** `make lint-architecture` does not report a violation for that type
+#### Scenario: A production type is split across handwritten source files
 
-#### Scenario: A reviewed aggregate gains a declaration
-- **WHEN** a type with a frozen reviewed entry gains an additional source declaration
-- **THEN** its declaration text and canonical identity change, the frozen entry no longer matches,
-  and strict validation fails for that type
+- **WHEN** a production type is split across two handwritten source files after the strict rule is
+  enabled
+- **THEN** `make lint-architecture` fails with the type name and both declaration paths
 
-#### Scenario: A new handwritten partial type is introduced
-- **WHEN** a production type outside the reviewed exception list is declared across more than one
-  source file
-- **THEN** strict validation fails naming the type, its actual declaration count, and its paths
+#### Scenario: Intentional partial-language fixtures remain analyzable
 
-#### Scenario: A reviewed aggregate is fully resolved
-- **WHEN** a reviewed type's declarations are reduced to exactly one
-- **THEN** the checker stops reporting a candidate for that type and its now-stale
-  `ignored_violations` entry must be removed in the same change, because
-  `unmatched_ignored_violations` fails closed by default
+- **WHEN** a test fixture deliberately declares one type across multiple source files
+- **THEN** the production declaration-count rule does not report that fixture
+- **AND** the source-file index continues to expose its ambiguity semantics for its dedicated tests
 
-#### Scenario: Improving a reviewed aggregate without finishing it changes required evidence
-- **WHEN** a reviewed type's declaration count decreases but remains above one
-- **THEN** its frozen entry's exact text no longer matches the new count, and the change must update
-  that entry to the new exact evidence for strict validation to pass
+### Requirement: Direct CLI command modules are independent
 
-#### Scenario: The audit inventory remains the full-debt authority
-- **WHEN** `make audit-architecture` runs `production-types-have-one-source-declaration`
-- **THEN** it continues to report every production type above one declaration, including reviewed
-  entries accepted by the strict ratchet rule
+The repository self-policy SHALL strictly forbid direct first-party namespace dependencies between
+distinct immediate command modules under `ArchLinterNet.Cli.Commands`. The policy SHALL retain a
+reviewed inventory of command layers, so a newly introduced command cannot silently bypass the
+boundary. The generic `Abstractions`, `Models`, and `Exceptions` conventions SHALL remain
+recursive and apply within each command without per-command duplication.
+
+#### Scenario: A command references a sibling command implementation
+
+- **WHEN** a type in `ArchLinterNet.Cli.Commands.Baseline` references a type in
+  `ArchLinterNet.Cli.Commands.PublicApi`
+- **THEN** `make lint-architecture` fails with the source and target command modules
+
+#### Scenario: A command uses a top-level CLI abstraction
+
+- **WHEN** a command references a type in `ArchLinterNet.Cli.Abstractions`
+- **THEN** the command-independence contract does not report a violation
+
+#### Scenario: A direct command folder is added
+
+- **WHEN** a new direct folder with a command module is added below `ArchLinterNet.Cli.Commands`
+- **THEN** the self-policy inventory regression fails until the command is added to the reviewed
+  independence contract

@@ -42,6 +42,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Self-architecture health baseline and remediation ownership](self-architecture-health-baseline.md) — durable raw post-v0.8 Health evidence and the focused owner for every reviewed aggregate, layout finding, preflight diagnostic, and remaining OpenSpec obligation (#804/#784).
 
+- [Self-architecture health acceptance evidence](evidence/self-architecture-health-acceptance-2026-09-13/README.md) — final strict/audit before-after evidence, local Health/coverage outputs, and public badge/report parity readback for #805.
+
 - [OpenSSF Best Practices Metal-passing assessment](openssf-best-practices-metal-passing-assessment.md) — per-criterion evidence checklist and manual-submission notes for project `13572`'s passing-level self-assessment (#287).
 
 ## Publishing rule
