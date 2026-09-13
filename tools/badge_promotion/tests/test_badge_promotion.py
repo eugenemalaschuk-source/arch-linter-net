@@ -184,6 +184,12 @@ def test_valid_artifact_accepts_stringified_github_identifier_context() -> None:
     assert artifact.payload == payload
 
 
+def test_valid_artifact_accepts_one_canonical_trailing_newline() -> None:
+    payload = payload_bytes() + b"\n"
+    artifact = validate_artifact(archive_bytes(payload=payload), CONFIG, evidence())
+    assert artifact.payload == payload
+
+
 @pytest.mark.parametrize(
     "mutator, message",
     [
@@ -192,6 +198,7 @@ def test_valid_artifact_accepts_stringified_github_identifier_context() -> None:
         (lambda data: archive_bytes(payload=b"{\xff"), "payload"),
         (lambda data: archive_bytes(payload=b'{"schemaVersion":1,"schemaVersion":1,"label":"architecture","message":"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules","color":"brightgreen"}'), "duplicate"),
         (lambda data: archive_bytes(payload=b'{"schemaVersion":1,"label":"architecture","message":"PASS \\u00b7 HEALTHY \\u00b7 0 ignores \\u00b7 42 rules","color":"brightgreen"}'), "canonical"),
+        (lambda data: archive_bytes(payload=payload_bytes() + b"\n\n"), "canonical"),
     ],
 )
 def test_hostile_artifact_fails_closed(mutator, message: str) -> None:
