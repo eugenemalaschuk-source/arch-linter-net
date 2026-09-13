@@ -3,10 +3,12 @@ using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Core.Validation.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitecturePublicApiApplicationServiceTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitecturePublicApiApplicationServiceTests
+[TestFixture]
+public sealed class ArchitecturePublicApiApplicationServiceCompositionTests
 {
     [Test]
     public void CoreComposition_RegistersSurfaceResolverAndApplicationFacade()

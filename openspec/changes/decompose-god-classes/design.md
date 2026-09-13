@@ -11,6 +11,25 @@ The current inventory contains 32 `ArchitectureContractGroups`, 30
 use `partial` extensively to group unrelated scenarios and must be reduced without removing the
 small source fixtures that intentionally model partial-type semantics.
 
+### Test-suite cleanup evidence (#822)
+
+The Core test cleanup separates unrelated responsibility groups into independently discoverable
+fixtures. The before state used multi-file partial aggregates for snapshot profile/ensure-built/
+metrics, baseline build-state/lifecycle/migration, source-index edge cases, formatter and SARIF
+coverage, public-API/build-state and validation seams, contract/applicability/project-discovery
+scenarios, CEL contextual contracts, expression compilation, Testing-adapter policy context,
+build-state preflight, and external-diagnostics identity/selection/parity. The after state uses
+purpose-named NUnit fixtures (and explicit abstract setup bases only where two fixtures genuinely
+share lifecycle setup), with helper visibility scoped to those fixtures.
+
+The cleanup retains only reviewed language/tooling cases: inline and two-file `PartialFixture` /
+`IntentionalFixture` source snippets that exercise partial declaration indexing, generated
+`GeneratedRegex`/interop declarations that require a partial containing type, and the cohesive
+Checkpoint B release-gate/process-runner harness already owned by #778. The new
+`CoreTestArchitectureCleanupTests` regression proves the intentional two-file source fixture
+still produces both stable declarations and fails when a handwritten production type spans source
+files. No production declaration-count exception or policy weakening is introduced.
+
 ## Goals / Non-Goals
 
 **Goals:**

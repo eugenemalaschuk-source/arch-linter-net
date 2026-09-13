@@ -5,14 +5,16 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitecturePublicApiApplicationServiceTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitecturePublicApiApplicationServiceTests
+[TestFixture]
+public sealed class ArchitecturePublicApiApplicationServiceBuildStateTests
 {
-    private static readonly string[] _value = { "net10.0" };
-    private static readonly string[] _value1 = { "Release", "Release" };
-    private static readonly string[] _value2 = { "net10.0", "net10.0" };
+    internal static readonly string[] TargetFrameworks = { "net10.0" };
+    internal static readonly string[] Configurations = { "Release", "Release" };
+    internal static readonly string[] ResolvedTargetFrameworks = { "net10.0", "net10.0" };
     [Test]
     public void Capture_EnsureBuilt_RecreatesRunnerAndReverifiesPostBuildArtifacts()
     {
@@ -23,7 +25,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
         {
             DiscoveredProjects = new[]
             {
-                new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, _value),
+                new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, TargetFrameworks),
             },
             ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -67,9 +69,9 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
             }));
             Assert.That(preparation.Requests, Is.All.Property(nameof(BuildStatePreflightRequest.NoRestore)).True);
             Assert.That(preparation.Requests.Select(request => request.RequestedConfiguration),
-                Is.EqualTo(_value1));
+                Is.EqualTo(Configurations));
             Assert.That(preparation.Requests.Select(request => request.RequestedTargetFramework),
-                Is.EqualTo(_value2));
+                Is.EqualTo(ResolvedTargetFrameworks));
             Assert.That(preparation.Requests.Select(request => request.Resolution.ResolvedAssemblyPaths[AssemblyName]),
                 Is.EqualTo(new[] { ArtifactPath, ArtifactPath }));
         });

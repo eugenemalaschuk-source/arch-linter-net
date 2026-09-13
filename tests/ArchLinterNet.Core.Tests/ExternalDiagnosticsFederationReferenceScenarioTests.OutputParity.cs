@@ -5,9 +5,9 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
+internal static class ExternalDiagnosticsOutputParityAssertions
 {
-    private static void AssertOutputParity(
+    internal static void AssertOutputParity(
         ImportedExternalDiagnostic detail,
         ArchitectureFinding finding,
         Dictionary<string, object?> json,

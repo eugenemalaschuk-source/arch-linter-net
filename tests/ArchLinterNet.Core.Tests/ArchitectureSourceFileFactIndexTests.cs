@@ -6,18 +6,21 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-[TestFixture]
-public sealed partial class ArchitectureSourceFileFactIndexTests
+/// <summary>
+/// Shared source-index test support is test-free; core single-file/ambiguity scenarios live in the
+/// concrete fixture below and edge cases live in a separate focused fixture.
+/// </summary>
+public abstract class ArchitectureSourceFileFactIndexTestSupport
 {
-    private static readonly Assembly _testAssembly = typeof(ArchitectureSourceFileFactIndexTests).Assembly;
-    private static readonly Assembly[] _testAssemblyOnly = [_testAssembly];
-    private const string TestAssemblyName = "ArchLinterNet.Core.Tests";
+    protected static readonly Assembly TestAssembly = typeof(ArchitectureSourceFileFactIndexTestSupport).Assembly;
+    protected const string TestAssemblyName = "ArchLinterNet.Core.Tests";
 
-    private static readonly string[] _srcDomain = ["src", "Domain"];
-    private static readonly string[] _srcMyProjectDomain = ["src", "MyProject", "Domain"];
-    private static readonly string[] _srcRoot = ["src"];
-    private static readonly string[] _nsSegments = ["ArchLinterNet", "Core", "Tests", "SourceFactFixtures"];
-    private static readonly string[] _fileTypeNames =
+    protected static readonly string[] SrcDomain = ["src", "Domain"];
+    protected static readonly string[] SrcMyProjectDomain = ["src", "MyProject", "Domain"];
+    protected static readonly string[] SrcRoot = ["src"];
+    protected static readonly string[] SingleSourceRoot = ["src"];
+    protected static readonly string[] NamespaceSegments = ["ArchLinterNet", "Core", "Tests", "SourceFactFixtures"];
+    protected static readonly string[] FileTypeNames =
     [
         "ArchLinterNet.Core.Tests.SourceFactFixtures.FileTypeA",
         "ArchLinterNet.Core.Tests.SourceFactFixtures.FileTypeB"
@@ -25,7 +28,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
 
     // Builds an index backed by FakeArchitectureFileSystem seeded with the given files.
     // sourceRoot is relative to repoRoot (e.g. "src").
-    private static ArchitectureSourceFileFactIndex BuildIndex(
+    private protected static ArchitectureSourceFileFactIndex BuildIndex(
         string repoRoot,
         string sourceRoot,
         Dictionary<string, string> files,
@@ -54,7 +57,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         }
 
         return new ArchitectureSourceFileFactIndex(
-            new[] { _testAssembly },
+            new[] { TestAssembly },
             absoluteRepoRoot,
             new[] { sourceRoot },
             preprocessorSymbols: null,
@@ -68,6 +71,19 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             new ArchitectureSourceFileFactIndex.ConstructionOptions(
                 CancellationToken: default, ProfilingCounters: profilingCounters));
     }
+}
+
+[TestFixture]
+public sealed class ArchitectureSourceFileFactIndexTests : ArchitectureSourceFileFactIndexTestSupport
+{
+    private static readonly Assembly _testAssembly = TestAssembly;
+    private static readonly Assembly[] _testAssemblyOnly = [TestAssembly];
+    private static readonly string[] _srcDomain = SrcDomain;
+    private static readonly string[] _srcMyProjectDomain = SrcMyProjectDomain;
+    private static readonly string[] _srcRoot = SrcRoot;
+    private static readonly string[] _singleSourceRoot = SingleSourceRoot;
+    private static readonly string[] _nsSegments = NamespaceSegments;
+    private static readonly string[] _fileTypeNames = FileTypeNames;
 
     [Test]
     public void AllFacts_SourceFilesScanned_ExcludesGeneratedFilesBeforeCountingParsedInputs()

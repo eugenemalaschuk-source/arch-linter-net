@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class ArchitectureHealthProjectorTests
+public sealed class ArchitectureHealthProjectorTests
 {
     private static readonly string[] _expectedDimensionNames =
     [
@@ -494,7 +494,7 @@ public sealed partial class ArchitectureHealthProjectorTests
         });
     }
 
-    private static ArchitectureHealthValidationOutcome Outcome(
+    internal static ArchitectureHealthValidationOutcome Outcome(
         string mode,
         bool passed = true,
         ArchitecturePolicyInventory? inventory = null,
@@ -538,12 +538,12 @@ public sealed partial class ArchitectureHealthProjectorTests
         return new ArchitectureHealthValidationOutcome(mode, validation);
     }
 
-    private static ArchitectureHealthSummary Project(
+    internal static ArchitectureHealthSummary Project(
         IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes,
         ArchitectureDebtGateOutcome debtGate) =>
         ArchitectureHealthProjector.Project(outcomes, debtGate);
 
-    private static ArchitectureDebtGateOutcome DebtGate(
+    internal static ArchitectureDebtGateOutcome DebtGate(
         bool succeeded = true,
         bool passed = true,
         bool inSync = true,
@@ -569,7 +569,7 @@ public sealed partial class ArchitectureHealthProjectorTests
         };
     }
 
-    private static ArchitecturePolicyInventory Inventory(
+    internal static ArchitecturePolicyInventory Inventory(
         ArchitecturePolicyInventoryIgnoreDebt? ignoreDebt = null,
         IReadOnlyList<ArchitectureWaiverLifecycleRecord>? waivers = null) => new(
         ArchitecturePolicyInventory.CurrentSchemaId,
@@ -578,14 +578,14 @@ public sealed partial class ArchitectureHealthProjectorTests
         ignoreDebt ?? DebtFor(waivers ?? []),
         waivers ?? []);
 
-    private static ArchitectureWaiverLifecycleAssessment Lifecycle(
+    internal static ArchitectureWaiverLifecycleAssessment Lifecycle(
         IReadOnlyList<ArchitectureWaiverLifecycleRecord> records,
         string profile = "strict") => new(
         profile,
         records,
         profile == "strict" ? ["expired", "invalid", "stale"] : ["invalid"]);
 
-    private static ArchitecturePolicyInventoryIgnoreDebt DebtFor(
+    internal static ArchitecturePolicyInventoryIgnoreDebt DebtFor(
         IReadOnlyList<ArchitectureWaiverLifecycleRecord> records) => new(
         records.Count,
         records.Count(record => record.State == "active"),
@@ -594,7 +594,7 @@ public sealed partial class ArchitectureHealthProjectorTests
         records.Count(record => record.State == "metadata_incomplete"),
         records.Count(record => record.State == "invalid"));
 
-    private static ArchitectureWaiverLifecycleRecord Waiver(string state, string id = "waiver-1") => new(
+    internal static ArchitectureWaiverLifecycleRecord Waiver(string state, string id = "waiver-1") => new(
         id,
         state,
         "Sample waiver",
@@ -611,13 +611,13 @@ public sealed partial class ArchitectureHealthProjectorTests
         new DateOnly(2026, 9, 1),
         state == "active");
 
-    private static ArchitectureApplicabilityRecord EvaluableRecord(string control, string family) => new(
+    internal static ArchitectureApplicabilityRecord EvaluableRecord(string control, string family) => new(
         control,
         family,
         ArchitectureApplicabilityRecordState.Evaluable,
         new ArchitectureApplicabilityProvenance(family, control, "health-policy"));
 
-    private static ArchitectureViolation MetricBreach() => new(
+    internal static ArchitectureViolation MetricBreach() => new(
         "metric budget",
         "budget.api",
         "Sample.Api",
@@ -636,14 +636,14 @@ public sealed partial class ArchitectureHealthProjectorTests
             ["Sample.Api"]),
     };
 
-    private static ArchitectureViolation CoverageFinding() => new(
+    internal static ArchitectureViolation CoverageFinding() => new(
         "namespace is uncovered",
         "coverage.namespace",
         "Sample.Application",
         "Sample.Infrastructure",
         ["Sample.Application"]);
 
-    private static SarifSelectedExternalDiagnostic SelectedExternalDiagnostic(
+    internal static SarifSelectedExternalDiagnostic SelectedExternalDiagnostic(
         string identity,
         SarifExternalDiagnosticGovernanceMode mode)
     {
@@ -671,17 +671,17 @@ public sealed partial class ArchitectureHealthProjectorTests
             [provenance]);
     }
 
-    private static ArchitectureAssessmentCompletionEvidence CompleteApplicability() =>
+    internal static ArchitectureAssessmentCompletionEvidence CompleteApplicability() =>
         new(ArchitectureAssessmentCompletionState.Pass, [], []);
 
-    private static ArchitectureBaselineComparisonEntry Entry(string id) => new(
+    internal static ArchitectureBaselineComparisonEntry Entry(string id) => new(
         "strict",
         id,
         "Sample.Application.Service",
         "Sample.Infrastructure.Repository",
         "reviewed");
 
-    private static ArchitectureHealthDimension Dimension(
+    internal static ArchitectureHealthDimension Dimension(
         ArchitectureHealthSummary summary,
         string name) => summary.Dimensions.Single(dimension => dimension.Name == name);
 }

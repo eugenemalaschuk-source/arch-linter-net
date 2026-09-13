@@ -7,11 +7,12 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ProtectedContractTests;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ProtectedContractTests
+public sealed class ProtectedContractEdgeCaseTests
 {
     private static readonly string[] _value = { "ArchLinterNet.Core.Execution.ArchitectureContractRunner" };
     private static readonly string[] _value1 = { "core" };
@@ -35,7 +36,7 @@ public sealed partial class ProtectedContractTests
                 AllowedImporters: _value1)
         };
 
-        string json = _formatter.FormatResultForCiArtifacts(
+        string json = Formatter.FormatResultForCiArtifacts(
             "strict", false,
             new[] { violation },
             Array.Empty<string>());
@@ -154,7 +155,7 @@ public sealed partial class ProtectedContractTests
             "Infrastructure",
             _value2);
 
-        string json = _formatter.FormatResultForCiArtifacts(
+        string json = Formatter.FormatResultForCiArtifacts(
             "strict", false,
             new[] { violation },
             Array.Empty<string>());

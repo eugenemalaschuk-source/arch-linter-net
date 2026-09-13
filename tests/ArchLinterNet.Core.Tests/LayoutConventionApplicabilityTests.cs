@@ -7,13 +7,87 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.LayoutConventionContractTests;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class LayoutConventionContractTests
+public sealed class LayoutConventionApplicabilityContractTests
 {
+    private string _tempDir = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-layout-convention-applicability-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempDir);
+        WriteFixtureFile("Services/OrderService.cs",
+            "namespace LayoutConventionContractTestFixtures.Services { public sealed class OrderService { } }");
+        WriteFixtureFile("Elsewhere/PartialOffender.Part2.cs",
+            "namespace LayoutConventionContractTestFixtures.AmbiguousFolder { public sealed class PartialOffender { } }");
+        WriteFixtureFile("MixedNamespaceFile/Mixed.cs", "namespace LayoutConventionContractTestFixtures.MixedNamespaceFile { public sealed class ServiceInMatchingNamespace { } }\nnamespace LayoutConventionContractTestFixtures.MixedNamespaceFileOther { public interface IEscapingInterface { } }");
+        WriteFixtureFile("Services/PaymentService.cs",
+            "namespace LayoutConventionContractTestFixtures.Services { public sealed class PaymentService { } }");
+        WriteFixtureFile("Services/IWronglyPlacedService.cs",
+            "namespace LayoutConventionContractTestFixtures.Services { public interface IWronglyPlacedService { } }");
+        WriteFixtureFile("Interfaces/IOrderService.cs",
+            "namespace LayoutConventionContractTestFixtures.Interfaces { public interface IOrderService { } }");
+        WriteFixtureFile("Interfaces/WronglyPlacedClass.cs",
+            "namespace LayoutConventionContractTestFixtures.Interfaces { public sealed class WronglyPlacedClass { } }");
+        WriteFixtureFile("MismatchedFileName/DifferentFileName.cs",
+            "namespace LayoutConventionContractTestFixtures.MismatchedFileName { public sealed class ActualTypeName { } }");
+        WriteFixtureFile("WhenRefinement/IncludedByWhen.cs",
+            "namespace LayoutConventionContractTestFixtures.WhenRefinement { public sealed class IncludedByWhen { } }");
+        WriteFixtureFile("WhenRefinement/ExcludedByWhen.cs",
+            "namespace LayoutConventionContractTestFixtures.WhenRefinement { public sealed class ExcludedByWhen { } }");
+        WriteFixtureFile("Services/PartialOffender.Part1.cs",
+            "namespace LayoutConventionContractTestFixtures.AmbiguousFolder { public sealed class PartialOffender { } }");
+        WriteFixtureFile("AbstractServices/AbstractBaseService.cs",
+            "namespace LayoutConventionContractTestFixtures.AbstractServices { public abstract class AbstractBaseService { } }");
+        WriteFixtureFile("FolderPurity/Abstractions/IOrderPort.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Abstractions { public interface IOrderPort { } }");
+        WriteFixtureFile("FolderPurity/Abstractions/AbstractOrderPort.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Abstractions { public abstract class AbstractOrderPort { } }");
+        WriteFixtureFile("FolderPurity/Abstractions/ConcreteOrderPort.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Abstractions { public sealed class ConcreteOrderPort { } }");
+        WriteFixtureFile("FolderPurity/Abstractions/ValueOrderPort.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Abstractions { public readonly struct ValueOrderPort { } }");
+        WriteFixtureFile("FolderPurity/Exceptions/OrderRejectedException.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Exceptions { public sealed class OrderRejectedException : System.Exception { } }");
+        WriteFixtureFile("FolderPurity/Exceptions/IncorrectExceptionRecord.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Exceptions { public sealed record IncorrectExceptionRecord; }");
+        WriteFixtureFile("FolderPurity/Exceptions/IIncorrectException.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Exceptions { public interface IIncorrectException { } }");
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_tempDir))
+        {
+            Directory.Delete(_tempDir, true);
+        }
+    }
+
+    private void WriteFixtureFile(string relativePath, string content)
+    {
+        string fullPath = Path.Combine(_tempDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        File.WriteAllText(fullPath, content);
+    }
+
+    private ArchitectureAnalysisContext CreateContext()
+    {
+        return new ArchitectureAnalysisContext(
+            _tempDir,
+            new[] { typeof(LayoutConventionContractTests).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            null,
+            projectDiscovery: null);
+    }
+
     [Test]
     public void ApplicabilityInventory_ExpectedFolderRemoved_IsStale()
     {
@@ -418,7 +492,7 @@ public sealed partial class LayoutConventionContractTests
         return LayoutConventionApplicabilityChecker.Evaluate(runner.Session.CheckerContext, inventory, conventions);
     }
 
-    private static ArchitectureContractDocument CreateInventoryDocument(
+    internal static ArchitectureContractDocument CreateInventoryDocument(
         ArchitectureLayoutConventionApplicabilityContract inventory,
         params ArchitectureLayoutConventionContract[] conventions) => new()
         {
@@ -436,7 +510,7 @@ public sealed partial class LayoutConventionContractTests
             },
         };
 
-    private static ArchitectureLayoutConventionApplicabilityContract CreateInventory(
+    internal static ArchitectureLayoutConventionApplicabilityContract CreateInventory(
         string scope,
         bool exhaustive,
         params ArchitectureLayoutConventionExpectedFolder[] expectedFolders) => new()
@@ -448,7 +522,7 @@ public sealed partial class LayoutConventionContractTests
             ExpectedFolders = expectedFolders.ToList(),
         };
 
-    private static ArchitectureLayoutConventionContract ServicesConvention() => new()
+    internal static ArchitectureLayoutConventionContract ServicesConvention() => new()
     {
         Id = "services",
         Name = "services",

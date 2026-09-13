@@ -10,7 +10,7 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed partial class PolicyConsistencyCheckTests
+public sealed class PolicyConsistencyCheckTests
 {
     private static readonly string[] _value = { "first", "second" };
     private static readonly string[] _value1 = { "shared-id" };
@@ -25,7 +25,7 @@ public sealed partial class PolicyConsistencyCheckTests
     private static readonly string[] _semanticLayers = { "semantic_a", "semantic_b" };
     private static readonly string[] _coreLayer = { "core" };
 
-    private static ArchitectureAnalysisContext CreateContext()
+    internal static ArchitectureAnalysisContext CreateContext()
     {
         return new ArchitectureAnalysisContext(
             "/tmp",
@@ -34,7 +34,7 @@ public sealed partial class PolicyConsistencyCheckTests
             Array.Empty<string>());
     }
 
-    private static ArchitectureContractDocument BaseDocument()
+    internal static ArchitectureContractDocument BaseDocument()
     {
         return new ArchitectureContractDocument
         {

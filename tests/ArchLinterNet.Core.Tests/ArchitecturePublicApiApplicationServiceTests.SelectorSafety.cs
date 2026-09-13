@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitecturePublicApiApplicationServiceTests;
 using Fixtures = PublicApiSurfaceSelectorTestFixtures;
 
 namespace ArchLinterNet.Core.Tests;
@@ -10,7 +11,8 @@ namespace ArchLinterNet.Core.Tests;
 // (zero-match, first-party escape) must also block capture/diff/update/migrate through the shared
 // ResolveSurface seam — otherwise a selector configuration `validate` rejects could still produce a
 // snapshot through `capture`/`update`, which `validate` would then never be able to pass against.
-public sealed partial class ArchitecturePublicApiApplicationServiceTests
+[TestFixture]
+public sealed class ArchitecturePublicApiApplicationServiceSelectorSafetyTests
 {
     [Test]
     public void Capture_SelectorWithFirstPartyEscape_FailsClosed()

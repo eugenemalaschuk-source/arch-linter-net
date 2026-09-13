@@ -6,10 +6,11 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureChangeSnapshotProjectorTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureChangeSnapshotProjectorTests
+public sealed class ArchitectureChangeSnapshotProjectorClassificationTests
 {
     [Test]
     public void Project_DeduplicatesEquivalentRoleFactsRegardlessOfMetadataEnumerationOrder()

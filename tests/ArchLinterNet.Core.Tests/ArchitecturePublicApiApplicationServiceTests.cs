@@ -16,16 +16,16 @@ namespace ArchLinterNet.Core.Tests;
 // Fake-composition tests for the public-api application seam. The session is built over the real
 // test assembly, so capture exercises the actual reflection scanner rather than a stubbed surface.
 [TestFixture]
-public sealed partial class ArchitecturePublicApiApplicationServiceTests
+public sealed class ArchitecturePublicApiApplicationServiceTests
 {
-    private const string ContractId = "surface";
-    private const string PolicyPath = "architecture/dependencies.arch.yml";
-    private const string SnapshotPath = "architecture/api/surface.txt";
-    private const string CleanDeclaredTypeName = "PublicApiSurfaceContractTestFixtures.CleanDeclaredType";
+    internal const string ContractId = "surface";
+    internal const string PolicyPath = "architecture/dependencies.arch.yml";
+    internal const string SnapshotPath = "architecture/api/surface.txt";
+    internal const string CleanDeclaredTypeName = "PublicApiSurfaceContractTestFixtures.CleanDeclaredType";
 
-    private static string AssemblyName => typeof(ArchitecturePublicApiApplicationServiceTests).Assembly.GetName().Name!;
+    internal static string AssemblyName => typeof(ArchitecturePublicApiApplicationServiceTests).Assembly.GetName().Name!;
 
-    private static ArchitecturePublicApiSurfaceContract Contract(
+    internal static ArchitecturePublicApiSurfaceContract Contract(
         string? apiSnapshot = null, params string[] declaredApi)
     {
         return new ArchitecturePublicApiSurfaceContract
@@ -38,7 +38,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
         };
     }
 
-    private static ArchitectureContractDocument Document(ArchitecturePublicApiSurfaceContract contract)
+    internal static ArchitectureContractDocument Document(ArchitecturePublicApiSurfaceContract contract)
     {
         return new ArchitectureContractDocument
         {
@@ -55,7 +55,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
         };
     }
 
-    private static ArchitectureAnalysisSession Session(
+    internal static ArchitectureAnalysisSession Session(
         ArchitectureContractDocument document,
         IReadOnlyCollection<Assembly>? targetAssemblies = null,
         ProjectDiscoveryResult? discovery = null)
@@ -72,7 +72,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
             preprocessorSymbols: null);
     }
 
-    private static ArchitecturePublicApiApplicationService Service(
+    internal static ArchitecturePublicApiApplicationService Service(
         ArchitectureContractDocument document,
         FakePublicApiSnapshotStore store,
         IReadOnlyCollection<Assembly>? targetAssemblies = null,
@@ -89,7 +89,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
             runnerSetupService, new FakeBuildStatePreparationService(preflight), store);
     }
 
-    private static IReadOnlyList<PublicApiSnapshotEntry> CapturedEntries(string snapshot)
+    internal static IReadOnlyList<PublicApiSnapshotEntry> CapturedEntries(string snapshot)
     {
         return PublicApiSnapshotFormat.Parse(snapshot, SnapshotPath).Entries;
     }
@@ -176,7 +176,8 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
         {
             DiscoveredProjects = new[]
             {
-                new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, _value),
+                new ArchitectureDiscoveredProject(
+                    "Test.csproj", AssemblyName, ArchitecturePublicApiApplicationServiceBuildStateTests.TargetFrameworks),
             },
         };
 
@@ -671,7 +672,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
         Assert.That(service.PathsMatch(First, Second), Is.False);
     }
 
-    private sealed class FakePublicApiSnapshotStore : IPublicApiSnapshotStore
+    internal sealed class FakePublicApiSnapshotStore : IPublicApiSnapshotStore
     {
         public IReadOnlyList<PublicApiSnapshotEntry> Entries { get; set; } = Array.Empty<PublicApiSnapshotEntry>();
 
@@ -746,7 +747,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
         }
     }
 
-    private sealed class FakeBuildStatePreparationService(params BuildStatePreflightResult?[] results) : IBuildStatePreparationService
+    internal sealed class FakeBuildStatePreparationService(params BuildStatePreflightResult?[] results) : IBuildStatePreparationService
     {
         private readonly Queue<BuildStatePreflightResult> _results = new(
             results.Where(static result => result is not null).Select(static result => result!));

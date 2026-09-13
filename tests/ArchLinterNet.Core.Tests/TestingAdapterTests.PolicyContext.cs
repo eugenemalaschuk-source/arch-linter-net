@@ -5,13 +5,14 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class TestingAdapterTests
+[Category("Core")]
+public sealed class TestingAdapterPolicyContextTests : TestingAdapterTestSupport
 {
     [Test]
     public void EvaluateDebtGate_AcceptsCliShapedSchemaFiveContexts()
     {
         string contractPath = WriteSelfForbiddenPolicy();
-        string baselinePath = Path.Combine(_tempDir, "baseline.yml");
+        string baselinePath = Path.Combine(TempDirectory, "baseline.yml");
         File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
 
         string baseContextPath = WritePolicyContext("base.context.json", "strict");
@@ -35,7 +36,7 @@ public sealed partial class TestingAdapterTests
     public void EvaluateDebtGate_IdenticalCliShapedContextsReportNoWeakening()
     {
         string contractPath = WriteSelfForbiddenPolicy();
-        string baselinePath = Path.Combine(_tempDir, "baseline.yml");
+        string baselinePath = Path.Combine(TempDirectory, "baseline.yml");
         File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
         string contextPath = WritePolicyContext("unchanged.context.json", "strict");
 
@@ -57,9 +58,9 @@ public sealed partial class TestingAdapterTests
     public void EvaluateDebtGate_InvalidContextFailsClosedBeforeComparison()
     {
         string contractPath = WriteSelfForbiddenPolicy();
-        string baselinePath = Path.Combine(_tempDir, "baseline.yml");
+        string baselinePath = Path.Combine(TempDirectory, "baseline.yml");
         File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
-        string invalidContextPath = Path.Combine(_tempDir, "invalid.context.json");
+        string invalidContextPath = Path.Combine(TempDirectory, "invalid.context.json");
         File.WriteAllText(invalidContextPath, "{}");
 
         Assert.That(
@@ -93,7 +94,7 @@ public sealed partial class TestingAdapterTests
             WaiverLifecycleProfile = "compatibility",
         };
 
-        string path = Path.Combine(_tempDir, fileName);
+        string path = Path.Combine(TempDirectory, fileName);
         File.WriteAllText(path, ArchitecturePolicyContextFormatter.FormatAsJson(context));
         return path;
     }

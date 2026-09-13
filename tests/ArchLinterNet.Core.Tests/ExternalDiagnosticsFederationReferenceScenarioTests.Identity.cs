@@ -7,7 +7,7 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
+public sealed class ExternalDiagnosticsFederationIdentityTests : ExternalDiagnosticsFederationReferenceScenarioTestSupport
 {
     [Test]
     public void DistinctScopeContexts_RemainDistinctWhenSourceResultsMatch()
@@ -15,8 +15,8 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
         ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan");
         string content = Sarif(Results(Result(
             "SEC100", "error", "src/App/One.cs", "same", fingerprint: "{\"stable\":\"same\"}")));
-        _repository.AddUtf8File("evidence/scope-a.sarif", content);
-        _repository.AddUtf8File("evidence/scope-b.sarif", content);
+        Repository.AddUtf8File("evidence/scope-a.sarif", content);
+        Repository.AddUtf8File("evidence/scope-b.sarif", content);
 
         SarifEvidenceReadResult scopeA = Read(
             requirement,
@@ -67,7 +67,7 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
         ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan");
         string first = Result("SEC100", "error", "src/App/One.cs", "same", fingerprint: "{\"stable\":\"same\"}");
         string second = Result("SEC100", "error", "src/App/Two.cs", "same", fingerprint: "{\"stable\":\"same\"}");
-        _repository.AddUtf8File("evidence/location.sarif", Sarif(Results(first, second)));
+        Repository.AddUtf8File("evidence/location.sarif", Sarif(Results(first, second)));
 
         SarifExternalDiagnosticSelectionResult selection = Select(Read(requirement, "evidence/location.sarif"));
         ImportedExternalDiagnosticProjection projection = ArchitectureImportedDiagnosticProjector.Project(selection);

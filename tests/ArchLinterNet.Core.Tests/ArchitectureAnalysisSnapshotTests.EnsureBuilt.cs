@@ -8,10 +8,12 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureAnalysisSnapshotTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureAnalysisSnapshotTests
+[TestFixture]
+public sealed class ArchitectureAnalysisSnapshotEnsureBuiltTests
 {
     [Test]
     public void CreateSnapshot_EnsureBuilt_EvaluatesStrictAndAuditFromOnePreparedSnapshot()
@@ -20,21 +22,21 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         var runnerSetupService = new EnsureBuiltMetadataRunnerSetupService { DocumentToReturn = document };
 
         var discovery = new ProjectDiscoveryResult(
-            _value3, Array.Empty<string>(), Array.Empty<string>(),
+            Value3, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
             DiscoveredProjects = new[]
             {
-                new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value4)
+                new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", Value4)
             }
         };
         var context = new ArchitectureAnalysisContext(
-            "/fake/repository/root", Array.Empty<Assembly>(), _value5, Array.Empty<string>(),
+            "/fake/repository/root", Array.Empty<Assembly>(), Value5, Array.Empty<string>(),
             projectDiscovery: discovery);
         var session = new ArchitectureAnalysisSession(
             context, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: true,
             preprocessorSymbols: null);
-        runnerSetupService.RunnerToReturn = new FakeContractRunner(session);
+        runnerSetupService.RunnerToReturn = new ArchitectureAnalysisSnapshotTests.FakeContractRunner(session);
 
         var contractExecutor = new CountingContractExecutor();
         var buildStatePreparationService = new EnsureBuiltCountingBuildStatePreparationService();
@@ -101,7 +103,7 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         }
     }
 
-    private sealed class EnsureBuiltMetadataRunnerSetupService : IArchitectureRunnerSetupService
+    internal sealed class EnsureBuiltMetadataRunnerSetupService : IArchitectureRunnerSetupService
     {
         public int BuildRunnerCallCount { get; private set; }
 
@@ -111,7 +113,7 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
 
         public ArchitectureContractDocument DocumentToReturn { get; set; } = new() { Version = 1, Name = "Fake" };
 
-        public FakeContractRunner RunnerToReturn { get; set; } = null!;
+        public ArchitectureAnalysisSnapshotTests.FakeContractRunner RunnerToReturn { get; set; } = null!;
 
         public ArchitectureContractDocument LoadDocument(
             string policyPath, string? baselinePath = null, ValidationTiming? timing = null)

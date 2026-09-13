@@ -2,10 +2,11 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.PolicyWeakening;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitecturePolicyWeakeningComparerTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitecturePolicyWeakeningComparerTests
+public sealed class ArchitecturePolicyWeakeningPublicApiApprovalTests
 {
     [TestCase("exact")]
     [TestCase("additions_only")]

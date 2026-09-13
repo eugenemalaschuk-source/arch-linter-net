@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ExpressionCompilationValidatorTests
+public sealed class ExpressionCompilationValidatorLocationRegressionTests : ExpressionCompilationValidatorTestSupport
 {
     // Regression coverage for PR #347 review findings (openspec/changes/core-cel-integration):
     // (1) 'when' outside the seven approved locations was silently dropped by
@@ -151,7 +151,7 @@ public sealed partial class ExpressionCompilationValidatorTests
     [Test]
     public void Load_InvalidImportedForbiddenWhen_ErrorMessageAndProvenanceIdentifyExactIndex()
     {
-        string root = Path.Combine(_tempDir, "root.yml");
+        string root = Path.Combine(TempDirectory, "root.yml");
         File.WriteAllText(root, $$"""
             version: 1
             name: Test
@@ -162,7 +162,7 @@ public sealed partial class ExpressionCompilationValidatorTests
             contracts:
               strict: []
             """);
-        File.WriteAllText(Path.Combine(_tempDir, "fragment.yml"), """
+        File.WriteAllText(Path.Combine(TempDirectory, "fragment.yml"), """
             layers:
               sales:
                 namespace: App.Sales

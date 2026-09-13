@@ -4,8 +4,27 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureProjectDiscoveryTests
+[TestFixture]
+public sealed class ArchitectureProjectDiscoveryMetricsTests
 {
+    private string _repoRoot = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _repoRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-discovery-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_repoRoot);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_repoRoot))
+        {
+            Directory.Delete(_repoRoot, true);
+        }
+    }
+
     [Test]
     public void ResolveFromDocument_DistinctArtifactsWithTheSameOutputNameRetainsBothProjectPaths()
     {

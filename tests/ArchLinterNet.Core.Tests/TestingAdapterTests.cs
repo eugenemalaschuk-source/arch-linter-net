@@ -6,27 +6,17 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-[TestFixture]
-public sealed partial class TestingAdapterTests
+[TestFixture, Category("Core")]
+public sealed class TestingAdapterTests : TestingAdapterTestSupport
 {
     private static readonly string[] _rulesFragmentPaths = { "architecture/rules.yml" };
     private static readonly string[] _selfForbiddenIds = { "self-forbidden" };
     private string _tempDir = null!;
 
     [SetUp]
-    public void SetUp()
+    public void CaptureTempDirectory()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempDir);
-    }
-
-    [TearDown]
-    public void TearDown()
-    {
-        if (Directory.Exists(_tempDir))
-        {
-            Directory.Delete(_tempDir, true);
-        }
+        _tempDir = TempDirectory;
     }
 
     [Test]
@@ -365,35 +355,6 @@ contracts:
         Assert.That(ex!.Message, Does.Contain("duplicate-id"));
         Assert.That(ex.Message, Does.Contain("core-no-forbidden"));
         Assert.That(ex.Message, Does.Contain("contracts-no-forbidden"));
-    }
-
-    private string WriteSelfForbiddenPolicy()
-    {
-        string contractDir = Path.Combine(_tempDir, "architecture");
-        Directory.CreateDirectory(contractDir);
-        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
-
-        File.WriteAllText(contractPath, @"
-version: 1
-name: Builder Test
-layers:
-  core:
-    namespace: ArchLinterNet.Core
-analysis:
-  target_assemblies:
-    - ArchLinterNet.Core
-contracts:
-  strict:
-    - id: self-forbidden
-      name: core-must-not-depend-on-itself
-      source: core
-      forbidden: [core]
-    - id: harmless
-      name: harmless-rule
-      source: core
-      forbidden: []
-");
-        return contractPath;
     }
 
     [Test]

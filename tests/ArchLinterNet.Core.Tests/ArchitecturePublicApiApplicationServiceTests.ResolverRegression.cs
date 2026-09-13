@@ -2,10 +2,12 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitecturePublicApiApplicationServiceTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitecturePublicApiApplicationServiceTests
+[TestFixture]
+public sealed class ArchitecturePublicApiApplicationServiceResolverRegressionTests
 {
     [Test]
     public void Capture_CancelledBeforeResolution_DoesNotBuildScanOrReadSnapshot()

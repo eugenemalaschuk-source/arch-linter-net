@@ -12,7 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 /// a write reviewable: preserved reason/issue metadata, mapped reasons for new entries only, retained
 /// ambiguity, and a reported comment refusal.
 /// </summary>
-public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositionTests
+[TestFixture]
+public sealed class ArchitectureBaselineApplicationServiceLifecycleTests
 {
     private static readonly string[] _matchedSources = ["SrcKept"];
     private static readonly string[] _resolvedSources = ["SrcStale"];
@@ -246,7 +247,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         });
     }
 
-    private static BaselineUpdateOutcome RunLifecycleUpdate(
+    internal static BaselineUpdateOutcome RunLifecycleUpdate(
         BaselineUpdateRequest request,
         FakeBaselineGenerator? generator = null,
         string rawBaselineText = "version: 1\nbaseline: {}\n")
@@ -261,7 +262,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         return applicationService.Update(request);
     }
 
-    private static BaselinePruneOutcome RunLifecyclePrune(FakeBaselineGenerator generator)
+    internal static BaselinePruneOutcome RunLifecyclePrune(FakeBaselineGenerator generator)
     {
         (FakeRunnerSetupService runnerSetupService, FakeBaselineLoadingService loadingService) =
             CreateLifecycleCollaborators("version: 1\nbaseline: {}\n");
@@ -283,7 +284,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
     /// metadata, an entry whose violation is gone, a legacy entry that now correlates to two
     /// candidates, and a current violation with no entry.
     /// </summary>
-    private static (FakeRunnerSetupService RunnerSetup, FakeBaselineLoadingService Loading) CreateLifecycleCollaborators(
+    internal static (FakeRunnerSetupService RunnerSetup, FakeBaselineLoadingService Loading) CreateLifecycleCollaborators(
         string rawBaselineText)
     {
         ArchitectureContractDocument document = new()

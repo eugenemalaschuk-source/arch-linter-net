@@ -5,26 +5,29 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureValidationApplicationServiceCacheLocationTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureValidationApplicationServiceCacheLocationTests
+[TestFixture]
+public sealed class ArchitectureValidationApplicationServicePreparedProvenanceTests
 {
     [Test]
     public void CreateSnapshot_MetadataPreflightFailureRetainsPreparedPathsInEvaluationException()
     {
         PreparedProvenanceFixture fixture = CreatePreparedProvenanceFixture();
-        var runnerSetupService = new FakeRunnerSetupService
+        var runnerSetupService = new ArchitectureValidationApplicationServiceCacheLocationTests.FakeRunnerSetupService
         {
             DocumentToReturn = CreateDocument(),
             PreparationProvider = _ => fixture.Preparation,
         };
-        var preparationService = new FakeBuildStatePreparationService
+        var preparationService = new ArchitectureValidationApplicationServiceCacheLocationTests.FakeBuildStatePreparationService
         {
             ExceptionToThrow = new InvalidOperationException("The metadata preflight failed."),
         };
         var applicationService = new ArchitectureValidationApplicationService(
-            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), preparationService);
+            runnerSetupService, new ArchitectureValidationApplicationServiceCacheLocationTests.FakeContractHandlerRegistry(),
+            new ArchitectureValidationApplicationServiceCacheLocationTests.FakeContractExecutor(), preparationService);
 
         ArchitectureAnalysisEvaluationException exception = Assert.Throws<ArchitectureAnalysisEvaluationException>(() =>
             applicationService.CreateSnapshot(new AnalysisSnapshotRequest
@@ -45,19 +48,20 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
     public void CreateSnapshot_PostBuildPreflightFailureRetainsPreparedPaths()
     {
         PreparedProvenanceFixture initial = CreatePreparedProvenanceFixture();
-        var runnerSetupService = new FakeRunnerSetupService
+        var runnerSetupService = new ArchitectureValidationApplicationServiceCacheLocationTests.FakeRunnerSetupService
         {
             DocumentToReturn = CreateDocument(),
             PreparationProvider = _ => initial.Preparation,
         };
-        var preparationService = new FakeBuildStatePreparationService
+        var preparationService = new ArchitectureValidationApplicationServiceCacheLocationTests.FakeBuildStatePreparationService
         {
             ExceptionProvider = call => call == 2
                 ? new InvalidOperationException("The post-build receipt preflight failed.")
                 : null,
         };
         var applicationService = new ArchitectureValidationApplicationService(
-            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), preparationService);
+            runnerSetupService, new ArchitectureValidationApplicationServiceCacheLocationTests.FakeContractHandlerRegistry(),
+            new ArchitectureValidationApplicationServiceCacheLocationTests.FakeContractExecutor(), preparationService);
 
         ArchitectureAnalysisEvaluationException exception = Assert.Throws<ArchitectureAnalysisEvaluationException>(() =>
             applicationService.CreateSnapshot(new AnalysisSnapshotRequest
@@ -80,17 +84,18 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
     public void CreateSnapshot_MetadataPreflightCancellationRetainsPreparedCountersAndInputPaths()
     {
         PreparedProvenanceFixture fixture = CreatePreparedProvenanceFixture();
-        var runnerSetupService = new FakeRunnerSetupService
+        var runnerSetupService = new ArchitectureValidationApplicationServiceCacheLocationTests.FakeRunnerSetupService
         {
             DocumentToReturn = CreateDocument(),
             PreparationProvider = _ => fixture.Preparation,
         };
-        var preparationService = new FakeBuildStatePreparationService
+        var preparationService = new ArchitectureValidationApplicationServiceCacheLocationTests.FakeBuildStatePreparationService
         {
             ExceptionToThrow = new OperationCanceledException("The metadata preflight was cancelled."),
         };
         var applicationService = new ArchitectureValidationApplicationService(
-            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), preparationService);
+            runnerSetupService, new ArchitectureValidationApplicationServiceCacheLocationTests.FakeContractHandlerRegistry(),
+            new ArchitectureValidationApplicationServiceCacheLocationTests.FakeContractExecutor(), preparationService);
 
         OperationCanceledException exception = Assert.Throws<OperationCanceledException>(() =>
             applicationService.CreateSnapshot(new AnalysisSnapshotRequest

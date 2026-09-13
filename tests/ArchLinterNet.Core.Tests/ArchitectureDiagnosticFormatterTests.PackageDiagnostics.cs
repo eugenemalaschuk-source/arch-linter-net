@@ -2,10 +2,11 @@ using System.Text.Json;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
+using static ArchLinterNet.Core.Tests.ArchitectureDiagnosticFormatterTests;
 
 namespace ArchLinterNet.Core.Tests;
 
-public sealed partial class ArchitectureDiagnosticFormatterTests
+public sealed class ArchitectureDiagnosticFormatterPackageTests
 {
     private static readonly string[] _packageDependencyReferences = ["Microsoft.EntityFrameworkCore@8.0.0"];
     private static readonly string[] _packageAllowOnlyReferences = ["Acme.Sdk@1.2.3"];
@@ -23,7 +24,7 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
 
         Assert.That(human, Does.Contain("MyApp.Domain"));
         Assert.That(human, Does.Contain("package group 'forbidden_infra'"));
@@ -42,7 +43,7 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var document = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement violation = document.RootElement.GetProperty("violations")[0];
 
@@ -71,7 +72,7 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
 
         Assert.That(human, Does.Contain("MyApp.Domain"));
         Assert.That(human, Does.Contain("outside allowed package groups"));
@@ -90,7 +91,7 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using var document = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement violation = document.RootElement.GetProperty("violations")[0];
 
@@ -131,9 +132,9 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string human = _formatter.FormatViolationsForHumans(violations);
+        string human = Formatter.FormatViolationsForHumans(violations);
 
-        using JsonDocument jsonDocument = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using JsonDocument jsonDocument = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
         JsonElement jsonViolation = jsonDocument.RootElement.GetProperty("violations")[0];
 
@@ -178,8 +179,8 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             ],
         };
 
-        string human = _formatter.FormatViolationsForHumans([violation]);
-        using JsonDocument jsonDocument = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        string human = Formatter.FormatViolationsForHumans([violation]);
+        using JsonDocument jsonDocument = JsonDocument.Parse(Formatter.FormatResultForCiArtifacts(
             "strict", false, [violation], Array.Empty<string>()));
         using JsonDocument sarifDocument = JsonDocument.Parse(
             new ArchitectureSarifFormatter().FormatResultAsSarif(
