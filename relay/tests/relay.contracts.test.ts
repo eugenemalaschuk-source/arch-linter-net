@@ -161,11 +161,12 @@ describe("relay contract helpers", () => {
     }
 
     validateOidcClaims(claims(), entry, 1_100);
+    validateOidcClaims(claims({ repository_id: String(entry.repository_id), repository_owner_id: String(entry.repository_owner_id) }), entry, 1_100);
     validateOidcClaims(claims({ event_name: "schedule" }), { ...entry, permitted_events: ["push", "schedule"] }, 1_100);
     validateOidcClaims(claims({ aud: ["another", entry.audience] }), entry, 1_100);
     for (const invalid of [
       { iss: "https://issuer.invalid" }, { aud: "other" }, { iat: "1000" }, { iat: 1_500 }, { nbf: 1_500 }, { exp: 900 }, { exp: 2_000 }, { jti: "" },
-      { repository_id: 1 }, { repository_owner_id: 1 }, { event_name: "workflow_dispatch" }, { ref: "refs/heads/dev" }, { job_workflow_ref: "other" }, { job_workflow_sha: "other" }, { sub: "other" }
+      { repository_id: 1 }, { repository_id: "0700042" }, { repository_owner_id: 1 }, { event_name: "workflow_dispatch" }, { ref: "refs/heads/dev" }, { job_workflow_ref: "other" }, { job_workflow_sha: "other" }, { sub: "other" }
     ]) expect(() => validateOidcClaims(claims(invalid), entry, 1_100)).toThrow(AuthorizationError);
     expect(() => validateOidcClaims(claims(), entry, 1_100, { issuer: "https://issuer.invalid", jwks_uri: "https://token.actions.githubusercontent.com/.well-known/jwks", audience: "architecture-health-badge-relay-fixture" })).toThrow(AuthorizationError);
     expect(isTrustedContext({ valid: true, kind: "github-pr-authoritative/v1" })).toBe(true);
