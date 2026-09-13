@@ -36,6 +36,9 @@ class ProviderFailure(RuntimeError):
         super().__init__(reason)
 
 
+_MAX_RAW_PUBLICATION_ATTEMPTS = 3
+
+
 class _ArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
     """Follow GitHub's signed artifact redirect without forwarding the bearer token."""
 
@@ -347,49 +350,52 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
     """Atomically update the fixed public raw branch; never force-push it."""
     repository = _repository_path(config.repository)
     ref_path = f"/repos/{repository}/git/ref/heads/architecture-health-badge"
-    try:
-        current_ref = api.request(ref_path)
-    except ProviderFailure as error:
-        if error.reason != "required_capability_unavailable":
-            raise
-        current_ref = None
-    parent = current_ref.get("object", {}).get("sha") if current_ref else os.environ.get("GITHUB_SHA")
-    if not isinstance(parent, str):
-        raise ProviderFailure("publication_parent_unavailable")
-    configured_ref = urllib.parse.quote(config.base_ref, safe="/")
-    base_ref = api.request(f"/repos/{repository}/git/ref/heads/{configured_ref}")
-    if base_ref.get("object", {}).get("sha") != os.environ.get("GITHUB_SHA"):
-        raise ProviderFailure("stale_base_ref")
-    parent_commit = api.request(f"/repos/{repository}/git/commits/{parent}")
-    base_tree = parent_commit.get("tree", {}).get("sha")
-    if not isinstance(base_tree, str):
-        raise ProviderFailure("publication_parent_unavailable")
-    receipt: dict[str, Any] = {
-        "schema": "architecture-health-badge-publication/v2", "status": status, "reason": reason,
-        "repository": config.repository,
-        "base_sha": evidence.base_sha if evidence else None, "head_sha": evidence.head_sha if evidence else None,
-        "head_tree_sha": evidence.head_tree_sha if evidence else None, "main_sha": os.environ.get("GITHUB_SHA"),
-        "main_tree_sha": evidence.main_tree_sha if evidence else None,
-        "pr_number": str(evidence.pr_number) if evidence else None,
-        "producer_run_id": str(evidence.run_id) if evidence else None,
-        "producer_run_attempt": str(evidence.run_attempt) if evidence else None,
-        "publisher_run_id": os.environ.get("GITHUB_RUN_ID"), "publisher_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
-        "payload_sha256": hashlib.sha256(payload).hexdigest(),
-        "published_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-    }
-    blob_shas = []
-    for content in (payload, (json.dumps(receipt, indent=2) + "\n").encode("utf-8")):
-        blob = api.request(f"/repos/{repository}/git/blobs", method="POST", value={"content": base64.b64encode(content).decode("ascii"), "encoding": "base64"})
-        blob_shas.append(blob["sha"])
-    tree = api.request(f"/repos/{repository}/git/trees", method="POST", value={"base_tree": base_tree, "tree": [{"path": "architecture-health.json", "mode": "100644", "type": "blob", "sha": blob_shas[0]}, {"path": "architecture-health-publication.json", "mode": "100644", "type": "blob", "sha": blob_shas[1]}]})
-    commit = api.request(f"/repos/{repository}/git/commits", method="POST", value={"message": "chore: publish architecture health badge", "tree": tree["sha"], "parents": [parent]})
-    try:
-        if current_ref:
-            api.request(ref_path, method="PATCH", value={"sha": commit["sha"], "force": False})
-        else:
-            api.request(f"/repos/{repository}/git/refs", method="POST", value={"ref": "refs/heads/architecture-health-badge", "sha": commit["sha"]})
-    except ProviderFailure as error:
-        raise ProviderFailure("publication_race_lost") from error
+    for attempt in range(_MAX_RAW_PUBLICATION_ATTEMPTS):
+        try:
+            current_ref = api.request(ref_path)
+        except ProviderFailure as error:
+            if error.reason != "required_capability_unavailable":
+                raise
+            current_ref = None
+        parent = current_ref.get("object", {}).get("sha") if current_ref else os.environ.get("GITHUB_SHA")
+        if not isinstance(parent, str):
+            raise ProviderFailure("publication_parent_unavailable")
+        configured_ref = urllib.parse.quote(config.base_ref, safe="/")
+        base_ref = api.request(f"/repos/{repository}/git/ref/heads/{configured_ref}")
+        if base_ref.get("object", {}).get("sha") != os.environ.get("GITHUB_SHA"):
+            raise ProviderFailure("stale_base_ref")
+        parent_commit = api.request(f"/repos/{repository}/git/commits/{parent}")
+        base_tree = parent_commit.get("tree", {}).get("sha")
+        if not isinstance(base_tree, str):
+            raise ProviderFailure("publication_parent_unavailable")
+        receipt: dict[str, Any] = {
+            "schema": "architecture-health-badge-publication/v2", "status": status, "reason": reason,
+            "repository": config.repository,
+            "base_sha": evidence.base_sha if evidence else None, "head_sha": evidence.head_sha if evidence else None,
+            "head_tree_sha": evidence.head_tree_sha if evidence else None, "main_sha": os.environ.get("GITHUB_SHA"),
+            "main_tree_sha": evidence.main_tree_sha if evidence else None,
+            "pr_number": str(evidence.pr_number) if evidence else None,
+            "producer_run_id": str(evidence.run_id) if evidence else None,
+            "producer_run_attempt": str(evidence.run_attempt) if evidence else None,
+            "publisher_run_id": os.environ.get("GITHUB_RUN_ID"), "publisher_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "payload_sha256": hashlib.sha256(payload).hexdigest(),
+            "published_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        }
+        blob_shas = []
+        for content in (payload, (json.dumps(receipt, indent=2) + "\n").encode("utf-8")):
+            blob = api.request(f"/repos/{repository}/git/blobs", method="POST", value={"content": base64.b64encode(content).decode("ascii"), "encoding": "base64"})
+            blob_shas.append(blob["sha"])
+        tree = api.request(f"/repos/{repository}/git/trees", method="POST", value={"base_tree": base_tree, "tree": [{"path": "architecture-health.json", "mode": "100644", "type": "blob", "sha": blob_shas[0]}, {"path": "architecture-health-publication.json", "mode": "100644", "type": "blob", "sha": blob_shas[1]}]})
+        commit = api.request(f"/repos/{repository}/git/commits", method="POST", value={"message": "chore: publish architecture health badge", "tree": tree["sha"], "parents": [parent]})
+        try:
+            if current_ref:
+                api.request(ref_path, method="PATCH", value={"sha": commit["sha"], "force": False})
+            else:
+                api.request(f"/repos/{repository}/git/refs", method="POST", value={"ref": "refs/heads/architecture-health-badge", "sha": commit["sha"]})
+            return
+        except ProviderFailure as error:
+            if attempt + 1 == _MAX_RAW_PUBLICATION_ATTEMPTS:
+                raise ProviderFailure("publication_race_lost") from error
 
 
 def _validate_invocation(config, operation: str) -> None:
