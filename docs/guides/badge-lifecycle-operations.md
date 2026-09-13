@@ -25,6 +25,10 @@ arch-linter-net badge architecture-health lifecycle \
   --operation status --input badge-relay-config.json
 ```
 
+The Relay deployment must also configure `RELAY_SHIPPED_BUNDLE_DIGESTS` as an
+operator-controlled comma-separated manifest of verified bundle digests. Stage,
+activate, and rollback refuse any digest outside that manifest.
+
 The command validates relay mode, an HTTPS origin, and an opaque alias. The
 operator-controlled origin is required and must exact-match the checked-in
 destination origin; the repository file cannot redirect the credential to a
