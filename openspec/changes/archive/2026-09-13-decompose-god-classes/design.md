@@ -70,13 +70,14 @@ Extending the existing source-layout family reuses selectors, audit/strict behav
 coverage, and reporting. A standalone contract family was rejected because its only selector would
 duplicate file-layout semantics and create another policy surface for the same source evidence.
 
-### Migrate from audit to strict only after responsibility extraction
+### Finish with one strict production declaration-count authority
 
-The first policy rule runs in audit mode to produce an exact baseline. Refactors remove handwritten
-production partial aggregates, then the same rule becomes strict with a maximum of one source
-declaration per type. Test source remains outside this production rule because a small number of
-fixtures must model C# partial declarations; test aggregate cleanup is proven by targeted fixture
-splits rather than a blanket rule that would prohibit the language test cases.
+The migration first used audit output to inventory handwritten production partial aggregates.
+Responsibility extraction removed those aggregates, so the final self-policy uses one strict layout
+rule with a maximum of one source declaration per production type. There is no duplicate audit
+declaration-count authority and no per-type waiver baseline. Test source remains outside this
+production rule because a small number of fixtures must model C# partial declarations; dedicated
+source-index tests prove those semantics instead of weakening the production gate.
 
 ### Treat direct CLI commands as independent feature modules
 
@@ -93,9 +94,9 @@ command-specific policy only supplies the missing sibling-boundary invariant.
 
 ### Audit baseline (2026-08-15)
 
-`production-types-have-one-source-declaration` reports these fifteen production aggregates. The
-temporary audit report is intentionally not committed; the table captures its deterministic,
-reviewable baseline and provides the extraction order.
+The historical audit run of `production-types-have-one-source-declaration` reported the production
+aggregates below. This table is retained as migration history only; the final strict rule and its
+current evidence are the acceptance authority.
 
 | Type | Declarations |
 | --- | ---: |
@@ -146,13 +147,11 @@ The post-tranche audit has nine handwritten source aggregates remaining:
 
 ### v0.8 release-delta continuation
 
-The table above records the pre-v0.8 snapshot shape. The `v0.7.4..v0.8.0` release delta then
-grew `ArchitectureAnalysisSnapshot` from its historical base plus `CacheWork` declaration to
-seven handwritten declarations by adding applicability completion, metric measurement, input and
-cache-project provenance, and policy-inventory orchestration projections. The production
-declaration-count ratchet records the current count of seven. Issue #776 owns removing those
-release-added responsibilities without changing snapshot behaviour; it must remove that exception
-rather than refresh it at a different count.
+The table above records the pre-v0.8 snapshot shape. The `v0.7.4..v0.8.0` release delta then grew
+`ArchitectureAnalysisSnapshot` through applicability, metric, input, cache-project, and
+policy-inventory responsibilities. The #776 extraction removed those release-added fragments;
+the final policy records no declaration-count exception and requires the resulting type to remain
+single-source.
 
 ### Extract collaborators, not more fragments
 
@@ -321,9 +320,9 @@ the source types are non-partial.
   matching, dependency-edge, semantic-coverage, and summary work to focused collaborators.
 - **`ArchitecturePolicyConsistencyAnalysisService`:** owns policy-consistency analysis and its
   protected-importer consistency collaborator.
-- **Remaining seams:** command handling, source indexing, layout matching, validation snapshots,
-  and diagnostic/SARIF rendering still require named collaborators before the final strict rule
-  can be enabled.
+- **Final seam status:** command handling, source indexing, layout matching, validation snapshots,
+  and diagnostic/SARIF rendering have named collaborators. The final strict declaration-count rule
+  is enabled only after this completed extraction state is verified.
 
 #### Validate command orchestration extraction (#803)
 
@@ -381,7 +380,7 @@ update rather than being hidden as refactoring churn.
 3. Extract `ArchitectureContractGroups` and diagnostic-formatting collaborators.
 4. Split non-semantic test aggregates; retain dedicated partial-language fixtures.
 5. Switch the production rule to strict at a maximum of one declaration, run full lint/test/API
-   checks, and remove the audit baseline.
+   checks, and record the historical audit bundle separately from the final strict evidence.
 
 Rollback is safe: retain the audit rule and revert an individual collaborator extraction without
 changing any policy or public API contract.
