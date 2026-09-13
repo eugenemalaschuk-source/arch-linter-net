@@ -65,7 +65,7 @@ not duplicate #828 storage or #831 read semantics.
 6. **Status is private and bounded.** The Durable Object retains the current
    state plus a bounded, redacted operation journal (30-day age and 256-entry
    cap). Status includes state, generation, epoch, lease boundary, last reason,
-   and compatibility identifiers, never payload, token, source identity, SHA,
+   and compatibility identifiers, never payload, token, source identity, commit/tree SHA,
    PR/run data, or receipts.
 7. **CLI tokens stay out of arguments.** The lifecycle CLI reads the admin
    bearer token from `ARCHLINTERNET_BADGE_ADMIN_TOKEN` and the operator origin
