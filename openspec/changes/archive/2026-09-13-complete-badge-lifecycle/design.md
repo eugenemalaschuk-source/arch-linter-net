@@ -50,8 +50,9 @@ not duplicate #828 storage or #831 read semantics.
    idempotent; Durable Object cleanup is retried afterward. Transfer,
    removal, and revocation tombstone the old alias. Transfer returns an explicit
    `registration_required` result; it never creates a new binding or carries
-   consent to another owner. A tombstone is retained and cannot be silently
-   reused.
+   consent to another owner. A tombstone and its monotonic revocation barrier
+   are retained permanently and cannot be silently reused; retention pruning
+   applies only to the bounded operation journal.
 4. **Pin rotation is invalidate-then-update.** The current state is made
    unavailable with a monotonic epoch before the registry stores the new exact
    workflow pin/audience. A stale writer using the old pin therefore loses even

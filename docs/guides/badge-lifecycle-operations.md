@@ -72,10 +72,12 @@ state are reconciled before a subsequent publish is accepted.
    compatibility plan; incompatible rollback is refused closed.
 
 Keep the redacted status response and operation ID with the deployment record.
-The Relay retains at most 256 operation records for 30 days and keeps an alias
-tombstone for at least 90 days. Entries contain reason codes and generation
-metadata only; payload bytes, tokens, URLs, and provider evidence are never
-written to the operator journal.
+The Relay retains at most 256 operation records for 30 days. An alias tombstone
+and its monotonic revocation barrier are permanent; the 90-day bound is only a
+minimum operational-retention target and never authorizes deleting the security
+state. Entries contain reason codes and generation metadata only; payload
+bytes, tokens, URLs, and provider evidence are never written to the operator
+journal.
 
 ## Synthetic acceptance checks
 

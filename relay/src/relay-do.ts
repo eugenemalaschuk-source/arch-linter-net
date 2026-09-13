@@ -8,7 +8,6 @@ import {
   MAX_REQUEST_BYTES,
   OPERATION_HISTORY_LIMIT,
   OPERATION_RETENTION_SECONDS,
-  TOMBSTONE_RETENTION_SECONDS,
   RENEWAL_MINIMUM_SECONDS,
   type DisclosureProfile,
   type PublishRequest,
@@ -262,13 +261,11 @@ export class RelayDurableObject {
 
   private ensureRegistered(entry: RegistryEntry, registryRevision = 1, barrierEpoch = 1): StateRow {
     const existing = this.sql.exec<StateRow>("SELECT * FROM relay_state WHERE id = 1").toArray();
-    if (existing.length > 0) {
-      if (existing[0].tombstoned !== 0 && existing[0].updated_at > 0 && existing[0].updated_at < nowSeconds() - TOMBSTONE_RETENTION_SECONDS) {
-        this.sql.exec("DELETE FROM relay_state WHERE id=1").toArray();
-      } else {
-        return existing[0];
-      }
-    }
+    // The relay_state row is the local monotonic security barrier. In
+    // particular, a tombstone must never expire into a fresh registration:
+    // Registry and the Durable Object must agree that an alias is permanently
+    // unavailable before any new setup plan can use it.
+    if (existing.length > 0) return existing[0];
     const generation = entry.initial_state?.generation && entry.initial_state.generation > 0 ? Math.floor(entry.initial_state.generation) : 1;
     const epoch = entry.initial_state?.revocation_epoch && entry.initial_state.revocation_epoch > 0 ? Math.floor(entry.initial_state.revocation_epoch) : 1;
     const now = nowSeconds();
@@ -294,11 +291,6 @@ export class RelayDurableObject {
     const now = nowSeconds();
     this.sql.exec("DELETE FROM relay_operations WHERE created_at < ?", now - OPERATION_RETENTION_SECONDS).toArray();
     this.sql.exec("DELETE FROM relay_operations WHERE id IN (SELECT id FROM relay_operations ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?)", OPERATION_HISTORY_LIMIT).toArray();
-    const current = this.sql.exec<StateRow>("SELECT * FROM relay_state WHERE id=1").toArray()[0];
-    if (current?.tombstoned !== 0 && current?.updated_at > 0 && current.updated_at < now - TOMBSTONE_RETENTION_SECONDS) {
-      this.sql.exec("DELETE FROM relay_state WHERE id=1").toArray();
-      this.sql.exec("DELETE FROM relay_challenges WHERE consumed=0").toArray();
-    }
   }
 
   private checkRegistryBarrier(request: Request, current: StateRow, entry?: RegistryEntry): "ok" | "stale-caller" | "advanced" {

@@ -58,7 +58,9 @@ incompatible target without serving the older generation.
 The Relay SHALL provide private status containing only state, generation,
 revocation epoch, validity boundaries, compatibility identifiers, tombstone,
 and bounded redacted reason codes. It SHALL retain operation diagnostics for at
-most 30 days and 256 records per alias. Status and diagnostics SHALL not expose
+most 30 days and 256 records per alias. A tombstone and its monotonic
+revocation barrier SHALL be retained permanently; diagnostic retention SHALL
+never delete the `relay_state` security barrier. Status and diagnostics SHALL not expose
 canonical payload bytes, tokens, JWT claims, source identity, repository URL,
 commit/tree/PR/run identifiers, receipts, or provider response bodies.
 
@@ -81,7 +83,8 @@ variables, exact-match that origin against checked-in configuration, and never
 take credential destination from repository input alone. Dry-run SHALL be
 read-only. The operator runbook SHALL map
 every lifecycle matrix event to a positive and negative action, state the
-60-minute lease/30-minute renewal and retention bounds, distinguish origin
+60-minute lease/30-minute renewal and retention bounds (with permanent
+tombstones), distinguish origin
 truth from cached copies, and include synthetic upgrade, rollback, uninstall,
 and recovery verification.
 

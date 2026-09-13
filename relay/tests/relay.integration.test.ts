@@ -338,6 +338,35 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(oldCount).toBe(0);
   });
 
+  it("retains a tombstone barrier after the 90-day diagnostic window", async () => {
+    const tombstoneAlias = "a833tmb1";
+    const tombstoneEntry: RegistryEntry = { ...entry, destination_alias: tombstoneAlias, bundle_digest: digestA, consent: true };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(tombstoneAlias));
+    const internalHeaders = {
+      "x-relay-registry": JSON.stringify(tombstoneEntry),
+      "x-relay-registry-revision": "4",
+      "x-relay-barrier-epoch": "3",
+      "x-relay-admin": "1",
+      "content-type": "application/json"
+    };
+    const initialize = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).fetch(new Request(`https://relay.test/internal/admin/${tombstoneAlias}/status`, { headers: internalHeaders })));
+    expect(initialize.status).toBe(200);
+
+    const oldTimestamp = Math.floor(Date.now() / 1000) - 91 * 24 * 60 * 60;
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec("UPDATE relay_state SET status='revoked', generation=9, revocation_epoch=7, tombstoned=1, registry_revision=4, barrier_epoch=3, updated_at=? WHERE id=1", oldTimestamp);
+    });
+
+    // Status invokes pruneRetention(), and ensureRegistered() runs before it.
+    // An expired diagnostic timestamp must not delete the security barrier.
+    const status = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).fetch(new Request(`https://relay.test/internal/admin/${tombstoneAlias}/status`, { headers: internalHeaders })));
+    expect(status.status).toBe(200);
+    expect(await status.json()).toMatchObject({ state: "revoked", generation: 9, revocation_epoch: 7, registry_revision: 4, barrier_epoch: 3, tombstoned: true });
+    const persisted = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; generation: number; revocation_epoch: number; tombstoned: number }>("SELECT status,generation,revocation_epoch,tombstoned FROM relay_state WHERE id=1").toArray()[0]);
+    expect(persisted).toEqual({ status: "revoked", generation: 9, revocation_epoch: 7, tombstoned: 1 });
+  });
+
   it("uses SQLite persistence across object eviction", async () => {
     const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
     const stub = relay.get(relay.idFromName(alias));

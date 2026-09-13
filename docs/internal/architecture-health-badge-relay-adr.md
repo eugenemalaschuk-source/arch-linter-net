@@ -270,10 +270,10 @@ old payloads, receipts, or provenance exists. The private Durable Object may
 retain the current envelope, registry, active challenge, and monotonic state;
 redacted operational reason codes are retained for at most 30 days. Spent
 challenge/idempotency records are retained for at least 48 hours. A tombstone
-and its revocation barrier are retained for at least 90 days and are not
-silently purged as part of ordinary payload deletion. Deletion removes current
-payload bytes and private provenance; the tombstone survives the retention
-period before any explicit, reviewed purge.
+and its revocation barrier are retained permanently and are never silently
+purged as part of ordinary payload or journal retention. Deletion removes
+current payload bytes and private provenance; the security barrier remains
+available for all future stale-state and restore checks.
 
 After backup restore, the Worker must enter `needs-recovery` even if a restored
 row says `ready`. A current registry pin, current consent, and current

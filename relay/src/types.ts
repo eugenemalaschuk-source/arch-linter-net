@@ -14,6 +14,7 @@ export const RENEWAL_MINIMUM_SECONDS = 30 * 60;
 export const CONTRACT_VERSION = "v1" as const;
 export const COMPATIBILITY_PLAN = "architecture-health-badge-relay/v1" as const;
 export const OPERATION_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+/** Minimum operational tombstone-retention target; tombstones are permanent. */
 export const TOMBSTONE_RETENTION_SECONDS = 90 * 24 * 60 * 60;
 export const OPERATION_HISTORY_LIMIT = 256;
 
