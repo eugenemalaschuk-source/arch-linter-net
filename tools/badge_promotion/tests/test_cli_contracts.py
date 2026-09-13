@@ -212,6 +212,42 @@ def test_raw_publication_stale_cas_uses_configured_base_ref(monkeypatch: pytest.
     assert base_ref_path in api.paths
 
 
+def test_raw_publication_retries_a_transient_ref_update_race(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text())
+    config = parse_config(raw)
+    repository = config.repository
+    main_sha = "a" * 40
+    parent_sha = "b" * 40
+    ref_path = f"/repos/{repository}/git/ref/heads/architecture-health-badge"
+
+    class FlakyApi(FakeApi):
+        patch_attempts = 0
+
+        def request(self, path: str, **kwargs: object) -> object:
+            if path == ref_path and kwargs.get("method") == "PATCH":
+                self.patch_attempts += 1
+                if self.patch_attempts == 1:
+                    raise ProviderFailure("github_api_unavailable")
+            return super().request(path, **kwargs)
+
+    api = FlakyApi(
+        {
+            ref_path: {"object": {"sha": parent_sha}},
+            f"/repos/{repository}/git/ref/heads/main": {"object": {"sha": main_sha}},
+            f"/repos/{repository}/git/commits/{parent_sha}": {"tree": {"sha": "c" * 40}},
+            f"/repos/{repository}/git/blobs": {"sha": "d" * 40},
+            f"/repos/{repository}/git/trees": {"sha": "e" * 40},
+            f"/repos/{repository}/git/commits": {"sha": "f" * 40},
+        }
+    )
+    monkeypatch.setenv("GITHUB_SHA", main_sha)
+
+    _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
+
+    assert api.patch_attempts == 2
+    assert api.paths.count(ref_path) == 3
+
+
 def test_semantic_evidence_member_is_bounded_before_decompression() -> None:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
