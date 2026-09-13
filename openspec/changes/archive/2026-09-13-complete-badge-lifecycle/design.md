@@ -42,17 +42,20 @@ not duplicate #828 storage or #831 read semantics.
 2. **Rename is metadata-only.** An admin may change the private display owner or
    repository only when both immutable IDs match the registered entry. The alias,
    state, generation, epoch, and public bytes do not change.
- 3. **The Registry is the lifecycle barrier.** Every forwarded read/mutation
-    carries the registry revision and barrier epoch. An older caller is rejected
-    without mutation; a revision-only rename synchronizes metadata while
-    preserving ready data; a newer barrier clears ready data and enters
-    `needs-recovery`, so a stale Durable Object backup or delayed publisher cannot
-    win. Caller CAS values are compared with the authoritative pre-change
-    snapshot and are never replaced by a later lookup. Registry revocation
-    validates generation/epoch and Registry revision/barrier first, then
-    advances the barrier; Durable Object cleanup uses the pre-barrier counters
-    as its witness so irreversible revocation cannot be reported as a conflict.
-    Transfer,
+ 3. **The Registry and Relay form a two-phase lifecycle barrier.** Every
+    forwarded read/mutation carries the registry revision and barrier epoch. An
+    older caller is rejected without mutation; a revision-only rename
+    synchronizes metadata while preserving ready data; a newer barrier clears
+    ready data and enters `needs-recovery`, so a stale Durable Object backup or
+    delayed publisher cannot win. Caller CAS values are compared with the
+    authoritative pre-change snapshot and are never replaced by a later lookup.
+    Destructive revoke/remove/transfer first reserves the Relay state in one
+    local transaction: it clears public bytes, records the operation identity,
+    and fences publisher/challenge writes. The outer Worker then performs the
+    Registry revision/barrier CAS and finally commits the reserved Relay
+    tombstone. A Registry conflict leaves the reservation unavailable for a
+    same-operation retry, never falsely successful and never tombstoning from a
+    stale Relay counter. Transfer,
    removal, and revocation tombstone the old alias. Transfer returns an explicit
    `registration_required` result; it never creates a new binding or carries
    consent to another owner. A tombstone and its monotonic revocation barrier
@@ -87,9 +90,10 @@ not duplicate #828 storage or #831 read semantics.
 
 - [Admin token compromise] → Require a dedicated adopter token, keep it out of
   command-line options/logs, and return generic errors.
-- [Registry update races with relay mutation] → Relay mutation is performed
-  first; registry update uses an atomic conditional transaction and failure
-  leaves the destination unavailable, never falsely ready.
+- [Registry update races with relay mutation] → destructive lifecycle uses a
+  Relay-side reservation/fence before the Registry conditional transaction;
+  failure leaves the destination unavailable and retryable under the same
+  operation ID, never falsely ready or falsely committed.
 - [Cloudflare schema drift] → Additive SQLite columns and bounded migration
   checks are idempotent; unknown bundle/contract values are rejected.
 - [Third-party cached images remain visible] → The runbook explicitly calls

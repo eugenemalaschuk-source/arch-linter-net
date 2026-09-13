@@ -54,14 +54,18 @@ redacted status contract.
 | Status/outage | `--operation status` | Storage outage is reported as `storage_unavailable`; no private payload or token is returned. |
 | Abandoned alias | `--operation revoke` (or `remove`) | Re-registering the tombstoned alias is refused; allocate a new opaque alias instead. |
 
-Every mutation advances the generation/revocation epoch and is guarded by the
-registry revision and barrier epoch. A delayed writer therefore loses to a
-revocation, rotation, restore, or recovery transition. Registry and Relay
-state are reconciled before a subsequent publish is accepted. When using
-optimistic concurrency, supply all four expected counters from the same private
-status snapshot; stale values fail with `409` before a Registry tombstone or
-other mutation is committed. Every mutation also requires its own explicit
-operation ID for retry tracing and idempotency.
+Every completed mutation advances the generation/revocation epoch and is
+guarded by the registry revision and barrier epoch. Revoke/remove/transfer use
+a two-phase fence: Relay first atomically clears public bytes and blocks
+publisher/challenge writes, then the Registry CAS tombstones the alias, and a
+final Relay step commits the revoked generation. A delayed writer therefore
+loses even while the Registry request is in flight. If the Registry CAS loses a
+race, the alias remains unavailable and the same operation ID can be retried
+with a fresh status snapshot; no stale caller is reported as a successful
+tombstone. When using optimistic concurrency, supply all four expected
+counters from the same private status snapshot; stale values fail with `409`
+before a Registry tombstone or other mutation is committed. Every mutation
+also requires its own explicit operation ID for retry tracing and idempotency.
 
 ## Recovery and rollback
 

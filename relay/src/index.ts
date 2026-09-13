@@ -106,14 +106,6 @@ function expectedRegistryStateMatches(body: Record<string, unknown>, binding: Re
   return true;
 }
 
-function expectedRelayStateMatches(body: Record<string, unknown>, status: Record<string, unknown>): boolean {
-  if (Object.prototype.hasOwnProperty.call(body, "expected_generation")
-    && (!Number.isSafeInteger(body.expected_generation) || body.expected_generation !== status.generation)) return false;
-  if (Object.prototype.hasOwnProperty.call(body, "expected_revocation_epoch")
-    && (!Number.isSafeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== status.revocation_epoch)) return false;
-  return true;
-}
-
 function requireMutationOperationId(body: Record<string, unknown>): Response | undefined {
   return operationId(body.operation_id) ? undefined : json(413, { error: "invalid_operation_id" });
 }
@@ -140,9 +132,13 @@ async function adminRevoke(request: Request, env: RelayEnvironment, alias: strin
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
   if (!lookup.entry) return unknownRoute();
   if (!expectedRegistryStateMatches(body, lookup)) return json(409, { error: "registry_conflict" });
-  const current = await relayAdminCall(env, alias, lookup, "status");
-  if (current.status !== 200) return json(current.status, current.body);
-  if (!expectedRelayStateMatches(body, current.body)) return json(409, { error: "state_conflict" });
+  const lifecycleOperation = operation === "uninstall" || operation === "transfer" ? operation : "revoke";
+  // Reserve the Relay state before the Registry CAS.  This is a two-phase
+  // cross-object transition: the reservation atomically fences publishers
+  // and clears the public payload, so a generation/epoch change cannot sneak
+  // in after the old status preflight but before Registry tombstoning.
+  const prepared = await relayAdminCall(env, alias, lookup, "revoke-prepare", { ...body, lifecycle_operation: lifecycleOperation });
+  if (prepared.status !== 200) return json(prepared.status, prepared.body);
   const result = await registryCall(env, "revoke", {
     alias,
     operation_id: body.operation_id,
@@ -150,26 +146,17 @@ async function adminRevoke(request: Request, env: RelayEnvironment, alias: strin
     expected_barrier_epoch: lookup.barrierEpoch
   });
   if (result.status !== 200) return result.status === 404 ? unknownRoute() : result.status === 409 ? json(409, { error: "registry_conflict" }) : json(503, { error: "storage_unavailable" });
-  // The registry barrier advances first. Public reads are now unavailable
-  // even if Durable Object cleanup must be retried after a transient failure.
+  // The registry barrier is now committed. Finalization performs the single
+  // irreversible Relay generation/epoch transition under the reservation.
   const revokedLookup = await lookupEntry(env, alias, true);
   if (revokedLookup.storageUnavailable || !revokedLookup.entry) return json(503, { error: "storage_unavailable" });
   const cleanupBody = {
     ...body,
-    expected_registry_revision: Object.prototype.hasOwnProperty.call(body, "expected_registry_revision") ? body.expected_registry_revision : lookup.revision,
-    expected_barrier_epoch: Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch") ? body.expected_barrier_epoch : lookup.barrierEpoch
+    lifecycle_operation: lifecycleOperation,
+    expected_registry_revision: revokedLookup.revision,
+    expected_barrier_epoch: revokedLookup.barrierEpoch
   };
-  const relay = await relayAdminCall(env, alias, revokedLookup, operation === "transfer" ? "revoke" : operation === "uninstall" ? "uninstall" : "revoke", cleanupBody);
-  if (relay.status === 409) {
-    // Registry revocation is intentionally irreversible. A concurrent Relay
-    // generation change can make the cleanup CAS stale after the Registry has
-    // already tombstoned the alias; report the committed barrier outcome
-    // instead of surfacing a false failure for an operation that succeeded.
-    const postRevokeStatus = await relayAdminCall(env, alias, revokedLookup, "status");
-    if (postRevokeStatus.status === 200 && postRevokeStatus.body.state === "revoked" && postRevokeStatus.body.tombstoned === true) {
-      return json(200, { ok: true, state: "revoked", tombstoned: true, operation: operation === "transfer" ? "registration_required" : operation });
-    }
-  }
+  const relay = await relayAdminCall(env, alias, revokedLookup, "revoke-finalize", cleanupBody);
   if (relay.status !== 200) return json(relay.status, relay.body);
   return json(200, { ok: true, state: "revoked", tombstoned: true, operation: operation === "transfer" ? "registration_required" : operation });
 }

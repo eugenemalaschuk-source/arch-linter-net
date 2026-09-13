@@ -48,6 +48,8 @@ interface StateRow {
   display_repository: string | null;
   last_operation: string | null;
   last_reason: string | null;
+  pending_operation_id: string | null;
+  pending_operation: string | null;
   updated_at: number;
 }
 
@@ -189,6 +191,8 @@ export class RelayDurableObject {
       display_repository TEXT,
       last_operation TEXT,
       last_reason TEXT,
+      pending_operation_id TEXT,
+      pending_operation TEXT,
       updated_at INTEGER NOT NULL DEFAULT 0
     )`).toArray();
     this.ensureColumn("registry_revision", "INTEGER NOT NULL DEFAULT 1");
@@ -204,6 +208,8 @@ export class RelayDurableObject {
     this.ensureColumn("display_repository", "TEXT");
     this.ensureColumn("last_operation", "TEXT");
     this.ensureColumn("last_reason", "TEXT");
+    this.ensureColumn("pending_operation_id", "TEXT");
+    this.ensureColumn("pending_operation", "TEXT");
     this.ensureColumn("updated_at", "INTEGER NOT NULL DEFAULT 0");
     this.sql.exec(`CREATE TABLE IF NOT EXISTS relay_challenges (
       id TEXT PRIMARY KEY,
@@ -312,6 +318,17 @@ export class RelayDurableObject {
         this.recordOperation("barrier-sync", current.status, "ok", this.row(), `barrier-revision-${nextRevision}`);
         return;
       }
+      if (current.pending_operation_id !== null) {
+        // A revocation reservation has already fenced publisher writes.  A
+        // Registry change while the two-phase revoke is in flight must update
+        // only the local binding metadata; it must not advance generation or
+        // otherwise rewrite the pending operation.  The outer control plane
+        // will CAS the Registry again and finalize only after its tombstone is
+        // visible.
+        this.sql.exec("UPDATE relay_state SET registry_revision=?, barrier_epoch=?, display_owner=?, display_repository=?, updated_at=? WHERE id=1", nextRevision, nextEpoch, entry?.owner ?? current.display_owner, entry?.repository ?? current.display_repository, nowSeconds()).toArray();
+        this.recordOperation("barrier-sync", current.status, "revoke_pending", this.row(), `barrier-pending-${nextRevision}-${nextEpoch}`);
+        return;
+      }
       this.sql.exec("UPDATE relay_state SET status=?, generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=?, last_renewed_at=NULL, registry_revision=?, barrier_epoch=?, updated_at=? WHERE id=1", registryTombstoned ? "revoked" : "needs-recovery", registryTombstoned ? 1 : 0, nextRevision, nextEpoch, nowSeconds()).toArray();
       this.sql.exec("DELETE FROM relay_challenges WHERE consumed=0").toArray();
       this.recordOperation("barrier-check", registryTombstoned ? "revoked" : "needs-recovery", registryTombstoned ? "already_revoked" : "stale_registry_barrier", this.row(), `barrier-${nextRevision}-${nextEpoch}`);
@@ -371,6 +388,7 @@ export class RelayDurableObject {
     return this.state.storage.transactionSync(() => {
       try {
       const current = this.row();
+      if (current.pending_operation_id !== null) return this.finishError(409);
       if (current.tombstoned || current.status === "revoked") return this.finishError(403);
       if (safeInteger(body.expected_generation) && body.expected_generation !== current.generation) return this.finishError(409);
       if (safeInteger(body.expected_revocation_epoch) && body.expected_revocation_epoch !== current.revocation_epoch) return this.finishError(409);
@@ -439,6 +457,7 @@ export class RelayDurableObject {
     return this.state.storage.transactionSync(() => {
       try {
       const current = this.row();
+      if (current.pending_operation_id !== null) return this.finishError(409);
       if (operation === "recover" && current.status !== "needs-recovery") return this.finishError(409);
       const challenge = this.sql.exec<ChallengeRow>("SELECT * FROM relay_challenges WHERE id = ? LIMIT 1", body.challenge_id).toArray()[0];
       if (!challenge || challenge.consumed || challenge.deadline <= nowSeconds() || challenge.canonical_digest !== body.canonical_digest || challenge.profile !== profile || challenge.generation !== body.expected_generation || challenge.revocation_epoch !== body.expected_revocation_epoch) return this.finishError(409);
@@ -484,6 +503,7 @@ export class RelayDurableObject {
     return this.state.storage.transactionSync(() => {
       try {
       const current = this.row();
+      if (current.pending_operation_id !== null) return this.finishError(409);
       if (current.generation !== body.expected_generation || current.revocation_epoch !== body.expected_revocation_epoch || current.tombstoned) return this.finishError(409);
       if (publisher.claims.repository_id !== entry.repository_id || publisher.claims.repository_owner_id !== entry.repository_owner_id) return this.finishError(403);
       const status = operation === "revoke" ? "revoked" : "unavailable";
@@ -527,9 +547,81 @@ export class RelayDurableObject {
     }));
   }
 
+  /**
+   * Reserve a destructive lifecycle transition before touching the Registry.
+   *
+   * Relay and Registry are different Durable Objects, so a status read
+   * followed by a Registry CAS is not one atomic operation.  The reservation
+   * is the Relay-side half of a small two-phase protocol: it atomically fences
+   * publisher/challenge writes and clears the public payload.  The outer
+   * control plane may then CAS the Registry tombstone; only a later finalize
+   * request can make the Relay tombstone permanent.  A failed Registry CAS
+   * therefore leaves the alias safely unavailable and retryable, never
+   * falsely committed.
+   */
+  private adminRevokePrepare(body: Record<string, unknown>, lifecycleOperation: "revoke" | "uninstall" | "transfer"): Response {
+    if (!boundedString(body.operation_id, 128) || body.operation_id.length === 0) return genericError(413);
+    if (!safeInteger(body.expected_generation) || !safeInteger(body.expected_revocation_epoch)) return genericError(413);
+    const operationIdValue = body.operation_id;
+    return this.state.storage.transactionSync(() => {
+      const current = this.row();
+      const prior = this.operationAlreadyApplied(operationIdValue);
+      if (prior) {
+        if (prior.operation !== lifecycleOperation) return this.finishError(409);
+        return response(200, { ok: true, state: prior.status, generation: prior.generation, revocation_epoch: prior.revocation_epoch, operation_id: operationIdValue });
+      }
+      if (current.pending_operation_id !== null) {
+        if (current.pending_operation_id !== operationIdValue || current.pending_operation !== lifecycleOperation) return this.finishError(409);
+        return response(200, { ok: true, state: current.status, pending: true, generation: current.generation, revocation_epoch: current.revocation_epoch, operation_id: operationIdValue });
+      }
+      if (current.tombstoned !== 0 || current.status === "revoked") return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+        && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== current.registry_revision)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+        && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== current.barrier_epoch)) return this.finishError(409);
+      if (body.expected_generation !== current.generation || body.expected_revocation_epoch !== current.revocation_epoch) return this.finishError(409);
+
+      this.sql.exec("UPDATE relay_state SET status='needs-recovery', generation=generation, revocation_epoch=revocation_epoch, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, pending_operation_id=?, pending_operation=?, last_operation='revoke-prepare', last_reason='revoke_pending', updated_at=? WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0 AND pending_operation_id IS NULL", operationIdValue, lifecycleOperation, nowSeconds(), current.generation, current.revocation_epoch).toArray();
+      this.sql.exec("DELETE FROM relay_challenges WHERE consumed=0").toArray();
+      const after = this.row();
+      if (after.pending_operation_id !== operationIdValue || after.pending_operation !== lifecycleOperation || after.generation !== current.generation || after.revocation_epoch !== current.revocation_epoch) return this.finishError(409);
+      return response(200, { ok: true, state: after.status, pending: true, generation: after.generation, revocation_epoch: after.revocation_epoch, operation_id: operationIdValue });
+    });
+  }
+
+  /** Complete a previously reserved revoke after the Registry tombstone CAS. */
+  private adminRevokeFinalize(body: Record<string, unknown>, lifecycleOperation: "revoke" | "uninstall" | "transfer"): Response {
+    if (!boundedString(body.operation_id, 128) || body.operation_id.length === 0) return genericError(413);
+    const operationIdValue = body.operation_id;
+    return this.state.storage.transactionSync(() => {
+      const current = this.row();
+      const prior = this.operationAlreadyApplied(operationIdValue);
+      if (prior) {
+        if (prior.operation !== lifecycleOperation) return this.finishError(409);
+        return response(200, { ok: true, state: prior.status, generation: prior.generation, revocation_epoch: prior.revocation_epoch, operation_id: operationIdValue });
+      }
+      if (current.pending_operation_id !== operationIdValue || current.pending_operation !== lifecycleOperation) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+        && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== current.registry_revision)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+        && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== current.barrier_epoch)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_generation")
+        && (!safeInteger(body.expected_generation) || body.expected_generation !== current.generation)) return this.finishError(409);
+      if (Object.prototype.hasOwnProperty.call(body, "expected_revocation_epoch")
+        && (!safeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== current.revocation_epoch)) return this.finishError(409);
+
+      this.sql.exec("UPDATE relay_state SET status='revoked', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=1, last_renewed_at=NULL, pending_operation_id=NULL, pending_operation=NULL, updated_at=? WHERE id=1 AND pending_operation_id=? AND pending_operation=?", nowSeconds(), operationIdValue, lifecycleOperation).toArray();
+      this.sql.exec("DELETE FROM relay_challenges WHERE consumed=0").toArray();
+      const after = this.row();
+      if (after.status !== "revoked" || after.tombstoned === 0 || after.pending_operation_id !== null) return this.finishError(409);
+      this.recordOperation(lifecycleOperation, after.status, "ok", after, operationIdValue);
+      return response(200, { ok: true, state: after.status, tombstoned: true, generation: after.generation, revocation_epoch: after.revocation_epoch, operation_id: operationIdValue });
+    });
+  }
+
   private adminMutation(
     body: Record<string, unknown>,
-    operation: "admin-invalidate" | "admin-revoke" | "admin-recover-open" | "admin-uninstall",
+    operation: "admin-invalidate" | "admin-recover-open",
     preBarrier?: Pick<StateRow, "generation" | "revocation_epoch" | "registry_revision" | "barrier_epoch">): Response {
     if (typeof body.operation_id !== "string" || body.operation_id.length === 0 || body.operation_id.length > 128) return genericError(413);
     return this.state.storage.transactionSync(() => {
@@ -539,6 +631,7 @@ export class RelayDurableObject {
         if (prior.operation !== operation) return this.finishError(409);
         return response(200, { ok: true, state: prior.status, generation: prior.generation, revocation_epoch: prior.revocation_epoch, operation_id: body.operation_id });
       }
+      if (current.pending_operation_id !== null) return this.finishError(409);
       const expected = preBarrier ?? current;
       if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
         && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== expected.registry_revision)) return this.finishError(409);
@@ -548,10 +641,8 @@ export class RelayDurableObject {
         && (!safeInteger(body.expected_generation) || body.expected_generation !== expected.generation)) return this.finishError(409);
       if (Object.prototype.hasOwnProperty.call(body, "expected_revocation_epoch")
         && (!safeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== expected.revocation_epoch)) return this.finishError(409);
-      if (current.tombstoned !== 0 && operation !== "admin-revoke" && operation !== "admin-uninstall") return this.finishError(409);
-      if (operation === "admin-revoke" || operation === "admin-uninstall") {
-        this.sql.exec("UPDATE relay_state SET status='revoked', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=1, last_renewed_at=NULL, updated_at=? WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0", nowSeconds(), current.generation, current.revocation_epoch).toArray();
-      } else if (operation === "admin-recover-open") {
+      if (current.tombstoned !== 0) return this.finishError(409);
+      if (operation === "admin-recover-open") {
         this.sql.exec("UPDATE relay_state SET status='needs-recovery', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, updated_at=? WHERE id=1 AND generation=? AND revocation_epoch=?", nowSeconds(), current.generation, current.revocation_epoch).toArray();
       } else {
         this.sql.exec("UPDATE relay_state SET status='unavailable', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, updated_at=? WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0", nowSeconds(), current.generation, current.revocation_epoch).toArray();
@@ -580,6 +671,7 @@ export class RelayDurableObject {
         if (prior.operation !== operation) return this.finishError(409);
         return response(200, { ok: true, state: prior.status, generation: prior.generation, revocation_epoch: prior.revocation_epoch, operation_id: operationIdValue });
       }
+      if (before.pending_operation_id !== null) return this.finishError(409);
       if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
         && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== before.registry_revision)) return this.finishError(409);
       if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
@@ -657,11 +749,24 @@ export class RelayDurableObject {
         if (operation === "admin-sync") return this.adminSyncBarrier(body, entry);
         const preBarrier = { generation: current.generation, revocation_epoch: current.revocation_epoch, registry_revision: current.registry_revision, barrier_epoch: current.barrier_epoch };
         const barrierResult = this.checkRegistryBarrier(request, current, entry);
-        if (barrierResult !== "ok" && request.headers.get("x-relay-registry-tombstoned") !== "true") return genericError(409);
+        const registryTombstoned = request.headers.get("x-relay-registry-tombstoned") === "true";
+        // The prepare phase is allowed to observe an advanced binding so it
+        // can return the Relay-side CAS result.  It must never write the
+        // Registry itself; only the outer control plane can do that after the
+        // reservation succeeds.
+        if (barrierResult !== "ok" && !registryTombstoned && operation !== "admin-revoke-prepare") return genericError(409);
+        if (operation === "admin-revoke-prepare") {
+          const lifecycleOperation = body.lifecycle_operation === "uninstall" || body.lifecycle_operation === "transfer" ? body.lifecycle_operation : "revoke";
+          return this.adminRevokePrepare(body, lifecycleOperation);
+        }
+        if (operation === "admin-revoke-finalize") {
+          if (!registryTombstoned) return genericError(409);
+          const lifecycleOperation = body.lifecycle_operation === "uninstall" || body.lifecycle_operation === "transfer" ? body.lifecycle_operation : "revoke";
+          return this.adminRevokeFinalize(body, lifecycleOperation);
+        }
         if (operation === "admin-upgrade" || operation === "admin-rollback") return this.adminUpgrade({ ...body, operation: operation === "admin-rollback" ? "upgrade-rollback" : body.operation ?? "upgrade-stage" });
-        if (operation === "admin-invalidate" || operation === "admin-revoke" || operation === "admin-recover-open" || operation === "admin-uninstall") {
-          const baseline = (operation === "admin-revoke" || operation === "admin-uninstall") && barrierResult === "advanced" ? preBarrier : undefined;
-          return this.adminMutation(body, operation, baseline);
+        if (operation === "admin-invalidate" || operation === "admin-recover-open") {
+          return this.adminMutation(body, operation, barrierResult === "advanced" ? preBarrier : undefined);
         }
       }
       if (this.checkRegistryBarrier(request, current, entry) !== "ok") return genericError(409);

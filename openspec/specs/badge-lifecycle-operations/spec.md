@@ -43,9 +43,16 @@ binding can be created.
 
 #### Scenario: Destructive admin CAS is checked before the Registry barrier
 - **WHEN** an authenticated revoke, remove, or transfer carries an operation ID and the current generation, revocation epoch, registry revision, and barrier epoch
-- **THEN** all caller preconditions are validated before the Registry tombstone is committed
+- **THEN** all caller preconditions are validated and the Relay atomically reserves the destructive operation before the Registry tombstone is committed
 - **AND** a stale generation, epoch, revision, or barrier receives `409` with the Registry and Relay state unchanged
-- **AND** a successful request returns success after the Registry barrier and Relay revocation transition, without comparing caller expectations against the post-barrier counters
+- **AND** a publisher or challenge that reaches the Relay after the reservation receives `409` and cannot advance generation or epoch
+- **AND** a successful request returns success only after the Registry barrier and the reserved Relay revocation finalization, without comparing caller expectations against the post-barrier counters
+
+#### Scenario: Cross-object revoke sequencing remains fail closed
+- **WHEN** the Registry CAS races with a publisher or another Registry revision after the Relay reservation
+- **THEN** the Registry tombstone either loses its own revision/barrier CAS or the pending Relay operation remains unavailable for retry
+- **AND** a stale caller never causes a Registry tombstone or a false successful cleanup
+- **AND** retrying the same operation ID after a fresh authoritative Registry snapshot can complete the existing reservation idempotently
 
 #### Scenario: Admin mutations preserve caller expectations and operation identity
 - **WHEN** an authenticated invalidate, recovery-open, rename, rotate, upgrade, activate, or rollback supplies an expected registry revision or barrier epoch

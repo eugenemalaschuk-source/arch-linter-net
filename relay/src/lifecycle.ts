@@ -23,6 +23,7 @@ export function isKnownBundleDigest(value: unknown, allowlist: ReadonlySet<strin
 export type LifecycleOperation =
   | "status"
   | "reconcile-identity"
+  | "revoke-prepare"
   | "revoke"
   | "recover-open"
   | "recover-finalize"
@@ -39,6 +40,7 @@ export type LifecycleReason =
   | "compatibility_conflict"
   | "stale_registry_barrier"
   | "already_revoked"
+  | "revoke_pending"
   | "recovery_required"
   | "storage_unavailable"
   | "quota_exceeded"

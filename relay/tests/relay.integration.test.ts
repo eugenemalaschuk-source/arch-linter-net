@@ -351,6 +351,99 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(state).toEqual({ status: "ready", generation: 7, registry_revision: 2 });
   });
 
+  it("rejects a stale revoke before the Registry tombstone when a publisher wins first", async () => {
+    const staleAlias = "a833rce1";
+    const staleEntry: RegistryEntry = { ...entry, destination_alias: staleAlias, consent: true };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(staleEntry))).toBe(true);
+    const jwt = await token({ jti: "stale-revoke-publisher-jti" });
+    const digest = await canonicalPayloadDigest(payload);
+    const prepared = await SELF.fetch(`https://relay.test/badge-relay/v1/${staleAlias}/prepare`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: payload, canonical_digest: digest, profile: staleEntry.disclosure_profile, idempotency_key: "stale-revoke-publisher-key", semantic_horizon: futureHorizon() })
+    });
+    expect(prepared.status).toBe(201);
+    const challenge = await prepared.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(staleAlias));
+    const advanced = await commitInternal(stub, jwt, challenge, "publish", payload, "stale-revoke-publisher-key");
+    expect(advanced.status).toBe(200);
+
+    const testEnv = { ...(env as unknown as Record<string, unknown>), ADMIN_TOKEN: "admin" } as unknown as RelayEnvironment;
+    const revoked = await worker.fetch(new Request(`https://relay.test/badge-relay/v1/admin/${staleAlias}/revoke`, {
+      method: "POST",
+      headers: { authorization: "Bearer admin", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: true, operation_id: "stale-revoke-before-registry", expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, expected_registry_revision: 1, expected_barrier_epoch: 1 })
+    }), testEnv);
+    expect(revoked.status).toBe(409);
+    const binding = await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).binding(staleAlias, true));
+    expect(binding?.tombstoned).toBe(false);
+    const row = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; generation: number; tombstoned: number }>("SELECT status,generation,tombstoned FROM relay_state WHERE id=1").toArray()[0]);
+    expect(row).toMatchObject({ status: "ready", generation: challenge.generation + 1, tombstoned: 0 });
+  });
+
+  it("fences a delayed publisher while revoke waits for the Registry CAS", async () => {
+    const raceAlias = "a833rce2";
+    const raceEntry: RegistryEntry = { ...entry, destination_alias: raceAlias, consent: true };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(raceEntry))).toBe(true);
+    const jwt = await token({ jti: "fenced-revoke-publisher-jti" });
+    const digest = await canonicalPayloadDigest(payload);
+    const prepared = await SELF.fetch(`https://relay.test/badge-relay/v1/${raceAlias}/prepare`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: payload, canonical_digest: digest, profile: raceEntry.disclosure_profile, idempotency_key: "fenced-revoke-publisher-key", semantic_horizon: futureHorizon() })
+    });
+    expect(prepared.status).toBe(201);
+    const challenge = await prepared.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(raceAlias));
+    const reservation = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).fetch(new Request(`https://relay.test/internal/admin/${raceAlias}/revoke-prepare`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-relay-admin": "1", "x-relay-registry": JSON.stringify(raceEntry), "x-relay-registry-revision": "1", "x-relay-barrier-epoch": "1", "x-relay-registry-tombstoned": "false" },
+      body: JSON.stringify({ operation_id: "fenced-revoke-operation", lifecycle_operation: "revoke", expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, expected_registry_revision: 1, expected_barrier_epoch: 1 })
+    })));
+    expect(reservation.status).toBe(200);
+    expect(await reservation.json()).toMatchObject({ pending: true, generation: challenge.generation, revocation_epoch: challenge.revocation_epoch });
+
+    const stale = await commitInternal(stub, jwt, challenge, "publish", payload, "fenced-revoke-publisher-key");
+    expect(stale.status).toBe(409);
+    const beforeRegistry = await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).binding(raceAlias, true));
+    expect(beforeRegistry?.tombstoned).toBe(false);
+
+    const testEnv = { ...(env as unknown as Record<string, unknown>), ADMIN_TOKEN: "admin" } as unknown as RelayEnvironment;
+    const renamed = await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).reconcileIdentity(raceAlias, "fenced-owner", "fenced-repo", raceEntry.repository_id, raceEntry.repository_owner_id, 1, 1));
+    expect(renamed?.revision).toBe(2);
+    const staleRegistryAttempt = await worker.fetch(new Request(`https://relay.test/badge-relay/v1/admin/${raceAlias}/revoke`, {
+      method: "POST",
+      headers: { authorization: "Bearer admin", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: true, operation_id: "fenced-revoke-operation", expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, expected_registry_revision: 1, expected_barrier_epoch: 1 })
+    }), testEnv);
+    expect(staleRegistryAttempt.status).toBe(409);
+    const stillPending = await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).binding(raceAlias, true));
+    expect(stillPending?.tombstoned).toBe(false);
+
+    const finalized = await worker.fetch(new Request(`https://relay.test/badge-relay/v1/admin/${raceAlias}/revoke`, {
+      method: "POST",
+      headers: { authorization: "Bearer admin", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: true, operation_id: "fenced-revoke-operation", expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, expected_registry_revision: 2, expected_barrier_epoch: 1 })
+    }), testEnv);
+    expect(finalized.status).toBe(200);
+    const replay = await worker.fetch(new Request(`https://relay.test/badge-relay/v1/admin/${raceAlias}/revoke`, {
+      method: "POST",
+      headers: { authorization: "Bearer admin", "content-type": "application/json" },
+      body: JSON.stringify({ confirm: true, operation_id: "fenced-revoke-operation", expected_generation: challenge.generation, expected_revocation_epoch: challenge.revocation_epoch, expected_registry_revision: 3, expected_barrier_epoch: 2 })
+    }), testEnv);
+    expect(replay.status).toBe(200);
+    const afterRegistry = await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).binding(raceAlias, true));
+    expect(afterRegistry?.tombstoned).toBe(true);
+    const row = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; generation: number; revocation_epoch: number; tombstoned: number; pending_operation_id: string | null }>("SELECT status,generation,revocation_epoch,tombstoned,pending_operation_id FROM relay_state WHERE id=1").toArray()[0]);
+    expect(row).toMatchObject({ status: "revoked", generation: challenge.generation + 1, revocation_epoch: challenge.revocation_epoch + 1, tombstoned: 1, pending_operation_id: null });
+  });
+
   it("honors caller registry CAS values and requires operation IDs for admin mutations", async () => {
     const casAlias = "a833cas1";
     const casEntry: RegistryEntry = { ...entry, destination_alias: casAlias, consent: true };

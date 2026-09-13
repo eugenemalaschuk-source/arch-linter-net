@@ -12,11 +12,11 @@
   "files": [
     {
       "path": "src/index.ts",
-      "sha256": "81a006dfbc3eaf9a77ac0a44643d434b0a71102af6c340bd22aafffc05826efe"
+      "sha256": "5b5ab79cb3f464a53701c80835b45d675572fdb8b655c22094e6850a8b3d663c"
     },
     {
       "path": "src/lifecycle.ts",
-      "sha256": "0c51355b25681800b61630acab30f050ed488cd459c98a3ebae38adbbd42b21c"
+      "sha256": "3f89d01e77d126ae11575b6d0406d9c77a34c31b4356a5dbc739ca513dec6d01"
     },
     {
       "path": "src/payload.ts",
@@ -36,7 +36,7 @@
     },
     {
       "path": "src/relay-do.ts",
-      "sha256": "cfe92c8e265fe8f53e915e858c778ad7c3a36ceee1a2e56efbf292df7543185c"
+      "sha256": "62ebf9fcc084475924ac1cb48fce384217672f11516589274bba5cce5d765cdd"
     },
     {
       "path": "src/security.ts",

@@ -14,5 +14,6 @@
 ## 3. Verification and closure
 
 - [x] 3.1 Add Relay contract/integration tests for identity transitions, races, pin rotation, upgrade/rollback, status redaction, and retention.
+- [x] 3.1a Add a two-phase Relay/Registry interleaving regression proving stale counters cannot tombstone the Registry and a fenced publisher cannot advance generation before finalize.
 - [x] 3.2 Add CLI tests for configuration/token/dry-run behavior and bounded diagnostics.
 - [x] 3.3 Run focused Relay/CLI tests, formatter/lints, OpenSpec validation, synchronize/archive the change, and inspect the final diff.
