@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -396,6 +397,9 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
         except ProviderFailure as error:
             if attempt + 1 == _MAX_RAW_PUBLICATION_ATTEMPTS:
                 raise ProviderFailure("publication_race_lost") from error
+            # GitHub may expose the newly created commit/tree slightly after the data API
+            # accepts it. Give the ref service a bounded opportunity to observe those objects.
+            time.sleep(2**attempt)
 
 
 def _validate_invocation(config, operation: str) -> None:
