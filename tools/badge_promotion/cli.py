@@ -298,6 +298,10 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     if len(producer_jobs) != 1:
         raise ProviderFailure("producer_job_unresolved")
     job = producer_jobs[0]
+    # The artifact manifest records the attempt of this producer job. A rerun of
+    # an unrelated job advances the workflow run's attempt without recreating
+    # this artifact, so binding to run.run_attempt would reject valid evidence.
+    producer_run_attempt = int(job.get("run_attempt", 0))
     artifacts = api.request(f"/repos/{_repository_path(repository)}/actions/runs/{run_id}/artifacts?per_page=100").get("artifacts", [])
     selected = [artifact for artifact in artifacts if artifact.get("name") == config.producer.artifact_name]
     if len(selected) != 1 or selected[0].get("expired") is True:
@@ -322,7 +326,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
         merged=True, workflow_path=config.producer.workflow_path, workflow_sha=workflow_sha,
         check_name=config.producer.check_name, check_app=config.producer.check_app, check_status="completed",
         check_conclusion="success", required_gate_present=_required_gate(api, repository, config.producer.check_name, check_app_id, config.base_ref), run_id=run_id,
-        run_attempt=int(run.get("run_attempt", 0)), job_id=int(job.get("id", 0)), job_name=job.get("name", ""),
+        run_attempt=producer_run_attempt, job_id=int(job.get("id", 0)), job_name=job.get("name", ""),
         artifact_id=int(artifact.get("id", 0)), artifact_name=artifact.get("name", ""), artifact_size=len(archive),
         artifact_expired=False, verified_at=verified_at, semantic_horizon=semantic_horizon,
     )

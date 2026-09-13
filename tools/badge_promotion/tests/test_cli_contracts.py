@@ -25,7 +25,7 @@ from badge_promotion.cli import (  # noqa: E402
     _workflow_blob_sha,
 )
 from badge_promotion.decision import DecisionDisposition, PromotionDecision  # noqa: E402
-from badge_promotion.model import PromotionStatus, ReasonCode  # noqa: E402
+from badge_promotion.model import EvidenceContext, PromotionStatus, ReasonCode  # noqa: E402
 
 
 class FakeApi:
@@ -212,6 +212,57 @@ def test_raw_publication_stale_cas_uses_configured_base_ref(monkeypatch: pytest.
     monkeypatch.setenv("GITHUB_SHA", main_sha)
     _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
     assert base_ref_path in api.paths
+
+
+def test_resolve_evidence_binds_manifest_attempt_to_producer_job(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text())
+    config = parse_config(raw)
+    repository = config.repository
+    main_sha = "a" * 40
+    base_sha = "b" * 40
+    head_sha = "c" * 40
+    tree_sha = "d" * 40
+    run_id = 7001
+    job_id = 8001
+    workflow_path = config.producer.workflow_path
+    workflow_ref = f"/repos/{repository}/contents/{workflow_path}?ref={head_sha}"
+    check_path = f"/repos/{repository}/commits/{head_sha}/check-runs?check_name=Architecture%20Coverage&filter=latest&per_page=100"
+    producer_run_path = f"/repos/{repository}/actions/runs?head_sha={head_sha}&event=pull_request&per_page=100"
+    job_path = f"/repos/{repository}/actions/runs/{run_id}/jobs?per_page=100"
+    artifacts_path = f"/repos/{repository}/actions/runs/{run_id}/artifacts?per_page=100"
+    evidence_stream = io.BytesIO()
+    with zipfile.ZipFile(evidence_stream, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "architecture-health.json",
+            b'{"report_evidence":{"publication_evidence":{"semantic_horizon":"2026-09-13T16:00:00Z"}}}',
+        )
+
+    class ResolveApi:
+        def request(self, path: str, **_: object) -> object:
+            responses: dict[str, object] = {
+                f"/repos/{repository}/commits/{main_sha}": {"commit": {"tree": {"sha": tree_sha}}, "parents": [{"sha": base_sha}]},
+                f"/repos/{repository}/commits/{main_sha}/pulls": [{"number": 42}],
+                f"/repos/{repository}/pulls/42": {"base": {"repo": {"full_name": repository}, "ref": "main"}, "merged": True, "merge_commit_sha": main_sha, "head": {"sha": head_sha}},
+                f"/repos/{repository}/commits/{head_sha}": {"commit": {"tree": {"sha": tree_sha}}},
+                workflow_ref: {"type": "file", "sha": config.producer.workflow_sha},
+                check_path: {"check_runs": [{"name": "Architecture Coverage", "status": "completed", "conclusion": "success", "app": {"slug": "github-actions", "id": 15368}, "details_url": f"https://github.com/{repository}/actions/runs/{run_id}/job/{job_id}"}]},
+                producer_run_path: {"workflow_runs": [{"id": run_id, "path": workflow_path, "event": "pull_request", "head_sha": head_sha, "conclusion": "success", "run_attempt": 2, "created_at": "2026-09-13T15:00:00Z"}]},
+                job_path: {"jobs": [{"id": job_id, "name": config.producer.job_name, "conclusion": "success", "run_attempt": 1}]},
+                artifacts_path: {"artifacts": [{"id": 9001, "name": config.producer.artifact_name, "expired": False, "archive_download_url": "badge"}, {"id": 9002, "name": config.producer.evidence_artifact_name, "expired": False, "archive_download_url": "evidence"}]},
+                f"/repos/{repository}/rules/branches/main": [{"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": True, "required_status_checks": [{"context": "Architecture Coverage", "integration_id": 15368}]}}],
+            }
+            return responses[path]
+
+        def download(self, url: str) -> bytes:
+            return b"badge-archive" if url == "badge" else evidence_stream.getvalue()
+
+    monkeypatch.setenv("GITHUB_REPOSITORY", repository)
+    monkeypatch.setenv("GITHUB_SHA", main_sha)
+    resolved, _ = cli.resolve_evidence(ResolveApi(), config)
+    assert isinstance(resolved, EvidenceContext)
+    assert resolved.run_id == run_id
+    assert resolved.run_attempt == 1
+    assert resolved.job_id == job_id
 
 
 @pytest.mark.parametrize(
