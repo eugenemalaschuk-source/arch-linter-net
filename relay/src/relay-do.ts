@@ -187,10 +187,17 @@ export class RelayDurableObject {
 
   private rollback(): void { /* transactionSync rolls back automatically on throw */ }
 
-  private async validatePublisher(request: Request, entry: RegistryEntry): Promise<import("./types").ValidatedPublisher> {
+  private async validatePublisher(request: Request, entry: RegistryEntry, operation: string): Promise<import("./types").ValidatedPublisher> {
     const token = getBearerToken(request);
     const audience = entry.audience ?? "";
-    return verifyOidcToken(token, entry, { trust: { issuer: "https://token.actions.githubusercontent.com", jwks_uri: "https://token.actions.githubusercontent.com/.well-known/jwks", audience } });
+    const publisher = await verifyOidcToken(token, entry, { trust: { issuer: "https://token.actions.githubusercontent.com", jwks_uri: "https://token.actions.githubusercontent.com/.well-known/jwks", audience } });
+    const eventName = publisher.claims.event_name;
+    // A scheduled token is a renewal-only capability. Requiring the operation
+    // to agree with the event prevents an allowlisted scheduler from reaching
+    // the initial publish, recovery, or lifecycle mutation paths.
+    const expectedEvent = operation === "renew" ? "schedule" : "push";
+    if (eventName !== expectedEvent) throw new AuthorizationError(403);
+    return publisher;
   }
 
   /**
@@ -372,7 +379,7 @@ export class RelayDurableObject {
       this.ensureRegistered(entry);
       if (request.method !== "POST") return genericError(404);
       const body = await readBoundedJson(request);
-      const publisher = await this.validatePublisher(request, entry);
+      const publisher = await this.validatePublisher(request, entry, operation);
       switch (operation) {
         case "prepare": return await this.prepare(body, entry, publisher, "prepare");
         case "publish": return await this.publish(body, entry, publisher, "publish");

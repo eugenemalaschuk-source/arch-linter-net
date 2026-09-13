@@ -22,6 +22,7 @@ nav:
       - First policy: getting-started/first-policy.md
       - Complete governance cycle: guides/single-tool-workflow.md
       - Run in CI: guides/ci-integration.md
+      - Turnkey badge setup: guides/badge-setup.md
   - Usage:
       - CLI: cli/index.md
       - Test adapter: usage/test-adapter.md

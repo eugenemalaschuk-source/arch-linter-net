@@ -57,6 +57,7 @@ describe("relay contract helpers", () => {
     for (const invalid of ["a123", "A7f4k2m9", "b7f4k2m9", "a7f4k2m!", 7, null]) expect(isOpaqueAlias(invalid)).toBe(false);
 
     expect(validateRegistryEntry(entry)).toBe(true);
+    expect(validateRegistryEntry({ ...entry, permitted_events: ["push", "schedule"] })).toBe(true);
     for (const invalid of [
       null,
       [],
@@ -64,7 +65,10 @@ describe("relay contract helpers", () => {
       { ...entry, repository_owner_id: 1.5 },
       { ...entry, destination_alias: "alias" },
       { ...entry, permitted_event: "pull_request" },
-      { ...entry, permitted_ref: "refs/heads/release" },
+      { ...entry, permitted_events: ["schedule"] },
+      { ...entry, permitted_events: ["push", "push"] },
+      { ...entry, permitted_events: ["workflow_dispatch"] },
+      { ...entry, permitted_ref: "refs/heads/../release" },
       { ...entry, job_workflow_ref: "" },
       { ...entry, job_workflow_sha: "bad" },
       { ...entry, disclosure_profile: "unbounded" },
@@ -129,6 +133,7 @@ describe("relay contract helpers", () => {
     }
 
     validateOidcClaims(claims(), entry, 1_100);
+    validateOidcClaims(claims({ event_name: "schedule" }), { ...entry, permitted_events: ["push", "schedule"] }, 1_100);
     validateOidcClaims(claims({ aud: ["another", entry.audience] }), entry, 1_100);
     for (const invalid of [
       { iss: "https://issuer.invalid" }, { aud: "other" }, { iat: "1000" }, { iat: 1_500 }, { nbf: 1_500 }, { exp: 900 }, { exp: 2_000 }, { jti: "" },
