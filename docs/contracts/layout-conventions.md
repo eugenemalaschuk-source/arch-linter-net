@@ -77,6 +77,14 @@ All optional; declare at least one, or policy loading fails as a configuration e
 - `required_name_suffix` / `required_name_prefix` / `forbidden_name_suffix` / `forbidden_name_prefix` — check each matched declared type's simple name, same semantics as [type placement](type-placement.md).
 - `require_type_name_matches_file_name` — the matched file must declare at least one type whose simple name equals the file name (without extension).
 - `require_matching_interface` — every matched concrete class must have a corresponding interface (`name_prefix` + class name, default prefix `I`) declared somewhere in the analyzed source. Ambiguous candidates (more than one interface with the expected name) are reported as unresolved rather than picked implicitly.
+- `max_declarations_per_type` — the source declaration inventory for each selected type must not exceed this positive integer. The diagnostic includes the type, observed count, configured maximum, and every declaration path.
+
+Declaration-count expectations use the path-complete source declaration inventory, not the unique
+source-file fact used by file-name checks. This preserves the existing ambiguity result for
+consumers that require one source path while still making a split type observable to layout policy.
+The repository's strict self-policy applies this expectation only to production files under `src`.
+Test fixtures, generated declarations, and language/interop samples that intentionally model
+partial-type semantics remain outside that production selector.
 
 ### Folder purity with `all_declarations`
 

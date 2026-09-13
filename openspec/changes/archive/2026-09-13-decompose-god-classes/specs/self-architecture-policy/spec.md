@@ -1,19 +1,26 @@
+## REMOVED Requirements
+
+### Requirement: New or grown production partial-type aggregates are blocked
+
 ## ADDED Requirements
 
 ### Requirement: Production types are not handwritten partial aggregates
 
-The repository self-policy SHALL first measure source declaration counts for production `src` types
-in audit mode and, after migration, SHALL strictly require every governed production type to have at
-most one handwritten source declaration. The strict rule SHALL not govern test fixtures that model
-C# partial-type semantics.
+The repository self-policy SHALL strictly require every governed production `src` type to have at
+most one handwritten source declaration through the `production-types-have-one-source-declaration`
+layout-convention rule with `max_declarations_per_type: 1`. The rule SHALL be the sole production
+declaration-count authority: it SHALL not be duplicated as an audit-only rule, ratcheted through
+per-type `ignored_violations`, or weakened by a baseline. The rule SHALL not govern test fixtures,
+generated declarations, or language/interop samples that intentionally model C# partial-type
+semantics.
 
-#### Scenario: A new production partial aggregate fails the strict gate
+#### Scenario: A production type is split across handwritten source files
 
 - **WHEN** a production type is split across two handwritten source files after the strict rule is
   enabled
 - **THEN** `make lint-architecture` fails with the type name and both declaration paths
 
-#### Scenario: A partial-language test fixture remains analyzable
+#### Scenario: Intentional partial-language fixtures remain analyzable
 
 - **WHEN** a test fixture deliberately declares one type across multiple source files
 - **THEN** the production declaration-count rule does not report that fixture
