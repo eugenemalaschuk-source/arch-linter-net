@@ -196,10 +196,12 @@ def test_raw_publication_stale_cas_uses_configured_base_ref(monkeypatch: pytest.
     main_sha = "a" * 40
     parent_sha = "b" * 40
     ref_path = f"/repos/{repository}/git/ref/heads/architecture-health-badge"
+    update_ref_path = f"/repos/{repository}/git/refs/heads/architecture-health-badge"
     base_ref_path = f"/repos/{repository}/git/ref/heads/develop"
     api = FakeApi(
         {
             ref_path: {"object": {"sha": parent_sha}},
+            update_ref_path: {},
             base_ref_path: {"object": {"sha": main_sha}},
             f"/repos/{repository}/git/commits/{parent_sha}": {"tree": {"sha": "c" * 40}},
             f"/repos/{repository}/git/blobs": {"sha": "d" * 40},
@@ -230,15 +232,18 @@ def test_raw_publication_retries_ref_update_race_and_fails_closed(
     main_sha = "a" * 40
     parent_sha = "b" * 40
     ref_path = f"/repos/{repository}/git/ref/heads/architecture-health-badge"
+    update_ref_path = f"/repos/{repository}/git/refs/heads/architecture-health-badge"
 
     class FlakyApi(FakeApi):
         patch_attempts = 0
 
         def request(self, path: str, **kwargs: object) -> object:
-            if path == ref_path and kwargs.get("method") == "PATCH":
+            if path == update_ref_path and kwargs.get("method") == "PATCH":
                 self.patch_attempts += 1
+                self.paths.append(path)
                 if self.patch_attempts <= failing_attempts:
                     raise ProviderFailure("github_api_unavailable")
+                return {}
             return super().request(path, **kwargs)
 
     api = FlakyApi(
@@ -262,7 +267,8 @@ def test_raw_publication_retries_ref_update_race_and_fails_closed(
         _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
 
     assert api.patch_attempts == len(expected_sleeps) + 1
-    assert api.paths.count(ref_path) == api.patch_attempts + 1 - int(expect_failure)
+    assert api.paths.count(ref_path) == api.patch_attempts
+    assert api.paths.count(update_ref_path) == api.patch_attempts
     assert sleeps == expected_sleeps
     assert capsys.readouterr().err.count("raw publication retry") == expected_retry_messages
 
