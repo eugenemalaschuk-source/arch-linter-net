@@ -73,8 +73,8 @@ exact filename, media kind, size, SHA-256 digest, and source/provenance
 identity. The inventory SHALL include only the reviewed `#825` transport scope
 and SHALL reject floating branch/latest references, unexpected files, or
 incompatible CLI/Relay/protocol/schema/storage combinations. Secret scanning is
-provided by separate repository and security gates rather than this inventory
-validator.
+outside this inventory validator's scope and remains the responsibility of
+separate repository and security gates.
 
 #### Scenario: Candidate transport inventory is complete
 
