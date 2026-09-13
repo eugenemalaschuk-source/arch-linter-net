@@ -12,7 +12,11 @@
   "files": [
     {
       "path": "src/index.ts",
-      "sha256": "76ab96f33e9cfc4ab3caa303e7024bf5ff34a99c09e737c617ceb4f76bdd9a7a"
+      "sha256": "81a006dfbc3eaf9a77ac0a44643d434b0a71102af6c340bd22aafffc05826efe"
+    },
+    {
+      "path": "src/lifecycle.ts",
+      "sha256": "0c51355b25681800b61630acab30f050ed488cd459c98a3ebae38adbbd42b21c"
     },
     {
       "path": "src/payload.ts",
@@ -24,15 +28,15 @@
     },
     {
       "path": "src/registry-do.ts",
-      "sha256": "f75ad2b8b435e32e110f8ac0a627956466cd6fd4e5c14922ec83fa8c58d4b2d4"
+      "sha256": "71b5c15256641406d4cdffed60f1bb09e2f2c51d56d9d1bf4c8426a16c8bbcbb"
     },
     {
       "path": "src/registry.ts",
-      "sha256": "4e73f37cdb7b17fa110edddff23268532ad0db5bf3f5793fd04c05b02c14081b"
+      "sha256": "d8bb16ea06dc44db1a869ad2746a36c07054629df9242c40977c798c460b641c"
     },
     {
       "path": "src/relay-do.ts",
-      "sha256": "8a57497582962a6bb52bf9de838a3d018c72cd18196b32bb43e28a1bf7413d04"
+      "sha256": "cfe92c8e265fe8f53e915e858c778ad7c3a36ceee1a2e56efbf292df7543185c"
     },
     {
       "path": "src/security.ts",
@@ -40,7 +44,7 @@
     },
     {
       "path": "src/types.ts",
-      "sha256": "3c4d61f8f27790f992f65280494780f742e2d89a40200b0b1bbd6f0f4b63535f"
+      "sha256": "5e6ac3a7a1f6fbb2735b4693e02434a2825b1cb0575122f6cea6a4a878a82c6d"
     },
     {
       "path": "package.json",
