@@ -82,7 +82,8 @@ export function validateOidcClaims(claims: OidcClaims, entry: RegistryEntry, now
   if (typeof claims.jti !== "string" || claims.jti.length === 0 || claims.jti.length > 256) throw new AuthorizationError(401);
 
   if (claims.repository_id !== entry.repository_id || claims.repository_owner_id !== entry.repository_owner_id) throw new AuthorizationError(403);
-  if (claims.event_name !== entry.permitted_event || claims.ref !== entry.permitted_ref) throw new AuthorizationError(403);
+  const permittedEvents = entry.permitted_events ?? [entry.permitted_event];
+  if (typeof claims.event_name !== "string" || !permittedEvents.includes(claims.event_name as "push" | "schedule") || claims.ref !== entry.permitted_ref) throw new AuthorizationError(403);
   if (claims.job_workflow_ref !== entry.job_workflow_ref || claims.job_workflow_sha !== entry.job_workflow_sha) throw new AuthorizationError(403);
   if (claims.sub !== exactSubject(entry, oidcTrust)) throw new AuthorizationError(403);
 }

@@ -31,6 +31,24 @@
     <Content Include="..\..\docs\internal\architecture-health-badge-relay-fixtures\**\*"
              Pack="true"
              PackagePath="tools/net10.0/any/architecture-health-badge-relay" />
+    <Content Include="..\..\schema\0.8.0\badge-relay-config.schema.json"
+             Pack="true"
+             PackagePath="tools/net10.0/any/architecture-health-badge-setup/schema/0.8.0" />
+    <Content Include="..\..\relay\src\**\*"
+             Pack="true"
+             PackagePath="tools/net10.0/any/architecture-health-badge-setup/relay/src" />
+    <Content Include="..\..\relay\package.json"
+             Pack="true"
+             PackagePath="tools/net10.0/any/architecture-health-badge-setup/relay" />
+    <Content Include="..\..\relay\package-lock.json"
+             Pack="true"
+             PackagePath="tools/net10.0/any/architecture-health-badge-setup/relay" />
+    <Content Include="..\..\relay\tsconfig.json"
+             Pack="true"
+             PackagePath="tools/net10.0/any/architecture-health-badge-setup/relay" />
+    <Content Include="..\..\relay\wrangler.jsonc"
+             Pack="true"
+             PackagePath="tools/net10.0/any/architecture-health-badge-setup/relay" />
   </ItemGroup>
 
 </Project>

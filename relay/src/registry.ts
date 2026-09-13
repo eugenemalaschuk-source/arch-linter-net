@@ -2,6 +2,7 @@ import { BUNDLE, FIXED_GITHUB_ISSUER, FIXED_GITHUB_JWKS, type DisclosureProfile,
 
 const ALIAS = /^a[0-9a-z]{7}$/u;
 const SHA = /^[0-9a-f]{40}$/u;
+const PERMITTED_REF = /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/u;
 
 export function isOpaqueAlias(value: unknown): value is string {
   return typeof value === "string" && ALIAS.test(value);
@@ -14,7 +15,15 @@ export function validateRegistryEntry(value: unknown): value is RegistryEntry {
     && Number.isSafeInteger(entry.repository_owner_id) && (entry.repository_owner_id as number) > 0
     && isOpaqueAlias(entry.destination_alias)
     && entry.permitted_event === "push"
-    && entry.permitted_ref === "refs/heads/main"
+    && (entry.permitted_events === undefined || (Array.isArray(entry.permitted_events)
+      && entry.permitted_events.length > 0
+      && entry.permitted_events.length <= 2
+      && entry.permitted_events.every((event) => event === "push" || event === "schedule")
+      && new Set(entry.permitted_events).size === entry.permitted_events.length
+      && entry.permitted_events.includes(entry.permitted_event)))
+    && typeof entry.permitted_ref === "string" && PERMITTED_REF.test(entry.permitted_ref)
+    && !entry.permitted_ref.includes("..") && !entry.permitted_ref.includes("//") && !entry.permitted_ref.includes("/.")
+    && !entry.permitted_ref.endsWith("/") && !entry.permitted_ref.endsWith(".")
     && typeof entry.job_workflow_ref === "string" && entry.job_workflow_ref.length > 0 && entry.job_workflow_ref.length <= 512
     && typeof entry.job_workflow_sha === "string" && SHA.test(entry.job_workflow_sha)
     && (entry.disclosure_profile === "headline-only/v1" || entry.disclosure_profile === "headline-plus-freshness/v1")

@@ -12,8 +12,5 @@
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["RelayDurableObject", "RelayRegistryDurableObject"] }
-  ],
-  "vars": {
-    "RELAY_REGISTRY": "{\"registry_entry\":{\"repository_id\":700000042,\"repository_owner_id\":7000000042,\"owner\":\"synthetic-owner-042\",\"repository\":\"synthetic-repo-042\",\"destination_alias\":\"a7f4k2m9\",\"permitted_event\":\"push\",\"permitted_ref\":\"refs/heads/main\",\"job_workflow_ref\":\"synthetic-owner-042/synthetic-repo-042/.github/workflows/architecture-health-badge.yml@refs/heads/main\",\"job_workflow_sha\":\"2222222222222222222222222222222222222222\",\"disclosure_profile\":\"headline-only/v1\",\"audience\":\"architecture-health-badge-relay-fixture\"}}"
-  }
+  ]
 }
