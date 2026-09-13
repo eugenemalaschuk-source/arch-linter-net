@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { decodeJwt, generateKeyPair, SignJWT, exportJWK } from "jose";
 import { env, SELF, evictDurableObject, listDurableObjectIds, runInDurableObject } from "cloudflare:test";
-import {
+import worker, {
   RelayDurableObject,
   REGISTRY_OBJECT_NAME,
   RelayRegistryDurableObject,
@@ -11,6 +11,7 @@ import {
   sha256Hex,
   type RegistryEntry
 } from "../src/index";
+import type { RelayEnvironment } from "../src/index";
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
 
 const alias = "a7f4k2m9";
@@ -214,6 +215,93 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     });
     expect(response.status).toBe(401);
     expect(await response.text()).not.toContain("synthetic-owner");
+  });
+
+  it("executes authenticated lifecycle transitions with redacted status and tombstone precedence", async () => {
+    const lifecycleAlias = "a833test";
+    const lifecycleEntry: RegistryEntry = { ...entry, destination_alias: lifecycleAlias, consent: true };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(lifecycleEntry))).toBe(true);
+    const testEnv = { ...(env as unknown as Record<string, unknown>), ADMIN_TOKEN: "admin" } as unknown as RelayEnvironment;
+    const admin = (path: string, init: RequestInit = {}) => worker.fetch(
+      new Request(`https://relay.test/badge-relay/v1/admin/${lifecycleAlias}/${path}`, {
+        ...init,
+        headers: { authorization: "Bearer admin", "content-type": "application/json", ...(init.headers ?? {}) },
+      }),
+      testEnv);
+
+    const status = await admin("status", { method: "GET" });
+    expect(status.status).toBe(200);
+    const initialStatus = await status.json() as Record<string, unknown>;
+    expect(initialStatus).toMatchObject({ state: "unavailable", tombstoned: false });
+    expect(initialStatus).not.toHaveProperty("payload");
+
+    const rename = await admin("reconcile-identity", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "rename-833", owner: "renamed-owner", repository: "renamed-repo", repository_id: entry.repository_id, repository_owner_id: entry.repository_owner_id }),
+    });
+    expect(rename.status).toBe(200);
+    const renamedStatus = await admin("status", { method: "GET" });
+    expect(await renamedStatus.json()).toMatchObject({ state: "unavailable", generation: initialStatus.generation, revocation_epoch: initialStatus.revocation_epoch });
+
+    const invalidRotation = await admin("rotate", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "rotate-bad-833", job_workflow_sha: "not-a-pin" }),
+    });
+    expect(invalidRotation.status).toBe(409);
+    expect(await invalidRotation.json()).toEqual({ error: "invalid_pin" });
+
+    const rotate = await admin("rotate", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "rotate-833", job_workflow_sha: "3333333333333333333333333333333333333333", audience: "rotated-audience" }),
+    });
+    expect(rotate.status).toBe(200);
+
+    const incompatibleRollback = await admin("rollback", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "rollback-bad-833", bundle: "badge-relay/v2", contract_version: "v2", compatibility_plan: "unknown-plan", to_bundle: "badge-relay/v2" }),
+    });
+    expect(incompatibleRollback.status).toBe(409);
+    expect(await incompatibleRollback.json()).toEqual({ error: "compatibility_conflict" });
+
+    const upgrade = await admin("upgrade", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "upgrade-833", bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1" }),
+    });
+    expect(upgrade.status).toBe(200);
+
+    const revoke = await admin("revoke", { method: "POST", body: JSON.stringify({ confirm: true, operation_id: "revoke-833" }) });
+    expect(revoke.status).toBe(200);
+    expect((await SELF.fetch(`https://relay.test/badge-relay/v1/${lifecycleAlias}`)).status).toBe(404);
+
+    const revokedStatus = await admin("status", { method: "GET" });
+    expect(revokedStatus.status).toBe(200);
+    expect(await revokedStatus.json()).toMatchObject({ state: "revoked", tombstoned: true });
+  });
+
+  it("bounds the private operation journal by age and count", async () => {
+    const journalAlias = "a833jrn1";
+    const journalEntry: RegistryEntry = { ...entry, destination_alias: journalAlias, consent: true };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(journalEntry))).toBe(true);
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(journalAlias));
+    const internalHeaders = { "x-relay-registry": JSON.stringify(journalEntry), "x-relay-registry-revision": "1", "x-relay-barrier-epoch": "1", "x-relay-admin": "1", "content-type": "application/json" };
+    const status = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).fetch(new Request(`https://relay.test/internal/admin/${journalAlias}/status`, { headers: internalHeaders })));
+    expect(status.status).toBe(200);
+    const now = Math.floor(Date.now() / 1000);
+    await runInDurableObject(stub, async (_instance, state) => {
+      for (let index = 0; index < 300; index++) state.storage.sql.exec("INSERT INTO relay_operations (operation,status,reason,generation,revocation_epoch,created_at) VALUES (?,?,?,?,?,?)", "synthetic", "unavailable", "storage_unavailable", 1, 1, now);
+      state.storage.sql.exec("INSERT INTO relay_operations (operation,status,reason,generation,revocation_epoch,created_at) VALUES (?,?,?,?,?,?)", "old", "unavailable", "storage_unavailable", 1, 1, now - 31 * 24 * 60 * 60);
+    });
+    const sync = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).fetch(new Request(`https://relay.test/internal/admin/${journalAlias}/sync`, { method: "POST", headers: internalHeaders, body: JSON.stringify({ registry_revision: 1, barrier_epoch: 1 }) })));
+    expect(sync.status).toBe(200);
+    const count = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM relay_operations").toArray()[0].count);
+    expect(count).toBeLessThanOrEqual(256);
+    const oldCount = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM relay_operations WHERE operation='old'").toArray()[0].count);
+    expect(oldCount).toBe(0);
   });
 
   it("uses SQLite persistence across object eviction", async () => {

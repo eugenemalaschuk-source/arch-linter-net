@@ -11,6 +11,11 @@ export const CLOCK_SKEW_SECONDS = 300;
 export const CHALLENGE_SECONDS = 5 * 60;
 export const LEASE_SECONDS = 60 * 60;
 export const RENEWAL_MINIMUM_SECONDS = 30 * 60;
+export const CONTRACT_VERSION = "v1" as const;
+export const COMPATIBILITY_PLAN = "architecture-health-badge-relay/v1" as const;
+export const OPERATION_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+export const TOMBSTONE_RETENTION_SECONDS = 90 * 24 * 60 * 60;
+export const OPERATION_HISTORY_LIMIT = 256;
 
 export type DisclosureProfile = "headline-only/v1" | "headline-plus-freshness/v1";
 export type RelayState = "unregistered" | "unavailable" | "ready" | "expired" | "revoked" | "needs-recovery";
@@ -30,6 +35,10 @@ export interface RegistryEntry {
   subject?: string;
   audience?: string;
   consent?: boolean;
+  bundle?: typeof BUNDLE;
+  contract_version?: typeof CONTRACT_VERSION;
+  compatibility_plan?: typeof COMPATIBILITY_PLAN;
+  bundle_digest?: string;
   initial_state?: {
     generation?: number;
     revocation_epoch?: number;

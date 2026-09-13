@@ -13,6 +13,10 @@ import worker, {
   validateCanonicalPayload,
   validateOidcClaims,
   validateRegistryEntry,
+  isIdentityPreserving,
+  isSupportedCompatibility,
+  redactStatus,
+  validateDisplayIdentity,
   type OidcClaims,
   type RegistryEntry,
   type RelayEnvironment
@@ -100,6 +104,30 @@ describe("relay contract helpers", () => {
       expect(validateBundleConfig(invalid)).toBe(false);
     }
     expect(profileFromEntry(entry)).toBe("headline-only/v1");
+  });
+
+  it("keeps lifecycle compatibility and status diagnostics closed", () => {
+    expect(isSupportedCompatibility({ bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1" })).toBe(true);
+    expect(isSupportedCompatibility({ bundle: "badge-relay/v2", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1" })).toBe(false);
+    expect(isSupportedCompatibility({ bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1", bundle_digest: "BAD" })).toBe(false);
+    expect(isIdentityPreserving({ repository_id: 1, repository_owner_id: 2 }, { repository_id: 1, repository_owner_id: 2 })).toBe(true);
+    expect(isIdentityPreserving({ repository_id: 1, repository_owner_id: 2 }, { repository_id: 9, repository_owner_id: 2 })).toBe(false);
+    expect(validateDisplayIdentity("owner-name")).toBe(true);
+    expect(validateDisplayIdentity("owner/name")).toBe(false);
+
+    const status = redactStatus({
+      state: "ready",
+      generation: 4,
+      revocation_epoch: 2,
+      profile: "headline-only/v1",
+      payload: "private-payload",
+      source: "https://private.example",
+      token: "secret"
+    });
+    expect(status).toMatchObject({ state: "ready", generation: 4, profile: "headline-only/v1" });
+    expect(status).not.toHaveProperty("payload");
+    expect(status).not.toHaveProperty("source");
+    expect(status).not.toHaveProperty("token");
   });
 
   it("accepts only canonical closed payloads", () => {
