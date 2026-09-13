@@ -697,10 +697,20 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     const recoveryAlias = "a833rcvr";
     const url = `https://relay.test/badge-relay/v1/admin/${recoveryAlias}/recover/finalize`;
     const testEnv = { ...(env as unknown as Record<string, unknown>), ADMIN_TOKEN: "admin" } as unknown as RelayEnvironment;
+    const guardEntry: RegistryEntry = { ...entry, destination_alias: recoveryAlias };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(recoveryAlias));
+    const initialized = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).fetch(new Request(`https://relay.test/internal/admin/${recoveryAlias}/status`, {
+      headers: { "x-relay-registry": JSON.stringify(guardEntry), "x-relay-registry-revision": "1", "x-relay-barrier-epoch": "1", "x-relay-admin": "1" }
+    })));
+    expect(initialized.status).toBe(200);
+    const before = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; generation: number; revocation_epoch: number }>("SELECT status,generation,revocation_epoch FROM relay_state WHERE id=1").toArray()[0]);
     const unauthorized = await worker.fetch(new Request(url, { method: "POST" }), testEnv);
     expect(unauthorized.status).toBe(401);
     const refused = await worker.fetch(new Request(url, { method: "POST", headers: { authorization: "Bearer admin" } }), testEnv);
     expect(refused.status).toBe(409);
     expect(await refused.json()).toEqual({ error: "fresh_publisher_proof_required" });
+    const after = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; generation: number; revocation_epoch: number }>("SELECT status,generation,revocation_epoch FROM relay_state WHERE id=1").toArray()[0]);
+    expect(after).toEqual(before);
   });
 });
