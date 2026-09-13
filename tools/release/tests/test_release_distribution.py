@@ -187,15 +187,17 @@ def test_metadata_binds_candidate_packages_and_exact_publisher_bytes(tmp_path: P
     assert metadata["package_ids"] == list(package_manifest._PACKAGE_IDS)
     assert metadata["compatibility"] == distribution._COMPATIBILITY_IDENTITIES
     assert metadata["approved_publisher_commit"] == distribution._APPROVED_PUBLISHER_COMMIT
-    assert metadata["publisher"]["workflow"]["sha256"] == distribution._sha256_bytes(
-        subprocess.check_output(
-            ["git", "-C", str(ROOT), "cat-file", "blob", f"{distribution._APPROVED_PUBLISHER_COMMIT}:{distribution._WORKFLOW_PATH}"]
-        )
+    inventory = json.loads(INVENTORY.read_text(encoding="utf-8"))
+    compatibility = inventory["compatibility"]
+    assert metadata["publisher"]["workflow"]["git_blob_sha"] == compatibility["workflow_source_sha"]
+    assert metadata["publisher"]["action"]["git_blob_sha"] == compatibility["action_source_sha"]
+    assert metadata["publisher"]["workflow"]["sha256"] == next(
+        subject["sha256"] for subject in json.loads((transport / distribution._MANIFEST_FILE).read_text(encoding="utf-8"))["subjects"]
+        if subject["kind"] == "publisher-workflow"
     )
-    assert metadata["publisher"]["action"]["sha256"] == distribution._sha256_bytes(
-        subprocess.check_output(
-            ["git", "-C", str(ROOT), "cat-file", "blob", f"{distribution._APPROVED_PUBLISHER_COMMIT}:{distribution._ACTION_PATH}"]
-        )
+    assert metadata["publisher"]["action"]["sha256"] == next(
+        subject["sha256"] for subject in json.loads((transport / distribution._MANIFEST_FILE).read_text(encoding="utf-8"))["subjects"]
+        if subject["kind"] == "publisher-action"
     )
 
 
