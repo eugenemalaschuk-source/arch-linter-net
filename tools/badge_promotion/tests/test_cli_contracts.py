@@ -234,6 +234,74 @@ def test_workflow_sha_resolution_rejects_a_directory_response() -> None:
         _workflow_blob_sha(api, "owner/repo", ".github/workflows", "a" * 40)
 
 
+def test_github_artifact_download_uses_github_api_media_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self, _limit: int) -> bytes:
+            return b"zip-bytes"
+
+    class Opener:
+        def open(self, request: object, *, timeout: int) -> Response:
+            captured["request"] = request
+            captured["timeout"] = timeout
+            return Response()
+
+    def build_opener(*handlers: object) -> Opener:
+        captured["handlers"] = handlers
+        return Opener()
+
+    def unused_urlopen(*_: object, **__: object) -> None:
+        raise AssertionError("artifact downloads must use the safe redirect opener")
+
+    monkeypatch.setattr(cli.urllib.request, "build_opener", build_opener)
+    monkeypatch.setattr(cli.urllib.request, "urlopen", unused_urlopen)
+
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+
+    api = cli.GitHubApi()
+
+    assert api.download("https://api.github.com/repos/owner/repo/actions/artifacts/42/zip") == b"zip-bytes"
+    request = captured["request"]
+    assert isinstance(request, cli.urllib.request.Request)
+    assert request.get_header("Accept") == "application/vnd.github+json"
+    assert request.get_header("Authorization") == "Bearer token"
+    assert captured["timeout"] == 30
+    assert isinstance(captured["handlers"][0], cli._ArtifactRedirectHandler)  # type: ignore[index]
+
+
+def test_github_artifact_redirect_drops_bearer_on_storage_host() -> None:
+    request = cli.urllib.request.Request(
+        "https://api.github.com/repos/owner/repo/actions/artifacts/42/zip",
+        headers={"authorization": "Bearer token", "accept": "application/vnd.github+json"},
+    )
+    redirected = cli._ArtifactRedirectHandler().redirect_request(
+        request,
+        None,
+        302,
+        "Found",
+        {},
+        "https://productionresultssa.example/artifact.zip?signature=opaque",
+    )
+
+    assert redirected is not None
+    assert redirected.get_header("Authorization") is None
+    assert redirected.get_header("Accept") == "application/vnd.github+json"
+
+
+def test_github_artifact_redirect_rejects_plain_http() -> None:
+    request = cli.urllib.request.Request("https://api.github.com/repos/owner/repo/actions/artifacts/42/zip")
+    redirected = cli._ArtifactRedirectHandler().redirect_request(request, None, 302, "Found", {}, "http://storage.example/artifact.zip")
+
+    assert redirected is None
+
+
 def test_relay_success_writes_ready_output_before_returning() -> None:
     source = inspect.getsource(cli.main)
     relay_start = source.index('if config.destination.adapter.value == "relay":')
