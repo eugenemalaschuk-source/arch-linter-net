@@ -352,6 +352,7 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
     """Atomically update the fixed public raw branch; never force-push it."""
     repository = _repository_path(config.repository)
     ref_path = f"/repos/{repository}/git/ref/heads/architecture-health-badge"
+    update_ref_path = f"/repos/{repository}/git/refs/heads/architecture-health-badge"
     for attempt in range(_MAX_RAW_PUBLICATION_ATTEMPTS):
         try:
             current_ref = api.request(ref_path)
@@ -391,7 +392,7 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
         commit = api.request(f"/repos/{repository}/git/commits", method="POST", value={"message": "chore: publish architecture health badge", "tree": tree["sha"], "parents": [parent]})
         try:
             if current_ref:
-                api.request(ref_path, method="PATCH", value={"sha": commit["sha"], "force": False})
+                api.request(update_ref_path, method="PATCH", value={"sha": commit["sha"], "force": False})
             else:
                 api.request(f"/repos/{repository}/git/refs", method="POST", value={"ref": "refs/heads/architecture-health-badge", "sha": commit["sha"]})
             return
