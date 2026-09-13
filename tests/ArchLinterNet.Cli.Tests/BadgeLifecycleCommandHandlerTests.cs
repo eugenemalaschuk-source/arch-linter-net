@@ -148,6 +148,41 @@ public sealed class BadgeLifecycleCommandHandlerTests
         Assert.That(console.Output, Does.Contain("invalid-configuration"));
     }
 
+    [Test]
+    public void OperatorOriginMustMatchCheckedInDestination()
+    {
+        RecordingConsole console = new();
+        MemoryFileSystem fileSystem = new(("badge-relay-config.json", JsonSerializer.Serialize(Configuration(endpoint: "https://attacker.example"))));
+        bool clientCreated = false;
+        BadgeLifecycleCommandHandler handler = new(console, fileSystem,
+            () => { clientCreated = true; return new HttpClient(); },
+            () => "admin-secret",
+            () => "https://relay.example");
+
+        int result = handler.Execute(Options(fileSystem));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.Output, Does.Contain("invalid-configuration"));
+            Assert.That(clientCreated, Is.False);
+        });
+    }
+
+    [Test]
+    public void OversizedRelayResponseIsRejectedWithoutBufferingUnboundedData()
+    {
+        RecordingConsole console = new();
+        BadgeLifecycleCommandHandler handler = Handler(console, out MemoryFileSystem fileSystem,
+            () => new HttpClient(new CapturingHandler(_ => JsonResponse(new string('x', 64 * 1024 + 1)))),
+            () => "admin-secret");
+
+        int result = handler.Execute(Options(fileSystem));
+
+        Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.That(console.Output, Does.Contain("relay-unavailable"));
+    }
+
     private static BadgeLifecycleCommandHandler Handler(
         RecordingConsole console,
         out MemoryFileSystem fileSystem,
@@ -155,7 +190,7 @@ public sealed class BadgeLifecycleCommandHandlerTests
         Func<string?> tokenProvider)
     {
         fileSystem = new(("badge-relay-config.json", JsonSerializer.Serialize(Configuration())));
-        return new(console, fileSystem, clientFactory, tokenProvider);
+        return new(console, fileSystem, clientFactory, tokenProvider, () => "https://relay.example");
     }
 
     private static BadgeLifecycleCommandOptions Options(
@@ -196,7 +231,7 @@ public sealed class BadgeLifecycleCommandHandlerTests
         new("owner", "repo", "public", 101, 202),
         new(alias, "0123456789abcdef0123456789abcdef", endpoint, "arch-relay/v1"),
         new(false, 1440, 60),
-        new("owner/repo/.github/workflows/publish.yml", new string('a', 40), "owner/repo/.github/actions/action@" + new string('a', 40)),
+        new(BadgeSetupContract.DefaultPublisherWorkflowRef, BadgeSetupContract.DefaultPublisherWorkflowSha, BadgeSetupContract.DefaultActionRef),
         ManagedFiles: ["badge-relay-config.json"],
         BaseRef: "main",
         Project: new("architecture/dependencies.arch.yml", "ArchLinterNet.slnx"),

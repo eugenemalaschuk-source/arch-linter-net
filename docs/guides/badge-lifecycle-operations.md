@@ -20,11 +20,15 @@ the environment only:
 
 ```text
 export ARCHLINTERNET_BADGE_ADMIN_TOKEN='short-lived-admin-token'
+export ARCHLINTERNET_BADGE_ADMIN_ORIGIN='https://relay.example'
 arch-linter-net badge architecture-health lifecycle \
   --operation status --input badge-relay-config.json
 ```
 
-The command validates relay mode, an HTTPS origin, and an opaque alias. It
+The command validates relay mode, an HTTPS origin, and an opaque alias. The
+operator-controlled origin is required and must exact-match the checked-in
+destination origin; the repository file cannot redirect the credential to a
+different host. It
 never accepts a token as a command-line argument and prints only the bounded,
 redacted status contract.
 
@@ -40,8 +44,8 @@ redacted status contract.
 | Disclosure withdrawal | `--operation invalidate` | A public read must become unavailable without returning the previous payload. |
 | Remove/uninstall | `--operation remove` | Omit confirmation; expect `explicit_confirmation_required`; the alias remains tombstoned and cannot be reused. |
 | Pin rotation | `--operation rotate --workflow-ref <ref> --workflow-sha <40-hex>` | Publish with the old workflow pin; expect authorization failure. |
-| Upgrade | `--operation upgrade --bundle badge-relay/v1 --contract-version v1 --compatibility-plan architecture-health-badge-relay/v1` | Unknown bundle, contract, or compatibility plan; expect `compatibility_conflict`. |
-| Rollback | `--operation rollback --bundle badge-relay/v1 --contract-version v1 --compatibility-plan architecture-health-badge-relay/v1` | Any unshipped or incompatible digest; expect a refused rollback. |
+| Upgrade | `--operation upgrade --to <shipped-digest>` followed by `--operation activate --to <shipped-digest>` | Unknown bundle, contract, compatibility plan, or manifest digest; expect `compatibility_conflict`. |
+| Rollback | `--operation rollback --to <previous-verified-digest>` | Any unshipped or incompatible digest; expect a refused rollback. |
 | Recovery | `--operation recover` | Omit confirmation or try to publish before fresh proof; expect `explicit_confirmation_required` or `fresh_publisher_proof_required`. |
 | Status/outage | `--operation status` | Storage outage is reported as `storage_unavailable`; no private payload or token is returned. |
 | Abandoned alias | `--operation revoke` (or `remove`) | Re-registering the tombstoned alias is refused; allocate a new opaque alias instead. |

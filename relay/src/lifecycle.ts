@@ -12,6 +12,14 @@ export const SUPPORTED_BUNDLE = BUNDLE;
 export const SUPPORTED_CONTRACT_VERSION = CONTRACT_VERSION;
 export const SUPPORTED_COMPATIBILITY_PLAN = COMPATIBILITY_PLAN;
 
+export function isBundleDigest(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
+}
+
+export function isKnownBundleDigest(value: unknown, allowlist: ReadonlySet<string>, current?: string | null): value is string {
+  return isBundleDigest(value) && (allowlist.has(value) || value === current);
+}
+
 export type LifecycleOperation =
   | "status"
   | "reconcile-identity"
@@ -47,6 +55,11 @@ export interface LifecycleStatusSnapshot {
   bundle: string;
   contract_version: string;
   compatibility_plan: string;
+  active_digest?: string | null;
+  staged_digest?: string | null;
+  previous_verified_digest?: string | null;
+  display_owner?: string | null;
+  display_repository?: string | null;
   verified_at: string | null;
   valid_until: string | null;
   tombstoned: boolean;
@@ -66,7 +79,7 @@ export function isSupportedCompatibility(value: CompatibilityDescriptor): boolea
   return value.bundle === SUPPORTED_BUNDLE
     && value.contract_version === SUPPORTED_CONTRACT_VERSION
     && value.compatibility_plan === SUPPORTED_COMPATIBILITY_PLAN
-    && (value.bundle_digest === undefined || (typeof value.bundle_digest === "string" && /^[0-9a-f]{64}$/u.test(value.bundle_digest)));
+    && (value.bundle_digest === undefined || isBundleDigest(value.bundle_digest));
 }
 
 export function compatibilityReason(value: CompatibilityDescriptor): LifecycleReason {
@@ -97,6 +110,11 @@ export function redactStatus(value: Partial<LifecycleStatusSnapshot> & Record<st
     bundle: SUPPORTED_BUNDLE,
     contract_version: SUPPORTED_CONTRACT_VERSION,
     compatibility_plan: SUPPORTED_COMPATIBILITY_PLAN,
+    active_digest: isBundleDigest(value.active_digest) ? value.active_digest : null,
+    staged_digest: isBundleDigest(value.staged_digest) ? value.staged_digest : null,
+    previous_verified_digest: isBundleDigest(value.previous_verified_digest) ? value.previous_verified_digest : null,
+    display_owner: typeof value.display_owner === "string" ? value.display_owner : null,
+    display_repository: typeof value.display_repository === "string" ? value.display_repository : null,
     verified_at: typeof value.verified_at === "string" ? value.verified_at : null,
     valid_until: typeof value.valid_until === "string" ? value.valid_until : null,
     tombstoned: value.tombstoned === true,

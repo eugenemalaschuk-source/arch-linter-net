@@ -15,6 +15,9 @@ import type { RelayEnvironment } from "../src/index";
 import type { DurableObjectNamespace } from "@cloudflare/workers-types";
 
 const alias = "a7f4k2m9";
+const digestA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const digestB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const digestC = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const entry: RegistryEntry = {
   repository_id: 700000042,
   repository_owner_id: 7000000042,
@@ -219,7 +222,7 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
 
   it("executes authenticated lifecycle transitions with redacted status and tombstone precedence", async () => {
     const lifecycleAlias = "a833test";
-    const lifecycleEntry: RegistryEntry = { ...entry, destination_alias: lifecycleAlias, consent: true };
+    const lifecycleEntry: RegistryEntry = { ...entry, destination_alias: lifecycleAlias, bundle_digest: digestA, consent: true };
     const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
     const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
     expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(lifecycleEntry))).toBe(true);
@@ -243,7 +246,7 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     });
     expect(rename.status).toBe(200);
     const renamedStatus = await admin("status", { method: "GET" });
-    expect(await renamedStatus.json()).toMatchObject({ state: "unavailable", generation: initialStatus.generation, revocation_epoch: initialStatus.revocation_epoch });
+    expect(await renamedStatus.json()).toMatchObject({ state: "unavailable", generation: initialStatus.generation, revocation_epoch: initialStatus.revocation_epoch, display_owner: "renamed-owner", display_repository: "renamed-repo" });
 
     const invalidRotation = await admin("rotate", {
       method: "POST",
@@ -258,18 +261,33 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     });
     expect(rotate.status).toBe(200);
 
-    const incompatibleRollback = await admin("rollback", {
-      method: "POST",
-      body: JSON.stringify({ operation_id: "rollback-bad-833", bundle: "badge-relay/v2", contract_version: "v2", compatibility_plan: "unknown-plan", to_bundle: "badge-relay/v2" }),
-    });
-    expect(incompatibleRollback.status).toBe(409);
-    expect(await incompatibleRollback.json()).toEqual({ error: "compatibility_conflict" });
-
     const upgrade = await admin("upgrade", {
       method: "POST",
-      body: JSON.stringify({ operation_id: "upgrade-833", bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1" }),
+      body: JSON.stringify({ operation_id: "upgrade-stage-833", bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1", bundle_digest: digestB }),
     });
     expect(upgrade.status).toBe(200);
+    expect(await upgrade.json()).toMatchObject({ active_digest: digestA, staged_digest: digestB });
+    const activate = await admin("upgrade/activate", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "upgrade-activate-833", bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1", bundle_digest: digestB }),
+    });
+    expect(activate.status).toBe(200);
+    expect(await activate.json()).toMatchObject({ active_digest: digestB, previous_verified_digest: digestA });
+    const unknown = await admin("upgrade", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "upgrade-unknown-833", bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1", bundle_digest: digestC }),
+    });
+    expect(unknown.status).toBe(409);
+    expect(await (await admin("status", { method: "GET" })).json()).toMatchObject({ active_digest: digestB, staged_digest: null, previous_verified_digest: digestA });
+    const rollback = await admin("rollback", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "rollback-833", bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1", bundle_digest: digestA, to_bundle: "badge-relay/v1" }),
+    });
+    expect(rollback.status).toBe(200);
+
+    const missingOperationId = await admin("revoke", { method: "POST", body: JSON.stringify({ confirm: true }) });
+    expect(missingOperationId.status).toBe(413);
+    expect((await admin("status", { method: "GET" })).status).toBe(200);
 
     const revoke = await admin("revoke", { method: "POST", body: JSON.stringify({ confirm: true, operation_id: "revoke-833" }) });
     expect(revoke.status).toBe(200);
@@ -277,7 +295,23 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
 
     const revokedStatus = await admin("status", { method: "GET" });
     expect(revokedStatus.status).toBe(200);
-    expect(await revokedStatus.json()).toMatchObject({ state: "revoked", tombstoned: true });
+    expect(await revokedStatus.json()).toMatchObject({ state: "revoked", tombstoned: true, active_digest: digestA, previous_verified_digest: digestB });
+  });
+
+  it("rejects a stale caller without mutating newer ready state", async () => {
+    const staleAlias = "a833stle";
+    const staleEntry: RegistryEntry = { ...entry, destination_alias: staleAlias };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(staleAlias));
+    const headers = { "x-relay-registry": JSON.stringify(staleEntry), "x-relay-registry-revision": "2", "x-relay-barrier-epoch": "1" };
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec("DELETE FROM relay_state");
+      state.storage.sql.exec("INSERT INTO relay_state (id,status,profile,generation,revocation_epoch,payload,payload_digest,verified_at,valid_until,semantic_horizon,tombstoned,registry_revision,barrier_epoch,bundle,contract_version,compatibility_plan,updated_at) VALUES (1,'ready','headline-only/v1',7,3,?,NULL,NULL,NULL,NULL,0,2,1,'badge-relay/v1','v1','architecture-health-badge-relay/v1',?)", payload, Math.floor(Date.now() / 1000));
+    });
+    const response = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).fetch(new Request(`https://relay.test/internal/${staleAlias}/read/json`, { headers: { ...headers, "x-relay-registry-revision": "1" } })));
+    expect(response.status).toBe(409);
+    const state = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; generation: number; registry_revision: number }>("SELECT status,generation,registry_revision FROM relay_state WHERE id=1").toArray()[0]);
+    expect(state).toEqual({ status: "ready", generation: 7, registry_revision: 2 });
   });
 
   it("bounds the private operation journal by age and count", async () => {
@@ -293,8 +327,8 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(status.status).toBe(200);
     const now = Math.floor(Date.now() / 1000);
     await runInDurableObject(stub, async (_instance, state) => {
-      for (let index = 0; index < 300; index++) state.storage.sql.exec("INSERT INTO relay_operations (operation,status,reason,generation,revocation_epoch,created_at) VALUES (?,?,?,?,?,?)", "synthetic", "unavailable", "storage_unavailable", 1, 1, now);
-      state.storage.sql.exec("INSERT INTO relay_operations (operation,status,reason,generation,revocation_epoch,created_at) VALUES (?,?,?,?,?,?)", "old", "unavailable", "storage_unavailable", 1, 1, now - 31 * 24 * 60 * 60);
+      for (let index = 0; index < 300; index++) state.storage.sql.exec("INSERT INTO relay_operations (operation,status,reason,operation_id,generation,revocation_epoch,created_at) VALUES (?,?,?,?,?,?,?)", "synthetic", "unavailable", "storage_unavailable", `synthetic-${index}`, 1, 1, now);
+      state.storage.sql.exec("INSERT INTO relay_operations (operation,status,reason,operation_id,generation,revocation_epoch,created_at) VALUES (?,?,?,?,?,?,?)", "old", "unavailable", "storage_unavailable", "old-operation", 1, 1, now - 31 * 24 * 60 * 60);
     });
     const sync = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).fetch(new Request(`https://relay.test/internal/admin/${journalAlias}/sync`, { method: "POST", headers: internalHeaders, body: JSON.stringify({ registry_revision: 1, barrier_epoch: 1 }) })));
     expect(sync.status).toBe(200);

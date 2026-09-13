@@ -18,32 +18,36 @@ namespace ArchLinterNet.Cli.Commands.Badge.Application;
 internal sealed class BadgeLifecycleCommandHandler
 {
     internal const string AdminTokenEnvironmentVariable = "ARCHLINTERNET_BADGE_ADMIN_TOKEN";
+    internal const string AdminOriginEnvironmentVariable = "ARCHLINTERNET_BADGE_ADMIN_ORIGIN";
     private const int MaximumJsonBytes = 64 * 1024;
     private const string Help =
-        "arch-linter-net badge architecture-health lifecycle --operation <status|invalidate|revoke|rename|transfer|rotate|remove|recover|upgrade|rollback> "
+        "arch-linter-net badge architecture-health lifecycle --operation <status|invalidate|revoke|rename|transfer|rotate|remove|recover|upgrade|activate|rollback> "
         + "--input <badge-relay-config.json> [--alias <a.......>] [--expected-generation <n>] [--expected-epoch <n>] "
         + "[--workflow-ref <ref>] [--to <bundle-digest>] [--approve-withdrawal|--approve-recovery] [--dry-run] [--format <json|human>]";
 
     private static readonly HashSet<string> _supportedOperations = new(StringComparer.Ordinal)
     {
-        "status", "invalidate", "revoke", "rename", "transfer", "rotate", "remove", "recover", "upgrade", "rollback",
+        "status", "invalidate", "revoke", "rename", "transfer", "rotate", "remove", "recover", "upgrade", "activate", "rollback",
     };
 
     private readonly ICliConsole _console;
     private readonly IFileSystem _fileSystem;
     private readonly Func<HttpClient> _httpClientFactory;
     private readonly Func<string?> _adminTokenProvider;
+    private readonly Func<string?> _adminOriginProvider;
 
     internal BadgeLifecycleCommandHandler(
         ICliConsole console,
         IFileSystem fileSystem,
         Func<HttpClient>? httpClientFactory = null,
-        Func<string?>? adminTokenProvider = null)
+        Func<string?>? adminTokenProvider = null,
+        Func<string?>? adminOriginProvider = null)
     {
         _console = console;
         _fileSystem = fileSystem;
         _httpClientFactory = httpClientFactory ?? (() => new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
         _adminTokenProvider = adminTokenProvider ?? (() => Environment.GetEnvironmentVariable(AdminTokenEnvironmentVariable));
+        _adminOriginProvider = adminOriginProvider ?? (() => Environment.GetEnvironmentVariable(AdminOriginEnvironmentVariable));
     }
 
     internal int Execute(BadgeLifecycleCommandOptions options)
@@ -101,15 +105,22 @@ internal sealed class BadgeLifecycleCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        string? operatorOrigin = _adminOriginProvider();
+        if (!TryValidateOperatorOrigin(configuration, operatorOrigin, out string originError, out string relayOrigin))
+        {
+            WriteFailure(options.Format, "invalid-configuration", originError);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
             HttpClient client = _httpClientFactory();
-            using HttpRequestMessage request = BuildRequest(configuration, alias, options, token);
+            using HttpRequestMessage request = BuildRequest(configuration, relayOrigin, alias, options, token);
             using HttpResponseMessage response = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
             string responseJson = ReadBoundedResponse(response);
             return WriteResponse(options, alias, response.StatusCode, responseJson);
         }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or IOException or InvalidOperationException or JsonException)
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or OperationCanceledException or IOException or InvalidOperationException or JsonException)
         {
             WriteFailure(options.Format, "relay-unavailable", "The badge Relay lifecycle request could not be completed.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -216,6 +227,23 @@ internal sealed class BadgeLifecycleCommandHandler
             return false;
         }
 
+        if (!string.Equals(configuration.SchemaId, BadgeSetupContract.SchemaId, StringComparison.Ordinal)
+            || !string.Equals(configuration.ContractVersion, BadgeSetupContract.ContractVersion, StringComparison.Ordinal)
+            || !string.Equals(configuration.Bundle, BadgeSetupContract.Bundle, StringComparison.Ordinal)
+            || !string.Equals(configuration.CompatibilityPlan, BadgeSetupContract.CompatibilityPlan, StringComparison.Ordinal)
+            || configuration.DisclosureProfile is not (BadgeSetupContract.HeadlineOnlyProfile or BadgeSetupContract.HeadlinePlusFreshnessProfile)
+            || configuration.Repository.RepositoryId is not > 0
+            || configuration.Repository.RepositoryOwnerId is not > 0
+            || configuration.Destination.Alias is null
+            || !BadgeSetupValidationHelpers.IsSafeAudience(configuration.Destination.Audience)
+            || !BadgeSetupValidationHelpers.IsSafeRef(configuration.BaseRef)
+            || !BadgeSetupValidationHelpers.AreTrustedPublisherPins(configuration.Pins)
+            || configuration.Pins?.BundleDigest is not null && !BadgeSetupValidationHelpers.IsSha(configuration.Pins.BundleDigest, 64))
+        {
+            error = "The Relay setup configuration does not satisfy the v1 semantic contract.";
+            return false;
+        }
+
         if (!BadgeSetupValidationHelpers.IsHttpsOrigin(configuration.Destination.Endpoint))
         {
             error = "The relay endpoint must be an HTTPS origin without query or fragment components.";
@@ -233,8 +261,37 @@ internal sealed class BadgeLifecycleCommandHandler
         return true;
     }
 
+    private static bool TryValidateOperatorOrigin(
+        BadgeSetupConfiguration configuration,
+        string? configuredOrigin,
+        out string error,
+        out string normalizedOrigin)
+    {
+        normalizedOrigin = string.Empty;
+        if (!BadgeSetupValidationHelpers.IsHttpsOrigin(configuredOrigin))
+        {
+            error = $"Set {AdminOriginEnvironmentVariable} to the operator-controlled HTTPS Relay origin.";
+            return false;
+        }
+
+        Uri configured = new(configuredOrigin!.TrimEnd('/'), UriKind.Absolute);
+        Uri repositoryEndpoint = new(configuration.Destination.Endpoint!.TrimEnd('/'), UriKind.Absolute);
+        string configuredAuthority = configured.GetComponents(UriComponents.SchemeAndServer, UriFormat.UriEscaped);
+        string repositoryAuthority = repositoryEndpoint.GetComponents(UriComponents.SchemeAndServer, UriFormat.UriEscaped);
+        if (!string.Equals(configuredAuthority, repositoryAuthority, StringComparison.OrdinalIgnoreCase))
+        {
+            error = $"{AdminOriginEnvironmentVariable} must exactly match the checked-in Relay destination origin.";
+            return false;
+        }
+
+        normalizedOrigin = configuredAuthority;
+        error = string.Empty;
+        return true;
+    }
+
     private static HttpRequestMessage BuildRequest(
         BadgeSetupConfiguration configuration,
+        string relayOrigin,
         string alias,
         BadgeLifecycleCommandOptions options,
         string token)
@@ -245,9 +302,10 @@ internal sealed class BadgeLifecycleCommandHandler
             "rename" => $"{alias}/reconcile-identity",
             "remove" => $"{alias}/uninstall",
             "recover" => $"{alias}/recover/open",
+            "activate" => $"{alias}/upgrade/activate",
             _ => $"{alias}/{options.Operation}",
         };
-        Uri uri = new(configuration.Destination.Endpoint!.TrimEnd('/') + "/badge-relay/v1/admin/" + route, UriKind.Absolute);
+        Uri uri = new(relayOrigin.TrimEnd('/') + "/badge-relay/v1/admin/" + route, UriKind.Absolute);
         bool isStatus = options.Operation.Equals("status", StringComparison.Ordinal);
         Dictionary<string, object?> fields = new(StringComparer.Ordinal)
         {
@@ -300,10 +358,24 @@ internal sealed class BadgeLifecycleCommandHandler
     {
         using Stream stream = response.Content.ReadAsStream();
         using MemoryStream buffer = new();
-        stream.CopyTo(buffer, MaximumJsonBytes + 1);
-        if (buffer.Length > MaximumJsonBytes)
+        using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(30));
+        byte[] chunk = new byte[8192];
+        int total = 0;
+        while (total <= MaximumJsonBytes)
         {
-            throw new InvalidOperationException("The Relay response is too large.");
+            int read = stream.ReadAsync(chunk.AsMemory(0, Math.Min(chunk.Length, MaximumJsonBytes + 1 - total)), deadline.Token).GetAwaiter().GetResult();
+            if (read == 0)
+            {
+                break;
+            }
+
+            total += read;
+            if (total > MaximumJsonBytes)
+            {
+                throw new InvalidOperationException("The Relay response is too large.");
+            }
+
+            buffer.Write(chunk, 0, read);
         }
 
         return Encoding.UTF8.GetString(buffer.ToArray());
@@ -433,6 +505,7 @@ internal sealed class BadgeLifecycleCommandHandler
         [
             "state", "generation", "revocation_epoch", "registry_revision", "barrier_epoch", "profile",
             "bundle", "contract_version", "compatibility_plan", "verified_at", "valid_until", "tombstoned",
+            "active_digest", "staged_digest", "previous_verified_digest", "display_owner", "display_repository",
             "last_operation", "last_reason", "updated_at",
         ];
         Dictionary<string, JsonElement> safe = new(StringComparer.Ordinal);

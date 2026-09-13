@@ -86,7 +86,12 @@ async function relayAdminCall(env: RelayEnvironment, alias: string, binding: Reg
   const target = new URL(`https://relay.test/internal/admin/${alias}/${operation}`);
   const headers = new Headers({ "content-type": "application/json", "x-relay-registry": entryForHeader(binding.entry), "x-relay-registry-revision": String(binding.revision), "x-relay-barrier-epoch": String(binding.barrierEpoch), "x-relay-registry-tombstoned": String(binding.tombstoned), "x-relay-admin": "1" });
   const stub = env.RELAY.get(env.RELAY.idFromName(alias));
-  const boundedBody = { ...body, expected_registry_revision: binding.revision, expected_barrier_epoch: binding.barrierEpoch };
+  const boundedBody = {
+    ...body,
+    operation_id: operationId(body.operation_id) ?? `relay-${operation}-${binding.revision}-${binding.barrierEpoch}`,
+    expected_registry_revision: binding.revision,
+    expected_barrier_epoch: binding.barrierEpoch
+  };
   const response = await (stub.fetch as unknown as (input: unknown) => Promise<Response>)(new Request(target, { method: "POST", headers, body: JSON.stringify(boundedBody) }));
   let parsed: Record<string, unknown> = {};
   try { parsed = await response.json() as Record<string, unknown>; } catch { /* generic response below */ }
@@ -109,10 +114,11 @@ async function adminRevoke(request: Request, env: RelayEnvironment, alias: strin
   const body = await readAdminBody(request);
   if (!body) return json(413, { error: "request_too_large" });
   if ((operation === "revoke" || operation === "uninstall" || operation === "transfer") && body.confirm !== true) return json(409, { error: "explicit_confirmation_required" });
+  if (!operationId(body.operation_id)) return json(413, { error: "invalid_operation_id" });
   const lookup = await lookupEntry(env, alias, true);
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
   if (!lookup.entry) return unknownRoute();
-  const result = await registryCall(env, "revoke", { alias });
+  const result = await registryCall(env, "revoke", { alias, operation_id: body.operation_id });
   if (result.status !== 200) return result.status === 404 ? unknownRoute() : json(503, { error: "storage_unavailable" });
   // The registry barrier advances first. Public reads are now unavailable
   // even if Durable Object cleanup must be retried after a transient failure.
@@ -146,7 +152,7 @@ async function adminRecoverOpen(request: Request, env: RelayEnvironment, alias: 
   return json(result.status, result.body);
 }
 
-async function adminUpgrade(request: Request, env: RelayEnvironment, alias: string, operation: "upgrade" | "rollback"): Promise<Response> {
+async function adminUpgrade(request: Request, env: RelayEnvironment, alias: string, operation: "upgrade" | "rollback", phase?: "stage" | "activate"): Promise<Response> {
   if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
   const body = await readAdminBody(request);
   if (!body) return json(413, { error: "request_too_large" });
@@ -155,7 +161,7 @@ async function adminUpgrade(request: Request, env: RelayEnvironment, alias: stri
   if (!lookup.entry) return unknownRoute();
   const requestedOperation = operation === "rollback"
     ? "upgrade-rollback"
-    : body.operation === "upgrade-activate" ? "upgrade-activate" : "upgrade-stage";
+    : phase === "activate" || body.operation === "upgrade-activate" || body.operation === "activate" ? "upgrade-activate" : "upgrade-stage";
   const result = await relayAdminCall(env, alias, lookup, operation, { ...body, operation: requestedOperation });
   return json(result.status, result.body);
 }
@@ -330,7 +336,7 @@ async function handleAdminRoute(request: Request, env: RelayEnvironment, parts: 
   if (operation === "invalidate" && request.method === "POST") return adminInvalidate(request, env, alias);
   if (operation === "recover" && parts[5] === "open" && request.method === "POST") return adminRecoverOpen(request, env, alias);
   if (operation === "recover" && parts[5] === "finalize" && request.method === "POST") return json(409, { error: "fresh_publisher_proof_required" });
-  if (operation === "upgrade" && request.method === "POST" && (parts[5] === undefined || parts[5] === "stage" || parts[5] === "activate")) return adminUpgrade(request, env, alias, "upgrade");
+  if (operation === "upgrade" && request.method === "POST" && (parts[5] === undefined || parts[5] === "stage" || parts[5] === "activate")) return adminUpgrade(request, env, alias, "upgrade", parts[5] as "stage" | "activate" | undefined);
   if (operation === "upgrade" && parts[5] === "rollback" && request.method === "POST") return adminUpgrade(request, env, alias, "rollback");
   if (operation === "rollback" && request.method === "POST") return adminUpgrade(request, env, alias, "rollback");
   if (operation === "rotate" && request.method === "POST") return adminRotate(request, env, alias);

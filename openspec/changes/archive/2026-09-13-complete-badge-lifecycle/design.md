@@ -42,9 +42,11 @@ not duplicate #828 storage or #831 read semantics.
    repository only when both immutable IDs match the registered entry. The alias,
    state, generation, epoch, and public bytes do not change.
 3. **The Registry is the lifecycle barrier.** Every forwarded read/mutation
-   carries the registry revision and barrier epoch. A mismatch clears ready data
-   and enters `needs-recovery`, so a stale Durable Object backup or delayed
-   publisher cannot win. Registry revocation first advances the barrier and is
+   carries the registry revision and barrier epoch. An older caller is rejected
+   without mutation; a revision-only rename synchronizes metadata while
+   preserving ready data; a newer barrier clears ready data and enters
+   `needs-recovery`, so a stale Durable Object backup or delayed publisher cannot
+   win. Registry revocation first advances the barrier and is
    idempotent; Durable Object cleanup is retried afterward. Transfer,
    removal, and revocation tombstone the old alias. Transfer returns an explicit
    `registration_required` result; it never creates a new binding or carries
@@ -56,17 +58,19 @@ not duplicate #828 storage or #831 read semantics.
    if it retries after the registry update.
 5. **Compatibility is an allowlist.** The lifecycle service recognizes only the
    shipped `badge-relay/v1`, `v1` contract, and
-   `architecture-health-badge-relay/v1` plan. Upgrades are idempotent metadata
-   changes; rollback is accepted only to the same known compatible version and
-   otherwise returns a bounded conflict without state mutation.
+   `architecture-health-badge-relay/v1` plan. An operator-controlled manifest
+   supplies shipped digests; transitions maintain active, staged, and previous
+   verified digests. Upgrade stage/activate and rollback are idempotent and
+   otherwise return a bounded conflict without state mutation.
 6. **Status is private and bounded.** The Durable Object retains the current
    state plus a bounded, redacted operation journal (30-day age and 256-entry
    cap). Status includes state, generation, epoch, lease boundary, last reason,
    and compatibility identifiers, never payload, token, source identity, SHA,
    PR/run data, or receipts.
 7. **CLI tokens stay out of arguments.** The lifecycle CLI reads the admin
-   bearer token from `ARCHLINTERNET_BADGE_ADMIN_TOKEN`, validates the generated
-   config and endpoint, and sends only approved JSON fields. `--dry-run` emits
+   bearer token from `ARCHLINTERNET_BADGE_ADMIN_TOKEN` and the operator origin
+   from `ARCHLINTERNET_BADGE_ADMIN_ORIGIN`, exact-matches it to the generated
+   config endpoint, and sends only approved JSON fields. `--dry-run` emits
    the operation plan without network access or writes. Destructive operations
    require an explicit approval switch; recovery is an open/finalize pair.
 

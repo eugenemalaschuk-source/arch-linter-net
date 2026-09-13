@@ -22,10 +22,13 @@ binding can be created.
 - **THEN** the alias, generation, epoch, public bytes, and lease remain unchanged
 - **AND** the updated display metadata is available only through private status
 
-#### Scenario: Registry barrier wins over a stale Durable Object
-- **WHEN** a forwarded read or mutation carries an older registry revision or barrier epoch
-- **THEN** the Durable Object clears ready data and enters `needs-recovery`
-- **AND** the stale request cannot recreate a ready state
+#### Scenario: Stale callers cannot mutate newer Relay state
+- **WHEN** a forwarded read or mutation carries a registry revision or barrier epoch older than the Durable Object
+- **THEN** the request is rejected with no state mutation and an already-ready payload remains ready
+- **AND WHEN** the registry revision advances without a barrier advance
+- **THEN** the Durable Object synchronizes display metadata without clearing ready data
+- **AND WHEN** the barrier advances
+- **THEN** the Durable Object clears ready data and enters `needs-recovery` (or `revoked` for a tombstone)
 
 #### Scenario: Transfer cannot carry authorization
 - **WHEN** an admin requests an owner or immutable repository identity transfer
@@ -42,9 +45,11 @@ The lifecycle service SHALL rotate publisher workflow/audience pins by first
 invalidating the current state and then atomically updating the private
 registry. Unknown workflow revisions, bundle identifiers, contract versions,
 compatibility plans, or manifest digests SHALL be rejected without mutation.
-Compatible upgrades SHALL be idempotent. A rollback SHALL be accepted only for
-an explicitly known compatible version and SHALL refuse an incompatible target
-without serving the older generation.
+Compatible upgrades SHALL be idempotent. Bundle transitions SHALL maintain
+`active_digest`, `staged_digest`, and `previous_verified_digest` and accept only
+digests in an operator-controlled shipped manifest. A rollback SHALL target the
+previous verified digest and SHALL refuse an incompatible target without serving
+the older generation.
 
 #### Scenario: Old pin cannot publish after rotation
 - **WHEN** an admin rotates the registered workflow pin
@@ -59,7 +64,7 @@ without serving the older generation.
 ### Requirement: Private operational status is redacted and bounded
 The Relay SHALL provide private status containing only state, generation,
 revocation epoch, validity boundaries, compatibility identifiers, tombstone,
-and bounded redacted reason codes. It SHALL retain operation diagnostics for at
+private display owner/repository names, and bounded redacted reason codes. It SHALL retain operation diagnostics for at
 most 30 days and 256 records per alias. Status and diagnostics SHALL not expose
 canonical payload bytes, tokens, JWT claims, source identity, repository URL,
 commit/tree/PR/run identifiers, receipts, or provider response bodies.
@@ -77,9 +82,11 @@ commit/tree/PR/run identifiers, receipts, or provider response bodies.
 ### Requirement: Lifecycle CLI and runbook are complete and dry-run safe
 The shipped CLI SHALL validate a generated v1 setup configuration and expose
 status, invalidate, revoke, rename, transfer, rotate, remove, recover, upgrade,
-and rollback operations through the approved admin routes. It SHALL obtain the
-admin token from a process environment variable, never from a positional or
-logged argument. Dry-run SHALL be read-only. The operator runbook SHALL map
+activate, and rollback operations through the approved admin routes. It SHALL obtain the
+admin token and an operator-controlled Relay origin from process environment
+variables, exact-match that origin against the checked-in destination, and
+never take credential destination from repository input alone. Dry-run SHALL be
+read-only. The operator runbook SHALL map
 every lifecycle matrix event to a positive and negative action, state the
 60-minute lease/30-minute renewal and retention bounds, distinguish origin
 truth from cached copies, and include synthetic upgrade, rollback, uninstall,
@@ -90,8 +97,9 @@ and recovery verification.
 - **THEN** the CLI prints the validated operation plan and performs no HTTP request, file write, or token lookup
 
 #### Scenario: Real lifecycle command uses the admin boundary
-- **WHEN** an operator runs a non-dry-run operation with a valid generated Relay config and `ARCHLINTERNET_BADGE_ADMIN_TOKEN`
+- **WHEN** an operator runs a non-dry-run operation with a valid generated Relay config, `ARCHLINTERNET_BADGE_ADMIN_TOKEN`, and `ARCHLINTERNET_BADGE_ADMIN_ORIGIN`
 - **THEN** the CLI sends only the approved bounded request to the configured Relay admin route
+- **AND** the operator origin exactly matches the checked-in destination origin before the bearer token is used
 - **AND** it returns the fixed status/reason result without printing the bearer token or private provenance
 
 #### Scenario: Runbook recovery starts unavailable

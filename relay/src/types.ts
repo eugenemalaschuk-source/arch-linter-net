@@ -83,6 +83,8 @@ export interface RelayEnvironment {
   REGISTRY: DurableObjectNamespace;
   RELAY_REGISTRY?: string | RegistryEntry | RegistryEntry[] | Record<string, RegistryEntry>;
   ADMIN_TOKEN?: string;
+  /** Comma-separated operator-controlled manifest of verified Relay bundle digests. */
+  RELAY_SHIPPED_BUNDLE_DIGESTS?: string | string[];
   OIDC_JWKS_URL?: string;
   OIDC_FETCH?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
