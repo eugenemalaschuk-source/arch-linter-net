@@ -55,6 +55,30 @@ def _license_present(value: Any) -> bool:
     return False
 
 
+def _license_label(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        for key in ("type", "spdx", "name"):
+            label = value.get(key)
+            if isinstance(label, str) and label.strip():
+                return label.strip()
+        return ", ".join(str(item).strip() for item in value.values() if isinstance(item, str) and item.strip())
+    return ""
+
+
+def _package_name(package_path: str) -> str:
+    return package_path.removeprefix("node_modules/").rsplit("/node_modules/", 1)[-1]
+
+
+def _notice_documents(notice: str, package_name: str, version: str, license_label: str) -> bool:
+    package_pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(package_name)}(?![A-Za-z0-9])")
+    return any(
+        package_pattern.search(line) is not None and version in line and license_label in line
+        for line in notice.splitlines()
+    )
+
+
 def _package_entry(packages: dict[str, Any], package_name: str, parent: str = "") -> tuple[str, dict[str, Any]] | None:
     path = parent
     while True:
@@ -87,9 +111,9 @@ def _runtime_dependency_closure(packages: dict[str, Any], direct: dict[str, str]
 def verify_relay_dependencies(source_root: Path, inventory: dict[str, Any]) -> dict[str, Any]:
     """Validate Relay package metadata without network access.
 
-    Every non-root lock package must carry resolution, integrity, and license metadata.  The
-    returned audit set is the runtime dependency closure only; devDependencies are intentionally
-    not treated as shipped runtime dependencies.
+    Every non-root lock package must carry resolution, integrity, and license metadata. The
+    notice must document every package in the runtime dependency closure with its locked version
+    and license; devDependencies are intentionally not treated as shipped runtime dependencies.
     """
 
     root = _safe_path(source_root, "source root")
@@ -101,7 +125,8 @@ def verify_relay_dependencies(source_root: Path, inventory: dict[str, Any]) -> d
     package_json_path = _relative_path(root, relay.get("package_json"), "Relay package.json")
     package_lock_path = _relative_path(root, relay.get("package_lock"), "Relay package-lock.json")
     notice_path = _relative_path(root, relay.get("license_notice"), "Relay license notice")
-    if not notice_path.read_bytes().strip():
+    notice = notice_path.read_text(encoding="utf-8")
+    if not notice.strip():
         raise ValueError("The Relay license notice is empty.")
 
     package = _read_json(package_json_path, "Relay package.json")
@@ -139,6 +164,16 @@ def verify_relay_dependencies(source_root: Path, inventory: dict[str, Any]) -> d
         if not _license_present(record.get("license")):
             raise ValueError(f"Relay lock package '{path}' has no license metadata.")
     audited = _runtime_dependency_closure(packages, dependencies)
+    for package_path in sorted(audited):
+        package = packages[package_path]
+        package_name = _package_name(package_path)
+        locked_version = package["version"]
+        license_label = _license_label(package["license"])
+        if not _notice_documents(notice, package_name, locked_version, license_label):
+            raise ValueError(
+                f"Relay license notice does not document runtime dependency '{package_name}' "
+                f"version '{locked_version}' with license '{license_label}'."
+            )
     return {
         "package": package_json_path.as_posix(),
         "lockfile": package_lock_path.as_posix(),

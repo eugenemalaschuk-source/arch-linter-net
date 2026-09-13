@@ -43,6 +43,22 @@ def test_offline_check_accepts_lockfile_and_audits_runtime_closure_only(tmp_path
     assert all("vitest" not in name and "wrangler" not in name for name in report["audited_runtime_packages"])
 
 
+def test_offline_check_rejects_stale_notice_for_locked_runtime_version(tmp_path: Path) -> None:
+    source, inventory = _fixture(tmp_path)
+    package_json_path = source / "relay" / "package.json"
+    package_lock_path = source / "relay" / "package-lock.json"
+    package_json = json.loads(package_json_path.read_text(encoding="utf-8"))
+    package_lock = json.loads(package_lock_path.read_text(encoding="utf-8"))
+    package_json["dependencies"]["jose"] = "6.2.13"
+    package_lock["packages"][""]["dependencies"]["jose"] = "6.2.13"
+    package_lock["packages"]["node_modules/jose"]["version"] = "6.2.13"
+    package_json_path.write_text(json.dumps(package_json), encoding="utf-8")
+    package_lock_path.write_text(json.dumps(package_lock), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"license notice.*6\.2\.13"):
+        dependencies.verify_relay_dependencies(source, inventory)
+
+
 @pytest.mark.parametrize(
     "mutation",
     ["lock-version", "runtime-map", "runtime-version", "missing-integrity", "missing-license", "missing-notice"],
