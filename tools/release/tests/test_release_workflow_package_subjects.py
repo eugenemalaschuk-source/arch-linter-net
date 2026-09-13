@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -15,12 +16,66 @@ def _ci_workflow() -> str:
     )
 
 
+def _job(workflow: str, job_name: str) -> str:
+    job_header = f"  {job_name}:\n"
+    start = workflow.index(job_header) + len(job_header)
+    remainder = workflow[start:]
+    next_job = re.search(r"\n  [A-Za-z0-9_-]+:\n", remainder)
+    return remainder if next_job is None else remainder[: next_job.start()]
+
+
 def test_release_workflow_creates_and_attaches_derived_checksum_evidence() -> None:
     workflow = _workflow()
 
     assert "render-checksums --manifest artifacts/packages/package-manifest.json" in workflow
     assert "artifacts/packages/package-checksums.txt" in workflow
     assert "artifacts/packages/package-manifest.json" in workflow
+
+
+def test_release_workflow_freezes_transport_before_candidate_upload() -> None:
+    workflow = _workflow()
+    prepare_job = _job(workflow, "prepare-candidate")
+
+    assert "python3 tools/release/verify_relay_dependencies.py --source-root ." in prepare_job
+    assert "python3 tools/release/release_distribution.py create" in prepare_job
+    assert "--source-root ." in prepare_job
+    assert "--inventory .github/badge-promotion/release-inventory.json" in prepare_job
+    assert "--candidate-manifest artifacts/packages/package-manifest.json" in prepare_job
+    assert '--version "$PACKAGE_VERSION"' in prepare_job
+    assert '--source-commit "$GITHUB_SHA"' in prepare_job
+    assert "--output-dir artifacts/packages/transport" in prepare_job
+    assert "artifacts/packages/package-manifest.json/transport" not in prepare_job
+    assert prepare_job.index("Create immutable candidate manifest") < prepare_job.index(
+        "Create frozen Relay distribution"
+    ) < prepare_job.index("Verify frozen Relay distribution") < prepare_job.index("Upload package artifacts")
+
+    upload_job = prepare_job.split("      - name: Upload package artifacts\n", maxsplit=1)[1].split(
+        "      - name: Upload repository-gate evidence\n", maxsplit=1
+    )[0]
+    assert "${{ env.PACKAGE_OUTPUT }}/" in upload_job
+    assert "artifacts/packages/transport" not in upload_job
+
+
+def test_checkpoint_b_and_publication_handoffs_verify_frozen_transport() -> None:
+    workflow = _workflow()
+
+    for job_name in (
+        "checkpoint-b-shards",
+        "checkpoint-b-platform-evidence",
+        "checkpoint-b-evidence",
+        "attest-prepublication-provenance",
+        "release",
+        "create-release",
+    ):
+        job = _job(workflow, job_name)
+        assert "python3 tools/release/release_distribution.py verify" in job
+        assert "--inventory .github/badge-promotion/release-inventory.json" in job
+        assert "--candidate-manifest" in job
+        assert "--transport-dir" in job
+        assert "--manifest " in job
+        assert "--checksums " in job
+        assert "architecture-health-badge-release-distribution.json" in job
+        assert "architecture-health-badge-release-checksums.txt" in job
 
 
 def test_nuget_push_uses_manifest_selected_primary_subjects_and_checks_symbols() -> None:
@@ -57,8 +112,21 @@ def test_github_release_attachment_uses_manifest_selected_subjects_without_globs
     workflow = _workflow()
 
     assert "--kind all" in workflow
+    assert (
+        "release_distribution.py paths --transport-dir artifacts/packages/transport "
+        "--manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json --kind subjects"
+        in workflow
+    )
+    assert (
+        "attachment_paths=(artifacts/packages/package-manifest.json artifacts/packages/package-checksums.txt "
+        "artifacts/packages/transport/architecture-health-badge-release-distribution.json "
+        "artifacts/packages/transport/architecture-health-badge-release-checksums.txt)"
+        in workflow
+    )
     assert 'attachment_paths+=("artifacts/packages/$asset")' in workflow
+    assert 'attachment_paths+=("artifacts/packages/transport/$asset")' in workflow
     assert "artifacts/packages/*.snupkg" not in workflow
+    assert "artifacts/packages/transport/*" not in workflow
 
 
 def test_github_release_notes_link_to_the_evergreen_provenance_guide() -> None:
@@ -78,12 +146,16 @@ def test_provenance_job_attests_exact_frozen_subject_inventories_with_least_priv
     assert "contents: read\n      id-token: write\n      attestations: write" in attestation_job
     assert workflow.count("attestations: write") == 1
     assert "verify-release-evidence" in attestation_job
-    assert attestation_job.count("render-attestation-subject-checksums") == 2
+    assert attestation_job.count("package_manifest.py render-attestation-subject-checksums") == 2
+    assert attestation_job.count("release_distribution.py render-attestation-subject-checksums") == 2
     assert "--subject-class package" in attestation_job
     assert "--subject-class evidence" in attestation_job
-    assert attestation_job.count("actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6") == 2
+    assert "--subject-class transport" in attestation_job
+    assert attestation_job.count("actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6") == 4
     assert "subject-checksums: artifacts/provenance/package-subjects.sha256" in attestation_job
     assert "subject-checksums: artifacts/provenance/evidence-subjects.sha256" in attestation_job
+    assert "subject-checksums: artifacts/provenance/transport-subjects.sha256" in attestation_job
+    assert "subject-checksums: artifacts/provenance/transport-evidence-subjects.sha256" in attestation_job
     assert "*.nupkg" not in attestation_job
     assert "*.snupkg" not in attestation_job
 
@@ -101,6 +173,13 @@ def test_independent_provenance_verification_blocks_publication_handoffs() -> No
     assert '--repository "$GITHUB_REPOSITORY"' in verification_job
     assert '--signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-nuget.yml"' in verification_job
     assert '--source-commit "$GITHUB_SHA"' in verification_job
+    assert "--distribution-dir artifacts/packages/transport" in verification_job
+    assert "--distribution-manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json" in (
+        verification_job
+    )
+    assert "--distribution-checksums artifacts/packages/transport/architecture-health-badge-release-checksums.txt" in (
+        verification_job
+    )
     assert all(
         dependency in release_job
         for dependency in ("prepare-candidate", "checkpoint-b-evidence", "verify-prepublication-provenance")

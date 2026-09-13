@@ -43,6 +43,12 @@
     <Content Include="..\..\relay\package-lock.json"
              Pack="true"
              PackagePath="tools/net10.0/any/architecture-health-badge-setup/relay" />
+    <Content Include="..\..\relay\THIRD-PARTY-NOTICES.txt"
+             Pack="true"
+             PackagePath="tools/net10.0/any/architecture-health-badge-setup/relay" />
+    <Content Include="..\..\relay\bundle-manifest.json"
+             Pack="true"
+             PackagePath="tools/net10.0/any/architecture-health-badge-setup/relay" />
     <Content Include="..\..\relay\tsconfig.json"
              Pack="true"
              PackagePath="tools/net10.0/any/architecture-health-badge-setup/relay" />

@@ -45,6 +45,32 @@ def _verified_subjects(arguments: argparse.Namespace) -> list[Path]:
     ]
 
 
+def _transport_subjects(arguments: argparse.Namespace) -> tuple[list[Path], list[Path]]:
+    distribution_manifest = getattr(arguments, "distribution_manifest", None)
+    distribution_dir = getattr(arguments, "distribution_dir", None)
+    distribution_checksums = getattr(arguments, "distribution_checksums", None)
+    if distribution_manifest is None:
+        return [], []
+    if distribution_dir is None or distribution_checksums is None:
+        raise ValueError("Transport provenance requires its manifest, checksums, and directory together.")
+    manifest_path = _safe_path(distribution_manifest, "transport manifest")
+    checksums_path = _safe_path(distribution_checksums, "transport checksum evidence")
+    transport_directory = _safe_path(distribution_dir, "transport subject directory")
+    try:
+        distribution = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"Cannot read transport manifest '{manifest_path}': {error}") from error
+    subjects = distribution.get("subjects") if isinstance(distribution, dict) else None
+    if not isinstance(subjects, list) or not subjects:
+        raise ValueError("Transport manifest does not contain any subjects.")
+    subject_paths: list[Path] = []
+    for subject in subjects:
+        if not isinstance(subject, dict) or not isinstance(subject.get("file"), str):
+            raise ValueError("Transport manifest contains an invalid subject.")
+        subject_paths.append(_safe_path(transport_directory / subject["file"], "transport subject"))
+    return subject_paths, [manifest_path, checksums_path]
+
+
 def _command(arguments: argparse.Namespace, subject: Path) -> list[str]:
     subject = _safe_path(subject, "attestation subject")
     repository = _validated_selector(arguments.repository, _REPOSITORY_PATTERN, "repository")
@@ -141,6 +167,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--signer-workflow", required=True)
+    parser.add_argument("--distribution-dir", type=Path)
+    parser.add_argument("--distribution-manifest", type=Path)
+    parser.add_argument("--distribution-checksums", type=Path)
     return parser.parse_args()
 
 
@@ -155,12 +184,18 @@ def main() -> int:
     for subject in subjects:
         verified_attestations[subject] = _verified_attestation_digests(subject, _verify(arguments, subject))
 
+    transport_subjects, transport_evidence = _transport_subjects(arguments)
+    for subject in [*transport_evidence, *transport_subjects]:
+        verified_attestations[subject] = _verified_attestation_digests(subject, _verify(arguments, subject))
+
     package_subject = next(subject for subject in subjects if subject.suffix == ".nupkg")
     with tempfile.TemporaryDirectory(prefix="archlinternet-provenance-", dir=packages_directory) as temporary_directory:
         directory = Path(temporary_directory)
         _verify_tamper_is_rejected(package_subject, verified_attestations[package_subject], directory)
         _verify_tamper_is_rejected(manifest_subject, verified_attestations[manifest_subject], directory)
         _verify_tamper_is_rejected(checksums_subject, verified_attestations[checksums_subject], directory)
+        for subject in [*transport_evidence, *transport_subjects]:
+            _verify_tamper_is_rejected(subject, verified_attestations[subject], directory)
     return 0
 
 

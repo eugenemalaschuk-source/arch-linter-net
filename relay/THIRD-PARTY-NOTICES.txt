@@ -1,0 +1,7 @@
+Badge Relay third-party notices
+
+Direct runtime dependency:
+- jose 6.2.12 (MIT)
+
+The package-lock.json file carries the complete pinned transitive dependency,
+license, and integrity inventory for this bundle.

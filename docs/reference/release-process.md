@@ -54,6 +54,34 @@ Those digests identify exact project-controlled bytes before upload and in GitHu
 
 Before publication, verify the generated release notes, the [evergreen adoption/upgrade guide](../guides/upgrading.md), and installed-schema commands against the candidate packages. Release-specific history belongs in the GitHub Release/tag and workflow evidence, not in a new version-named page in the evergreen documentation tree.
 
+### Frozen Relay transport and release ownership
+
+Issue #835 extends the existing candidate artifact with a frozen transport set under
+`artifacts/packages/transport`. The set contains exactly the manifest-selected deterministic
+Relay distribution archive, approved reusable publisher workflow bytes, approved composite
+publisher action bytes, and compatibility metadata. Its outer evidence files are
+`architecture-health-badge-release-distribution.json` and
+`architecture-health-badge-release-checksums.txt`; the transport manifest is authoritative for
+the exact subject filenames, including
+`architecture-health-badge-publisher-workflow.yml` and
+`architecture-health-badge-publisher-action.yml`, media kinds, sizes, digests, and source
+identities. No additional
+transport file is a release asset merely because it is present in the directory.
+
+The transport inventory is bound to the same candidate package manifest, source commit, and
+reviewed release inventory. Candidate creation, verification, Checkpoint B, attestation, and
+independent provenance verification consume these frozen bytes without regeneration. The
+existing package manifest remains authoritative for NuGet package and symbol identity; the
+transport manifest is a sibling inventory and does not add transport files to the package-manifest
+root or recursively hash its own evidence.
+
+#835 owns repository-side candidate packaging, integrity checks, provenance inputs, and this
+documentation integration. It does not publish packages, create a GitHub Release, deploy GitHub
+Pages, or declare the milestone release complete. Those actions remain under #806: the maintainer
+selects the exact free `0.8.Z`, runs the existing `publish: true` workflow, and verifies the
+actually released CLI, transport assets, pins, and clean consumer journey. A `publish: false`
+candidate run is review evidence for that candidate only; it is not a public release.
+
 ## Versioning
 
 ArchLinterNet follows Semantic Versioning 2.0.

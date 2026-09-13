@@ -128,6 +128,19 @@ jobs:
         shell: bash
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
 
+      - name: Verify immutable transport candidate
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py verify \
+            --source-root . \
+            --inventory .github/badge-promotion/release-inventory.json \
+            --candidate-manifest artifacts/candidate/package-manifest.json \
+            --version "$CHECKPOINT_B_CANDIDATE_VERSION" \
+            --source-commit "$ARCH_LINTER_SOURCE_SHA" \
+            --transport-dir artifacts/candidate/transport \
+            --manifest artifacts/candidate/transport/architecture-health-badge-release-distribution.json \
+            --checksums artifacts/candidate/transport/architecture-health-badge-release-checksums.txt
+
       - name: Run ${{ matrix.shard.name }} shard
         shell: bash
         run: make ${{ matrix.shard.target }}
@@ -174,6 +187,19 @@ jobs:
         with:
           name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/candidate
+
+      - name: Verify immutable transport candidate
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py verify \
+            --source-root . \
+            --inventory .github/badge-promotion/release-inventory.json \
+            --candidate-manifest artifacts/candidate/package-manifest.json \
+            --version "${{ needs.prepare-candidate.outputs.package_version }}" \
+            --source-commit "$GITHUB_SHA" \
+            --transport-dir artifacts/candidate/transport \
+            --manifest artifacts/candidate/transport/architecture-health-badge-release-distribution.json \
+            --checksums artifacts/candidate/transport/architecture-health-badge-release-checksums.txt
 
       - name: Download platform shard evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
@@ -222,6 +248,19 @@ jobs:
       - name: Verify immutable candidate manifest
         shell: bash
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json --version "${{ needs.prepare-candidate.outputs.package_version }}" --source-commit "$GITHUB_SHA"
+
+      - name: Verify immutable transport candidate
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py verify \
+            --source-root . \
+            --inventory .github/badge-promotion/release-inventory.json \
+            --candidate-manifest artifacts/candidate/package-manifest.json \
+            --version "${{ needs.prepare-candidate.outputs.package_version }}" \
+            --source-commit "$GITHUB_SHA" \
+            --transport-dir artifacts/candidate/transport \
+            --manifest artifacts/candidate/transport/architecture-health-badge-release-distribution.json \
+            --checksums artifacts/candidate/transport/architecture-health-badge-release-checksums.txt
 
       - name: Download repository-gate evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
@@ -286,6 +325,9 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
 
+      - name: Verify Relay dependency and license evidence
+        run: python3 tools/release/verify_relay_dependencies.py --source-root .
+
       - name: Calculate package version
         shell: bash
         env:
@@ -343,6 +385,30 @@ jobs:
       - name: Render candidate package checksums
         run: python3 tools/release/package_manifest.py render-checksums --manifest artifacts/packages/package-manifest.json --output artifacts/packages/package-checksums.txt
 
+      - name: Create frozen Relay distribution
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py create \
+            --source-root . \
+            --inventory .github/badge-promotion/release-inventory.json \
+            --candidate-manifest artifacts/packages/package-manifest.json \
+            --version "$PACKAGE_VERSION" \
+            --source-commit "$GITHUB_SHA" \
+            --output-dir artifacts/packages/transport
+
+      - name: Verify frozen Relay distribution
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py verify \
+            --source-root . \
+            --inventory .github/badge-promotion/release-inventory.json \
+            --candidate-manifest artifacts/packages/package-manifest.json \
+            --version "$PACKAGE_VERSION" \
+            --source-commit "$GITHUB_SHA" \
+            --transport-dir artifacts/packages/transport \
+            --manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json \
+            --checksums artifacts/packages/transport/architecture-health-badge-release-checksums.txt
+
       - name: Record passed repository gates
         run: python3 tools/release/create_repository_gate_evidence.py --candidate-manifest artifacts/packages/package-manifest.json --source-commit "$GITHUB_SHA" --output artifacts/checkpoint-b/repository-gates.json
 
@@ -392,6 +458,19 @@ jobs:
             --version "${{ needs.prepare-candidate.outputs.package_version }}" \
             --source-commit "$GITHUB_SHA"
 
+      - name: Verify frozen transport distribution
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py verify \
+            --source-root . \
+            --inventory .github/badge-promotion/release-inventory.json \
+            --candidate-manifest artifacts/packages/package-manifest.json \
+            --version "${{ needs.prepare-candidate.outputs.package_version }}" \
+            --source-commit "$GITHUB_SHA" \
+            --transport-dir artifacts/packages/transport \
+            --manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json \
+            --checksums artifacts/packages/transport/architecture-health-badge-release-checksums.txt
+
       - name: Generate exact package attestation inventory
         shell: bash
         run: |
@@ -412,6 +491,26 @@ jobs:
             --subject-class evidence \
             --output artifacts/provenance/evidence-subjects.sha256
 
+      - name: Generate exact transport attestation inventory
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py render-attestation-subject-checksums \
+            --transport-dir artifacts/packages/transport \
+            --manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json \
+            --checksums artifacts/packages/transport/architecture-health-badge-release-checksums.txt \
+            --subject-class transport \
+            --output artifacts/provenance/transport-subjects.sha256
+
+      - name: Generate exact transport-evidence attestation inventory
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py render-attestation-subject-checksums \
+            --transport-dir artifacts/packages/transport \
+            --manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json \
+            --checksums artifacts/packages/transport/architecture-health-badge-release-checksums.txt \
+            --subject-class evidence \
+            --output artifacts/provenance/transport-evidence-subjects.sha256
+
       - name: Attest exact package and symbol subjects
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -421,6 +520,16 @@ jobs:
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: artifacts/provenance/evidence-subjects.sha256
+
+      - name: Attest exact transport subjects
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: artifacts/provenance/transport-subjects.sha256
+
+      - name: Attest exact transport manifest and checksum evidence subjects
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: artifacts/provenance/transport-evidence-subjects.sha256
 
   verify-prepublication-provenance:
     name: Verify pre-publication release provenance
@@ -454,7 +563,10 @@ jobs:
             --version "${{ needs.prepare-candidate.outputs.package_version }}" \
             --source-commit "$GITHUB_SHA" \
             --repository "$GITHUB_REPOSITORY" \
-            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-nuget.yml"
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-nuget.yml" \
+            --distribution-dir artifacts/packages/transport \
+            --distribution-manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json \
+            --distribution-checksums artifacts/packages/transport/architecture-health-badge-release-checksums.txt
 
   release:
     name: Publish verified NuGet candidate
@@ -494,6 +606,19 @@ jobs:
             --checksums artifacts/packages/package-checksums.txt \
             --version "${{ needs.prepare-candidate.outputs.package_version }}" \
             --source-commit "$GITHUB_SHA"
+
+      - name: Verify frozen transport before publication
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py verify \
+            --source-root . \
+            --inventory .github/badge-promotion/release-inventory.json \
+            --candidate-manifest artifacts/packages/package-manifest.json \
+            --version "${{ needs.prepare-candidate.outputs.package_version }}" \
+            --source-commit "$GITHUB_SHA" \
+            --transport-dir artifacts/packages/transport \
+            --manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json \
+            --checksums artifacts/packages/transport/architecture-health-badge-release-checksums.txt
 
       - name: Generate release notes after Checkpoint B
         shell: bash
@@ -575,6 +700,19 @@ jobs:
             --version "${{ needs.release.outputs.package_version }}" \
             --source-commit "$GITHUB_SHA"
 
+      - name: Verify frozen transport release attachment subjects
+        shell: bash
+        run: |
+          python3 tools/release/release_distribution.py verify \
+            --source-root . \
+            --inventory .github/badge-promotion/release-inventory.json \
+            --candidate-manifest artifacts/packages/package-manifest.json \
+            --version "${{ needs.release.outputs.package_version }}" \
+            --source-commit "$GITHUB_SHA" \
+            --transport-dir artifacts/packages/transport \
+            --manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json \
+            --checksums artifacts/packages/transport/architecture-health-badge-release-checksums.txt
+
       - name: Create GitHub Release
         shell: bash
         env:
@@ -584,9 +722,13 @@ jobs:
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
           mapfile -t assets < <(python3 tools/release/package_manifest.py paths --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json --kind all)
-          attachment_paths=(artifacts/packages/package-manifest.json artifacts/packages/package-checksums.txt)
+          mapfile -t transport_assets < <(python3 tools/release/release_distribution.py paths --transport-dir artifacts/packages/transport --manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json --kind subjects)
+          attachment_paths=(artifacts/packages/package-manifest.json artifacts/packages/package-checksums.txt artifacts/packages/transport/architecture-health-badge-release-distribution.json artifacts/packages/transport/architecture-health-badge-release-checksums.txt)
           for asset in "${assets[@]}"; do
             attachment_paths+=("artifacts/packages/$asset")
+          done
+          for asset in "${transport_assets[@]}"; do
+            attachment_paths+=("artifacts/packages/transport/$asset")
           done
           gh release create "$TARGET_TAG" \
             --target "$RELEASE_COMMIT" \
