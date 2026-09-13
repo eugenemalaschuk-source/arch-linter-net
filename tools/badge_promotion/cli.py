@@ -37,7 +37,7 @@ class ProviderFailure(RuntimeError):
         super().__init__(reason)
 
 
-_MAX_RAW_PUBLICATION_ATTEMPTS = 3
+_MAX_RAW_PUBLICATION_ATTEMPTS = 5
 
 
 class _ArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -399,6 +399,10 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
                 raise ProviderFailure("publication_race_lost") from error
             # GitHub may expose the newly created commit/tree slightly after the data API
             # accepts it. Give the ref service a bounded opportunity to observe those objects.
+            print(
+                f"Architecture Health raw publication retry {attempt + 1}: {error.reason}",
+                file=sys.stderr,
+            )
             time.sleep(2**attempt)
 
 
