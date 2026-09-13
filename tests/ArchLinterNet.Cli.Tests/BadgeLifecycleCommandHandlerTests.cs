@@ -95,6 +95,87 @@ public sealed class BadgeLifecycleCommandHandlerTests
     }
 
     [Test]
+    public void HumanFormatPrintsRelayState()
+    {
+        RecordingConsole console = new();
+        BadgeLifecycleCommandHandler handler = Handler(console, out MemoryFileSystem fileSystem,
+            () => new HttpClient(new CapturingHandler(_ => JsonResponse("{\"state\":\"ready\"}"))),
+            () => "admin-secret");
+
+        int result = handler.Execute(Options(fileSystem, Operation: "status", Format: "human"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(console.Output, Does.Contain("status: ready"));
+        });
+    }
+
+    [Test]
+    public void HumanDryRunPrintsOperationPlan()
+    {
+        RecordingConsole console = new();
+        BadgeLifecycleCommandHandler handler = Handler(console, out MemoryFileSystem fileSystem,
+            () => throw new AssertionException("HTTP must not be created"),
+            () => throw new AssertionException("token must not be read"));
+
+        int result = handler.Execute(Options(fileSystem, Operation: "status", DryRun: true, Format: "human"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(console.Output, Does.Contain("dry-run: status aabc1234 (https://relay.example)"));
+        });
+    }
+
+    [TestCase("invalid-operation")]
+    [TestCase("invalid-format")]
+    [TestCase("invalid-alias")]
+    [TestCase("invalid-target-digest")]
+    [TestCase("invalid-audience")]
+    public void InvalidLifecycleOptionsAreRejectedBeforeHttp(string invalid)
+    {
+        RecordingConsole console = new();
+        BadgeLifecycleCommandHandler handler = Handler(console, out MemoryFileSystem fileSystem,
+            () => throw new AssertionException("HTTP must not be created"),
+            () => "admin-secret");
+        BadgeLifecycleCommandOptions options = invalid switch
+        {
+            "invalid-operation" => new("unsupported", "badge-relay-config.json", null, false, "json", false),
+            "invalid-format" => Options(fileSystem, Format: "xml"),
+            "invalid-alias" => new("status", "badge-relay-config.json", "public", false, "json", false),
+            "invalid-target-digest" => new("status", "badge-relay-config.json", null, false, "json", false, TargetDigest: "not-a-digest"),
+            _ => new("status", "badge-relay-config.json", null, false, "json", false, Audience: "invalid audience")
+        };
+
+        int result = handler.Execute(options);
+
+        Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.That(console.Output, Does.Contain("invalid-arguments"));
+    }
+
+    [TestCase("{\"error\":\"compatibility_conflict\"}", "compatibility_conflict")]
+    [TestCase("not-json", "relay-request-failed")]
+    public void RelayErrorsUseAllowlistedReasonOrGenericFallback(string body, string expectedReason)
+    {
+        RecordingConsole console = new();
+        BadgeLifecycleCommandHandler handler = Handler(console, out MemoryFileSystem fileSystem,
+            () => new HttpClient(new CapturingHandler(_ => new(HttpStatusCode.Conflict)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            })),
+            () => "admin-secret");
+
+        int result = handler.Execute(Options(fileSystem));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.Output, Does.Contain($"\"reason\":\"{expectedReason}\""));
+        });
+    }
+
+    [Test]
     public void MissingAdminTokenDoesNotCreateHttpClient()
     {
         RecordingConsole console = new();
