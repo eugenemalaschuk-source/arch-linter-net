@@ -212,7 +212,18 @@ def test_raw_publication_stale_cas_uses_configured_base_ref(monkeypatch: pytest.
     assert base_ref_path in api.paths
 
 
-def test_raw_publication_retries_a_transient_ref_update_race(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    "failing_attempts, expect_failure, expected_sleeps, expected_retry_messages",
+    [(1, False, [1], 1), (5, True, [1, 2, 4, 8], 4)],
+)
+def test_raw_publication_retries_ref_update_race_and_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    failing_attempts: int,
+    expect_failure: bool,
+    expected_sleeps: list[int],
+    expected_retry_messages: int,
+) -> None:
     raw = json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text())
     config = parse_config(raw)
     repository = config.repository
@@ -226,7 +237,7 @@ def test_raw_publication_retries_a_transient_ref_update_race(monkeypatch: pytest
         def request(self, path: str, **kwargs: object) -> object:
             if path == ref_path and kwargs.get("method") == "PATCH":
                 self.patch_attempts += 1
-                if self.patch_attempts == 1:
+                if self.patch_attempts <= failing_attempts:
                     raise ProviderFailure("github_api_unavailable")
             return super().request(path, **kwargs)
 
@@ -241,11 +252,19 @@ def test_raw_publication_retries_a_transient_ref_update_race(monkeypatch: pytest
         }
     )
     monkeypatch.setenv("GITHUB_SHA", main_sha)
+    sleeps: list[int] = []
+    monkeypatch.setattr(cli.time, "sleep", sleeps.append)
 
-    _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
+    if expect_failure:
+        with pytest.raises(ProviderFailure, match="publication_race_lost"):
+            _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
+    else:
+        _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
 
-    assert api.patch_attempts == 2
-    assert api.paths.count(ref_path) == 3
+    assert api.patch_attempts == len(expected_sleeps) + 1
+    assert api.paths.count(ref_path) == api.patch_attempts + 1 - int(expect_failure)
+    assert sleeps == expected_sleeps
+    assert capsys.readouterr().err.count("raw publication retry") == expected_retry_messages
 
 
 def test_semantic_evidence_member_is_bounded_before_decompression() -> None:
