@@ -32,6 +32,8 @@ def test_triage_baseline_references_authoritative_metadata_and_gate() -> None:
     triage = json.loads(TRIAGE_PATH.read_text(encoding="utf-8"))
     triage_baseline = triage["baseline"]
 
+    baseline_report = (ROOT / "docs/internal/sonar-debt-baseline-2026-09-13.md").read_text(encoding="utf-8")
+    assert "| new_coverage | LT | 80 | 88.0 | OK |" in baseline_report
     assert triage_baseline["metadata"] == baseline["metadata"]
     assert triage_baseline["qualityGate"] == baseline["qualityGate"]
     assert triage_baseline["findings"] == baseline["totals"]["findings"]
@@ -71,6 +73,8 @@ def test_triage_assigns_every_baseline_finding_exactly_once() -> None:
 
     capture = triage["afterCapture"]
     assert capture["artifact"] == "docs/internal/sonar-debt-after-877-keys-2026-09-14.json"
+    for field in ("revision", "analysisKey", "analysisDate", "capturedAt", "analysisLink"):
+        assert capture[field] == key_evidence[field]
     assert capture["keyEvidence"]["baselineFindingCount"] == len(baseline_keys)
     assert capture["keyEvidence"]["afterFindingCount"] == len(after_keys)
     assert capture["keyEvidence"]["persistentCount"] == len(persistent_keys)
