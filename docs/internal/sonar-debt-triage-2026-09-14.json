@@ -116,8 +116,8 @@
       "new_reliability_rating GT 1 -> 1 (OK)",
       "new_security_rating GT 1 -> 5 (ERROR)",
       "new_maintainability_rating GT 1 -> 1 (OK)",
-      "new_coverage LT 80 -> 88.1 (OK)",
-      "new_duplicated_lines_density GT 3 -> 0.2 (OK)",
+      "new_coverage LT 80 -> 88.08868646614164 (OK)",
+      "new_duplicated_lines_density GT 3 -> 0.23186606539718474 (OK)",
       "new_security_hotspots_reviewed LT 100 -> 100.0 (OK)"
     ],
     "keyEvidence": {

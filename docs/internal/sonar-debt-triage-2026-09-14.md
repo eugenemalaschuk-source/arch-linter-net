@@ -30,6 +30,8 @@ The Sonar inventory tool was rerun against the merged #877 tree at revision `5c8
 
 The frozen [key evidence](sonar-debt-after-877-keys-2026-09-14.json) stores the complete persistent/remediated/new key sets and capture timestamp. The test computes the exact set difference against the immutable baseline, proving that the 281 persistent keys and 179 absent baseline keys are the reported comparison. Its gate is still red solely because the two guarded path-injection findings remain visible to SonarCloud; they are individually reviewed below and remain protected by `_release_workspace._safe_path`.
 
+The comparison Quality Gate conditions retain SonarCloud's full-precision values in the JSON triage artifact; rounded values in this narrative are presentation-only.
+
 ## Complete disposition matrix
 
 Every one of the 460 baseline findings is assigned exactly once by the JSON selectors and the coverage test. A cluster is an exact rule/path/key set, not a broad directory promise.
