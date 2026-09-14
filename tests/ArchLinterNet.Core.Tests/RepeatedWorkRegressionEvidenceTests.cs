@@ -94,7 +94,7 @@ public sealed class RepeatedWorkRegressionEvidenceTests
     private static void AssertPackageDependencyFanOut()
     {
         ArchitectureAnalysisSession session = CreateSession(CreateDocument(), out ArchitectureAnalysisContext context);
-        IReadOnlyList<ArchitecturePackageDependencyContract> contracts = session.Document.Contracts.StrictPackageDependency;
+        List<ArchitecturePackageDependencyContract> contracts = session.Document.Contracts.StrictPackageDependency;
 
         Assert.That(context.ProfilingCounters.SessionProjectMetadataIndexMaterializations, Is.Zero);
         Assert.That(session.CheckPackageDependencyContract(contracts[0]), Is.Not.Empty);
@@ -111,7 +111,7 @@ public sealed class RepeatedWorkRegressionEvidenceTests
     private static void AssertFrameworkReferenceFanOut()
     {
         ArchitectureAnalysisSession session = CreateSession(CreateDocument(), out ArchitectureAnalysisContext context);
-        IReadOnlyList<ArchitectureFrameworkReferenceContract> contracts = session.Document.Contracts.StrictFrameworkDependency;
+        List<ArchitectureFrameworkReferenceContract> contracts = session.Document.Contracts.StrictFrameworkDependency;
 
         Assert.That(context.ProfilingCounters.SessionProjectMetadataIndexMaterializations, Is.Zero);
         session.CheckFrameworkDependencyContract(contracts[0]);
@@ -128,7 +128,7 @@ public sealed class RepeatedWorkRegressionEvidenceTests
     private static void AssertAssemblyDependencyFanOut()
     {
         ArchitectureAnalysisSession session = CreateSession(CreateDocument(), out ArchitectureAnalysisContext context);
-        IReadOnlyList<ArchitectureAssemblyDependencyContract> contracts = session.Document.Contracts.StrictAssemblyDependency;
+        List<ArchitectureAssemblyDependencyContract> contracts = session.Document.Contracts.StrictAssemblyDependency;
 
         Assert.That(context.ProfilingCounters.SessionAssemblyIndexMaterializations, Is.Zero);
         Assert.That(session.CheckAssemblyDependencyContract(contracts[0]), Is.Not.Empty);
@@ -145,7 +145,7 @@ public sealed class RepeatedWorkRegressionEvidenceTests
     private static void AssertProjectMetadataFanOut()
     {
         ArchitectureAnalysisSession session = CreateSession(CreateDocument(), out ArchitectureAnalysisContext context);
-        IReadOnlyList<ArchitectureProjectMetadataContract> contracts = session.Document.Contracts.StrictProjectMetadata;
+        List<ArchitectureProjectMetadataContract> contracts = session.Document.Contracts.StrictProjectMetadata;
 
         Assert.That(context.ProfilingCounters.SessionProjectMetadataIndexMaterializations, Is.Zero);
         Assert.That(session.CheckProjectMetadataContract(contracts[0]), Is.Empty);
@@ -162,7 +162,7 @@ public sealed class RepeatedWorkRegressionEvidenceTests
     private static void AssertPublicApiSurfaceFanOut()
     {
         ArchitectureAnalysisSession session = CreateSession(CreateDocument(), out _);
-        IReadOnlyList<ArchitecturePublicApiSurfaceContract> contracts = session.Document.Contracts.StrictPublicApiSurface;
+        List<ArchitecturePublicApiSurfaceContract> contracts = session.Document.Contracts.StrictPublicApiSurface;
 
         Assert.That(session.PublicApiSurfaceMaterializationCount, Is.Zero);
         Assert.That(session.CheckPublicApiSurfaceContract(contracts[0]), Is.Empty);
@@ -316,7 +316,7 @@ public sealed class RepeatedWorkRegressionEvidenceTests
 
     private static string ProjectName(int index) => $"Project{index:D2}";
 
-    private static IReadOnlyList<string> CanonicalProjection(
+    private static string[] CanonicalProjection(
         ArchitectureContractExecutionResult result,
         string mode) => ArchitectureFindingMapper.Order(ArchitectureFindingMapper.FromViolations(result.Violations, mode))
             .Select(finding => $"{finding.ContractId}|{finding.Kind}|{finding.CanonicalIdentity}")

@@ -357,16 +357,16 @@ public sealed class ContractSurfaceExposureIndexTests
 
     public sealed class SurfaceShapeRoot
     {
-        public Customer PublicValue => new();
+        public static Customer PublicValue => new();
 
-        internal InternalSurfacePayload InternalValue => new();
+        internal static InternalSurfacePayload InternalValue => new();
     }
 
     public sealed class AccessorNamedMethodRoot
     {
         // The name intentionally resembles a CLR property accessor without carrying SpecialName.
 #pragma warning disable IDE1006 // Naming Styles
-        public Customer get_Current() => new();
+        public static Customer get_Current() => new();
 #pragma warning restore IDE1006 // Naming Styles
     }
 
@@ -374,7 +374,7 @@ public sealed class ContractSurfaceExposureIndexTests
     {
         public sealed class UnselectedNested
         {
-            public NestedOnlyPayload Value => new();
+            public static NestedOnlyPayload Value => new();
         }
     }
 
@@ -433,7 +433,7 @@ public sealed class ContractSurfaceExposureIndexTests
             set => _value = value;
         }
 
-        public event Action<Customer>? Changed
+        public static event Action<Customer>? Changed
         {
             [ExposureMetadata(typeof(EventAddMethodMetadataPayload), ExposureKind.Customer, 14, "event-add-method")]
             [param: ExposureMetadata(typeof(EventAddParameterMetadataPayload), ExposureKind.Customer, 15, "event-add-parameter")]

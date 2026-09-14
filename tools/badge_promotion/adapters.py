@@ -10,13 +10,16 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import os
 import json
-from typing import Protocol
+from typing import Protocol, cast
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from .decision import PromotionDecision
 from .model import AdapterKind, PromotionStatus
+
+
+_JSON_MEDIA_TYPE = "application/json"
 
 
 class AdapterError(RuntimeError):
@@ -27,8 +30,8 @@ class AdapterError(RuntimeError):
 
 class RelayClient(Protocol):
     def prepare(self, payload: bytes, digest: str, *, idempotency_key: str, generation: int | None, revocation_epoch: int | None, semantic_horizon: str, oidc_token: str) -> dict[str, object]: ...
-    def publish(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str, tree_sha: str | None = None) -> dict[str, object]: ...
-    def renew(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str, tree_sha: str | None = None) -> dict[str, object]: ...
+    def publish(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str) -> dict[str, object]: ...
+    def renew(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str) -> dict[str, object]: ...
 
 
 def issue_github_oidc_token(audience: str) -> str:
@@ -40,7 +43,7 @@ def issue_github_oidc_token(audience: str) -> str:
     separator = "&" if "?" in url else "?"
     request = urllib.request.Request(
         f"{url}{separator}{urllib.parse.urlencode({'audience': audience})}",
-        headers={"authorization": f"bearer {request_token}", "accept": "application/json"},
+        headers={"authorization": f"bearer {request_token}", "accept": _JSON_MEDIA_TYPE},
     )
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
@@ -51,7 +54,7 @@ def issue_github_oidc_token(audience: str) -> str:
         raise AdapterError("oidc_token_oversized")
     try:
         token = __import__("json").loads(body.decode("utf-8"))["value"]
-    except (UnicodeError, ValueError, KeyError, TypeError) as error:
+    except (ValueError, KeyError, TypeError) as error:
         raise AdapterError("oidc_response_invalid") from error
     if not isinstance(token, str) or not token:
         raise AdapterError("oidc_response_invalid")
@@ -71,7 +74,7 @@ class HttpRelayClient:
             f"{self.endpoint}/badge-relay/v1/{self.alias}/{operation}",
             data=json.dumps(body, separators=(",", ":")).encode("utf-8"),
             method="POST",
-            headers={"authorization": f"Bearer {token}", "content-type": "application/json", "accept": "application/json"},
+            headers={"authorization": f"Bearer {token}", "content-type": _JSON_MEDIA_TYPE, "accept": _JSON_MEDIA_TYPE},
         )
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
@@ -90,7 +93,7 @@ class HttpRelayClient:
             raise AdapterError("relay_request_rejected") from error
         except OSError as error:
             raise AdapterError("relay_transport_unavailable") from error
-        except (UnicodeError, ValueError) as error:
+        except ValueError as error:
             raise AdapterError("relay_response_invalid") from error
         if not isinstance(result, dict) or response.status >= 400:
             raise AdapterError("relay_publication_rejected")
@@ -110,10 +113,10 @@ class HttpRelayClient:
             body["expected_revocation_epoch"] = revocation_epoch
         return self._post("prepare", body, oidc_token)
 
-    def publish(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str, tree_sha: str | None = None) -> dict[str, object]:
+    def publish(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str) -> dict[str, object]:
         return self._post("publish", {"operation": "publish", "challenge_id": challenge_id, "idempotency_key": idempotency_key, "canonical_bytes": payload.decode("utf-8"), "canonical_digest": digest, "profile": self.profile, "expected_generation": generation, "expected_revocation_epoch": revocation_epoch, "semantic_horizon": semantic_horizon}, oidc_token)
 
-    def renew(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str, tree_sha: str | None = None) -> dict[str, object]:
+    def renew(self, payload: bytes, digest: str, *, challenge_id: str, idempotency_key: str, generation: int, revocation_epoch: int, oidc_token: str, semantic_horizon: str) -> dict[str, object]:
         body = {"operation": "renew", "challenge_id": challenge_id, "idempotency_key": idempotency_key, "canonical_bytes": payload.decode("utf-8"), "canonical_digest": digest, "profile": self.profile, "expected_generation": generation, "expected_revocation_epoch": revocation_epoch, "semantic_horizon": semantic_horizon}
         return self._post("renew", body, oidc_token)
 
@@ -126,7 +129,7 @@ class NoneAdapter:
         """Record a successful private outcome without contacting a destination."""
         if decision.status.value != "ready":
             return decision
-        return replace(decision, status=PromotionStatus.PRIVATE)
+        return cast(PromotionDecision, replace(decision, status=PromotionStatus.PRIVATE))
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,7 +137,7 @@ class RelayAdapter:
     client: RelayClient
     kind: AdapterKind = AdapterKind.RELAY
 
-    def commit(self, decision: PromotionDecision, *, digest: str, idempotency_key: str, challenge_id: str, semantic_horizon: str, tree_sha: str | None = None, renewal: bool = False) -> dict[str, object]:
+    def commit(self, decision: PromotionDecision, *, digest: str, idempotency_key: str, challenge_id: str, semantic_horizon: str, renewal: bool = False) -> dict[str, object]:
         if decision.payload is None or decision.generation is None or decision.revocation_epoch is None:
             raise AdapterError("relay_decision_has_no_ready_payload")
         operation = self.client.renew if renewal else self.client.publish
@@ -148,7 +151,6 @@ class RelayAdapter:
             revocation_epoch=decision.revocation_epoch,
             oidc_token=token,
             semantic_horizon=semantic_horizon,
-            tree_sha=tree_sha,
         )
 
 

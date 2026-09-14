@@ -11,6 +11,9 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class SarifExternalDiagnosticSelectorTests
 {
     private SarifEvidenceTestRepository _repository = null!;
+    private static readonly string[] _securityCodeTags = ["security", "code"];
+    private static readonly string[] _equivalentArtifactPaths = ["equivalent-a.sarif", "equivalent-b.sarif"];
+    private static readonly string[] _sec100RuleId = ["SEC100"];
 
     [SetUp]
     public void SetUp() => _repository = new SarifEvidenceTestRepository();
@@ -65,7 +68,7 @@ public sealed class SarifExternalDiagnosticSelectorTests
                 SarifExternalDiagnosticFingerprintOrigin.Source,
                 "a-value",
                 "alpha")));
-            Assert.That(strict.SourceDiagnostic.DriverRuleTags, Is.EqualTo(new[] { "security", "code" }));
+            Assert.That(strict.SourceDiagnostic.DriverRuleTags, Is.EqualTo(_securityCodeTags));
             Assert.That(strict.EvidenceProvenances, Has.Count.EqualTo(1));
             Assert.That(strict.EvidenceProvenances.Single().LogicalId, Is.EqualTo("external.scan"));
             Assert.That(strict.EvidenceProvenances.Single().Context!.Revision, Is.EqualTo("revision"));
@@ -175,7 +178,7 @@ public sealed class SarifExternalDiagnosticSelectorTests
         {
             Assert.That(forward.Diagnostics, Has.Count.EqualTo(2));
             Assert.That(deduplicated.EvidenceProvenances.Select(provenance => provenance.ArtifactPath), Is.EquivalentTo(
-                new[] { "equivalent-a.sarif", "equivalent-b.sarif" }));
+                _equivalentArtifactPaths));
             Assert.That(
                 deduplicated.EvidenceProvenances.Select(provenance => provenance.ArtifactPath).ToArray(),
                 Is.EqualTo(reverse.Diagnostics.Single(diagnostic => diagnostic.Fingerprint.Value == "same")
@@ -435,7 +438,7 @@ public sealed class SarifExternalDiagnosticSelectorTests
             Assert.That(evidence.Authorization!.Tool, Is.EqualTo("Acme.Scanner"));
             Assert.That(evidence.Authorization.Run, Is.EqualTo("assessment-42"));
             Assert.That(evidence.Authorization.RequireRevision, Is.True);
-            Assert.That(evidence.Authorization.DiagnosticFilter!.RuleIds, Is.EqualTo(new[] { "SEC100" }));
+            Assert.That(evidence.Authorization.DiagnosticFilter!.RuleIds, Is.EqualTo(_sec100RuleId));
             Assert.That(result.Diagnostics, Has.Count.EqualTo(1));
             Assert.That(result.Diagnostics[0].GovernanceMode, Is.EqualTo(SarifExternalDiagnosticGovernanceMode.Strict));
         });

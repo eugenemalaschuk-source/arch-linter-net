@@ -292,26 +292,27 @@ public sealed class CheckpointBProcessRunnerTests
                 primary,
                 [],
                 TimeSpan.FromSeconds(5),
-                CancellationToken.None,
                 "test phase",
                 "test command",
                 1234,
                 Stopwatch.StartNew(),
                 standardOutput,
-                standardError));
+                standardError,
+                CancellationToken.None));
 
         Assert.That(observed, Is.SameAs(genuineFailure));
     }
 
     [Test]
     [CancelAfter(5_000)]
-    public async Task WaitBestEffortAsyncSwallowsAFaultedTask()
+    public void WaitBestEffortAsyncSwallowsAFaultedTask()
     {
         Task faulted = Task.FromException(new InvalidOperationException("boom"));
 
         // No exception escaping this call is the assertion: a fault on the task being cleaned up
         // must never replace the exception the caller is already propagating.
-        await CheckpointBProcessRunner.WaitBestEffortAsync(faulted, TimeSpan.FromSeconds(1));
+        Assert.DoesNotThrowAsync(() =>
+            CheckpointBProcessRunner.WaitBestEffortAsync(faulted, TimeSpan.FromSeconds(1)));
     }
 
     [Test]

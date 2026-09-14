@@ -58,16 +58,16 @@ async function boundedBody(request: Request): Promise<Record<string, unknown>> {
 export class RelayRegistryDurableObject {
   private readonly state: RelayStateLike;
   private readonly sql: RelayStateLike["storage"]["sql"];
-  private readonly initialized: Promise<void>;
+  private initialized!: Promise<void>;
 
   constructor(state: DurableObjectState, env: { RELAY_REGISTRY?: unknown }) {
     this.state = state as RelayStateLike;
     this.sql = this.state.storage.sql;
-    this.initialized = this.initializeState(env.RELAY_REGISTRY);
+    this.startInitialization(env.RELAY_REGISTRY);
   }
 
-  private initializeState(config: unknown): Promise<void> {
-    return this.state.blockConcurrencyWhile(() => {
+  private startInitialization(config: unknown): void {
+    this.initialized = this.state.blockConcurrencyWhile(() => {
       this.ensureSchema();
       this.seed(config);
     });
@@ -191,7 +191,8 @@ export class RelayRegistryDurableObject {
     try {
       await this.initialized;
       if (request.headers.get("x-relay-internal") !== "1" || request.method !== "POST") return json(404, { error: "unknown_route" });
-      const operation = new URL(request.url).pathname.split("/").filter(Boolean).at(-1);
+      const pathParts = new URL(request.url).pathname.split("/").filter(Boolean);
+      const operation = pathParts.at(-1);
       const body = await boundedBody(request);
       if (operation === "lookup" && typeof body.alias === "string") {
         const binding = await this.binding(body.alias, body.include_tombstoned === true);
@@ -203,7 +204,11 @@ export class RelayRegistryDurableObject {
           body.alias,
           Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined,
           Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
-        return json(result === "conflict" ? 409 : result ? 200 : 404, { ok: result === true });
+        let status: number;
+        if (result === "conflict") status = 409;
+        else if (result) status = 200;
+        else status = 404;
+        return json(status, { ok: result === true });
       }
       if (operation === "reconcile-identity" && typeof body.alias === "string" && typeof body.owner === "string" && typeof body.repository === "string" && Number.isSafeInteger(body.repository_id) && Number.isSafeInteger(body.repository_owner_id)) {
         const binding = await this.reconcileIdentity(body.alias, body.owner, body.repository, body.repository_id as number, body.repository_owner_id as number, Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined, Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);

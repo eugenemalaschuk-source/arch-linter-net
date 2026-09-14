@@ -211,7 +211,6 @@ def test_manifest_digest_and_provenance_are_bound_to_exact_evidence() -> None:
     wrong = evidence(run_attempt=3)
     with pytest.raises(ArtifactValidationError, match="provenance"):
         validate_artifact(artifact, CONFIG, wrong)
-    bad_manifest = json.loads(json.dumps({}))
     bad_manifest = {"schema": CONFIG.schema_id, "kind": "architecture-health-badge", "context": {}, "payload": {}}
     with pytest.raises(ArtifactValidationError):
         validate_artifact(archive_bytes(manifest=bad_manifest), CONFIG, evidence())

@@ -23,6 +23,7 @@ _SONAR_STATS_PATTERN = re.compile(
     r"Coverage Report Statistics: \d+ files, \d+ main files, (\d+) main files with coverage"
 )
 _GITHUB_OUTPUT_DESCRIPTION = "GitHub output file"
+_INVENTORY_FILENAME = "coverage-inventory.json"
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,44 @@ def _expected_report_records(shard_id: str) -> list[tuple[ProducerSpec, str, str
     ]
 
 
+def _shard_producer(shard_id: str, producer_id: Any) -> ProducerSpec | None:
+    return next((item for item in _SHARDS[shard_id] if item.id == producer_id), None)
+
+
+def _validate_shard_report_record(record: Any, shard_id: str, manifest_path: Path) -> tuple[Any, Any]:
+    if not isinstance(record, dict) or set(record) != {
+        "producer_id",
+        "test_project",
+        "format",
+        "file",
+        "size",
+        "sha256",
+        "candidate_count",
+    }:
+        raise ValueError(f"Coverage shard report record is invalid: {manifest_path}")
+    producer_id = record.get("producer_id")
+    report_format = record.get("format")
+    producer = _shard_producer(shard_id, producer_id)
+    if producer is None or record.get("test_project") != producer.test_project:
+        raise ValueError(f"Coverage shard producer identity is invalid: {manifest_path}")
+    if report_format not in _REPORT_FORMATS:
+        raise ValueError(f"Coverage shard report format is invalid: {manifest_path}")
+    expected_file = f"{producer_id}/{_REPORT_FORMATS[report_format][0]}"
+    if record.get("file") != expected_file:
+        raise ValueError(f"Coverage shard canonical report path is invalid: {manifest_path}")
+    if not isinstance(record.get("size"), int) or isinstance(record["size"], bool) or record["size"] <= 0:
+        raise ValueError(f"Coverage shard report size is invalid: {manifest_path}")
+    if not isinstance(record.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", record["sha256"]):
+        raise ValueError(f"Coverage shard report digest is invalid: {manifest_path}")
+    if (
+        not isinstance(record.get("candidate_count"), int)
+        or isinstance(record["candidate_count"], bool)
+        or record["candidate_count"] < 1
+    ):
+        raise ValueError(f"Coverage shard candidate count is invalid: {manifest_path}")
+    return producer_id, report_format
+
+
 def _validate_shard_manifest(manifest: dict[str, Any], manifest_path: Path) -> dict[str, Any]:
     if set(manifest) != {"schema", "source_sha", "shard_id", "reports"}:
         raise ValueError(f"Coverage shard manifest fields are invalid: {manifest_path}")
@@ -155,41 +194,8 @@ def _validate_shard_manifest(manifest: dict[str, Any], manifest_path: Path) -> d
     expected = _expected_report_records(shard_id)
     if not isinstance(reports, list) or len(reports) != len(expected):
         raise ValueError(f"Coverage shard report inventory is incomplete: {manifest_path}")
-
     expected_keys = [(producer.id, report_format) for producer, report_format, _ in expected]
-    actual_keys: list[tuple[str, str]] = []
-    for record in reports:
-        if not isinstance(record, dict) or set(record) != {
-            "producer_id",
-            "test_project",
-            "format",
-            "file",
-            "size",
-            "sha256",
-            "candidate_count",
-        }:
-            raise ValueError(f"Coverage shard report record is invalid: {manifest_path}")
-        producer_id = record.get("producer_id")
-        report_format = record.get("format")
-        actual_keys.append((producer_id, report_format))
-        producer = next((item for item in _SHARDS[shard_id] if item.id == producer_id), None)
-        if producer is None or record.get("test_project") != producer.test_project:
-            raise ValueError(f"Coverage shard producer identity is invalid: {manifest_path}")
-        if report_format not in _REPORT_FORMATS:
-            raise ValueError(f"Coverage shard report format is invalid: {manifest_path}")
-        expected_file = f"{producer_id}/{_REPORT_FORMATS[report_format][0]}"
-        if record.get("file") != expected_file:
-            raise ValueError(f"Coverage shard canonical report path is invalid: {manifest_path}")
-        if not isinstance(record.get("size"), int) or isinstance(record["size"], bool) or record["size"] <= 0:
-            raise ValueError(f"Coverage shard report size is invalid: {manifest_path}")
-        if not isinstance(record.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", record["sha256"]):
-            raise ValueError(f"Coverage shard report digest is invalid: {manifest_path}")
-        if (
-            not isinstance(record.get("candidate_count"), int)
-            or isinstance(record["candidate_count"], bool)
-            or record["candidate_count"] < 1
-        ):
-            raise ValueError(f"Coverage shard candidate count is invalid: {manifest_path}")
+    actual_keys = [_validate_shard_report_record(record, shard_id, manifest_path) for record in reports]
     if actual_keys != expected_keys:
         raise ValueError(f"Coverage shard report order/inventory is invalid: {manifest_path}")
     return manifest
@@ -265,7 +271,7 @@ def _inventory_outputs(root: Path, inventory: dict[str, Any]) -> dict[str, str]:
         "cobertura_count": str(len(cobertura)),
         "opencover_files": ",".join(path.as_posix() for path in opencover),
         "cobertura_files": ",".join(path.as_posix() for path in cobertura),
-        "inventory_file": (root / "coverage-inventory.json").as_posix(),
+        "inventory_file": (root / _INVENTORY_FILENAME).as_posix(),
     }
 
 
@@ -275,6 +281,42 @@ def _write_github_outputs(path: Path | None, outputs: dict[str, str]) -> None:
     with path.open("a", encoding="utf-8") as stream:
         for key, value in outputs.items():
             stream.write(f"{key}={value}\n")
+
+
+def _validate_inventory_record(record: Any, root: Path) -> tuple[Any, Any, Any]:
+    if not isinstance(record, dict) or set(record) != {
+        "shard_id",
+        "producer_id",
+        "test_project",
+        "format",
+        "path",
+        "size",
+        "sha256",
+        "candidate_count",
+    }:
+        raise ValueError("Coverage inventory report record is invalid.")
+    shard_id = record.get("shard_id")
+    producer_id = record.get("producer_id")
+    report_format = record.get("format")
+    if shard_id not in _SHARDS or report_format not in _REPORT_FORMATS:
+        raise ValueError("Coverage inventory report identity is invalid.")
+    producer = _shard_producer(shard_id, producer_id)
+    if producer is None or record.get("test_project") != producer.test_project:
+        raise ValueError("Coverage inventory producer identity is invalid.")
+    expected_path = f"{shard_id}/{producer_id}/{_REPORT_FORMATS[report_format][0]}"
+    if record.get("path") != expected_path:
+        raise ValueError("Coverage inventory canonical path is invalid.")
+    path = root / expected_path
+    size, digest = _validate_report(path, report_format)
+    if size != record.get("size") or digest != record.get("sha256"):
+        raise ValueError(f"Canonical coverage report does not match inventory: {path}")
+    if (
+        not isinstance(record.get("candidate_count"), int)
+        or isinstance(record["candidate_count"], bool)
+        or record["candidate_count"] < 1
+    ):
+        raise ValueError("Coverage inventory candidate count is invalid.")
+    return shard_id, producer_id, report_format
 
 
 def _validate_inventory(root: Path, inventory: dict[str, Any], expected_sha: str) -> dict[str, Any]:
@@ -289,7 +331,6 @@ def _validate_inventory(root: Path, inventory: dict[str, Any], expected_sha: str
         )
     if inventory.get("expected_shards") != list(_SHARD_IDS) or inventory.get("observed_shards") != list(_SHARD_IDS):
         raise ValueError("Coverage inventory does not prove the complete 3/3 shard set.")
-
     reports = inventory.get("reports")
     expected_records = [
         (shard_id, producer, report_format, filename)
@@ -298,43 +339,7 @@ def _validate_inventory(root: Path, inventory: dict[str, Any], expected_sha: str
     ]
     if not isinstance(reports, list) or len(reports) != len(expected_records):
         raise ValueError("Coverage inventory report set is incomplete.")
-
-    actual_keys: list[tuple[str, str, str]] = []
-    for record in reports:
-        if not isinstance(record, dict) or set(record) != {
-            "shard_id",
-            "producer_id",
-            "test_project",
-            "format",
-            "path",
-            "size",
-            "sha256",
-            "candidate_count",
-        }:
-            raise ValueError("Coverage inventory report record is invalid.")
-        shard_id = record.get("shard_id")
-        producer_id = record.get("producer_id")
-        report_format = record.get("format")
-        actual_keys.append((shard_id, producer_id, report_format))
-        if shard_id not in _SHARDS or report_format not in _REPORT_FORMATS:
-            raise ValueError("Coverage inventory report identity is invalid.")
-        producer = next((item for item in _SHARDS[shard_id] if item.id == producer_id), None)
-        if producer is None or record.get("test_project") != producer.test_project:
-            raise ValueError("Coverage inventory producer identity is invalid.")
-        expected_path = f"{shard_id}/{producer_id}/{_REPORT_FORMATS[report_format][0]}"
-        if record.get("path") != expected_path:
-            raise ValueError("Coverage inventory canonical path is invalid.")
-        path = root / expected_path
-        size, digest = _validate_report(path, report_format)
-        if size != record.get("size") or digest != record.get("sha256"):
-            raise ValueError(f"Canonical coverage report does not match inventory: {path}")
-        if (
-            not isinstance(record.get("candidate_count"), int)
-            or isinstance(record["candidate_count"], bool)
-            or record["candidate_count"] < 1
-        ):
-            raise ValueError("Coverage inventory candidate count is invalid.")
-
+    actual_keys = [_validate_inventory_record(record, root) for record in reports]
     expected_keys = [(shard, producer.id, report_format) for shard, producer, report_format, _ in expected_records]
     if actual_keys != expected_keys:
         raise ValueError("Coverage inventory report order/inventory is invalid.")
@@ -408,7 +413,7 @@ def _assemble(arguments: argparse.Namespace) -> None:
         "reports": reports,
     }
     _validate_inventory(output_root, inventory, arguments.expected_sha)
-    _write_json(output_root / "coverage-inventory.json", inventory)
+    _write_json(output_root / _INVENTORY_FILENAME, inventory)
     outputs = _inventory_outputs(output_root, inventory)
     _write_github_outputs(github_output, outputs)
     print(
@@ -427,7 +432,7 @@ def _verify_inventory_command(arguments: argparse.Namespace) -> None:
         else None
     )
 
-    inventory_path = inventory_root / "coverage-inventory.json"
+    inventory_path = inventory_root / _INVENTORY_FILENAME
     inventory = _read_json(inventory_path, "coverage inventory")
     _validate_inventory(inventory_root, inventory, arguments.expected_sha)
     outputs = _inventory_outputs(inventory_root, inventory)
@@ -452,7 +457,7 @@ def _verify_sonar(arguments: argparse.Namespace) -> None:
         else None
     )
 
-    inventory_path = inventory_root / "coverage-inventory.json"
+    inventory_path = inventory_root / _INVENTORY_FILENAME
     inventory = _read_json(inventory_path, "coverage inventory")
     _validate_inventory(inventory_root, inventory, arguments.expected_sha)
     expected_reports = [

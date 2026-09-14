@@ -39,7 +39,8 @@ def test_main_quality_is_coverage_telemetry_only_and_fail_closed() -> None:
     workflow = _read("main-quality.yml")
     trigger = _trigger_block(workflow, "\nconcurrency:")
 
-    assert "push:" in trigger and "- main" in trigger
+    assert "push:" in trigger
+    assert "- main" in trigger
     assert "test-coverage-core-1" in workflow
     assert "test-coverage-core-2" in workflow
     assert "test-coverage-other" in workflow
@@ -132,7 +133,8 @@ def test_main_packages_uses_github_token_and_never_runs_validation_matrix() -> N
     workflow = _read("main-packages.yml")
     trigger = _trigger_block(workflow, "\npermissions:")
 
-    assert "push:" in trigger and "- main" in trigger
+    assert "push:" in trigger
+    assert "- main" in trigger
     assert "packages: write" in workflow
     assert "${{ github.token }}" in workflow
     assert "GITHUB_PACKAGES_PAT" not in workflow

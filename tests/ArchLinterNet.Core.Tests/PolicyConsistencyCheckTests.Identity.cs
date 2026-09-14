@@ -15,6 +15,8 @@ namespace ArchLinterNet.Core.Tests;
 // under the repository's 800-line hard limit.
 public sealed class PolicyConsistencyIdentityTests
 {
+    private static readonly string[] _conflictingContractIds = ["independence-id", "duplicate"];
+
     [Test]
     public void IndependenceConflict_TwoConflictingContractsSharingDuplicateId_GetDistinctIdentities()
     {
@@ -43,7 +45,7 @@ public sealed class PolicyConsistencyIdentityTests
             .ToList();
 
         Assert.That(findings, Has.Count.EqualTo(2));
-        Assert.That(findings.Select(f => f.ConflictingContractIds), Has.All.EquivalentTo(new[] { "independence-id", "duplicate" }));
+        Assert.That(findings.Select(f => f.ConflictingContractIds), Has.All.EquivalentTo(_conflictingContractIds));
         Assert.That(findings.Select(f => string.Join(",", f.ConflictingContractNames)).Distinct().Count(), Is.EqualTo(2));
 
         string[] identities = findings

@@ -192,7 +192,7 @@ namespace ArchLinterNet.Core.Tests.ReferencePolicyFixtures.Server.Contracts.V2
     [SerializationMarker]
     public sealed class OrderContractV2
     {
-        public string Id => "v2";
+        public static string Id => "v2";
     }
 }
 
@@ -252,6 +252,6 @@ namespace ArchLinterNet.Core.Tests.ReferencePolicyFixtures.Library.Editor
     [SerializationMarker]
     public sealed class EditorSettings
     {
-        public string Theme => "editor";
+        public static string Theme => "editor";
     }
 }

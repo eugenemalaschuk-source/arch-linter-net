@@ -35,7 +35,7 @@ _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 _GIT_BLOB_PATTERN = re.compile(r"[0-9a-f]{40}")
 _VERSION_PATTERN = re.compile(
-    r"^0\.8\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+    r"^0\.8\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-](?:\.?[0-9A-Za-z-])*)?(?:\+[0-9A-Za-z-](?:\.?[0-9A-Za-z-])*)?$"
 )
 
 _ARCHIVE_FILE_TEMPLATE = "architecture-health-badge-relay-{version}.tar.gz"
@@ -44,6 +44,13 @@ _WORKFLOW_FILE = "architecture-health-badge-publisher-workflow.yml"
 _ACTION_FILE = "architecture-health-badge-publisher-action.yml"
 _MANIFEST_FILE = "architecture-health-badge-release-distribution.json"
 _CHECKSUMS_FILE = "architecture-health-badge-release-checksums.txt"
+
+_MEDIA_YAML = "text/yaml"
+_MEDIA_JSON = "application/json"
+_MEDIA_TYPESCRIPT = "text/typescript"
+_CANDIDATE_MANIFEST_DESCRIPTION = "candidate manifest"
+_TRANSPORT_MANIFEST_DESCRIPTION = "transport manifest"
+_TRANSPORT_SUBJECT_DESCRIPTION = "transport subject"
 
 _COMPATIBILITY_IDENTITIES = {
     "bundle": "badge-relay/v1",
@@ -61,23 +68,23 @@ _ACTION_REF_PATH = ".github/actions/architecture-health-badge-promotion"
 # This is intentionally duplicated as a closed review boundary.  A caller cannot broaden the
 # shipped bundle by editing a caller-provided inventory file.
 _REVIEWED_BUNDLE_MEMBERS = (
-    (".github/actions/architecture-health-badge-promotion/action.yml", "text/yaml", "approved-commit"),
-    (".github/workflows/architecture-health-badge-promotion.yml", "text/yaml", "approved-commit"),
+    (".github/actions/architecture-health-badge-promotion/action.yml", _MEDIA_YAML, "approved-commit"),
+    (".github/workflows/architecture-health-badge-promotion.yml", _MEDIA_YAML, "approved-commit"),
     ("relay/THIRD-PARTY-NOTICES.txt", "text/plain", "working-tree"),
-    ("relay/bundle-manifest.json", "application/json", "working-tree"),
-    ("relay/package-lock.json", "application/json", "working-tree"),
-    ("relay/package.json", "application/json", "working-tree"),
-    ("relay/src/index.ts", "text/typescript", "working-tree"),
-    ("relay/src/payload.ts", "text/typescript", "working-tree"),
-    ("relay/src/read.ts", "text/typescript", "working-tree"),
-    ("relay/src/registry-do.ts", "text/typescript", "working-tree"),
-    ("relay/src/registry.ts", "text/typescript", "working-tree"),
-    ("relay/src/relay-do.ts", "text/typescript", "working-tree"),
-    ("relay/src/security.ts", "text/typescript", "working-tree"),
-    ("relay/src/types.ts", "text/typescript", "working-tree"),
-    ("relay/tsconfig.json", "application/json", "working-tree"),
-    ("relay/wrangler.jsonc", "application/json", "working-tree"),
-    ("schema/0.8.0/badge-relay-config.schema.json", "application/json", "working-tree"),
+    ("relay/bundle-manifest.json", _MEDIA_JSON, "working-tree"),
+    ("relay/package-lock.json", _MEDIA_JSON, "working-tree"),
+    ("relay/package.json", _MEDIA_JSON, "working-tree"),
+    ("relay/src/index.ts", _MEDIA_TYPESCRIPT, "working-tree"),
+    ("relay/src/payload.ts", _MEDIA_TYPESCRIPT, "working-tree"),
+    ("relay/src/read.ts", _MEDIA_TYPESCRIPT, "working-tree"),
+    ("relay/src/registry-do.ts", _MEDIA_TYPESCRIPT, "working-tree"),
+    ("relay/src/registry.ts", _MEDIA_TYPESCRIPT, "working-tree"),
+    ("relay/src/relay-do.ts", _MEDIA_TYPESCRIPT, "working-tree"),
+    ("relay/src/security.ts", _MEDIA_TYPESCRIPT, "working-tree"),
+    ("relay/src/types.ts", _MEDIA_TYPESCRIPT, "working-tree"),
+    ("relay/tsconfig.json", _MEDIA_JSON, "working-tree"),
+    ("relay/wrangler.jsonc", _MEDIA_JSON, "working-tree"),
+    ("schema/0.8.0/badge-relay-config.schema.json", _MEDIA_JSON, "working-tree"),
 )
 
 
@@ -138,7 +145,7 @@ def _validate_source_commit(value: Any) -> str:
     return value
 
 
-def _validate_inventory(value: dict[str, Any]) -> dict[str, Any]:
+def _validate_inventory_header(value: dict[str, Any]) -> None:
     expected_fields = {
         "schema",
         "lifecycle",
@@ -168,6 +175,8 @@ def _validate_inventory(value: dict[str, Any]) -> dict[str, Any]:
     if value.get("package_ids") != _PACKAGE_IDS:
         raise ValueError("The release inventory package identity set is invalid.")
 
+
+def _validate_inventory_compatibility(value: dict[str, Any]) -> dict[str, Any]:
     compatibility = value.get("compatibility")
     if not isinstance(compatibility, dict):
         raise ValueError("The release inventory compatibility identity is invalid.")
@@ -200,7 +209,10 @@ def _validate_inventory(value: dict[str, Any]) -> dict[str, Any]:
     for key in ("workflow_source_sha", "action_source_sha"):
         if not isinstance(compatibility.get(key), str) or not _GIT_BLOB_PATTERN.fullmatch(compatibility[key]):
             raise ValueError(f"The release inventory {key} is invalid.")
+    return compatibility
 
+
+def _validate_inventory_components(value: dict[str, Any], compatibility: dict[str, Any]) -> None:
     components = value.get("components")
     if components != [
         {
@@ -216,6 +228,8 @@ def _validate_inventory(value: dict[str, Any]) -> dict[str, Any]:
     ]:
         raise ValueError("The release inventory publisher component set is invalid.")
 
+
+def _validate_inventory_relay(value: dict[str, Any]) -> None:
     relay = value.get("relay")
     if relay != {
         "package_json": "relay/package.json",
@@ -225,6 +239,8 @@ def _validate_inventory(value: dict[str, Any]) -> dict[str, Any]:
     }:
         raise ValueError("The release inventory Relay dependency paths are invalid.")
 
+
+def _validate_inventory_members(value: dict[str, Any]) -> None:
     members = value.get("bundle_members")
     expected_members = [
         {"path": path, "archive_path": path, "media_kind": media_kind, "source": source}
@@ -235,6 +251,14 @@ def _validate_inventory(value: dict[str, Any]) -> dict[str, Any]:
     for member in members:
         _safe_archive_path(member["path"], "bundle source path")
         _safe_archive_path(member["archive_path"], "bundle archive path")
+
+
+def _validate_inventory(value: dict[str, Any]) -> dict[str, Any]:
+    _validate_inventory_header(value)
+    compatibility = _validate_inventory_compatibility(value)
+    _validate_inventory_components(value, compatibility)
+    _validate_inventory_relay(value)
+    _validate_inventory_members(value)
     return value
 
 
@@ -243,7 +267,7 @@ def _load_inventory(path: Path) -> dict[str, Any]:
 
 
 def _candidate_manifest(path: Path, version: str, source_commit: str) -> tuple[dict[str, Any], str]:
-    path = _safe_path(path, "candidate manifest")
+    path = _safe_path(path, _CANDIDATE_MANIFEST_DESCRIPTION)
     manifest = package_manifest._load_manifest(path)
     if manifest["version"] != version:
         raise ValueError("Candidate manifest version does not match the expected version.")
@@ -459,7 +483,7 @@ def _build_outputs(
     compatibility_subject = _subject(
         "compatibility-metadata",
         compatibility_name,
-        "application/json",
+        _MEDIA_JSON,
         compatibility_bytes,
         {
             "kind": "generated-from-candidate",
@@ -469,14 +493,14 @@ def _build_outputs(
     workflow_subject = _subject(
         "publisher-workflow",
         _WORKFLOW_FILE,
-        "text/yaml",
+        _MEDIA_YAML,
         workflow["_contents"],
         workflow["source"],
     )
     action_subject = _subject(
         "publisher-action",
         _ACTION_FILE,
-        "text/yaml",
+        _MEDIA_YAML,
         action["_contents"],
         action["source"],
     )
@@ -542,7 +566,7 @@ def _create(arguments: argparse.Namespace) -> None:
         arguments.source_root,
         inventory,
         candidate,
-        _safe_path(arguments.candidate_manifest, "candidate manifest").name,
+        _safe_path(arguments.candidate_manifest, _CANDIDATE_MANIFEST_DESCRIPTION).name,
         candidate_manifest_sha,
     )
     _write_outputs(arguments.output_dir, outputs)
@@ -550,16 +574,16 @@ def _create(arguments: argparse.Namespace) -> None:
 
 def _transport_paths(transport_dir: Path, manifest_path: Path) -> tuple[Path, Path, dict[str, Any]]:
     transport_dir = _safe_path(transport_dir, "transport directory")
-    manifest_path = _safe_path(manifest_path, "transport manifest")
+    manifest_path = _safe_path(manifest_path, _TRANSPORT_MANIFEST_DESCRIPTION)
     if not transport_dir.is_dir() or transport_dir.is_symlink():
         raise ValueError(f"The transport directory '{transport_dir}' is invalid.")
     if manifest_path.parent != transport_dir or manifest_path.name != _MANIFEST_FILE:
         raise ValueError("The transport manifest path is invalid.")
-    manifest = _read_json(manifest_path, "transport manifest")
+    manifest = _read_json(manifest_path, _TRANSPORT_MANIFEST_DESCRIPTION)
     return transport_dir, manifest_path, manifest
 
 
-def _validate_distribution_manifest(distribution: dict[str, Any]) -> None:
+def _validate_distribution_header(distribution: dict[str, Any]) -> None:
     required = {
         "schema",
         "version",
@@ -583,31 +607,36 @@ def _validate_distribution_manifest(distribution: dict[str, Any]) -> None:
     _safe_archive_path(candidate_manifest.get("file"), "candidate manifest filename")
     if not _SHA256_PATTERN.fullmatch(candidate_manifest.get("sha256", "")):
         raise ValueError("The transport manifest candidate digest is invalid.")
-    compatibility = distribution.get("compatibility")
-    if compatibility != _COMPATIBILITY_IDENTITIES:
+    if distribution.get("compatibility") != _COMPATIBILITY_IDENTITIES:
         raise ValueError("The transport manifest compatibility identity is invalid.")
-    evidence = distribution.get("evidence")
-    if evidence != {"manifest": _MANIFEST_FILE, "checksums": _CHECKSUMS_FILE}:
+    if distribution.get("evidence") != {"manifest": _MANIFEST_FILE, "checksums": _CHECKSUMS_FILE}:
         raise ValueError("The transport manifest evidence paths are invalid.")
+
+
+def _validate_distribution_subject(subject: Any, names: set[str]) -> None:
+    if not isinstance(subject, dict) or set(subject) != {"kind", "file", "media_kind", "size", "sha256", "source"}:
+        raise ValueError("The transport manifest subject record is invalid.")
+    _safe_archive_path(subject.get("file"), "transport subject filename")
+    if subject["file"] in names or subject["file"] in {_MANIFEST_FILE, _CHECKSUMS_FILE}:
+        raise ValueError("The transport manifest subject inventory is recursive or duplicated.")
+    names.add(subject["file"])
+    if not isinstance(subject.get("kind"), str) or not isinstance(subject.get("media_kind"), str):
+        raise ValueError("The transport manifest subject media identity is invalid.")
+    if not isinstance(subject.get("size"), int) or isinstance(subject["size"], bool) or subject["size"] < 0:
+        raise ValueError("The transport manifest subject size is invalid.")
+    if not _SHA256_PATTERN.fullmatch(subject.get("sha256", "")):
+        raise ValueError("The transport manifest subject digest is invalid.")
+    if not isinstance(subject.get("source"), dict):
+        raise ValueError("The transport manifest subject source identity is invalid.")
+
+
+def _validate_distribution_subjects(distribution: dict[str, Any]) -> None:
     subjects = distribution.get("subjects")
     if not isinstance(subjects, list) or len(subjects) != 4:
         raise ValueError("The transport manifest subject inventory is invalid.")
     names: set[str] = set()
     for subject in subjects:
-        if not isinstance(subject, dict) or set(subject) != {"kind", "file", "media_kind", "size", "sha256", "source"}:
-            raise ValueError("The transport manifest subject record is invalid.")
-        _safe_archive_path(subject.get("file"), "transport subject filename")
-        if subject["file"] in names or subject["file"] in {_MANIFEST_FILE, _CHECKSUMS_FILE}:
-            raise ValueError("The transport manifest subject inventory is recursive or duplicated.")
-        names.add(subject["file"])
-        if not isinstance(subject.get("kind"), str) or not isinstance(subject.get("media_kind"), str):
-            raise ValueError("The transport manifest subject media identity is invalid.")
-        if not isinstance(subject.get("size"), int) or isinstance(subject["size"], bool) or subject["size"] < 0:
-            raise ValueError("The transport manifest subject size is invalid.")
-        if not _SHA256_PATTERN.fullmatch(subject.get("sha256", "")):
-            raise ValueError("The transport manifest subject digest is invalid.")
-        if not isinstance(subject.get("source"), dict):
-            raise ValueError("The transport manifest subject source identity is invalid.")
+        _validate_distribution_subject(subject, names)
     expected_subjects = {
         ("relay-archive", _ARCHIVE_FILE_TEMPLATE.format(version=distribution["version"])),
         ("publisher-workflow", _WORKFLOW_FILE),
@@ -616,23 +645,36 @@ def _validate_distribution_manifest(distribution: dict[str, Any]) -> None:
     }
     if {(subject["kind"], subject["file"]) for subject in subjects} != expected_subjects:
         raise ValueError("The transport manifest subjects are not the reviewed distribution set.")
+
+
+def _validate_distribution_member(member: Any, member_names: set[str]) -> None:
+    if not isinstance(member, dict) or set(member) != {"file", "media_kind", "size", "sha256", "source"}:
+        raise ValueError("The transport archive member record is invalid.")
+    _safe_archive_path(member.get("file"), "archive member filename")
+    if member["file"] in member_names:
+        raise ValueError("The transport archive member inventory is duplicated.")
+    member_names.add(member["file"])
+    if not isinstance(member.get("media_kind"), str) or not isinstance(member.get("source"), dict):
+        raise ValueError("The transport archive member identity is invalid.")
+    if not isinstance(member.get("size"), int) or isinstance(member["size"], bool) or member["size"] < 0:
+        raise ValueError("The transport archive member size is invalid.")
+    if not _SHA256_PATTERN.fullmatch(member.get("sha256", "")):
+        raise ValueError("The transport archive member digest is invalid.")
+
+
+def _validate_distribution_members(distribution: dict[str, Any]) -> None:
     members = distribution.get("archive_members")
     if not isinstance(members, list) or not members:
         raise ValueError("The transport archive member inventory is invalid.")
     member_names: set[str] = set()
     for member in members:
-        if not isinstance(member, dict) or set(member) != {"file", "media_kind", "size", "sha256", "source"}:
-            raise ValueError("The transport archive member record is invalid.")
-        _safe_archive_path(member.get("file"), "archive member filename")
-        if member["file"] in member_names:
-            raise ValueError("The transport archive member inventory is duplicated.")
-        member_names.add(member["file"])
-        if not isinstance(member.get("media_kind"), str) or not isinstance(member.get("source"), dict):
-            raise ValueError("The transport archive member identity is invalid.")
-        if not isinstance(member.get("size"), int) or isinstance(member["size"], bool) or member["size"] < 0:
-            raise ValueError("The transport archive member size is invalid.")
-        if not _SHA256_PATTERN.fullmatch(member.get("sha256", "")):
-            raise ValueError("The transport archive member digest is invalid.")
+        _validate_distribution_member(member, member_names)
+
+
+def _validate_distribution_manifest(distribution: dict[str, Any]) -> None:
+    _validate_distribution_header(distribution)
+    _validate_distribution_subjects(distribution)
+    _validate_distribution_members(distribution)
 
 
 def _regular_transport_files(transport_dir: Path, expected: set[str]) -> None:
@@ -684,7 +726,7 @@ def _verify_transport_subjects(transport_dir: Path, distribution: dict[str, Any]
     if checksum_bytes != _checksum_text(distribution).encode("utf-8"):
         raise ValueError("Transport checksum evidence differs from the manifest rendering.")
     for subject in subjects:
-        path = _safe_source_path(transport_dir, subject["file"], "transport subject")
+        path = _safe_source_path(transport_dir, subject["file"], _TRANSPORT_SUBJECT_DESCRIPTION)
         contents = path.read_bytes()
         if len(contents) != subject["size"] or _sha256_bytes(contents) != subject["sha256"]:
             raise ValueError(f"Transport subject digest mismatch: {subject['file']}")
@@ -702,7 +744,7 @@ def _verify(arguments: argparse.Namespace) -> None:
     candidate, candidate_manifest_sha = _candidate_manifest(arguments.candidate_manifest, version, source_commit)
     verify_relay_dependencies(arguments.source_root, inventory)
     transport_dir = _safe_path(arguments.transport_dir, "transport directory")
-    manifest_path = _safe_path(arguments.manifest, "transport manifest")
+    manifest_path = _safe_path(arguments.manifest, _TRANSPORT_MANIFEST_DESCRIPTION)
     checksums_path = _safe_path(arguments.checksums, "transport checksum evidence")
     if checksums_path.parent != transport_dir or checksums_path.name != _CHECKSUMS_FILE:
         raise ValueError("The transport checksum evidence path is invalid.")
@@ -711,7 +753,7 @@ def _verify(arguments: argparse.Namespace) -> None:
         arguments.source_root,
         inventory,
         candidate,
-        _safe_path(arguments.candidate_manifest, "candidate manifest").name,
+        _safe_path(arguments.candidate_manifest, _CANDIDATE_MANIFEST_DESCRIPTION).name,
         candidate_manifest_sha,
     )
     expected_distribution = json.loads(outputs[_MANIFEST_FILE].decode("utf-8"))
@@ -720,7 +762,7 @@ def _verify(arguments: argparse.Namespace) -> None:
         raise ValueError("Transport manifest differs from the reviewed candidate composition.")
     _verify_transport_subjects(transport_dir, observed_distribution, checksums_path)
     for name, expected in outputs.items():
-        path = _safe_path(transport_dir / name, "transport subject")
+        path = _safe_path(transport_dir / name, _TRANSPORT_SUBJECT_DESCRIPTION)
         if path.read_bytes() != expected:
             raise ValueError(f"Frozen transport subject differs from the candidate: {name}")
 
@@ -747,19 +789,19 @@ def _render_attestation_subject_checksums(arguments: argparse.Namespace) -> None
         subjects = distribution["subjects"]
         lines = []
         for subject in subjects:
-            path = _safe_source_path(directory, subject["file"], "transport subject")
+            path = _safe_source_path(directory, subject["file"], _TRANSPORT_SUBJECT_DESCRIPTION)
             if path.stat().st_size != subject["size"] or _sha256_bytes(path.read_bytes()) != subject["sha256"]:
                 raise ValueError(f"Transport subject digest mismatch: {subject['file']}")
             lines.append(f"{subject['sha256']}  {subject['file']}")
     else:
         lines = []
-        for path in (_safe_path(arguments.manifest, "transport manifest"), checksums):
+        for path in (_safe_path(arguments.manifest, _TRANSPORT_MANIFEST_DESCRIPTION), checksums):
             lines.append(f"{package_manifest._sha256(path)}  {path.name}")
     output = _safe_path(arguments.output, "attestation subject checksum output")
     if output in {
-        _safe_path(arguments.manifest, "transport manifest"),
+        _safe_path(arguments.manifest, _TRANSPORT_MANIFEST_DESCRIPTION),
         checksums,
-        *[_safe_path(directory / subject["file"], "transport subject") for subject in distribution["subjects"]],
+        *[_safe_path(directory / subject["file"], _TRANSPORT_SUBJECT_DESCRIPTION) for subject in distribution["subjects"]],
     }:
         raise ValueError("Attestation output cannot overwrite a transport subject or evidence file.")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -772,7 +814,7 @@ def _paths(arguments: argparse.Namespace) -> None:
     if arguments.kind == "all":
         names.extend([_MANIFEST_FILE, _CHECKSUMS_FILE])
     for name in names:
-        _safe_source_path(directory, name, "transport subject")
+        _safe_source_path(directory, name, _TRANSPORT_SUBJECT_DESCRIPTION)
         print(name)
 
 
@@ -820,7 +862,7 @@ def main() -> int:
     arguments = _parse_args()
     try:
         arguments.handler(arguments)
-    except (OSError, ValueError, json.JSONDecodeError, tarfile.TarError) as error:
+    except (OSError, ValueError, tarfile.TarError) as error:
         print(f"release distribution verification failed: {error}", file=sys.stderr)
         return 1
     return 0

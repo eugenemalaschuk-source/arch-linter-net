@@ -6,6 +6,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureTargetFrameworkSelectorTests
 {
+    private static readonly string[] _deduplicatedFramework = ["NET10.0"];
+    private static readonly string[] _orderedFrameworks = ["net8.0", "net7.0"];
+
     [Test]
     public void Select_UsesOnlyNamedResolvedPathsAndDeduplicatesFrameworksCaseInsensitively()
     {
@@ -19,7 +22,7 @@ public sealed class ArchitectureTargetFrameworkSelectorTests
         IReadOnlyCollection<string> result = ArchitectureTargetFrameworkSelector.Select(
             resolvedAssemblyPaths, ["Second", "First", "Missing", "Second"]);
 
-        Assert.That(result, Is.EqualTo(new[] { "NET10.0" }));
+        Assert.That(result, Is.EqualTo(_deduplicatedFramework));
         Assert.That(result, Has.Count.EqualTo(1));
         Assert.That(result, Does.Not.Contain("net8.0"));
     }
@@ -36,7 +39,7 @@ public sealed class ArchitectureTargetFrameworkSelectorTests
         IReadOnlyCollection<string> result = ArchitectureTargetFrameworkSelector.Select(
             resolvedAssemblyPaths, ["Runtime", "Fallback"]);
 
-        Assert.That(result, Is.EqualTo(new[] { "net8.0", "net7.0" }));
+        Assert.That(result, Is.EqualTo(_orderedFrameworks));
     }
 
     [Test]

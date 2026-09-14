@@ -13,6 +13,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureMetricMeasurementTests
 {
+    private static readonly string[] _declaredMetricIds = ["outgoing", "project-footprint", "type-count"];
+    private static readonly string[] _evaluatedMetricIds =
+        ["assembly-footprint", "external", "incoming", "outgoing", "project-footprint", "type-count"];
+
     private string _temporaryDirectory = null!;
     private string _policyPath = null!;
 
@@ -166,10 +170,7 @@ public sealed class ArchitectureMetricMeasurementTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(metrics.Metrics.Select(definition => definition.Id), Is.EqualTo(new[]
-            {
-                "outgoing", "project-footprint", "type-count",
-            }));
+            Assert.That(metrics.Metrics.Select(definition => definition.Id), Is.EqualTo(_declaredMetricIds));
             Assert.That(legacy.Metrics, Is.Empty);
         });
     }
@@ -272,10 +273,7 @@ public sealed class ArchitectureMetricMeasurementTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(outcome.Measurements.Select(measurement => measurement.Id), Is.EqualTo(new[]
-            {
-                "assembly-footprint", "external", "incoming", "outgoing", "project-footprint", "type-count",
-            }));
+            Assert.That(outcome.Measurements.Select(measurement => measurement.Id), Is.EqualTo(_evaluatedMetricIds));
             Assert.That(outcome.Measurements.All(measurement => measurement.IsEvaluable), Is.True);
             Assert.That(outcome.Measurements.All(measurement =>
                 measurement.Value == measurement.ContributorCount), Is.True);

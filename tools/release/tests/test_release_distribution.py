@@ -291,7 +291,7 @@ def test_archive_safety_rejects_traversal_and_symlink_members(archive_bytes: byt
 
 
 def test_attestation_and_path_commands_exclude_recursive_outer_evidence(tmp_path: Path, capsys) -> None:
-    arguments, transport = _arguments(tmp_path)
+    _, transport = _arguments(tmp_path)
     manifest = transport / distribution._MANIFEST_FILE
     checksums = transport / distribution._CHECKSUMS_FILE
     transport_subjects = tmp_path / "transport-subjects.sha256"

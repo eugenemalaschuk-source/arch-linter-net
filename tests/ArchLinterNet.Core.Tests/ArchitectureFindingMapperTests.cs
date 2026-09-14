@@ -8,6 +8,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureFindingMapperTests
 {
     private static readonly string[] _value = { "Framework.A", "Framework.B" };
+    private static readonly string[] _contractsPolicyLocation = { "contracts" };
     [Test]
     public void KindToken_MapsEverySupportedDiagnosticKindToStableDistinctWireValue()
     {
@@ -296,7 +297,7 @@ public sealed class ArchitectureFindingMapperTests
         // change report.
         var atExcludeIndexZero = new PolicyConsistencyDiagnostic(
             "<policy-consistency>", null, "unmatched-layer-exclusion", "reason",
-            Array.Empty<string>(), Array.Empty<string>(), new[] { "contracts" })
+            Array.Empty<string>(), Array.Empty<string>(), _contractsPolicyLocation)
         {
             RepresentativeType = "contracts|Acme.Legacy",
             PolicyLocation = PolicyLocationAt("layers.contracts.exclude[0]"),

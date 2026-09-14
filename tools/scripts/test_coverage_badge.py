@@ -34,6 +34,26 @@ def merge_line_coverage(cobertura_paths: list[Path]) -> tuple[int, int]:
     return covered, total
 
 
+def collect_cobertura_reports(reports_glob: str) -> list[Path]:
+    """Resolve the reports glob while confining it to the current workspace.
+
+    The glob is a CLI-provided (and therefore untrusted) value. An absolute pattern or
+    one containing a ``..`` segment could select XML files outside the workspace, so it
+    is rejected, and every match is resolved and kept only when it stays inside the
+    workspace root.
+    """
+    root = Path.cwd().resolve()
+    pattern = Path(reports_glob)
+    if pattern.is_absolute() or ".." in pattern.parts:
+        raise ValueError("The reports glob must be a relative path inside the workspace.")
+    reports: list[Path] = []
+    for candidate in glob.glob(reports_glob, recursive=True):
+        resolved = Path(candidate).resolve()
+        if resolved.is_relative_to(root):
+            reports.append(resolved)
+    return reports
+
+
 def badge_color(percentage: float) -> str:
     if percentage >= 80:
         return "brightgreen"
@@ -65,7 +85,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    cobertura_paths = [Path(path) for path in glob.glob(args.reports_glob, recursive=True)]
+    try:
+        cobertura_paths = collect_cobertura_reports(args.reports_glob)
+    except ValueError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 2
     if not cobertura_paths:
         print("No cobertura reports found. Run `make test-coverage` first.", file=sys.stderr)
         return 1

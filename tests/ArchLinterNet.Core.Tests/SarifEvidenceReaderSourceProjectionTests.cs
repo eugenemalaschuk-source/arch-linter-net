@@ -12,6 +12,12 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class SarifEvidenceReaderSourceProjectionTests
 {
     private SarifEvidenceTestRepository _repository = null!;
+    private static readonly string[] _securityInjectionTags = ["security", "injection"];
+    private static readonly string[] _twoRuleIds = ["SEC100", "SEC200"];
+    private static readonly string[] _firstTag = ["first"];
+    private static readonly string[] _secondTag = ["second"];
+    private static readonly string[] _hierarchicalTag = ["hierarchical"];
+    private static readonly string[] _distinctArtifactPaths = ["src/A.cs", "src/B.cs"];
 
     [SetUp]
     public void SetUp() => _repository = new SarifEvidenceTestRepository();
@@ -46,7 +52,7 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
             Assert.That(diagnostic.PrimaryLocation!.Path, Is.EqualTo("src/App.cs"));
             Assert.That(diagnostic.PrimaryLocation.Region!.StartLine, Is.EqualTo(7));
             Assert.That(diagnostic.PrimaryLocation.Region.EndColumn, Is.EqualTo(9));
-            Assert.That(diagnostic.DriverRuleTags, Is.EqualTo(new[] { "security", "injection" }));
+            Assert.That(diagnostic.DriverRuleTags, Is.EqualTo(_securityInjectionTags));
             Assert.That(diagnostic.Fingerprints, Is.EqualTo(new[]
             {
                 new SarifEvidenceSourceFingerprint("alpha", "a-value"),
@@ -212,7 +218,7 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         Assert.Multiple(() =>
         {
             Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), result.Detail);
-            Assert.That(result.SourceDiagnostics.Select(diagnostic => diagnostic.RuleId), Is.EqualTo(new[] { "SEC100", "SEC200" }));
+            Assert.That(result.SourceDiagnostics.Select(diagnostic => diagnostic.RuleId), Is.EqualTo(_twoRuleIds));
         });
     }
 
@@ -242,9 +248,9 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
                 Is.EqualTo(["DUP", "DUP", "SEC100/injection"]));
             Assert.That(result.SourceDiagnostics.Select(diagnostic => diagnostic.DriverRuleTags), Is.EqualTo(
             [
-                new[] { "first" },
-                new[] { "second" },
-                new[] { "hierarchical" },
+                _firstTag,
+                _secondTag,
+                _hierarchicalTag,
             ]));
         });
     }
@@ -291,7 +297,7 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         Assert.Multiple(() =>
         {
             Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), result.Detail);
-            Assert.That(result.SourceDiagnostics.Select(diagnostic => diagnostic.PrimaryLocation!.Path), Is.EqualTo(new[] { "src/A.cs", "src/B.cs" }));
+            Assert.That(result.SourceDiagnostics.Select(diagnostic => diagnostic.PrimaryLocation!.Path), Is.EqualTo(_distinctArtifactPaths));
         });
     }
 
@@ -470,5 +476,5 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         "}},\"automationDetails\":{\"id\":\"assessment-42\"},\"invocations\":[{\"executionSuccessful\":true}]," +
         (string.IsNullOrEmpty(runMembers) ? string.Empty : runMembers + ",") +
         "\"versionControlProvenance\":[{\"repositoryUri\":\"repo\",\"revisionId\":\"revision\"}],\"results\":" +
-        (result.TrimStart().StartsWith("[", StringComparison.Ordinal) ? result : "[" + result + "]") + "}]}";
+        (result.TrimStart().StartsWith('[') ? result : "[" + result + "]") + "}]}";
 }

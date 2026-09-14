@@ -5,7 +5,6 @@ import {
   type JWK,
 } from "jose";
 import {
-  BUNDLE,
   CLOCK_SKEW_SECONDS,
   FIXED_GITHUB_ISSUER,
   FIXED_GITHUB_JWKS,
@@ -56,7 +55,7 @@ function integerClaim(claims: OidcClaims, key: "iat" | "exp" | "nbf"): number {
 
 function repositoryIdClaim(value: unknown): number | undefined {
   if (typeof value === "number") return Number.isSafeInteger(value) && value > 0 ? value : undefined;
-  if (typeof value !== "string" || !/^[1-9][0-9]*$/u.test(value)) return undefined;
+  if (typeof value !== "string" || !/^[1-9]\d*$/u.test(value)) return undefined;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 && String(parsed) === value ? parsed : undefined;
 }
@@ -119,7 +118,7 @@ async function fetchJwks(url: string, fetcher: typeof fetch): Promise<Map<string
 async function signingKey(kid: string, fetcher: typeof fetch): Promise<CryptoKey | Uint8Array> {
   const cached = jwksCache.get(FIXED_GITHUB_JWKS);
   let keys = cached;
-  if (!keys || !keys.has(kid)) {
+  if (!keys?.has(kid)) {
     // An unknown key may cause exactly one refresh of the fixed endpoint.
     keys = await fetchJwks(FIXED_GITHUB_JWKS, fetcher);
     jwksCache.set(FIXED_GITHUB_JWKS, keys);

@@ -1,4 +1,4 @@
-import type { DurableObjectNamespace, DurableObjectState } from "@cloudflare/workers-types";
+import type { DurableObjectNamespace } from "@cloudflare/workers-types";
 
 export const FIXED_GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
 export const FIXED_GITHUB_JWKS = "https://token.actions.githubusercontent.com/.well-known/jwks";

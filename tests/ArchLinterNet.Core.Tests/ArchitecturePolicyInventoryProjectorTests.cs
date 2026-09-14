@@ -12,6 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitecturePolicyInventoryProjectorTests
 {
+    private static readonly string[] _orderedWaiverIds = ["a-active", "i-invalid", "m-metadata", "s-stale", "z-expired"];
+
     [Test]
     public void Project_SourceSetAliasesCountOnce_AndSelectedScopeIsExact()
     {
@@ -115,7 +117,7 @@ public sealed class ArchitecturePolicyInventoryProjectorTests
             Assert.That(inventory.IgnoreDebt, Is.EqualTo(
                 new ArchitecturePolicyInventoryIgnoreDebt(5, 1, 1, 1, 1, 1)));
             Assert.That(inventory.Waivers.Select(record => record.Id),
-                Is.EqualTo(new[] { "a-active", "i-invalid", "m-metadata", "s-stale", "z-expired" }));
+                Is.EqualTo(_orderedWaiverIds));
         });
     }
 

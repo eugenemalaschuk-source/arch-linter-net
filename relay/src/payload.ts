@@ -3,14 +3,14 @@ import { sha256Hex } from "./security";
 
 const HEADLINE_KEYS = ["schemaVersion", "label", "message", "color"] as const;
 const FRESHNESS_KEYS = [...HEADLINE_KEYS, "verified_at", "valid_until"] as const;
-const MESSAGE = /^(PASS|FAIL) · (HEALTHY|DEBT|DEGRADING|FAILING) · (0|[1-9][0-9]{0,3}) ignores · (0|[1-9][0-9]{0,3}) rules$|^UNASSESSABLE · \? ignores · \? rules$/u;
+const MESSAGE = /^(PASS|FAIL) · (HEALTHY|DEBT|DEGRADING|FAILING) · (0|[1-9]\d{0,3}) ignores · (0|[1-9]\d{0,3}) rules$|^UNASSESSABLE · \? ignores · \? rules$/u;
 const COLORS: Record<string, string> = {
   HEALTHY: "brightgreen",
   DEBT: "yellow",
   DEGRADING: "orange",
   FAILING: "red"
 };
-const UTC_TIMESTAMP = /^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/u;
+const UTC_TIMESTAMP = /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u;
 
 export class PayloadError extends Error {
   readonly status = 413;
@@ -22,19 +22,19 @@ function escapeJsonString(value: string): string {
   for (const character of value) {
     const code = character.codePointAt(0) as number;
     switch (character) {
-      case "\"": output += "\\\""; break;
+      case "\"": output += String.raw`\"`; break;
       case "\\": output += "\\\\"; break;
-      case "\b": output += "\\b"; break;
-      case "\f": output += "\\f"; break;
-      case "\n": output += "\\n"; break;
-      case "\r": output += "\\r"; break;
-      case "\t": output += "\\t"; break;
+      case "\b": output += String.raw`\b`; break;
+      case "\f": output += String.raw`\f`; break;
+      case "\n": output += String.raw`\n`; break;
+      case "\r": output += String.raw`\r`; break;
+      case "\t": output += String.raw`\t`; break;
       default:
-        if (code < 0x20 || code > 0x7e) output += `\\u${code.toString(16).padStart(4, "0").toUpperCase()}`;
+        if (code < 0x20 || code > 0x7e) output += String.raw`\u${code.toString(16).padStart(4, "0").toUpperCase()}`;
         else output += character;
     }
   }
-  return `${output}\"`;
+  return `${output}"`;
 }
 
 function hasExactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
@@ -58,8 +58,10 @@ export function canonicalizePayload(payload: CanonicalPayload, profile: Disclosu
   ];
   if (profile === "headline-plus-freshness/v1") {
     if (!payload.verified_at || !payload.valid_until) throw new PayloadError();
-    pairs.push(`${escapeJsonString("verified_at")}:${escapeJsonString(payload.verified_at)}`);
-    pairs.push(`${escapeJsonString("valid_until")}:${escapeJsonString(payload.valid_until)}`);
+    pairs.push(
+      `${escapeJsonString("verified_at")}:${escapeJsonString(payload.verified_at)}`,
+      `${escapeJsonString("valid_until")}:${escapeJsonString(payload.valid_until)}`
+    );
   }
   return `{${pairs.join(",")}}`;
 }

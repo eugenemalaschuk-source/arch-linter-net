@@ -18,7 +18,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class TopologyCommandHandlerTests
+public sealed partial class TopologyCommandHandlerTests
 {
     private static readonly string[] _topologySubcommandNames = ["capture", "diff", "verify"];
     private static readonly string[] _sharedValidationEvidenceArguments =
@@ -29,6 +29,7 @@ public sealed class TopologyCommandHandlerTests
         "--evidence-revision", "revision",
         "--evidence-scope", "ci",
     ];
+    private static readonly string[] _captureTemporaryPath = ["capture.json.tmp"];
 
     [Test]
     public void TopologyModule_ComposesCaptureDiffAndVerifySubcommands()
@@ -232,7 +233,7 @@ public sealed class TopologyCommandHandlerTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.Output, Does.Contain("output-write-failed"));
             Assert.That(files.RenameCalls, Is.EqualTo(1));
-            Assert.That(files.DeletedPaths, Is.EqualTo(new[] { "capture.json.tmp" }));
+            Assert.That(files.DeletedPaths, Is.EqualTo(_captureTemporaryPath));
             Assert.That(files.DirectWrites, Is.EqualTo(0));
         });
     }
@@ -416,7 +417,7 @@ public sealed class TopologyCommandHandlerTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.Output, Does.Contain("cancelled").And.Not.Contain("output-write-failed"));
             Assert.That(files.RenameCalls, Is.Zero);
-            Assert.That(files.DeletedPaths, Is.EqualTo(new[] { "capture.json.tmp" }));
+            Assert.That(files.DeletedPaths, Is.EqualTo(_captureTemporaryPath));
         });
     }
 
@@ -622,12 +623,12 @@ public sealed class TopologyCommandHandlerTests
         }
     }
 
-    [DllImport("kernel32.dll", EntryPoint = "CreateHardLinkW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [LibraryImport("kernel32.dll", EntryPoint = "CreateHardLinkW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool CreateHardLinkWindows(string linkPath, string existingPath, IntPtr securityAttributes);
+    private static partial bool CreateHardLinkWindows(string linkPath, string existingPath, IntPtr securityAttributes);
 
-    [DllImport("libc", EntryPoint = "link", SetLastError = true)]
-    private static extern int CreateHardLinkUnix(string existingPath, string linkPath);
+    [LibraryImport("libc", EntryPoint = "link", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+    private static partial int CreateHardLinkUnix(string existingPath, string linkPath);
 
     private sealed class FakeRuntime : ICliRuntime
     {
