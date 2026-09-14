@@ -104,7 +104,7 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     });
   });
 
-  async function token(overrides: Record<string, unknown> = {}): Promise<string> {
+  async function token(overrides: Record<string, unknown> = {}, kid = "local-key"): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
     return new SignJWT({
       iss: "https://token.actions.githubusercontent.com",
@@ -121,7 +121,7 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
       exp: now + 300,
       jti: crypto.randomUUID(),
       ...overrides
-    }).setProtectedHeader({ alg: "RS256", kid: "local-key" }).sign(privateKey);
+    }).setProtectedHeader({ alg: "RS256", kid }).sign(privateKey);
   }
 
   function relayUrl(operation: string): string { return `https://relay.test/badge-relay/v1/${alias}/${operation}`; }
@@ -150,6 +150,48 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
       proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
     }));
   }
+
+  it("fails closed for a required JWKS refresh without creating publication state", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("unavailable", { status: 503 })));
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(alias));
+    const prepared = await prepareRemote(await token({}, "provider-outage"), `provider-outage-${crypto.randomUUID()}`);
+
+    expect(prepared.response.status).toBe(503);
+    const state = await runInDurableObject(stub, async (_instance, durableState) => ({
+      challengeCount: durableState.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM relay_challenges").toArray()[0]?.count,
+      relayState: durableState.storage.sql.exec<{ status: string; payload: string | null }>("SELECT status, payload FROM relay_state WHERE id=1").toArray()[0]
+    }));
+    expect(state.challengeCount).toBe(0);
+    expect(state.relayState).toMatchObject({ status: "unavailable", payload: null });
+  });
+
+  it("coalesces unknown-key refreshes across concurrent SELF.fetch requests", async () => {
+    const pendingFetches: Array<(response: Response) => void> = [];
+    let signalFetchStarted!: () => void;
+    const fetchStarted = new Promise<void>((resolve) => { signalFetchStarted = resolve; });
+    const fetcher = vi.fn(() => {
+      signalFetchStarted();
+      return new Promise<Response>((resolve) => pendingFetches.push(resolve));
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const tokens = await Promise.all(Array.from({ length: 32 }, (_, index) => token({}, `cross-request-invalid-${index}`)));
+    const requests = tokens.map((jwt, index) => prepareRemote(jwt, `cross-request-${index}-${crypto.randomUUID()}`));
+
+    try {
+      await Promise.race([
+        fetchStarted,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("JWKS fetch did not start")), 2_000))
+      ]);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const release of pendingFetches) release(new Response(JSON.stringify({ keys: [publicJwk] }), { headers: { "content-type": "application/json" } }));
+    }
+
+    const results = await Promise.all(requests);
+    expect(results.every(({ response }) => response.status === 401)).toBe(true);
+  });
 
   it("rejects an unknown alias before Durable Object allocation", async () => {
     const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;

@@ -40,7 +40,7 @@
     },
     {
       "path": "src/security.ts",
-      "sha256": "0466df76465e9b254828283c0101fbe48b926d9fb5a94ce2cf9bd72dfb7a5616"
+      "sha256": "d799ebbcd622292e834c7adc9a68e1f89fa12f36caba234457dbd236afaaa4ea"
     },
     {
       "path": "src/types.ts",
