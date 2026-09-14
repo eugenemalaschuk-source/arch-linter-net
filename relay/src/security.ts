@@ -15,7 +15,15 @@ import {
   type ValidatedPublisher
 } from "./types";
 
-const jwksCache = new Map<string, Map<string, JWK>>();
+const JWKS_REFRESH_COOLDOWN_MS = 5_000;
+
+interface JwksCacheEntry {
+  keys: Map<string, JWK>;
+  lastRefreshAt?: number;
+  inFlight?: Promise<Map<string, JWK>>;
+}
+
+const jwksCache = new Map<string, JwksCacheEntry>();
 
 export class AuthorizationError extends Error {
   readonly status: number;
@@ -115,13 +123,40 @@ async function fetchJwks(url: string, fetcher: typeof fetch): Promise<Map<string
   }
 }
 
+function jwksCacheEntry(url: string): JwksCacheEntry {
+  const existing = jwksCache.get(url);
+  if (existing) return existing;
+  const created: JwksCacheEntry = { keys: new Map<string, JWK>() };
+  jwksCache.set(url, created);
+  return created;
+}
+
+async function refreshJwks(entry: JwksCacheEntry, url: string, fetcher: typeof fetch): Promise<Map<string, JWK>> {
+  if (entry.inFlight) return entry.inFlight;
+  const refresh = fetchJwks(url, fetcher)
+    .then((keys) => {
+      entry.keys = keys;
+      return keys;
+    })
+    .finally(() => {
+      entry.lastRefreshAt = Date.now();
+      entry.inFlight = undefined;
+    });
+  entry.inFlight = refresh;
+  return refresh;
+}
+
 async function signingKey(kid: string, fetcher: typeof fetch): Promise<CryptoKey | Uint8Array> {
-  const cached = jwksCache.get(FIXED_GITHUB_JWKS);
-  let keys = cached;
-  if (!keys?.has(kid)) {
-    // An unknown key may cause exactly one refresh of the fixed endpoint.
-    keys = await fetchJwks(FIXED_GITHUB_JWKS, fetcher);
-    jwksCache.set(FIXED_GITHUB_JWKS, keys);
+  const entry = jwksCacheEntry(FIXED_GITHUB_JWKS);
+  let keys = entry.keys;
+  if (!keys.has(kid)) {
+    if (entry.inFlight) {
+      keys = await entry.inFlight;
+    } else if (entry.lastRefreshAt === undefined || Date.now() - entry.lastRefreshAt >= JWKS_REFRESH_COOLDOWN_MS) {
+      keys = await refreshJwks(entry, FIXED_GITHUB_JWKS, fetcher);
+    } else {
+      throw new AuthorizationError(401);
+    }
   }
   const jwk = keys.get(kid);
   if (!jwk) throw new AuthorizationError(401);
