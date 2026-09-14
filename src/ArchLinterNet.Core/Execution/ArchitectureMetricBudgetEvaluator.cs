@@ -27,6 +27,34 @@ internal static class ArchitectureMetricBudgetAnalysisService
             return ArchitectureMetricBudgetEvaluationResult.Empty;
         }
 
+        ArchitectureMetricMeasurementOutcome measurements = MeasureSelectedMetrics(session, budgets);
+        BudgetEvaluationInputs inputs = new(
+            measurements.Measurements.ToDictionary(measurement => measurement.Id, StringComparer.Ordinal),
+            measurements.ApplicabilityRecords.ToDictionary(record => record.ControlIdentity, StringComparer.Ordinal),
+            budgets.ToDictionary(
+                budget => budget,
+                budget => session.CreateExecutionContext(budget, budget.IgnoredViolations)));
+
+        var violations = new List<ArchitectureViolation>();
+        var expected = new List<ArchitectureApplicabilityExpectedEntry>(budgets.Length);
+        var records = new List<ArchitectureApplicabilityRecord>(budgets.Length);
+        foreach (ArchitectureMetricBudgetContract budget in budgets)
+        {
+            EvaluateBudget(session, budget, inputs, violations, expected, records);
+        }
+
+        foreach (ArchitectureContractExecutionContext executionContext in inputs.ExecutionContexts.Values)
+        {
+            session.CollectUnmatchedIgnores(executionContext);
+        }
+
+        return new ArchitectureMetricBudgetEvaluationResult(violations, expected, records);
+    }
+
+    private static ArchitectureMetricMeasurementOutcome MeasureSelectedMetrics(
+        ArchitectureAnalysisSession session,
+        IReadOnlyCollection<ArchitectureMetricBudgetContract> budgets)
+    {
         HashSet<string> declaredMetricIds = session.Document.Metrics
             .Select(metric => metric.Id)
             .ToHashSet(StringComparer.Ordinal);
@@ -36,156 +64,168 @@ internal static class ArchitectureMetricBudgetAnalysisService
             .Distinct(StringComparer.Ordinal)
             .OrderBy(id => id, StringComparer.Ordinal)
             .ToArray();
-        ArchitectureMetricMeasurementOutcome measurements = selectedMetricIds.Length == 0
-            ? new ArchitectureMetricMeasurementOutcome(
-                Array.Empty<ArchitectureMetricMeasurement>(), null, null)
+        return selectedMetricIds.Length == 0
+            ? new ArchitectureMetricMeasurementOutcome(Array.Empty<ArchitectureMetricMeasurement>(), null, null)
             : ArchitectureMetricEvaluator.Evaluate(session, session.Document.Metrics, selectedMetricIds);
-        Dictionary<string, ArchitectureMetricMeasurement> measurementsById = measurements.Measurements
-            .ToDictionary(measurement => measurement.Id, StringComparer.Ordinal);
-        Dictionary<string, ArchitectureApplicabilityRecord> recordsById = measurements.ApplicabilityRecords
-            .ToDictionary(record => record.ControlIdentity, StringComparer.Ordinal);
+    }
 
-        var violations = new List<ArchitectureViolation>();
-        var expected = new List<ArchitectureApplicabilityExpectedEntry>(budgets.Length);
-        var records = new List<ArchitectureApplicabilityRecord>(budgets.Length);
-        Dictionary<ArchitectureMetricBudgetContract, ArchitectureContractExecutionContext> executionContexts =
-            budgets.ToDictionary(
-                budget => budget,
-                budget => session.CreateExecutionContext(budget, budget.IgnoredViolations));
-        foreach (ArchitectureMetricBudgetContract budget in budgets)
+    private static void EvaluateBudget(
+        ArchitectureAnalysisSession session,
+        ArchitectureMetricBudgetContract budget,
+        BudgetEvaluationInputs inputs,
+        List<ArchitectureViolation> violations,
+        List<ArchitectureApplicabilityExpectedEntry> expected,
+        List<ArchitectureApplicabilityRecord> records)
+    {
+        string budgetId = budget.Id ?? budget.Name;
+        ArchitectureApplicabilityProvenance provenance = new(Family, budgetId, session.Document.Name);
+        expected.Add(new ArchitectureApplicabilityExpectedEntry(
+            budgetId, Family, ArchitectureApplicabilityMembership.Required, provenance));
+
+        if (!inputs.MeasurementsById.TryGetValue(budget.Metric, out ArchitectureMetricMeasurement? measurement))
         {
-            string budgetId = budget.Id ?? budget.Name;
-            ArchitectureApplicabilityProvenance provenance =
-                new(Family, budgetId, session.Document.Name);
-            expected.Add(new ArchitectureApplicabilityExpectedEntry(
-                budgetId, Family, ArchitectureApplicabilityMembership.Required, provenance));
-
-            if (!measurementsById.TryGetValue(budget.Metric, out ArchitectureMetricMeasurement? measurement))
-            {
-                records.Add(new ArchitectureApplicabilityRecord(
-                    budgetId,
-                    Family,
-                    ArchitectureApplicabilityRecordState.Unassessable,
-                    [new ArchitectureApplicabilityReason(
-                        ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance)],
-                    provenance));
-                continue;
-            }
-
-            ArchitectureApplicabilityRecord? metricRecord = recordsById.GetValueOrDefault(budget.Metric);
-            if (!measurement.IsEvaluable || metricRecord is null)
-            {
-                IReadOnlyList<ArchitectureApplicabilityReason> reasons = metricRecord?.Reasons
-                    .Select(reason => new ArchitectureApplicabilityReason(reason.Code, provenance))
-                    .ToArray()
-                    ?? [new ArchitectureApplicabilityReason(
-                        ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance)];
-                records.Add(new ArchitectureApplicabilityRecord(
-                    budgetId, Family, ArchitectureApplicabilityRecordState.Unassessable, reasons, provenance)
-                {
-                    MetricEvidence = metricRecord?.MetricEvidence,
-                });
-                continue;
-            }
-
             records.Add(new ArchitectureApplicabilityRecord(
-                budgetId, Family, ArchitectureApplicabilityRecordState.Evaluable, provenance)
-            {
-                MetricEvidence = metricRecord.MetricEvidence,
-            });
-
-            if (budget.IsRelative)
-            {
-                // Capture is an explicit baseline-generation concern. The session only retains
-                // complete scalar measurements, and this list is intentionally separate from the
-                // finding candidate stream used for ignore matching.
-                session.AddMetricBaselineCandidate(new ArchitectureMetricBaselineEntry
-                {
-                    MetricIdentityVersion = ArchitectureMetricBaselineIdentity.CurrentVersion,
-                    MetricId = measurement.Id,
-                    MetricKind = measurement.Kind,
-                    NativeSubject = measurement.NativeSubject ?? string.Empty,
-                    Unit = measurement.Unit,
-                    EffectiveScope = measurement.EffectiveScope,
-                    Value = measurement.Value!.Value,
-                });
-
-                ArchitectureMetricBaselineEntry? reviewed = session.Document.MetricBaselines
-                    .FirstOrDefault(entry => string.Equals(entry.MetricId, measurement.Id, StringComparison.Ordinal));
-                if (reviewed is null)
-                {
-                    records[^1] = UnassessableBudgetRecord(
-                        budgetId, provenance, metricRecord.MetricEvidence, ArchitectureApplicabilityReasonCodes.MissingMetricBaseline);
-                    continue;
-                }
-
-                ArchitectureMetricBaselineIdentity currentIdentity = new(
-                    ArchitectureMetricBaselineIdentity.CurrentVersion,
-                    measurement.Id,
-                    measurement.Kind,
-                    measurement.NativeSubject ?? string.Empty,
-                    measurement.Unit,
-                    measurement.EffectiveScope);
-                if (!reviewed.Identity.Equals(currentIdentity))
-                {
-                    records[^1] = UnassessableBudgetRecord(
-                        budgetId, provenance, metricRecord.MetricEvidence, ArchitectureApplicabilityReasonCodes.StaleMetricBaseline);
-                    continue;
-                }
-
-                int baselineValue = reviewed.Value
-                    ?? throw new InvalidOperationException("A validated metric baseline must have a value.");
-                int currentValue = measurement.Value!.Value;
-                int delta = currentValue - baselineValue;
-                int allowedDelta = budget.AllowedDelta;
-                long relativeThreshold = (long)baselineValue + allowedDelta;
-                long effectiveThreshold = budget.Maximum is { } absoluteCap
-                    ? Math.Min(relativeThreshold, absoluteCap)
-                    : relativeThreshold;
-                if (currentValue > effectiveThreshold)
-                {
-                    ArchitectureViolation violation = CreateRelativeViolation(
-                        budget,
-                        measurement,
-                        baselineValue,
-                        delta,
-                        allowedDelta,
-                        effectiveThreshold,
-                        budget.Maximum);
-                    if (!IsIgnored(executionContexts[budget], violation))
-                    {
-                        violations.Add(violation);
-                    }
-                }
-
-                continue;
-            }
-
-            if (budget.Minimum is { } minimum && measurement.Value < minimum)
-            {
-                ArchitectureViolation violation = CreateViolation(budget, measurement, "minimum", minimum);
-                if (!IsIgnored(executionContexts[budget], violation))
-                {
-                    violations.Add(violation);
-                }
-            }
-
-            if (budget.Maximum is { } maximum && measurement.Value > maximum)
-            {
-                ArchitectureViolation violation = CreateViolation(budget, measurement, "maximum", maximum);
-                if (!IsIgnored(executionContexts[budget], violation))
-                {
-                    violations.Add(violation);
-                }
-            }
+                budgetId,
+                Family,
+                ArchitectureApplicabilityRecordState.Unassessable,
+                [new ArchitectureApplicabilityReason(
+                    ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance)],
+                provenance));
+            return;
         }
 
-        foreach (ArchitectureContractExecutionContext executionContext in executionContexts.Values)
+        ArchitectureApplicabilityRecord? metricRecord = inputs.RecordsById.GetValueOrDefault(budget.Metric);
+        if (!measurement.IsEvaluable || metricRecord is null)
         {
-            session.CollectUnmatchedIgnores(executionContext);
+            IReadOnlyList<ArchitectureApplicabilityReason> reasons = metricRecord?.Reasons
+                .Select(reason => new ArchitectureApplicabilityReason(reason.Code, provenance))
+                .ToArray()
+                ?? [new ArchitectureApplicabilityReason(
+                    ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance)];
+            records.Add(new ArchitectureApplicabilityRecord(
+                budgetId, Family, ArchitectureApplicabilityRecordState.Unassessable, reasons, provenance)
+            {
+                MetricEvidence = metricRecord?.MetricEvidence,
+            });
+            return;
         }
 
-        return new ArchitectureMetricBudgetEvaluationResult(violations, expected, records);
+        records.Add(new ArchitectureApplicabilityRecord(
+            budgetId, Family, ArchitectureApplicabilityRecordState.Evaluable, provenance)
+        {
+            MetricEvidence = metricRecord.MetricEvidence,
+        });
+
+        ArchitectureContractExecutionContext executionContext = inputs.ExecutionContexts[budget];
+        if (budget.IsRelative)
+        {
+            EvaluateRelativeBudget(session, budget, measurement, metricRecord, provenance, executionContext, violations, records);
+            return;
+        }
+
+        EvaluateAbsoluteBudget(budget, measurement, executionContext, violations);
+    }
+
+    private static void EvaluateRelativeBudget(
+        ArchitectureAnalysisSession session,
+        ArchitectureMetricBudgetContract budget,
+        ArchitectureMetricMeasurement measurement,
+        ArchitectureApplicabilityRecord metricRecord,
+        ArchitectureApplicabilityProvenance provenance,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations,
+        List<ArchitectureApplicabilityRecord> records)
+    {
+        string budgetId = budget.Id ?? budget.Name;
+
+        // Capture is an explicit baseline-generation concern. The session only retains
+        // complete scalar measurements, and this list is intentionally separate from the
+        // finding candidate stream used for ignore matching.
+        session.AddMetricBaselineCandidate(new ArchitectureMetricBaselineEntry
+        {
+            MetricIdentityVersion = ArchitectureMetricBaselineIdentity.CurrentVersion,
+            MetricId = measurement.Id,
+            MetricKind = measurement.Kind,
+            NativeSubject = measurement.NativeSubject ?? string.Empty,
+            Unit = measurement.Unit,
+            EffectiveScope = measurement.EffectiveScope,
+            Value = measurement.Value!.Value,
+        });
+
+        ArchitectureMetricBaselineEntry? reviewed = session.Document.MetricBaselines
+            .FirstOrDefault(entry => string.Equals(entry.MetricId, measurement.Id, StringComparison.Ordinal));
+        if (reviewed is null)
+        {
+            records[^1] = UnassessableBudgetRecord(
+                budgetId, provenance, metricRecord.MetricEvidence, ArchitectureApplicabilityReasonCodes.MissingMetricBaseline);
+            return;
+        }
+
+        ArchitectureMetricBaselineIdentity currentIdentity = new(
+            ArchitectureMetricBaselineIdentity.CurrentVersion,
+            measurement.Id,
+            measurement.Kind,
+            measurement.NativeSubject ?? string.Empty,
+            measurement.Unit,
+            measurement.EffectiveScope);
+        if (!reviewed.Identity.Equals(currentIdentity))
+        {
+            records[^1] = UnassessableBudgetRecord(
+                budgetId, provenance, metricRecord.MetricEvidence, ArchitectureApplicabilityReasonCodes.StaleMetricBaseline);
+            return;
+        }
+
+        int baselineValue = reviewed.Value
+            ?? throw new InvalidOperationException("A validated metric baseline must have a value.");
+        int currentValue = measurement.Value!.Value;
+        int delta = currentValue - baselineValue;
+        int allowedDelta = budget.AllowedDelta;
+        long relativeThreshold = (long)baselineValue + allowedDelta;
+        long effectiveThreshold = budget.Maximum is { } absoluteCap
+            ? Math.Min(relativeThreshold, absoluteCap)
+            : relativeThreshold;
+        if (currentValue <= effectiveThreshold)
+        {
+            return;
+        }
+
+        ArchitectureViolation violation = CreateRelativeViolation(
+            budget,
+            measurement,
+            baselineValue,
+            delta,
+            allowedDelta,
+            effectiveThreshold,
+            budget.Maximum);
+        if (!IsIgnored(executionContext, violation))
+        {
+            violations.Add(violation);
+        }
+    }
+
+    private static void EvaluateAbsoluteBudget(
+        ArchitectureMetricBudgetContract budget,
+        ArchitectureMetricMeasurement measurement,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations)
+    {
+        if (budget.Minimum is { } minimum && measurement.Value < minimum)
+        {
+            ArchitectureViolation violation = CreateViolation(budget, measurement, "minimum", minimum);
+            if (!IsIgnored(executionContext, violation))
+            {
+                violations.Add(violation);
+            }
+        }
+
+        if (budget.Maximum is { } maximum && measurement.Value > maximum)
+        {
+            ArchitectureViolation violation = CreateViolation(budget, measurement, "maximum", maximum);
+            if (!IsIgnored(executionContext, violation))
+            {
+                violations.Add(violation);
+            }
+        }
     }
 
     private static ArchitectureApplicabilityRecord UnassessableBudgetRecord(
@@ -331,6 +371,13 @@ internal static class ArchitectureMetricBudgetAnalysisService
         return violation;
     }
 }
+
+// Groups the per-run inputs shared by every budget evaluation into one parameter so that
+// EvaluateBudget and its callees stay within the reviewed parameter-count budget.
+internal sealed record BudgetEvaluationInputs(
+    IReadOnlyDictionary<string, ArchitectureMetricMeasurement> MeasurementsById,
+    IReadOnlyDictionary<string, ArchitectureApplicabilityRecord> RecordsById,
+    IReadOnlyDictionary<ArchitectureMetricBudgetContract, ArchitectureContractExecutionContext> ExecutionContexts);
 
 internal sealed record ArchitectureMetricBudgetEvaluationResult(
     IReadOnlyList<ArchitectureViolation> Violations,

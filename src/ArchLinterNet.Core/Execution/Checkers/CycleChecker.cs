@@ -31,30 +31,37 @@ internal static class CycleChecker
         IReadOnlyDictionary<string, HashSet<string>> FullGraph,
         IReadOnlyCollection<CycleCandidateEvidence> CandidateEvidence);
 
+    // Bundles the three mutable accumulators built up across every layer so
+    // CollectCycleEdgesForLayer stays within the reviewed parameter-count budget.
+    private sealed record CycleGraphBuildState(
+        Dictionary<string, HashSet<string>> Graph,
+        Dictionary<string, HashSet<string>> FullGraph,
+        List<CycleCandidateEvidence> CandidateEvidence);
+
     public static Result Check(
         ArchitectureCycleContract contract,
         ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext)
     {
         var contractLayers = contract.Layers.ToHashSet(StringComparer.Ordinal);
-        var graph = contractLayers.ToDictionary(
-            layer => layer,
-            _ => new HashSet<string>(StringComparer.Ordinal),
-            StringComparer.Ordinal);
-        var fullGraph = contractLayers.ToDictionary(
-            layer => layer,
-            _ => new HashSet<string>(StringComparer.Ordinal),
-            StringComparer.Ordinal);
-        var cycleCandidateEvidence = new List<CycleCandidateEvidence>();
+        CycleGraphBuildState state = new(
+            contractLayers.ToDictionary(
+                layer => layer,
+                _ => new HashSet<string>(StringComparer.Ordinal),
+                StringComparer.Ordinal),
+            contractLayers.ToDictionary(
+                layer => layer,
+                _ => new HashSet<string>(StringComparer.Ordinal),
+                StringComparer.Ordinal),
+            new List<CycleCandidateEvidence>());
 
         foreach (string sourceLayerName in contract.Layers)
         {
-            CollectCycleEdgesForLayer(
-                contract, sourceLayerName, contractLayers, context, executionContext, graph, fullGraph, cycleCandidateEvidence);
+            CollectCycleEdgesForLayer(contract, sourceLayerName, contractLayers, context, executionContext, state);
         }
 
-        IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
-        return new Result(cycles, graph, fullGraph, cycleCandidateEvidence);
+        IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(state.Graph);
+        return new Result(cycles, state.Graph, state.FullGraph, state.CandidateEvidence);
     }
 
     private static void CollectCycleEdgesForLayer(
@@ -63,9 +70,7 @@ internal static class CycleChecker
         HashSet<string> contractLayers,
         ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext,
-        Dictionary<string, HashSet<string>> graph,
-        Dictionary<string, HashSet<string>> fullGraph,
-        List<CycleCandidateEvidence> cycleCandidateEvidence)
+        CycleGraphBuildState state)
     {
         ArchitectureLayer sourceLayer =
             ArchitectureLayerResolver.ResolveLayer(context.Document, contract.Name, sourceLayerName);
@@ -86,7 +91,7 @@ internal static class CycleChecker
                     continue;
                 }
 
-                fullGraph[sourceLayerName].Add(referencedLayerName);
+                state.FullGraph[sourceLayerName].Add(referencedLayerName);
 
                 if (executionContext.IsIgnored(
                         sourceTypeName,
@@ -95,13 +100,13 @@ internal static class CycleChecker
                         targetAssembly: ArchitectureTypeNames.SafeAssemblyName(referencedType),
                         targetType: referencedTypeName,
                         targetMember: referencedTypeName,
-                        observeCandidate: candidate => cycleCandidateEvidence.Add(
+                        observeCandidate: candidate => state.CandidateEvidence.Add(
                             new CycleCandidateEvidence(sourceLayerName, referencedLayerName, candidate))))
                 {
                     continue;
                 }
 
-                graph[sourceLayerName].Add(referencedLayerName);
+                state.Graph[sourceLayerName].Add(referencedLayerName);
             }
         }
     }
