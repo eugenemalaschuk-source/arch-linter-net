@@ -126,6 +126,7 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 		pytest tools/release/tests \
 		tools/badge_promotion/tests \
 		tools/scripts/tests/test_calculate_version.py \
+		tools/scripts/tests/test_check_canonical_actions_pinning.py \
 		tools/scripts/tests/test_check_dogfood_reference_evidence.py \
 		tools/scripts/tests/test_check_evergreen_docs.py \
 		tools/scripts/tests/test_check_evergreen_docs_edges.py \
