@@ -166,6 +166,33 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(state.relayState).toMatchObject({ status: "unavailable", payload: null });
   });
 
+  it("coalesces unknown-key refreshes across concurrent SELF.fetch requests", async () => {
+    const pendingFetches: Array<(response: Response) => void> = [];
+    let signalFetchStarted!: () => void;
+    const fetchStarted = new Promise<void>((resolve) => { signalFetchStarted = resolve; });
+    const fetcher = vi.fn(() => {
+      signalFetchStarted();
+      return new Promise<Response>((resolve) => pendingFetches.push(resolve));
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const tokens = await Promise.all(Array.from({ length: 32 }, (_, index) => token({}, `cross-request-invalid-${index}`)));
+    const requests = tokens.map((jwt, index) => prepareRemote(jwt, `cross-request-${index}-${crypto.randomUUID()}`));
+
+    try {
+      await Promise.race([
+        fetchStarted,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("JWKS fetch did not start")), 2_000))
+      ]);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const release of pendingFetches) release(new Response(JSON.stringify({ keys: [publicJwk] }), { headers: { "content-type": "application/json" } }));
+    }
+
+    const results = await Promise.all(requests);
+    expect(results.every(({ response }) => response.status === 401)).toBe(true);
+  });
+
   it("rejects an unknown alias before Durable Object allocation", async () => {
     const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
     const before = (await listDurableObjectIds(relay)).length;
