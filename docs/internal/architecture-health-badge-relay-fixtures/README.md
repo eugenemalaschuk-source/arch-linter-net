@@ -26,8 +26,10 @@ relay code, a real adopter identity, a secret, or a JWT.
   HEAD behavior, storage-safe fallback, and fixed-template SVG rendering.
   Protected JOSE headers (`alg`, `kid`) are separate from signed
   claims (`nbf`, `iat`, `exp`); `kid` selects a key only from the fixed GitHub
-  JWKS endpoint, with at most one bounded refresh for an unknown key. The
-  registry permits only `push` on `refs/heads/main`.
+  JWKS endpoint. Unknown-key misses share one in-flight refresh and are
+  suppressed during the fixed protection window after a refresh attempt;
+  unresolved keys remain rejected, while a later miss can discover provider
+  rotation. The registry permits only `push` on `refs/heads/main`.
   `expected.public_response` is deliberately public-safe.
 
 The relay never reconstructs Gate, Health, counts, message, or color. The

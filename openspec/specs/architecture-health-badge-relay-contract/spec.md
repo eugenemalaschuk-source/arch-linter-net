@@ -107,17 +107,20 @@ renewal MAY use the `schedule` event only when the same registry entry
 explicitly allowlists it; renewal SHALL preserve the same immutable identity,
 ref, workflow binding, audience, and validity constraints, and a `schedule`
 token SHALL be accepted only on the `renew` operation while all other mutation
-operations require `push`. The Relay SHALL
-verify protected GitHub OIDC JOSE header `alg` and `kid` before trusting the
-signed JWT claims. The `kid` SHALL select a key only from the fixed GitHub
-issuer JWKS endpoint; an unknown key MAY cause one bounded refresh of that
-same endpoint and then SHALL be rejected. Configuration SHALL not pin allowed
-key IDs or current/next rotation state. It SHALL verify issuer, audience,
-signature, `nbf`, `iat`, `exp`, token size, and bounded clock skew before
-writes. It SHALL bind a one-time challenge, token identifier, idempotency key,
-digest, target generation, and bounded deadline before a publisher context
-recheck. Repository names, workflow names, run IDs, arbitrary URLs, and SHA
-sorting SHALL not establish authorization or ordering.
+operations require `push`. The Relay SHALL verify protected GitHub OIDC JOSE
+header `alg` and `kid` before trusting the signed JWT claims. The `kid` SHALL
+select a key only from the fixed GitHub issuer JWKS endpoint. An unknown key
+MAY trigger a refresh only when the fixed protection window permits it; concurrent
+misses SHALL share one in-flight refresh, and an unresolved key SHALL be
+rejected. A later miss after the window SHALL be allowed to refresh the same
+fixed endpoint so legitimate provider rotation remains usable. Configuration
+SHALL not pin allowed key IDs or current/next rotation state, and refresh
+bookkeeping SHALL not grow with arbitrary `kid` values. It SHALL verify issuer,
+audience, signature, `nbf`, `iat`, `exp`, token size, and bounded clock skew
+before writes. It SHALL bind a one-time challenge, token identifier,
+idempotency key, digest, target generation, and bounded deadline before a
+publisher context recheck. Repository names, workflow names, run IDs, arbitrary
+URLs, and SHA sorting SHALL not establish authorization or ordering.
 
 #### Scenario: A stale writer loses after its challenge
 
@@ -144,10 +147,20 @@ sorting SHALL not establish authorization or ordering.
 #### Scenario: Provider JWKS rotation stays in the fixed trust chain
 
 - **WHEN** a protected `kid` is absent from the cached fixed GitHub JWKS set
-- **THEN** the Relay refreshes that fixed endpoint at most once before
-  rejecting an unresolved key
+- **THEN** the Relay performs at most one coalesced refresh during the fixed
+  protection window before rejecting an unresolved key
+- **AND** a later miss after that window can discover a newly introduced valid
+  provider key from the same fixed endpoint
 - **AND** no configured key-ID allow-list or current/next key snapshot controls
   acceptance
+
+#### Scenario: Invalid traffic cannot amplify provider work
+
+- **WHEN** repeated or concurrent requests present unsupported key identifiers
+- **THEN** refresh attempts remain bounded by the single-flight and protection
+  window policy
+- **AND** the Relay retains no unbounded negative-cache entries keyed by those
+  identifiers
 
 #### Scenario: Scheduled renewal is explicitly allowlisted
 
