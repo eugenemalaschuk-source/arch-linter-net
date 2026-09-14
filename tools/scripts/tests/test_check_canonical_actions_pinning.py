@@ -104,3 +104,85 @@ def test_rejects_unpinned_third_party_reference_without_at_ref(tmp_path: Path) -
 
     assert len(violations) == 1
     assert "unpinned" in violations[0]
+
+
+def test_rejects_indented_yaml_fence(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        "1. Step one:\n\n"
+        "   ```yaml\n"
+        "   steps:\n"
+        "     - uses: actions/checkout@v4\n"
+        "   ```\n",
+    )
+
+    violations = pinning.find_violations(tmp_path)
+
+    assert len(violations) == 1
+    assert "actions/checkout@v4" in violations[0]
+
+
+def test_rejects_yaml_fence_with_extra_info_string_content(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        '```yaml title="ci.yml"\nsteps:\n  - uses: actions/checkout@v4\n```\n',
+    )
+
+    violations = pinning.find_violations(tmp_path)
+
+    assert len(violations) == 1
+    assert "actions/checkout@v4" in violations[0]
+
+
+def test_rejects_tilde_yaml_fence(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        "~~~yaml\nsteps:\n  - uses: actions/checkout@v4\n~~~\n",
+    )
+
+    violations = pinning.find_violations(tmp_path)
+
+    assert len(violations) == 1
+    assert "actions/checkout@v4" in violations[0]
+
+
+def test_rejects_quoted_uses_key(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        '```yaml\nsteps:\n  - "uses": actions/checkout@v4\n```\n',
+    )
+
+    violations = pinning.find_violations(tmp_path)
+
+    assert len(violations) == 1
+    assert "actions/checkout@v4" in violations[0]
+
+
+def test_rejects_flow_style_uses_mapping(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        "```yaml\nsteps:\n  - {uses: actions/checkout@v4, with: {fetch-depth: 0}}\n```\n",
+    )
+
+    violations = pinning.find_violations(tmp_path)
+
+    assert len(violations) == 1
+    assert "actions/checkout@v4" in violations[0]
+
+
+def test_short_fence_marker_inside_open_fence_does_not_close_it(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        "````yaml\nsteps:\n  - uses: actions/checkout@v4\n``\nmore: text\n````\n",
+    )
+
+    violations = pinning.find_violations(tmp_path)
+
+    assert len(violations) == 1
+    assert "actions/checkout@v4" in violations[0]
