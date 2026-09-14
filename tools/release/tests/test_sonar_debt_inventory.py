@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import sys
+import urllib.error
 from pathlib import Path
 
 import pytest
@@ -182,3 +184,262 @@ def test_reviewed_disposition_applies_only_to_the_named_finding() -> None:
             "justification": "guarded by the release-workspace confinement helper",
         }
     ]
+
+
+class _FakeResponse:
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> "_FakeResponse":
+        return self
+
+    def __exit__(self, *exc_info: object) -> bool:
+        return False
+
+
+def test_http_fetch_sends_bearer_token_and_parses_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request: object, timeout: int | None = None) -> _FakeResponse:
+        captured["url"] = request.full_url  # type: ignore[attr-defined]
+        captured["headers"] = dict(request.header_items())  # type: ignore[attr-defined]
+        captured["timeout"] = timeout
+        return _FakeResponse(json.dumps({"ok": True}).encode("utf-8"))
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    fetch = inventory._http_fetch("https://sonarcloud.example/", "secret-token")
+
+    result = fetch("/api/thing", {"a": "1"})
+
+    assert result == {"ok": True}
+    assert captured["url"] == "https://sonarcloud.example/api/thing?a=1"
+    assert captured["headers"]["Authorization"] == "Bearer secret-token"
+    assert captured["timeout"] == 60
+
+
+def test_http_fetch_without_token_omits_authorization_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request: object, timeout: int | None = None) -> _FakeResponse:
+        assert "Authorization" not in dict(request.header_items())  # type: ignore[attr-defined]
+        return _FakeResponse(json.dumps({"ok": True}).encode("utf-8"))
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    fetch = inventory._http_fetch("https://sonarcloud.example", None)
+
+    assert fetch("/api/thing", {}) == {"ok": True}
+
+
+def test_http_fetch_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request: object, timeout: int | None = None) -> _FakeResponse:
+        raise urllib.error.HTTPError("url", 500, "boom", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    fetch = inventory._http_fetch("https://sonarcloud.example", None)
+
+    with pytest.raises(inventory.SonarInventoryError, match="HTTP 500"):
+        fetch("/api/thing", {})
+
+
+def test_http_fetch_raises_on_url_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request: object, timeout: int | None = None) -> _FakeResponse:
+        raise urllib.error.URLError("unreachable")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    fetch = inventory._http_fetch("https://sonarcloud.example", None)
+
+    with pytest.raises(inventory.SonarInventoryError, match="SonarCloud request failed"):
+        fetch("/api/thing", {})
+
+
+def test_http_fetch_rejects_non_object_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request: object, timeout: int | None = None) -> _FakeResponse:
+        return _FakeResponse(b"[1, 2, 3]")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    fetch = inventory._http_fetch("https://sonarcloud.example", None)
+
+    with pytest.raises(inventory.SonarInventoryError, match="was not an object"):
+        fetch("/api/thing", {})
+
+
+def test_search_all_requires_the_collection_key() -> None:
+    client = _client(lambda endpoint, params: {"paging": {"total": 0}})
+
+    with pytest.raises(inventory.SonarInventoryError, match="is missing 'issues'"):
+        inventory._search_all(client, "/api/issues/search", {}, "issues")
+
+
+def test_search_all_requires_a_total() -> None:
+    client = _client(lambda endpoint, params: {"issues": []})
+
+    with pytest.raises(inventory.SonarInventoryError, match="is missing a total"):
+        inventory._search_all(client, "/api/issues/search", {}, "issues")
+
+
+def test_search_all_accepts_a_top_level_total() -> None:
+    client = _client(lambda endpoint, params: {"issues": [{"key": "i1"}], "total": 1})
+
+    result = inventory._search_all(client, "/api/issues/search", {}, "issues")
+
+    assert result == [{"key": "i1"}]
+
+
+def test_normalize_issue_sorts_impacts_and_derives_path() -> None:
+    issue = {
+        "key": "i1",
+        "rule": "r1",
+        "component": "proj:src/a.py",
+        "line": 10,
+        "type": "CODE_SMELL",
+        "severity": "MAJOR",
+        "impacts": [
+            {"softwareQuality": "SECURITY", "severity": "HIGH"},
+            {"softwareQuality": "MAINTAINABILITY", "severity": "LOW"},
+            "not-a-dict",
+        ],
+    }
+
+    normalized = inventory._normalize_issue(issue)
+
+    assert normalized["path"] == "src/a.py"
+    assert normalized["impacts"] == [
+        {"softwareQuality": "MAINTAINABILITY", "severity": "LOW"},
+        {"softwareQuality": "SECURITY", "severity": "HIGH"},
+    ]
+
+
+def test_fetch_measures_returns_empty_when_component_is_missing() -> None:
+    client = _client(lambda endpoint, params: {"component": None})
+
+    assert inventory._fetch_measures(client, "project", "main") == {}
+
+
+def test_fetch_quality_gate_requires_project_status() -> None:
+    client = _client(lambda endpoint, params: {"projectStatus": None})
+
+    with pytest.raises(inventory.SonarInventoryError, match="missing projectStatus"):
+        inventory._fetch_quality_gate(client, "project", "main")
+
+
+def test_fetch_hotspots_normalizes_and_sorts() -> None:
+    responses = {
+        ("/api/hotspots/search", 1): {
+            "paging": {"total": 2},
+            "hotspots": [
+                {"key": "h2", "ruleKey": "python:S2", "component": "p:b.py", "line": 5, "status": "TO_REVIEW"},
+                {"key": "h1", "ruleKey": "python:S1", "component": "p:a.py", "line": 1, "status": "REVIEWED"},
+            ],
+        }
+    }
+    client = _client(FakeFetch(responses))
+
+    result = inventory._fetch_hotspots(client, "project", "main")
+
+    assert [item["key"] for item in result] == ["h1", "h2"]
+    assert result[0]["disposition"] == "untriaged"
+
+
+def test_parser_requires_revision_and_applies_defaults() -> None:
+    parser = inventory._parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
+
+    arguments = parser.parse_args(["--revision", "abc"])
+
+    assert arguments.host == inventory._DEFAULT_HOST
+    assert arguments.project == inventory._DEFAULT_PROJECT
+    assert arguments.organization == inventory._DEFAULT_ORGANIZATION
+    assert arguments.branch == inventory._DEFAULT_BRANCH
+    assert arguments.format == "json"
+    assert arguments.dispositions == "{}"
+
+
+def _stub_http_fetch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        inventory,
+        "_http_fetch",
+        lambda host, token: (lambda endpoint, params: {}),
+    )
+
+
+def test_main_rejects_invalid_dispositions_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    _stub_http_fetch(monkeypatch)
+
+    exit_code = inventory.main(["--revision", _SHA, "--dispositions", "not-json"])
+
+    assert exit_code == 2
+    assert "not valid JSON" in capsys.readouterr().err
+
+
+def test_main_rejects_non_object_dispositions(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    _stub_http_fetch(monkeypatch)
+
+    exit_code = inventory.main(["--revision", _SHA, "--dispositions", "[]"])
+
+    assert exit_code == 2
+    assert "must be a JSON object" in capsys.readouterr().err
+
+
+def test_main_reports_inventory_errors(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    _stub_http_fetch(monkeypatch)
+
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise inventory.SonarInventoryError("boom")
+
+    monkeypatch.setattr(inventory, "build_inventory", fail)
+
+    exit_code = inventory.main(["--revision", _SHA])
+
+    assert exit_code == 2
+    assert "boom" in capsys.readouterr().err
+
+
+_FAKE_MAIN_INVENTORY = {
+    "metadata": {"project": "p", "branch": "main", "revision": _SHA, "analysisDate": "d"},
+    "qualityGate": {"status": "OK", "conditions": []},
+    "totals": {"findings": 0, "hotspots": 0},
+    "findings": [],
+    "hotspots": [],
+    "reviewedDispositions": [],
+}
+
+
+def test_main_writes_json_by_default(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    _stub_http_fetch(monkeypatch)
+    monkeypatch.setattr(inventory, "build_inventory", lambda *_a, **_k: dict(_FAKE_MAIN_INVENTORY))
+
+    exit_code = inventory.main(["--revision", _SHA])
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["qualityGate"]["status"] == "OK"
+
+
+def test_main_writes_markdown_when_requested(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    _stub_http_fetch(monkeypatch)
+    monkeypatch.setattr(inventory, "build_inventory", lambda *_a, **_k: dict(_FAKE_MAIN_INVENTORY))
+
+    exit_code = inventory.main(["--revision", _SHA, "--format", "markdown"])
+
+    assert exit_code == 0
+    assert "# SonarCloud debt inventory" in capsys.readouterr().out
+
+
+def test_apply_reviewed_dispositions_is_invoked_from_main(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    _stub_http_fetch(monkeypatch)
+    captured: dict[str, object] = {}
+
+    def fake_apply(inventory_payload: dict[str, object], dispositions: dict[str, object]) -> None:
+        captured["dispositions"] = dispositions
+
+    monkeypatch.setattr(inventory, "build_inventory", lambda *_a, **_k: dict(_FAKE_MAIN_INVENTORY))
+    monkeypatch.setattr(inventory, "apply_reviewed_dispositions", fake_apply)
+
+    exit_code = inventory.main(
+        ["--revision", _SHA, "--dispositions", json.dumps({"r1|a.py|1": {"disposition": "false-positive"}})]
+    )
+
+    assert exit_code == 0
+    assert captured["dispositions"] == {"r1|a.py|1": {"disposition": "false-positive"}}
