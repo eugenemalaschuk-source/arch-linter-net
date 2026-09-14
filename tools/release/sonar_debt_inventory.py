@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
-"""Produce a reproducible, revision-bound SonarCloud debt inventory and triage report.
+"""Produce a revision-bound SonarCloud debt inventory and triage report.
 
 The tool reads the SonarCloud web API for one project/branch and refuses to present a
-baseline unless the requested revision already has a completed analysis on that branch.
+baseline unless the requested revision is the exact latest completed analysis on that
+branch, re-verified after capture; see #795 and #783 for that contract. Code identity is
+therefore exact: the Quality Gate is read pinned to that one analysis's own analysisId, not
+to a mutable "current branch" query.
+
+Issue, hotspot and measure DATA is not similarly pinned, because SonarCloud's web API has
+no concept of "the issue list as of analysis X" — only "the issue list right now". Their
+disposition (resolved, reopened, hotspot reviewed, false-positive) can change after the
+analysis ran without producing a new analysis, so two captures against the same analysisId
+are bound to the same code and are not guaranteed byte-identical. Each captured document
+records its own `metadata.capturedAt` wall-clock timestamp for exactly this reason: it is
+evidence of a point-in-time triage snapshot layered on an exact code analysis, not proof
+that the triage state itself is immutable.
+
 It accepts no filesystem path arguments and writes to stdout, so a faulty caller cannot
-use it to read or write outside the workspace. Output is deterministic so two runs over
-the same revision produce identical bytes.
+use it to read or write outside the workspace.
 
 Examples:
     python3 tools/release/sonar_debt_inventory.py --revision <sha>
@@ -21,6 +33,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 _DEFAULT_HOST = "https://sonarcloud.io"
@@ -276,18 +289,33 @@ def _fetch_hotspots(client: SonarClient, project: str, branch: str) -> list[dict
     )
 
 
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def build_inventory(
     client: SonarClient,
     project: str,
     branch: str,
     revision: str,
+    *,
+    now: Callable[[], str] = _utc_now_iso,
 ) -> dict[str, Any]:
-    """Capture the complete debt inventory bound to one analysis revision."""
+    """Capture a debt inventory whose code identity is pinned to one analysis revision.
+
+    The Quality Gate is bound exactly to the resolved analysis. Findings, hotspots and
+    measures are SonarCloud's live triage state for that same branch at capture time —
+    see the module docstring for why the API gives no stronger guarantee — so the
+    `metadata.capturedAt` timestamp this returns is part of the document's identity, not
+    incidental logging: two documents at the same analysisId can legitimately differ if
+    someone re-triaged an issue or reviewed a hotspot between captures.
+    """
     analysis = _resolve_analysis(client, project, branch, revision)
     gate_payload, conditions = _fetch_quality_gate(client, str(analysis["key"]))
     measures = _fetch_measures(client, project, branch)
     findings = _fetch_findings(client, project, branch)
     normalized_hotspots = _fetch_hotspots(client, project, branch)
+    captured_at = now()
 
     latest_after_capture = _latest_analysis(client, project, branch)
     if latest_after_capture.get("key") != analysis.get("key"):
@@ -306,6 +334,7 @@ def build_inventory(
             "revision": revision,
             "analysisDate": analysis.get("date"),
             "analysisKey": analysis.get("key"),
+            "capturedAt": captured_at,
         },
         "qualityGate": {"status": gate_payload.get("status"), "conditions": conditions},
         "measures": {key: measures[key] for key in sorted(measures)},
@@ -386,6 +415,8 @@ def render_markdown(inventory: dict[str, Any]) -> str:
         f"- Branch: `{metadata['branch']}`",
         f"- Revision: `{metadata['revision']}`",
         f"- Analysis date: {metadata['analysisDate']}",
+        f"- Captured at: {metadata['capturedAt']} (findings/hotspots/measures reflect SonarCloud's "
+        "live triage state at this instant, not a snapshot pinned to the analysis above)",
         f"- Quality gate: **{gate['status']}**",
         f"- Findings: {inventory['totals']['findings']}",
         f"- Security hotspots: {inventory['totals']['hotspots']}",

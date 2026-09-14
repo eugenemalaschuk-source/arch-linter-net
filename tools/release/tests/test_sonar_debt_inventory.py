@@ -4,6 +4,7 @@ import json
 import sys
 import urllib.error
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -149,6 +150,35 @@ def test_new_analysis_landing_during_capture_fails_closed() -> None:
         inventory.build_inventory(client, "project", "main", _SHA)
 
     assert "analysis-2" in str(error.value)
+
+
+def test_same_analysis_id_can_still_capture_different_issue_state() -> None:
+    """The Quality Gate is pinned to one immutable analysisId, but SonarCloud's issue/hotspot
+    triage state is live: a finding can be resolved, reopened or marked false-positive without
+    a new analysis running. Two captures at the same analysisId must therefore be allowed to
+    disagree on findings — the tool's contract is capturedAt-stamped live triage layered on an
+    exact code analysis, not a claim that the triage state itself never changes."""
+    issue_v1 = {"key": "i1", "rule": "r1", "component": "p:a.py", "line": 1, "status": "OPEN"}
+    issue_v2 = {"key": "i1", "rule": "r1", "component": "p:a.py", "line": 1, "status": "RESOLVED"}
+    hotspots_page = {"paging": {"total": 0}, "hotspots": []}
+
+    def make_fetch(issue: dict[str, Any]):
+        base = _base_responses({1: {"paging": {"total": 1}, "issues": [issue]}}, {1: hotspots_page})
+
+        def fetch(endpoint: str, params: dict[str, str]) -> dict:
+            page = int(params.get("p", "1"))
+            return base[(endpoint, page)]
+
+        return fetch
+
+    first = inventory.build_inventory(_client(make_fetch(issue_v1)), "project", "main", _SHA, now=lambda: "t1")
+    second = inventory.build_inventory(_client(make_fetch(issue_v2)), "project", "main", _SHA, now=lambda: "t2")
+
+    assert first["metadata"]["analysisKey"] == second["metadata"]["analysisKey"] == "analysis-1"
+    assert first["metadata"]["capturedAt"] == "t1"
+    assert second["metadata"]["capturedAt"] == "t2"
+    assert first["findings"][0]["status"] == "OPEN"
+    assert second["findings"][0]["status"] == "RESOLVED"
 
 
 def test_full_pagination_is_honoured() -> None:
@@ -500,7 +530,7 @@ def test_main_reports_inventory_errors(monkeypatch: pytest.MonkeyPatch, capsys: 
 
 
 _FAKE_MAIN_INVENTORY = {
-    "metadata": {"project": "p", "branch": "main", "revision": _SHA, "analysisDate": "d"},
+    "metadata": {"project": "p", "branch": "main", "revision": _SHA, "analysisDate": "d", "capturedAt": "c"},
     "qualityGate": {"status": "OK", "conditions": []},
     "totals": {"findings": 0, "hotspots": 0},
     "findings": [],
