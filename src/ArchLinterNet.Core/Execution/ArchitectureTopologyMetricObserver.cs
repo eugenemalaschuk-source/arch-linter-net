@@ -68,6 +68,30 @@ internal static class ArchitectureTopologyMetricObserver
         Type[] types = session.TypeIndex.AllTypes()
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .ToArray();
+        TypeSubjectProjection projection = BuildTypeSubjects(session, subjectKind, types);
+        (HashSet<ArchitectureTopologyObservedDependency> dependencies, HashSet<string> incompleteDependencySourceIdentities) =
+            BuildTypeDependencies(session, types, projection.SubjectByType);
+
+        return new ArchitectureTopologyObservation(
+            projection.SubjectsByIdentity.Values.OrderBy(subject => subject.Identity, StringComparer.Ordinal).ToArray(),
+            dependencies.OrderBy(dependency => dependency.SourceIdentity, StringComparer.Ordinal)
+                .ThenBy(dependency => dependency.TargetIdentity, StringComparer.Ordinal)
+                .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
+                .ToArray(),
+            incompleteDependencySourceIdentities);
+    }
+
+    // Groups the two intermediate maps produced by the type-subject scan into one return value so
+    // BuildTypeSubjects and its caller stay within the reviewed parameter-count budget.
+    private sealed record TypeSubjectProjection(
+        IReadOnlyDictionary<Type, ArchitectureTopologyObservedSubject> SubjectByType,
+        IReadOnlyDictionary<string, ArchitectureTopologyObservedSubject> SubjectsByIdentity);
+
+    private static TypeSubjectProjection BuildTypeSubjects(
+        ArchitectureAnalysisSession session,
+        string subjectKind,
+        IReadOnlyList<Type> types)
+    {
         var subjectByType = new Dictionary<Type, ArchitectureTopologyObservedSubject>();
         var subjectsByIdentity = new Dictionary<string, ArchitectureTopologyObservedSubject>(StringComparer.Ordinal);
 
@@ -114,6 +138,15 @@ internal static class ArchitectureTopologyMetricObserver
             subjectByType[type] = observed;
         }
 
+        return new TypeSubjectProjection(subjectByType, subjectsByIdentity);
+    }
+
+    private static (HashSet<ArchitectureTopologyObservedDependency> Dependencies, HashSet<string> IncompleteDependencySourceIdentities)
+        BuildTypeDependencies(
+            ArchitectureAnalysisSession session,
+            IReadOnlyList<Type> types,
+            IReadOnlyDictionary<Type, ArchitectureTopologyObservedSubject> subjectByType)
+    {
         var dependencies = new HashSet<ArchitectureTopologyObservedDependency>();
         var incompleteDependencySourceIdentities = new HashSet<string>(StringComparer.Ordinal);
         foreach (Type source in types)
@@ -145,13 +178,7 @@ internal static class ArchitectureTopologyMetricObserver
             }
         }
 
-        return new ArchitectureTopologyObservation(
-            subjectsByIdentity.Values.OrderBy(subject => subject.Identity, StringComparer.Ordinal).ToArray(),
-            dependencies.OrderBy(dependency => dependency.SourceIdentity, StringComparer.Ordinal)
-                .ThenBy(dependency => dependency.TargetIdentity, StringComparer.Ordinal)
-                .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
-                .ToArray(),
-            incompleteDependencySourceIdentities);
+        return (dependencies, incompleteDependencySourceIdentities);
     }
 
     // Shared with metrics so external facts use the exact owner binding used by the metric
