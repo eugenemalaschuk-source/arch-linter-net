@@ -356,13 +356,11 @@ public sealed class SarifEvidenceReader
         ArchitectureExternalEvidenceDiagnosticFilter? filter = requirement.DiagnosticFilter;
         ValidateDiagnosticFilterBounds(filter);
         return new SarifEvidenceAuthorizationSnapshot(
-            requirement.Id,
-            requirement.Tool,
-            requirement.ToolVersion,
-            requirement.Run,
-            requirement.RequireRepository,
-            requirement.RequireRevision,
-            requirement.RequireScope,
+            new SarifEvidenceAuthorizationIdentity(requirement.Id, requirement.Tool, requirement.ToolVersion, requirement.Run),
+            new SarifEvidenceAuthorizationBindingRequirements(
+                requirement.RequireRepository,
+                requirement.RequireRevision,
+                requirement.RequireScope),
             assessmentContext,
             filter is null
                 ? null
