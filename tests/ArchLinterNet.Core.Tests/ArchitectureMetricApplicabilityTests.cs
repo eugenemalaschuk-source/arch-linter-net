@@ -12,6 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureMetricApplicabilityTests
 {
+    private static readonly string[] _vendorSdkContributor = ["vendor-sdk"];
+
     [Test]
     public void Evaluate_AmbiguousTopologyTarget_IsUnassessableWithoutPartialValue()
     {
@@ -268,7 +270,7 @@ public sealed class ArchitectureMetricApplicabilityTests
         {
             Assert.That(measurement.IsEvaluable, Is.True);
             Assert.That(measurement.Value, Is.EqualTo(1));
-            Assert.That(measurement.Contributors, Is.EqualTo(new[] { "vendor-sdk" }));
+            Assert.That(measurement.Contributors, Is.EqualTo(_vendorSdkContributor));
         });
     }
 
@@ -317,7 +319,7 @@ public sealed class ArchitectureMetricApplicabilityTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(first.Contributors, Is.EqualTo(new[] { "vendor-sdk" }));
+            Assert.That(first.Contributors, Is.EqualTo(_vendorSdkContributor));
             Assert.That(second.Contributors, Is.Empty);
         });
     }

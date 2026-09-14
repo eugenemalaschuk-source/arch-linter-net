@@ -9,6 +9,8 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class MeasureReportFormatterTests
 {
+    private static readonly string[] _boundedContributors = ["alpha", "middle"];
+
     [Test]
     public void FormatJson_BoundsOrdinalContributorsAndPreservesTotalEvidence()
     {
@@ -38,7 +40,7 @@ public sealed class MeasureReportFormatterTests
             Assert.That(measurement.GetProperty("contributor_count").GetInt32(), Is.EqualTo(3));
             Assert.That(measurement.GetProperty("contributors_truncated").GetBoolean(), Is.True);
             Assert.That(measurement.GetProperty("contributors").EnumerateArray()
-                .Select(item => item.GetString()), Is.EqualTo(new[] { "alpha", "middle" }));
+                .Select(item => item.GetString()), Is.EqualTo(_boundedContributors));
         });
     }
 

@@ -11,6 +11,11 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureChangeSnapshotProjectorTests
 {
     private static readonly string[] _violationEvidence = ["Acme.Service.Run: System.Console.WriteLine"];
+    private static readonly string[] _staleProjectCoverageIdentities =
+    [
+        "project-coverage|project|stale|/src/Stale.csproj",
+        "project-coverage|project|unknown|/src/Foo.csproj",
+    ];
 
     [Test]
     public void Project_CanonicalizesProjectIdentityAcrossCheckoutRoots()
@@ -358,11 +363,7 @@ public sealed class ArchitectureChangeSnapshotProjectorTests
             .Where(static entry => entry.Kind == "coverage_blind_spot")
             .Select(static entry => entry.Identity)
             .ToArray();
-        Assert.That(identities, Is.EquivalentTo(new[]
-        {
-            "project-coverage|project|stale|/src/Stale.csproj",
-            "project-coverage|project|unknown|/src/Foo.csproj",
-        }));
+        Assert.That(identities, Is.EquivalentTo(_staleProjectCoverageIdentities));
     }
 
     internal static ArchitectureGraphOutcome EmptyGraph() => new(new ArchitectureDependencyGraph(

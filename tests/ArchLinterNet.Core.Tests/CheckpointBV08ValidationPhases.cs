@@ -83,7 +83,7 @@ internal sealed class CheckpointBV08ValidationPhases(CheckpointBV08ToolRunner ru
         return (CheckpointBReleaseGateTests.Passed("v08-validate-strict-audit"), result.StandardOutput, outputSarifPath);
     }
 
-    internal CheckpointScenarioResult AssertRecursiveExposureEvidence(string validateJson)
+    internal static CheckpointScenarioResult AssertRecursiveExposureEvidence(string validateJson)
     {
         using JsonDocument document = JsonDocument.Parse(validateJson);
         JsonElement findings = document.RootElement.TryGetProperty("violations", out JsonElement violations)

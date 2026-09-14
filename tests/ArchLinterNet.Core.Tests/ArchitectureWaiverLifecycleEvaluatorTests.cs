@@ -13,6 +13,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureWaiverLifecycleEvaluatorTests
 {
+    private static readonly string[] _selectedWaiverId = ["ARCH-IGN-001"];
+
     [Test]
     public void Evaluate_ExpiredUnmatchedWaiver_RemainsExpired()
     {
@@ -75,7 +77,7 @@ public sealed class ArchitectureWaiverLifecycleEvaluatorTests
         IReadOnlyList<ArchitectureWaiverLifecycleRecord> records = ArchitectureWaiverLifecycleEvaluator.Evaluate(
             document, "strict", [], new DateOnly(2026, 8, 2), ["boundary"]);
 
-        Assert.That(records.Select(record => record.Id), Is.EquivalentTo(new[] { "ARCH-IGN-001" }));
+        Assert.That(records.Select(record => record.Id), Is.EquivalentTo(_selectedWaiverId));
     }
 
     [Test]

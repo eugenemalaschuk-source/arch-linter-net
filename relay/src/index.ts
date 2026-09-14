@@ -1,11 +1,11 @@
-import { RelayDurableObject } from "./relay-do";
-import { REGISTRY_OBJECT_NAME, RelayRegistryDurableObject } from "./registry-do";
+import { REGISTRY_OBJECT_NAME } from "./registry-do";
 import { validateRegistryEntry, isOpaqueAlias } from "./registry";
 import { FIXED_GITHUB_ISSUER, FIXED_GITHUB_JWKS, MAX_REQUEST_BYTES, type RegistryEntry, type RelayEnvironment } from "./types";
 import { publicUnavailableResponse, type PublicRepresentation } from "./read";
 
-export { RelayDurableObject };
-export { RelayRegistryDurableObject, REGISTRY_OBJECT_NAME };
+export { RelayDurableObject } from "./relay-do";
+export { RelayRegistryDurableObject } from "./registry-do";
+export { REGISTRY_OBJECT_NAME };
 export * from "./types";
 export * from "./registry";
 export * from "./security";
@@ -16,7 +16,9 @@ function entryForHeader(entry: RegistryEntry): string {
   return JSON.stringify(entry);
 }
 
-function json(status: number, body: unknown, headers: Record<string, string> = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }): Response {
+const JSON_RESPONSE_HEADERS: Record<string, string> = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
+
+function json(status: number, body: unknown, headers: Record<string, string> = JSON_RESPONSE_HEADERS): Response {
   return new Response(JSON.stringify(body), { status, headers });
 }
 
@@ -89,8 +91,8 @@ async function relayAdminCall(env: RelayEnvironment, alias: string, binding: Reg
   const boundedBody = {
     ...body,
     operation_id: operationId(body.operation_id) ?? (operation === "status" || operation === "sync" ? `relay-${operation}-${binding.revision}-${binding.barrierEpoch}` : undefined),
-    expected_registry_revision: Object.prototype.hasOwnProperty.call(body, "expected_registry_revision") ? body.expected_registry_revision : binding.revision,
-    expected_barrier_epoch: Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch") ? body.expected_barrier_epoch : binding.barrierEpoch
+    expected_registry_revision: Object.hasOwn(body, "expected_registry_revision") ? body.expected_registry_revision : binding.revision,
+    expected_barrier_epoch: Object.hasOwn(body, "expected_barrier_epoch") ? body.expected_barrier_epoch : binding.barrierEpoch
   };
   const response = await (stub.fetch as unknown as (input: unknown) => Promise<Response>)(new Request(target, { method: "POST", headers, body: JSON.stringify(boundedBody) }));
   let parsed: Record<string, unknown> = {};
@@ -99,9 +101,9 @@ async function relayAdminCall(env: RelayEnvironment, alias: string, binding: Reg
 }
 
 function expectedRegistryStateMatches(body: Record<string, unknown>, binding: RegistryLookup): boolean {
-  if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+  if (Object.hasOwn(body, "expected_registry_revision")
     && (!Number.isSafeInteger(body.expected_registry_revision) || body.expected_registry_revision !== binding.revision)) return false;
-  if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+  if (Object.hasOwn(body, "expected_barrier_epoch")
     && (!Number.isSafeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== binding.barrierEpoch)) return false;
   return true;
 }
@@ -145,7 +147,11 @@ async function adminRevoke(request: Request, env: RelayEnvironment, alias: strin
     expected_revision: lookup.revision,
     expected_barrier_epoch: lookup.barrierEpoch
   });
-  if (result.status !== 200) return result.status === 404 ? unknownRoute() : result.status === 409 ? json(409, { error: "registry_conflict" }) : json(503, { error: "storage_unavailable" });
+  if (result.status !== 200) {
+    if (result.status === 404) return unknownRoute();
+    if (result.status === 409) return json(409, { error: "registry_conflict" });
+    return json(503, { error: "storage_unavailable" });
+  }
   // The registry barrier is now committed. Finalization performs the single
   // irreversible Relay generation/epoch transition under the reservation.
   const revokedLookup = await lookupEntry(env, alias, true);
@@ -206,9 +212,14 @@ async function adminUpgrade(request: Request, env: RelayEnvironment, alias: stri
   const lookup = await lookupEntry(env, alias);
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
   if (!lookup.entry) return unknownRoute();
-  const requestedOperation = operation === "rollback"
-    ? "upgrade-rollback"
-    : phase === "activate" || body.operation === "upgrade-activate" || body.operation === "activate" ? "upgrade-activate" : "upgrade-stage";
+  let requestedOperation: "upgrade-rollback" | "upgrade-activate" | "upgrade-stage";
+  if (operation === "rollback") {
+    requestedOperation = "upgrade-rollback";
+  } else if (phase === "activate" || body.operation === "upgrade-activate" || body.operation === "activate") {
+    requestedOperation = "upgrade-activate";
+  } else {
+    requestedOperation = "upgrade-stage";
+  }
   const result = await relayAdminCall(env, alias, lookup, operation, { ...body, operation: requestedOperation });
   return json(result.status, result.body);
 }

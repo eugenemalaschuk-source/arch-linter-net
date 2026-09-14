@@ -1,7 +1,5 @@
 import {
   CHALLENGE_SECONDS,
-  COMPATIBILITY_PLAN,
-  CONTRACT_VERSION,
   LEASE_SECONDS,
   MAX_MANIFEST_BYTES,
   MAX_PUBLIC_PAYLOAD_BYTES,
@@ -109,9 +107,15 @@ function response(status: number, body: unknown, headers: Record<string, string>
   return new Response(JSON.stringify(body), { status, headers });
 }
 
+const GENERIC_ERROR_REASONS: Record<number, string> = {
+  413: "request_too_large",
+  409: "stale_or_replayed",
+  403: "forbidden",
+  503: "storage_unavailable"
+};
+
 function genericError(status: number): Response {
-  const reason = status === 413 ? "request_too_large" : status === 409 ? "stale_or_replayed" : status === 403 ? "forbidden" : status === 503 ? "storage_unavailable" : "unauthorized";
-  return response(status, { error: reason });
+  return response(status, { error: GENERIC_ERROR_REASONS[status] ?? "unauthorized" });
 }
 
 async function readBoundedJson(request: Request): Promise<Record<string, unknown>> {
@@ -147,20 +151,23 @@ function parseCanonicalDateSeconds(value: unknown): number | undefined {
 export class RelayDurableObject {
   private readonly state: RelayStateLike;
   private readonly sql: RelayStateLike["storage"]["sql"];
-  private readonly initialized: Promise<void>;
+  private initialized!: Promise<void>;
   private readonly shippedDigests: ReadonlySet<string>;
 
   constructor(state: DurableObjectState, env: unknown) {
     this.state = state as RelayStateLike;
     this.sql = this.state.storage.sql;
     const configured = (env as { RELAY_SHIPPED_BUNDLE_DIGESTS?: string | string[] } | undefined)?.RELAY_SHIPPED_BUNDLE_DIGESTS;
-    const values = Array.isArray(configured) ? configured : typeof configured === "string" ? configured.split(",") : [];
+    let values: string[];
+    if (Array.isArray(configured)) values = configured;
+    else if (typeof configured === "string") values = configured.split(",");
+    else values = [];
     this.shippedDigests = new Set(values.map((value) => value.trim()).filter((value) => /^[0-9a-f]{64}$/u.test(value)));
-    this.initialized = this.initializeState();
+    this.startInitialization();
   }
 
-  private initializeState(): Promise<void> {
-    return this.state.blockConcurrencyWhile(() => { this.ensureSchema(); });
+  private startInitialization(): void {
+    this.initialized = this.state.blockConcurrencyWhile(() => { this.ensureSchema(); });
   }
 
   private ensureSchema(): void {
@@ -280,7 +287,7 @@ export class RelayDurableObject {
     return this.row();
   }
 
-  private recordOperation(operation: LifecycleOperation | string, status: string, reason: LifecycleReason | string, row?: StateRow, operationId = `${operation}-${crypto.randomUUID()}`): void {
+  private recordOperation(operation: string, status: string, reason: string, row?: StateRow, operationId = `${operation}-${crypto.randomUUID()}`): void {
     const current = row ?? this.row();
     const now = nowSeconds();
     this.sql.exec("INSERT OR IGNORE INTO relay_operations (operation,status,reason,operation_id,generation,revocation_epoch,created_at) VALUES (?,?,?,?,?,?,?)", operation, status, reason, operationId, current.generation, current.revocation_epoch, now).toArray();
@@ -386,7 +393,6 @@ export class RelayDurableObject {
     const idempotencyHash = await sha256Hex(body.idempotency_key);
     const semanticHorizon = typeof body.semantic_horizon === "string" ? body.semantic_horizon : payload.valid_until;
     return this.state.storage.transactionSync(() => {
-      try {
       const current = this.row();
       if (current.pending_operation_id !== null) return this.finishError(409);
       if (current.tombstoned || current.status === "revoked") return this.finishError(403);
@@ -408,9 +414,6 @@ export class RelayDurableObject {
       this.sql.exec("INSERT INTO relay_replay_keys (hash,kind,canonical_digest,generation,revocation_epoch,challenge_id,used_at) VALUES (?,?,?,?,?,?,?)", idempotencyHash, "idempotency", digest, current.generation, current.revocation_epoch, challengeId, nowSeconds()).toArray();
       this.sql.exec("INSERT INTO relay_replay_keys (hash,kind,canonical_digest,generation,revocation_epoch,challenge_id,used_at) VALUES (?,?,?,?,?,?,?)", publisher.jtiHash, "jti", digest, current.generation, current.revocation_epoch, challengeId, nowSeconds()).toArray();
       return response(201, { ok: true, challenge_id: challengeId, deadline: new Date(deadline * 1000).toISOString(), generation: current.generation, revocation_epoch: current.revocation_epoch });
-      } catch (error) {
-        throw error;
-      }
     });
   }
 
@@ -455,7 +458,6 @@ export class RelayDurableObject {
     if (!safeInteger(body.expected_generation) || !safeInteger(body.expected_revocation_epoch)) throw new PayloadError();
     const idempotencyHash = await sha256Hex(body.idempotency_key);
     return this.state.storage.transactionSync(() => {
-      try {
       const current = this.row();
       if (current.pending_operation_id !== null) return this.finishError(409);
       if (operation === "recover" && current.status !== "needs-recovery") return this.finishError(409);
@@ -491,9 +493,6 @@ export class RelayDurableObject {
       if (after.generation !== newGeneration || after.payload_digest !== body.canonical_digest) return this.finishError(409);
       this.recordOperation(operation, "ready", "ok", after);
       return response(200, { ok: true, generation: newGeneration, revocation_epoch: after.revocation_epoch, state: "ready", valid_until: validUntil });
-      } catch (error) {
-        throw error;
-      }
     });
   }
 
@@ -501,7 +500,6 @@ export class RelayDurableObject {
     this.validateOperationBasics(body, operation);
     if (safeInteger(body.expected_generation) === false || safeInteger(body.expected_revocation_epoch) === false) throw new PayloadError();
     return this.state.storage.transactionSync(() => {
-      try {
       const current = this.row();
       if (current.pending_operation_id !== null) return this.finishError(409);
       if (current.generation !== body.expected_generation || current.revocation_epoch !== body.expected_revocation_epoch || current.tombstoned) return this.finishError(409);
@@ -513,9 +511,6 @@ export class RelayDurableObject {
       if (operation === "revoke" && (after.status !== "revoked" || !after.tombstoned)) return this.finishError(409);
       this.recordOperation(operation, after.status, operation === "invalidate" ? "expired" : "ok", after);
       return response(200, { ok: true, state: status, generation: after.generation, revocation_epoch: after.revocation_epoch });
-      } catch (error) {
-        throw error;
-      }
     });
   }
 
@@ -575,9 +570,9 @@ export class RelayDurableObject {
         return response(200, { ok: true, state: current.status, pending: true, generation: current.generation, revocation_epoch: current.revocation_epoch, operation_id: operationIdValue });
       }
       if (current.tombstoned !== 0 || current.status === "revoked") return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+      if (Object.hasOwn(body, "expected_registry_revision")
         && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== current.registry_revision)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+      if (Object.hasOwn(body, "expected_barrier_epoch")
         && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== current.barrier_epoch)) return this.finishError(409);
       if (body.expected_generation !== current.generation || body.expected_revocation_epoch !== current.revocation_epoch) return this.finishError(409);
 
@@ -601,13 +596,13 @@ export class RelayDurableObject {
         return response(200, { ok: true, state: prior.status, generation: prior.generation, revocation_epoch: prior.revocation_epoch, operation_id: operationIdValue });
       }
       if (current.pending_operation_id !== operationIdValue || current.pending_operation !== lifecycleOperation) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+      if (Object.hasOwn(body, "expected_registry_revision")
         && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== current.registry_revision)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+      if (Object.hasOwn(body, "expected_barrier_epoch")
         && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== current.barrier_epoch)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_generation")
+      if (Object.hasOwn(body, "expected_generation")
         && (!safeInteger(body.expected_generation) || body.expected_generation !== current.generation)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_revocation_epoch")
+      if (Object.hasOwn(body, "expected_revocation_epoch")
         && (!safeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== current.revocation_epoch)) return this.finishError(409);
 
       this.sql.exec("UPDATE relay_state SET status='revoked', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=1, last_renewed_at=NULL, pending_operation_id=NULL, pending_operation=NULL, updated_at=? WHERE id=1 AND pending_operation_id=? AND pending_operation=?", nowSeconds(), operationIdValue, lifecycleOperation).toArray();
@@ -633,13 +628,13 @@ export class RelayDurableObject {
       }
       if (current.pending_operation_id !== null) return this.finishError(409);
       const expected = preBarrier ?? current;
-      if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+      if (Object.hasOwn(body, "expected_registry_revision")
         && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== expected.registry_revision)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+      if (Object.hasOwn(body, "expected_barrier_epoch")
         && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== expected.barrier_epoch)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_generation")
+      if (Object.hasOwn(body, "expected_generation")
         && (!safeInteger(body.expected_generation) || body.expected_generation !== expected.generation)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_revocation_epoch")
+      if (Object.hasOwn(body, "expected_revocation_epoch")
         && (!safeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== expected.revocation_epoch)) return this.finishError(409);
       if (current.tombstoned !== 0) return this.finishError(409);
       if (operation === "admin-recover-open") {
@@ -650,7 +645,10 @@ export class RelayDurableObject {
       this.sql.exec("DELETE FROM relay_challenges WHERE consumed=0").toArray();
       const after = this.row();
       const status = after.status;
-      const reason: LifecycleReason = operation === "admin-recover-open" ? "recovery_required" : operation === "admin-invalidate" ? "expired" : "ok";
+      let reason: LifecycleReason;
+      if (operation === "admin-recover-open") reason = "recovery_required";
+      else if (operation === "admin-invalidate") reason = "expired";
+      else reason = "ok";
       this.recordOperation(operation, status, reason, after, body.operation_id as string);
       return response(200, { ok: true, state: status, generation: after.generation, revocation_epoch: after.revocation_epoch, operation_id: body.operation_id });
     });
@@ -660,7 +658,6 @@ export class RelayDurableObject {
     const reason = compatibilityReason({ bundle: body.bundle, contract_version: body.contract_version, compatibility_plan: body.compatibility_plan, bundle_digest: body.bundle_digest });
     if (reason !== "ok") return response(409, { error: "compatibility_conflict" });
     if (!boundedString(body.operation_id, 128) || body.operation_id.length === 0) return genericError(413);
-    const current = this.row();
     const operation = typeof body.operation === "string" ? body.operation : "upgrade-stage";
     if (operation !== "upgrade-stage" && operation !== "upgrade-activate" && operation !== "upgrade-rollback") return response(409, { error: "compatibility_conflict" });
     const operationIdValue = body.operation_id as string;
@@ -672,13 +669,13 @@ export class RelayDurableObject {
         return response(200, { ok: true, state: prior.status, generation: prior.generation, revocation_epoch: prior.revocation_epoch, operation_id: operationIdValue });
       }
       if (before.pending_operation_id !== null) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_registry_revision")
+      if (Object.hasOwn(body, "expected_registry_revision")
         && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== before.registry_revision)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_barrier_epoch")
+      if (Object.hasOwn(body, "expected_barrier_epoch")
         && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== before.barrier_epoch)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_generation")
+      if (Object.hasOwn(body, "expected_generation")
         && (!safeInteger(body.expected_generation) || body.expected_generation !== before.generation)) return this.finishError(409);
-      if (Object.prototype.hasOwnProperty.call(body, "expected_revocation_epoch")
+      if (Object.hasOwn(body, "expected_revocation_epoch")
         && (!safeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== before.revocation_epoch)) return this.finishError(409);
       const active = before.active_digest ?? before.bundle_digest;
       const requested = typeof body.bundle_digest === "string" ? body.bundle_digest : undefined;
@@ -785,13 +782,11 @@ export class RelayDurableObject {
     } catch (error) {
       try {
         const current = this.row();
-        const reason: LifecycleReason = error instanceof AuthorizationError && error.status === 409
-          ? "expired"
-          : error instanceof AuthorizationError
-            ? "authorization_failed"
-            : error instanceof PayloadError
-              ? "quota_exceeded"
-              : "storage_unavailable";
+        let reason: LifecycleReason;
+        if (error instanceof AuthorizationError && error.status === 409) reason = "expired";
+        else if (error instanceof AuthorizationError) reason = "authorization_failed";
+        else if (error instanceof PayloadError) reason = "quota_exceeded";
+        else reason = "storage_unavailable";
         this.state.storage.transactionSync(() => this.recordOperation("diagnostic", current.status, reason, this.row()));
       } catch {
         // Diagnostics must never turn a fixed generic response into a leak.
@@ -813,7 +808,11 @@ export class RelayDurableObject {
     proof: { valid: true; kind?: string; digest?: string; semantic_horizon?: string; tree_sha?: string };
   }): Promise<Response> {
     await this.initialized;
-    return this.publish(args.body as unknown as Record<string, unknown>, args.entry, { claims: {}, jti: "", jtiHash: args.jtiHash }, args.body.operation === "renew" ? "renew" : args.body.operation === "recover" ? "recover" : "publish", args.proof);
+    let operation: "publish" | "renew" | "recover";
+    if (args.body.operation === "renew") operation = "renew";
+    else if (args.body.operation === "recover") operation = "recover";
+    else operation = "publish";
+    return this.publish(args.body as unknown as Record<string, unknown>, args.entry, { claims: {}, jti: "", jtiHash: args.jtiHash }, operation, args.proof);
   }
 
   /** Mark a restored object unavailable until a fresh proof is committed. */

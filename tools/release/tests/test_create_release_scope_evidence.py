@@ -25,6 +25,10 @@ _COMMIT = "b" * 40
 _REPOSITORY = "owner/arch-linter-net"
 
 
+def _raise_different_drives(_: object) -> str:
+    raise ValueError("different drives")
+
+
 def _declaration(
     directory: Path,
     target: str = "0.6.4",
@@ -330,7 +334,7 @@ def test_incomparable_root_is_treated_as_not_containing(tmp_path: Path, monkeypa
     monkeypatch.setattr(
         _release_workspace.os.path,
         "commonpath",
-        lambda paths: (_ for _ in ()).throw(ValueError("different drives")),
+        _raise_different_drives,
     )
 
     with pytest.raises(ValueError, match="resolves outside the release workspace"):
@@ -375,7 +379,7 @@ def test_main_rejects_caller_controlled_scope_paths(monkeypatch) -> None:
             "--repository",
             _REPOSITORY,
             "--scope-dir",
-            "/tmp/elsewhere",
+            "../elsewhere",
         ],
     )
 

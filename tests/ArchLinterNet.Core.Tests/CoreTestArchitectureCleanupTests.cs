@@ -15,6 +15,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class CoreTestArchitectureCleanupTests
 {
+    private static readonly string[] _intentionalFixturePartPaths =
+        ["src/IntentionalFixture.Part1.cs", "src/IntentionalFixture.Part2.cs"];
+
     [Test]
     public void PartialLanguageFixture_RemainsDiscoverableWithEveryDeclarationPath()
     {
@@ -39,7 +42,7 @@ public sealed class CoreTestArchitectureCleanupTests
         Assert.That(declarations.All(declaration => declaration.IsPartial), Is.True);
         Assert.That(
             declarations.Select(declaration => declaration.SourceFilePath),
-            Is.EqualTo(new[] { "src/IntentionalFixture.Part1.cs", "src/IntentionalFixture.Part2.cs" }));
+            Is.EqualTo(_intentionalFixturePartPaths));
     }
 
     [Test]

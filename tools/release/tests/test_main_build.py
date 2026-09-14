@@ -129,9 +129,9 @@ def test_development_version_rejects_unreadable_or_malformed_props(tmp_path: Pat
         ("<Project><PropertyGroup /></Project>", 0),
         (
             "<Project><PropertyGroup>"
-            "<ArchLinterDevelopmentVersion>0.8.0</ArchLinterDevelopmentVersion>"
-            "<ArchLinterDevelopmentVersion>0.8.1</ArchLinterDevelopmentVersion>"
-            "</PropertyGroup></Project>",
+            + "<ArchLinterDevelopmentVersion>0.8.0</ArchLinterDevelopmentVersion>"
+            + "<ArchLinterDevelopmentVersion>0.8.1</ArchLinterDevelopmentVersion>"
+            + "</PropertyGroup></Project>",
             2,
         ),
     ],

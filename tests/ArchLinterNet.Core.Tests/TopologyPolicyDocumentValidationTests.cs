@@ -6,6 +6,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class TopologyPolicyDocumentValidationTests
 {
+    private static readonly string[] _applicationDomainIds = ["application", "domain"];
+
     [Test]
     public void Load_ValidExhaustiveTopology_RetainsNativeDeclarations()
     {
@@ -45,8 +47,8 @@ public sealed class TopologyPolicyDocumentValidationTests
             Assert.That(topology.Mode, Is.EqualTo("exhaustive"));
             Assert.That(topology.SubjectKind, Is.EqualTo("type"));
             Assert.That(topology.Scope.AllowEmpty, Is.False);
-            Assert.That(topology.Scope.Selectors.Select(selector => selector.Layer), Is.EqualTo(new[] { "application", "domain" }));
-            Assert.That(topology.Nodes.Select(node => node.Id), Is.EqualTo(new[] { "application", "domain" }));
+            Assert.That(topology.Scope.Selectors.Select(selector => selector.Layer), Is.EqualTo(_applicationDomainIds));
+            Assert.That(topology.Nodes.Select(node => node.Id), Is.EqualTo(_applicationDomainIds));
             Assert.That(topology.AllowedEdges.Single().From, Is.EqualTo("application"));
             Assert.That(topology.OutOfScope.Single().Selector.Context!.Role, Is.EqualTo("Generated"));
             Assert.That(topology.StaleDeclarations, Is.True);

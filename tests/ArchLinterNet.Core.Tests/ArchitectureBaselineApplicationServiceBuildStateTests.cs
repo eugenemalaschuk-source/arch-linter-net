@@ -28,6 +28,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     private static readonly string[] _materializationCallOrder =
         { "PrepareRunner", "PrepareBuild", "VerifyPostBuild", "MaterializePreparedRunner" };
     private static readonly string[] _fallbackCallOrder = { "PrepareRunner", "BuildRunner" };
+    private static readonly string[] _directMissingAssembly = { "Direct" };
 
     internal sealed class FakeBuildStatePreparationService : IBuildStatePreparationService
     {
@@ -507,7 +508,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
                 ResolveAssemblyOutputs: true,
                 SelectedAssemblyArtifactPaths: Array.Empty<string>(),
                 CapturedArtifactContentDigests: new Dictionary<string, string>(),
-                MissingAssemblyNames: new[] { "Direct" },
+                MissingAssemblyNames: _directMissingAssembly,
                 IsMetadataReferenceClosureComplete: false),
         };
         var preparationService = new FakeBuildStatePreparationService { CallOrder = callOrder };

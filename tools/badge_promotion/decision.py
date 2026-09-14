@@ -58,15 +58,23 @@ def _unavailable(request: PromotionRequest, reason: ReasonCode, disposition: Dec
     return PromotionDecision(PromotionStatus.UNAVAILABLE, reason, disposition, request.generation, request.revocation_epoch)
 
 
-def _context_reason(config: PromotionConfig, evidence: EvidenceContext) -> ReasonCode | None:
+def _identity_reason(config: PromotionConfig, evidence: EvidenceContext) -> ReasonCode | None:
     if evidence.repository != config.repository:
         return ReasonCode.REPOSITORY_MISMATCH
     if evidence.base_ref != config.base_ref:
         return ReasonCode.BASE_REF_MISMATCH
     if evidence.event != "pull_request":
         return ReasonCode.DIRECT_PUSH
+    return None
+
+
+def _provenance_reason(config: PromotionConfig, evidence: EvidenceContext) -> ReasonCode | None:
     if evidence.event != config.producer.event or not evidence.merged or not is_sha1(evidence.base_sha) or not is_sha1(evidence.head_sha) or not is_sha1(evidence.main_tree_sha) or not is_sha1(evidence.head_tree_sha) or evidence.main_tree_sha != evidence.head_tree_sha:
         return ReasonCode.MERGE_PROVENANCE_INVALID
+    return None
+
+
+def _gate_reason(config: PromotionConfig, evidence: EvidenceContext) -> ReasonCode | None:
     if not evidence.required_gate_present:
         return ReasonCode.REQUIRED_GATE_MISSING
     if evidence.check_name != config.producer.check_name or evidence.check_app != config.producer.check_app:
@@ -75,16 +83,39 @@ def _context_reason(config: PromotionConfig, evidence: EvidenceContext) -> Reaso
         return ReasonCode.CHECK_NOT_SUCCESSFUL
     if evidence.workflow_path != config.producer.workflow_path or evidence.workflow_sha != config.producer.workflow_sha:
         return ReasonCode.WORKFLOW_MISMATCH
+    return None
+
+
+def _run_reason(config: PromotionConfig, evidence: EvidenceContext) -> ReasonCode | None:
     if evidence.run_id <= 0:
         return ReasonCode.RUN_MISMATCH
     if evidence.run_attempt <= 0:
         return ReasonCode.ATTEMPT_MISMATCH
     if evidence.job_name != config.producer.job_name or evidence.job_id <= 0:
         return ReasonCode.JOB_MISMATCH
+    return None
+
+
+def _artifact_reason(config: PromotionConfig, evidence: EvidenceContext) -> ReasonCode | None:
     if evidence.artifact_name != config.producer.artifact_name or evidence.artifact_id <= 0 or evidence.artifact_size <= 0:
         return ReasonCode.ARTIFACT_MISMATCH
     if evidence.artifact_expired:
         return ReasonCode.ARTIFACT_EXPIRED
+    return None
+
+
+def _context_reason(config: PromotionConfig, evidence: EvidenceContext) -> ReasonCode | None:
+    checks = (
+        _identity_reason,
+        _provenance_reason,
+        _gate_reason,
+        _run_reason,
+        _artifact_reason,
+    )
+    for check in checks:
+        reason = check(config, evidence)
+        if reason is not None:
+            return reason
     return None
 
 

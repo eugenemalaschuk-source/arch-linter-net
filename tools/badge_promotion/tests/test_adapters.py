@@ -54,7 +54,6 @@ def test_relay_http_commit_requests_do_not_carry_forged_trusted_context(monkeypa
         "revocation_epoch": 2,
         "oidc_token": "token",
         "semantic_horizon": "2026-09-12T11:00:00Z",
-        "tree_sha": "c" * 40,
     }
     client.publish(b"{}", "a" * 64, **kwargs)
     client.renew(b"{}", "a" * 64, **kwargs)

@@ -386,7 +386,7 @@ public sealed class ArchitectureMetricApplicabilityCompletenessTests
         });
     }
 
-    private static Assembly CreateDuplicateAssembly(string simpleName, Version version)
+    private static AssemblyBuilder CreateDuplicateAssembly(string simpleName, Version version)
     {
         AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
             new AssemblyName(simpleName) { Version = version }, AssemblyBuilderAccess.Run);

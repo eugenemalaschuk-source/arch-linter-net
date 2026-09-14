@@ -20,7 +20,7 @@ def _job(workflow: str, job_name: str) -> str:
     job_header = f"  {job_name}:\n"
     start = workflow.index(job_header) + len(job_header)
     remainder = workflow[start:]
-    next_job = re.search(r"\n  [A-Za-z0-9_-]+:\n", remainder)
+    next_job = re.search(r"\n {2}[A-Za-z0-9_-]+:\n", remainder)
     return remainder if next_job is None else remainder[: next_job.start()]
 
 

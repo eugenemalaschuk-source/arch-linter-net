@@ -6,6 +6,9 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 internal sealed class CliMeasureIntegrationTests : CliIntegrationTestBase
 {
+    private static readonly string[] _expectedProjectContributor =
+        ["../../../src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj"];
+
     [Test]
     public void Measure_Help_ShowsMeasureSpecificOptionsAndExitsZero()
     {
@@ -88,7 +91,7 @@ internal sealed class CliMeasureIntegrationTests : CliIntegrationTestBase
             Assert.That(measurement.GetProperty("value").GetInt32(), Is.EqualTo(1));
             Assert.That(measurement.GetProperty("contributors").EnumerateArray()
                     .Select(contributor => contributor.GetString()),
-                Is.EqualTo(new[] { "../../../src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" }));
+                Is.EqualTo(_expectedProjectContributor));
         });
     }
 

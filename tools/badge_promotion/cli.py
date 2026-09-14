@@ -39,6 +39,7 @@ class ProviderFailure(RuntimeError):
 
 
 _MAX_RAW_PUBLICATION_ATTEMPTS = 5
+_DEFAULT_BRANCH = "~DEFAULT_BRANCH"
 
 
 class _ArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -62,7 +63,7 @@ class _ArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
         source_host = urllib.parse.urlparse(request.full_url).netloc
         if target.netloc != source_host:
             for header_map in (redirected.headers, redirected.unredirected_hdrs):
-                for header_name in list(header_map):
+                for header_name in header_map.copy():
                     if header_name.lower() == "authorization":
                         del header_map[header_name]
         return redirected
@@ -108,7 +109,7 @@ class GitHubApi:
             opener = urllib.request.build_opener(_ArtifactRedirectHandler())
             with opener.open(request, timeout=30) as response:
                 data = response.read(65_537)
-        except (OSError, urllib.error.HTTPError) as error:
+        except OSError as error:
             raise ProviderFailure("artifact_download_failed") from error
         if len(data) > 65_536:
             raise ProviderFailure("artifact_archive_oversized")
@@ -134,6 +135,98 @@ def _parse_time(value: Any) -> datetime:
         raise ProviderFailure("semantic_evidence_unavailable") from error
 
 
+def _has_required_check(document: Any, check_name: str, check_app_id: int) -> bool:
+    if not isinstance(document, dict) or document.get("type") != "required_status_checks":
+        return False
+    parameters = document.get("parameters")
+    if not isinstance(parameters, dict) or parameters.get("strict_required_status_checks_policy") is not True:
+        return False
+    checks = parameters.get("required_status_checks")
+    if not isinstance(checks, list):
+        return False
+    return any(
+        isinstance(check, dict)
+        and check.get("context") == check_name
+        and not isinstance(check.get("integration_id"), bool)
+        and check.get("integration_id") == check_app_id
+        for check in checks
+    )
+
+
+def _branch_pattern_matches(pattern: Any, ref: str, base_ref: str, default_branch: Any) -> bool:
+    if not isinstance(pattern, str):
+        return False
+    if pattern == _DEFAULT_BRANCH:
+        return default_branch == base_ref
+    return fnmatch.fnmatchcase(ref, pattern) or fnmatch.fnmatchcase(base_ref, pattern)
+
+
+def _applies_to_base_ref(document: Any, api: GitHubApi, repository_path: str, base_ref: str) -> bool:
+    if not isinstance(document, dict) or document.get("target") != "branch" or document.get("enforcement") != "active":
+        return False
+    conditions = document.get("conditions")
+    ref_name = conditions.get("ref_name") if isinstance(conditions, dict) else None
+    if not isinstance(ref_name, dict) or not isinstance(ref_name.get("include"), list) or not isinstance(ref_name.get("exclude"), list):
+        return False
+    ref = f"refs/heads/{base_ref}"
+    default_branch = None
+    if _DEFAULT_BRANCH in ref_name["include"] or _DEFAULT_BRANCH in ref_name["exclude"]:
+        try:
+            repository_info = api.request(f"/repos/{repository_path}")
+        except ProviderFailure:
+            return False
+        default_branch = repository_info.get("default_branch") if isinstance(repository_info, dict) else None
+    included = any(_branch_pattern_matches(pattern, ref, base_ref, default_branch) for pattern in ref_name["include"])
+    excluded = any(_branch_pattern_matches(pattern, ref, base_ref, default_branch) for pattern in ref_name["exclude"])
+    return included and not excluded
+
+
+def _ruleset_detail_requires_check(
+    api: GitHubApi,
+    repository_path: str,
+    ruleset_id: int,
+    check_name: str,
+    check_app_id: int,
+    base_ref: str,
+) -> bool:
+    try:
+        detail = api.request(f"/repos/{repository_path}/rulesets/{ruleset_id}")
+    except ProviderFailure as detail_error:
+        if detail_error.reason == "required_capability_unavailable":
+            return False
+        raise
+    detail_rules = detail.get("rules") if isinstance(detail, dict) else None
+    return (
+        isinstance(detail, dict)
+        and detail.get("id") == ruleset_id
+        and _applies_to_base_ref(detail, api, repository_path, base_ref)
+        and isinstance(detail_rules, list)
+        and any(_has_required_check(rule, check_name, check_app_id) for rule in detail_rules)
+    )
+
+
+def _ruleset_requires_check(
+    api: GitHubApi,
+    repository_path: str,
+    check_name: str,
+    check_app_id: int,
+    base_ref: str,
+) -> bool:
+    try:
+        rules = api.request(f"/repos/{repository_path}/rulesets?includes_parents=true&includes_inherited=true&per_page=100")
+    except ProviderFailure:
+        return False
+    if not isinstance(rules, list):
+        return False
+    for summary in rules:
+        ruleset_id = summary.get("id") if isinstance(summary, dict) else None
+        if not isinstance(ruleset_id, int) or ruleset_id <= 0:
+            continue
+        if _ruleset_detail_requires_check(api, repository_path, ruleset_id, check_name, check_app_id, base_ref):
+            return True
+    return False
+
+
 def _required_gate(
     api: GitHubApi,
     repository: str,
@@ -141,48 +234,6 @@ def _required_gate(
     check_app_id: int,
     base_ref: str,
 ) -> bool:
-    def has_required_check(document: Any) -> bool:
-        if not isinstance(document, dict) or document.get("type") != "required_status_checks":
-            return False
-        parameters = document.get("parameters")
-        if not isinstance(parameters, dict) or parameters.get("strict_required_status_checks_policy") is not True:
-            return False
-        checks = parameters.get("required_status_checks")
-        if not isinstance(checks, list):
-            return False
-        return any(
-            isinstance(check, dict)
-            and check.get("context") == check_name
-            and not isinstance(check.get("integration_id"), bool)
-            and check.get("integration_id") == check_app_id
-            for check in checks
-        )
-
-    def applies_to_base_ref(document: Any) -> bool:
-        if not isinstance(document, dict) or document.get("target") != "branch" or document.get("enforcement") != "active":
-            return False
-        conditions = document.get("conditions")
-        ref_name = conditions.get("ref_name") if isinstance(conditions, dict) else None
-        if not isinstance(ref_name, dict) or not isinstance(ref_name.get("include"), list) or not isinstance(ref_name.get("exclude"), list):
-            return False
-        ref = f"refs/heads/{base_ref}"
-        default_branch = None
-        if "~DEFAULT_BRANCH" in ref_name["include"] or "~DEFAULT_BRANCH" in ref_name["exclude"]:
-            try:
-                repository_info = api.request(f"/repos/{repository_path}")
-            except ProviderFailure:
-                return False
-            default_branch = repository_info.get("default_branch") if isinstance(repository_info, dict) else None
-
-        def matches(pattern: Any) -> bool:
-            if not isinstance(pattern, str):
-                return False
-            if pattern == "~DEFAULT_BRANCH":
-                return default_branch == base_ref
-            return fnmatch.fnmatchcase(ref, pattern) or fnmatch.fnmatchcase(base_ref, pattern)
-
-        return any(matches(pattern) for pattern in ref_name["include"]) and not any(matches(pattern) for pattern in ref_name["exclude"])
-
     repository_path = _repository_path(repository)
     try:
         branch_path = urllib.parse.quote(base_ref, safe="")
@@ -190,35 +241,10 @@ def _required_gate(
     except ProviderFailure as error:
         if error.reason != "required_capability_unavailable":
             raise
-        try:
-            rules = api.request(f"/repos/{repository_path}/rulesets?includes_parents=true&includes_inherited=true&per_page=100")
-        except ProviderFailure:
-            return False
-        if not isinstance(rules, list):
-            return False
-        for summary in rules:
-            ruleset_id = summary.get("id") if isinstance(summary, dict) else None
-            if not isinstance(ruleset_id, int) or ruleset_id <= 0:
-                continue
-            try:
-                detail = api.request(f"/repos/{repository_path}/rulesets/{ruleset_id}")
-            except ProviderFailure as detail_error:
-                if detail_error.reason == "required_capability_unavailable":
-                    continue
-                raise
-            detail_rules = detail.get("rules") if isinstance(detail, dict) else None
-            if (
-                isinstance(detail, dict)
-                and detail.get("id") == ruleset_id
-                and applies_to_base_ref(detail)
-                and isinstance(detail_rules, list)
-                and any(has_required_check(rule) for rule in detail_rules)
-            ):
-                return True
-        return False
+        return _ruleset_requires_check(api, repository_path, check_name, check_app_id, base_ref)
     if not isinstance(rules, list):
         return False
-    return any(has_required_check(rule) for rule in rules)
+    return any(_has_required_check(rule, check_name, check_app_id) for rule in rules)
 
 
 def _workflow_blob_sha(api: GitHubApi, repository: str, workflow_path: str, ref: str) -> str:
@@ -247,44 +273,44 @@ def _read_bounded_zip_member(opened: zipfile.ZipFile, name: str, max_bytes: int)
     return data
 
 
-def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
-    repository = os.environ.get("GITHUB_REPOSITORY", "")
-    base_ref = config.base_ref
-    main_sha = _sha(os.environ.get("GITHUB_SHA"))
-    if repository != config.repository:
-        raise ProviderFailure("repository_mismatch")
-    commit = api.request(f"/repos/{_repository_path(repository)}/commits/{main_sha}")
+def _merged_pull_request(api: GitHubApi, repository: str, main_sha: str, base_ref: str) -> tuple[str, str, str, str, int]:
+    repository_path = _repository_path(repository)
+    commit = api.request(f"/repos/{repository_path}/commits/{main_sha}")
     main_tree = _sha(commit.get("commit", {}).get("tree", {}).get("sha"))
     parents = commit.get("parents", [])
     if len(parents) != 1:
         raise ProviderFailure("main_commit_shape_invalid")
     base_sha = _sha(parents[0].get("sha"))
-    associated = api.request(f"/repos/{_repository_path(repository)}/commits/{main_sha}/pulls")
+    associated = api.request(f"/repos/{repository_path}/commits/{main_sha}/pulls")
     if not isinstance(associated, list) or len(associated) != 1 or not isinstance(associated[0].get("number"), int):
         raise ProviderFailure("merged_pull_request_ambiguous")
     pr_number = associated[0]["number"]
-    pull = api.request(f"/repos/{_repository_path(repository)}/pulls/{pr_number}")
+    pull = api.request(f"/repos/{repository_path}/pulls/{pr_number}")
     base = pull.get("base", {})
     if base.get("repo", {}).get("full_name") != repository or base.get("ref") != base_ref or pull.get("merged") is not True or pull.get("merge_commit_sha") != main_sha:
         raise ProviderFailure("merged_pull_request_invalid")
     head_sha = _sha(pull.get("head", {}).get("sha"))
-    head_commit = api.request(f"/repos/{_repository_path(repository)}/commits/{head_sha}")
+    head_commit = api.request(f"/repos/{repository_path}/commits/{head_sha}")
     head_tree = _sha(head_commit.get("commit", {}).get("tree", {}).get("sha"))
     if head_tree != main_tree:
         raise ProviderFailure("merged_tree_mismatch")
-    workflow_sha = _workflow_blob_sha(api, repository, config.producer.workflow_path, head_sha)
-    if workflow_sha != config.producer.workflow_sha:
-        raise ProviderFailure("workflow_mismatch")
+    return main_tree, base_sha, head_sha, head_tree, pr_number
+
+
+def _successful_check(api: GitHubApi, repository: str, head_sha: str, config) -> tuple[int, dict[str, Any]]:
     check_name = urllib.parse.quote(config.producer.check_name, safe="")
     checks = api.request(f"/repos/{_repository_path(repository)}/commits/{head_sha}/check-runs?check_name={check_name}&filter=latest&per_page=100")
-    successful_checks = [item for item in checks.get("check_runs", []) if item.get("name") == config.producer.check_name and item.get("status") == "completed" and item.get("conclusion") == "success" and item.get("app", {}).get("slug") == config.producer.check_app]
-    if len(successful_checks) != 1:
+    successful = [item for item in checks.get("check_runs", []) if item.get("name") == config.producer.check_name and item.get("status") == "completed" and item.get("conclusion") == "success" and item.get("app", {}).get("slug") == config.producer.check_app]
+    if len(successful) != 1:
         raise ProviderFailure("required_gate_not_successful")
-    check_app_id = successful_checks[0].get("app", {}).get("id")
+    check_app_id = successful[0].get("app", {}).get("id")
     if isinstance(check_app_id, bool) or not isinstance(check_app_id, int) or check_app_id <= 0:
         raise ProviderFailure("check_app_unresolved")
-    details = successful_checks[0].get("details_url", "")
-    run_match = re.search(r"/runs/(\d+)(?:/|$)", details)
+    return check_app_id, successful[0]
+
+
+def _producer_run(api: GitHubApi, repository: str, head_sha: str, config, check: dict[str, Any]) -> tuple[dict[str, Any], int, dict[str, Any]]:
+    run_match = re.search(r"/runs/(\d+)(?:/|$)", check.get("details_url", ""))
     if run_match is None:
         raise ProviderFailure("producer_run_unresolved")
     run_id = int(run_match.group(1))
@@ -297,18 +323,18 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     producer_jobs = [job for job in jobs if job.get("name") == config.producer.job_name and job.get("conclusion") == "success"]
     if len(producer_jobs) != 1:
         raise ProviderFailure("producer_job_unresolved")
-    job = producer_jobs[0]
-    # The artifact manifest records the attempt of this producer job. A rerun of
-    # an unrelated job advances the workflow run's attempt without recreating
-    # this artifact, so binding to run.run_attempt would reject valid evidence.
-    producer_run_attempt = int(job.get("run_attempt", 0))
+    return run, run_id, producer_jobs[0]
+
+
+def _selected_artifact(api: GitHubApi, repository: str, run_id: int, artifact_name: str) -> tuple[list[Any], dict[str, Any]]:
     artifacts = api.request(f"/repos/{_repository_path(repository)}/actions/runs/{run_id}/artifacts?per_page=100").get("artifacts", [])
-    selected = [artifact for artifact in artifacts if artifact.get("name") == config.producer.artifact_name]
+    selected = [artifact for artifact in artifacts if artifact.get("name") == artifact_name]
     if len(selected) != 1 or selected[0].get("expired") is True:
         raise ProviderFailure("artifact_missing_or_expired")
-    artifact = selected[0]
-    archive = api.download(str(artifact.get("archive_download_url", "")))
-    verified_at = _parse_time(run.get("created_at"))
+    return artifacts, selected[0]
+
+
+def _read_semantic_horizon(api: GitHubApi, artifacts: list[Any], config) -> datetime:
     evidence_artifacts = [item for item in artifacts if item.get("name") == config.producer.evidence_artifact_name and item.get("expired") is not True]
     if len(evidence_artifacts) != 1:
         raise ProviderFailure("semantic_evidence_unavailable")
@@ -316,10 +342,31 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     try:
         with zipfile.ZipFile(io.BytesIO(evidence_archive)) as opened:
             health = json.loads(_read_bounded_zip_member(opened, "architecture-health.json", config.limits.max_member_bytes).decode("utf-8"))
-        semantic_value = health["report_evidence"]["publication_evidence"]["semantic_horizon"]
-        semantic_horizon = _parse_time(semantic_value)
-    except (KeyError, TypeError, ValueError, UnicodeError, zipfile.BadZipFile) as error:
+        return _parse_time(health["report_evidence"]["publication_evidence"]["semantic_horizon"])
+    except (KeyError, TypeError, ValueError, zipfile.BadZipFile) as error:
         raise ProviderFailure("semantic_evidence_unavailable") from error
+
+
+def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
+    repository = os.environ.get("GITHUB_REPOSITORY", "")
+    base_ref = config.base_ref
+    main_sha = _sha(os.environ.get("GITHUB_SHA"))
+    if repository != config.repository:
+        raise ProviderFailure("repository_mismatch")
+    main_tree, base_sha, head_sha, head_tree, pr_number = _merged_pull_request(api, repository, main_sha, base_ref)
+    workflow_sha = _workflow_blob_sha(api, repository, config.producer.workflow_path, head_sha)
+    if workflow_sha != config.producer.workflow_sha:
+        raise ProviderFailure("workflow_mismatch")
+    check_app_id, check = _successful_check(api, repository, head_sha, config)
+    run, run_id, job = _producer_run(api, repository, head_sha, config, check)
+    # The artifact manifest records the attempt of this producer job. A rerun of
+    # an unrelated job advances the workflow run's attempt without recreating
+    # this artifact, so binding to run.run_attempt would reject valid evidence.
+    producer_run_attempt = int(job.get("run_attempt", 0))
+    artifacts, artifact = _selected_artifact(api, repository, run_id, config.producer.artifact_name)
+    archive = api.download(str(artifact.get("archive_download_url", "")))
+    verified_at = _parse_time(run.get("created_at"))
+    semantic_horizon = _read_semantic_horizon(api, artifacts, config)
     evidence = EvidenceContext(
         repository=repository, base_ref=base_ref, base_sha=base_sha, main_tree_sha=main_tree,
         head_sha=head_sha, head_tree_sha=head_tree, pr_number=pr_number, event=config.producer.event,
@@ -352,18 +399,55 @@ def _write_outputs(values: dict[str, object]) -> None:
             output.write(f"{key}={value}\n")
 
 
+def _current_raw_ref(api: GitHubApi, ref_path: str) -> Any:
+    try:
+        return api.request(ref_path)
+    except ProviderFailure as error:
+        if error.reason != "required_capability_unavailable":
+            raise
+        return None
+
+
+def _publication_receipt(config, payload: bytes, evidence: EvidenceContext | None, status: str, reason: str) -> dict[str, Any]:
+    return {
+        "schema": "architecture-health-badge-publication/v2", "status": status, "reason": reason,
+        "repository": config.repository,
+        "base_sha": evidence.base_sha if evidence else None, "head_sha": evidence.head_sha if evidence else None,
+        "head_tree_sha": evidence.head_tree_sha if evidence else None, "main_sha": os.environ.get("GITHUB_SHA"),
+        "main_tree_sha": evidence.main_tree_sha if evidence else None,
+        "pr_number": str(evidence.pr_number) if evidence else None,
+        "producer_run_id": str(evidence.run_id) if evidence else None,
+        "producer_run_attempt": str(evidence.run_attempt) if evidence else None,
+        "publisher_run_id": os.environ.get("GITHUB_RUN_ID"), "publisher_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "payload_sha256": hashlib.sha256(payload).hexdigest(),
+        "published_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    }
+
+
+def _publication_commit_sha(api: GitHubApi, repository: str, parent: str, base_tree: str, payload: bytes, receipt: dict[str, Any]) -> str:
+    blob_shas = []
+    for content in (payload, (json.dumps(receipt, indent=2) + "\n").encode("utf-8")):
+        blob = api.request(f"/repos/{repository}/git/blobs", method="POST", value={"content": base64.b64encode(content).decode("ascii"), "encoding": "base64"})
+        blob_shas.append(blob["sha"])
+    tree = api.request(f"/repos/{repository}/git/trees", method="POST", value={"base_tree": base_tree, "tree": [{"path": "architecture-health.json", "mode": "100644", "type": "blob", "sha": blob_shas[0]}, {"path": "architecture-health-publication.json", "mode": "100644", "type": "blob", "sha": blob_shas[1]}]})
+    commit = api.request(f"/repos/{repository}/git/commits", method="POST", value={"message": "chore: publish architecture health badge", "tree": tree["sha"], "parents": [parent]})
+    return commit["sha"]
+
+
+def _update_publication_ref(api: GitHubApi, current_ref: Any, update_ref_path: str, repository: str, commit_sha: str) -> None:
+    if current_ref:
+        api.request(update_ref_path, method="PATCH", value={"sha": commit_sha, "force": False})
+    else:
+        api.request(f"/repos/{repository}/git/refs", method="POST", value={"ref": "refs/heads/architecture-health-badge", "sha": commit_sha})
+
+
 def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceContext | None, status: str, reason: str) -> None:
     """Atomically update the fixed public raw branch; never force-push it."""
     repository = _repository_path(config.repository)
     ref_path = f"/repos/{repository}/git/ref/heads/architecture-health-badge"
     update_ref_path = f"/repos/{repository}/git/refs/heads/architecture-health-badge"
     for attempt in range(_MAX_RAW_PUBLICATION_ATTEMPTS):
-        try:
-            current_ref = api.request(ref_path)
-        except ProviderFailure as error:
-            if error.reason != "required_capability_unavailable":
-                raise
-            current_ref = None
+        current_ref = _current_raw_ref(api, ref_path)
         parent = current_ref.get("object", {}).get("sha") if current_ref else os.environ.get("GITHUB_SHA")
         if not isinstance(parent, str):
             raise ProviderFailure("publication_parent_unavailable")
@@ -375,30 +459,10 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
         base_tree = parent_commit.get("tree", {}).get("sha")
         if not isinstance(base_tree, str):
             raise ProviderFailure("publication_parent_unavailable")
-        receipt: dict[str, Any] = {
-            "schema": "architecture-health-badge-publication/v2", "status": status, "reason": reason,
-            "repository": config.repository,
-            "base_sha": evidence.base_sha if evidence else None, "head_sha": evidence.head_sha if evidence else None,
-            "head_tree_sha": evidence.head_tree_sha if evidence else None, "main_sha": os.environ.get("GITHUB_SHA"),
-            "main_tree_sha": evidence.main_tree_sha if evidence else None,
-            "pr_number": str(evidence.pr_number) if evidence else None,
-            "producer_run_id": str(evidence.run_id) if evidence else None,
-            "producer_run_attempt": str(evidence.run_attempt) if evidence else None,
-            "publisher_run_id": os.environ.get("GITHUB_RUN_ID"), "publisher_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
-            "payload_sha256": hashlib.sha256(payload).hexdigest(),
-            "published_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        }
-        blob_shas = []
-        for content in (payload, (json.dumps(receipt, indent=2) + "\n").encode("utf-8")):
-            blob = api.request(f"/repos/{repository}/git/blobs", method="POST", value={"content": base64.b64encode(content).decode("ascii"), "encoding": "base64"})
-            blob_shas.append(blob["sha"])
-        tree = api.request(f"/repos/{repository}/git/trees", method="POST", value={"base_tree": base_tree, "tree": [{"path": "architecture-health.json", "mode": "100644", "type": "blob", "sha": blob_shas[0]}, {"path": "architecture-health-publication.json", "mode": "100644", "type": "blob", "sha": blob_shas[1]}]})
-        commit = api.request(f"/repos/{repository}/git/commits", method="POST", value={"message": "chore: publish architecture health badge", "tree": tree["sha"], "parents": [parent]})
+        receipt = _publication_receipt(config, payload, evidence, status, reason)
+        commit_sha = _publication_commit_sha(api, repository, parent, base_tree, payload, receipt)
         try:
-            if current_ref:
-                api.request(update_ref_path, method="PATCH", value={"sha": commit["sha"], "force": False})
-            else:
-                api.request(f"/repos/{repository}/git/refs", method="POST", value={"ref": "refs/heads/architecture-health-badge", "sha": commit["sha"]})
+            _update_publication_ref(api, current_ref, update_ref_path, repository, commit_sha)
             return
         except ProviderFailure as error:
             if attempt + 1 == _MAX_RAW_PUBLICATION_ATTEMPTS:
@@ -420,12 +484,54 @@ def _validate_invocation(config, operation: str) -> None:
         raise ProviderFailure("event_or_ref_mismatch")
 
 
+def _promotion_request(evidence: EvidenceContext, archive: bytes, operation: str) -> PromotionRequest:
+    return PromotionRequest(
+        evidence=evidence, archive=archive, generation=int(os.environ.get("BADGE_GENERATION", "1")),
+        revocation_epoch=int(os.environ.get("BADGE_REVOCATION_EPOCH", "0")),
+        idempotency_key=f"{os.environ.get('GITHUB_RUN_ID', 'unknown')}:{os.environ.get('GITHUB_RUN_ATTEMPT', '0')}:{operation}",
+        deadline=datetime.now(timezone.utc).replace(microsecond=0) + timedelta(minutes=5),
+        now=datetime.now(timezone.utc),
+    )
+
+
+def _unavailable_snapshot_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "architecture" / "architecture-health-badge-unavailable.json"
+
+
+def _report_unavailable(config, api: GitHubApi, evidence: EvidenceContext, decision, output_metadata: dict[str, object]) -> int:
+    _write_outputs({**output_metadata, "status": "unavailable"})
+    if config.destination.adapter.value == "github-raw":
+        _publish_raw(api, config, _unavailable_snapshot_path().read_bytes(), evidence=evidence, status="unassessable", reason=decision.reason.value)
+    print(json.dumps({"status": "unavailable", "reason": decision.reason.value}, separators=(",", ":")), file=sys.stderr)
+    return 1
+
+
+def _commit_private(decision, output_metadata: dict[str, object]) -> int:
+    private_decision = NoneAdapter().commit(decision)
+    _write_outputs({**output_metadata, "status": private_decision.status.value})
+    print(json.dumps({"status": private_decision.status.value, "reason": private_decision.reason.value}, separators=(",", ":")))
+    return 0
+
+
+def _handle_failure(error, config, api: GitHubApi | None) -> None:
+    if config is not None and config.destination.adapter.value == "github-raw":
+        try:
+            api = api or GitHubApi()
+            _publish_raw(api, config, _unavailable_snapshot_path().read_bytes(), evidence=None, status="unassessable", reason=error.reason)
+        except Exception:
+            pass
+    _write_outputs({"status": "unavailable", "reason": error.reason})
+    print(json.dumps({"status": "unavailable", "reason": error.reason}, separators=(",", ":")), file=sys.stderr)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configuration-id", required=True)
     parser.add_argument("--adapter", required=True)
     parser.add_argument("--operation", choices=("publish", "renew"), default="publish")
     args = parser.parse_args()
+    config = None
+    api = None
     try:
         config = _load_config(args.configuration_id)
         if config.destination.adapter.value != args.adapter:
@@ -433,29 +539,15 @@ def main() -> int:
         _validate_invocation(config, args.operation)
         api = GitHubApi()
         evidence, archive = resolve_evidence(api, config)
-        request = PromotionRequest(
-            evidence=evidence, archive=archive, generation=int(os.environ.get("BADGE_GENERATION", "1")),
-            revocation_epoch=int(os.environ.get("BADGE_REVOCATION_EPOCH", "0")),
-            idempotency_key=f"{os.environ.get('GITHUB_RUN_ID', 'unknown')}:{os.environ.get('GITHUB_RUN_ATTEMPT', '0')}:{args.operation}",
-            deadline=datetime.now(timezone.utc).replace(microsecond=0) + timedelta(minutes=5),
-            now=datetime.now(timezone.utc),
-        )
+        request = _promotion_request(evidence, archive, args.operation)
         # The Relay challenge is the deadline authority. A raw publication uses
         # the same pure decision and remains a fixed snapshot adapter.
         decision = decide_promotion(config, request)
         output_metadata = {"reason": decision.reason.value, "head_sha": evidence.head_sha, "head_tree_sha": evidence.head_tree_sha, "run_id": evidence.run_id, "run_attempt": evidence.run_attempt}
         if decision.status is PromotionStatus.UNAVAILABLE:
-            _write_outputs({**output_metadata, "status": "unavailable"})
-            if config.destination.adapter.value == "github-raw":
-                unavailable = Path(__file__).resolve().parents[2] / "architecture" / "architecture-health-badge-unavailable.json"
-                _publish_raw(api, config, unavailable.read_bytes(), evidence=evidence, status="unassessable", reason=decision.reason.value)
-            print(json.dumps({"status": "unavailable", "reason": decision.reason.value}, separators=(",", ":")), file=sys.stderr)
-            return 1
+            return _report_unavailable(config, api, evidence, decision, output_metadata)
         if config.destination.adapter.value == "none":
-            private_decision = NoneAdapter().commit(decision)
-            _write_outputs({**output_metadata, "status": private_decision.status.value})
-            print(json.dumps({"status": private_decision.status.value, "reason": private_decision.reason.value}, separators=(",", ":")))
-            return 0
+            return _commit_private(decision, output_metadata)
         if config.destination.adapter.value == "relay":
             digest = hashlib.sha256(decision.payload or b"").hexdigest()
             horizon = evidence.semantic_horizon.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -470,24 +562,16 @@ def main() -> int:
             if not isinstance(challenge_id, str) or not isinstance(generation, int) or not isinstance(revocation_epoch, int):
                 raise ProviderFailure("relay_challenge_invalid")
             if args.operation == "renew":
-                client.renew(decision.payload or b"", digest, challenge_id=challenge_id, idempotency_key=request.idempotency_key, generation=generation, revocation_epoch=revocation_epoch, oidc_token=token, semantic_horizon=horizon, tree_sha=evidence.head_tree_sha)
+                client.renew(decision.payload or b"", digest, challenge_id=challenge_id, idempotency_key=request.idempotency_key, generation=generation, revocation_epoch=revocation_epoch, oidc_token=token, semantic_horizon=horizon)
             else:
-                client.publish(decision.payload or b"", digest, challenge_id=challenge_id, idempotency_key=request.idempotency_key, generation=generation, revocation_epoch=revocation_epoch, oidc_token=token, semantic_horizon=horizon, tree_sha=evidence.head_tree_sha)
+                client.publish(decision.payload or b"", digest, challenge_id=challenge_id, idempotency_key=request.idempotency_key, generation=generation, revocation_epoch=revocation_epoch, oidc_token=token, semantic_horizon=horizon)
             _write_outputs({**output_metadata, "status": "ready"})
             return 0
         _write_outputs({**output_metadata, "status": "ready"})
         _publish_raw(api, config, decision.payload or b"", evidence=evidence, status="ready", reason=decision.reason.value)
         return 0
     except (ProviderFailure, AdapterError) as error:
-        if "config" in locals() and config.destination.adapter.value == "github-raw":
-            try:
-                api = locals().get("api") or GitHubApi()
-                unavailable = Path(__file__).resolve().parents[2] / "architecture" / "architecture-health-badge-unavailable.json"
-                _publish_raw(api, config, unavailable.read_bytes(), evidence=None, status="unassessable", reason=error.reason)
-            except Exception:
-                pass
-        _write_outputs({"status": "unavailable", "reason": error.reason})
-        print(json.dumps({"status": "unavailable", "reason": error.reason}, separators=(",", ":")), file=sys.stderr)
+        _handle_failure(error, config, api)
         return 1
 
 
