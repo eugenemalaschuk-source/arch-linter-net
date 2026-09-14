@@ -32,95 +32,114 @@ internal sealed class MetricBudgetValidator : IArchitecturePolicyDocumentValidat
                         ArchitecturePolicyProvenancePath.Property("contracts"), group),
                     index));
 
-            if (string.IsNullOrWhiteSpace(budget.Id))
-            {
-                throw new InvalidOperationException("Every metric budget must declare a non-empty id.");
-            }
+            ValidateBudget(budget, metricIds, budgetIds);
+        }
+    }
 
-            if (!budgetIds.Add(budget.Id))
-            {
-                throw new InvalidOperationException(
-                    $"Duplicate metric budget id '{budget.Id}'. Each metric budget ID must be unique across strict and audit modes.");
-            }
+    private static void ValidateBudget(
+        ArchitectureMetricBudgetContract budget, IReadOnlySet<string> metricIds, ISet<string> budgetIds)
+    {
+        if (string.IsNullOrWhiteSpace(budget.Id))
+        {
+            throw new InvalidOperationException("Every metric budget must declare a non-empty id.");
+        }
 
-            if (string.IsNullOrWhiteSpace(budget.Metric))
-            {
-                throw new InvalidOperationException(
-                    $"Metric budget '{budget.Id}' must reference a non-empty metric ID.");
-            }
+        if (!budgetIds.Add(budget.Id))
+        {
+            throw new InvalidOperationException(
+                $"Duplicate metric budget id '{budget.Id}'. Each metric budget ID must be unique across strict and audit modes.");
+        }
 
-            if (!metricIds.Contains(budget.Metric))
-            {
-                throw new InvalidOperationException(
-                    $"Metric budget '{budget.Id}' references unknown metric '{budget.Metric}'.");
-            }
+        if (string.IsNullOrWhiteSpace(budget.Metric))
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' must reference a non-empty metric ID.");
+        }
 
-            if (budget.BaselineMode is not null
-                && budget.BaselineMode is not ("no_worse_than_baseline" or "max_delta"))
-            {
-                throw new InvalidOperationException(
-                    $"Metric budget '{budget.Id}' has unsupported baseline_mode '{budget.BaselineMode}'. " +
-                    "Supported values are 'no_worse_than_baseline' and 'max_delta'.");
-            }
+        if (!metricIds.Contains(budget.Metric))
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' references unknown metric '{budget.Metric}'.");
+        }
 
-            if (budget.BaselineMode is null)
-            {
-                if (budget.Minimum is null && budget.Maximum is null)
-                {
-                    throw new InvalidOperationException(
-                        $"Metric budget '{budget.Id}' must declare at least one of 'minimum' or 'maximum'.");
-                }
+        ValidateBaselineMode(budget);
+        ValidateBaselineModeConstraints(budget);
+        ValidateThresholds(budget);
+    }
 
-                if (budget.MaxDelta is not null)
-                {
-                    throw new InvalidOperationException(
-                        $"Metric budget '{budget.Id}' may declare 'max_delta' only with baseline_mode 'max_delta'.");
-                }
-            }
-            else
-            {
-                if (budget.Minimum is not null)
-                {
-                    throw new InvalidOperationException(
-                        $"Metric budget '{budget.Id}' cannot declare 'minimum' with baseline_mode '{budget.BaselineMode}'.");
-                }
+    private static void ValidateBaselineMode(ArchitectureMetricBudgetContract budget)
+    {
+        if (budget.BaselineMode is not null
+            && budget.BaselineMode is not ("no_worse_than_baseline" or "max_delta"))
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' has unsupported baseline_mode '{budget.BaselineMode}'. " +
+                "Supported values are 'no_worse_than_baseline' and 'max_delta'.");
+        }
+    }
 
-                if (budget.BaselineMode == "max_delta" && budget.MaxDelta is null)
-                {
-                    throw new InvalidOperationException(
-                        $"Metric budget '{budget.Id}' requires 'max_delta' with baseline_mode 'max_delta'.");
-                }
-
-                if (budget.BaselineMode == "no_worse_than_baseline" && budget.MaxDelta is not null)
-                {
-                    throw new InvalidOperationException(
-                        $"Metric budget '{budget.Id}' must not declare 'max_delta' with baseline_mode 'no_worse_than_baseline'.");
-                }
-            }
-
-            if (budget.Minimum is < 0)
+    private static void ValidateBaselineModeConstraints(ArchitectureMetricBudgetContract budget)
+    {
+        if (budget.BaselineMode is null)
+        {
+            if (budget.Minimum is null && budget.Maximum is null)
             {
                 throw new InvalidOperationException(
-                    $"Metric budget '{budget.Id}' minimum must be non-negative.");
+                    $"Metric budget '{budget.Id}' must declare at least one of 'minimum' or 'maximum'.");
             }
 
-            if (budget.Maximum is < 0)
+            if (budget.MaxDelta is not null)
             {
                 throw new InvalidOperationException(
-                    $"Metric budget '{budget.Id}' maximum must be non-negative.");
+                    $"Metric budget '{budget.Id}' may declare 'max_delta' only with baseline_mode 'max_delta'.");
             }
 
-            if (budget.MaxDelta is < 0)
-            {
-                throw new InvalidOperationException(
-                    $"Metric budget '{budget.Id}' max_delta must be non-negative.");
-            }
+            return;
+        }
 
-            if (budget.Minimum is { } minimum && budget.Maximum is { } maximum && minimum > maximum)
-            {
-                throw new InvalidOperationException(
-                    $"Metric budget '{budget.Id}' minimum must be less than or equal to maximum.");
-            }
+        if (budget.Minimum is not null)
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' cannot declare 'minimum' with baseline_mode '{budget.BaselineMode}'.");
+        }
+
+        if (budget.BaselineMode == "max_delta" && budget.MaxDelta is null)
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' requires 'max_delta' with baseline_mode 'max_delta'.");
+        }
+
+        if (budget.BaselineMode == "no_worse_than_baseline" && budget.MaxDelta is not null)
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' must not declare 'max_delta' with baseline_mode 'no_worse_than_baseline'.");
+        }
+    }
+
+    private static void ValidateThresholds(ArchitectureMetricBudgetContract budget)
+    {
+        if (budget.Minimum is < 0)
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' minimum must be non-negative.");
+        }
+
+        if (budget.Maximum is < 0)
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' maximum must be non-negative.");
+        }
+
+        if (budget.MaxDelta is < 0)
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' max_delta must be non-negative.");
+        }
+
+        if (budget.Minimum is { } minimum && budget.Maximum is { } maximum && minimum > maximum)
+        {
+            throw new InvalidOperationException(
+                $"Metric budget '{budget.Id}' minimum must be less than or equal to maximum.");
         }
     }
 }
