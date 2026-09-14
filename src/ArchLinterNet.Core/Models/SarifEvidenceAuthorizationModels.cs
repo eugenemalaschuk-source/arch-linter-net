@@ -50,33 +50,38 @@ public sealed record SarifExternalDiagnosticFilterAuthorization
         (values ?? Array.Empty<string>()).OrderBy(value => value, StringComparer.Ordinal).ToArray());
 }
 
+/// <summary>Immutable producer identity captured for one trusted external-evidence read.</summary>
+internal sealed record SarifEvidenceAuthorizationIdentity(string LogicalId, string Tool, string? ToolVersion, string Run);
+
+/// <summary>Immutable context-binding requirements captured for one trusted external-evidence read.</summary>
+internal readonly record struct SarifEvidenceAuthorizationBindingRequirements(
+    bool RequireRepository,
+    bool RequireRevision,
+    bool RequireScope);
+
 /// <summary>Immutable policy and assessment authorization captured by the SARIF trust reader.</summary>
 public sealed record SarifEvidenceAuthorizationSnapshot
 {
     /// <summary>Creates the detached authorization facts for one trusted external-evidence read.</summary>
     internal SarifEvidenceAuthorizationSnapshot(
-        string logicalId,
-        string tool,
-        string? toolVersion,
-        string run,
-        bool requireRepository,
-        bool requireRevision,
-        bool requireScope,
+        SarifEvidenceAuthorizationIdentity identity,
+        SarifEvidenceAuthorizationBindingRequirements bindingRequirements,
         SarifEvidenceAssessmentContext assessmentContext,
         SarifExternalDiagnosticFilterAuthorization? diagnosticFilter,
         SarifEvidenceResolvedContext? validatedContext)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(logicalId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(tool);
-        ArgumentException.ThrowIfNullOrWhiteSpace(run);
+        ArgumentNullException.ThrowIfNull(identity);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identity.LogicalId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identity.Tool);
+        ArgumentException.ThrowIfNullOrWhiteSpace(identity.Run);
         ArgumentNullException.ThrowIfNull(assessmentContext);
-        LogicalId = logicalId;
-        Tool = tool;
-        ToolVersion = toolVersion;
-        Run = run;
-        RequireRepository = requireRepository;
-        RequireRevision = requireRevision;
-        RequireScope = requireScope;
+        LogicalId = identity.LogicalId;
+        Tool = identity.Tool;
+        ToolVersion = identity.ToolVersion;
+        Run = identity.Run;
+        RequireRepository = bindingRequirements.RequireRepository;
+        RequireRevision = bindingRequirements.RequireRevision;
+        RequireScope = bindingRequirements.RequireScope;
         AssessmentContext = new SarifEvidenceAssessmentContext(
             assessmentContext.Repository,
             assessmentContext.Revision,
