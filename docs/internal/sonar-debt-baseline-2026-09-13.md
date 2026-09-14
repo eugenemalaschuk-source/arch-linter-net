@@ -12,7 +12,7 @@
 
 | Metric | Comparator | Threshold | Actual | Status |
 | --- | --- | --- | --- | --- |
-| new_coverage | LT | 80 | 88.1 | OK |
+| new_coverage | LT | 80 | 88.0 | OK |
 | new_duplicated_lines_density | GT | 3 | 0.2 | OK |
 | new_maintainability_rating | GT | 1 | 1 | OK |
 | new_reliability_rating | GT | 1 | 3 | ERROR |

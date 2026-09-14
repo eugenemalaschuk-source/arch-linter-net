@@ -5,14 +5,62 @@
   "baseline": {
     "artifact": "docs/internal/sonar-debt-baseline-2026-09-13.json",
     "report": "docs/internal/sonar-debt-baseline-2026-09-13.md",
-    "project": "eugenemalaschuk-source_arch-linter-net",
-    "organization": "eugenemalaschuk-source",
-    "branch": "main",
-    "revision": "103b2680511b702288a95ee4a16189bcec099027",
-    "analysisKey": "86bce771-6bc9-4856-98b7-2b2f47aa4065",
-    "analysisDate": "2026-09-13T17:14:50+0000",
+    "metadata": {
+      "analysisDate": "2026-09-13T17:14:50+0000",
+      "analysisKey": "86bce771-6bc9-4856-98b7-2b2f47aa4065",
+      "branch": "main",
+      "organization": "eugenemalaschuk-source",
+      "project": "eugenemalaschuk-source_arch-linter-net",
+      "revision": "103b2680511b702288a95ee4a16189bcec099027"
+    },
     "analysisLink": "https://sonarcloud.io/project/analysis?id=eugenemalaschuk-source_arch-linter-net&analysis=86bce771-6bc9-4856-98b7-2b2f47aa4065",
-    "qualityGate": "ERROR",
+    "qualityGate": {
+      "conditions": [
+        {
+          "actualValue": "88.0",
+          "comparator": "LT",
+          "errorThreshold": "80",
+          "metricKey": "new_coverage",
+          "status": "OK"
+        },
+        {
+          "actualValue": "0.2",
+          "comparator": "GT",
+          "errorThreshold": "3",
+          "metricKey": "new_duplicated_lines_density",
+          "status": "OK"
+        },
+        {
+          "actualValue": "1",
+          "comparator": "GT",
+          "errorThreshold": "1",
+          "metricKey": "new_maintainability_rating",
+          "status": "OK"
+        },
+        {
+          "actualValue": "3",
+          "comparator": "GT",
+          "errorThreshold": "1",
+          "metricKey": "new_reliability_rating",
+          "status": "ERROR"
+        },
+        {
+          "actualValue": "100.0",
+          "comparator": "LT",
+          "errorThreshold": "100",
+          "metricKey": "new_security_hotspots_reviewed",
+          "status": "OK"
+        },
+        {
+          "actualValue": "5",
+          "comparator": "GT",
+          "errorThreshold": "1",
+          "metricKey": "new_security_rating",
+          "status": "ERROR"
+        }
+      ],
+      "status": "ERROR"
+    },
     "findings": 460,
     "hotspots": 0,
     "measures": {
@@ -22,25 +70,18 @@
       "reliability_rating": "3.0",
       "security_rating": "5.0",
       "security_hotspots": "0"
-    },
-    "qualityGateConditions": [
-      "new_coverage LT 80 -> 88.1 (OK)",
-      "new_duplicated_lines_density GT 3 -> 0.2 (OK)",
-      "new_maintainability_rating GT 1 -> 1 (OK)",
-      "new_reliability_rating GT 1 -> 3 (ERROR)",
-      "new_security_hotspots_reviewed LT 100 -> 100.0 (OK)",
-      "new_security_rating GT 1 -> 5 (ERROR)"
-    ]
+    }
   },
   "afterCapture": {
     "source": "tools/release/sonar_debt_inventory.py --revision 5c83219a4bc3d1952cee22cf630c5d136ec2d71f",
+    "artifact": "docs/internal/sonar-debt-after-877-keys-2026-09-14.json",
     "project": "eugenemalaschuk-source_arch-linter-net",
     "organization": "eugenemalaschuk-source",
     "branch": "main",
     "revision": "5c83219a4bc3d1952cee22cf630c5d136ec2d71f",
     "analysisKey": "646eff89-b3a0-4092-8d99-0089a04a18c9",
     "analysisDate": "2026-09-14T13:07:48+02:00",
-    "capturedAt": "2026-09-14T20:07:46.547183+02:00",
+    "capturedAt": "2026-09-14T21:16:42.082662+02:00",
     "analysisLink": "https://sonarcloud.io/project/analysis?id=eugenemalaschuk-source_arch-linter-net&analysis=646eff89-b3a0-4092-8d99-0089a04a18c9",
     "qualityGate": "ERROR",
     "findings": 281,
@@ -79,6 +120,14 @@
       "new_duplicated_lines_density GT 3 -> 0.2 (OK)",
       "new_security_hotspots_reviewed LT 100 -> 100.0 (OK)"
     ],
+    "keyEvidence": {
+      "artifact": "docs/internal/sonar-debt-after-877-keys-2026-09-14.json",
+      "baselineFindingCount": 460,
+      "afterFindingCount": 281,
+      "persistentCount": 281,
+      "remediatedCount": 179,
+      "newCount": 0
+    },
     "note": "This is a post-#877 comparison capture, not a replacement for the immutable baseline. Issue and hotspot dispositions are live triage state at capturedAt."
   },
   "clusters": [
