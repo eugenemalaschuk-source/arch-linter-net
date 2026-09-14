@@ -164,27 +164,40 @@ def _normalize_issue(issue: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _resolve_analysis(client: SonarClient, project: str, branch: str, revision: str) -> dict[str, Any]:
+def _latest_analysis(client: SonarClient, project: str, branch: str) -> dict[str, Any]:
     analyses = _search_all(
         client,
         "/api/project_analyses/search",
         {"project": project, "branch": branch},
         "analyses",
     )
-    matching = [analysis for analysis in analyses if analysis.get("revision") == revision]
-    if not matching:
-        observed = sorted({str(analysis.get("revision")) for analysis in analyses})
+    if not analyses:
+        raise SonarInventoryError(f"Branch '{branch}' has no completed analyses.")
+    return max(analyses, key=lambda analysis: str(analysis.get("date") or ""))
+
+
+def _resolve_analysis(client: SonarClient, project: str, branch: str, revision: str) -> dict[str, Any]:
+    """Bind to the requested revision only if it is the latest completed analysis.
+
+    A requested SHA that merely appears somewhere in analysis history is not enough: if a
+    newer analysis has since landed on the branch, every branch-scoped read below (quality
+    gate, measures, issues, hotspots) would observe that newer state while the returned
+    metadata still claimed the stale SHA, silently mixing two revisions into one document.
+    """
+    latest = _latest_analysis(client, project, branch)
+    if latest.get("revision") != revision:
         raise SonarInventoryError(
-            f"Revision {revision} has no completed analysis on branch '{branch}'. "
-            f"Observed revisions: {observed[:5]}"
+            f"Requested revision {revision} is not the latest completed analysis on branch "
+            f"'{branch}'. Latest completed analysis is {latest.get('revision')} "
+            f"(analysis {latest.get('key')} at {latest.get('date')})."
         )
-    return matching[0]
+    return latest
 
 
-def _fetch_quality_gate(client: SonarClient, project: str, branch: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def _fetch_quality_gate(client: SonarClient, analysis_id: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     gate_payload = client.get(
         "/api/qualitygates/project_status",
-        {"projectKey": project, "branch": branch},
+        {"analysisId": analysis_id},
     ).get("projectStatus")
     if not isinstance(gate_payload, dict):
         raise SonarInventoryError("SonarCloud response is missing projectStatus")
@@ -271,10 +284,19 @@ def build_inventory(
 ) -> dict[str, Any]:
     """Capture the complete debt inventory bound to one analysis revision."""
     analysis = _resolve_analysis(client, project, branch, revision)
-    gate_payload, conditions = _fetch_quality_gate(client, project, branch)
+    gate_payload, conditions = _fetch_quality_gate(client, str(analysis["key"]))
     measures = _fetch_measures(client, project, branch)
     findings = _fetch_findings(client, project, branch)
     normalized_hotspots = _fetch_hotspots(client, project, branch)
+
+    latest_after_capture = _latest_analysis(client, project, branch)
+    if latest_after_capture.get("key") != analysis.get("key"):
+        raise SonarInventoryError(
+            f"A newer analysis landed on branch '{branch}' while this inventory was being "
+            f"captured (requested analysis {analysis.get('key')} at revision {revision}, "
+            f"branch now at analysis {latest_after_capture.get('key')} / revision "
+            f"{latest_after_capture.get('revision')}). Re-run against the new revision."
+        )
 
     return {
         "metadata": {

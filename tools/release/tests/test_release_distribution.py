@@ -224,6 +224,13 @@ def test_inventory_action_ref_matches_badge_setup_contract() -> None:
     assert "/action.yml@" not in action_ref
 
 
+def test_validate_version_rejects_non_ascii_unicode_digits() -> None:
+    assert distribution._validate_version("0.8.19") == "0.8.19"
+
+    with pytest.raises(ValueError, match="valid 0.8.x version"):
+        distribution._validate_version("0.8.1١")
+
+
 def test_verify_accepts_any_0_8_x_candidate_and_rejects_wrong_binding(tmp_path: Path) -> None:
     arguments, transport = _arguments(tmp_path, "0.8.19")
     distribution._verify(_verify_arguments(arguments, transport))

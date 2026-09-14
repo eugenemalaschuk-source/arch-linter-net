@@ -83,8 +83,72 @@ def test_revision_mismatch_fails_closed() -> None:
     fetch = FakeFetch(_base_responses({1: {"paging": {"total": 0}, "issues": []}}))
     client = _client(fetch)
 
-    with pytest.raises(inventory.SonarInventoryError, match="no completed analysis"):
+    with pytest.raises(inventory.SonarInventoryError, match="is not the latest completed analysis"):
         inventory.build_inventory(client, "project", "main", "c" * 40)
+
+
+def test_stale_revision_that_did_analyze_once_still_fails_closed() -> None:
+    """A SHA that merely appears in analysis history is not enough: if main has since moved
+    on to a newer analysis, every branch-scoped read below would observe that newer state
+    while the document still claimed the stale SHA, silently mixing two revisions."""
+    fetch = FakeFetch(_base_responses({1: {"paging": {"total": 0}, "issues": []}}))
+    client = _client(fetch)
+
+    with pytest.raises(inventory.SonarInventoryError, match="is not the latest completed analysis") as error:
+        inventory.build_inventory(client, "project", "main", _OTHER_SHA)
+
+    assert _SHA in str(error.value)
+
+
+def test_no_completed_analyses_fails_closed() -> None:
+    fetch = FakeFetch({("/api/project_analyses/search", 1): {"paging": {"total": 0}, "analyses": []}})
+    client = _client(fetch)
+
+    with pytest.raises(inventory.SonarInventoryError, match="has no completed analyses"):
+        inventory._latest_analysis(client, "project", "main")
+
+
+def test_quality_gate_is_pinned_to_the_resolved_analysis_id() -> None:
+    responses = _base_responses({1: {"paging": {"total": 0}, "issues": []}}, {1: {"paging": {"total": 0}, "hotspots": []}})
+    fetch = FakeFetch(responses)
+    client = _client(fetch)
+
+    inventory.build_inventory(client, "project", "main", _SHA)
+
+    gate_calls = [params for endpoint, params in fetch.calls if endpoint == "/api/qualitygates/project_status"]
+    assert gate_calls == [{"analysisId": "analysis-1", "organization": "org"}]
+
+
+def test_new_analysis_landing_during_capture_fails_closed() -> None:
+    """If a newer analysis lands on the branch between resolving the requested revision and
+    finishing the capture, the document must not be presented as bound to the stale SHA."""
+    call_count = {"project_analyses/search": 0}
+    base = _base_responses(
+        {1: {"paging": {"total": 0}, "issues": []}},
+        {1: {"paging": {"total": 0}, "hotspots": []}},
+    )
+    race_analyses = {
+        "paging": {"total": 3},
+        "analyses": [
+            {"key": "analysis-2", "revision": "c" * 40, "date": "2026-09-14T00:00:00+0000"},
+            {"key": "analysis-1", "revision": _SHA, "date": "2026-09-13T17:14:50+0000"},
+            {"key": "analysis-0", "revision": _OTHER_SHA, "date": "2026-09-12T00:00:00+0000"},
+        ],
+    }
+
+    def fetch(endpoint: str, params: dict[str, str]) -> dict:
+        if endpoint == "/api/project_analyses/search":
+            call_count["project_analyses/search"] += 1
+            return base[(endpoint, 1)] if call_count["project_analyses/search"] == 1 else race_analyses
+        page = int(params.get("p", "1"))
+        return base[(endpoint, page)]
+
+    client = _client(fetch)
+
+    with pytest.raises(inventory.SonarInventoryError, match="A newer analysis landed") as error:
+        inventory.build_inventory(client, "project", "main", _SHA)
+
+    assert "analysis-2" in str(error.value)
 
 
 def test_full_pagination_is_honoured() -> None:
@@ -320,7 +384,7 @@ def test_fetch_quality_gate_requires_project_status() -> None:
     client = _client(lambda endpoint, params: {"projectStatus": None})
 
     with pytest.raises(inventory.SonarInventoryError, match="missing projectStatus"):
-        inventory._fetch_quality_gate(client, "project", "main")
+        inventory._fetch_quality_gate(client, "analysis-1")
 
 
 def test_fetch_hotspots_normalizes_and_sorts() -> None:

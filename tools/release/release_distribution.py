@@ -35,7 +35,7 @@ _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 _GIT_BLOB_PATTERN = re.compile(r"[0-9a-f]{40}")
 _VERSION_PATTERN = re.compile(
-    r"^0\.8\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-](?:\.?[0-9A-Za-z-])*)?(?:\+[0-9A-Za-z-](?:\.?[0-9A-Za-z-])*)?$"
+    r"^0\.8\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-](?:\.?[0-9A-Za-z-])*)?(?:\+[0-9A-Za-z-](?:\.?[0-9A-Za-z-])*)?$"
 )
 
 _ARCHIVE_FILE_TEMPLATE = "architecture-health-badge-relay-{version}.tar.gz"
