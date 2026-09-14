@@ -186,3 +186,61 @@ def test_short_fence_marker_inside_open_fence_does_not_close_it(tmp_path: Path) 
 
     assert len(violations) == 1
     assert "actions/checkout@v4" in violations[0]
+
+
+def test_ignores_uses_mentioned_inside_a_run_string(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        '```yaml\nsteps:\n  - run: echo "old syntax was uses: actions/checkout@v4"\n```\n',
+    )
+
+    assert pinning.find_violations(tmp_path) == []
+
+
+def test_ignores_uses_mentioned_inside_a_yaml_comment(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        "```yaml\nsteps:\n  # Previous versions used: actions/checkout@v4\n  - run: echo hi\n```\n",
+    )
+
+    assert pinning.find_violations(tmp_path) == []
+
+
+def test_accepts_immutable_docker_action_digest(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        "```yaml\nsteps:\n  - uses: docker://alpine@sha256:"
+        + "a" * 64
+        + "\n```\n",
+    )
+
+    assert pinning.find_violations(tmp_path) == []
+
+
+def test_rejects_mutable_docker_action_tag(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        "```yaml\nsteps:\n  - uses: docker://alpine@latest\n```\n",
+    )
+
+    violations = pinning.find_violations(tmp_path)
+
+    assert len(violations) == 1
+    assert "sha256" in violations[0]
+
+
+def test_rejects_unpinned_docker_action_without_digest(tmp_path: Path) -> None:
+    write_doc(
+        tmp_path,
+        "docs/guides/ci-integration.md",
+        "```yaml\nsteps:\n  - uses: docker://alpine:3.18\n```\n",
+    )
+
+    violations = pinning.find_violations(tmp_path)
+
+    assert len(violations) == 1
+    assert "unpinned" in violations[0]
