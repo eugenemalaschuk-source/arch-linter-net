@@ -196,6 +196,29 @@ public sealed class ArchitecturePrReportReaderTests
     }
 
     [Test]
+    public void Project_BuildsBaselineAndPolicyWeakeningNavigationFromDebtGate()
+    {
+        ArchitectureChangeReport change = ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1");
+        ArchitecturePrReportInput input = ArchitecturePrReportReader.Read(
+            ArchitectureHealthProjector.FormatAsJson(CreateOutcomeWithDebtEvidence()),
+            ArchitectureChangeReports.FormatJson(change));
+
+        ArchitecturePrReportProjection projection = ArchitecturePrReportProjector.Project(input);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                projection.Navigation.Where(reference => reference.Authority == "baseline")
+                    .Select(reference => reference.Identity),
+                Is.EquivalentTo(input.Evidence!.DebtGate.PersistentDebt.Entries.Select(entry => entry.Identity)));
+            Assert.That(
+                projection.Navigation.Where(reference => reference.Authority == "policy_weakening")
+                    .Select(reference => reference.Identity),
+                Does.Contain("weakening-1"));
+        });
+    }
+
+    [Test]
     public void FormatAsJson_UsesLegacyDebtBucketsWhenLifecycleEntriesAreAbsent()
     {
         using JsonDocument document = JsonDocument.Parse(
@@ -376,8 +399,10 @@ public sealed class ArchitecturePrReportReaderTests
         receipt["findings"] = new JsonArray(FullFinding("validation-finding"));
 
         ArchitectureChangeReport change = ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1");
-        ArchitecturePrReportValidationReceipt parsed = ArchitecturePrReportReader.Read(
-            health.ToJsonString(), ArchitectureChangeReports.FormatJson(change)).Evidence!.ValidationOutcomes.Single();
+        ArchitecturePrReportInput input = ArchitecturePrReportReader.Read(
+            health.ToJsonString(), ArchitectureChangeReports.FormatJson(change));
+        ArchitecturePrReportValidationReceipt parsed = input.Evidence!.ValidationOutcomes.Single();
+        ArchitecturePrReportProjection projection = ArchitecturePrReportProjector.Project(input);
 
         Assert.Multiple(() =>
         {
@@ -396,6 +421,21 @@ public sealed class ArchitecturePrReportReaderTests
             Assert.That(parsed.ExternalEvidence.Findings.Single().Remediation!.Evidence.Single().Value,
                 Is.EqualTo("runtime"));
             Assert.That(parsed.Findings.Single().PolicyIdentity, Is.EqualTo("/repo/policy.yml:rules[0]"));
+
+            // Regression for the extracted per-receipt navigation boundaries: waiver lifecycle
+            // (policy inventory + waiver lifecycle records), applicability/topology, and
+            // external-evidence requirements/trust receipts each still contribute one reference.
+            Assert.That(projection.Navigation.Where(reference => reference.Authority == "waiver")
+                .Select(reference => reference.Identity), Does.Contain("waiver-1"));
+            Assert.That(projection.Navigation.Where(reference => reference.Authority == "applicability")
+                .Select(reference => reference.Identity), Does.Contain("topology.control"));
+            Assert.That(projection.Navigation.Where(reference => reference.Authority == "topology")
+                .Select(reference => reference.Identity), Does.Contain("App.Api"));
+            Assert.That(projection.Navigation.Where(reference => reference.Authority == "external_evidence")
+                .Select(reference => reference.Identity), Is.EquivalentTo(["sarif", "sarif"]));
+            Assert.That(projection.Navigation.Where(reference => reference.Authority == "finding")
+                .Select(reference => reference.Identity),
+                Is.EquivalentTo(["validation-finding"]));
         });
     }
 

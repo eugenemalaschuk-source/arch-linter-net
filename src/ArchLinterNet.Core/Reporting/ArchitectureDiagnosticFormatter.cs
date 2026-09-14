@@ -322,104 +322,50 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
     internal static string FormatFindingForHumansInternal(ArchitectureFinding finding) =>
         FormatFindingForHumans(finding);
 
-    private static string BuildHumanContext(ArchitectureDiagnostic diagnostic)
+    // Each diagnostic instance is exactly one concrete subtype, so at most one arm below ever
+    // matches — the dispatch is a type switch, not a sequence of independent conditions. Moving it
+    // from a chain of sequential ifs to a switch expression preserves that single-arm behavior
+    // while keeping cognitive complexity flat instead of accumulating once per diagnostic family.
+    private static string BuildHumanContext(ArchitectureDiagnostic diagnostic) => diagnostic switch
     {
-        string context = string.Empty;
+        DependencyDiagnostic { AllowedImporters: not null } dependency =>
+            FormatDependencyContextForHumans(dependency),
+        ExternalDependencyDiagnostic external => $" (external_group: {external.ForbiddenExternalGroup})",
+        TypePlacementDiagnostic typePlacement => FormatTypePlacementContextForHumans(typePlacement),
+        LayoutConventionDiagnostic layoutConvention =>
+            Reporting.ArchitectureDiagnosticFormatter.FormatLayoutConventionContextForHumans(layoutConvention),
+        PublicApiSurfaceDiagnostic publicApiSurface =>
+            Reporting.ArchitectureDiagnosticFormatter.FormatPublicApiSurfaceContextForHumans(publicApiSurface),
+        ContractSurfaceExposureDiagnostic exposure => ArchitectureContractSurfaceExposureRenderer.RenderForHumans(exposure),
+        AttributeUsageDiagnostic attributeUsage => FormatAttributeUsageContextForHumans(attributeUsage),
+        InheritanceDiagnostic inheritance => FormatInheritanceContextForHumans(inheritance),
+        InterfaceImplementationDiagnostic interfaceImplementation =>
+            FormatInterfaceImplementationContextForHumans(interfaceImplementation),
+        CompositionDiagnostic composition => FormatCompositionContextForHumans(composition),
+        ProjectMetadataDiagnostic projectMetadata => FormatProjectMetadataContextForHumans(projectMetadata),
+        MetricBudgetDiagnostic metricBudget => FormatMetricBudgetContextForHumans(metricBudget),
+        ContextDependencyDiagnostic contextDependency =>
+            Reporting.ArchitectureDiagnosticFormatter.FormatContextDependencyContextForHumans(contextDependency),
+        ContextAllowOnlyDiagnostic contextAllowOnly =>
+            Reporting.ArchitectureDiagnosticFormatter.FormatContextAllowOnlyContextForHumans(contextAllowOnly),
+        PortBoundaryDiagnostic portBoundary =>
+            Reporting.ArchitectureDiagnosticFormatter.FormatPortBoundaryContextForHumans(portBoundary),
+        FrameworkReferenceDiagnostic { Evidence.Count: > 0 } frameworkDependency =>
+            Reporting.ArchitectureDiagnosticFormatter.FormatFrameworkReferenceContextForHumans(frameworkDependency.Evidence),
+        FrameworkReferenceAllowOnlyDiagnostic { Evidence.Count: > 0 } frameworkAllowOnly =>
+            Reporting.ArchitectureDiagnosticFormatter.FormatFrameworkReferenceContextForHumans(frameworkAllowOnly.Evidence),
+        _ => string.Empty
+    };
 
-        if (diagnostic is DependencyDiagnostic { AllowedImporters: not null } dependency)
-        {
-            context = FormatDependencyContextForHumans(dependency);
-        }
-
-        if (diagnostic is ExternalDependencyDiagnostic external)
-        {
-            context += $" (external_group: {external.ForbiddenExternalGroup})";
-        }
-
-        if (diagnostic is TypePlacementDiagnostic typePlacement)
-        {
-            context += FormatTypePlacementContextForHumans(typePlacement);
-        }
-
-        if (diagnostic is LayoutConventionDiagnostic layoutConvention)
-        {
-            context += Reporting.ArchitectureDiagnosticFormatter.FormatLayoutConventionContextForHumans(layoutConvention);
-        }
-
-        if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
-        {
-            context += Reporting.ArchitectureDiagnosticFormatter.FormatPublicApiSurfaceContextForHumans(publicApiSurface);
-        }
-
-        if (diagnostic is ContractSurfaceExposureDiagnostic exposure)
-        {
-            context += ArchitectureContractSurfaceExposureRenderer.RenderForHumans(exposure);
-        }
-
-        if (diagnostic is AttributeUsageDiagnostic attributeUsage)
-        {
-            context += FormatAttributeUsageContextForHumans(attributeUsage);
-        }
-
-        if (diagnostic is InheritanceDiagnostic inheritance)
-        {
-            context += FormatInheritanceContextForHumans(inheritance);
-        }
-
-        if (diagnostic is InterfaceImplementationDiagnostic interfaceImplementation)
-        {
-            context += FormatInterfaceImplementationContextForHumans(interfaceImplementation);
-        }
-
-        if (diagnostic is CompositionDiagnostic composition)
-        {
-            context += FormatCompositionContextForHumans(composition);
-        }
-
-        if (diagnostic is ProjectMetadataDiagnostic projectMetadata)
-        {
-            context += FormatProjectMetadataContextForHumans(projectMetadata);
-        }
-
-        if (diagnostic is MetricBudgetDiagnostic metricBudget)
-        {
-            context += $" (kind: metric_budget, metric_id: {metricBudget.MetricId}, metric_kind: {metricBudget.MetricKind}, "
-                + $"native_subject: {metricBudget.NativeSubject ?? "<none>"}, effective_scope: {metricBudget.EffectiveScope}, "
-                + $"measured_value: {metricBudget.MeasuredValue}, breached_bound: {metricBudget.BreachedBound}, "
-                + $"configured_limit: {metricBudget.ConfiguredLimit}, "
-                + $"baseline_mode: {metricBudget.BaselineMode ?? "<none>"}, baseline_value: {metricBudget.BaselineValue?.ToString() ?? "<none>"}, "
-                + $"delta: {metricBudget.Delta?.ToString() ?? "<none>"}, allowed_delta: {metricBudget.AllowedDelta?.ToString() ?? "<none>"}, "
-                + $"effective_threshold: {metricBudget.EffectiveThreshold?.ToString() ?? "<none>"}, absolute_cap: {metricBudget.AbsoluteCap?.ToString() ?? "<none>"}, "
-                + $"contributors: [{string.Join(", ", metricBudget.Contributors)}])";
-        }
-
-        if (diagnostic is ContextDependencyDiagnostic contextDependency)
-        {
-            context += Reporting.ArchitectureDiagnosticFormatter.FormatContextDependencyContextForHumans(contextDependency);
-        }
-
-        if (diagnostic is ContextAllowOnlyDiagnostic contextAllowOnly)
-        {
-            context += Reporting.ArchitectureDiagnosticFormatter.FormatContextAllowOnlyContextForHumans(contextAllowOnly);
-        }
-
-        if (diagnostic is PortBoundaryDiagnostic portBoundary)
-        {
-            context += Reporting.ArchitectureDiagnosticFormatter.FormatPortBoundaryContextForHumans(portBoundary);
-        }
-
-        if (diagnostic is FrameworkReferenceDiagnostic { Evidence.Count: > 0 } frameworkDependency)
-        {
-            context += Reporting.ArchitectureDiagnosticFormatter.FormatFrameworkReferenceContextForHumans(frameworkDependency.Evidence);
-        }
-
-        if (diagnostic is FrameworkReferenceAllowOnlyDiagnostic { Evidence.Count: > 0 } frameworkAllowOnly)
-        {
-            context += Reporting.ArchitectureDiagnosticFormatter.FormatFrameworkReferenceContextForHumans(frameworkAllowOnly.Evidence);
-        }
-
-        return context;
-    }
+    private static string FormatMetricBudgetContextForHumans(MetricBudgetDiagnostic metricBudget) =>
+        $" (kind: metric_budget, metric_id: {metricBudget.MetricId}, metric_kind: {metricBudget.MetricKind}, "
+        + $"native_subject: {metricBudget.NativeSubject ?? "<none>"}, effective_scope: {metricBudget.EffectiveScope}, "
+        + $"measured_value: {metricBudget.MeasuredValue}, breached_bound: {metricBudget.BreachedBound}, "
+        + $"configured_limit: {metricBudget.ConfiguredLimit}, "
+        + $"baseline_mode: {metricBudget.BaselineMode ?? "<none>"}, baseline_value: {metricBudget.BaselineValue?.ToString() ?? "<none>"}, "
+        + $"delta: {metricBudget.Delta?.ToString() ?? "<none>"}, allowed_delta: {metricBudget.AllowedDelta?.ToString() ?? "<none>"}, "
+        + $"effective_threshold: {metricBudget.EffectiveThreshold?.ToString() ?? "<none>"}, absolute_cap: {metricBudget.AbsoluteCap?.ToString() ?? "<none>"}, "
+        + $"contributors: [{string.Join(", ", metricBudget.Contributors)}])";
 
     private static string FormatDependencyContextForHumans(DependencyDiagnostic dependency)
     {
