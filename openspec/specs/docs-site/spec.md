@@ -2,7 +2,9 @@
 
 ## Purpose
 Sets up the MkDocs-based documentation site tooling, including a gitignored Python virtual environment.
+
 ## Requirements
+
 ### Requirement: Documentation tooling setup
 The repository SHALL contain a Python tooling project at `tools/pyproject.toml` that defines MkDocs and mkdocs-material as dependencies, managed via `uv` with a committed `tools/uv.lock` file.
 
@@ -71,7 +73,8 @@ The project SHALL define these targets:
 - `make docs-build` — builds the static documentation site
 - `make fmt-docs` — auto-formats markdown documentation with mdformat
 - `make lint-evergreen-docs` — rejects ArchLinterNet product-release SemVer as an evergreen public docs identity while allowing genuine machine/standard/release-process version semantics
-- `make lint-docs` — runs the evergreen-docs guard and strict MkDocs validation
+- `make lint-canonical-actions-pinning` — rejects a mutable third-party GitHub Actions `uses:` ref inside a canonical public workflow-example code fence, while allowing first-party local/reusable-workflow refs and non-workflow prose
+- `make lint-docs` — runs the evergreen-docs guard, the canonical-actions-pinning guard, and strict MkDocs validation
 
 #### Scenario: make venv creates virtual environment
 - **WHEN** running `make venv`
@@ -88,6 +91,14 @@ The project SHALL define these targets:
 #### Scenario: lint-docs retains real contract versions
 - **WHEN** documentation contains a genuine machine/document/standard version such as a schema/artifact identity or SARIF version
 - **THEN** the evergreen guard does not reject that version merely because it is numeric
+
+#### Scenario: lint-docs rejects a mutable canonical Actions ref
+- **WHEN** a canonical public workflow-example code fence contains a third-party `uses: owner/action@vN` (or other mutable tag/branch) reference
+- **THEN** `make lint-docs` fails before accepting the documentation change
+
+#### Scenario: lint-docs accepts an immutable canonical Actions pin
+- **WHEN** a canonical public workflow-example code fence pins a third-party action to a full commit SHA, optionally with a trailing human-readable version comment
+- **THEN** the canonical-actions-pinning guard does not reject that reference
 
 ### Requirement: Contributor documentation is separated from user docs
 Project/contributor documentation SHALL live in `docs/internal/` to distinguish it from user-facing MkDocs pages. The `docs/internal/` directory SHALL be excluded from the MkDocs site build.
@@ -144,3 +155,27 @@ product release number.
 - **WHEN** a user browses the public Guides navigation
 - **THEN** they can open the self-dogfood reference without consulting
 contributor-only documentation
+
+### Requirement: Canonical GitHub Actions examples pin third-party actions to immutable SHAs
+Canonical, copy/paste-intended public GitHub Actions workflow examples in `docs/` SHALL pin every
+third-party action `uses:` reference to a full immutable commit SHA rather than a mutable
+version tag or branch. A human-readable version comment MAY appear beside the pin. First-party
+local actions (`./.github/actions/...`) and reusable-workflow references owned by this
+repository are not required to use SHA syntax. Prose that mentions an action version
+descriptively, outside a workflow-example code fence, is not a canonical pin and is not subject
+to this requirement.
+
+#### Scenario: Canonical example reuses a reviewed production pin
+- **WHEN** a canonical documentation example uses the same third-party action and version already
+  pinned in a production `.github/workflows/*.yml` file
+- **THEN** the documentation example pins that action to the same reviewed commit SHA
+
+#### Scenario: Local action is not forced into SHA syntax
+- **WHEN** a canonical workflow example references a first-party local action under
+  `./.github/actions/...`
+- **THEN** the lint does not require that reference to use commit-SHA syntax
+
+#### Scenario: Descriptive prose is not a false positive
+- **WHEN** documentation prose mentions `actions/checkout@v4` descriptively outside a workflow
+  code fence, such as in historical or explanatory text
+- **THEN** the lint does not treat that mention as a canonical unpinned reference
