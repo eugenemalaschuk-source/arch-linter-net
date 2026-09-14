@@ -104,7 +104,7 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     });
   });
 
-  async function token(overrides: Record<string, unknown> = {}): Promise<string> {
+  async function token(overrides: Record<string, unknown> = {}, kid = "local-key"): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
     return new SignJWT({
       iss: "https://token.actions.githubusercontent.com",
@@ -121,7 +121,7 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
       exp: now + 300,
       jti: crypto.randomUUID(),
       ...overrides
-    }).setProtectedHeader({ alg: "RS256", kid: "local-key" }).sign(privateKey);
+    }).setProtectedHeader({ alg: "RS256", kid }).sign(privateKey);
   }
 
   function relayUrl(operation: string): string { return `https://relay.test/badge-relay/v1/${alias}/${operation}`; }
@@ -150,6 +150,21 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
       proof: { valid: true, kind: "github-pr-authoritative/v1", digest }
     }));
   }
+
+  it("fails closed for a required JWKS refresh without creating publication state", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("unavailable", { status: 503 })));
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(alias));
+    const prepared = await prepareRemote(await token({}, "provider-outage"), `provider-outage-${crypto.randomUUID()}`);
+
+    expect(prepared.response.status).toBe(503);
+    const state = await runInDurableObject(stub, async (_instance, durableState) => ({
+      challengeCount: durableState.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM relay_challenges").toArray()[0]?.count,
+      relayState: durableState.storage.sql.exec<{ status: string; payload: string | null }>("SELECT status, payload FROM relay_state WHERE id=1").toArray()[0]
+    }));
+    expect(state.challengeCount).toBe(0);
+    expect(state.relayState).toMatchObject({ status: "unavailable", payload: null });
+  });
 
   it("rejects an unknown alias before Durable Object allocation", async () => {
     const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
