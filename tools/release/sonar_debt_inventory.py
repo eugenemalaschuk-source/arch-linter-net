@@ -320,7 +320,10 @@ def build_inventory(
 
 
 def disposition_key(finding: dict[str, Any]) -> str:
-    return f"{finding['rule']}|{finding['path']}|{finding['line']}"
+    """The finding's SonarCloud issue key — the only identity precise enough to bind a
+    disposition to exactly one finding. ``rule``/``path``/``line`` are not unique: distinct
+    issues routinely share all three, especially file-level issues where ``line`` is null."""
+    return str(finding["key"])
 
 
 def apply_reviewed_dispositions(
@@ -330,7 +333,8 @@ def apply_reviewed_dispositions(
     """Apply individually reviewed dispositions to matching findings only.
 
     Any finding without an entry stays ``untriaged``; a disposition never covers other
-    findings that merely share a rule, file or directory.
+    findings that merely share a rule, file or directory — dispositions are keyed by each
+    finding's own SonarCloud issue key, never by the (rule, path, line) it happens to sit at.
     """
     reviewed: list[dict[str, Any]] = []
     for finding in inventory["findings"]:
@@ -341,6 +345,7 @@ def apply_reviewed_dispositions(
         finding["justification"] = str(entry.get("justification", ""))
         reviewed.append(
             {
+                "key": finding["key"],
                 "rule": finding["rule"],
                 "path": finding["path"],
                 "line": finding["line"],
@@ -348,7 +353,7 @@ def apply_reviewed_dispositions(
                 "justification": finding["justification"],
             }
         )
-    reviewed.sort(key=lambda item: (item["rule"], item["path"], item["line"] or 0))
+    reviewed.sort(key=lambda item: (item["rule"], item["path"], item["line"] or 0, str(item["key"])))
     inventory["reviewedDispositions"] = reviewed
 
 
@@ -414,7 +419,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dispositions",
         default="{}",
-        help="Inline JSON map of 'rule|path|line' to {disposition, justification}.",
+        help="Inline JSON map of a finding's SonarCloud issue key to {disposition, justification}.",
     )
     return parser
 

@@ -229,7 +229,7 @@ def test_reviewed_disposition_applies_only_to_the_named_finding() -> None:
     inventory.apply_reviewed_dispositions(
         result,
         {
-            "r1|a.py|1": {
+            "i1": {
                 "disposition": "false-positive",
                 "justification": "guarded by the release-workspace confinement helper",
             }
@@ -241,6 +241,7 @@ def test_reviewed_disposition_applies_only_to_the_named_finding() -> None:
     assert second["disposition"] == "untriaged"
     assert result["reviewedDispositions"] == [
         {
+            "key": "i1",
             "rule": "r1",
             "path": "a.py",
             "line": 1,
@@ -248,6 +249,44 @@ def test_reviewed_disposition_applies_only_to_the_named_finding() -> None:
             "justification": "guarded by the release-workspace confinement helper",
         }
     ]
+
+
+def test_reviewed_disposition_does_not_leak_across_findings_sharing_rule_component_and_line() -> None:
+    """Two distinct SonarCloud issues can share rule, component and line (routinely true for
+    file-level issues, where line is null for every issue in the file). The (rule, path, line)
+    triple is not a unique identity; only the issue's own key is, so a disposition keyed by
+    that triple must never silently apply to more than the one finding it names."""
+    responses = _base_responses(
+        {
+            1: {
+                "paging": {"total": 2},
+                "issues": [
+                    {"key": "i1", "rule": "r1", "component": "p:a.py", "line": None},
+                    {"key": "i2", "rule": "r1", "component": "p:a.py", "line": None},
+                ],
+            }
+        },
+        {1: {"paging": {"total": 0}, "hotspots": []}},
+    )
+    client = _client(FakeFetch(responses))
+    result = inventory.build_inventory(client, "project", "main", _SHA)
+
+    inventory.apply_reviewed_dispositions(
+        result,
+        {
+            "i1": {
+                "disposition": "false-positive",
+                "justification": "reviewed for i1 only",
+            }
+        },
+    )
+
+    first, second = result["findings"]
+    assert first["key"] == "i1"
+    assert first["disposition"] == "false-positive"
+    assert second["key"] == "i2"
+    assert second["disposition"] == "untriaged"
+    assert [item["key"] for item in result["reviewedDispositions"]] == ["i1"]
 
 
 class _FakeResponse:
