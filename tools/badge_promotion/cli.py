@@ -181,6 +181,30 @@ def _applies_to_base_ref(document: Any, api: GitHubApi, repository_path: str, ba
     return included and not excluded
 
 
+def _ruleset_detail_requires_check(
+    api: GitHubApi,
+    repository_path: str,
+    ruleset_id: int,
+    check_name: str,
+    check_app_id: int,
+    base_ref: str,
+) -> bool:
+    try:
+        detail = api.request(f"/repos/{repository_path}/rulesets/{ruleset_id}")
+    except ProviderFailure as detail_error:
+        if detail_error.reason == "required_capability_unavailable":
+            return False
+        raise
+    detail_rules = detail.get("rules") if isinstance(detail, dict) else None
+    return (
+        isinstance(detail, dict)
+        and detail.get("id") == ruleset_id
+        and _applies_to_base_ref(detail, api, repository_path, base_ref)
+        and isinstance(detail_rules, list)
+        and any(_has_required_check(rule, check_name, check_app_id) for rule in detail_rules)
+    )
+
+
 def _ruleset_requires_check(
     api: GitHubApi,
     repository_path: str,
@@ -198,20 +222,7 @@ def _ruleset_requires_check(
         ruleset_id = summary.get("id") if isinstance(summary, dict) else None
         if not isinstance(ruleset_id, int) or ruleset_id <= 0:
             continue
-        try:
-            detail = api.request(f"/repos/{repository_path}/rulesets/{ruleset_id}")
-        except ProviderFailure as detail_error:
-            if detail_error.reason == "required_capability_unavailable":
-                continue
-            raise
-        detail_rules = detail.get("rules") if isinstance(detail, dict) else None
-        if (
-            isinstance(detail, dict)
-            and detail.get("id") == ruleset_id
-            and _applies_to_base_ref(detail, api, repository_path, base_ref)
-            and isinstance(detail_rules, list)
-            and any(_has_required_check(rule, check_name, check_app_id) for rule in detail_rules)
-        ):
+        if _ruleset_detail_requires_check(api, repository_path, ruleset_id, check_name, check_app_id, base_ref):
             return True
     return False
 
@@ -323,7 +334,7 @@ def _selected_artifact(api: GitHubApi, repository: str, run_id: int, artifact_na
     return artifacts, selected[0]
 
 
-def _read_semantic_horizon(api: GitHubApi, repository: str, artifacts: list[Any], config) -> datetime:
+def _read_semantic_horizon(api: GitHubApi, artifacts: list[Any], config) -> datetime:
     evidence_artifacts = [item for item in artifacts if item.get("name") == config.producer.evidence_artifact_name and item.get("expired") is not True]
     if len(evidence_artifacts) != 1:
         raise ProviderFailure("semantic_evidence_unavailable")
@@ -355,7 +366,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     artifacts, artifact = _selected_artifact(api, repository, run_id, config.producer.artifact_name)
     archive = api.download(str(artifact.get("archive_download_url", "")))
     verified_at = _parse_time(run.get("created_at"))
-    semantic_horizon = _read_semantic_horizon(api, repository, artifacts, config)
+    semantic_horizon = _read_semantic_horizon(api, artifacts, config)
     evidence = EvidenceContext(
         repository=repository, base_ref=base_ref, base_sha=base_sha, main_tree_sha=main_tree,
         head_sha=head_sha, head_tree_sha=head_tree, pr_number=pr_number, event=config.producer.event,

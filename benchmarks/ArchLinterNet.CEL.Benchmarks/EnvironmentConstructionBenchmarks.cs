@@ -14,6 +14,10 @@ namespace ArchLinterNet.CEL.Benchmarks;
 [MemoryDiagnoser]
 public class EnvironmentConstructionBenchmarks
 {
+    protected EnvironmentConstructionBenchmarks()
+    {
+    }
+
     [Benchmark(Description = "Build source/target context schema (2 object-typed variables)")]
     public static CelContextSchema BuildContextSchema() =>
         BenchmarkFixtures.BuildSourceTargetSchema(out _, out _);

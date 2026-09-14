@@ -164,13 +164,7 @@ def _normalize_issue(issue: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_inventory(
-    client: SonarClient,
-    project: str,
-    branch: str,
-    revision: str,
-) -> dict[str, Any]:
-    """Capture the complete debt inventory bound to one analysis revision."""
+def _resolve_analysis(client: SonarClient, project: str, branch: str, revision: str) -> dict[str, Any]:
     analyses = _search_all(
         client,
         "/api/project_analyses/search",
@@ -184,51 +178,52 @@ def build_inventory(
             f"Revision {revision} has no completed analysis on branch '{branch}'. "
             f"Observed revisions: {observed[:5]}"
         )
-    analysis = matching[0]
+    return matching[0]
 
+
+def _fetch_quality_gate(client: SonarClient, project: str, branch: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     gate_payload = client.get(
         "/api/qualitygates/project_status",
         {"projectKey": project, "branch": branch},
     ).get("projectStatus")
     if not isinstance(gate_payload, dict):
         raise SonarInventoryError("SonarCloud response is missing projectStatus")
-    conditions = []
-    for condition in gate_payload.get("conditions") or []:
-        if isinstance(condition, dict):
-            conditions.append(
-                {
-                    "metricKey": condition.get("metricKey"),
-                    "comparator": condition.get("comparator"),
-                    "errorThreshold": condition.get("errorThreshold"),
-                    "actualValue": condition.get("actualValue"),
-                    "status": condition.get("status"),
-                }
-            )
+    conditions = [
+        {
+            "metricKey": condition.get("metricKey"),
+            "comparator": condition.get("comparator"),
+            "errorThreshold": condition.get("errorThreshold"),
+            "actualValue": condition.get("actualValue"),
+            "status": condition.get("status"),
+        }
+        for condition in gate_payload.get("conditions") or []
+        if isinstance(condition, dict)
+    ]
     conditions.sort(key=lambda condition: str(condition["metricKey"]))
+    return gate_payload, conditions
 
-    measures = {}
+
+def _fetch_measures(client: SonarClient, project: str, branch: str) -> dict[str, Any]:
+    measures: dict[str, Any] = {}
     component = client.get(
         "/api/measures/component",
         {"component": project, "branch": branch, "metricKeys": ",".join(_METRIC_KEYS)},
     ).get("component")
-    if isinstance(component, dict):
-        for measure in component.get("measures") or []:
-            if isinstance(measure, dict) and measure.get("metric") is not None:
-                measures[measure["metric"]] = measure.get("value")
+    if not isinstance(component, dict):
+        return measures
+    for measure in component.get("measures") or []:
+        if isinstance(measure, dict) and measure.get("metric") is not None:
+            measures[measure["metric"]] = measure.get("value")
+    return measures
 
+
+def _fetch_findings(client: SonarClient, project: str, branch: str) -> list[dict[str, Any]]:
     issues = _search_all(
         client,
         "/api/issues/search",
         {"componentKeys": project, "branch": branch, "resolved": "false"},
         "issues",
     )
-    hotspots = _search_all(
-        client,
-        "/api/hotspots/search",
-        {"projectKey": project, "branch": branch},
-        "hotspots",
-    )
-
     findings = [_normalize_issue(issue) for issue in issues]
     findings.sort(
         key=lambda finding: (
@@ -238,7 +233,17 @@ def build_inventory(
             str(finding["key"]),
         )
     )
-    normalized_hotspots = sorted(
+    return findings
+
+
+def _fetch_hotspots(client: SonarClient, project: str, branch: str) -> list[dict[str, Any]]:
+    hotspots = _search_all(
+        client,
+        "/api/hotspots/search",
+        {"projectKey": project, "branch": branch},
+        "hotspots",
+    )
+    return sorted(
         (
             {
                 "key": hotspot.get("key"),
@@ -256,6 +261,20 @@ def build_inventory(
             hotspot["line"] if isinstance(hotspot["line"], int) else 0,
         ),
     )
+
+
+def build_inventory(
+    client: SonarClient,
+    project: str,
+    branch: str,
+    revision: str,
+) -> dict[str, Any]:
+    """Capture the complete debt inventory bound to one analysis revision."""
+    analysis = _resolve_analysis(client, project, branch, revision)
+    gate_payload, conditions = _fetch_quality_gate(client, project, branch)
+    measures = _fetch_measures(client, project, branch)
+    findings = _fetch_findings(client, project, branch)
+    normalized_hotspots = _fetch_hotspots(client, project, branch)
 
     return {
         "metadata": {
@@ -319,6 +338,16 @@ def _tally(findings: list[dict[str, Any]], key: str) -> dict[str, int]:
     return {name: counts[name] for name in sorted(counts)}
 
 
+_TWO_COLUMN_SEPARATOR = "| --- | --- |"
+
+
+def _render_tally_section(title: str, header: str, findings: list[dict[str, Any]], key: str) -> list[str]:
+    lines = ["", f"## {title}", "", header, _TWO_COLUMN_SEPARATOR]
+    for name, count in _tally(findings, key).items():
+        lines.append(f"| {name} | {count} |")
+    return lines
+
+
 def render_markdown(inventory: dict[str, Any]) -> str:
     metadata = inventory["metadata"]
     gate = inventory["qualityGate"]
@@ -345,15 +374,9 @@ def render_markdown(inventory: dict[str, Any]) -> str:
                 **condition
             )
         )
-    lines += ["", "## Findings by rule", "", "| Rule | Count |", "| --- | --- |"]
-    for rule, count in _tally(findings, "rule").items():
-        lines.append(f"| {rule} | {count} |")
-    lines += ["", "## Findings by component", "", "| Component | Count |", "| --- | --- |"]
-    for component, count in _tally(findings, "component").items():
-        lines.append(f"| {component} | {count} |")
-    lines += ["", "## Disposition summary", "", "| Disposition | Count |", "| --- | --- |"]
-    for disposition, count in _tally(findings, "disposition").items():
-        lines.append(f"| {disposition} | {count} |")
+    lines += _render_tally_section("Findings by rule", "| Rule | Count |", findings, "rule")
+    lines += _render_tally_section("Findings by component", "| Component | Count |", findings, "component")
+    lines += _render_tally_section("Disposition summary", "| Disposition | Count |", findings, "disposition")
     lines.append("")
     return "\n".join(lines)
 

@@ -52,19 +52,19 @@ public sealed class RepeatedWorkRegressionEvidenceTests
 
         ArchitectureContractExecutionResult strict = executor.Execute(session, "strict", registry);
         ArchitectureContractExecutionResult audit = executor.Execute(session, "audit", registry);
-        IReadOnlyList<string> strictProjection = CanonicalProjection(strict, "strict");
-        IReadOnlyList<string> auditProjection = CanonicalProjection(audit, "audit");
+        string[] strictProjection = CanonicalProjection(strict, "strict");
+        string[] auditProjection = CanonicalProjection(audit, "audit");
 
         Assert.Multiple(() =>
         {
             Assert.That(strictProjection, Is.Not.Empty);
             Assert.That(auditProjection, Is.Not.Empty);
-            Assert.That(strictProjection, Has.Count.EqualTo(ExpectedStrictProjectionCount));
-            Assert.That(auditProjection, Has.Count.EqualTo(ExpectedAuditProjectionCount));
+            Assert.That(strictProjection, Has.Length.EqualTo(ExpectedStrictProjectionCount));
+            Assert.That(auditProjection, Has.Length.EqualTo(ExpectedAuditProjectionCount));
             Assert.That(CanonicalChecksum(strictProjection), Is.EqualTo(ExpectedStrictProjectionChecksum),
-                $"Strict projection count={strictProjection.Count}, checksum={CanonicalChecksum(strictProjection)}");
+                $"Strict projection count={strictProjection.Length}, checksum={CanonicalChecksum(strictProjection)}");
             Assert.That(CanonicalChecksum(auditProjection), Is.EqualTo(ExpectedAuditProjectionChecksum),
-                $"Audit projection count={auditProjection.Count}, checksum={CanonicalChecksum(auditProjection)}");
+                $"Audit projection count={auditProjection.Length}, checksum={CanonicalChecksum(auditProjection)}");
         });
     }
 

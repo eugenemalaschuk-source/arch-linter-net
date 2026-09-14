@@ -46,8 +46,9 @@ def collect_cobertura_reports(reports_glob: str) -> list[Path]:
     pattern = Path(reports_glob)
     if pattern.is_absolute() or ".." in pattern.parts:
         raise ValueError("The reports glob must be a relative path inside the workspace.")
+    safe_pattern = pattern.as_posix()
     reports: list[Path] = []
-    for candidate in glob.glob(reports_glob, recursive=True):
+    for candidate in glob.glob(safe_pattern, recursive=True):
         resolved = Path(candidate).resolve()
         if resolved.is_relative_to(root):
             reports.append(resolved)
