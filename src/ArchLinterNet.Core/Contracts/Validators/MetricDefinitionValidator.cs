@@ -13,95 +13,118 @@ internal sealed class MetricDefinitionValidator : IArchitecturePolicyDocumentVal
         foreach (ArchitectureMetricDefinition definition in document.Metrics)
         {
             document.Provenance.SetValidationSubject(definition);
-            if (string.IsNullOrWhiteSpace(definition.Id))
-            {
-                throw new InvalidOperationException("Every metric definition must declare a non-empty id.");
-            }
+            ValidateDefinition(document, definition, ids);
+        }
+    }
 
-            if (!ids.Add(definition.Id))
-            {
-                throw new InvalidOperationException($"Duplicate metric id '{definition.Id}'.");
-            }
+    private void ValidateDefinition(ArchitectureContractDocument document, ArchitectureMetricDefinition definition, HashSet<string> ids)
+    {
+        if (string.IsNullOrWhiteSpace(definition.Id))
+        {
+            throw new InvalidOperationException("Every metric definition must declare a non-empty id.");
+        }
 
-            if (!_kinds.Contains(definition.Kind))
-            {
-                throw new InvalidOperationException(
-                    $"Metric '{definition.Id}' declares unsupported kind '{definition.Kind}'. " +
-                    $"Supported values are {string.Join(", ", ArchitectureMetricKinds.All.Select(kind => $"'{kind}'"))}.");
-            }
+        if (!ids.Add(definition.Id))
+        {
+            throw new InvalidOperationException($"Duplicate metric id '{definition.Id}'.");
+        }
 
-            bool hasTopologyTarget = definition.TopologyNode is not null;
-            bool hasPublicTarget = definition.PublicApiSurface is not null;
-            bool hasUnitTarget = definition.Unit is not null;
-            bool topologyTarget = !string.IsNullOrWhiteSpace(definition.TopologyNode);
-            bool publicTarget = !string.IsNullOrWhiteSpace(definition.PublicApiSurface);
-            bool isPublic = definition.Kind == ArchitectureMetricKinds.PublicContractSurfaceCount;
-            bool isFootprint = definition.Kind == ArchitectureMetricKinds.ComponentFootprintCount;
-            bool isTopology = !isPublic;
+        if (!_kinds.Contains(definition.Kind))
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' declares unsupported kind '{definition.Kind}'. " +
+                $"Supported values are {string.Join(", ", ArchitectureMetricKinds.All.Select(kind => $"'{kind}'"))}.");
+        }
 
-            if (isTopology && (!topologyTarget || hasPublicTarget))
-            {
-                throw new InvalidOperationException(
-                    $"Metric '{definition.Id}' kind '{definition.Kind}' requires exactly one 'topology_node' target.");
-            }
+        bool isPublic = definition.Kind == ArchitectureMetricKinds.PublicContractSurfaceCount;
+        bool isTopology = !isPublic;
 
-            if (isPublic && (hasTopologyTarget || hasUnitTarget || !publicTarget))
-            {
-                throw new InvalidOperationException(
-                    $"Metric '{definition.Id}' kind '{definition.Kind}' requires exactly one 'public_api_surface' target.");
-            }
+        ValidateTargetShape(definition, isPublic, isTopology);
 
-            if (isFootprint && definition.Unit is not ("project" or "assembly"))
-            {
-                throw new InvalidOperationException(
-                    $"Metric '{definition.Id}' footprint must select unit 'project' or 'assembly'.");
-            }
+        if (isTopology)
+        {
+            ValidateTopologyTarget(document, definition);
+        }
 
-            if (!isFootprint && hasUnitTarget)
-            {
-                throw new InvalidOperationException(
-                    $"Metric '{definition.Id}' kind '{definition.Kind}' does not accept 'unit'.");
-            }
+        if (isPublic)
+        {
+            ValidatePublicApiSurfaceTarget(document, definition);
+        }
+    }
 
-            if (document.Topology is null && isTopology)
-            {
-                throw new InvalidOperationException(
-                    $"Metric '{definition.Id}' targets topology node '{definition.TopologyNode}', but no topology is declared.");
-            }
+    private static void ValidateTargetShape(ArchitectureMetricDefinition definition, bool isPublic, bool isTopology)
+    {
+        bool hasTopologyTarget = definition.TopologyNode is not null;
+        bool hasPublicTarget = definition.PublicApiSurface is not null;
+        bool hasUnitTarget = definition.Unit is not null;
+        bool topologyTarget = !string.IsNullOrWhiteSpace(definition.TopologyNode);
+        bool publicTarget = !string.IsNullOrWhiteSpace(definition.PublicApiSurface);
+        bool isFootprint = definition.Kind == ArchitectureMetricKinds.ComponentFootprintCount;
 
-            if (isTopology && document.Topology is { } topology
-                && !topology.Nodes.Any(node => string.Equals(node.Id, definition.TopologyNode, StringComparison.Ordinal)))
-            {
-                throw new InvalidOperationException(
-                    $"Metric '{definition.Id}' references undeclared topology node '{definition.TopologyNode}'.");
-            }
+        if (isTopology && (!topologyTarget || hasPublicTarget))
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' kind '{definition.Kind}' requires exactly one 'topology_node' target.");
+        }
 
-            if (isTopology && definition.Kind == ArchitectureMetricKinds.TopologyTypeCount
-                && document.Topology is { SubjectKind: not "type" })
-            {
-                throw new InvalidOperationException(
-                    $"Metric '{definition.Id}' topology_type_count requires a topology with subject_kind 'type'.");
-            }
+        if (isPublic && (hasTopologyTarget || hasUnitTarget || !publicTarget))
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' kind '{definition.Kind}' requires exactly one 'public_api_surface' target.");
+        }
 
-            if (isPublic)
-            {
-                bool strictMatch = document.Contracts.StrictPublicApiSurface
-                    .Any(contract => string.Equals(contract.Id, definition.PublicApiSurface, StringComparison.OrdinalIgnoreCase));
-                bool auditMatch = document.Contracts.AuditPublicApiSurface
-                    .Any(contract => string.Equals(contract.Id, definition.PublicApiSurface, StringComparison.OrdinalIgnoreCase));
-                if (!strictMatch && !auditMatch)
-                {
-                    throw new InvalidOperationException(
-                        $"Metric '{definition.Id}' references unknown public API surface '{definition.PublicApiSurface}'.");
-                }
+        if (isFootprint && definition.Unit is not ("project" or "assembly"))
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' footprint must select unit 'project' or 'assembly'.");
+        }
 
-                if (strictMatch && auditMatch)
-                {
-                    throw new InvalidOperationException(
-                        $"Metric '{definition.Id}' references ambiguous public API surface '{definition.PublicApiSurface}' " +
-                        "declared in both strict and audit modes.");
-                }
-            }
+        if (!isFootprint && hasUnitTarget)
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' kind '{definition.Kind}' does not accept 'unit'.");
+        }
+    }
+
+    private static void ValidateTopologyTarget(ArchitectureContractDocument document, ArchitectureMetricDefinition definition)
+    {
+        if (document.Topology is null)
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' targets topology node '{definition.TopologyNode}', but no topology is declared.");
+        }
+
+        if (!document.Topology.Nodes.Any(node => string.Equals(node.Id, definition.TopologyNode, StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' references undeclared topology node '{definition.TopologyNode}'.");
+        }
+
+        if (definition.Kind == ArchitectureMetricKinds.TopologyTypeCount
+            && document.Topology is { SubjectKind: not "type" })
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' topology_type_count requires a topology with subject_kind 'type'.");
+        }
+    }
+
+    private static void ValidatePublicApiSurfaceTarget(ArchitectureContractDocument document, ArchitectureMetricDefinition definition)
+    {
+        bool strictMatch = document.Contracts.StrictPublicApiSurface
+            .Any(contract => string.Equals(contract.Id, definition.PublicApiSurface, StringComparison.OrdinalIgnoreCase));
+        bool auditMatch = document.Contracts.AuditPublicApiSurface
+            .Any(contract => string.Equals(contract.Id, definition.PublicApiSurface, StringComparison.OrdinalIgnoreCase));
+        if (!strictMatch && !auditMatch)
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' references unknown public API surface '{definition.PublicApiSurface}'.");
+        }
+
+        if (strictMatch && auditMatch)
+        {
+            throw new InvalidOperationException(
+                $"Metric '{definition.Id}' references ambiguous public API surface '{definition.PublicApiSurface}' " +
+                "declared in both strict and audit modes.");
         }
     }
 }

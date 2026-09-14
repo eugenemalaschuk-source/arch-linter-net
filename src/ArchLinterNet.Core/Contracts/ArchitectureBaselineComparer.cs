@@ -73,13 +73,9 @@ public static class ArchitectureBaselineComparer
             }
 
             ProcessNewCandidates(
-                groupName,
+                new NewCandidateScope(groupName, selectedIds, canonicalIds, externalEvidenceIds, useStructuredIdentity),
                 candidates,
-                selectedIds,
-                canonicalIds,
-                externalEvidenceIds,
                 baselineKeys,
-                useStructuredIdentity,
                 newEntries);
         }
 
@@ -108,6 +104,15 @@ public static class ArchitectureBaselineComparer
         List<ArchitectureBaselineComparisonEntry> Resolved,
         List<ArchitectureBaselineComparisonEntry> Ambiguous);
 
+    // The per-group inputs ProcessNewCandidates needs, bundled the same way as BaselineGroupScope so
+    // the call site stays one bundled argument instead of a wide positional parameter list.
+    private sealed record NewCandidateScope(
+        string GroupName,
+        HashSet<string>? SelectedIds,
+        Dictionary<string, string> CanonicalIds,
+        Dictionary<string, string> ExternalEvidenceIds,
+        bool UseStructuredIdentity);
+
     private static HashSet<string> ProcessBaselineEntries(
         BaselineGroupScope scope,
         IReadOnlyList<ArchitectureBaselineCandidate> candidates,
@@ -124,37 +129,56 @@ public static class ArchitectureBaselineComparer
             // carried through verbatim so scoped update/prune never drops unrelated debt.
             if (!entryInScope)
             {
-                foreach (var ignore in entry.IgnoredViolations)
-                {
-                    classification.OutOfScope.Add(BuildComparisonEntry(scope.GroupName, entry.Id, ignore, useStructuredIdentity));
-                }
-
+                CollectOutOfScopeEntry(scope.GroupName, entry, useStructuredIdentity, classification.OutOfScope);
                 continue;
             }
 
-            foreach (var ignore in entry.IgnoredViolations)
-            {
-                bool isImportedExternalDiagnostic = IsImportedExternalDiagnostic(
-                    scope.GroupName,
-                    ignore,
-                    useStructuredIdentity);
-                bool idKnown = isImportedExternalDiagnostic
-                    ? scope.ExternalEvidenceIds.ContainsKey(entry.Id)
-                    : scope.KnownIds.Contains(entry.Id);
-                string canonicalContractId = CanonicalizeContractId(
-                    isImportedExternalDiagnostic ? scope.ExternalEvidenceIds : scope.CanonicalIds,
-                    entry.Id);
-                baselineKeys.Add(useStructuredIdentity
-                    ? BuildIdentityKey(ignore.ToIdentity(canonicalContractId))
-                    : BuildLegacyKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference));
-
-                ClassifyBaselineEntry(
-                    scope.GroupName, entry.Id, canonicalContractId, ignore, idKnown,
-                    candidates, useStructuredIdentity, classification);
-            }
+            ProcessInScopeEntry(scope, entry, candidates, useStructuredIdentity, classification, baselineKeys);
         }
 
         return baselineKeys;
+    }
+
+    private static void CollectOutOfScopeEntry(
+        string groupName,
+        ArchitectureBaselineContractEntry entry,
+        bool useStructuredIdentity,
+        List<ArchitectureBaselineComparisonEntry> outOfScope)
+    {
+        foreach (var ignore in entry.IgnoredViolations)
+        {
+            outOfScope.Add(BuildComparisonEntry(groupName, entry.Id, ignore, useStructuredIdentity));
+        }
+    }
+
+    private static void ProcessInScopeEntry(
+        BaselineGroupScope scope,
+        ArchitectureBaselineContractEntry entry,
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates,
+        bool useStructuredIdentity,
+        BaselineClassification classification,
+        HashSet<string> baselineKeys)
+    {
+        foreach (var ignore in entry.IgnoredViolations)
+        {
+            bool isImportedExternalDiagnostic = IsImportedExternalDiagnostic(
+                scope.GroupName,
+                ignore,
+                useStructuredIdentity);
+            bool idKnown = isImportedExternalDiagnostic
+                ? scope.ExternalEvidenceIds.ContainsKey(entry.Id)
+                : scope.KnownIds.Contains(entry.Id);
+            string canonicalContractId = CanonicalizeContractId(
+                isImportedExternalDiagnostic ? scope.ExternalEvidenceIds : scope.CanonicalIds,
+                entry.Id);
+            baselineKeys.Add(useStructuredIdentity
+                ? BuildIdentityKey(ignore.ToIdentity(canonicalContractId))
+                : BuildLegacyKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference));
+
+            ClassifyBaselineEntry(
+                scope.GroupName, entry.Id, canonicalContractId, ignore, idKnown,
+                candidates, useStructuredIdentity, classification);
+        }
     }
 
     private static void ClassifyBaselineEntry(
@@ -217,40 +241,36 @@ public static class ArchitectureBaselineComparer
     }
 
     private static void ProcessNewCandidates(
-        string groupName,
+        NewCandidateScope scope,
         IReadOnlyList<ArchitectureBaselineCandidate> candidates,
-        HashSet<string>? selectedIds,
-        Dictionary<string, string> canonicalIds,
-        Dictionary<string, string> externalEvidenceIds,
         HashSet<string> baselineKeys,
-        bool useStructuredIdentity,
         List<ArchitectureBaselineComparisonEntry> newEntries)
     {
         var seenNewKeys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var candidate in candidates)
         {
-            if (candidate.ContractGroup != groupName || candidate.ContractId == null)
+            if (candidate.ContractGroup != scope.GroupName || candidate.ContractId == null)
             {
                 continue;
             }
 
-            if (selectedIds != null && !selectedIds.Contains(candidate.ContractId))
+            if (scope.SelectedIds != null && !scope.SelectedIds.Contains(candidate.ContractId))
             {
                 continue;
             }
 
             bool isImportedExternalDiagnostic = IsImportedExternalDiagnostic(
-                groupName,
+                scope.GroupName,
                 candidate.Identity,
-                useStructuredIdentity);
+                scope.UseStructuredIdentity);
             string canonicalContractId = CanonicalizeContractId(
-                isImportedExternalDiagnostic ? externalEvidenceIds : canonicalIds,
+                isImportedExternalDiagnostic ? scope.ExternalEvidenceIds : scope.CanonicalIds,
                 candidate.ContractId);
-            ArchitectureViolationIdentity? candidateIdentity = useStructuredIdentity
-                ? (candidate.Identity ?? BuildFallbackIdentity(groupName, canonicalContractId, candidate)) with { ContractId = canonicalContractId }
+            ArchitectureViolationIdentity? candidateIdentity = scope.UseStructuredIdentity
+                ? (candidate.Identity ?? BuildFallbackIdentity(scope.GroupName, canonicalContractId, candidate)) with { ContractId = canonicalContractId }
                 : null;
 
-            string key = useStructuredIdentity
+            string key = scope.UseStructuredIdentity
                 ? BuildIdentityKey(candidateIdentity!)
                 : BuildLegacyKey(canonicalContractId, candidate.SourceType, candidate.ForbiddenReference);
 
@@ -260,8 +280,8 @@ public static class ArchitectureBaselineComparer
             }
 
             newEntries.Add(new ArchitectureBaselineComparisonEntry(
-                groupName, candidate.ContractId, candidate.SourceType, candidate.ForbiddenReference, null,
-                useStructuredIdentity ? candidateIdentity : null));
+                scope.GroupName, candidate.ContractId, candidate.SourceType, candidate.ForbiddenReference, null,
+                scope.UseStructuredIdentity ? candidateIdentity : null));
         }
     }
 

@@ -142,28 +142,34 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 continue;
             }
 
-            foreach (YamlNode field in entry.Children.Keys)
-            {
-                if (field is not YamlScalarNode { Value: { } fieldName })
-                {
-                    throw new InvalidOperationException(
-                        $"metric_baselines entry at index {index} has an unknown non-scalar field.");
-                }
+            ValidateMetricBaselineEntryFields(entry, index, requiredKeys, allowedKeys);
+        }
+    }
 
-                if (!allowedKeys.Contains(fieldName, StringComparer.Ordinal))
-                {
-                    throw new InvalidOperationException(
-                        $"metric_baselines entry at index {index} has an unknown field '{fieldName}'.");
-                }
+    private static void ValidateMetricBaselineEntryFields(
+        YamlMappingNode entry, int index, string[] requiredKeys, string[] allowedKeys)
+    {
+        foreach (YamlNode field in entry.Children.Keys)
+        {
+            if (field is not YamlScalarNode { Value: { } fieldName })
+            {
+                throw new InvalidOperationException(
+                    $"metric_baselines entry at index {index} has an unknown non-scalar field.");
             }
 
-            foreach (string requiredKey in requiredKeys)
+            if (!allowedKeys.Contains(fieldName, StringComparer.Ordinal))
             {
-                if (!TryGetChild(entry, requiredKey, out _))
-                {
-                    throw new InvalidOperationException(
-                        $"metric_baselines entry at index {index} has a missing '{requiredKey}'.");
-                }
+                throw new InvalidOperationException(
+                    $"metric_baselines entry at index {index} has an unknown field '{fieldName}'.");
+            }
+        }
+
+        foreach (string requiredKey in requiredKeys)
+        {
+            if (!TryGetChild(entry, requiredKey, out _))
+            {
+                throw new InvalidOperationException(
+                    $"metric_baselines entry at index {index} has a missing '{requiredKey}'.");
             }
         }
     }
@@ -189,84 +195,111 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         var metricIds = new HashSet<string>(StringComparer.Ordinal);
         for (int index = 0; index < entries.Count; index++)
         {
-            ArchitectureMetricBaselineEntry entry = entries[index];
-            string location = $"metric_baselines entry at index {index}";
+            ValidateMetricBaselineEntry(entries[index], index, metricIds);
+        }
+    }
 
-            if (entry.MetricIdentityVersion is null)
-            {
-                throw new InvalidOperationException(
-                    $"{location} has a missing 'metric_identity_version'.");
-            }
+    private static void ValidateMetricBaselineEntry(
+        ArchitectureMetricBaselineEntry entry, int index, HashSet<string> metricIds)
+    {
+        string location = $"metric_baselines entry at index {index}";
 
-            if (entry.MetricIdentityVersion != ArchitectureMetricBaselineIdentity.CurrentVersion)
-            {
-                throw new InvalidOperationException(
-                    $"{location} has unsupported 'metric_identity_version' " +
-                    $"(expected {ArchitectureMetricBaselineIdentity.CurrentVersion}).");
-            }
+        ValidateMetricIdentityVersion(entry, location);
 
-            if (string.IsNullOrWhiteSpace(entry.MetricId))
-            {
-                throw new InvalidOperationException(
-                    $"{location} has an empty or missing 'metric_id'.");
-            }
+        if (string.IsNullOrWhiteSpace(entry.MetricId))
+        {
+            throw new InvalidOperationException(
+                $"{location} has an empty or missing 'metric_id'.");
+        }
 
-            if (!metricIds.Add(entry.MetricId))
-            {
-                throw new InvalidOperationException(
-                    $"Duplicate metric baseline id '{entry.MetricId}'. Each metric ID may appear only once.");
-            }
+        if (!metricIds.Add(entry.MetricId))
+        {
+            throw new InvalidOperationException(
+                $"Duplicate metric baseline id '{entry.MetricId}'. Each metric ID may appear only once.");
+        }
 
-            if (string.IsNullOrWhiteSpace(entry.MetricKind))
-            {
-                throw new InvalidOperationException(
-                    $"{location} for metric '{entry.MetricId}' has an empty or missing 'metric_kind'.");
-            }
+        ValidateMetricKind(entry, location);
 
-            if (!ArchitectureMetricKinds.All.Contains(entry.MetricKind, StringComparer.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    $"{location} for metric '{entry.MetricId}' has unsupported 'metric_kind' '{entry.MetricKind}'.");
-            }
+        if (string.IsNullOrWhiteSpace(entry.NativeSubject))
+        {
+            throw new InvalidOperationException(
+                $"{location} for metric '{entry.MetricId}' has an empty or missing 'native_subject'.");
+        }
 
-            if (string.IsNullOrWhiteSpace(entry.NativeSubject))
-            {
-                throw new InvalidOperationException(
-                    $"{location} for metric '{entry.MetricId}' has an empty or missing 'native_subject'.");
-            }
+        ValidateMetricUnit(entry, location);
 
-            if (entry.Unit is not null)
-            {
-                if (string.IsNullOrWhiteSpace(entry.Unit))
-                {
-                    throw new InvalidOperationException(
-                        $"{location} for metric '{entry.MetricId}' has an empty 'unit'.");
-                }
+        if (string.IsNullOrWhiteSpace(entry.EffectiveScope))
+        {
+            throw new InvalidOperationException(
+                $"{location} for metric '{entry.MetricId}' has an empty or missing 'effective_scope'.");
+        }
 
-                if (entry.Unit is not ("project" or "assembly"))
-                {
-                    throw new InvalidOperationException(
-                        $"{location} for metric '{entry.MetricId}' has unsupported 'unit' '{entry.Unit}'.");
-                }
-            }
+        ValidateMetricValue(entry, location);
+    }
 
-            if (string.IsNullOrWhiteSpace(entry.EffectiveScope))
-            {
-                throw new InvalidOperationException(
-                    $"{location} for metric '{entry.MetricId}' has an empty or missing 'effective_scope'.");
-            }
+    private static void ValidateMetricIdentityVersion(ArchitectureMetricBaselineEntry entry, string location)
+    {
+        if (entry.MetricIdentityVersion is null)
+        {
+            throw new InvalidOperationException(
+                $"{location} has a missing 'metric_identity_version'.");
+        }
 
-            if (entry.Value is null)
-            {
-                throw new InvalidOperationException(
-                    $"{location} for metric '{entry.MetricId}' has a missing 'value'.");
-            }
+        if (entry.MetricIdentityVersion != ArchitectureMetricBaselineIdentity.CurrentVersion)
+        {
+            throw new InvalidOperationException(
+                $"{location} has unsupported 'metric_identity_version' " +
+                $"(expected {ArchitectureMetricBaselineIdentity.CurrentVersion}).");
+        }
+    }
 
-            if (entry.Value < 0)
-            {
-                throw new InvalidOperationException(
-                    $"{location} for metric '{entry.MetricId}' has a negative 'value'.");
-            }
+    private static void ValidateMetricKind(ArchitectureMetricBaselineEntry entry, string location)
+    {
+        if (string.IsNullOrWhiteSpace(entry.MetricKind))
+        {
+            throw new InvalidOperationException(
+                $"{location} for metric '{entry.MetricId}' has an empty or missing 'metric_kind'.");
+        }
+
+        if (!ArchitectureMetricKinds.All.Contains(entry.MetricKind, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"{location} for metric '{entry.MetricId}' has unsupported 'metric_kind' '{entry.MetricKind}'.");
+        }
+    }
+
+    private static void ValidateMetricUnit(ArchitectureMetricBaselineEntry entry, string location)
+    {
+        if (entry.Unit is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(entry.Unit))
+        {
+            throw new InvalidOperationException(
+                $"{location} for metric '{entry.MetricId}' has an empty 'unit'.");
+        }
+
+        if (entry.Unit is not ("project" or "assembly"))
+        {
+            throw new InvalidOperationException(
+                $"{location} for metric '{entry.MetricId}' has unsupported 'unit' '{entry.Unit}'.");
+        }
+    }
+
+    private static void ValidateMetricValue(ArchitectureMetricBaselineEntry entry, string location)
+    {
+        if (entry.Value is null)
+        {
+            throw new InvalidOperationException(
+                $"{location} for metric '{entry.MetricId}' has a missing 'value'.");
+        }
+
+        if (entry.Value < 0)
+        {
+            throw new InvalidOperationException(
+                $"{location} for metric '{entry.MetricId}' has a negative 'value'.");
         }
     }
 
@@ -276,43 +309,53 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
         for (int i = 0; i < entries.Count; i++)
         {
-            var entry = entries[i];
-            if (string.IsNullOrWhiteSpace(entry.Id))
-            {
-                throw new InvalidOperationException(
-                    $"Baseline entry at index {i} in group '{groupName}' has an empty or missing 'id'. " +
-                    "Each baseline entry must reference a contract by its 'id'.");
-            }
+            ValidateGroupEntry(entries[i], i, groupName, documentVersion, isStructured);
+        }
+    }
 
-            for (int j = 0; j < entry.IgnoredViolations.Count; j++)
-            {
-                var ignore = entry.IgnoredViolations[j];
-                if (string.IsNullOrWhiteSpace(ignore.SourceType))
-                {
-                    throw new InvalidOperationException(
-                        $"Baseline entry '{entry.Id}' in group '{groupName}' has an ignored_violations entry " +
-                        $"at index {j} with an empty or missing 'source_type'.");
-                }
+    private static void ValidateGroupEntry(
+        ArchitectureBaselineContractEntry entry, int entryIndex, string groupName, int documentVersion, bool isStructured)
+    {
+        if (string.IsNullOrWhiteSpace(entry.Id))
+        {
+            throw new InvalidOperationException(
+                $"Baseline entry at index {entryIndex} in group '{groupName}' has an empty or missing 'id'. " +
+                "Each baseline entry must reference a contract by its 'id'.");
+        }
 
-                if (string.IsNullOrWhiteSpace(ignore.ForbiddenReference))
-                {
-                    throw new InvalidOperationException(
-                        $"Baseline entry '{entry.Id}' in group '{groupName}' has an ignored_violations entry " +
-                        $"at index {j} with an empty or missing 'forbidden_reference'.");
-                }
+        for (int j = 0; j < entry.IgnoredViolations.Count; j++)
+        {
+            ValidateIgnoredViolationEntry(entry.IgnoredViolations[j], j, entry.Id, groupName, documentVersion, isStructured);
+        }
+    }
 
-                if (isStructured)
-                {
-                    ValidateStructuredIdentity(ignore, entry.Id, groupName, j);
-                }
-                else if (ignore.IdentityVersion != null)
-                {
-                    throw new InvalidOperationException(
-                        $"Baseline entry '{entry.Id}' in group '{groupName}' has an ignored_violations entry " +
-                        $"at index {j} with an 'identity_version' field, but the document is 'version: {documentVersion}'. " +
-                        "Structured identity fields are only valid in a 'version: 2' or 'version: 3' document.");
-                }
-            }
+    private static void ValidateIgnoredViolationEntry(
+        ArchitectureBaselineIgnoredViolation ignore, int index, string entryId, string groupName, int documentVersion, bool isStructured)
+    {
+        if (string.IsNullOrWhiteSpace(ignore.SourceType))
+        {
+            throw new InvalidOperationException(
+                $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry " +
+                $"at index {index} with an empty or missing 'source_type'.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ignore.ForbiddenReference))
+        {
+            throw new InvalidOperationException(
+                $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry " +
+                $"at index {index} with an empty or missing 'forbidden_reference'.");
+        }
+
+        if (isStructured)
+        {
+            ValidateStructuredIdentity(ignore, entryId, groupName, index);
+        }
+        else if (ignore.IdentityVersion != null)
+        {
+            throw new InvalidOperationException(
+                $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry " +
+                $"at index {index} with an 'identity_version' field, but the document is 'version: {documentVersion}'. " +
+                "Structured identity fields are only valid in a 'version: 2' or 'version: 3' document.");
         }
     }
 
