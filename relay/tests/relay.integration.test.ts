@@ -157,7 +157,7 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     const response = await SELF.fetch("https://relay.test/badge-relay/v1/a0000000");
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "unknown_route" });
-    expect((await listDurableObjectIds(relay)).length).toBe(before);
+    expect(await listDurableObjectIds(relay)).toHaveLength(before);
   });
 
   it("expires a ready public GET before conditional handling without a publisher or scheduler", async () => {

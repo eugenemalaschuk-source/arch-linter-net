@@ -76,7 +76,7 @@ internal static partial class CheckpointBProcessRunner
                 standardOutputTask = standardOutput.ReadAsync(standardOutputReader);
                 standardErrorTask = standardError.ReadAsync(standardErrorReader);
 #pragma warning restore CA2016
-                completion = process.WaitForExitAsync();
+                completion = process.WaitForExitAsync(CancellationToken.None);
 
                 // Watching both stream tasks here (not just completion) means a genuine read fault
                 // that happens while the process is still running surfaces immediately, instead of
@@ -85,13 +85,13 @@ internal static partial class CheckpointBProcessRunner
                         completion,
                         [standardOutputTask, standardErrorTask],
                         ProcessCompletionTimeout,
-                        cancellationToken,
                         "process completion",
                         command,
                         processId,
                         elapsed,
                         standardOutput,
-                        standardError)
+                        standardError,
+                        cancellationToken)
                     .ConfigureAwait(false);
 
                 // Task.WhenAll only completes once BOTH streams finish, fault or not, so it alone
@@ -104,13 +104,13 @@ internal static partial class CheckpointBProcessRunner
                         streams,
                         [standardOutputTask, standardErrorTask],
                         PostExitDrainTimeout,
-                        cancellationToken,
                         "post-exit stream drain",
                         command,
                         processId,
                         elapsed,
                         standardOutput,
-                        standardError)
+                        standardError,
+                        cancellationToken)
                     .ConfigureAwait(false);
 
                 return new CheckpointBReleaseGateTests.CommandResult(
@@ -169,13 +169,13 @@ internal static partial class CheckpointBProcessRunner
         Task primary,
         IReadOnlyList<Task> watchedFaults,
         TimeSpan timeout,
-        CancellationToken cancellationToken,
         string phase,
         string command,
         int processId,
         Stopwatch elapsed,
         StreamCapture standardOutput,
-        StreamCapture standardError)
+        StreamCapture standardError,
+        CancellationToken cancellationToken)
     {
         using var timeoutSource = new CancellationTokenSource(timeout);
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);

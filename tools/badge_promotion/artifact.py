@@ -40,13 +40,17 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _reject_non_finite(_: Any) -> Any:
+    raise ArtifactValidationError("non-finite JSON value")
+
+
 def _parse_json(data: bytes, label: str) -> dict[str, Any]:
     try:
         text = data.decode("utf-8", errors="strict")
         value = json.loads(
             text,
             object_pairs_hook=_reject_duplicate_keys,
-            parse_constant=lambda _: (_ for _ in ()).throw(ArtifactValidationError("non-finite JSON value")),
+            parse_constant=_reject_non_finite,
         )
     except ArtifactValidationError:
         raise

@@ -29,6 +29,7 @@ _MAIN_VERSION_RE = re.compile(
 _RETENTION_SCHEMA = "arch-linter-main-package-retention/v2"
 _GITHUB_ENV_DESCRIPTION = "GitHub environment file"
 _GITHUB_OUTPUT_DESCRIPTION = "GitHub output file"
+_UTC_OFFSET = "+00:00"
 
 
 @dataclass(frozen=True)
@@ -98,7 +99,7 @@ def _parse_github_timestamp(value: Any, package_id: str, version: str) -> dateti
             f"GitHub Packages inventory for {package_id} version '{version}' has an invalid created_at value."
         )
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value.replace("Z", _UTC_OFFSET))
     except ValueError as error:
         raise ValueError(
             f"GitHub Packages inventory for {package_id} version '{version}' has an invalid created_at value."
@@ -157,14 +158,17 @@ def _is_partial_version_stale(
     )
 
 
-def create_retention_plan(
+def _version_sort_key(version: str) -> tuple[int, int, int, int]:
+    return _parse_main_version(version) or (-1, -1, -1, -1)
+
+
+def _validate_retention_inputs(
     inventories: dict[str, dict[str, InventoryValue]],
     current_version: str,
     keep: int,
-    *,
-    prune_stale_partials: bool = False,
-    stale_partial_before: datetime | None = None,
-) -> dict[str, Any]:
+    prune_stale_partials: bool,
+    stale_partial_before: datetime | None,
+) -> tuple[tuple[int, int, int, int], datetime | None]:
     if keep <= 0:
         raise ValueError("Retention count must be a positive integer.")
     current_version_key = _parse_main_version(current_version)
@@ -176,58 +180,39 @@ def create_retention_plan(
         if stale_partial_before.tzinfo is None:
             raise ValueError("Stale partial cleanup cutoff must include a timezone.")
         stale_partial_before = stale_partial_before.astimezone(timezone.utc)
-
     missing_packages = sorted(set(PACKAGE_IDS) - set(inventories))
     unexpected_packages = sorted(set(inventories) - set(PACKAGE_IDS))
     if missing_packages or unexpected_packages:
         raise ValueError(
             f"Package inventory set mismatch: missing={missing_packages}, unexpected={unexpected_packages}."
         )
+    return current_version_key, stale_partial_before
 
-    main_versions_by_package = {
-        package_id: {version for version in versions if _parse_main_version(version) is not None}
-        for package_id, versions in inventories.items()
-    }
-    complete_versions = set.intersection(*(main_versions_by_package[package_id] for package_id in PACKAGE_IDS))
-    if current_version not in complete_versions:
-        raise ValueError(
-            f"Current main build '{current_version}' is not complete across all four package IDs."
-        )
 
-    all_main_versions = set.union(*(main_versions_by_package[package_id] for package_id in PACKAGE_IDS))
-    partial_versions = sorted(
-        all_main_versions - complete_versions,
-        key=lambda version: _parse_main_version(version) or (-1, -1, -1, -1),
-        reverse=True,
-    )
-    stale_partial_versions = (
-        [
-            version
-            for version in partial_versions
-            if (_parse_main_version(version) or current_version_key) < current_version_key
-            and stale_partial_before is not None
-            and _is_partial_version_stale(version, inventories, stale_partial_before)
-        ]
-        if prune_stale_partials
-        else []
-    )
-    stale_partial_set = set(stale_partial_versions)
-    protected_partial_versions = [
-        version for version in partial_versions if version not in stale_partial_set
+def _stale_partial_versions(
+    partial_versions: list[str],
+    inventories: dict[str, dict[str, InventoryValue]],
+    current_version_key: tuple[int, int, int, int],
+    stale_partial_before: datetime | None,
+    prune_stale_partials: bool,
+) -> list[str]:
+    if not prune_stale_partials:
+        return []
+    return [
+        version
+        for version in partial_versions
+        if (_parse_main_version(version) or current_version_key) < current_version_key
+        and stale_partial_before is not None
+        and _is_partial_version_stale(version, inventories, stale_partial_before)
     ]
-    ordered_complete = sorted(
-        complete_versions,
-        key=lambda version: _parse_main_version(version) or (-1, -1, -1, -1),
-        reverse=True,
-    )
 
-    target_retained = ordered_complete[:keep]
-    retained = list(target_retained)
-    current_retention_deferred = current_version not in target_retained
-    if current_retention_deferred:
-        retained.append(current_version)
 
-    retained_set = set(retained)
+def _deletion_records(
+    inventories: dict[str, dict[str, InventoryValue]],
+    ordered_complete: list[str],
+    retained_set: set[str],
+    stale_partial_versions: list[str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     deletions = []
     orphan_deletions = []
     for package_id in PACKAGE_IDS:
@@ -242,7 +227,6 @@ def create_retention_plan(
                     "reason": "expired_complete",
                 }
             )
-
         for version in stale_partial_versions:
             record = inventories[package_id].get(version)
             if record is None:
@@ -255,6 +239,54 @@ def create_retention_plan(
                     "reason": "stale_partial",
                 }
             )
+    return deletions, orphan_deletions
+
+
+def create_retention_plan(
+    inventories: dict[str, dict[str, InventoryValue]],
+    current_version: str,
+    keep: int,
+    *,
+    prune_stale_partials: bool = False,
+    stale_partial_before: datetime | None = None,
+) -> dict[str, Any]:
+    current_version_key, stale_partial_before = _validate_retention_inputs(
+        inventories, current_version, keep, prune_stale_partials, stale_partial_before
+    )
+    main_versions_by_package = {
+        package_id: {version for version in versions if _parse_main_version(version) is not None}
+        for package_id, versions in inventories.items()
+    }
+    complete_versions = set.intersection(*(main_versions_by_package[package_id] for package_id in PACKAGE_IDS))
+    if current_version not in complete_versions:
+        raise ValueError(
+            f"Current main build '{current_version}' is not complete across all four package IDs."
+        )
+    all_main_versions = set.union(*(main_versions_by_package[package_id] for package_id in PACKAGE_IDS))
+    partial_versions = sorted(
+        all_main_versions - complete_versions,
+        key=_version_sort_key,
+        reverse=True,
+    )
+    stale_partial_versions = _stale_partial_versions(
+        partial_versions, inventories, current_version_key, stale_partial_before, prune_stale_partials
+    )
+    stale_partial_set = set(stale_partial_versions)
+    protected_partial_versions = [
+        version for version in partial_versions if version not in stale_partial_set
+    ]
+    ordered_complete = sorted(complete_versions, key=_version_sort_key, reverse=True)
+
+    target_retained = ordered_complete[:keep]
+    retained = list(target_retained)
+    current_retention_deferred = current_version not in target_retained
+    if current_retention_deferred:
+        retained.append(current_version)
+
+    retained_set = set(retained)
+    deletions, orphan_deletions = _deletion_records(
+        inventories, ordered_complete, retained_set, stale_partial_versions
+    )
 
     return {
         "schema": _RETENTION_SCHEMA,
@@ -266,7 +298,7 @@ def create_retention_plan(
         "partial_versions": partial_versions,
         "orphan_cleanup_enabled": prune_stale_partials,
         "stale_partial_before": (
-            stale_partial_before.isoformat().replace("+00:00", "Z")
+            stale_partial_before.isoformat().replace(_UTC_OFFSET, "Z")
             if stale_partial_before is not None
             else None
         ),
@@ -346,7 +378,7 @@ def _retention_command(arguments: argparse.Namespace) -> None:
 
 def _utc_timestamp(value: str) -> datetime:
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value.replace("Z", _UTC_OFFSET))
     except ValueError as error:
         raise argparse.ArgumentTypeError(f"Invalid UTC timestamp: {value}") from error
     if parsed.tzinfo is None:

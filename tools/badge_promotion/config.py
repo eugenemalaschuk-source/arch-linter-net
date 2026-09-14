@@ -45,6 +45,10 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _reject_non_finite(_: Any) -> Any:
+    raise ConfigValidationError("non-finite JSON value")
+
+
 def _object(value: Any, field: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ConfigValidationError(f"{field} must be an object")
@@ -73,32 +77,26 @@ def _bounded_int(value: Any, field: str, minimum: int, maximum: int) -> int:
     return value
 
 
-def parse_config(source: str | bytes | Mapping[str, Any]) -> PromotionConfig:
-    """Parse trusted setup JSON without accepting consumer-selected producers."""
-
+def _raw_config(source: str | bytes | Mapping[str, Any]) -> Any:
     if isinstance(source, Mapping):
-        raw: Any = dict(source)
-    else:
-        try:
-            raw = json.loads(source, object_pairs_hook=_reject_duplicate_keys, parse_constant=lambda _: (_ for _ in ()).throw(ConfigValidationError("non-finite JSON value")))
-        except ConfigValidationError:
-            raise
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ConfigValidationError("configuration is not valid JSON") from error
-    raw = _object(raw, "configuration")
-    _keys(
-        raw,
-        {"schema_id", "repository", "repository_visibility", "base_ref", "producer", "destination", "disclosure_profile", "validity", "limits"},
-        "configuration",
-    )
-    schema_id = _string(raw["schema_id"], "schema_id")
-    if schema_id != _SCHEMA_ID:
-        raise ConfigValidationError("unsupported configuration schema")
-    repository = _string(raw["repository"], "repository", pattern=REPOSITORY_PATTERN.pattern)
+        return dict(source)
+    try:
+        return json.loads(source, object_pairs_hook=_reject_duplicate_keys, parse_constant=_reject_non_finite)
+    except ConfigValidationError:
+        raise
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ConfigValidationError("configuration is not valid JSON") from error
+
+
+def _parse_visibility(raw: Mapping[str, Any]) -> str:
     visibility = _string(raw["repository_visibility"], "repository_visibility")
     if visibility not in {"public", "private"}:
         raise ConfigValidationError("repository_visibility is unsupported")
-    base_ref = _string(raw["base_ref"], "base_ref")
+    return visibility
+
+
+def _parse_base_ref(value: Any) -> str:
+    base_ref = _string(value, "base_ref")
     if (
         _BASE_REF_PATTERN.fullmatch(base_ref) is None
         or base_ref in {".", ".."}
@@ -110,7 +108,10 @@ def parse_config(source: str | bytes | Mapping[str, Any]) -> PromotionConfig:
         or "@{" in base_ref
     ):
         raise ConfigValidationError("base_ref is not a safe branch name")
+    return base_ref
 
+
+def _parse_producer(raw: Mapping[str, Any]) -> ProducerConfig:
     producer_raw = _object(raw["producer"], "producer")
     _keys(producer_raw, {"workflow_path", "workflow_sha", "job_name", "check_name", "check_app", "event", "artifact_name", "evidence_artifact_name", "payload_path"}, "producer")
     workflow_path = _string(producer_raw["workflow_path"], "producer.workflow_path", pattern=WORKFLOW_PATH_PATTERN.pattern)
@@ -126,8 +127,10 @@ def parse_config(source: str | bytes | Mapping[str, Any]) -> PromotionConfig:
     payload_path = _string(producer_raw["payload_path"], "producer.payload_path")
     if payload_path != "architecture-health-badge.json":
         raise ConfigValidationError("only the approved payload path is supported")
-    producer = ProducerConfig(workflow_path, workflow_sha, job_name, check_name, check_app, event, artifact_name, evidence_artifact_name, payload_path)
+    return ProducerConfig(workflow_path, workflow_sha, job_name, check_name, check_app, event, artifact_name, evidence_artifact_name, payload_path)
 
+
+def _parse_destination(raw: Mapping[str, Any], visibility: str) -> DestinationConfig:
     destination_raw = _object(raw["destination"], "destination")
     adapter_value = _string(destination_raw.get("adapter"), "destination.adapter")
     try:
@@ -136,37 +139,59 @@ def parse_config(source: str | bytes | Mapping[str, Any]) -> PromotionConfig:
         raise ConfigValidationError("destination adapter is unsupported") from error
     if adapter is AdapterKind.NONE:
         _keys(destination_raw, {"adapter"}, "destination")
-        destination = DestinationConfig(adapter)
-    elif adapter is AdapterKind.GITHUB_RAW:
+        return DestinationConfig(adapter)
+    if adapter is AdapterKind.GITHUB_RAW:
         _keys(destination_raw, {"adapter", "branch", "endpoint_path"}, "destination")
         if visibility != "public":
             raise ConfigValidationError("private repositories cannot use github-raw")
         if destination_raw["branch"] != _RAW_BRANCH or destination_raw["endpoint_path"] != _RAW_ENDPOINT:
             raise ConfigValidationError("github-raw destination is not approved")
-        destination = DestinationConfig(adapter, _RAW_BRANCH, _RAW_ENDPOINT)
-    else:
-        _keys(destination_raw, {"adapter", "alias", "endpoint", "audience"}, "destination")
-        alias = _string(destination_raw["alias"], "destination.alias", pattern=ALIAS_PATTERN.pattern)
-        endpoint = _string(destination_raw["endpoint"], "destination.endpoint")
-        parsed_endpoint = urlparse(endpoint)
-        if parsed_endpoint.scheme != "https" or not parsed_endpoint.netloc or parsed_endpoint.query or parsed_endpoint.fragment:
-            raise ConfigValidationError("relay endpoint is not an approved HTTPS origin")
-        audience = _string(destination_raw["audience"], "destination.audience")
-        destination = DestinationConfig(adapter, alias=alias, endpoint=endpoint.rstrip("/"), audience=audience)
+        return DestinationConfig(adapter, _RAW_BRANCH, _RAW_ENDPOINT)
+    _keys(destination_raw, {"adapter", "alias", "endpoint", "audience"}, "destination")
+    alias = _string(destination_raw["alias"], "destination.alias", pattern=ALIAS_PATTERN.pattern)
+    endpoint = _string(destination_raw["endpoint"], "destination.endpoint")
+    parsed_endpoint = urlparse(endpoint)
+    if parsed_endpoint.scheme != "https" or not parsed_endpoint.netloc or parsed_endpoint.query or parsed_endpoint.fragment:
+        raise ConfigValidationError("relay endpoint is not an approved HTTPS origin")
+    audience = _string(destination_raw["audience"], "destination.audience")
+    return DestinationConfig(adapter, alias=alias, endpoint=endpoint.rstrip("/"), audience=audience)
 
-    profile = _string(raw["disclosure_profile"], "disclosure_profile")
-    if profile != _DISCLOSURE_PROFILE:
-        raise ConfigValidationError("disclosure profile is unsupported")
+
+def _parse_limits(raw: Mapping[str, Any]) -> PromotionLimits:
     validity = _object(raw["validity"], "validity")
     _keys(validity, {"max_lease_seconds"}, "validity")
     max_lease = _bounded_int(validity["max_lease_seconds"], "validity.max_lease_seconds", 1, _MAX_LEASE_SECONDS)
     limits_raw = _object(raw["limits"], "limits")
     _keys(limits_raw, {"max_archive_bytes", "max_member_bytes", "max_payload_bytes", "max_members"}, "limits")
-    limits = PromotionLimits(
+    return PromotionLimits(
         _bounded_int(limits_raw["max_archive_bytes"], "limits.max_archive_bytes", 1, _MAX_ARCHIVE_BYTES),
         _bounded_int(limits_raw["max_member_bytes"], "limits.max_member_bytes", 1, _MAX_MEMBER_BYTES),
         _bounded_int(limits_raw["max_payload_bytes"], "limits.max_payload_bytes", 1, _MAX_PAYLOAD_BYTES),
         _bounded_int(limits_raw["max_members"], "limits.max_members", 2, _MAX_MEMBERS),
         max_lease,
     )
+
+
+def parse_config(source: str | bytes | Mapping[str, Any]) -> PromotionConfig:
+    """Parse trusted setup JSON without accepting consumer-selected producers."""
+
+    raw = _raw_config(source)
+    raw = _object(raw, "configuration")
+    _keys(
+        raw,
+        {"schema_id", "repository", "repository_visibility", "base_ref", "producer", "destination", "disclosure_profile", "validity", "limits"},
+        "configuration",
+    )
+    schema_id = _string(raw["schema_id"], "schema_id")
+    if schema_id != _SCHEMA_ID:
+        raise ConfigValidationError("unsupported configuration schema")
+    repository = _string(raw["repository"], "repository", pattern=REPOSITORY_PATTERN.pattern)
+    visibility = _parse_visibility(raw)
+    base_ref = _parse_base_ref(raw["base_ref"])
+    producer = _parse_producer(raw)
+    destination = _parse_destination(raw, visibility)
+    profile = _string(raw["disclosure_profile"], "disclosure_profile")
+    if profile != _DISCLOSURE_PROFILE:
+        raise ConfigValidationError("disclosure profile is unsupported")
+    limits = _parse_limits(raw)
     return PromotionConfig(repository, visibility, base_ref, producer, destination, profile, limits, schema_id)

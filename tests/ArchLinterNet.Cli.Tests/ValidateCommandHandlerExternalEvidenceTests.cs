@@ -459,7 +459,7 @@ internal sealed class ValidateCommandExternalEvidenceTests : ValidateCommandHand
         Assert.That(exitCode, Is.EqualTo(CliExitCodes.ValidationFailure));
     }
 
-    private int RunWithBindings(
+    private static int RunWithBindings(
         TempRepository repo,
         IReadOnlyList<ArchitectureExternalEvidenceRequirement> requirements,
         SarifEvidenceAssessmentContext context,

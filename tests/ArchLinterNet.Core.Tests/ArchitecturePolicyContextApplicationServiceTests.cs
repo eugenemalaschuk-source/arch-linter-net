@@ -20,6 +20,7 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
     private static readonly string[] _unitySemanticRoles = { "System", "UnityEditor" };
     private static readonly string[] _unityRuntimeContextValues = { "editor", "player" };
     private static readonly string[] _allowedContextRoles = { "ApplicationLayer", "DomainLayer" };
+    private static readonly string[] _applicationDomainNodes = { "application", "domain" };
     private static readonly string[] _transportContextValues = { "http" };
     private static readonly string[] _moduleShapeContainers = { "Sample.Modules.Sales", "Sample.Modules.Legacy" };
     private static readonly string[] _moduleShapeExcludeContainers = { "Sample.Modules.Legacy" };
@@ -134,8 +135,8 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
                 Assert.That(topology, Is.Not.Null);
                 Assert.That(topology.Mode, Is.EqualTo("exhaustive"));
                 Assert.That(topology.SubjectKind, Is.EqualTo("type"));
-                Assert.That(topology.ScopeSelectors.Select(selector => selector.Value), Is.EqualTo(new[] { "application", "domain" }));
-                Assert.That(topology.Nodes.Select(node => node.Id), Is.EqualTo(new[] { "application", "domain" }));
+                Assert.That(topology.ScopeSelectors.Select(selector => selector.Value), Is.EqualTo(_applicationDomainNodes));
+                Assert.That(topology.Nodes.Select(node => node.Id), Is.EqualTo(_applicationDomainNodes));
                 Assert.That(topology.AllowedEdges.Single().From, Is.EqualTo("application"));
                 Assert.That(topology.OutOfScope.Single().Selector.Value, Is.EqualTo("Sample.Generated"));
                 Assert.That(topology.OutOfScope.Single().Provenance!.YamlPath, Does.Contain("out_of_scope"));

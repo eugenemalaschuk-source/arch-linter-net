@@ -5,6 +5,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class CheckpointBRestoreReuseTests
 {
+    private static readonly string[] _restoreSkippingEnsureBuilt = ["validate", "--ensure-built", "--no-restore"];
+
     [TestCase(0)]
     [TestCase(1)]
     public void CompletedEnsureBuiltIsReusedOnlyForTheSameFixtureRoot(int completedExitCode)
@@ -22,7 +24,7 @@ public sealed class CheckpointBRestoreReuseTests
         Assert.Multiple(() =>
         {
             Assert.That(restoreReuse.PrepareArguments(firstRoot, ensureBuilt),
-                Is.EqualTo(new[] { "validate", "--ensure-built", "--no-restore" }),
+                Is.EqualTo(_restoreSkippingEnsureBuilt),
                 "A later --ensure-built command for the same root must skip only redundant restore.");
             Assert.That(restoreReuse.PrepareArguments(secondRoot, ensureBuilt), Is.EqualTo(ensureBuilt),
                 "A different fixture root must still perform its first restore.");

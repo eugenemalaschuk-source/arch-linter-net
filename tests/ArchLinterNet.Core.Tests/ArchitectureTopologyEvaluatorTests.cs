@@ -9,6 +9,12 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureTopologyEvaluatorTests
 {
+    private static readonly string[] _ambiguousNodeIds = ["first", "second"];
+    private static readonly string[] _applicationNodeId = ["application"];
+    private static readonly string[] _staleDeclarationDrift = ["topology declaration drift", "topology declaration drift"];
+    private static readonly string[] _structuralMappingContract = ["topology structural mapping"];
+    private static readonly string[] _ordinalWitness = ["A.Service -> A.Entity"];
+
     [Test]
     public void Evaluate_ExhaustiveMappedSubjectsWithAllowedRelation_IsEvaluable()
     {
@@ -69,7 +75,7 @@ public sealed class ArchitectureTopologyEvaluatorTests
             Assert.That(record.State, Is.EqualTo(ArchitectureApplicabilityRecordState.Unassessable));
             Assert.That(record.Reasons.Select(reason => reason.Code), Contains.Item(ArchitectureApplicabilityReasonCodes.AmbiguousSubject));
             Assert.That(record.TopologyEvidence!.AmbiguousSubjectCount, Is.EqualTo(1));
-            Assert.That(record.TopologyEvidence.Subjects.Single().NodeIds, Is.EqualTo(new[] { "first", "second" }));
+            Assert.That(record.TopologyEvidence.Subjects.Single().NodeIds, Is.EqualTo(_ambiguousNodeIds));
             Assert.That(result.Violations.Single().ContractName, Is.EqualTo("topology structural mapping"));
         });
     }
@@ -156,11 +162,11 @@ public sealed class ArchitectureTopologyEvaluatorTests
         {
             Assert.That(record.Reasons.Select(reason => reason.Code),
                 Is.EqualTo(new[] { ArchitectureApplicabilityReasonCodes.StaleDeclaration }));
-            Assert.That(record.TopologyEvidence!.StaleNodes, Is.EqualTo(new[] { "application" }));
+            Assert.That(record.TopologyEvidence!.StaleNodes, Is.EqualTo(_applicationNodeId));
             Assert.That(record.TopologyEvidence.StaleEdges.Single(), Is.EqualTo(
                 new ArchitectureTopologyStaleEdgeEvidence("application", "application")));
             Assert.That(result.Violations.Select(violation => violation.ContractName),
-                Is.EqualTo(new[] { "topology declaration drift", "topology declaration drift" }));
+                Is.EqualTo(_staleDeclarationDrift));
         });
     }
 
@@ -183,7 +189,7 @@ public sealed class ArchitectureTopologyEvaluatorTests
             Assert.That(record.TopologyEvidence!.StaleNodes, Is.Empty);
             Assert.That(record.TopologyEvidence.StaleEdges, Is.Empty);
             Assert.That(result.Violations.Select(violation => violation.ContractName),
-                Is.EqualTo(new[] { "topology structural mapping" }));
+                Is.EqualTo(_structuralMappingContract));
         });
     }
 
@@ -237,7 +243,7 @@ public sealed class ArchitectureTopologyEvaluatorTests
             Assert.That(record.TopologyEvidence.StaleNodes, Is.Empty);
             Assert.That(record.TopologyEvidence.StaleEdges, Is.Empty);
             Assert.That(result.Violations.Select(violation => violation.ContractName),
-                Is.EqualTo(new[] { "topology structural mapping" }));
+                Is.EqualTo(_structuralMappingContract));
         });
     }
 
@@ -264,7 +270,7 @@ public sealed class ArchitectureTopologyEvaluatorTests
         {
             Assert.That(first.Violations.Single().SourceType, Is.EqualTo("application"));
             Assert.That(first.Violations.Single().ForbiddenNamespace, Is.EqualTo("domain"));
-            Assert.That(first.Violations.Single().ForbiddenReferences, Is.EqualTo(new[] { "A.Service -> A.Entity" }));
+            Assert.That(first.Violations.Single().ForbiddenReferences, Is.EqualTo(_ordinalWitness));
             Assert.That(second.Violations.Single().ContractName, Is.EqualTo(first.Violations.Single().ContractName));
             Assert.That(second.Violations.Single().SourceType, Is.EqualTo(first.Violations.Single().SourceType));
             Assert.That(second.Violations.Single().ForbiddenNamespace, Is.EqualTo(first.Violations.Single().ForbiddenNamespace));

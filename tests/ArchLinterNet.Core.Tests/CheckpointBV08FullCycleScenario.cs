@@ -60,7 +60,7 @@ internal sealed class CheckpointBV08FullCycleScenario(CandidatePackageFeed candi
                 validation.AssertValidateStrictAudit(
                     fixture.Root, validSarifPath, CheckpointBV08EvidenceIdentity.Repository, currentSha, CheckpointBV08EvidenceIdentity.Scope);
             scenarios.Add(validateScenario);
-            scenarios.Add(validation.AssertRecursiveExposureEvidence(validateJson));
+            scenarios.Add(CheckpointBV08ValidationPhases.AssertRecursiveExposureEvidence(validateJson));
             scenarios.Add(validation.AssertTopologyCaptureDiffVerify(fixture.Root, currentSha));
             scenarios.Add(validation.AssertTopologyUnmappedSubjectFailsClosed(fixture.Root, currentSha));
             scenarios.Add(validation.AssertMeasureAndBudget(fixture.Root, validateJson));

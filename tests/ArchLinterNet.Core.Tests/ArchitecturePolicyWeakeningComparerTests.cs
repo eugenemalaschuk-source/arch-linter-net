@@ -8,6 +8,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitecturePolicyWeakeningComparerTests
 {
+    private static readonly string[] _baseExpiry = ["2026-09-01"];
+    private static readonly string[] _currentExpiry = ["2027-09-01"];
+
     [Test]
     public void Compare_StrictToSameControlAudit_ReportsSemanticDowngradeWithImportedProvenance()
     {
@@ -616,8 +619,8 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
             Assert.That(finding.Kind, Is.EqualTo("structured_waiver_expiry_extended"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
             Assert.That(finding.Severity, Is.EqualTo("error"));
-            Assert.That(finding.BaseValues, Is.EqualTo(new[] { "2026-09-01" }));
-            Assert.That(finding.CurrentValues, Is.EqualTo(new[] { "2027-09-01" }));
+            Assert.That(finding.BaseValues, Is.EqualTo(_baseExpiry));
+            Assert.That(finding.CurrentValues, Is.EqualTo(_currentExpiry));
         });
     }
 

@@ -199,6 +199,7 @@ def test_valid_artifact_accepts_one_canonical_trailing_newline() -> None:
         (lambda data: archive_bytes(payload=b'{"schemaVersion":1,"schemaVersion":1,"label":"architecture","message":"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules","color":"brightgreen"}'), "duplicate"),
         (lambda data: archive_bytes(payload=b'{"schemaVersion":1,"label":"architecture","message":"PASS \\u00b7 HEALTHY \\u00b7 0 ignores \\u00b7 42 rules","color":"brightgreen"}'), "canonical"),
         (lambda data: archive_bytes(payload=payload_bytes() + b"\n\n"), "canonical"),
+        (lambda data: archive_bytes(payload=b'{"schemaVersion":1,"label":"architecture","message":"PASS \\u00B7 HEALTHY \\u00B7 \\u0661 ignores \\u00B7 42 rules","color":"brightgreen"}'), "dictionary"),
     ],
 )
 def test_hostile_artifact_fails_closed(mutator, message: str) -> None:
@@ -211,7 +212,6 @@ def test_manifest_digest_and_provenance_are_bound_to_exact_evidence() -> None:
     wrong = evidence(run_attempt=3)
     with pytest.raises(ArtifactValidationError, match="provenance"):
         validate_artifact(artifact, CONFIG, wrong)
-    bad_manifest = json.loads(json.dumps({}))
     bad_manifest = {"schema": CONFIG.schema_id, "kind": "architecture-health-badge", "context": {}, "payload": {}}
     with pytest.raises(ArtifactValidationError):
         validate_artifact(archive_bytes(manifest=bad_manifest), CONFIG, evidence())

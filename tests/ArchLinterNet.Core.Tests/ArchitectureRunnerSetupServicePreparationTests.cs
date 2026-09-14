@@ -23,6 +23,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureRunnerSetupServicePreparationTests
 {
     private static readonly string[] _value = { "Missing" };
+    private static readonly string[] _net10TargetFramework = { "net10.0" };
     private sealed class FixedDiscoveryService : IArchitectureProjectDiscoveryService
     {
         public ProjectDiscoveryResult Result { get; set; } = ProjectDiscoveryResult.Empty;
@@ -146,7 +147,7 @@ public sealed class ArchitectureRunnerSetupServicePreparationTests
             {
                 DiscoveredProjects = new[]
                 {
-                    new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", new[] { "net10.0" }),
+                    new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _net10TargetFramework),
                 },
                 ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
                 {
