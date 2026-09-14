@@ -390,7 +390,7 @@
     {
       "id": "oidc-unknown-kid",
       "category": "oidc",
-      "purpose": "After one bounded refresh of the fixed GitHub JWKS endpoint, reject an unresolved key identifier.",
+      "purpose": "During the fixed refresh protection window, reject an unresolved key without repeating provider work.",
       "request": {
         "operation": "prepare",
         "signature": "fixture-signature-valid",
@@ -417,7 +417,7 @@
       },
       "expected": {
         "outcome": "rejected",
-        "reason": "The key identifier did not resolve from the fixed GitHub JWKS endpoint after its bounded refresh.",
+        "reason": "The key identifier did not resolve from the fixed GitHub JWKS endpoint after the permitted refresh.",
         "state_change": "none",
         "public_response": {
           "state": "unavailable",
@@ -429,7 +429,11 @@
             "color": "lightgrey"
           }
         }
-      }
+      },
+      "notes": [
+        "Concurrent unknown-key misses share one fixed-endpoint refresh; later misses may refresh after the protection window so provider rotation remains recoverable.",
+        "Refresh coordination retains no negative-cache entries keyed by attacker-controlled identifiers."
+      ]
     },
     {
       "id": "oidc-expired-time",
