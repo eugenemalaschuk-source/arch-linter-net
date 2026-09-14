@@ -22,12 +22,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
     internal BaselineCandidateCollection CollectDiffCandidates(BaselineDiffRequest request)
     {
         BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
-            request.PreparationMode,
-            request.NoRestore,
-            request.RequestedConfiguration,
-            request.RequestedTargetFramework,
-            request.RequestedPlatform,
-            request.RequestedRuntimeIdentifier,
+            RequestedBuildStateShape.From(request),
             request.UsePreparedPostBuildState,
             request.PreparedPostBuildRunner,
             useMetadataFirstEnsureBuilt: false);
@@ -39,12 +34,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
     internal BaselineCandidateCollection CollectGenerateCandidates(BaselineGenerationRequest request)
     {
         BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
-            request.PreparationMode,
-            request.NoRestore,
-            request.RequestedConfiguration,
-            request.RequestedTargetFramework,
-            request.RequestedPlatform,
-            request.RequestedRuntimeIdentifier,
+            RequestedBuildStateShape.From(request),
             usePreparedPostBuildState: false,
             preparedPostBuildRunner: null,
             useMetadataFirstEnsureBuilt: false);
@@ -56,12 +46,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
     internal BaselineCandidateCollection CollectUpdateCandidates(BaselineUpdateRequest request)
     {
         BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
-            request.PreparationMode,
-            request.NoRestore,
-            request.RequestedConfiguration,
-            request.RequestedTargetFramework,
-            request.RequestedPlatform,
-            request.RequestedRuntimeIdentifier,
+            RequestedBuildStateShape.From(request),
             usePreparedPostBuildState: false,
             preparedPostBuildRunner: null,
             useMetadataFirstEnsureBuilt: false);
@@ -73,12 +58,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
     internal BaselineCandidateCollection CollectPruneCandidates(BaselinePruneRequest request)
     {
         BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
-            request.PreparationMode,
-            request.NoRestore,
-            request.RequestedConfiguration,
-            request.RequestedTargetFramework,
-            request.RequestedPlatform,
-            request.RequestedRuntimeIdentifier,
+            RequestedBuildStateShape.From(request),
             usePreparedPostBuildState: false,
             preparedPostBuildRunner: null,
             useMetadataFirstEnsureBuilt: false);
@@ -90,12 +70,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
     internal BaselineCandidateCollection CollectVerifyCandidates(BaselineVerifyRequest request)
     {
         BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
-            request.PreparationMode,
-            request.NoRestore,
-            request.RequestedConfiguration,
-            request.RequestedTargetFramework,
-            request.RequestedPlatform,
-            request.RequestedRuntimeIdentifier,
+            RequestedBuildStateShape.From(request),
             usePreparedPostBuildState: false,
             preparedPostBuildRunner: null,
             useMetadataFirstEnsureBuilt: true);
@@ -174,30 +149,12 @@ internal sealed class ArchitectureBaselineCandidateCollector(
         BaselineBuildStateOptions? buildState)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (mode is not (ModeStrict or ModeAudit or "all"))
-        {
-            throw new ArgumentException($"Invalid mode: {mode}. Use 'strict', 'audit', or 'all'.", nameof(mode));
-        }
+        ValidateMode(mode);
 
         ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath, null, null, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
-        HashSet<string>? selectedContractIds = contractIds is { Count: > 0 }
-            ? new HashSet<string>(contractIds, StringComparer.OrdinalIgnoreCase)
-            : null;
-
-        if (selectedContractIds != null)
-        {
-            HashSet<string> availableIds = CollectAvailableContractIds(document, mode);
-            List<string> unknownIds = selectedContractIds.Where(id => !availableIds.Contains(id)).ToList();
-
-            if (unknownIds.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Unknown contract IDs: {string.Join(", ", unknownIds)}{Environment.NewLine}" +
-                    $"Available IDs in {mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
-            }
-        }
+        HashSet<string>? selectedContractIds = ResolveSelectedContractIds(document, mode, contractIds);
 
         if (buildState?.UsePreparedPostBuildState == true
             && buildState.RequestedTargetFramework is not null)
@@ -211,181 +168,292 @@ internal sealed class ArchitectureBaselineCandidateCollector(
 
         try
         {
-            if (buildState?.UsePreparedPostBuildState == true)
+            SetupOutcome outcome = ResolveSetup(
+                document, policyPath, conditionSetName, buildState, selectedContractIds, mode, cancellationToken);
+
+            // Whatever setup the outcome carries -- even a blocked one -- is the setup this call
+            // produced and therefore the one this method owns disposing of.
+            setup = outcome.Setup;
+            if (outcome.Blocked != null)
             {
-                setup = runnerSetupService.MaterializePreparedRunner(
-                    document,
-                    buildState.PreparedPostBuildRunner
-                        ?? throw new InvalidOperationException("Prepared baseline analysis requires validation's receipt-backed artifact selection."),
-                    selectedContractIds: selectedContractIds,
-                    enableUnmatchedIgnoreTracking: true,
-                    mode: mode == "all" ? null : mode,
-                    cancellationToken: cancellationToken);
-
-                BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
-                if (preflight.Blocked)
-                {
-                    return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                }
-            }
-            else if (buildState?.PreparationMode == BuildPreparationMode.EnsureBuilt
-                && buildState.UseMetadataFirstEnsureBuilt)
-            {
-                ArchitectureRunnerPreparation preparation = runnerSetupService.PrepareRunner(
-                    document,
-                    policyPath,
-                    conditionSetName,
-                    selectedContractIds: selectedContractIds,
-                    mode: mode == "all" ? null : mode,
-                    cancellationToken: cancellationToken);
-
-                BuildStatePreflightResult preflight = RunBuildStatePreflight(preparation, buildState, cancellationToken);
-                if (preflight.Blocked)
-                {
-                    return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                }
-
-                preparation = PostBuildArtifactEvidenceRefresher.Refresh(
-                    document, preparation, preflight, cancellationToken);
-                preflight = RunBuildStatePreflight(
-                    preparation,
-                    buildState with { PreparationMode = BuildPreparationMode.Ordinary },
-                    cancellationToken);
-                if (preflight.Blocked)
-                {
-                    return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                }
-
-                if (preparation.HasCompleteRootSelection && preparation.SelectedAssemblyArtifactPaths.Count > 0)
-                {
-                    setup = runnerSetupService.MaterializePreparedRunner(
-                        document,
-                        preparation,
-                        selectedContractIds: selectedContractIds,
-                        enableUnmatchedIgnoreTracking: true,
-                        mode: mode == "all" ? null : mode,
-                        cancellationToken: cancellationToken);
-                }
-                else
-                {
-                    // An incomplete metadata selection cannot be materialized. Preserve the
-                    // existing ordinary resolution fallback, but only after metadata preparation
-                    // and both preflight decisions have established that no build result is being
-                    // consumed by the prepared path.
-                    setup = runnerSetupService.BuildRunner(
-                        document,
-                        policyPath,
-                        conditionSetName,
-                        selectedContractIds: selectedContractIds,
-                        enableUnmatchedIgnoreTracking: true,
-                        mode: mode == "all" ? null : mode,
-                        cancellationToken: cancellationToken);
-                }
-            }
-            else
-            {
-                setup = runnerSetupService.BuildRunner(
-                    document,
-                    policyPath,
-                    conditionSetName,
-                    selectedContractIds: selectedContractIds,
-                    enableUnmatchedIgnoreTracking: true,
-                    mode: mode == "all" ? null : mode,
-                    cancellationToken: cancellationToken);
-
-                if (buildState != null)
-                {
-                    BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
-                    if (preflight.Blocked)
-                    {
-                        return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                    }
-
-                    if (buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
-                        && setup.Runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
-                    {
-                        // Baseline diff keeps its established isolated post-build path. Baseline
-                        // verify takes the metadata-first branch above to avoid locking outputs.
-                        ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
-                            document, policyPath, conditionSetName,
-                            selectedContractIds: selectedContractIds,
-                            enableUnmatchedIgnoreTracking: true,
-                            mode: mode == "all" ? null : mode,
-                            cancellationToken: cancellationToken);
-                        setup.Runner.Session.Context.Dispose();
-                        setup = postBuildSetup;
-
-                        preflight = RunBuildStatePreflight(
-                            setup.Runner,
-                            buildState with
-                            {
-                                PreparationMode = BuildPreparationMode.Ordinary,
-                                UsePreparedPostBuildState = false,
-                            },
-                            cancellationToken);
-                        if (preflight.Blocked)
-                        {
-                            return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
-                        }
-                    }
-                }
+                return outcome.Blocked;
             }
 
             IArchitectureContractRunner runner = setup is null
                 ? throw new InvalidOperationException("Architecture runner materialization did not produce a runner.")
                 : setup.Runner;
-            List<ArchitectureViolation> configViolations = mode switch
-            {
-                ModeStrict => runner.CheckConfiguration(strict: true),
-                ModeAudit => runner.CheckConfiguration(strict: false),
-                "all" => runner.CheckConfiguration(),
-                _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported baseline mode."),
-            };
 
-            if (configViolations.Count > 0)
-            {
-                return new BaselineCandidateCollection(document, null, configViolations, Array.Empty<BuildStatePreflightDiagnostic>());
-            }
-
-            bool includeStrict = mode is ModeStrict or "all";
-            bool includeAudit = mode is ModeAudit or "all";
-            var applicabilityCandidates = new List<ArchitectureBaselineCandidate>();
-
-            if (includeStrict)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                ArchitectureContractExecutionResult execution = contractExecutor.Execute(
-                    runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
-                applicabilityCandidates.AddRange(ProjectApplicabilityCandidates(document, ModeStrict, execution));
-            }
-
-            if (includeAudit)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                ArchitectureContractExecutionResult execution = contractExecutor.Execute(
-                    runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
-                applicabilityCandidates.AddRange(ProjectApplicabilityCandidates(document, ModeAudit, execution));
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // Ordinary candidates are recorded by the executor while each contract runs. Read the
-            // runner only after both modes have completed, then append the projection-owned
-            // applicability candidates to that complete ordinary inventory.
-            var baselineCandidates = runner.BaselineCandidates.ToList();
-            baselineCandidates.AddRange(applicabilityCandidates);
-            return new BaselineCandidateCollection(
-                document, baselineCandidates, new List<ArchitectureViolation>(), Array.Empty<BuildStatePreflightDiagnostic>())
-            {
-                MetricBaselineCandidates = runner.Session.MetricBaselineCandidates,
-                HasSelectedRelativeMetricBudgets = HasSelectedRelativeMetricBudgets(document, mode, selectedContractIds),
-            };
+            return BuildCandidateCollection(document, mode, runner, selectedContractIds, cancellationToken);
         }
         finally
         {
             setup?.Runner.Session.Context.Dispose();
         }
     }
+
+    private static void ValidateMode(string mode)
+    {
+        if (mode is not (ModeStrict or ModeAudit or "all"))
+        {
+            throw new ArgumentException($"Invalid mode: {mode}. Use 'strict', 'audit', or 'all'.", nameof(mode));
+        }
+    }
+
+    private static HashSet<string>? ResolveSelectedContractIds(
+        ArchitectureContractDocument document,
+        string mode,
+        IReadOnlyCollection<string>? contractIds)
+    {
+        if (contractIds is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        HashSet<string> selectedContractIds = new(contractIds, StringComparer.OrdinalIgnoreCase);
+        HashSet<string> availableIds = CollectAvailableContractIds(document, mode);
+        List<string> unknownIds = selectedContractIds.Where(id => !availableIds.Contains(id)).ToList();
+
+        if (unknownIds.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Unknown contract IDs: {string.Join(", ", unknownIds)}{Environment.NewLine}" +
+                $"Available IDs in {mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
+        }
+
+        return selectedContractIds;
+    }
+
+    // The three ways CollectCandidatesCore's try block used to materialize a runner (prepared
+    // post-build state, metadata-first ensure-built, or ordinary), extracted one branch per method
+    // below and dispatched here. Each branch reports back both the setup it produced (so the
+    // caller's finally still disposes exactly what used to be disposed, even when blocked) and, if
+    // a build-state preflight blocked it, the terminal collection to return.
+    private SetupOutcome ResolveSetup(
+        ArchitectureContractDocument document,
+        string policyPath,
+        string? conditionSetName,
+        BaselineBuildStateOptions? buildState,
+        HashSet<string>? selectedContractIds,
+        string mode,
+        CancellationToken cancellationToken)
+    {
+        if (buildState?.UsePreparedPostBuildState == true)
+        {
+            return ResolvePreparedPostBuildSetup(document, buildState, selectedContractIds, mode, cancellationToken);
+        }
+
+        if (buildState?.PreparationMode == BuildPreparationMode.EnsureBuilt
+            && buildState.UseMetadataFirstEnsureBuilt)
+        {
+            return ResolveMetadataFirstEnsureBuiltSetup(
+                document, policyPath, conditionSetName, buildState, selectedContractIds, mode, cancellationToken);
+        }
+
+        return ResolveOrdinarySetup(
+            document, policyPath, conditionSetName, buildState, selectedContractIds, mode, cancellationToken);
+    }
+
+    private SetupOutcome ResolvePreparedPostBuildSetup(
+        ArchitectureContractDocument document,
+        BaselineBuildStateOptions buildState,
+        HashSet<string>? selectedContractIds,
+        string mode,
+        CancellationToken cancellationToken)
+    {
+        ArchitectureRunnerSetup setup = runnerSetupService.MaterializePreparedRunner(
+            document,
+            buildState.PreparedPostBuildRunner
+                ?? throw new InvalidOperationException("Prepared baseline analysis requires validation's receipt-backed artifact selection."),
+            selectedContractIds: selectedContractIds,
+            enableUnmatchedIgnoreTracking: true,
+            mode: mode == "all" ? null : mode,
+            cancellationToken: cancellationToken);
+
+        BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
+        return preflight.Blocked
+            ? new SetupOutcome(setup, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics))
+            : new SetupOutcome(setup, null);
+    }
+
+    private SetupOutcome ResolveMetadataFirstEnsureBuiltSetup(
+        ArchitectureContractDocument document,
+        string policyPath,
+        string? conditionSetName,
+        BaselineBuildStateOptions buildState,
+        HashSet<string>? selectedContractIds,
+        string mode,
+        CancellationToken cancellationToken)
+    {
+        ArchitectureRunnerPreparation preparation = runnerSetupService.PrepareRunner(
+            document,
+            policyPath,
+            conditionSetName,
+            selectedContractIds: selectedContractIds,
+            mode: mode == "all" ? null : mode,
+            cancellationToken: cancellationToken);
+
+        BuildStatePreflightResult preflight = RunBuildStatePreflight(preparation, buildState, cancellationToken);
+        if (preflight.Blocked)
+        {
+            return new SetupOutcome(null, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics));
+        }
+
+        preparation = PostBuildArtifactEvidenceRefresher.Refresh(document, preparation, preflight, cancellationToken);
+        preflight = RunBuildStatePreflight(
+            preparation,
+            buildState with { PreparationMode = BuildPreparationMode.Ordinary },
+            cancellationToken);
+        if (preflight.Blocked)
+        {
+            return new SetupOutcome(null, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics));
+        }
+
+        if (preparation.HasCompleteRootSelection && preparation.SelectedAssemblyArtifactPaths.Count > 0)
+        {
+            ArchitectureRunnerSetup preparedSetup = runnerSetupService.MaterializePreparedRunner(
+                document,
+                preparation,
+                selectedContractIds: selectedContractIds,
+                enableUnmatchedIgnoreTracking: true,
+                mode: mode == "all" ? null : mode,
+                cancellationToken: cancellationToken);
+            return new SetupOutcome(preparedSetup, null);
+        }
+
+        // An incomplete metadata selection cannot be materialized. Preserve the existing ordinary
+        // resolution fallback, but only after metadata preparation and both preflight decisions
+        // have established that no build result is being consumed by the prepared path.
+        ArchitectureRunnerSetup fallbackSetup = runnerSetupService.BuildRunner(
+            document,
+            policyPath,
+            conditionSetName,
+            selectedContractIds: selectedContractIds,
+            enableUnmatchedIgnoreTracking: true,
+            mode: mode == "all" ? null : mode,
+            cancellationToken: cancellationToken);
+        return new SetupOutcome(fallbackSetup, null);
+    }
+
+    private SetupOutcome ResolveOrdinarySetup(
+        ArchitectureContractDocument document,
+        string policyPath,
+        string? conditionSetName,
+        BaselineBuildStateOptions? buildState,
+        HashSet<string>? selectedContractIds,
+        string mode,
+        CancellationToken cancellationToken)
+    {
+        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
+            document,
+            policyPath,
+            conditionSetName,
+            selectedContractIds: selectedContractIds,
+            enableUnmatchedIgnoreTracking: true,
+            mode: mode == "all" ? null : mode,
+            cancellationToken: cancellationToken);
+
+        if (buildState == null)
+        {
+            return new SetupOutcome(setup, null);
+        }
+
+        BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
+        if (preflight.Blocked)
+        {
+            return new SetupOutcome(setup, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics));
+        }
+
+        if (buildState.PreparationMode != BuildPreparationMode.EnsureBuilt
+            || setup.Runner.Session.Context.ProjectDiscovery is not { DiscoveredProjects.Count: > 0 })
+        {
+            return new SetupOutcome(setup, null);
+        }
+
+        // Baseline diff keeps its established isolated post-build path. Baseline verify takes the
+        // metadata-first branch above to avoid locking outputs.
+        ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
+            document, policyPath, conditionSetName,
+            selectedContractIds: selectedContractIds,
+            enableUnmatchedIgnoreTracking: true,
+            mode: mode == "all" ? null : mode,
+            cancellationToken: cancellationToken);
+        setup.Runner.Session.Context.Dispose();
+        setup = postBuildSetup;
+
+        preflight = RunBuildStatePreflight(
+            setup.Runner,
+            buildState with
+            {
+                PreparationMode = BuildPreparationMode.Ordinary,
+                UsePreparedPostBuildState = false,
+            },
+            cancellationToken);
+
+        return preflight.Blocked
+            ? new SetupOutcome(setup, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics))
+            : new SetupOutcome(setup, null);
+    }
+
+    private BaselineCandidateCollection BuildCandidateCollection(
+        ArchitectureContractDocument document,
+        string mode,
+        IArchitectureContractRunner runner,
+        HashSet<string>? selectedContractIds,
+        CancellationToken cancellationToken)
+    {
+        List<ArchitectureViolation> configViolations = mode switch
+        {
+            ModeStrict => runner.CheckConfiguration(strict: true),
+            ModeAudit => runner.CheckConfiguration(strict: false),
+            "all" => runner.CheckConfiguration(),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported baseline mode."),
+        };
+
+        if (configViolations.Count > 0)
+        {
+            return new BaselineCandidateCollection(document, null, configViolations, Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        bool includeStrict = mode is ModeStrict or "all";
+        bool includeAudit = mode is ModeAudit or "all";
+        var applicabilityCandidates = new List<ArchitectureBaselineCandidate>();
+
+        if (includeStrict)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ArchitectureContractExecutionResult execution = contractExecutor.Execute(
+                runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
+            applicabilityCandidates.AddRange(ProjectApplicabilityCandidates(document, ModeStrict, execution));
+        }
+
+        if (includeAudit)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ArchitectureContractExecutionResult execution = contractExecutor.Execute(
+                runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
+            applicabilityCandidates.AddRange(ProjectApplicabilityCandidates(document, ModeAudit, execution));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Ordinary candidates are recorded by the executor while each contract runs. Read the
+        // runner only after both modes have completed, then append the projection-owned
+        // applicability candidates to that complete ordinary inventory.
+        var baselineCandidates = runner.BaselineCandidates.ToList();
+        baselineCandidates.AddRange(applicabilityCandidates);
+        return new BaselineCandidateCollection(
+            document, baselineCandidates, new List<ArchitectureViolation>(), Array.Empty<BuildStatePreflightDiagnostic>())
+        {
+            MetricBaselineCandidates = runner.Session.MetricBaselineCandidates,
+            HasSelectedRelativeMetricBudgets = HasSelectedRelativeMetricBudgets(document, mode, selectedContractIds),
+        };
+    }
+
+    // Whatever ResolveSetup produced: the setup to use/dispose (Setup, possibly still set even
+    // when Blocked is non-null -- disposal must match what CollectCandidatesCore used to do before
+    // this branching moved into its own methods) and, when a build-state preflight blocked
+    // materialization, the terminal collection CollectCandidatesCore should return immediately.
+    private readonly record struct SetupOutcome(ArchitectureRunnerSetup? Setup, BaselineCandidateCollection? Blocked);
 
     private static IReadOnlyList<ArchitectureBaselineCandidate> ProjectApplicabilityCandidates(
         ArchitectureContractDocument document,
@@ -435,6 +503,44 @@ internal sealed class ArchitectureBaselineCandidateCollector(
                 || budget.Id is not null && selectedContractIds.Contains(budget.Id, StringComparer.OrdinalIgnoreCase)));
     }
 
+    // The build-state-shaped subset of a baseline request's fields (PreparationMode, NoRestore,
+    // and the four Requested* overrides), common to every request type that reaches
+    // BaselineBuildStateOptions.From. Grouping them here is what keeps From's own parameter count
+    // in bounds; the two From overloads below are how the two different request-record shapes
+    // (BaselineBuildStateRequest-derived vs. the standalone diff/verify records) each construct one.
+    private readonly record struct RequestedBuildStateShape(
+        BuildPreparationMode PreparationMode,
+        bool NoRestore,
+        string? RequestedConfiguration,
+        string? RequestedTargetFramework,
+        string? RequestedPlatform,
+        string? RequestedRuntimeIdentifier)
+    {
+        public static RequestedBuildStateShape From(BaselineBuildStateRequest request) => new(
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier);
+
+        public static RequestedBuildStateShape From(BaselineDiffRequest request) => new(
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier);
+
+        public static RequestedBuildStateShape From(BaselineVerifyRequest request) => new(
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier);
+    }
+
     private sealed record BaselineBuildStateOptions(
         BuildPreparationMode PreparationMode,
         bool NoRestore,
@@ -447,30 +553,25 @@ internal sealed class ArchitectureBaselineCandidateCollector(
         bool UseMetadataFirstEnsureBuilt)
     {
         public static BaselineBuildStateOptions? From(
-            BuildPreparationMode preparationMode,
-            bool noRestore,
-            string? requestedConfiguration,
-            string? requestedTargetFramework,
-            string? requestedPlatform,
-            string? requestedRuntimeIdentifier,
+            RequestedBuildStateShape shape,
             bool usePreparedPostBuildState,
             ArchitectureRunnerPreparation? preparedPostBuildRunner,
             bool useMetadataFirstEnsureBuilt)
         {
-            return preparationMode == BuildPreparationMode.EnsureBuilt
-                || noRestore
-                || requestedConfiguration is not null
-                || requestedTargetFramework is not null
-                || requestedPlatform is not null
-                || requestedRuntimeIdentifier is not null
+            return shape.PreparationMode == BuildPreparationMode.EnsureBuilt
+                || shape.NoRestore
+                || shape.RequestedConfiguration is not null
+                || shape.RequestedTargetFramework is not null
+                || shape.RequestedPlatform is not null
+                || shape.RequestedRuntimeIdentifier is not null
                 || usePreparedPostBuildState
                 ? new(
-                    preparationMode,
-                    noRestore,
-                    requestedConfiguration,
-                    requestedTargetFramework,
-                    requestedPlatform,
-                    requestedRuntimeIdentifier,
+                    shape.PreparationMode,
+                    shape.NoRestore,
+                    shape.RequestedConfiguration,
+                    shape.RequestedTargetFramework,
+                    shape.RequestedPlatform,
+                    shape.RequestedRuntimeIdentifier,
                     usePreparedPostBuildState,
                     preparedPostBuildRunner,
                     useMetadataFirstEnsureBuilt)
