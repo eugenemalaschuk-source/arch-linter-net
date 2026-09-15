@@ -122,19 +122,7 @@ async function adminStatus(request: Request, env: RelayEnvironment, alias: strin
   return json(result.status, result.body);
 }
 
-async function adminRevoke(request: Request, env: RelayEnvironment, alias: string, operation: "revoke" | "uninstall" | "transfer" = "revoke"): Promise<Response> {
-  if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
-  if (!isOpaqueAlias(alias)) return unknownRoute();
-  const body = await readAdminBody(request);
-  if (!body) return json(413, { error: "request_too_large" });
-  if ((operation === "revoke" || operation === "uninstall" || operation === "transfer") && body.confirm !== true) return json(409, { error: "explicit_confirmation_required" });
-  const operationError = requireMutationOperationId(body);
-  if (operationError) return operationError;
-  const lookup = await lookupEntry(env, alias, true);
-  if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
-  if (!lookup.entry) return unknownRoute();
-  if (!expectedRegistryStateMatches(body, lookup)) return json(409, { error: "registry_conflict" });
-  const lifecycleOperation = operation === "uninstall" || operation === "transfer" ? operation : "revoke";
+async function performRevokeCommit(env: RelayEnvironment, alias: string, lookup: RegistryLookup, body: Record<string, unknown>, operation: "revoke" | "uninstall" | "transfer", lifecycleOperation: "revoke" | "uninstall" | "transfer"): Promise<Response> {
   // Reserve the Relay state before the Registry CAS.  This is a two-phase
   // cross-object transition: the reservation atomically fences publishers
   // and clears the public payload, so a generation/epoch change cannot sneak
@@ -165,6 +153,22 @@ async function adminRevoke(request: Request, env: RelayEnvironment, alias: strin
   const relay = await relayAdminCall(env, alias, revokedLookup, "revoke-finalize", cleanupBody);
   if (relay.status !== 200) return json(relay.status, relay.body);
   return json(200, { ok: true, state: "revoked", tombstoned: true, operation: operation === "transfer" ? "registration_required" : operation });
+}
+
+async function adminRevoke(request: Request, env: RelayEnvironment, alias: string, operation: "revoke" | "uninstall" | "transfer" = "revoke"): Promise<Response> {
+  if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
+  if (!isOpaqueAlias(alias)) return unknownRoute();
+  const body = await readAdminBody(request);
+  if (!body) return json(413, { error: "request_too_large" });
+  if ((operation === "revoke" || operation === "uninstall" || operation === "transfer") && body.confirm !== true) return json(409, { error: "explicit_confirmation_required" });
+  const operationError = requireMutationOperationId(body);
+  if (operationError) return operationError;
+  const lookup = await lookupEntry(env, alias, true);
+  if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
+  if (!lookup.entry) return unknownRoute();
+  if (!expectedRegistryStateMatches(body, lookup)) return json(409, { error: "registry_conflict" });
+  const lifecycleOperation = operation === "uninstall" || operation === "transfer" ? operation : "revoke";
+  return performRevokeCommit(env, alias, lookup, body, operation, lifecycleOperation);
 }
 
 async function adminInvalidate(request: Request, env: RelayEnvironment, alias: string): Promise<Response> {
@@ -252,6 +256,24 @@ async function adminReconcileIdentity(request: Request, env: RelayEnvironment, a
   return json(200, { ok: true, alias, operation: "reconcile-identity" });
 }
 
+function buildRotateCandidate(entry: RegistryEntry, body: Record<string, unknown>): RegistryEntry | undefined {
+  const candidate: RegistryEntry = { ...entry, job_workflow_ref: typeof body.job_workflow_ref === "string" ? body.job_workflow_ref : entry.job_workflow_ref, job_workflow_sha: typeof body.job_workflow_sha === "string" ? body.job_workflow_sha : entry.job_workflow_sha, audience: typeof body.audience === "string" ? body.audience : entry.audience };
+  if (!validateRegistryEntry(candidate) || typeof candidate.audience !== "string" || candidate.audience.length === 0 || candidate.audience.length > 256) return undefined;
+  return candidate;
+}
+
+async function performRotateCommit(env: RelayEnvironment, alias: string, lookup: RegistryLookup, body: Record<string, unknown>, candidate: RegistryEntry, rotateOperationId: string): Promise<Response> {
+  const invalidated = await relayAdminCall(env, alias, lookup, "invalidate", { ...body, operation_id: rotateOperationId });
+  if (invalidated.status !== 200) return json(invalidated.status, invalidated.body);
+  const result = await registryCall(env, "rotate", { alias, entry: candidate, expected_revision: Number.isSafeInteger(body.expected_registry_revision) ? body.expected_registry_revision : lookup.revision, expected_barrier_epoch: Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch : lookup.barrierEpoch, operation_id: rotateOperationId });
+  if (result.status !== 200) return json(409, { error: "rotation_conflict" });
+  const revision = typeof result.body.revision === "number" ? result.body.revision : lookup.revision + 1;
+  const barrierEpoch = typeof result.body.barrier_epoch === "number" ? result.body.barrier_epoch : lookup.barrierEpoch + 1;
+  const synced = await relayAdminCall(env, alias, { ...lookup, revision, barrierEpoch }, "sync", { registry_revision: revision, barrier_epoch: barrierEpoch });
+  if (synced.status !== 200) return json(503, { error: "storage_unavailable" });
+  return json(200, { ok: true, state: "unavailable", alias, operation: "rotate" });
+}
+
 async function adminRotate(request: Request, env: RelayEnvironment, alias: string): Promise<Response> {
   if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
   const body = await readAdminBody(request);
@@ -262,18 +284,10 @@ async function adminRotate(request: Request, env: RelayEnvironment, alias: strin
   if (lookup.storageUnavailable) return json(503, { error: "storage_unavailable" });
   if (!lookup.entry) return unknownRoute();
   if (!expectedRegistryStateMatches(body, lookup)) return json(409, { error: "registry_conflict" });
+  const candidate = buildRotateCandidate(lookup.entry, body);
+  if (!candidate) return json(409, { error: "invalid_pin" });
   const rotateOperationId = body.operation_id as string;
-  const candidate: RegistryEntry = { ...lookup.entry, job_workflow_ref: typeof body.job_workflow_ref === "string" ? body.job_workflow_ref : lookup.entry.job_workflow_ref, job_workflow_sha: typeof body.job_workflow_sha === "string" ? body.job_workflow_sha : lookup.entry.job_workflow_sha, audience: typeof body.audience === "string" ? body.audience : lookup.entry.audience };
-  if (!validateRegistryEntry(candidate) || typeof candidate.audience !== "string" || candidate.audience.length === 0 || candidate.audience.length > 256) return json(409, { error: "invalid_pin" });
-  const invalidated = await relayAdminCall(env, alias, lookup, "invalidate", { ...body, operation_id: rotateOperationId });
-  if (invalidated.status !== 200) return json(invalidated.status, invalidated.body);
-  const result = await registryCall(env, "rotate", { alias, entry: candidate, expected_revision: Number.isSafeInteger(body.expected_registry_revision) ? body.expected_registry_revision : lookup.revision, expected_barrier_epoch: Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch : lookup.barrierEpoch, operation_id: rotateOperationId });
-  if (result.status !== 200) return json(409, { error: "rotation_conflict" });
-  const revision = typeof result.body.revision === "number" ? result.body.revision : lookup.revision + 1;
-  const barrierEpoch = typeof result.body.barrier_epoch === "number" ? result.body.barrier_epoch : lookup.barrierEpoch + 1;
-  const synced = await relayAdminCall(env, alias, { ...lookup, revision, barrierEpoch }, "sync", { registry_revision: revision, barrier_epoch: barrierEpoch });
-  if (synced.status !== 200) return json(503, { error: "storage_unavailable" });
-  return json(200, { ok: true, state: "unavailable", alias, operation: "rotate" });
+  return performRotateCommit(env, alias, lookup, body, candidate, rotateOperationId);
 }
 
 function registryEntryFromConfig(env: RelayEnvironment, entry: RegistryEntry): RegistryEntry {
@@ -382,27 +396,65 @@ async function forwardMutation(request: Request, env: RelayEnvironment, parts: s
   return (stub.fetch as unknown as (input: unknown) => Promise<Response>)(new Request(target, { method: request.method, headers, body: request.body }));
 }
 
-async function handleAdminRoute(request: Request, env: RelayEnvironment, parts: string[]): Promise<Response> {
+async function handleAdminCompatRoutes(request: Request, env: RelayEnvironment, parts: string[]): Promise<Response | undefined> {
   if (parts[3] === "register" && request.method === "POST") return adminRegister(request, env);
   // Keep the original /admin/revoke/{alias} route as a compatibility alias,
   // while the versioned control plane uses /admin/{alias}/{operation}.
   if (parts[3] === "revoke" && request.method === "POST") return adminRevoke(request, env, parts[4] ?? "", "revoke");
-  if (parts.length < 5 || !isOpaqueAlias(parts[3])) return unknownRoute();
-  const alias = parts[3];
-  const operation = parts[4];
-  if (operation === "status" && request.method === "GET") return adminStatus(request, env, alias);
-  if (operation === "reconcile-identity" && request.method === "POST") return adminReconcileIdentity(request, env, alias);
-  if (operation === "revoke" && request.method === "POST") return adminRevoke(request, env, alias, "revoke");
-  if (operation === "uninstall" && request.method === "POST") return adminRevoke(request, env, alias, "uninstall");
-  if (operation === "transfer" && request.method === "POST") return adminRevoke(request, env, alias, "transfer");
-  if (operation === "invalidate" && request.method === "POST") return adminInvalidate(request, env, alias);
-  if (operation === "recover" && parts[5] === "open" && request.method === "POST") return adminRecoverOpen(request, env, alias);
-  if (operation === "recover" && parts[5] === "finalize" && request.method === "POST") return adminRecoverFinalize(request, env);
+  return undefined;
+}
+
+interface SimpleAdminRoute {
+  operation: string;
+  method: string;
+  handler: (request: Request, env: RelayEnvironment, alias: string) => Promise<Response>;
+}
+
+const SIMPLE_ADMIN_ROUTES: SimpleAdminRoute[] = [
+  { operation: "status", method: "GET", handler: adminStatus },
+  { operation: "reconcile-identity", method: "POST", handler: adminReconcileIdentity },
+  { operation: "revoke", method: "POST", handler: (r, e, a) => adminRevoke(r, e, a, "revoke") },
+  { operation: "uninstall", method: "POST", handler: (r, e, a) => adminRevoke(r, e, a, "uninstall") },
+  { operation: "transfer", method: "POST", handler: (r, e, a) => adminRevoke(r, e, a, "transfer") },
+  { operation: "invalidate", method: "POST", handler: adminInvalidate },
+  { operation: "rotate", method: "POST", handler: adminRotate }
+];
+
+async function handleAdminSimpleOperation(request: Request, env: RelayEnvironment, alias: string, operation: string): Promise<Response | undefined> {
+  const route = SIMPLE_ADMIN_ROUTES.find((candidate) => candidate.operation === operation && candidate.method === request.method);
+  return route ? route.handler(request, env, alias) : undefined;
+}
+
+async function handleAdminRecoverOperation(request: Request, env: RelayEnvironment, alias: string, operation: string, parts: string[]): Promise<Response | undefined> {
+  if (operation !== "recover") return undefined;
+  if (parts[5] === "open" && request.method === "POST") return adminRecoverOpen(request, env, alias);
+  if (parts[5] === "finalize" && request.method === "POST") return adminRecoverFinalize(request, env);
+  return undefined;
+}
+
+async function handleAdminUpgradeOperation(request: Request, env: RelayEnvironment, alias: string, operation: string, parts: string[]): Promise<Response | undefined> {
   if (operation === "upgrade" && request.method === "POST" && (parts[5] === undefined || parts[5] === "stage" || parts[5] === "activate")) return adminUpgrade(request, env, alias, "upgrade", parts[5] as "stage" | "activate" | undefined);
   if (operation === "upgrade" && parts[5] === "rollback" && request.method === "POST") return adminUpgrade(request, env, alias, "rollback");
   if (operation === "rollback" && request.method === "POST") return adminUpgrade(request, env, alias, "rollback");
-  if (operation === "rotate" && request.method === "POST") return adminRotate(request, env, alias);
-  return unknownRoute();
+  return undefined;
+}
+
+async function handleAdminOperation(request: Request, env: RelayEnvironment, alias: string, operation: string, parts: string[]): Promise<Response | undefined> {
+  const simple = await handleAdminSimpleOperation(request, env, alias, operation);
+  if (simple) return simple;
+  const recover = await handleAdminRecoverOperation(request, env, alias, operation, parts);
+  if (recover) return recover;
+  return handleAdminUpgradeOperation(request, env, alias, operation, parts);
+}
+
+async function handleAdminRoute(request: Request, env: RelayEnvironment, parts: string[]): Promise<Response> {
+  const compat = await handleAdminCompatRoutes(request, env, parts);
+  if (compat) return compat;
+  if (parts.length < 5 || !isOpaqueAlias(parts[3])) return unknownRoute();
+  const alias = parts[3];
+  const operation = parts[4];
+  const result = await handleAdminOperation(request, env, alias, operation, parts);
+  return result ?? unknownRoute();
 }
 
 async function handleRequest(request: Request, env: RelayEnvironment): Promise<Response> {
