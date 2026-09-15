@@ -10,7 +10,7 @@ namespace ArchLinterNet.Cli.Commands.Report.Application;
 /// Renders the Core PR-report projection as architecture-only Markdown.
 /// This type deliberately has no access to policy, analysis, SARIF, or network services.
 /// </summary>
-internal static partial class PrReportMarkdownRenderer
+internal static class PrReportMarkdownRenderer
 {
     public static string Render(ArchitecturePrReportProjection projection, int maxDetails = 20)
         => Render(projection, maxDetails, null);
