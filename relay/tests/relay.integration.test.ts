@@ -576,6 +576,76 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(await (await admin("status", { method: "GET" })).json()).toMatchObject({ state: "unavailable", generation: stateBefore.generation, revocation_epoch: stateBefore.revocation_epoch });
   });
 
+  it("executes admin-invalidate then admin-recover-open with distinct persisted states", async () => {
+    // Regression for the adminMutation() -> applyAdminMutation() extraction:
+    // both operation branches (admin-invalidate's simple CAS update and
+    // admin-recover-open's generation/epoch bump into needs-recovery) must
+    // still persist their own state and surface it through redactStatus().
+    const mutationAlias = "a833mut1";
+    const mutationEntry: RegistryEntry = { ...entry, destination_alias: mutationAlias, consent: true };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(mutationEntry))).toBe(true);
+    const testEnv = { ...(env as unknown as Record<string, unknown>), ADMIN_TOKEN: "admin" } as unknown as RelayEnvironment;
+    const admin = (path: string, init: RequestInit = {}) => worker.fetch(
+      new Request(`https://relay.test/badge-relay/v1/admin/${mutationAlias}/${path}`, {
+        ...init,
+        headers: { authorization: "Bearer admin", "content-type": "application/json", ...(init.headers ?? {}) },
+      }),
+      testEnv);
+
+    const before = await admin("status", { method: "GET" });
+    expect(before.status).toBe(200);
+    const beforeState = await before.json() as Record<string, number>;
+
+    const invalidated = await admin("invalidate", { method: "POST", body: JSON.stringify({ operation_id: "mutation-invalidate-833" }) });
+    expect(invalidated.status).toBe(200);
+    const invalidatedStatus = await admin("status", { method: "GET" });
+    expect(await invalidatedStatus.json()).toMatchObject({ state: "unavailable", generation: beforeState.generation + 1, revocation_epoch: beforeState.revocation_epoch + 1 });
+
+    const recovered = await admin("recover/open", { method: "POST", body: JSON.stringify({ operation_id: "mutation-recover-833", confirm: true }) });
+    expect(recovered.status).toBe(200);
+    const recoveredStatus = await admin("status", { method: "GET" });
+    expect(await recoveredStatus.json()).toMatchObject({ state: "needs-recovery", generation: beforeState.generation + 2, revocation_epoch: beforeState.revocation_epoch + 2 });
+  });
+
+  it("rejects an upgrade to_bundle mismatch and an activation without a staged digest", async () => {
+    // Regression for the adminUpgrade() -> resolveUpgradeRequest() /
+    // applyUpgradeActivateOrRollback() extraction: the to_bundle guard and
+    // the activate-without-a-staged-digest guard must still reject before
+    // any state mutation, independent of the digest-known check exercised
+    // elsewhere.
+    const upgradeAlias = "a833upg1";
+    const upgradeEntry: RegistryEntry = { ...entry, destination_alias: upgradeAlias, bundle_digest: digestA, consent: true };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(upgradeEntry))).toBe(true);
+    const testEnv = { ...(env as unknown as Record<string, unknown>), ADMIN_TOKEN: "admin" } as unknown as RelayEnvironment;
+    const admin = (path: string, init: RequestInit = {}) => worker.fetch(
+      new Request(`https://relay.test/badge-relay/v1/admin/${upgradeAlias}/${path}`, {
+        ...init,
+        headers: { authorization: "Bearer admin", "content-type": "application/json", ...(init.headers ?? {}) },
+      }),
+      testEnv);
+
+    const mismatchedBundle = await admin("upgrade", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "upgrade-to-bundle-833", bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1", to_bundle: "badge-relay/v2" }),
+    });
+    expect(mismatchedBundle.status).toBe(409);
+    expect(await mismatchedBundle.json()).toEqual({ error: "compatibility_conflict" });
+
+    const activateWithoutStage = await admin("upgrade/activate", {
+      method: "POST",
+      body: JSON.stringify({ operation_id: "upgrade-activate-unstaged-833", bundle: "badge-relay/v1", contract_version: "v1", compatibility_plan: "architecture-health-badge-relay/v1" }),
+    });
+    expect(activateWithoutStage.status).toBe(409);
+    expect(await activateWithoutStage.json()).toEqual({ error: "compatibility_conflict" });
+
+    const unchanged = await admin("status", { method: "GET" });
+    expect(await unchanged.json()).toMatchObject({ state: "unavailable", active_digest: digestA, staged_digest: null });
+  });
+
   it("bounds the private operation journal by age and count", async () => {
     const journalAlias = "a833jrn1";
     const journalEntry: RegistryEntry = { ...entry, destination_alias: journalAlias, consent: true };
@@ -679,6 +749,41 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     const stored = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string; payload_digest: string }>("SELECT status, payload_digest FROM relay_state WHERE id=1").toArray()[0]);
     expect(stored.status).toBe("ready");
     expect(stored.payload_digest).toBe(digest);
+  });
+
+  it("rejects a publish against an unknown or already-consumed challenge without mutating state", async () => {
+    // Regression for the publish() -> commitPublish() -> loadPublishChallenge()
+    // extraction: both the "no matching challenge row" and "challenge already
+    // consumed" guards must still fail closed with no state change.
+    const jwt = await token({ jti: "challenge-seam-jti" });
+    const digest = await canonicalPayloadDigest(payload);
+    const idempotency = `challenge-seam-${crypto.randomUUID()}`;
+    const publishWith = (challengeId: string) => SELF.fetch(relayUrl("publish"), {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "publish", challenge_id: challengeId, idempotency_key: idempotency, canonical_bytes: payload, canonical_digest: digest, profile: entry.disclosure_profile, expected_generation: 1, expected_revocation_epoch: 1, semantic_horizon: futureHorizon() })
+    });
+
+    const unknownChallenge = await publishWith(crypto.randomUUID());
+    expect(unknownChallenge.status).toBe(409);
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(alias));
+    const afterUnknown = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ status: string }>("SELECT status FROM relay_state WHERE id=1").toArray()[0]);
+    expect(afterUnknown.status).toBe("unavailable");
+
+    const prepare = await SELF.fetch(relayUrl("prepare"), {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation: "prepare", canonical_bytes: payload, canonical_digest: digest, profile: entry.disclosure_profile, idempotency_key: idempotency, semantic_horizon: futureHorizon() })
+    });
+    expect(prepare.status).toBe(201);
+    const challenge = await prepare.json() as { challenge_id: string; generation: number; revocation_epoch: number };
+    const first = await publishWith(challenge.challenge_id);
+    expect(first.status).toBe(200);
+    const replay = await publishWith(challenge.challenge_id);
+    expect(replay.status).toBe(409);
+    const afterReplay = await runInDurableObject(stub, async (_instance, state) => state.storage.sql.exec<{ generation: number }>("SELECT generation FROM relay_state WHERE id=1").toArray()[0]);
+    expect(afterReplay.generation).toBe(challenge.generation + 1);
   });
 
   it("preserves product-owned freshness timestamps through trusted publish and public SVG reads", async () => {
