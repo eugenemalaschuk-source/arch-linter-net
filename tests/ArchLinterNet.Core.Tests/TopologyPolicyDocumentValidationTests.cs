@@ -87,6 +87,36 @@ public sealed class TopologyPolicyDocumentValidationTests
           mode: partial
           subject_kind: type
           scope: { selectors: [{ namespace: Sample }] }
+          nodes: []
+        """, "at least one node")]
+    [TestCase("""
+        topology:
+          mode: partial
+          subject_kind: type
+          scope: { selectors: [{ namespace: Sample }] }
+          nodes: [{ id: "", mappings: [{ namespace: Sample }] }]
+        """, "non-empty id")]
+    [TestCase("""
+        topology:
+          mode: partial
+          subject_kind: type
+          scope: { selectors: [{ namespace: Sample }] }
+          nodes: [{ id: sample, mappings: [] }]
+        """, "at least one mapping selector")]
+    [TestCase("""
+        topology:
+          mode: partial
+          subject_kind: type
+          scope: { selectors: [{ namespace: Sample }] }
+          nodes:
+            - id: sample
+              mappings: [{ namespace: Sample }, { namespace: Sample }]
+        """, "declares duplicate mapping selector")]
+    [TestCase("""
+        topology:
+          mode: partial
+          subject_kind: type
+          scope: { selectors: [{ namespace: Sample }] }
           nodes:
             - id: sample
               mappings: [{ namespace: Sample }]
@@ -129,6 +159,31 @@ public sealed class TopologyPolicyDocumentValidationTests
             - id: generated
               selector: { namespace: Sample.Generated }
         """, "non-empty reason")]
+    [TestCase("""
+        topology:
+          mode: partial
+          subject_kind: type
+          scope: { selectors: [{ namespace: Sample }] }
+          nodes: [{ id: sample, mappings: [{ namespace: Sample }] }]
+          out_of_scope:
+            - id: ""
+              selector: { namespace: Sample.Generated }
+              reason: generated code
+        """, "must declare a non-empty id")]
+    [TestCase("""
+        topology:
+          mode: partial
+          subject_kind: type
+          scope: { selectors: [{ namespace: Sample }] }
+          nodes: [{ id: sample, mappings: [{ namespace: Sample }] }]
+          out_of_scope:
+            - id: generated
+              selector: { namespace: Sample.Generated }
+              reason: generated code
+            - id: generated
+              selector: { namespace: Sample.OtherGenerated }
+              reason: also generated
+        """, "duplicate out_of_scope id")]
     public void Load_InvalidTopology_FailsWithActionableDiagnostic(string topology, string expectedMessage)
     {
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Load($"""

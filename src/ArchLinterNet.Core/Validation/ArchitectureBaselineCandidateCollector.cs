@@ -269,10 +269,22 @@ internal sealed class ArchitectureBaselineCandidateCollector(
             mode: mode == "all" ? null : mode,
             cancellationToken: cancellationToken);
 
-        BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
-        return preflight.Blocked
-            ? new SetupOutcome(setup, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics))
-            : new SetupOutcome(setup, null);
+        // Ownership of `setup` only reaches the caller through the returned SetupOutcome. If the
+        // preflight below throws (including cancellation) before that outcome is produced, this
+        // method must dispose the runner it just materialized itself -- otherwise the caller's
+        // try/finally never sees it and it leaks.
+        try
+        {
+            BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
+            return preflight.Blocked
+                ? new SetupOutcome(setup, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics))
+                : new SetupOutcome(setup, null);
+        }
+        catch
+        {
+            setup.Runner.Session.Context.Dispose();
+            throw;
+        }
     }
 
     private SetupOutcome ResolveMetadataFirstEnsureBuiltSetup(
@@ -357,41 +369,53 @@ internal sealed class ArchitectureBaselineCandidateCollector(
             return new SetupOutcome(setup, null);
         }
 
-        BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
-        if (preflight.Blocked)
+        // From here on, `setup` is only handed to the caller through the returned SetupOutcome.
+        // Any exception (including cancellation) below must dispose whichever runner this method
+        // currently holds before propagating -- otherwise it leaks, since the caller's try/finally
+        // never receives it.
+        try
         {
-            return new SetupOutcome(setup, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics));
-        }
-
-        if (buildState.PreparationMode != BuildPreparationMode.EnsureBuilt
-            || setup.Runner.Session.Context.ProjectDiscovery is not { DiscoveredProjects.Count: > 0 })
-        {
-            return new SetupOutcome(setup, null);
-        }
-
-        // Baseline diff keeps its established isolated post-build path. Baseline verify takes the
-        // metadata-first branch above to avoid locking outputs.
-        ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
-            document, policyPath, conditionSetName,
-            selectedContractIds: selectedContractIds,
-            enableUnmatchedIgnoreTracking: true,
-            mode: mode == "all" ? null : mode,
-            cancellationToken: cancellationToken);
-        setup.Runner.Session.Context.Dispose();
-        setup = postBuildSetup;
-
-        preflight = RunBuildStatePreflight(
-            setup.Runner,
-            buildState with
+            BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
+            if (preflight.Blocked)
             {
-                PreparationMode = BuildPreparationMode.Ordinary,
-                UsePreparedPostBuildState = false,
-            },
-            cancellationToken);
+                return new SetupOutcome(setup, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics));
+            }
 
-        return preflight.Blocked
-            ? new SetupOutcome(setup, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics))
-            : new SetupOutcome(setup, null);
+            if (buildState.PreparationMode != BuildPreparationMode.EnsureBuilt
+                || setup.Runner.Session.Context.ProjectDiscovery is not { DiscoveredProjects.Count: > 0 })
+            {
+                return new SetupOutcome(setup, null);
+            }
+
+            // Baseline diff keeps its established isolated post-build path. Baseline verify takes
+            // the metadata-first branch above to avoid locking outputs.
+            ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
+                document, policyPath, conditionSetName,
+                selectedContractIds: selectedContractIds,
+                enableUnmatchedIgnoreTracking: true,
+                mode: mode == "all" ? null : mode,
+                cancellationToken: cancellationToken);
+            setup.Runner.Session.Context.Dispose();
+            setup = postBuildSetup;
+
+            preflight = RunBuildStatePreflight(
+                setup.Runner,
+                buildState with
+                {
+                    PreparationMode = BuildPreparationMode.Ordinary,
+                    UsePreparedPostBuildState = false,
+                },
+                cancellationToken);
+
+            return preflight.Blocked
+                ? new SetupOutcome(setup, BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics))
+                : new SetupOutcome(setup, null);
+        }
+        catch
+        {
+            setup.Runner.Session.Context.Dispose();
+            throw;
+        }
     }
 
     private BaselineCandidateCollection BuildCandidateCollection(

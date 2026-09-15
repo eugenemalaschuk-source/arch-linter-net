@@ -376,16 +376,9 @@ internal static class SarifEvidenceSourceProjectionReader
             return false;
         }
 
-        if (directRuleId is not null && referencedRuleId is not null
-            && !string.Equals(directRuleId, referencedRuleId, StringComparison.Ordinal))
-        {
-            detail = $"The SARIF result at index {resultIndex} contains conflicting rule identifiers.";
-            return false;
-        }
-
         int? ruleIndex = directRuleIndex ?? referencedRuleIndex;
-        string? ruleId = directRuleId ?? referencedRuleId;
-        return TryResolveRuleIdentity(driverRules, resultIndex, ruleId, ruleIndex, out resolvedRule, out detail);
+        return TryResolveRuleIdentity(
+            driverRules, resultIndex, directRuleId, referencedRuleId, ruleIndex, out resolvedRule, out detail);
     }
 
     private static bool TryReadDirectRuleIdentity(
@@ -477,7 +470,8 @@ internal static class SarifEvidenceSourceProjectionReader
     private static bool TryResolveRuleIdentity(
         SarifDriverRuleCatalog driverRules,
         int resultIndex,
-        string? ruleId,
+        string? directRuleId,
+        string? referencedRuleId,
         int? ruleIndex,
         out SarifResolvedRule? resolvedRule,
         out string? detail)
@@ -492,6 +486,14 @@ internal static class SarifEvidenceSourceProjectionReader
             return false;
         }
 
+        if (directRuleId is not null && referencedRuleId is not null
+            && !string.Equals(directRuleId, referencedRuleId, StringComparison.Ordinal))
+        {
+            detail = $"The SARIF result at index {resultIndex} contains conflicting rule identifiers.";
+            return false;
+        }
+
+        string? ruleId = directRuleId ?? referencedRuleId;
         string? resolvedRuleId = ruleId ?? indexedDescriptor?.Id;
         if (indexedDescriptor is not null && resolvedRuleId is not null
             && !string.Equals(indexedDescriptor.Id, resolvedRuleId, StringComparison.Ordinal))

@@ -125,6 +125,25 @@ public sealed class MetricBudgetContractTests
     [TestCase("id: negative-maximum\n      metric: type-count\n      maximum: -1", "maximum must be non-negative")]
     [TestCase("id: inverted\n      metric: type-count\n      minimum: 4\n      maximum: 3", "minimum must be less than or equal to maximum")]
     [TestCase("id: unknown-metric\n      metric: missing\n      maximum: 3", "references unknown metric")]
+    [TestCase("id: blank-metric\n      metric: \" \"\n      maximum: 3", "non-empty metric ID")]
+    [TestCase(
+        "id: bad-mode\n      metric: type-count\n      baseline_mode: worse\n      maximum: 3",
+        "unsupported baseline_mode")]
+    [TestCase(
+        "id: minimum-with-mode\n      metric: type-count\n      baseline_mode: max_delta\n      max_delta: 1\n      minimum: 1",
+        "cannot declare 'minimum' with baseline_mode")]
+    [TestCase(
+        "id: missing-max-delta\n      metric: type-count\n      baseline_mode: max_delta\n      maximum: 3",
+        "requires 'max_delta' with baseline_mode 'max_delta'")]
+    [TestCase(
+        "id: unexpected-max-delta\n      metric: type-count\n      baseline_mode: no_worse_than_baseline\n      max_delta: 1\n      maximum: 3",
+        "must not declare 'max_delta' with baseline_mode 'no_worse_than_baseline'")]
+    [TestCase(
+        "id: max-delta-without-mode\n      metric: type-count\n      max_delta: 1\n      maximum: 3",
+        "may declare 'max_delta' only with baseline_mode 'max_delta'")]
+    [TestCase(
+        "id: negative-max-delta\n      metric: type-count\n      baseline_mode: max_delta\n      max_delta: -1\n      maximum: 3",
+        "max_delta must be non-negative")]
     public void Load_InvalidBoundsOrReference_RejectsBudget(string budget, string expectedMessage)
     {
         string path = WriteFile("dependencies.arch.yml", Policy(BudgetBlock(budget)));
@@ -310,6 +329,109 @@ public sealed class MetricBudgetContractTests
             Assert.That(jsonFinding.GetProperty("details").GetProperty("configured_limit").GetInt32(), Is.Zero);
             Assert.That(sarifFinding.GetRawText(), Is.EqualTo(jsonFinding.GetRawText()));
             Assert.That(formatter.FormatViolationsForHumans(strict.Violations), Does.Contain("measured_value"));
+        });
+    }
+
+    [Test]
+    public void Validate_BreachedMinimumBudget_ReportsMinimumBoundInPayload()
+    {
+        string path = WriteFile("dependencies.arch.yml", """
+            version: 1
+            name: Metric budget minimum evaluation
+            layers: {}
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            topology:
+              mode: partial
+              subject_kind: type
+              scope:
+                selectors:
+                  - namespace: ArchLinterNet.Core.Model
+              nodes:
+                - id: model
+                  mappings:
+                    - namespace: ArchLinterNet.Core.Model
+            metrics:
+              - id: model-types
+                kind: topology_type_count
+                topology_node: model
+            contracts:
+              strict_metric_budgets:
+                - id: strict-model-type-floor
+                  metric: model-types
+                  minimum: 1000000
+            """);
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
+
+        ValidationOutcome strict = engine.Validate(new ValidationRequest { PolicyPath = path, Mode = "strict" });
+        var payload = (MetricBudgetPayload)strict.Violations.Single().Payload!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strict.Passed, Is.False);
+            Assert.That(payload.BreachedBound, Is.EqualTo("minimum"));
+            Assert.That(payload.ConfiguredLimit, Is.EqualTo(1000000));
+            Assert.That(payload.MeasuredValue, Is.LessThan(1000000));
+        });
+    }
+
+    [Test]
+    public void Validate_BreachedBudgetMatchingBaselineIgnoredViolation_SuppressesFindingWithoutLeavingItUnmatched()
+    {
+        // Metric budgets are a closed contract shape (RawMetricBudgetValidator rejects an inline
+        // `ignored_violations` key), so budget-level ignores can only reach
+        // ArchitectureContractExecutionContext.IsIgnored through a loaded baseline document, unlike
+        // dependency-family contracts which also accept it authored directly in the policy.
+        string path = WriteFile("dependencies.arch.yml", """
+            version: 1
+            name: Metric budget ignore evaluation
+            layers: {}
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            topology:
+              mode: partial
+              subject_kind: type
+              scope:
+                selectors:
+                  - namespace: ArchLinterNet.Core.Model
+              nodes:
+                - id: model
+                  mappings:
+                    - namespace: ArchLinterNet.Core.Model
+            metrics:
+              - id: model-types
+                kind: topology_type_count
+                topology_node: model
+            contracts:
+              strict_metric_budgets:
+                - id: strict-model-type-limit
+                  metric: model-types
+                  maximum: 0
+            """);
+        string baselinePath = WriteFile("dependencies.baseline.yml", """
+            version: 1
+            baseline:
+              strict_metric_budgets:
+                - id: strict-model-type-limit
+                  ignored_violations:
+                    - source_type: "*"
+                      forbidden_reference: "*"
+                      reason: exercised by a regression test
+            """);
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
+
+        ValidationOutcome strict = engine.Validate(new ValidationRequest
+        {
+            PolicyPath = path,
+            BaselinePath = baselinePath,
+            Mode = "strict",
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strict.Passed, Is.True);
+            Assert.That(strict.Violations, Is.Empty);
+            Assert.That(strict.UnmatchedIgnoredViolations, Is.Empty);
         });
     }
 
