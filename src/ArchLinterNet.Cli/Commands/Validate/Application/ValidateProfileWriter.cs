@@ -65,7 +65,7 @@ internal sealed class ValidateProfileWriter
         WriteProfileToDestination(options.ProfileDestination, AnalysisProfileJsonWriter.Write(profile));
     }
 
-    internal void CaptureCancelledProfileState(ValidateProfileExecutionState state, OperationCanceledException exception)
+    internal static void CaptureCancelledProfileState(ValidateProfileExecutionState state, OperationCanceledException exception)
     {
         if (exception.Data[CancellationCountersDataKey] is not ArchitectureAnalysisSnapshotCounters counters
             || exception.Data[CancellationInputPathsDataKey] is not IReadOnlyList<string> inputPaths)

@@ -10,6 +10,7 @@ internal static class BadgeSetupOutputWriter
 {
     internal const string ReadmeFileName = "README.md";
     private const string RelayMode = "relay";
+    private const string RelaySchemaPath = "schema/0.8.0/badge-relay-config.schema.json";
     private static readonly JsonSerializerOptions _serializerOptions = new() { WriteIndented = true };
     private static readonly string[] _renewalPermittedEvents = ["push", "schedule"];
     private static readonly string[] _pushPermittedEvents = ["push"];
@@ -147,7 +148,7 @@ internal static class BadgeSetupOutputWriter
         files.AddRange([
             new(".github/badge-promotion/registry.json", RenderRegistry(configuration)),
             new(ReadmeFileName, BuildReadme(root, configuration)),
-            new("schema/0.8.0/badge-relay-config.schema.json", ReadAsset("schema/0.8.0/badge-relay-config.schema.json")),
+            new(RelaySchemaPath, ReadAsset(RelaySchemaPath)),
         ]);
         AddRelayFiles(files, configuration, relayFiles);
         return files;
@@ -258,7 +259,7 @@ internal static class BadgeSetupOutputWriter
                 ?? throw new InvalidOperationException("Generated setup output requires producer metadata."),
             ".github/badge-promotion/registry.json",
             ReadmeFileName,
-            "schema/0.8.0/badge-relay-config.schema.json",
+            RelaySchemaPath,
         ];
         if (configuration.Mode != BadgeSetupMode.None.ToWireValue())
         {
@@ -628,8 +629,7 @@ jobs:
     }
     private static string RenderRelayBundleManifest(IReadOnlyList<GeneratedFile> relayFiles)
     {
-        const string SchemaPath = "schema/0.8.0/badge-relay-config.schema.json";
-        GeneratedFile[] manifestFiles = [.. relayFiles, new(SchemaPath, ReadAsset(SchemaPath))];
+        GeneratedFile[] manifestFiles = [.. relayFiles, new(RelaySchemaPath, ReadAsset(RelaySchemaPath))];
         return Serialize(new
         {
             schema_id = "badge-relay-bundle-manifest/v1",

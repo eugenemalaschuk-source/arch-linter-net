@@ -10,20 +10,14 @@ namespace ArchLinterNet.Cli.Commands.Validate.Application;
 internal sealed class ReportApplicabilityRenderer
 {
     private const string PropertiesPropertyName = "properties";
-
-    // ArchitectureSarifFormatter uses ContractId as ruleId — for an imported diagnostic that is the
-    // raw external_evidence logical id, which shares its namespace with native contract ids (policy
-    // validation forbids external_evidence conflicting with strict_external/audit_external, but does
-    // not forbid it from matching an unrelated native contract's own id — see #741 review). Every
-    // imported rule/result is namespaced with this stable prefix before merging so a same-named
-    // native rule descriptor can never be misattributed to an imported result, or vice versa,
-    // regardless of what any one policy happens to declare.
-    private const string ImportedRuleIdPrefix = "external-evidence:";
+    private const string ProvenancePropertyName = "provenance";
+    private const string FamilyPropertyName = "family";
+    private const string ControlIdentityPropertyName = "control_identity";
 
     private static string CompletionStateToken(ArchitectureAssessmentCompletionState state) =>
         state.ToString().ToLowerInvariant();
 
-    internal string AddAssessmentCompletionToJson(
+    internal static string AddAssessmentCompletionToJson(
         string json,
         ArchitectureAssessmentCompletionEvidence? completion,
         ArchitectureApplicabilityProjection? projection = null)
@@ -63,10 +57,10 @@ internal sealed class ReportApplicabilityRenderer
             reasons.Add(new JsonObject
             {
                 ["code"] = reason.Code,
-                ["provenance"] = new JsonObject
+                [ProvenancePropertyName] = new JsonObject
                 {
-                    ["family"] = provenance.Family,
-                    ["control_identity"] = provenance.ControlIdentity,
+                    [FamilyPropertyName] = provenance.Family,
+                    [ControlIdentityPropertyName] = provenance.ControlIdentity,
                     ["policy_identity"] = provenance.PolicyIdentity,
                 },
             });
@@ -111,8 +105,8 @@ internal sealed class ReportApplicabilityRenderer
             string? family = control.Expected?.Family ?? control.Record?.Family;
             var value = new JsonObject
             {
-                ["control_identity"] = control.ControlIdentity,
-                ["family"] = family,
+                [ControlIdentityPropertyName] = control.ControlIdentity,
+                [FamilyPropertyName] = family,
                 ["membership"] = control.Membership is { } membership
                     ? ArchitectureApplicabilityWireNames.MembershipToken(membership)
                     : null,
@@ -146,10 +140,10 @@ internal sealed class ReportApplicabilityRenderer
 
         return new JsonObject
         {
-            ["control_identity"] = expected.ControlIdentity,
-            ["family"] = expected.Family,
+            [ControlIdentityPropertyName] = expected.ControlIdentity,
+            [FamilyPropertyName] = expected.Family,
             ["membership"] = ArchitectureApplicabilityWireNames.MembershipToken(expected.Membership),
-            ["provenance"] = BuildApplicabilityProvenanceJson(expected.Provenance),
+            [ProvenancePropertyName] = BuildApplicabilityProvenanceJson(expected.Provenance),
         };
     }
 
@@ -163,11 +157,11 @@ internal sealed class ReportApplicabilityRenderer
 
         return new JsonObject
         {
-            ["control_identity"] = record.ControlIdentity,
-            ["family"] = record.Family,
+            [ControlIdentityPropertyName] = record.ControlIdentity,
+            [FamilyPropertyName] = record.Family,
             ["state"] = ArchitectureApplicabilityWireNames.StateToken(record.State),
             ["reasons"] = BuildApplicabilityReasonsJson(record.Reasons),
-            ["provenance"] = BuildApplicabilityProvenanceJson(record.Provenance),
+            [ProvenancePropertyName] = BuildApplicabilityProvenanceJson(record.Provenance),
             ["topology_evidence"] = BuildTopologyEvidenceJson(record.TopologyEvidence),
         };
     }
@@ -239,7 +233,7 @@ internal sealed class ReportApplicabilityRenderer
             result.Add(new JsonObject
             {
                 ["code"] = reason.Code,
-                ["provenance"] = BuildApplicabilityProvenanceJson(reason.Provenance),
+                [ProvenancePropertyName] = BuildApplicabilityProvenanceJson(reason.Provenance),
             });
         }
 
@@ -251,8 +245,8 @@ internal sealed class ReportApplicabilityRenderer
     {
         return new JsonObject
         {
-            ["family"] = provenance.Family,
-            ["control_identity"] = provenance.ControlIdentity,
+            [FamilyPropertyName] = provenance.Family,
+            [ControlIdentityPropertyName] = provenance.ControlIdentity,
             ["policy_identity"] = provenance.PolicyIdentity,
         };
     }
@@ -270,7 +264,7 @@ internal sealed class ReportApplicabilityRenderer
         return result;
     }
 
-    internal string AddAssessmentCompletionToSarif(
+    internal static string AddAssessmentCompletionToSarif(
         string json,
         ArchitectureAssessmentCompletionEvidence? completion,
         ArchitectureApplicabilityProjection? projection = null)

@@ -8,7 +8,6 @@ namespace ArchLinterNet.Cli.Commands.Validate.Application;
 // compose documents only from supplied outcomes; this type performs no sink operations.
 internal sealed class ReportDocumentRenderer
 {
-    private const string FormatHuman = "human";
     private const string FormatJson = "json";
     private const string FormatSarif = "sarif";
 
@@ -34,8 +33,6 @@ internal sealed class ReportDocumentRenderer
         CancellationToken cancellationToken) =>
         _structured.Render(format, isSingleMode, outcomesByMode, cancellationToken);
 
-    // Re-renders a complete document from an already-computed outcome for output-error envelopes;
-    // it never repeats validation or contract execution.
     internal string RenderReportContent(
         string format,
         bool isSingleMode,

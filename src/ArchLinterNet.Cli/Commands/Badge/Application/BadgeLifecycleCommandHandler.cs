@@ -20,6 +20,9 @@ internal sealed class BadgeLifecycleCommandHandler
     internal const string AdminTokenEnvironmentVariable = "ARCHLINTERNET_BADGE_ADMIN_TOKEN";
     internal const string AdminOriginEnvironmentVariable = "ARCHLINTERNET_BADGE_ADMIN_ORIGIN";
     private const int MaximumJsonBytes = 64 * 1024;
+    private const string StatusOperation = "status";
+    private const string InvalidConfigurationReason = "invalid-configuration";
+    private const string HumanFormat = "human";
     private const string Help =
         "arch-linter-net badge architecture-health lifecycle --operation <status|invalidate|revoke|rename|transfer|rotate|remove|recover|upgrade|activate|rollback> "
         + "--input <badge-relay-config.json> [--alias <a.......>] [--expected-generation <n>] [--expected-epoch <n>] "
@@ -27,7 +30,7 @@ internal sealed class BadgeLifecycleCommandHandler
 
     private static readonly HashSet<string> _supportedOperations = new(StringComparer.Ordinal)
     {
-        "status", "invalidate", "revoke", "rename", "transfer", "rotate", "remove", "recover", "upgrade", "activate", "rollback",
+        StatusOperation, "invalidate", "revoke", "rename", "transfer", "rotate", "remove", "recover", "upgrade", "activate", "rollback",
     };
 
     private readonly ICliConsole _console;
@@ -72,7 +75,7 @@ internal sealed class BadgeLifecycleCommandHandler
                 _fileSystem.ReadAllText(options.InputPath!));
             if (!parsed.IsValid || parsed.Configuration is null)
             {
-                WriteFailure(options.Format, "invalid-configuration", "The setup configuration is malformed.");
+                WriteFailure(options.Format, InvalidConfigurationReason, "The setup configuration is malformed.");
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -80,13 +83,13 @@ internal sealed class BadgeLifecycleCommandHandler
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or JsonException)
         {
-            WriteFailure(options.Format, "invalid-configuration", "The setup configuration could not be read.");
+            WriteFailure(options.Format, InvalidConfigurationReason, "The setup configuration could not be read.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!TryValidateRelayConfiguration(configuration, options.Alias, out string relayError))
         {
-            WriteFailure(options.Format, "invalid-configuration", relayError);
+            WriteFailure(options.Format, InvalidConfigurationReason, relayError);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -108,7 +111,7 @@ internal sealed class BadgeLifecycleCommandHandler
         string? operatorOrigin = _adminOriginProvider();
         if (!TryValidateOperatorOrigin(configuration, operatorOrigin, out string originError, out string relayOrigin))
         {
-            WriteFailure(options.Format, "invalid-configuration", originError);
+            WriteFailure(options.Format, InvalidConfigurationReason, originError);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -154,7 +157,7 @@ internal sealed class BadgeLifecycleCommandHandler
         }
 
         if (!options.Format.Equals("json", StringComparison.OrdinalIgnoreCase)
-            && !options.Format.Equals("human", StringComparison.OrdinalIgnoreCase))
+            && !options.Format.Equals(HumanFormat, StringComparison.OrdinalIgnoreCase))
         {
             error = "Invalid format. Use 'json' or 'human'.";
             return false;
@@ -298,7 +301,7 @@ internal sealed class BadgeLifecycleCommandHandler
     {
         string route = options.Operation switch
         {
-            "status" => $"{alias}/status",
+            StatusOperation => $"{alias}/{StatusOperation}",
             "rename" => $"{alias}/reconcile-identity",
             "remove" => $"{alias}/uninstall",
             "recover" => $"{alias}/recover/open",
@@ -306,7 +309,7 @@ internal sealed class BadgeLifecycleCommandHandler
             _ => $"{alias}/{options.Operation}",
         };
         Uri uri = new(relayOrigin.TrimEnd('/') + "/badge-relay/v1/admin/" + route, UriKind.Absolute);
-        bool isStatus = options.Operation.Equals("status", StringComparison.Ordinal);
+        bool isStatus = options.Operation.Equals(StatusOperation, StringComparison.Ordinal);
         Dictionary<string, object?> fields = new(StringComparer.Ordinal)
         {
             ["operation"] = options.Operation,
@@ -361,9 +364,12 @@ internal sealed class BadgeLifecycleCommandHandler
         using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(30));
         byte[] chunk = new byte[8192];
         int total = 0;
-        while (total <= MaximumJsonBytes)
+        while (true)
         {
-            int read = stream.ReadAsync(chunk.AsMemory(0, Math.Min(chunk.Length, MaximumJsonBytes + 1 - total)), deadline.Token).GetAwaiter().GetResult();
+            int read = stream.ReadAsync(chunk.AsMemory(0, Math.Min(chunk.Length, MaximumJsonBytes + 1 - total)), deadline.Token)
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
             if (read == 0)
             {
                 break;
@@ -392,7 +398,7 @@ internal sealed class BadgeLifecycleCommandHandler
         }
 
         JsonElement? fixedStatus = ReadFixedStatus(responseJson);
-        if (options.Format.Equals("human", StringComparison.OrdinalIgnoreCase))
+        if (options.Format.Equals(HumanFormat, StringComparison.OrdinalIgnoreCase))
         {
             string state = fixedStatus is JsonElement status && status.TryGetProperty("state", out JsonElement stateValue)
                 ? stateValue.GetString() ?? "ok"
@@ -421,7 +427,7 @@ internal sealed class BadgeLifecycleCommandHandler
 
     private void WriteDryRun(BadgeLifecycleCommandOptions options, BadgeSetupConfiguration configuration, string alias)
     {
-        if (options.Format.Equals("human", StringComparison.OrdinalIgnoreCase))
+        if (options.Format.Equals(HumanFormat, StringComparison.OrdinalIgnoreCase))
         {
             _console.Out.WriteLine($"dry-run: {options.Operation} {alias} ({configuration.Destination.Endpoint})");
             return;
@@ -453,7 +459,7 @@ internal sealed class BadgeLifecycleCommandHandler
 
     private void WriteFailure(string format, string reason, string message)
     {
-        if (format.Equals("human", StringComparison.OrdinalIgnoreCase))
+        if (format.Equals(HumanFormat, StringComparison.OrdinalIgnoreCase))
         {
             _console.Error.WriteLine(message);
         }
@@ -491,7 +497,7 @@ internal sealed class BadgeLifecycleCommandHandler
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement root = document.RootElement;
         JsonElement candidate = root;
-        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("status", out JsonElement nested) && nested.ValueKind == JsonValueKind.Object)
+        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty(StatusOperation, out JsonElement nested) && nested.ValueKind == JsonValueKind.Object)
         {
             candidate = nested;
         }

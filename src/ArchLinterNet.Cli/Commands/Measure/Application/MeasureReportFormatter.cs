@@ -10,6 +10,9 @@ internal static class MeasureReportFormatter
 {
     private const string SchemaId = "architecture-metrics-report/v1";
     private const string ApplicabilityInterpretation = "completeness transparency; not an architecture quality score";
+    private const string StatePropertyName = "state";
+    private const string ControlIdentityPropertyName = "control_identity";
+    private const string FamilyPropertyName = "family";
 
     public static string FormatHuman(
         ArchitectureMetricMeasurementOutcome outcome,
@@ -92,7 +95,7 @@ internal static class MeasureReportFormatter
                 ["native_subject"] = measurement.NativeSubject,
                 ["unit"] = measurement.Unit,
                 ["effective_scope"] = measurement.EffectiveScope,
-                ["state"] = ArchitectureApplicabilityWireNames.StateToken(measurement.State),
+                [StatePropertyName] = ArchitectureApplicabilityWireNames.StateToken(measurement.State),
                 ["value"] = measurement.IsEvaluable ? measurement.Value : null,
             };
             if (!measurement.IsEvaluable)
@@ -127,7 +130,7 @@ internal static class MeasureReportFormatter
     {
         JsonObject result = new()
         {
-            ["state"] = completion.State.ToString().ToLowerInvariant(),
+            [StatePropertyName] = completion.State.ToString().ToLowerInvariant(),
             ["reasons"] = BuildReasons(completion.Reasons),
         };
         if (projection is not null)
@@ -158,12 +161,12 @@ internal static class MeasureReportFormatter
         {
             result.Add(new JsonObject
             {
-                ["control_identity"] = control.ControlIdentity,
-                ["family"] = control.Expected?.Family ?? control.Record?.Family,
+                [ControlIdentityPropertyName] = control.ControlIdentity,
+                [FamilyPropertyName] = control.Expected?.Family ?? control.Record?.Family,
                 ["membership"] = control.Membership is { } membership
                     ? ArchitectureApplicabilityWireNames.MembershipToken(membership)
                     : null,
-                ["state"] = control.State is { } state
+                [StatePropertyName] = control.State is { } state
                     ? ArchitectureApplicabilityWireNames.StateToken(state)
                     : null,
                 ["validated_state"] = control.State is { } validatedState
@@ -186,8 +189,8 @@ internal static class MeasureReportFormatter
         ? null
         : new JsonObject
         {
-            ["control_identity"] = expected.ControlIdentity,
-            ["family"] = expected.Family,
+            [ControlIdentityPropertyName] = expected.ControlIdentity,
+            [FamilyPropertyName] = expected.Family,
             ["membership"] = ArchitectureApplicabilityWireNames.MembershipToken(expected.Membership),
             ["provenance"] = BuildProvenance(expected.Provenance),
         };
@@ -196,9 +199,9 @@ internal static class MeasureReportFormatter
         ? null
         : new JsonObject
         {
-            ["control_identity"] = record.ControlIdentity,
-            ["family"] = record.Family,
-            ["state"] = ArchitectureApplicabilityWireNames.StateToken(record.State),
+            [ControlIdentityPropertyName] = record.ControlIdentity,
+            [FamilyPropertyName] = record.Family,
+            [StatePropertyName] = ArchitectureApplicabilityWireNames.StateToken(record.State),
             ["reasons"] = BuildReasons(record.Reasons),
             ["provenance"] = BuildProvenance(record.Provenance),
         };
@@ -220,8 +223,8 @@ internal static class MeasureReportFormatter
 
     private static JsonObject BuildProvenance(ArchitectureApplicabilityProvenance provenance) => new()
     {
-        ["family"] = provenance.Family,
-        ["control_identity"] = provenance.ControlIdentity,
+        [FamilyPropertyName] = provenance.Family,
+        [ControlIdentityPropertyName] = provenance.ControlIdentity,
         ["policy_identity"] = provenance.PolicyIdentity,
     };
 
@@ -258,11 +261,19 @@ internal static class MeasureReportFormatter
         IReadOnlyList<string> bounded = allContributors
             ? contributors
             : contributors.Take(maxContributors).ToArray();
-        string suffix = allContributors
-            ? " (all)"
-            : bounded.Count < contributors.Count
-                ? $" (showing {bounded.Count} of {contributors.Count}; truncated)"
-                : string.Empty;
+        string suffix;
+        if (allContributors)
+        {
+            suffix = " (all)";
+        }
+        else if (bounded.Count < contributors.Count)
+        {
+            suffix = $" (showing {bounded.Count} of {contributors.Count}; truncated)";
+        }
+        else
+        {
+            suffix = string.Empty;
+        }
         report.AppendLine($"  contributors: {contributors.Count}{suffix}");
         foreach (string contributor in bounded)
         {
@@ -299,13 +310,23 @@ internal static class MeasureReportFormatter
         string state = control.State is { } controlState
             ? ArchitectureApplicabilityWireNames.StateToken(controlState)
             : "unassessable";
-        string reasons = control.IntegrityReasons.Count == 0 && control.Record is { } record
-            ? record.Reasons.Count == 0
-                ? "none"
-                : string.Join(", ", record.Reasons.Select(reason => reason.Code))
-            : control.IntegrityReasons.Count == 0
-                ? "missing_record"
-                : string.Join(", ", control.IntegrityReasons.Select(reason => reason.Code));
+        string reasons;
+        if (control.IntegrityReasons.Count != 0)
+        {
+            reasons = string.Join(", ", control.IntegrityReasons.Select(reason => reason.Code));
+        }
+        else if (control.Record is not { } record)
+        {
+            reasons = "missing_record";
+        }
+        else if (record.Reasons.Count == 0)
+        {
+            reasons = "none";
+        }
+        else
+        {
+            reasons = string.Join(", ", record.Reasons.Select(reason => reason.Code));
+        }
         report.AppendLine($"  applicability: completion={completion}; membership={control.Membership?.ToString().ToLowerInvariant() ?? "unknown"}; state={state}; reasons={reasons}");
     }
 

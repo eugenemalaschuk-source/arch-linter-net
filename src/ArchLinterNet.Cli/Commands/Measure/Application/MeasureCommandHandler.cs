@@ -13,6 +13,7 @@ internal sealed class MeasureCommandHandler(
     CancellationToken cancellationToken = default)
 {
     private const int DefaultMaxContributors = 20;
+    private const string InvalidArgumentsReason = "invalid-arguments";
 
     public int Execute(MeasureCommandOptions options)
     {
@@ -24,21 +25,21 @@ internal sealed class MeasureCommandHandler(
 
         if (options.Format is not ("human" or "json"))
         {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments",
+            CliErrorOutputWriter.Write(console, options.Format, InvalidArgumentsReason,
                 $"Invalid format: {options.Format}. Use 'human' or 'json'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.MaxContributors is <= 0)
         {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments",
+            CliErrorOutputWriter.Write(console, options.Format, InvalidArgumentsReason,
                 "--max-contributors must be a positive integer.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.AllContributors && options.MaxContributors is not null)
         {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments",
+            CliErrorOutputWriter.Write(console, options.Format, InvalidArgumentsReason,
                 "--max-contributors and --all-contributors cannot be used together.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
@@ -71,7 +72,7 @@ internal sealed class MeasureCommandHandler(
         }
         catch (ArgumentException ex)
         {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", ex.Message);
+            CliErrorOutputWriter.Write(console, options.Format, InvalidArgumentsReason, ex.Message);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
         catch (Exception ex)

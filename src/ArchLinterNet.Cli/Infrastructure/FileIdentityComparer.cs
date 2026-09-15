@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
@@ -78,12 +79,20 @@ internal static class FileIdentityComparer
         }
     }
 
+    [SuppressMessage(
+        "Interoperability",
+        "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute",
+        Justification = "The Windows output struct embeds ComTypes.FILETIME fields; LibraryImport source generation cannot marshal this type without assembly-wide DisableRuntimeMarshalling.")]
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetFileInformationByHandle(
         SafeFileHandle file,
         out ByHandleFileInformation information);
 
+    [SuppressMessage(
+        "Interoperability",
+        "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute",
+        Justification = "The fstat buffer is an ABI-specific platform struct read through an IntPtr; LibraryImport source generation cannot model the supported Linux/macOS layouts.")]
     [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
     private static extern int FStat(SafeFileHandle fileDescriptor, IntPtr buffer);
 

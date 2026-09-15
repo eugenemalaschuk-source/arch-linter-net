@@ -117,8 +117,7 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
         }
 
         string contextDigest = ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(currentContext);
-        List<ArchitecturePublicApiLiveEvidence> evidence = new();
-        foreach (ArchitecturePublicApiWeakeningApproval approval in approvals)
+        return approvals.Select(approval =>
         {
             PublicApiCaptureOutcome capture = capturePublicApi(new PublicApiCaptureRequest
             {
@@ -133,14 +132,12 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
             }
 
             PublicApiSnapshotDocument document = PublicApiSnapshotFormat.Parse(capture.Snapshot, "captured live public API");
-            evidence.Add(new ArchitecturePublicApiLiveEvidence(
+            return new ArchitecturePublicApiLiveEvidence(
                 ArchitecturePublicApiLiveEvidence.CurrentSchemaVersion,
                 ArchitecturePublicApiLiveEvidence.EvidenceKind,
                 contextDigest,
                 approval.ContractId,
-                document.Entries));
-        }
-
-        return evidence;
+                document.Entries);
+        }).ToList();
     }
 }
