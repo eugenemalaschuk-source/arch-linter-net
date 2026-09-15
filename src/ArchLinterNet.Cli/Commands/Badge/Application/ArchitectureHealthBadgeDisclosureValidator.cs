@@ -12,6 +12,8 @@ namespace ArchLinterNet.Cli.Commands.Badge.Application;
 internal static partial class ArchitectureHealthBadgeDisclosureValidator
 {
     internal const int MaximumPayloadBytes = 16 * 1024;
+    private const string SchemaVersionPropertyName = "schemaVersion";
+    private const string LabelPropertyName = "label";
 
     internal static bool TryValidate(string profile, ReadOnlySpan<byte> utf8, out string sha256)
     {
@@ -30,8 +32,8 @@ internal static partial class ArchitectureHealthBadgeDisclosureValidator
                 return false;
             }
 
-            int schemaVersion = RequiredInt(root, "schemaVersion");
-            string label = RequiredString(root, "label");
+            int schemaVersion = RequiredInt(root, SchemaVersionPropertyName);
+            string label = RequiredString(root, LabelPropertyName);
             string message = RequiredString(root, "message");
             string color = RequiredString(root, "color");
             if (schemaVersion != 1 || label != "architecture" || !HasClosedHeadline(message, color))
@@ -75,8 +77,8 @@ internal static partial class ArchitectureHealthBadgeDisclosureValidator
     private static bool HasExactFields(JsonElement root, string profile)
     {
         string[] expected = profile == "headline-only/v1"
-            ? ["schemaVersion", "label", "message", "color"]
-            : ["schemaVersion", "label", "message", "color", "verified_at", "valid_until"];
+            ? [SchemaVersionPropertyName, LabelPropertyName, "message", "color"]
+            : [SchemaVersionPropertyName, LabelPropertyName, "message", "color", "verified_at", "valid_until"];
         return root.EnumerateObject().Select(property => property.Name)
             .SequenceEqual(expected, StringComparer.Ordinal);
     }
@@ -110,8 +112,8 @@ internal static partial class ArchitectureHealthBadgeDisclosureValidator
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
-            writer.WriteNumber("schemaVersion", 1);
-            writer.WriteString("label", "architecture");
+            writer.WriteNumber(SchemaVersionPropertyName, 1);
+            writer.WriteString(LabelPropertyName, "architecture");
             writer.WriteString("message", message);
             writer.WriteString("color", color);
             if (verifiedAt is not null)

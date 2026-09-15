@@ -88,17 +88,17 @@ internal static class PrReportTransportContext
             {
                 normalized = normalized[prefix.Length..];
             }
-            else if (normalized.StartsWith("/", StringComparison.Ordinal))
+            else if (normalized.StartsWith('/'))
             {
                 return null;
             }
         }
-        else if (normalized.StartsWith("/", StringComparison.Ordinal))
+        else if (normalized.StartsWith('/'))
         {
             return null;
         }
 
-        if (normalized.Contains(":", StringComparison.Ordinal))
+        if (normalized.Contains(':'))
         {
             return null;
         }

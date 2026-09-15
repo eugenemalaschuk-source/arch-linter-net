@@ -108,7 +108,7 @@ internal sealed class BadgeSetupCommandHandler(ICliConsole console, IFileSystem 
                 return WriteDoctor(BadgeSetupEngine.RunDoctor(plan, inspected.Observations), options);
             }
 
-            BadgeDoctorObservations observations = parsedObservation?.Observations ?? new();
+            BadgeDoctorObservations observations = parsedObservation!.Observations!;
             return WriteDoctor(BadgeSetupEngine.RunDoctor(plan, observations), options);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException)

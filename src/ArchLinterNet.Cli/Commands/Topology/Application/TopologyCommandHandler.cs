@@ -60,9 +60,12 @@ internal sealed class TopologyCommandHandler(
                 document = TopologyCaptureRenderer.FormatJson(outcome);
             }
             int writeResult = Publish(document, options.OutputPath, options.Format, "topology capture");
-            return writeResult != CliExitCodes.Success
-                ? writeResult
-                : outcome.PreflightBlocked ? CliExitCodes.InvalidArgumentsOrRuntimeError : CliExitCodes.Success;
+            if (writeResult != CliExitCodes.Success)
+            {
+                return writeResult;
+            }
+
+            return outcome.PreflightBlocked ? CliExitCodes.InvalidArgumentsOrRuntimeError : CliExitCodes.Success;
         }
         catch (OperationCanceledException)
         {

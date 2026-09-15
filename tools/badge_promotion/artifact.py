@@ -148,7 +148,7 @@ def _validate_manifest(manifest: Mapping[str, Any], config: PromotionConfig, evi
         raise ArtifactValidationError("manifest payload digest does not match")
 
 
-_MESSAGE_PATTERN = re.compile(r"^(PASS|FAIL) · (HEALTHY|DEBT|DEGRADING|FAILING) · ([0-9]{1,4}) ignores · ([0-9]{1,4}) rules$")
+_MESSAGE_PATTERN = re.compile(r"^(PASS|FAIL) · (HEALTHY|DEBT|DEGRADING|FAILING) · (?a:\d{1,4}) ignores · (?a:\d{1,4}) rules$")
 _HEALTH_COLORS = {"HEALTHY": "brightgreen", "DEBT": "yellow", "DEGRADING": "orange", "FAILING": "red"}
 
 
