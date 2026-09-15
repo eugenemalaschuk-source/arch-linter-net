@@ -12,11 +12,11 @@
   "files": [
     {
       "path": "src/index.ts",
-      "sha256": "e7ee7bbc2bcc1f4095890d1e77ae5d47d6601a32aab771364d35ecd5feb15a01"
+      "sha256": "97fabd58e15594db3cf8bbd706ddb67f1f024af38252058ff09a607bcc3cf066"
     },
     {
       "path": "src/lifecycle.ts",
-      "sha256": "3f89d01e77d126ae11575b6d0406d9c77a34c31b4356a5dbc739ca513dec6d01"
+      "sha256": "920275c1647d6060b3c76ab47814ae1f22bdcb5d236f2ed6d8f0b621c400693c"
     },
     {
       "path": "src/payload.ts",
@@ -24,11 +24,11 @@
     },
     {
       "path": "src/read.ts",
-      "sha256": "3de26d36a334be637848c9ea1a39451a9c86070a2cb9c821ded236aa71a1a986"
+      "sha256": "b463eccf3cbaa992a72221283a78c2613ced286617e175a59709c68f94748e7b"
     },
     {
       "path": "src/registry-do.ts",
-      "sha256": "a84dfce53b808e80bb3405812c7475c6909e7afdf92cd4355d465f9600f61864"
+      "sha256": "a196a49c0604a2492ad4ef3c555c4f76eb9c1460d1df85071a59d075459a416f"
     },
     {
       "path": "src/registry.ts",
@@ -36,7 +36,7 @@
     },
     {
       "path": "src/relay-do.ts",
-      "sha256": "c762ba6d5ed055484152fe2db73a87b0d7913d0523a7d21e6fef336a08ffbfff"
+      "sha256": "849fbdf837ac92910055dbfeb6a9cbbc97d9e5a661aa1f4e6f209184b81f4a68"
     },
     {
       "path": "src/security.ts",

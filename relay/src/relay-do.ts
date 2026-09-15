@@ -139,6 +139,10 @@ function parseDateSeconds(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : undefined;
 }
 
+function expectedBarrierMismatch(body: Record<string, unknown>, field: string, actual: number): boolean {
+  return Object.hasOwn(body, field) && (!safeInteger(body[field]) || body[field] !== actual);
+}
+
 function parseCanonicalDateSeconds(value: unknown): number | undefined {
   if (typeof value !== "string" || !/^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u.test(value)) return undefined;
   const parsed = Date.parse(value);
@@ -147,6 +151,8 @@ function parseCanonicalDateSeconds(value: unknown): number | undefined {
   if (!Number.isSafeInteger(seconds)) return undefined;
   return new Date(parsed).toISOString().replace(".000Z", "Z") === value ? seconds : undefined;
 }
+
+type PublishOperation = "publish" | "renew" | "recover";
 
 export class RelayDurableObject {
   private readonly state: RelayStateLike;
@@ -435,7 +441,63 @@ export class RelayDurableObject {
     return readPublicRepresentation(request, current, kind, entry);
   }
 
-  private async publish(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "publish" | "renew" | "recover", internalProof?: unknown): Promise<Response> {
+  private checkPublishPreconditions(current: StateRow, operation: PublishOperation): Response | undefined {
+    if (current.pending_operation_id !== null) return this.finishError(409);
+    if (operation === "recover" && current.status !== "needs-recovery") return this.finishError(409);
+    return undefined;
+  }
+
+  private loadPublishChallenge(body: Record<string, unknown>, profile: DisclosureProfile, idempotencyHash: string, current: StateRow, publisher: import("./types").ValidatedPublisher): ChallengeRow | Response {
+    const challenge = this.sql.exec<ChallengeRow>("SELECT * FROM relay_challenges WHERE id = ? LIMIT 1", body.challenge_id).toArray()[0];
+    if (!challenge || challenge.consumed || challenge.deadline <= nowSeconds() || challenge.canonical_digest !== body.canonical_digest || challenge.profile !== profile || challenge.generation !== body.expected_generation || challenge.revocation_epoch !== body.expected_revocation_epoch) return this.finishError(409);
+    if (idempotencyHash !== challenge.idempotency_hash) return this.finishError(409);
+    if (challenge.jti_hash !== publisher.jtiHash || current.generation !== body.expected_generation || current.revocation_epoch !== body.expected_revocation_epoch || current.status === "revoked" || current.tombstoned) return this.finishError(409);
+    return challenge;
+  }
+
+  private resolvePublishTiming(profile: DisclosureProfile, payload: import("./types").CanonicalPayload, horizonSeconds: number): { verifiedAt: string; verifiedAtSeconds: number; validUntil: string; validUntilSeconds: number } | Response {
+    const verifiedAt = profile === "headline-plus-freshness/v1" && payload.verified_at
+      ? payload.verified_at
+      : new Date(nowSeconds() * 1000).toISOString().replace(".000Z", "Z");
+    const verifiedAtSeconds = parseCanonicalDateSeconds(verifiedAt);
+    if (!verifiedAtSeconds || verifiedAtSeconds > nowSeconds()) return this.finishError(409);
+    const maxLease = nowSeconds() + LEASE_SECONDS;
+    const validUntilSeconds = Math.min(maxLease, horizonSeconds);
+    if (validUntilSeconds <= nowSeconds()) return this.finishError(409);
+    const validUntil = profile === "headline-plus-freshness/v1" && payload.valid_until
+      ? payload.valid_until
+      : new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
+    const persistedValidUntilSeconds = parseCanonicalDateSeconds(validUntil);
+    if (!persistedValidUntilSeconds
+      || persistedValidUntilSeconds <= nowSeconds()
+      || persistedValidUntilSeconds > horizonSeconds
+      || persistedValidUntilSeconds > maxLease
+      || persistedValidUntilSeconds > verifiedAtSeconds + LEASE_SECONDS) return this.finishError(409);
+    return { verifiedAt, verifiedAtSeconds, validUntil, validUntilSeconds };
+  }
+
+  private commitPublish(body: Record<string, unknown>, profile: DisclosureProfile, payload: import("./types").CanonicalPayload, publisher: import("./types").ValidatedPublisher, operation: PublishOperation, timingInput: { horizon: string | undefined; horizonSeconds: number; idempotencyHash: string }): Response {
+    const current = this.row();
+    const precondition = this.checkPublishPreconditions(current, operation);
+    if (precondition) return precondition;
+    const challenge = this.loadPublishChallenge(body, profile, timingInput.idempotencyHash, current, publisher);
+    if (challenge instanceof Response) return challenge;
+    if (operation === "renew" && current.last_renewed_at !== null && nowSeconds() - current.last_renewed_at < RENEWAL_MINIMUM_SECONDS) return this.finishError(409);
+    const newGeneration = current.generation + 1;
+    const timing = this.resolvePublishTiming(profile, payload, timingInput.horizonSeconds);
+    if (timing instanceof Response) return timing;
+    this.sql.exec("UPDATE relay_challenges SET consumed = 1 WHERE id = ? AND consumed = 0", challenge.id).toArray();
+    this.sql.exec(`UPDATE relay_state SET status='ready', profile=?, generation=?, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0, last_renewed_at=?, updated_at=?
+      WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0 AND status <> 'revoked'`, profile, newGeneration, body.canonical_bytes, body.canonical_digest, timing.verifiedAt, timing.validUntil, timingInput.horizon, nowSeconds(), nowSeconds(), body.expected_generation, body.expected_revocation_epoch).toArray();
+    // SQLite UPDATE's result is not portable across the Workers cursor, so
+    // re-read the row as the compare-and-set witness.
+    const after = this.row();
+    if (after.generation !== newGeneration || after.payload_digest !== body.canonical_digest) return this.finishError(409);
+    this.recordOperation(operation, "ready", "ok", after);
+    return response(200, { ok: true, generation: newGeneration, revocation_epoch: after.revocation_epoch, state: "ready", valid_until: timing.validUntil });
+  }
+
+  private async publish(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: PublishOperation, internalProof?: unknown): Promise<Response> {
     this.validateOperationBasics(body, operation);
     if ("trusted_context" in body) throw new AuthorizationError(403);
     const profile = asProfile(body.profile);
@@ -457,43 +519,7 @@ export class RelayDurableObject {
     }
     if (!safeInteger(body.expected_generation) || !safeInteger(body.expected_revocation_epoch)) throw new PayloadError();
     const idempotencyHash = await sha256Hex(body.idempotency_key);
-    return this.state.storage.transactionSync(() => {
-      const current = this.row();
-      if (current.pending_operation_id !== null) return this.finishError(409);
-      if (operation === "recover" && current.status !== "needs-recovery") return this.finishError(409);
-      const challenge = this.sql.exec<ChallengeRow>("SELECT * FROM relay_challenges WHERE id = ? LIMIT 1", body.challenge_id).toArray()[0];
-      if (!challenge || challenge.consumed || challenge.deadline <= nowSeconds() || challenge.canonical_digest !== body.canonical_digest || challenge.profile !== profile || challenge.generation !== body.expected_generation || challenge.revocation_epoch !== body.expected_revocation_epoch) return this.finishError(409);
-      if (idempotencyHash !== challenge.idempotency_hash) return this.finishError(409);
-      if (challenge.jti_hash !== publisher.jtiHash || current.generation !== body.expected_generation || current.revocation_epoch !== body.expected_revocation_epoch || current.status === "revoked" || current.tombstoned) return this.finishError(409);
-      if (operation === "renew" && current.last_renewed_at !== null && nowSeconds() - current.last_renewed_at < RENEWAL_MINIMUM_SECONDS) return this.finishError(409);
-      const newGeneration = current.generation + 1;
-      const verifiedAt = profile === "headline-plus-freshness/v1" && payload.verified_at
-        ? payload.verified_at
-        : new Date(nowSeconds() * 1000).toISOString().replace(".000Z", "Z");
-      const verifiedAtSeconds = parseCanonicalDateSeconds(verifiedAt);
-      if (!verifiedAtSeconds || verifiedAtSeconds > nowSeconds()) return this.finishError(409);
-      const maxLease = nowSeconds() + LEASE_SECONDS;
-      const validUntilSeconds = Math.min(maxLease, horizonSeconds);
-      if (validUntilSeconds <= nowSeconds()) return this.finishError(409);
-      const validUntil = profile === "headline-plus-freshness/v1" && payload.valid_until
-        ? payload.valid_until
-        : new Date(validUntilSeconds * 1000).toISOString().replace(".000Z", "Z");
-      const persistedValidUntilSeconds = parseCanonicalDateSeconds(validUntil);
-      if (!persistedValidUntilSeconds
-        || persistedValidUntilSeconds <= nowSeconds()
-        || persistedValidUntilSeconds > horizonSeconds
-        || persistedValidUntilSeconds > maxLease
-        || persistedValidUntilSeconds > verifiedAtSeconds + LEASE_SECONDS) return this.finishError(409);
-      this.sql.exec("UPDATE relay_challenges SET consumed = 1 WHERE id = ? AND consumed = 0", challenge.id).toArray();
-      this.sql.exec(`UPDATE relay_state SET status='ready', profile=?, generation=?, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0, last_renewed_at=?, updated_at=?
-        WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0 AND status <> 'revoked'`, profile, newGeneration, body.canonical_bytes, body.canonical_digest, verifiedAt, validUntil, horizon, nowSeconds(), nowSeconds(), body.expected_generation, body.expected_revocation_epoch).toArray();
-      // SQLite UPDATE's result is not portable across the Workers cursor, so
-      // re-read the row as the compare-and-set witness.
-      const after = this.row();
-      if (after.generation !== newGeneration || after.payload_digest !== body.canonical_digest) return this.finishError(409);
-      this.recordOperation(operation, "ready", "ok", after);
-      return response(200, { ok: true, generation: newGeneration, revocation_epoch: after.revocation_epoch, state: "ready", valid_until: validUntil });
-    });
+    return this.state.storage.transactionSync(() => this.commitPublish(body, profile, payload, publisher, operation, { horizon, horizonSeconds, idempotencyHash }));
   }
 
   private async lifecycle(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "invalidate" | "revoke"): Promise<Response> {
@@ -614,6 +640,14 @@ export class RelayDurableObject {
     });
   }
 
+  private applyAdminMutation(operation: "admin-invalidate" | "admin-recover-open", current: StateRow): void {
+    if (operation === "admin-recover-open") {
+      this.sql.exec("UPDATE relay_state SET status='needs-recovery', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, updated_at=? WHERE id=1 AND generation=? AND revocation_epoch=?", nowSeconds(), current.generation, current.revocation_epoch).toArray();
+    } else {
+      this.sql.exec("UPDATE relay_state SET status='unavailable', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, updated_at=? WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0", nowSeconds(), current.generation, current.revocation_epoch).toArray();
+    }
+  }
+
   private adminMutation(
     body: Record<string, unknown>,
     operation: "admin-invalidate" | "admin-recover-open",
@@ -628,20 +662,12 @@ export class RelayDurableObject {
       }
       if (current.pending_operation_id !== null) return this.finishError(409);
       const expected = preBarrier ?? current;
-      if (Object.hasOwn(body, "expected_registry_revision")
-        && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== expected.registry_revision)) return this.finishError(409);
-      if (Object.hasOwn(body, "expected_barrier_epoch")
-        && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== expected.barrier_epoch)) return this.finishError(409);
-      if (Object.hasOwn(body, "expected_generation")
-        && (!safeInteger(body.expected_generation) || body.expected_generation !== expected.generation)) return this.finishError(409);
-      if (Object.hasOwn(body, "expected_revocation_epoch")
-        && (!safeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== expected.revocation_epoch)) return this.finishError(409);
+      if (expectedBarrierMismatch(body, "expected_registry_revision", expected.registry_revision)
+        || expectedBarrierMismatch(body, "expected_barrier_epoch", expected.barrier_epoch)
+        || expectedBarrierMismatch(body, "expected_generation", expected.generation)
+        || expectedBarrierMismatch(body, "expected_revocation_epoch", expected.revocation_epoch)) return this.finishError(409);
       if (current.tombstoned !== 0) return this.finishError(409);
-      if (operation === "admin-recover-open") {
-        this.sql.exec("UPDATE relay_state SET status='needs-recovery', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, updated_at=? WHERE id=1 AND generation=? AND revocation_epoch=?", nowSeconds(), current.generation, current.revocation_epoch).toArray();
-      } else {
-        this.sql.exec("UPDATE relay_state SET status='unavailable', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, updated_at=? WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0", nowSeconds(), current.generation, current.revocation_epoch).toArray();
-      }
+      this.applyAdminMutation(operation, current);
       this.sql.exec("DELETE FROM relay_challenges WHERE consumed=0").toArray();
       const after = this.row();
       const status = after.status;
@@ -652,6 +678,38 @@ export class RelayDurableObject {
       this.recordOperation(operation, status, reason, after, body.operation_id as string);
       return response(200, { ok: true, state: status, generation: after.generation, revocation_epoch: after.revocation_epoch, operation_id: body.operation_id });
     });
+  }
+
+  private resolveUpgradeRequest(body: Record<string, unknown>, before: StateRow, operation: string, active: string | null): { requested: string | undefined } | Response {
+    if (expectedBarrierMismatch(body, "expected_registry_revision", before.registry_revision)
+      || expectedBarrierMismatch(body, "expected_barrier_epoch", before.barrier_epoch)
+      || expectedBarrierMismatch(body, "expected_generation", before.generation)
+      || expectedBarrierMismatch(body, "expected_revocation_epoch", before.revocation_epoch)) return this.finishError(409);
+    const requested = typeof body.bundle_digest === "string" ? body.bundle_digest : undefined;
+    const known = requested === undefined || isKnownBundleDigest(requested, this.shippedDigests, active);
+    if (!known || (operation === "upgrade-activate" && !before.staged_digest)) return response(409, { error: "compatibility_conflict" });
+    if (body.to_bundle !== undefined && body.to_bundle !== SUPPORTED_BUNDLE) return response(409, { error: "compatibility_conflict" });
+    return { requested };
+  }
+
+  private applyUpgradeStage(target: string | null): void {
+    if (target === null) {
+      // Preserve the historical metadata-only upgrade for installations
+      // that have not opted into digest pinning yet.
+      this.sql.exec("UPDATE relay_state SET bundle=?, contract_version=?, compatibility_plan=?, updated_at=? WHERE id=1", SUPPORTED_BUNDLE, SUPPORTED_CONTRACT_VERSION, SUPPORTED_COMPATIBILITY_PLAN, nowSeconds()).toArray();
+    } else {
+      this.sql.exec("UPDATE relay_state SET bundle=?, contract_version=?, compatibility_plan=?, staged_digest=?, updated_at=? WHERE id=1", SUPPORTED_BUNDLE, SUPPORTED_CONTRACT_VERSION, SUPPORTED_COMPATIBILITY_PLAN, target, nowSeconds()).toArray();
+    }
+  }
+
+  private applyUpgradeActivateOrRollback(operation: string, before: StateRow, active: string | null, requestedTarget: string | null): Response | undefined {
+    const target = requestedTarget ?? (operation === "upgrade-rollback" ? before.previous_verified_digest : before.staged_digest);
+    if (!target || !isKnownBundleDigest(target, this.shippedDigests, active)) return response(409, { error: "compatibility_conflict" });
+    if (operation === "upgrade-activate" && before.staged_digest !== null && target !== before.staged_digest) return response(409, { error: "compatibility_conflict" });
+    if (operation === "upgrade-rollback" && target !== before.previous_verified_digest) return response(409, { error: "compatibility_conflict" });
+    this.sql.exec("UPDATE relay_state SET status='unavailable', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, bundle=?, contract_version=?, compatibility_plan=?, bundle_digest=?, active_digest=?, staged_digest=NULL, previous_verified_digest=?, updated_at=? WHERE id=1", SUPPORTED_BUNDLE, SUPPORTED_CONTRACT_VERSION, SUPPORTED_COMPATIBILITY_PLAN, target, target, active, nowSeconds()).toArray();
+    this.sql.exec("DELETE FROM relay_challenges WHERE consumed=0").toArray();
+    return undefined;
   }
 
   private adminUpgrade(body: Record<string, unknown>): Response {
@@ -669,36 +727,15 @@ export class RelayDurableObject {
         return response(200, { ok: true, state: prior.status, generation: prior.generation, revocation_epoch: prior.revocation_epoch, operation_id: operationIdValue });
       }
       if (before.pending_operation_id !== null) return this.finishError(409);
-      if (Object.hasOwn(body, "expected_registry_revision")
-        && (!safeInteger(body.expected_registry_revision) || body.expected_registry_revision !== before.registry_revision)) return this.finishError(409);
-      if (Object.hasOwn(body, "expected_barrier_epoch")
-        && (!safeInteger(body.expected_barrier_epoch) || body.expected_barrier_epoch !== before.barrier_epoch)) return this.finishError(409);
-      if (Object.hasOwn(body, "expected_generation")
-        && (!safeInteger(body.expected_generation) || body.expected_generation !== before.generation)) return this.finishError(409);
-      if (Object.hasOwn(body, "expected_revocation_epoch")
-        && (!safeInteger(body.expected_revocation_epoch) || body.expected_revocation_epoch !== before.revocation_epoch)) return this.finishError(409);
       const active = before.active_digest ?? before.bundle_digest;
-      const requested = typeof body.bundle_digest === "string" ? body.bundle_digest : undefined;
-      const known = requested === undefined || isKnownBundleDigest(requested, this.shippedDigests, active);
-      if (!known || (operation === "upgrade-activate" && !before.staged_digest)) return response(409, { error: "compatibility_conflict" });
-      if (body.to_bundle !== undefined && body.to_bundle !== SUPPORTED_BUNDLE) return response(409, { error: "compatibility_conflict" });
-
-      let target: string | null = requested ?? null;
+      const resolved = this.resolveUpgradeRequest(body, before, operation, active);
+      if (resolved instanceof Response) return resolved;
+      const target: string | null = resolved.requested ?? null;
       if (operation === "upgrade-stage") {
-        if (target === null) {
-          // Preserve the historical metadata-only upgrade for installations
-          // that have not opted into digest pinning yet.
-          this.sql.exec("UPDATE relay_state SET bundle=?, contract_version=?, compatibility_plan=?, updated_at=? WHERE id=1", SUPPORTED_BUNDLE, SUPPORTED_CONTRACT_VERSION, SUPPORTED_COMPATIBILITY_PLAN, nowSeconds()).toArray();
-        } else {
-          this.sql.exec("UPDATE relay_state SET bundle=?, contract_version=?, compatibility_plan=?, staged_digest=?, updated_at=? WHERE id=1", SUPPORTED_BUNDLE, SUPPORTED_CONTRACT_VERSION, SUPPORTED_COMPATIBILITY_PLAN, target, nowSeconds()).toArray();
-        }
+        this.applyUpgradeStage(target);
       } else {
-        target = target ?? (operation === "upgrade-rollback" ? before.previous_verified_digest : before.staged_digest);
-        if (!target || !isKnownBundleDigest(target, this.shippedDigests, active)) return response(409, { error: "compatibility_conflict" });
-        if (operation === "upgrade-activate" && before.staged_digest !== null && target !== before.staged_digest) return response(409, { error: "compatibility_conflict" });
-        if (operation === "upgrade-rollback" && target !== before.previous_verified_digest) return response(409, { error: "compatibility_conflict" });
-        this.sql.exec("UPDATE relay_state SET status='unavailable', generation=generation+1, revocation_epoch=revocation_epoch+1, payload=NULL, payload_digest=NULL, verified_at=NULL, valid_until=NULL, semantic_horizon=NULL, tree_sha=NULL, tombstoned=0, last_renewed_at=NULL, bundle=?, contract_version=?, compatibility_plan=?, bundle_digest=?, active_digest=?, staged_digest=NULL, previous_verified_digest=?, updated_at=? WHERE id=1", SUPPORTED_BUNDLE, SUPPORTED_CONTRACT_VERSION, SUPPORTED_COMPATIBILITY_PLAN, target, target, active, nowSeconds()).toArray();
-        this.sql.exec("DELETE FROM relay_challenges WHERE consumed=0").toArray();
+        const failure = this.applyUpgradeActivateOrRollback(operation, before, active, target);
+        if (failure) return failure;
       }
       const after = this.row();
       this.recordOperation(operation, after.status, "ok", after, operationIdValue);
@@ -716,83 +753,122 @@ export class RelayDurableObject {
     return response(200, { ok: true, state: after.status, registry_revision: after.registry_revision, barrier_epoch: after.barrier_epoch });
   }
 
+  private parseRegistryEntry(request: Request): RegistryEntry | undefined {
+    const entryHeader = request.headers.get("x-relay-registry");
+    if (!entryHeader) return undefined;
+    try { return JSON.parse(entryHeader) as RegistryEntry; } catch { return undefined; }
+  }
+
+  private resolveOperation(request: Request, pathParts: string[]): string {
+    const rawOperation = pathParts.at(-1) ?? "";
+    return request.headers.get("x-relay-admin") === "1" && pathParts.at(-3) === "admin"
+      ? `admin-${rawOperation}`
+      : rawOperation;
+  }
+
+  private async handlePublicRead(request: Request, entry: RegistryEntry, operation: string, pathParts: string[]): Promise<Response | undefined> {
+    if (!(request.method === "GET" || request.method === "HEAD") || pathParts.at(-2) !== "read" || (operation !== "json" && operation !== "svg")) return undefined;
+    const current = this.sql.exec<StateRow>("SELECT * FROM relay_state WHERE id = 1").toArray()[0];
+    if (current && this.checkRegistryBarrier(request, current, entry) === "stale-caller") return genericError(409);
+    return await this.read(request, operation, entry);
+  }
+
+  private handleAdminRevokeRoute(body: Record<string, unknown>, operation: string, registryTombstoned: boolean): Response | undefined {
+    const lifecycleOperation = body.lifecycle_operation === "uninstall" || body.lifecycle_operation === "transfer" ? body.lifecycle_operation : "revoke";
+    if (operation === "admin-revoke-prepare") return this.adminRevokePrepare(body, lifecycleOperation);
+    if (operation === "admin-revoke-finalize") {
+      if (!registryTombstoned) return genericError(409);
+      return this.adminRevokeFinalize(body, lifecycleOperation);
+    }
+    return undefined;
+  }
+
+  private handleAdminUpgradeRoute(body: Record<string, unknown>, operation: string): Response | undefined {
+    if (operation !== "admin-upgrade" && operation !== "admin-rollback") return undefined;
+    return this.adminUpgrade({ ...body, operation: operation === "admin-rollback" ? "upgrade-rollback" : body.operation ?? "upgrade-stage" });
+  }
+
+  private handleAdminStateRoute(body: Record<string, unknown>, operation: string, barrierResult: "ok" | "stale-caller" | "advanced", preBarrier: Pick<StateRow, "generation" | "revocation_epoch" | "registry_revision" | "barrier_epoch">): Response | undefined {
+    if (operation !== "admin-invalidate" && operation !== "admin-recover-open") return undefined;
+    return this.adminMutation(body, operation, barrierResult === "advanced" ? preBarrier : undefined);
+  }
+
+  private async handleAdminDispatch(request: Request, entry: RegistryEntry, current: StateRow, operation: string): Promise<Response | undefined> {
+    if (!(request.headers.get("x-relay-admin") === "1" && operation.startsWith("admin-"))) return undefined;
+    if (operation === "admin-status") {
+      if (this.checkRegistryBarrier(request, current, entry) === "stale-caller") return genericError(409);
+      return this.adminStatus();
+    }
+    const body = await readBoundedJson(request);
+    if (operation === "admin-sync") return this.adminSyncBarrier(body, entry);
+    const preBarrier = { generation: current.generation, revocation_epoch: current.revocation_epoch, registry_revision: current.registry_revision, barrier_epoch: current.barrier_epoch };
+    const barrierResult = this.checkRegistryBarrier(request, current, entry);
+    const registryTombstoned = request.headers.get("x-relay-registry-tombstoned") === "true";
+    // The prepare phase is allowed to observe an advanced binding so it
+    // can return the Relay-side CAS result.  It must never write the
+    // Registry itself; only the outer control plane can do that after the
+    // reservation succeeds.
+    if (barrierResult !== "ok" && !registryTombstoned && operation !== "admin-revoke-prepare") return genericError(409);
+    const revokeResult = this.handleAdminRevokeRoute(body, operation, registryTombstoned);
+    if (revokeResult) return revokeResult;
+    const upgradeResult = this.handleAdminUpgradeRoute(body, operation);
+    if (upgradeResult) return upgradeResult;
+    return this.handleAdminStateRoute(body, operation, barrierResult, preBarrier);
+  }
+
+  private async dispatchPublishOperation(request: Request, entry: RegistryEntry, operation: string): Promise<Response> {
+    const body = await readBoundedJson(request);
+    const publisher = await this.validatePublisher(request, entry, operation);
+    switch (operation) {
+      case "prepare": return await this.prepare(body, entry, publisher, "prepare");
+      case "publish": return await this.publish(body, entry, publisher, "publish");
+      case "renew": return "challenge_id" in body ? await this.publish(body, entry, publisher, "renew") : await this.prepare(body, entry, publisher, "renew");
+      case "invalidate": return await this.lifecycle(body, entry, publisher, "invalidate");
+      case "revoke": return await this.lifecycle(body, entry, publisher, "revoke");
+      case "recover": return await this.publish(body, entry, publisher, "recover");
+      default: return genericError(404);
+    }
+  }
+
+  private recordFetchDiagnostic(error: unknown): void {
+    try {
+      const current = this.row();
+      let reason: LifecycleReason;
+      if (error instanceof AuthorizationError && error.status === 409) reason = "expired";
+      else if (error instanceof AuthorizationError) reason = "authorization_failed";
+      else if (error instanceof PayloadError) reason = "quota_exceeded";
+      else reason = "storage_unavailable";
+      this.state.storage.transactionSync(() => this.recordOperation("diagnostic", current.status, reason, this.row()));
+    } catch {
+      // Diagnostics must never turn a fixed generic response into a leak.
+    }
+  }
+
+  private mapFetchError(error: unknown): Response {
+    if (error instanceof PayloadError || error instanceof AuthorizationError) return genericError(error instanceof AuthorizationError ? error.status : 413);
+    return genericError(503);
+  }
+
   async fetch(request: Request): Promise<Response> {
     try {
       await this.initialized;
-      const entryHeader = request.headers.get("x-relay-registry");
-      if (!entryHeader) return genericError(404);
-      let entry: RegistryEntry;
-      try { entry = JSON.parse(entryHeader) as RegistryEntry; } catch { return genericError(404); }
-      const pathname = new URL(request.url).pathname;
-      const pathParts = pathname.split("/").filter(Boolean);
-      const rawOperation = pathParts.at(-1) ?? "";
-      const operation = request.headers.get("x-relay-admin") === "1" && pathParts.at(-3) === "admin"
-        ? `admin-${rawOperation}`
-        : rawOperation;
-      if ((request.method === "GET" || request.method === "HEAD") && pathParts.at(-2) === "read" && (operation === "json" || operation === "svg")) {
-        const current = this.sql.exec<StateRow>("SELECT * FROM relay_state WHERE id = 1").toArray()[0];
-        if (current && this.checkRegistryBarrier(request, current, entry) === "stale-caller") return genericError(409);
-        return await this.read(request, operation, entry);
-      }
+      const entry = this.parseRegistryEntry(request);
+      if (!entry) return genericError(404);
+      const pathParts = new URL(request.url).pathname.split("/").filter(Boolean);
+      const operation = this.resolveOperation(request, pathParts);
+      const publicRead = await this.handlePublicRead(request, entry, operation, pathParts);
+      if (publicRead) return publicRead;
       const registryRevision = Number(request.headers.get("x-relay-registry-revision") ?? "1");
       const barrierEpoch = Number(request.headers.get("x-relay-barrier-epoch") ?? "1");
       const current = this.ensureRegistered(entry, Number.isSafeInteger(registryRevision) ? registryRevision : 1, Number.isSafeInteger(barrierEpoch) ? barrierEpoch : 1);
-      if (request.headers.get("x-relay-admin") === "1" && operation.startsWith("admin-")) {
-        if (operation === "admin-status") {
-          if (this.checkRegistryBarrier(request, current, entry) === "stale-caller") return genericError(409);
-          return this.adminStatus();
-        }
-        const body = await readBoundedJson(request);
-        if (operation === "admin-sync") return this.adminSyncBarrier(body, entry);
-        const preBarrier = { generation: current.generation, revocation_epoch: current.revocation_epoch, registry_revision: current.registry_revision, barrier_epoch: current.barrier_epoch };
-        const barrierResult = this.checkRegistryBarrier(request, current, entry);
-        const registryTombstoned = request.headers.get("x-relay-registry-tombstoned") === "true";
-        // The prepare phase is allowed to observe an advanced binding so it
-        // can return the Relay-side CAS result.  It must never write the
-        // Registry itself; only the outer control plane can do that after the
-        // reservation succeeds.
-        if (barrierResult !== "ok" && !registryTombstoned && operation !== "admin-revoke-prepare") return genericError(409);
-        if (operation === "admin-revoke-prepare") {
-          const lifecycleOperation = body.lifecycle_operation === "uninstall" || body.lifecycle_operation === "transfer" ? body.lifecycle_operation : "revoke";
-          return this.adminRevokePrepare(body, lifecycleOperation);
-        }
-        if (operation === "admin-revoke-finalize") {
-          if (!registryTombstoned) return genericError(409);
-          const lifecycleOperation = body.lifecycle_operation === "uninstall" || body.lifecycle_operation === "transfer" ? body.lifecycle_operation : "revoke";
-          return this.adminRevokeFinalize(body, lifecycleOperation);
-        }
-        if (operation === "admin-upgrade" || operation === "admin-rollback") return this.adminUpgrade({ ...body, operation: operation === "admin-rollback" ? "upgrade-rollback" : body.operation ?? "upgrade-stage" });
-        if (operation === "admin-invalidate" || operation === "admin-recover-open") {
-          return this.adminMutation(body, operation, barrierResult === "advanced" ? preBarrier : undefined);
-        }
-      }
+      const admin = await this.handleAdminDispatch(request, entry, current, operation);
+      if (admin) return admin;
       if (this.checkRegistryBarrier(request, current, entry) !== "ok") return genericError(409);
       if (request.method !== "POST") return genericError(404);
-      const body = await readBoundedJson(request);
-      const publisher = await this.validatePublisher(request, entry, operation);
-      switch (operation) {
-        case "prepare": return await this.prepare(body, entry, publisher, "prepare");
-        case "publish": return await this.publish(body, entry, publisher, "publish");
-        case "renew": return "challenge_id" in body ? await this.publish(body, entry, publisher, "renew") : await this.prepare(body, entry, publisher, "renew");
-        case "invalidate": return await this.lifecycle(body, entry, publisher, "invalidate");
-        case "revoke": return await this.lifecycle(body, entry, publisher, "revoke");
-        case "recover": return await this.publish(body, entry, publisher, "recover");
-        default: return genericError(404);
-      }
+      return await this.dispatchPublishOperation(request, entry, operation);
     } catch (error) {
-      try {
-        const current = this.row();
-        let reason: LifecycleReason;
-        if (error instanceof AuthorizationError && error.status === 409) reason = "expired";
-        else if (error instanceof AuthorizationError) reason = "authorization_failed";
-        else if (error instanceof PayloadError) reason = "quota_exceeded";
-        else reason = "storage_unavailable";
-        this.state.storage.transactionSync(() => this.recordOperation("diagnostic", current.status, reason, this.row()));
-      } catch {
-        // Diagnostics must never turn a fixed generic response into a leak.
-      }
-      if (error instanceof PayloadError || error instanceof AuthorizationError) return genericError(error instanceof AuthorizationError ? error.status : 413);
-      return genericError(503);
+      this.recordFetchDiagnostic(error);
+      return this.mapFetchError(error);
     }
   }
 
@@ -808,7 +884,7 @@ export class RelayDurableObject {
     proof: { valid: true; kind?: string; digest?: string; semantic_horizon?: string; tree_sha?: string };
   }): Promise<Response> {
     await this.initialized;
-    let operation: "publish" | "renew" | "recover";
+    let operation: PublishOperation;
     if (args.body.operation === "renew") operation = "renew";
     else if (args.body.operation === "recover") operation = "recover";
     else operation = "publish";

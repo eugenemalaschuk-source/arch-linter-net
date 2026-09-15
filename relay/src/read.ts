@@ -113,46 +113,95 @@ function renderSvg(payload: CanonicalPayload, verifiedAt: string | undefined, va
   return `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="${height}" viewBox="0 0 420 ${height}"><rect width="420" height="${height}" rx="3" fill="#fff" stroke="#bbb"/><rect width="112" height="34" rx="3" fill="#555"/><rect x="112" width="308" height="34" rx="3" fill="${color}"/><text x="56" y="22" fill="#fff" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">${label}</text><text x="266" y="22" fill="#fff" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">${message}</text>${freshness}</svg>`;
 }
 
-async function validateReadState(state: PublicReadState, entry: RegistryEntry): Promise<ValidatedReadState | undefined> {
-  if (state.status !== "ready" || state.tombstoned !== 0) return undefined;
+interface ReadFields {
+  profile: DisclosureProfile;
+  payload: string;
+  payloadDigestField: string;
+  verifiedAtField: string;
+  validUntilField: string;
+}
+
+function resolveReadFields(state: PublicReadState, entry: RegistryEntry): ReadFields | undefined {
   const profile = state.profile === "headline-only/v1" || state.profile === "headline-plus-freshness/v1" ? state.profile : undefined;
   if (!profile || typeof state.payload !== "string" || typeof state.payload_digest !== "string" || typeof state.verified_at !== "string" || typeof state.valid_until !== "string") return undefined;
   if (profile !== entry.disclosure_profile) return undefined;
+  return { profile, payload: state.payload, payloadDigestField: state.payload_digest, verifiedAtField: state.verified_at, validUntilField: state.valid_until };
+}
+
+interface EpochWindow {
+  expectedEpoch: number;
+  stateEpoch: number;
+}
+
+function resolveEpochWindow(state: PublicReadState, entry: RegistryEntry): EpochWindow | undefined {
   const expectedEpoch = entry.initial_state?.revocation_epoch ?? 1;
   const stateEpoch = typeof state.revocation_epoch === "number" ? state.revocation_epoch : undefined;
   if (!Number.isSafeInteger(expectedEpoch) || stateEpoch === undefined || !Number.isSafeInteger(stateEpoch)) return undefined;
   if (stateEpoch < expectedEpoch) return undefined;
-  if (typeof state.semantic_horizon !== "string") return undefined;
-  if (state.payload.length === 0 || new TextEncoder().encode(state.payload).byteLength > MAX_PUBLIC_PAYLOAD_BYTES) return undefined;
-  const generation = state.generation;
-  if (typeof generation !== "number" || !Number.isSafeInteger(generation) || generation <= 0) return undefined;
+  return { expectedEpoch, stateEpoch };
+}
+
+function resolveGeneration(generationValue: unknown, entry: RegistryEntry, epoch: EpochWindow): number | undefined {
+  if (typeof generationValue !== "number" || !Number.isSafeInteger(generationValue) || generationValue <= 0) return undefined;
   const initialGeneration = entry.initial_state?.generation;
   if (typeof initialGeneration === "number" && Number.isSafeInteger(initialGeneration)) {
-    const generationDelta = generation - initialGeneration;
-    const epochDelta = stateEpoch - expectedEpoch;
+    const generationDelta = generationValue - initialGeneration;
+    const epochDelta = epoch.stateEpoch - epoch.expectedEpoch;
     if (generationDelta < 0 || epochDelta < 0 || epochDelta > generationDelta) return undefined;
   }
-  const payload = (() => {
-    try { return validateCanonicalPayload(state.payload as string, profile); } catch { return undefined; }
-  })();
-  if (!payload) return undefined;
-  const verifiedAtSeconds = timestampSeconds(state.verified_at);
-  const validUntilSeconds = timestampSeconds(state.valid_until);
+  return generationValue;
+}
+
+function parseReadPayload(bytes: string, profile: DisclosureProfile): CanonicalPayload | undefined {
+  try { return validateCanonicalPayload(bytes, profile); } catch { return undefined; }
+}
+
+interface FreshnessWindow {
+  verifiedAtSeconds: number;
+  validUntilSeconds: number;
+}
+
+function resolveFreshnessWindow(state: PublicReadState, fields: ReadFields, payload: CanonicalPayload): FreshnessWindow | undefined {
+  const verifiedAtSeconds = timestampSeconds(fields.verifiedAtField);
+  const validUntilSeconds = timestampSeconds(fields.validUntilField);
   const semanticHorizonSeconds = timestampSeconds(state.semantic_horizon);
   if (verifiedAtSeconds === undefined || validUntilSeconds === undefined || semanticHorizonSeconds === undefined || validUntilSeconds <= verifiedAtSeconds) return undefined;
   if (validUntilSeconds > semanticHorizonSeconds || validUntilSeconds > verifiedAtSeconds + LEASE_SECONDS) return undefined;
-  if (profile === "headline-plus-freshness/v1" && (payload.verified_at !== state.verified_at || payload.valid_until !== state.valid_until)) return undefined;
-  const payloadDigest = await canonicalPayloadDigest(state.payload);
-  if (!/^[0-9a-f]{64}$/u.test(state.payload_digest) || payloadDigest !== state.payload_digest) return undefined;
+  if (fields.profile === "headline-plus-freshness/v1" && (payload.verified_at !== fields.verifiedAtField || payload.valid_until !== fields.validUntilField)) return undefined;
+  return { verifiedAtSeconds, validUntilSeconds };
+}
+
+async function verifyPayloadDigest(payload: string, payloadDigestField: string): Promise<string | undefined> {
+  const payloadDigest = await canonicalPayloadDigest(payload);
+  if (!/^[0-9a-f]{64}$/u.test(payloadDigestField) || payloadDigest !== payloadDigestField) return undefined;
+  return payloadDigest;
+}
+
+async function validateReadState(state: PublicReadState, entry: RegistryEntry): Promise<ValidatedReadState | undefined> {
+  if (state.status !== "ready" || state.tombstoned !== 0) return undefined;
+  const fields = resolveReadFields(state, entry);
+  if (!fields) return undefined;
+  const epoch = resolveEpochWindow(state, entry);
+  if (!epoch) return undefined;
+  if (typeof state.semantic_horizon !== "string") return undefined;
+  if (fields.payload.length === 0 || new TextEncoder().encode(fields.payload).byteLength > MAX_PUBLIC_PAYLOAD_BYTES) return undefined;
+  const generation = resolveGeneration(state.generation, entry, epoch);
+  if (generation === undefined) return undefined;
+  const payload = parseReadPayload(fields.payload, fields.profile);
+  if (!payload) return undefined;
+  const freshness = resolveFreshnessWindow(state, fields, payload);
+  if (!freshness) return undefined;
+  const payloadDigest = await verifyPayloadDigest(fields.payload, fields.payloadDigestField);
+  if (!payloadDigest) return undefined;
   return {
-    profile,
+    profile: fields.profile,
     generation,
     payload,
-    payloadBytes: state.payload,
+    payloadBytes: fields.payload,
     payloadDigest,
-    verifiedAt: state.verified_at,
-    validUntil: state.valid_until,
-    validUntilSeconds
+    verifiedAt: fields.verifiedAtField,
+    validUntil: fields.validUntilField,
+    validUntilSeconds: freshness.validUntilSeconds
   };
 }
 

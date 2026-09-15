@@ -96,6 +96,26 @@ export function validateDisplayIdentity(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 100 && /^[A-Za-z0-9_.-]+$/u.test(value);
 }
 
+function redactedString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function redactedNullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function redactedSafeInteger(value: unknown, fallback: number): number {
+  return Number.isSafeInteger(value) ? (value as number) : fallback;
+}
+
+function redactedDigest(value: unknown): string | null {
+  return isBundleDigest(value) ? value : null;
+}
+
+function redactedDisplayIdentity(value: unknown): string | null {
+  return validateDisplayIdentity(value) ? value : null;
+}
+
 /**
  * Keep the private status contract deliberately small. This function is also
  * used by tests and adapters to guarantee that a future column cannot leak
@@ -103,26 +123,26 @@ export function validateDisplayIdentity(value: unknown): value is string {
  */
 export function redactStatus(value: Partial<LifecycleStatusSnapshot> & Record<string, unknown>): Record<string, unknown> {
   return {
-    state: typeof value.state === "string" ? value.state : "unavailable",
-    generation: Number.isSafeInteger(value.generation) ? value.generation : 0,
-    revocation_epoch: Number.isSafeInteger(value.revocation_epoch) ? value.revocation_epoch : 0,
-    registry_revision: Number.isSafeInteger(value.registry_revision) ? value.registry_revision : 0,
-    barrier_epoch: Number.isSafeInteger(value.barrier_epoch) ? value.barrier_epoch : 0,
-    profile: typeof value.profile === "string" ? value.profile : "unknown",
+    state: redactedString(value.state, "unavailable"),
+    generation: redactedSafeInteger(value.generation, 0),
+    revocation_epoch: redactedSafeInteger(value.revocation_epoch, 0),
+    registry_revision: redactedSafeInteger(value.registry_revision, 0),
+    barrier_epoch: redactedSafeInteger(value.barrier_epoch, 0),
+    profile: redactedString(value.profile, "unknown"),
     bundle: SUPPORTED_BUNDLE,
     contract_version: SUPPORTED_CONTRACT_VERSION,
     compatibility_plan: SUPPORTED_COMPATIBILITY_PLAN,
-    active_digest: isBundleDigest(value.active_digest) ? value.active_digest : null,
-    staged_digest: isBundleDigest(value.staged_digest) ? value.staged_digest : null,
-    previous_verified_digest: isBundleDigest(value.previous_verified_digest) ? value.previous_verified_digest : null,
-    display_owner: validateDisplayIdentity(value.display_owner) ? value.display_owner : null,
-    display_repository: validateDisplayIdentity(value.display_repository) ? value.display_repository : null,
-    verified_at: typeof value.verified_at === "string" ? value.verified_at : null,
-    valid_until: typeof value.valid_until === "string" ? value.valid_until : null,
+    active_digest: redactedDigest(value.active_digest),
+    staged_digest: redactedDigest(value.staged_digest),
+    previous_verified_digest: redactedDigest(value.previous_verified_digest),
+    display_owner: redactedDisplayIdentity(value.display_owner),
+    display_repository: redactedDisplayIdentity(value.display_repository),
+    verified_at: redactedNullableString(value.verified_at),
+    valid_until: redactedNullableString(value.valid_until),
     tombstoned: value.tombstoned === true,
-    last_operation: typeof value.last_operation === "string" ? value.last_operation : null,
-    last_reason: typeof value.last_reason === "string" ? value.last_reason : null,
-    updated_at: typeof value.updated_at === "string" ? value.updated_at : new Date(0).toISOString()
+    last_operation: redactedNullableString(value.last_operation),
+    last_reason: redactedNullableString(value.last_reason),
+    updated_at: redactedString(value.updated_at, new Date(0).toISOString())
   };
 }
 
