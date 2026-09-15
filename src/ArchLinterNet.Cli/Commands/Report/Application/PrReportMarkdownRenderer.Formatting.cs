@@ -5,6 +5,9 @@ namespace ArchLinterNet.Cli.Commands.Report.Application;
 
 internal static class PrReportMarkdownFormatter
 {
+    private const string UnavailableToken = "unavailable";
+    private const string UnassessableToken = "unassessable";
+    private const string UnavailableInline = $"`{UnavailableToken}`";
     internal static ArchitecturePrReportValidationReceipt? PrimaryReceipt(ArchitecturePrReportProjection projection) =>
         projection.Evidence?.ValidationOutcomes
             .SingleOrDefault(item => string.Equals(item.Mode, projection.Change.Mode, StringComparison.Ordinal));
@@ -50,7 +53,7 @@ internal static class PrReportMarkdownFormatter
     {
         ArchitecturePolicyInventoryIgnoreDebt? debt = PrimaryReceipt(projection)?.PolicyInventory?.IgnoreDebt;
         return debt is null
-            ? "`unavailable`"
+            ? UnavailableInline
             : $"`{debt.Total}` total (`{debt.Active}` active, `{debt.Stale}` stale, `{debt.Expired}` expired, " +
               $"`{debt.MetadataIncomplete}` metadata-incomplete, `{debt.Invalid}` invalid)";
     }
@@ -58,14 +61,14 @@ internal static class PrReportMarkdownFormatter
     internal static string ExistingDebtHeadline(ArchitecturePrReportProjection projection)
     {
         int count = projection.Evidence is null ? 0 : ExistingBaselineDebt(projection.Evidence).Count;
-        return projection.Evidence is null ? "`unavailable`" : $"`{count}` baseline entries";
+        return projection.Evidence is null ? UnavailableInline : $"`{count}` baseline entries";
     }
 
     internal static string NewDebtHeadline(ArchitecturePrReportProjection projection)
     {
         if (projection.Evidence is null)
         {
-            return "`unavailable`";
+            return UnavailableInline;
         }
 
         int count = projection.Evidence.DebtGate.PersistentDebt.Entries.Count(item =>
@@ -89,7 +92,7 @@ internal static class PrReportMarkdownFormatter
     {
         if (projection.Evidence?.DebtGate.PolicyWeakening is null)
         {
-            return projection.Evidence is null ? "`unavailable`" : "`not_configured`";
+            return projection.Evidence is null ? UnavailableInline : "`not_configured`";
         }
 
         ArchitecturePrReportPolicyWeakening weakening = projection.Evidence.DebtGate.PolicyWeakening;
@@ -107,7 +110,7 @@ internal static class PrReportMarkdownFormatter
         ArchitecturePrReportExternalEvidence external = receipt.ExternalEvidence;
         if (!external.HasCompleteTrustReceipts)
         {
-            return "`unavailable` — canonical trust receipt missing";
+            return $"{UnavailableInline} — canonical trust receipt missing";
         }
 
         return $"`{DimensionToken(projection, "external_evidence")}` — {external.Requirements.Count} requirement(s), {external.Findings.Count} finding(s)";
@@ -122,18 +125,18 @@ internal static class PrReportMarkdownFormatter
         ArchitectureHealthDimensionState.Fail => "fail",
         ArchitectureHealthDimensionState.Debt => "debt",
         ArchitectureHealthDimensionState.Degrading => "degrading",
-        ArchitectureHealthDimensionState.Unassessable => "unassessable",
+        ArchitectureHealthDimensionState.Unassessable => UnassessableToken,
         ArchitectureHealthDimensionState.NotConfigured => "not_configured",
         ArchitectureHealthDimensionState.NotApplicable => "not_applicable",
-        _ => "unavailable",
+        _ => UnavailableToken,
     };
 
     internal static string GateToken(ArchitectureHealthGate gate) => gate switch
     {
         ArchitectureHealthGate.Pass => "pass",
         ArchitectureHealthGate.Fail => "fail",
-        ArchitectureHealthGate.Unassessable => "unassessable",
-        _ => "unavailable",
+        ArchitectureHealthGate.Unassessable => UnassessableToken,
+        _ => UnavailableToken,
     };
 
     internal static string HealthToken(ArchitectureHealthState health) => health switch
@@ -142,16 +145,16 @@ internal static class PrReportMarkdownFormatter
         ArchitectureHealthState.Debt => "debt",
         ArchitectureHealthState.Degrading => "degrading",
         ArchitectureHealthState.Failing => "failing",
-        ArchitectureHealthState.Unassessable => "unassessable",
-        _ => "unavailable",
+        ArchitectureHealthState.Unassessable => UnassessableToken,
+        _ => UnavailableToken,
     };
 
     internal static string AvailabilityToken(ArchitecturePrReportAvailability availability) => availability switch
     {
         ArchitecturePrReportAvailability.Complete => "complete",
-        ArchitecturePrReportAvailability.Unavailable => "unavailable",
-        ArchitecturePrReportAvailability.Unassessable => "unassessable",
-        _ => "unavailable",
+        ArchitecturePrReportAvailability.Unavailable => UnavailableToken,
+        ArchitecturePrReportAvailability.Unassessable => UnassessableToken,
+        _ => UnavailableToken,
     };
 
     internal static string FormatWaiver(ArchitectureWaiverLifecycleRecord waiver) =>

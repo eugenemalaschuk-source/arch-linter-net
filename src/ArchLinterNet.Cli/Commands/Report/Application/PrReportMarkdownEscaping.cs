@@ -63,12 +63,13 @@ internal static class PrReportMarkdownEscaping
     private static string NeutralizeBareAutolinks(string value)
     {
         var builder = new StringBuilder(value.Length);
-        for (int index = 0; index < value.Length; index++)
+        int index = 0;
+        while (index < value.Length)
         {
             if (value.AsSpan(index).StartsWith("://", StringComparison.Ordinal))
             {
                 builder.Append("\\://");
-                index += 2;
+                index += 3;
                 continue;
             }
 
@@ -76,11 +77,12 @@ internal static class PrReportMarkdownEscaping
             {
                 builder.Append(value, index, 3);
                 builder.Append("&#46;");
-                index += 3;
+                index += 4;
                 continue;
             }
 
             builder.Append(value[index]);
+            index++;
         }
 
         return builder.ToString();

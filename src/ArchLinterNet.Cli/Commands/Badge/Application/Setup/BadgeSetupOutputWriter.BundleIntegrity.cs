@@ -99,7 +99,10 @@ internal static class BadgeRelayBundleIntegrityValidator
             if (seen.Count != expected.Length) throw Integrity("manifest is missing one or more required files.");
 
             if (requireTrustedManifest
-                && Convert.ToHexString(SHA256.HashData(manifestBytes)).ToLowerInvariant() != BadgeSetupContract.ShippedRelayBundleManifestSha256)
+                && !string.Equals(
+                    Convert.ToHexString(SHA256.HashData(manifestBytes)).ToLowerInvariant(),
+                    BadgeSetupContract.ShippedRelayBundleManifestSha256,
+                    StringComparison.OrdinalIgnoreCase))
             {
                 throw Integrity("bundle-manifest.json does not match the trusted shipped manifest.");
             }

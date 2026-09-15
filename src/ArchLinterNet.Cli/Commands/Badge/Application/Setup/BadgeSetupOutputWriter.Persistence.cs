@@ -24,7 +24,6 @@ internal static class BadgeSetupOutputWriterPersistence
         string path = SafePath(root, relativePath);
         string? directory = Path.GetDirectoryName(path);
         if (directory is not null) Directory.CreateDirectory(directory);
-        path = SafePath(root, relativePath);
         string temporaryRelativePath = relativePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         string temporary = SafePath(root, temporaryRelativePath);
         File.WriteAllText(temporary, contents, new UTF8Encoding(false));

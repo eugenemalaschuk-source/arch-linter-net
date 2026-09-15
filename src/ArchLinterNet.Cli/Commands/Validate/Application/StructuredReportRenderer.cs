@@ -13,10 +13,12 @@ internal sealed class StructuredReportRenderer
 {
     private const string FormatJson = "json";
     private const string FormatSarif = "sarif";
+    private const string ResultsPropertyName = "results";
+    private const string DriverPropertyName = "driver";
+    private const string RulesPropertyName = "rules";
     private const string ImportedRuleIdPrefix = "external-evidence:";
 
     private readonly ICliRuntime _runtime;
-    private readonly ReportApplicabilityRenderer _applicability = new();
 
     public StructuredReportRenderer(ICliRuntime runtime)
     {
@@ -55,7 +57,7 @@ internal sealed class StructuredReportRenderer
             results.Add(JsonNode.Parse(FormatJsonContent(mode, outcome, cancellationToken)));
         }
 
-        return new JsonObject { ["results"] = results }.ToJsonString();
+        return new JsonObject { [ResultsPropertyName] = results }.ToJsonString();
     }
 
     private string FormatSingleSarif(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default) =>
@@ -100,7 +102,7 @@ internal sealed class StructuredReportRenderer
         result = ArchitectureDiagnosticFormatter.AddPolicyInventoryToCiArtifacts(result, outcome.PolicyInventory);
         result = AddImportedDiagnosticsToJson(result, outcome.ImportedDiagnosticFindings);
 
-        return _applicability.AddAssessmentCompletionToJson(
+        return ReportApplicabilityRenderer.AddAssessmentCompletionToJson(
             result, outcome.AssessmentCompletionEvidence, outcome.ApplicabilityProjection);
     }
 
@@ -139,7 +141,7 @@ internal sealed class StructuredReportRenderer
             outcome.CoverageSummaries, outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
         result = AddImportedDiagnosticsToSarif(result, outcome.ImportedDiagnosticFindings, cancellationToken);
 
-        return _applicability.AddAssessmentCompletionToSarif(
+        return ReportApplicabilityRenderer.AddAssessmentCompletionToSarif(
             result, outcome.AssessmentCompletionEvidence, outcome.ApplicabilityProjection);
     }
 
@@ -174,9 +176,9 @@ internal sealed class StructuredReportRenderer
             {
                 ["tool"] = new JsonObject
                 {
-                    ["driver"] = new JsonObject { ["name"] = "arch-linter-net", ["rules"] = new JsonArray() },
+                    [DriverPropertyName] = new JsonObject { ["name"] = "arch-linter-net", [RulesPropertyName] = new JsonArray() },
                 },
-                ["results"] = new JsonArray(),
+                [ResultsPropertyName] = new JsonArray(),
             });
         }
 
@@ -185,8 +187,8 @@ internal sealed class StructuredReportRenderer
         JsonObject importedPayload = (JsonNode.Parse(importedSarif) as JsonObject)!;
         JsonObject importedRun = (importedPayload["runs"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault()
             ?? new JsonObject();
-        JsonArray importedResults = importedRun["results"] as JsonArray ?? new JsonArray();
-        JsonArray importedRules = ((importedRun["tool"] as JsonObject)?["driver"] as JsonObject)?["rules"]
+        JsonArray importedResults = importedRun[ResultsPropertyName] as JsonArray ?? new JsonArray();
+        JsonArray importedRules = ((importedRun["tool"] as JsonObject)?[DriverPropertyName] as JsonObject)?[RulesPropertyName]
             as JsonArray ?? new JsonArray();
 
         NamespaceImportedRuleIds(importedResults, importedRules);
@@ -218,8 +220,8 @@ internal sealed class StructuredReportRenderer
     private static void MergeImportedDiagnosticsIntoRun(
         JsonObject run, JsonArray importedResults, JsonArray importedRules)
     {
-        JsonArray results = run["results"] as JsonArray ?? new JsonArray();
-        run["results"] = results;
+        JsonArray results = run[ResultsPropertyName] as JsonArray ?? new JsonArray();
+        run[ResultsPropertyName] = results;
         foreach (JsonNode? result in importedResults.ToArray())
         {
             results.Add(result?.DeepClone());
@@ -227,9 +229,9 @@ internal sealed class StructuredReportRenderer
 
         JsonObject tool = run["tool"] as JsonObject ?? new JsonObject();
         run["tool"] = tool;
-        JsonObject driver = tool["driver"] as JsonObject ?? new JsonObject();
-        tool["driver"] = driver;
-        JsonArray rules = driver["rules"] as JsonArray ?? new JsonArray();
+        JsonObject driver = tool[DriverPropertyName] as JsonObject ?? new JsonObject();
+        tool[DriverPropertyName] = driver;
+        JsonArray rules = driver[RulesPropertyName] as JsonArray ?? new JsonArray();
 
         foreach (JsonNode? rule in importedRules)
         {
@@ -255,7 +257,7 @@ internal sealed class StructuredReportRenderer
             orderedRules.Add(rule.DeepClone());
         }
 
-        driver["rules"] = orderedRules;
+        driver[RulesPropertyName] = orderedRules;
     }
 
 

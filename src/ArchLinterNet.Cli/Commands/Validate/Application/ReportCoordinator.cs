@@ -621,8 +621,6 @@ internal sealed class ReportCoordinator
         return contentByFormat;
     }
 
-    // Re-renders a complete document from an already-computed outcome for output-error envelopes;
-    // it never repeats validation or contract execution.
     public string RenderReportContent(
         string format, bool isSingleMode, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode) =>
         _renderer.RenderReportContent(format, isSingleMode, outcomesByMode);
