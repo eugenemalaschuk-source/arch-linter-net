@@ -64,33 +64,61 @@ internal static class BadgeDoctorInspector
         Func<string, string?, HttpClient>? clientFactory)
     {
         bool none = configuration.Mode == BadgeSetupMode.None.ToWireValue();
-        bool capabilityEvidenceValid = !plan.Diagnostics.Any(static diagnostic => diagnostic.Code == BadgeSetupDiagnosticCodes.InvalidObservation);
-        bool identityValid = !HasDiagnostic(plan, BadgeSetupDiagnosticCodes.MalformedIdentity) && capabilityEvidenceValid;
-        bool pinsValid = none || (!HasDiagnostic(plan, BadgeSetupDiagnosticCodes.InvalidPin) && HasGeneratedProducerPin(configuration, configurationPath, fileSystem));
+        bool capabilityEvidenceValid = HasCapabilityEvidence(plan);
+        bool identityValid = IsIdentityValid(plan, capabilityEvidenceValid);
+        bool pinsValid = IsPinsValid(none, plan, configuration, configurationPath, fileSystem);
         bool relay = configuration.Mode == BadgeSetupMode.Relay.ToWireValue();
-        bool oidcValid = !relay || capabilityEvidenceValid && capabilities.CanUseOidc;
-        bool requiredCheckAvailable = !relay || capabilityEvidenceValid && capabilities.HasRequiredCheck;
-        bool rulesApiAvailable = !relay || capabilityEvidenceValid && capabilities.HasRulesApi;
-        bool providerQuotaAvailable = !relay || capabilityEvidenceValid && capabilities.ProviderQuotaAvailable;
-
-        BadgeDoctorArtifactInspection artifact = none || !plan.IsValid
-            ? BadgeDoctorArtifactInspection.None
-            : ProbeArtifact(configuration, clientFactory);
-
-        return new(
-            DestinationReachable: none || artifact.DestinationReachable,
-            FirstEvidenceAvailable: none || artifact.FirstEvidenceAvailable,
-            ArtifactValid: none || artifact.ArtifactValid,
-            ValidityCurrent: none || artifact.ValidityCurrent,
-            DestinationRevoked: artifact.DestinationRevoked,
-            ProviderQuotaAvailable: providerQuotaAvailable,
-            IdentityValid: identityValid,
-            PinsValid: pinsValid,
-            OidcValid: oidcValid,
-            RequiredCheckAvailable: requiredCheckAvailable,
-            RulesApiAvailable: rulesApiAvailable,
-            CacheFresh: none || artifact.CacheFresh);
+        BadgeDoctorArtifactInspection artifact = InspectArtifact(none, plan, configuration, clientFactory);
+        return CreateObservations(none, relay, capabilityEvidenceValid, identityValid, pinsValid, capabilities, artifact);
     }
+
+    private static bool HasCapabilityEvidence(BadgeSetupPlanResult plan) =>
+        !plan.Diagnostics.Any(static diagnostic => diagnostic.Code == BadgeSetupDiagnosticCodes.InvalidObservation);
+
+    private static bool IsIdentityValid(BadgeSetupPlanResult plan, bool capabilityEvidenceValid) =>
+        !HasDiagnostic(plan, BadgeSetupDiagnosticCodes.MalformedIdentity) && capabilityEvidenceValid;
+
+    private static bool IsPinsValid(
+        bool none,
+        BadgeSetupPlanResult plan,
+        BadgeSetupConfiguration configuration,
+        string configurationPath,
+        IFileSystem fileSystem) =>
+        none || (!HasDiagnostic(plan, BadgeSetupDiagnosticCodes.InvalidPin)
+            && HasGeneratedProducerPin(configuration, configurationPath, fileSystem));
+
+    private static BadgeDoctorArtifactInspection InspectArtifact(
+        bool none,
+        BadgeSetupPlanResult plan,
+        BadgeSetupConfiguration configuration,
+        Func<string, string?, HttpClient>? clientFactory) =>
+        none || !plan.IsValid ? BadgeDoctorArtifactInspection.None : ProbeArtifact(configuration, clientFactory);
+
+    private static BadgeDoctorObservations CreateObservations(
+        bool none,
+        bool relay,
+        bool capabilityEvidenceValid,
+        bool identityValid,
+        bool pinsValid,
+        BadgeSetupCapabilities capabilities,
+        BadgeDoctorArtifactInspection artifact) => new(
+        DestinationReachable: WhenNone(none, artifact.DestinationReachable),
+        FirstEvidenceAvailable: WhenNone(none, artifact.FirstEvidenceAvailable),
+        ArtifactValid: WhenNone(none, artifact.ArtifactValid),
+        ValidityCurrent: WhenNone(none, artifact.ValidityCurrent),
+        DestinationRevoked: artifact.DestinationRevoked,
+        ProviderQuotaAvailable: RelayCapability(relay, capabilityEvidenceValid, capabilities.ProviderQuotaAvailable),
+        IdentityValid: identityValid,
+        PinsValid: pinsValid,
+        OidcValid: RelayCapability(relay, capabilityEvidenceValid, capabilities.CanUseOidc),
+        RequiredCheckAvailable: RelayCapability(relay, capabilityEvidenceValid, capabilities.HasRequiredCheck),
+        RulesApiAvailable: RelayCapability(relay, capabilityEvidenceValid, capabilities.HasRulesApi),
+        CacheFresh: WhenNone(none, artifact.CacheFresh));
+
+    private static bool WhenNone(bool none, bool value) => none || value;
+
+    private static bool RelayCapability(bool relay, bool capabilityEvidenceValid, bool capability) =>
+        !relay || capabilityEvidenceValid && capability;
 
     private static bool HasDiagnostic(BadgeSetupPlanResult plan, string code) =>
         plan.Diagnostics.Any(diagnostic => diagnostic.Code == code);

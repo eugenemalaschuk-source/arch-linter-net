@@ -10,7 +10,7 @@ namespace ArchLinterNet.Cli.Commands.Report.Application;
 /// Renders the Core PR-report projection as architecture-only Markdown.
 /// This type deliberately has no access to policy, analysis, SARIF, or network services.
 /// </summary>
-internal static partial class PrReportMarkdownRenderer
+internal static class PrReportMarkdownRenderer
 {
     public static string Render(ArchitecturePrReportProjection projection, int maxDetails = 20)
         => Render(projection, maxDetails, null);
@@ -94,68 +94,7 @@ internal static partial class PrReportMarkdownRenderer
         ArchitecturePrReportProjection projection,
         int maxDetails)
     {
-        List<string> blockers = new();
-        ArchitecturePrReportEvidence? evidence = projection.Evidence;
-        if (evidence is not null)
-        {
-            if (!evidence.DebtGate.PersistentDebt.InSync)
-            {
-                foreach (ArchitecturePrReportBaselineEntry entry in BlockingBaselineLifecycle(evidence)
-                    .OrderBy(item => item.Identity ?? item.ContractId, StringComparer.Ordinal)
-                    .ThenBy(item => item.Status, StringComparer.Ordinal))
-                {
-                    blockers.Add($"baseline lifecycle `{Inline(Bounded(entry.Status))}`: {FormatBaseline(entry)}");
-                }
-            }
-
-            ArchitecturePrReportPolicyWeakening? weakening = evidence.DebtGate.PolicyWeakening;
-            if (weakening is { HasBlockingFindings: true }
-                && evidence.DebtGate.Succeeded
-                && evidence.DebtGate.Evaluation.Completed
-                && !evidence.DebtGate.Passed)
-            {
-                foreach (ArchitecturePrReportPolicyWeakeningFinding finding in weakening.Findings
-                    .OrderBy(item => item.Identity, StringComparer.Ordinal))
-                {
-                    blockers.Add($"policy weakening `{Inline(Bounded(finding.Identity))}`: {Text(Bounded(finding.Classification))} {Text(Bounded(finding.ControlIdentity))}");
-                }
-            }
-
-            ArchitecturePrReportValidationReceipt? receipt = PrimaryReceipt(projection);
-            if (receipt?.WaiverLifecycle is not null)
-            {
-                HashSet<string> blockingStates = receipt.WaiverLifecycle.BlockingStates.ToHashSet(StringComparer.Ordinal);
-                foreach (ArchitectureWaiverLifecycleRecord waiver in receipt.WaiverLifecycle.Records
-                    .Where(item => blockingStates.Contains(item.State))
-                    .OrderBy(item => item.Id, StringComparer.Ordinal))
-                {
-                    blockers.Add($"waiver `{Inline(Bounded(waiver.Id))}`: lifecycle `{Inline(Bounded(waiver.State))}` ({Text(Bounded(waiver.ContractId ?? waiver.ContractName))})");
-                }
-            }
-
-            if (receipt is not null)
-            {
-                foreach (ArchitecturePrReportFinding finding in receipt.Findings
-                    .Where(finding => string.Equals(finding.Mode, "strict", StringComparison.Ordinal)
-                        && string.Equals(finding.Severity, "error", StringComparison.Ordinal)
-                        && !string.Equals(finding.Kind, "build_state_preflight", StringComparison.Ordinal))
-                    .OrderBy(item => item.ContractId ?? item.ContractName, StringComparer.Ordinal)
-                    .ThenBy(item => item.CanonicalIdentity, StringComparer.Ordinal))
-                {
-                    blockers.Add($"finding `{Inline(Bounded(finding.CanonicalIdentity))}`: {Text(Bounded(finding.MessageCode))} ({Text(Bounded(finding.ContractId ?? finding.ContractName))})");
-                }
-            }
-        }
-
-        foreach (PrReportMarkdownHealth.HealthExplanationView explanation in PrReportMarkdownHealth.BuildHealthExplanations(projection)
-            .Where(item => item.IsBlocking)
-            .OrderBy(item => item.Dimension, StringComparer.Ordinal))
-        {
-            foreach (ArchitectureHealthReason reason in explanation.Reasons)
-            {
-                blockers.Add($"{Text(Bounded(explanation.Dimension))} `{DimensionToken(explanation.State)}`: {Text(Bounded(reason.Code))}{FormatReasonIdentity(reason)}");
-            }
-        }
+        List<string> blockers = PrReportMarkdownBlockers.Build(projection);
 
         if (blockers.Count == 0)
         {

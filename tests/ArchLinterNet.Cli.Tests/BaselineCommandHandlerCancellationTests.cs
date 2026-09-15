@@ -138,6 +138,56 @@ internal sealed class BaselineCommandCancellationTests : BaselineCommandHandlerT
     }
 
     [Test]
+    public void BaselinePrune_CoreThrowsOperationCanceled_ReportsTypedCancelledStatusNotGenericError()
+    {
+        var runtime = new StubRuntime { PruneException = new OperationCanceledException("cancelled") };
+        var console = new RecordingConsole();
+        var fileSystem = new StubFileSystem("policy.yml", "baseline.yml");
+
+        int result = new BaselinePruneCommandHandler(runtime, console, fileSystem).Execute(
+            new BaselinePruneCommandOptions(
+                "policy.yml", "baseline.yml", "pruned.yml", "strict", null, "human", WriteOptions,
+                Array.Empty<string>(), false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("Baseline prune was cancelled."));
+            Assert.That(console.ErrorText, Does.Not.Contain("Baseline prune error"));
+            Assert.That(fileSystem.LastWritePath, Is.Null);
+        });
+    }
+
+    [Test]
+    public void BaselinePrune_TokenCancelledAfterOutcomeReturned_DoesNotWriteAndReportsCancelled()
+    {
+        using CancellationTokenSource cts = new();
+        ArchitectureBaselineComparisonEntry resolved = CreateEntry(
+            "strict", "rule-a", "Src.Gone", "Ref.Gone", "old reason");
+        var runtime = new StubRuntime
+        {
+            PruneOutcome = new BaselinePruneOutcome(
+                true, "pruned: yaml", [new BaselineRemovedEntry(resolved, BaselineEntryLifecycleNames.Resolved)],
+                Array.Empty<ArchitectureViolation>()),
+            OnPruneBaseline = () => cts.Cancel(),
+        };
+        var console = new RecordingConsole();
+        var fileSystem = new StubFileSystem("policy.yml", "baseline.yml");
+
+        int result = new BaselinePruneCommandHandler(runtime, console, fileSystem, cts.Token).Execute(
+            new BaselinePruneCommandOptions(
+                "policy.yml", "baseline.yml", "pruned.yml", "strict", null, "human", WriteOptions,
+                Array.Empty<string>(), false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("Baseline prune was cancelled."));
+            Assert.That(fileSystem.LastWritePath, Is.Null);
+        });
+    }
+
+    [Test]
     public void BaselineDiff_CoreThrowsOperationCanceled_ReportsTypedCancelledStatusNotGenericError()
     {
         var runtime = new StubRuntime { DiffException = new OperationCanceledException("cancelled") };
