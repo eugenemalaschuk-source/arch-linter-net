@@ -7,6 +7,7 @@ namespace ArchLinterNet.Core.Scanning;
 // while all recursive branches use the same state-owned active-type set.
 internal sealed class ArchitectureContractSurfaceExposureTraversal
 {
+    private const string GenericArgumentSegment = "generic_argument";
     private readonly ArchitectureContractSurfaceExposureScanState _state;
     private readonly ArchitectureContractSurfaceShape _surfaceShape;
     private readonly ArchitectureContractSurfaceExposureAttributeScanner _attributeScanner;
@@ -107,7 +108,19 @@ internal sealed class ArchitectureContractSurfaceExposureTraversal
             return;
         }
 
-        string kind = type.IsArray ? "array_element" : type.IsPointer ? "pointer_element" : "byref_element";
+        string kind;
+        if (type.IsArray)
+        {
+            kind = "array_element";
+        }
+        else if (type.IsPointer)
+        {
+            kind = "pointer_element";
+        }
+        else
+        {
+            kind = "byref_element";
+        }
         ScanShape(element, path.Append(kind));
     }
 
@@ -119,13 +132,25 @@ internal sealed class ArchitectureContractSurfaceExposureTraversal
         }
 
         Type[] arguments = _state.TryReadArray(
-            () => type.GetGenericArguments(), path.Append("generic_argument"),
+            () => type.GetGenericArguments(), path.Append(GenericArgumentSegment),
             "generic-arguments-unavailable");
         bool nullable = IsNullable(type);
         bool tuple = IsTuple(type);
         for (int index = 0; index < arguments.Length; index++)
         {
-            string kind = nullable ? "nullable_underlying" : tuple ? "tuple_element" : "generic_argument";
+            string kind;
+            if (nullable)
+            {
+                kind = "nullable_underlying";
+            }
+            else if (tuple)
+            {
+                kind = "tuple_element";
+            }
+            else
+            {
+                kind = GenericArgumentSegment;
+            }
             ArchitectureContractExposurePath childPath = path.Append(
                 kind, index.ToString(System.Globalization.CultureInfo.InvariantCulture));
             ScanShape(arguments[index], childPath);
@@ -163,12 +188,12 @@ internal sealed class ArchitectureContractSurfaceExposureTraversal
         if (type.IsGenericType && !type.IsGenericTypeDefinition)
         {
             Type[] arguments = _state.TryReadArray(
-                () => type.GetGenericArguments(), path.Append("generic_argument"),
+            () => type.GetGenericArguments(), path.Append(GenericArgumentSegment),
                 "generic-arguments-unavailable");
             for (int index = 0; index < arguments.Length; index++)
             {
                 ScanShape(arguments[index], path.Append(
-                    "generic_argument", index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                    GenericArgumentSegment, index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             }
         }
     }

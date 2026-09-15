@@ -14,6 +14,7 @@ namespace ArchLinterNet.Core.PolicyContext;
 public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePolicyDocumentLoader policyDocumentLoader)
     : IArchitecturePolicyContextApplicationService
 {
+    private const string LayerKind = "layer";
     private const string ExcludeSelectorKind = "exclude";
 
     private const string ContextKind = "architecture-policy-context";
@@ -121,10 +122,10 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                 item.Value.Namespace,
                 item.Value.NamespaceSuffix,
                 item.Value.External,
-                item.Value.Selector is null ? null : ProjectSelector("layer", item.Value.Selector),
+                item.Value.Selector is null ? null : ProjectSelector(LayerKind, item.Value.Selector),
                 item.Value.Exclude
                     .Select(exclusion => new ArchitecturePolicyContextException(
-                        "layer",
+                        LayerKind,
                         item.Key,
                         ExcludeSelectorKind,
                         JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix),
@@ -201,7 +202,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         ArchitecturePolicyContextProvenance? provenance = ProjectTopologyProvenance(document, path);
         if (!string.IsNullOrWhiteSpace(selector.Layer))
         {
-            return new ArchitecturePolicyContextTopologySelector("layer", selector.Layer, string.Empty, null, provenance);
+            return new ArchitecturePolicyContextTopologySelector(LayerKind, selector.Layer, string.Empty, null, provenance);
         }
 
         if (!string.IsNullOrWhiteSpace(selector.Namespace))
@@ -458,7 +459,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
     {
         List<ArchitecturePolicyContextException> exceptions = document.Layers
             .SelectMany(layer => layer.Value.Exclude.Select(exclusion => new ArchitecturePolicyContextException(
-                "layer", layer.Key, ExcludeSelectorKind, JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix), null)))
+                LayerKind, layer.Key, ExcludeSelectorKind, JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix), null)))
             .ToList();
 
         exceptions.AddRange(document.SourceExpansion.Contracts

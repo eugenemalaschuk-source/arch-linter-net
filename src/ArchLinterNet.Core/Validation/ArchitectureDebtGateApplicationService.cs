@@ -121,33 +121,34 @@ public sealed class ArchitectureDebtGateApplicationService : IArchitectureDebtGa
         }
 
         string currentDigest = ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(request.CurrentPolicyContext!);
-        List<ArchitecturePublicApiLiveEvidence> evidence = new();
-        foreach (ArchitecturePublicApiWeakeningApproval approval in request.PublicApiWeakeningApprovals)
-        {
-            PublicApiCaptureOutcome capture = publicApiService.Capture(new PublicApiCaptureRequest
+        return request.PublicApiWeakeningApprovals
+            .Select(approval =>
             {
-                PolicyPath = request.PolicyPath,
-                ContractId = approval.ContractId,
-                OutputPath = "architecture/public-api-approval-evidence.txt",
-                ConditionSetName = request.ConditionSetName,
-                PreparationMode = request.PreparationMode,
-                NoRestore = request.NoRestore,
-                CancellationToken = request.CancellationToken,
-            });
-            if (!capture.Succeeded || capture.Snapshot is null)
-            {
-                continue;
-            }
+                PublicApiCaptureOutcome capture = publicApiService.Capture(new PublicApiCaptureRequest
+                {
+                    PolicyPath = request.PolicyPath,
+                    ContractId = approval.ContractId,
+                    OutputPath = "architecture/public-api-approval-evidence.txt",
+                    ConditionSetName = request.ConditionSetName,
+                    PreparationMode = request.PreparationMode,
+                    NoRestore = request.NoRestore,
+                    CancellationToken = request.CancellationToken,
+                });
+                if (!capture.Succeeded || capture.Snapshot is null)
+                {
+                    return null;
+                }
 
-            PublicApiSnapshotDocument document = PublicApiSnapshotFormat.Parse(capture.Snapshot, "captured live public API");
-            evidence.Add(new ArchitecturePublicApiLiveEvidence(
-                ArchitecturePublicApiLiveEvidence.CurrentSchemaVersion,
-                ArchitecturePublicApiLiveEvidence.EvidenceKind,
-                currentDigest,
-                approval.ContractId,
-                document.Entries));
-        }
-
-        return evidence;
+                PublicApiSnapshotDocument document = PublicApiSnapshotFormat.Parse(capture.Snapshot, "captured live public API");
+                return new ArchitecturePublicApiLiveEvidence(
+                    ArchitecturePublicApiLiveEvidence.CurrentSchemaVersion,
+                    ArchitecturePublicApiLiveEvidence.EvidenceKind,
+                    currentDigest,
+                    approval.ContractId,
+                    document.Entries);
+            })
+            .Where(evidence => evidence is not null)
+            .Cast<ArchitecturePublicApiLiveEvidence>()
+            .ToList();
     }
 }

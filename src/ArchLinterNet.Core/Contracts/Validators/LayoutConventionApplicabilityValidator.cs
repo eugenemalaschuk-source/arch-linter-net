@@ -92,7 +92,7 @@ internal sealed class LayoutConventionApplicabilityValidator : IArchitecturePoli
 
         if ((!allowCurrentDirectory && normalized == ".")
             || value.Contains('\\')
-            || normalized.StartsWith("/", StringComparison.Ordinal)
+            || normalized.StartsWith('/')
             || normalized.Contains("//", StringComparison.Ordinal)
             || (normalized != "." && normalized.Split('/').Any(segment => segment is "" or "." or "..")))
         {

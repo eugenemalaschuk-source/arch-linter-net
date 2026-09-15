@@ -132,21 +132,28 @@ public sealed class ArchitectureGraphApplicationService(
     private ArchitectureRunnerSetup CreateRunnerSetup(
         ArchitectureGraphRequest request,
         ArchitectureContractDocument document,
-        HashSet<string>? selectedIds) => request.UsePreparedPostBuildState
-        ? runnerSetupService.MaterializePreparedRunner(
-            document,
-            request.PreparedPostBuildRunner
-                ?? throw new InvalidOperationException("Prepared graph analysis requires validation's receipt-backed artifact selection."),
-            selectedContractIds: selectedIds,
-            enableUnmatchedIgnoreTracking: false,
-            mode: request.Mode == "all" ? null : request.Mode)
-        : runnerSetupService.BuildRunner(
+        HashSet<string>? selectedIds)
+    {
+        string? effectiveMode = request.Mode == "all" ? null : request.Mode;
+        if (request.UsePreparedPostBuildState)
+        {
+            return runnerSetupService.MaterializePreparedRunner(
+                document,
+                request.PreparedPostBuildRunner
+                    ?? throw new InvalidOperationException("Prepared graph analysis requires validation's receipt-backed artifact selection."),
+                selectedContractIds: selectedIds,
+                enableUnmatchedIgnoreTracking: false,
+                mode: effectiveMode);
+        }
+
+        return runnerSetupService.BuildRunner(
             document,
             request.PolicyPath,
             request.ConditionSetName,
             selectedContractIds: selectedIds,
             enableUnmatchedIgnoreTracking: false,
-            mode: request.Mode == "all" ? null : request.Mode);
+            mode: effectiveMode);
+    }
 
     private void ExecuteContracts(
         IArchitectureContractRunner runner,

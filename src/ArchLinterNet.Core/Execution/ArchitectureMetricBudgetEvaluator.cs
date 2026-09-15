@@ -137,6 +137,7 @@ internal static class ArchitectureMetricBudgetAnalysisService
         List<ArchitectureApplicabilityRecord> records)
     {
         string budgetId = budget.Id ?? budget.Name;
+        int measuredValue = RequiredValue(measurement);
 
         // Capture is an explicit baseline-generation concern. The session only retains
         // complete scalar measurements, and this list is intentionally separate from the
@@ -149,7 +150,7 @@ internal static class ArchitectureMetricBudgetAnalysisService
             NativeSubject = measurement.NativeSubject ?? string.Empty,
             Unit = measurement.Unit,
             EffectiveScope = measurement.EffectiveScope,
-            Value = measurement.Value!.Value,
+            Value = measuredValue,
         });
 
         ArchitectureMetricBaselineEntry? reviewed = session.Document.MetricBaselines
@@ -177,7 +178,7 @@ internal static class ArchitectureMetricBudgetAnalysisService
 
         int baselineValue = reviewed.Value
             ?? throw new InvalidOperationException("A validated metric baseline must have a value.");
-        int currentValue = measurement.Value!.Value;
+        int currentValue = RequiredValue(measurement);
         int delta = currentValue - baselineValue;
         int allowedDelta = budget.AllowedDelta;
         long relativeThreshold = (long)baselineValue + allowedDelta;
@@ -265,6 +266,7 @@ internal static class ArchitectureMetricBudgetAnalysisService
         string bound,
         int configuredLimit)
     {
+        int measuredValue = RequiredValue(measurement);
         string budgetId = budget.Id ?? budget.Name;
         string subject = measurement.NativeSubject
             ?? measurement.EffectiveScope
@@ -298,7 +300,7 @@ internal static class ArchitectureMetricBudgetAnalysisService
                 measurement.Kind,
                 measurement.NativeSubject,
                 measurement.EffectiveScope ?? string.Empty,
-                measurement.Value!.Value,
+                measuredValue,
                 bound,
                 configuredLimit,
                 measurement.Contributors ?? Array.Empty<string>()),
@@ -306,6 +308,9 @@ internal static class ArchitectureMetricBudgetAnalysisService
 
         return violation;
     }
+
+    private static int RequiredValue(ArchitectureMetricMeasurement measurement) =>
+        measurement.Value ?? throw new InvalidOperationException("Metric budget evaluation requires a measured value.");
 
     private static ArchitectureViolation CreateRelativeViolation(
         ArchitectureMetricBudgetContract budget,
@@ -354,7 +359,7 @@ internal static class ArchitectureMetricBudgetAnalysisService
                 measurement.Kind,
                 measurement.NativeSubject,
                 measurement.EffectiveScope ?? string.Empty,
-                measurement.Value!.Value,
+                RequiredValue(measurement),
                 bound,
                 configuredLimit,
                 measurement.Contributors ?? Array.Empty<string>())

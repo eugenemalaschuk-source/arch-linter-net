@@ -80,17 +80,12 @@ internal static class ArchitectureWaiverLifecycleEvaluator
     {
         ArgumentNullException.ThrowIfNull(document);
 
-        HashSet<string> modes = new(StringComparer.Ordinal);
-        foreach (ArchitectureContractDescriptor descriptor in ArchitectureContractCatalog.Build(document).Descriptors)
-        {
-            if (IsSelected(descriptor, selectedContractIds)
+        return [.. ArchitectureContractCatalog.Build(document).Descriptors
+            .Where(descriptor => IsSelected(descriptor, selectedContractIds)
                 && GetIgnoredViolations(descriptor.Contract).Any(ignore => !ignore.IsBaselineImported))
-            {
-                modes.Add(descriptor.Mode);
-            }
-        }
-
-        return [.. modes.OrderBy(mode => mode == "strict" ? 0 : 1)];
+            .Select(descriptor => descriptor.Mode)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(mode => mode == "strict" ? 0 : 1)];
     }
 
     private static bool IsSelected(
@@ -128,15 +123,27 @@ internal static class ArchitectureWaiverLifecycleEvaluator
     {
         DateOnly? introduced = TryParseDate(ignore.Introduced);
         DateOnly? expires = TryParseDate(ignore.Expires);
-        string state = ignore.WaiverValidationError is not null
-            ? Invalid
-            : expires is { } expiry && expiry < evaluationDate
-                ? Expired
-                : isUnmatched
-                    ? Stale
-                    : ignore.HasStructuredWaiverFields
-                        ? Active
-                        : MetadataIncomplete;
+        string state;
+        if (ignore.WaiverValidationError is not null)
+        {
+            state = Invalid;
+        }
+        else if (expires is { } expiry && expiry < evaluationDate)
+        {
+            state = Expired;
+        }
+        else if (isUnmatched)
+        {
+            state = Stale;
+        }
+        else if (ignore.HasStructuredWaiverFields)
+        {
+            state = Active;
+        }
+        else
+        {
+            state = MetadataIncomplete;
+        }
 
         return new ArchitectureWaiverLifecycleRecord(
             ignore.WaiverId ?? CreateLegacyId(descriptor, ignore),
