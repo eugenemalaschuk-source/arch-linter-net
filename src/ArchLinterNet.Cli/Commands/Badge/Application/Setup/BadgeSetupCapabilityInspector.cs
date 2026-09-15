@@ -489,64 +489,120 @@ internal static class BadgeSetupCapabilityInspector
             return false;
         }
 
-        string[] segments = token.Split('.', StringSplitOptions.None);
-        if (segments.Length != 3
-            || segments.Any(string.IsNullOrEmpty)
-            || !TryDecodeBase64Url(segments[0], out byte[] headerBytes)
-            || !TryDecodeBase64Url(segments[2], out byte[] signatureBytes))
+        if (!TryReadJwtParts(token, out string[] segments, out byte[] headerBytes, out byte[] signatureBytes))
         {
             return false;
         }
 
         using JsonDocument headerDocument = JsonDocument.Parse(headerBytes);
         JsonElement header = headerDocument.RootElement;
-        if (header.ValueKind != JsonValueKind.Object
-            || StringClaim(header, "alg") != "RS256"
-            || StringClaim(header, "kid") is not { Length: > 0 } keyId)
+        if (!TryReadOidcKeyId(header, out string keyId))
         {
             return false;
         }
 
         using HttpClient jwksClient = clientFactory(OidcIssuer, null);
         using JsonDocument? jwks = GetJson(jwksClient, OidcJwksPath);
-        if (jwks?.RootElement is not { ValueKind: JsonValueKind.Object } jwksRoot
-            || !jwksRoot.TryGetProperty("keys", out JsonElement keys)
-            || keys.ValueKind != JsonValueKind.Array)
+        if (!TryReadJwksKeys(jwks, out JsonElement keys))
         {
             return false;
         }
 
         byte[] signingInput = Encoding.ASCII.GetBytes(segments[0] + "." + segments[1]);
+        return HasValidSigningKey(keys, keyId, signingInput, signatureBytes);
+    }
+
+    private static bool TryReadJwtParts(
+        string token,
+        out string[] segments,
+        out byte[] headerBytes,
+        out byte[] signatureBytes)
+    {
+        segments = token.Split('.', StringSplitOptions.None);
+        headerBytes = [];
+        signatureBytes = [];
+        return segments.Length == 3
+            && !segments.Any(string.IsNullOrEmpty)
+            && TryDecodeBase64Url(segments[0], out headerBytes)
+            && TryDecodeBase64Url(segments[2], out signatureBytes);
+    }
+
+    private static bool TryReadOidcKeyId(JsonElement header, out string keyId)
+    {
+        keyId = string.Empty;
+        if (header.ValueKind != JsonValueKind.Object
+            || StringClaim(header, "alg") != "RS256"
+            || StringClaim(header, "kid") is not { Length: > 0 } value)
+        {
+            return false;
+        }
+
+        keyId = value;
+        return true;
+    }
+
+    private static bool TryReadJwksKeys(JsonDocument? jwks, out JsonElement keys)
+    {
+        keys = default;
+        if (jwks?.RootElement is not { ValueKind: JsonValueKind.Object } jwksRoot
+            || !jwksRoot.TryGetProperty("keys", out keys)
+            || keys.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool HasValidSigningKey(
+        JsonElement keys,
+        string keyId,
+        byte[] signingInput,
+        byte[] signatureBytes)
+    {
         foreach (JsonElement key in keys.EnumerateArray())
         {
-            if (key.ValueKind != JsonValueKind.Object
-                || StringClaim(key, "kid") != keyId
-                || StringClaim(key, "kty") != "RSA"
-                || (key.TryGetProperty("alg", out JsonElement keyAlgorithm)
-                    && (keyAlgorithm.ValueKind != JsonValueKind.String || keyAlgorithm.GetString() != "RS256"))
-                || (key.TryGetProperty("use", out JsonElement use)
-                    && (use.ValueKind != JsonValueKind.String || use.GetString() != "sig"))
-                || StringClaim(key, "n") is not { Length: > 0 } modulusText
-                || StringClaim(key, "e") is not { Length: > 0 } exponentText
-                || !TryDecodeBase64Url(modulusText, out byte[] modulus)
-                || !TryDecodeBase64Url(exponentText, out byte[] exponent))
+            bool? verification = TryVerifySigningKey(key, keyId, signingInput, signatureBytes);
+            if (verification.HasValue)
             {
-                continue;
-            }
-
-            try
-            {
-                using RSA rsa = RSA.Create();
-                rsa.ImportParameters(new RSAParameters { Modulus = modulus, Exponent = exponent });
-                return rsa.VerifyData(signingInput, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            }
-            catch (CryptographicException)
-            {
-                return false;
+                return verification.Value;
             }
         }
 
         return false;
+    }
+
+    private static bool? TryVerifySigningKey(
+        JsonElement key,
+        string keyId,
+        byte[] signingInput,
+        byte[] signatureBytes)
+    {
+        if (key.ValueKind != JsonValueKind.Object
+            || StringClaim(key, "kid") != keyId
+            || StringClaim(key, "kty") != "RSA"
+            || (key.TryGetProperty("alg", out JsonElement keyAlgorithm)
+                && (keyAlgorithm.ValueKind != JsonValueKind.String || keyAlgorithm.GetString() != "RS256"))
+            || (key.TryGetProperty("use", out JsonElement use)
+                && (use.ValueKind != JsonValueKind.String || use.GetString() != "sig"))
+            || StringClaim(key, "n") is not { Length: > 0 } modulusText
+            || StringClaim(key, "e") is not { Length: > 0 } exponentText
+            || !TryDecodeBase64Url(modulusText, out byte[] modulus)
+            || !TryDecodeBase64Url(exponentText, out byte[] exponent))
+        {
+            return null;
+        }
+
+        try
+        {
+            using RSA rsa = RSA.Create();
+            rsa.ImportParameters(new RSAParameters { Modulus = modulus, Exponent = exponent });
+            return rsa.VerifyData(signingInput, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        }
+        catch (CryptographicException)
+        {
+            return false;
+        }
     }
 
     private static bool TryDecodeBase64Url(string value, out byte[] bytes)
