@@ -93,33 +93,7 @@ internal sealed class ArchitectureContractSurfaceExposureAttributeScanner
 
         if (argumentType.IsArray)
         {
-            Type? elementType = _state.TryRead(
-                () => argumentType.GetElementType(), path, "attribute-array-element-type-unavailable");
-            if (elementType != null && _state.TryRead(
-                    () => elementType.IsEnum, path, "attribute-array-element-type-unavailable"))
-            {
-                // The declared element type is semantic evidence even when the metadata array
-                // has no values to scan.
-                _state.AddExposure(path, elementType);
-            }
-
-            object? value = _state.TryRead(
-                () => argument.Value, path, "attribute-array-value-unavailable");
-            if (value is IEnumerable values)
-            {
-                int index = 0;
-                foreach (object? item in values)
-                {
-                    if (item is CustomAttributeTypedArgument typed)
-                    {
-                        ScanArgument(typed, path.Append(
-                            "array_element", index.ToString(CultureInfo.InvariantCulture)));
-                    }
-
-                    index++;
-                }
-            }
-
+            ScanArrayArgument(argument, argumentType, path);
             return;
         }
 
@@ -131,13 +105,53 @@ internal sealed class ArchitectureContractSurfaceExposureAttributeScanner
 
         if (argumentType == typeof(Type))
         {
-            object? value = _state.TryRead(
-                () => argument.Value, path, "attribute-type-value-unavailable");
-            if (value is Type referenced)
-            {
-                _traversal.ScanShape(referenced, path);
-            }
+            ScanTypeArgument(argument, path);
         }
         // Primitive, string, and null values deliberately do not become type targets.
+    }
+
+    private void ScanArrayArgument(
+        CustomAttributeTypedArgument argument,
+        Type argumentType,
+        ArchitectureContractExposurePath path)
+    {
+        Type? elementType = _state.TryRead(
+            () => argumentType.GetElementType(), path, "attribute-array-element-type-unavailable");
+        if (elementType != null && _state.TryRead(
+                () => elementType.IsEnum, path, "attribute-array-element-type-unavailable"))
+        {
+            // The declared element type is semantic evidence even when the metadata array
+            // has no values to scan.
+            _state.AddExposure(path, elementType);
+        }
+
+        object? value = _state.TryRead(
+            () => argument.Value, path, "attribute-array-value-unavailable");
+        if (value is not IEnumerable values)
+        {
+            return;
+        }
+
+        int index = 0;
+        foreach (object? item in values)
+        {
+            if (item is CustomAttributeTypedArgument typed)
+            {
+                ScanArgument(typed, path.Append(
+                    "array_element", index.ToString(CultureInfo.InvariantCulture)));
+            }
+
+            index++;
+        }
+    }
+
+    private void ScanTypeArgument(CustomAttributeTypedArgument argument, ArchitectureContractExposurePath path)
+    {
+        object? value = _state.TryRead(
+            () => argument.Value, path, "attribute-type-value-unavailable");
+        if (value is Type referenced)
+        {
+            _traversal.ScanShape(referenced, path);
+        }
     }
 }

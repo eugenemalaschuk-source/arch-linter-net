@@ -21,10 +21,7 @@ internal static class LayoutConventionApplicabilityChecker
         ArgumentNullException.ThrowIfNull(conventions);
 
         string inventoryIdentity = inventory.Id ?? inventory.Name;
-        ArchitectureLayoutConventionContract[] linkedConventions = inventory.ExpectedFolders
-            .Select(folder => conventions.Single(convention => string.Equals(
-                convention.Id, folder.ConventionId, StringComparison.Ordinal)))
-            .ToArray();
+        ArchitectureLayoutConventionContract[] linkedConventions = ResolveLinkedConventions(inventory, conventions);
 
         // Built once and shared by both the source-declaration inventory and every convention
         // projection below. A partial type can have one reflected fact but several real source
@@ -42,6 +39,40 @@ internal static class LayoutConventionApplicabilityChecker
         var expectedEntries = new List<ArchitectureApplicabilityExpectedEntry>();
         var records = new List<ArchitectureApplicabilityRecord>();
 
+        EvaluateExpectedFolders(inventory, inventoryIdentity, subjects, effectiveSubjectIdentities, expectedEntries, records);
+
+        SubjectMapping[] subjectMappings = BuildSubjectMappings(inventory, subjects, effectiveSubjectIdentities, linkedConventions);
+
+        List<SubjectIssue> subjectIssues = inventory.Exhaustive
+            ? EvaluateExhaustiveScope(
+                inventory, inventoryIdentity, subjects, effectiveSubjectIdentities, linkedConventions, expectedEntries, records)
+            : [];
+
+        return new Result(
+            expectedEntries,
+            records,
+            subjectMappings,
+            subjectIssues
+                .OrderBy(issue => issue.SubjectIdentity, StringComparer.Ordinal)
+                .ThenBy(issue => issue.ReasonCode, StringComparer.Ordinal)
+                .ToArray());
+    }
+
+    private static ArchitectureLayoutConventionContract[] ResolveLinkedConventions(
+        ArchitectureLayoutConventionApplicabilityContract inventory,
+        IReadOnlyList<ArchitectureLayoutConventionContract> conventions) => inventory.ExpectedFolders
+        .Select(folder => conventions.Single(convention => string.Equals(
+            convention.Id, folder.ConventionId, StringComparison.Ordinal)))
+        .ToArray();
+
+    private static void EvaluateExpectedFolders(
+        ArchitectureLayoutConventionApplicabilityContract inventory,
+        string inventoryIdentity,
+        SourceSubject[] subjects,
+        HashSet<string>[] effectiveSubjectIdentities,
+        List<ArchitectureApplicabilityExpectedEntry> expectedEntries,
+        List<ArchitectureApplicabilityRecord> records)
+    {
         for (int index = 0; index < inventory.ExpectedFolders.Count; index++)
         {
             ArchitectureLayoutConventionExpectedFolder expected = inventory.ExpectedFolders[index];
@@ -72,77 +103,80 @@ internal static class LayoutConventionApplicabilityChecker
                     ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput,
                     provenance));
         }
+    }
 
-        SubjectMapping[] subjectMappings = subjects
-            .SelectMany(subject => Enumerable.Range(0, inventory.ExpectedFolders.Count)
+    private static SubjectMapping[] BuildSubjectMappings(
+        ArchitectureLayoutConventionApplicabilityContract inventory,
+        SourceSubject[] subjects,
+        HashSet<string>[] effectiveSubjectIdentities,
+        ArchitectureLayoutConventionContract[] linkedConventions) => subjects
+        .SelectMany(subject => Enumerable.Range(0, inventory.ExpectedFolders.Count)
+            .Where(index => IsSameOrDescendant(
+                subject.DirectoryPath,
+                Combine(inventory.Scope, inventory.ExpectedFolders[index].Path))
+                && effectiveSubjectIdentities[index].Contains(subject.Identity))
+            .Select(index => new SubjectMapping(subject.Identity, linkedConventions[index].Id!)))
+        .OrderBy(mapping => mapping.SubjectIdentity, StringComparer.Ordinal)
+        .ThenBy(mapping => mapping.ConventionId, StringComparer.Ordinal)
+        .ToArray();
+
+    private static List<SubjectIssue> EvaluateExhaustiveScope(
+        ArchitectureLayoutConventionApplicabilityContract inventory,
+        string inventoryIdentity,
+        SourceSubject[] subjects,
+        HashSet<string>[] effectiveSubjectIdentities,
+        ArchitectureLayoutConventionContract[] linkedConventions,
+        List<ArchitectureApplicabilityExpectedEntry> expectedEntries,
+        List<ArchitectureApplicabilityRecord> records)
+    {
+        string controlIdentity = $"{inventoryIdentity}/scope";
+        ArchitectureApplicabilityProvenance provenance = new(Family, controlIdentity, inventoryIdentity);
+        var reasons = new HashSet<string>(StringComparer.Ordinal);
+        var subjectIssues = new List<SubjectIssue>();
+        foreach (SourceSubject subject in subjects)
+        {
+            int distinctConventionMappings = Enumerable.Range(0, inventory.ExpectedFolders.Count)
                 .Where(index => IsSameOrDescendant(
                     subject.DirectoryPath,
                     Combine(inventory.Scope, inventory.ExpectedFolders[index].Path))
                     && effectiveSubjectIdentities[index].Contains(subject.Identity))
-                .Select(index => new SubjectMapping(subject.Identity, linkedConventions[index].Id!)))
-            .OrderBy(mapping => mapping.SubjectIdentity, StringComparer.Ordinal)
-            .ThenBy(mapping => mapping.ConventionId, StringComparer.Ordinal)
-            .ToArray();
-        var subjectIssues = new List<SubjectIssue>();
-
-        if (inventory.Exhaustive)
-        {
-            string controlIdentity = $"{inventoryIdentity}/scope";
-            ArchitectureApplicabilityProvenance provenance = new(Family, controlIdentity, inventoryIdentity);
-            var reasons = new HashSet<string>(StringComparer.Ordinal);
-            foreach (SourceSubject subject in subjects)
+                .Select(index => linkedConventions[index].Id)
+                .Distinct(StringComparer.Ordinal)
+                .Count();
+            if (distinctConventionMappings == 0)
             {
-                int distinctConventionMappings = Enumerable.Range(0, inventory.ExpectedFolders.Count)
-                    .Where(index => IsSameOrDescendant(
-                        subject.DirectoryPath,
-                        Combine(inventory.Scope, inventory.ExpectedFolders[index].Path))
-                        && effectiveSubjectIdentities[index].Contains(subject.Identity))
-                    .Select(index => linkedConventions[index].Id)
-                    .Distinct(StringComparer.Ordinal)
-                    .Count();
-                if (distinctConventionMappings == 0)
-                {
-                    reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
-                    subjectIssues.Add(new SubjectIssue(
-                        subject.Identity,
-                        subject.Fact.SourceFilePath!,
-                        ArchitectureApplicabilityReasonCodes.UnmappedSubject));
-                }
-                else if (distinctConventionMappings > 1)
-                {
-                    reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
-                    subjectIssues.Add(new SubjectIssue(
-                        subject.Identity,
-                        subject.Fact.SourceFilePath!,
-                        ArchitectureApplicabilityReasonCodes.AmbiguousSubject));
-                }
+                reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
+                subjectIssues.Add(new SubjectIssue(
+                    subject.Identity,
+                    subject.Fact.SourceFilePath!,
+                    ArchitectureApplicabilityReasonCodes.UnmappedSubject));
             }
-
-            expectedEntries.Add(new ArchitectureApplicabilityExpectedEntry(
-                controlIdentity,
-                Family,
-                ArchitectureApplicabilityMembership.Required,
-                provenance));
-            records.Add(reasons.Count == 0
-                ? Evaluable(controlIdentity, provenance)
-                : new ArchitectureApplicabilityRecord(
-                    controlIdentity,
-                    Family,
-                    ArchitectureApplicabilityRecordState.Unassessable,
-                    reasons.Order(StringComparer.Ordinal)
-                        .Select(code => new ArchitectureApplicabilityReason(code, provenance))
-                        .ToArray(),
-                    provenance));
+            else if (distinctConventionMappings > 1)
+            {
+                reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
+                subjectIssues.Add(new SubjectIssue(
+                    subject.Identity,
+                    subject.Fact.SourceFilePath!,
+                    ArchitectureApplicabilityReasonCodes.AmbiguousSubject));
+            }
         }
 
-        return new Result(
-            expectedEntries,
-            records,
-            subjectMappings,
-            subjectIssues
-                .OrderBy(issue => issue.SubjectIdentity, StringComparer.Ordinal)
-                .ThenBy(issue => issue.ReasonCode, StringComparer.Ordinal)
-                .ToArray());
+        expectedEntries.Add(new ArchitectureApplicabilityExpectedEntry(
+            controlIdentity,
+            Family,
+            ArchitectureApplicabilityMembership.Required,
+            provenance));
+        records.Add(reasons.Count == 0
+            ? Evaluable(controlIdentity, provenance)
+            : new ArchitectureApplicabilityRecord(
+                controlIdentity,
+                Family,
+                ArchitectureApplicabilityRecordState.Unassessable,
+                reasons.Order(StringComparer.Ordinal)
+                    .Select(code => new ArchitectureApplicabilityReason(code, provenance))
+                    .ToArray(),
+                provenance));
+        return subjectIssues;
     }
 
     private static HashSet<string> BuildEffectiveSubjectIdentities(

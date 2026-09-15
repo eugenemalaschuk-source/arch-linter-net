@@ -147,56 +147,7 @@ public static class ArchitecturePrReportProjector
         {
             foreach (ArchitecturePrReportValidationReceipt receipt in input.Evidence.ValidationOutcomes)
             {
-                AddProvenance(references, receipt.Provenance);
-                if (receipt.PolicyInventory is not null)
-                {
-                    references.Add(new("policy_inventory", receipt.PolicyInventory.SchemaId, null));
-                    foreach (ArchitectureWaiverLifecycleRecord waiver in receipt.PolicyInventory.Waivers)
-                    {
-                        references.Add(new("waiver", waiver.Id, PolicyPath(waiver.PolicyLocation)));
-                    }
-                }
-
-                if (receipt.WaiverLifecycle is not null)
-                {
-                    foreach (ArchitectureWaiverLifecycleRecord waiver in receipt.WaiverLifecycle.Records)
-                    {
-                        references.Add(new("waiver", waiver.Id, PolicyPath(waiver.PolicyLocation)));
-                    }
-                }
-
-                if (receipt.Applicability is not null)
-                {
-                    foreach (ArchitecturePrReportApplicabilityControl control in receipt.Applicability.Controls)
-                    {
-                        references.Add(new("applicability", control.ControlIdentity, null));
-                        if (control.Record?.Topology is not null)
-                        {
-                            foreach (ArchitecturePrReportTopologySubject subject in control.Record.Topology.Subjects)
-                            {
-                                references.Add(new("topology", subject.Identity, null));
-                            }
-                        }
-                    }
-                }
-
-                foreach (ArchitecturePrReportFinding finding in receipt.Findings)
-                {
-                    references.Add(new("finding", finding.CanonicalIdentity, finding.SourceLocation?.Path));
-                }
-
-                if (receipt.ExternalEvidence is not null)
-                {
-                    foreach (ArchitecturePrReportExternalRequirement requirement in receipt.ExternalEvidence.Requirements)
-                    {
-                        references.Add(new("external_evidence", requirement.Id, null));
-                    }
-
-                    foreach (ArchitecturePrReportExternalEvidenceTrustReceipt trust in receipt.ExternalEvidence.TrustReceipts)
-                    {
-                        references.Add(new("external_evidence", trust.LogicalId, trust.ArtifactPath));
-                    }
-                }
+                AddReceiptNavigation(references, receipt);
             }
 
             AddDebtNavigation(references, input.Evidence.DebtGate);
@@ -221,6 +172,77 @@ public static class ArchitecturePrReportProjector
             .ThenBy(reference => reference.Identity, StringComparer.Ordinal)
             .ThenBy(reference => reference.Path, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static void AddReceiptNavigation(
+        ICollection<ArchitecturePrReportNavigationReference> references,
+        ArchitecturePrReportValidationReceipt receipt)
+    {
+        AddProvenance(references, receipt.Provenance);
+
+        if (receipt.PolicyInventory is not null)
+        {
+            references.Add(new("policy_inventory", receipt.PolicyInventory.SchemaId, null));
+            foreach (ArchitectureWaiverLifecycleRecord waiver in receipt.PolicyInventory.Waivers)
+            {
+                references.Add(new("waiver", waiver.Id, PolicyPath(waiver.PolicyLocation)));
+            }
+        }
+
+        if (receipt.WaiverLifecycle is not null)
+        {
+            foreach (ArchitectureWaiverLifecycleRecord waiver in receipt.WaiverLifecycle.Records)
+            {
+                references.Add(new("waiver", waiver.Id, PolicyPath(waiver.PolicyLocation)));
+            }
+        }
+
+        if (receipt.Applicability is not null)
+        {
+            AddApplicabilityNavigation(references, receipt.Applicability);
+        }
+
+        foreach (ArchitecturePrReportFinding finding in receipt.Findings)
+        {
+            references.Add(new("finding", finding.CanonicalIdentity, finding.SourceLocation?.Path));
+        }
+
+        if (receipt.ExternalEvidence is not null)
+        {
+            AddExternalEvidenceNavigation(references, receipt.ExternalEvidence);
+        }
+    }
+
+    private static void AddApplicabilityNavigation(
+        ICollection<ArchitecturePrReportNavigationReference> references,
+        ArchitecturePrReportApplicability applicability)
+    {
+        foreach (ArchitecturePrReportApplicabilityControl control in applicability.Controls)
+        {
+            references.Add(new("applicability", control.ControlIdentity, null));
+            if (control.Record?.Topology is not null)
+            {
+                foreach (ArchitecturePrReportTopologySubject subject in control.Record.Topology.Subjects)
+                {
+                    references.Add(new("topology", subject.Identity, null));
+                }
+            }
+        }
+    }
+
+    private static void AddExternalEvidenceNavigation(
+        ICollection<ArchitecturePrReportNavigationReference> references,
+        ArchitecturePrReportExternalEvidence externalEvidence)
+    {
+        foreach (ArchitecturePrReportExternalRequirement requirement in externalEvidence.Requirements)
+        {
+            references.Add(new("external_evidence", requirement.Id, null));
+        }
+
+        foreach (ArchitecturePrReportExternalEvidenceTrustReceipt trust in externalEvidence.TrustReceipts)
+        {
+            references.Add(new("external_evidence", trust.LogicalId, trust.ArtifactPath));
+        }
     }
 
     private static void AddDebtNavigation(

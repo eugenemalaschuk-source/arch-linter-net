@@ -564,54 +564,27 @@ internal static class ArchitecturePublicApiMemberScanner
     {
         if (type.IsGenericParameter)
         {
-            return type.DeclaringMethod != null
-                ? $"!!{type.GenericParameterPosition}"
-                : $"!{type.GenericParameterPosition}";
+            return RenderGenericParameterName(type);
         }
 
         if (type.IsByRef)
         {
-            string? element = RenderTypeName(type.GetElementType()!, completeness);
-            return element == null ? null : element + "&";
+            return RenderElementSuffixedTypeName(type, completeness, "&");
         }
 
         if (type.IsPointer)
         {
-            string? element = RenderTypeName(type.GetElementType()!, completeness);
-            return element == null ? null : element + "*";
+            return RenderElementSuffixedTypeName(type, completeness, "*");
         }
 
         if (type.IsArray)
         {
-            int rank = type.GetArrayRank();
-            string commas = rank > 1 ? new string(',', rank - 1) : string.Empty;
-            string? element = RenderTypeName(type.GetElementType()!, completeness);
-            return element == null ? null : element + "[" + commas + "]";
+            return RenderArrayTypeName(type, completeness);
         }
 
         if (type.IsGenericType && !type.IsGenericTypeDefinition)
         {
-            if (!ArchitectureTypeNames.TryGetFullName(type.GetGenericTypeDefinition(), out string genericDefinitionName))
-            {
-                completeness?.MarkIncomplete();
-                return null;
-            }
-
-            Type[] genericArguments = type.GetGenericArguments();
-            string[] names = new string[genericArguments.Length];
-            for (int i = 0; i < genericArguments.Length; i++)
-            {
-                string? rendered = RenderTypeName(genericArguments[i], completeness);
-                if (rendered == null)
-                {
-                    return null;
-                }
-
-                names[i] = rendered;
-            }
-
-            string args = string.Join(",", names);
-            return $"{genericDefinitionName}[{args}]";
+            return RenderConstructedGenericTypeName(type, completeness);
         }
 
         if (!ArchitectureTypeNames.TryGetFullName(type, out string fullName))
@@ -621,6 +594,50 @@ internal static class ArchitecturePublicApiMemberScanner
         }
 
         return fullName;
+    }
+
+    private static string RenderGenericParameterName(Type type) =>
+        type.DeclaringMethod != null
+            ? $"!!{type.GenericParameterPosition}"
+            : $"!{type.GenericParameterPosition}";
+
+    private static string? RenderElementSuffixedTypeName(Type type, SurfaceScanCompleteness? completeness, string suffix)
+    {
+        string? element = RenderTypeName(type.GetElementType()!, completeness);
+        return element == null ? null : element + suffix;
+    }
+
+    private static string? RenderArrayTypeName(Type type, SurfaceScanCompleteness? completeness)
+    {
+        int rank = type.GetArrayRank();
+        string commas = rank > 1 ? new string(',', rank - 1) : string.Empty;
+        string? element = RenderTypeName(type.GetElementType()!, completeness);
+        return element == null ? null : element + "[" + commas + "]";
+    }
+
+    private static string? RenderConstructedGenericTypeName(Type type, SurfaceScanCompleteness? completeness)
+    {
+        if (!ArchitectureTypeNames.TryGetFullName(type.GetGenericTypeDefinition(), out string genericDefinitionName))
+        {
+            completeness?.MarkIncomplete();
+            return null;
+        }
+
+        Type[] genericArguments = type.GetGenericArguments();
+        string[] names = new string[genericArguments.Length];
+        for (int i = 0; i < genericArguments.Length; i++)
+        {
+            string? rendered = RenderTypeName(genericArguments[i], completeness);
+            if (rendered == null)
+            {
+                return null;
+            }
+
+            names[i] = rendered;
+        }
+
+        string args = string.Join(",", names);
+        return $"{genericDefinitionName}[{args}]";
     }
 
     private static TMember[] SafeGetMembers<TMember>(

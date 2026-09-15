@@ -25,14 +25,11 @@ internal static class ArchitecturePolicyWeakeningWaiverEvaluator
             if (!existsInBaseline)
             {
                 AddFinding(
-                    "structured_waiver_added",
-                    "semantic",
-                    control,
+                    new PolicyWeakeningControlContext("structured_waiver_added", control, "semantic", severity),
                     Array.Empty<string>(),
                     [string.Join("; ", waiver.TargetFingerprint, waiver.ContractFamily, waiver.ContractId)],
                     null,
                     waiver,
-                    severity,
                     findings);
                 continue;
             }
@@ -40,44 +37,35 @@ internal static class ArchitecturePolicyWeakeningWaiverEvaluator
             if (!string.Equals(previous!.TargetFingerprint, waiver.TargetFingerprint, StringComparison.Ordinal))
             {
                 AddFinding(
-                    "structured_waiver_target_changed",
-                    "impact_not_proven",
-                    control,
+                    new PolicyWeakeningControlContext("structured_waiver_target_changed", control, "impact_not_proven", severity),
                     [previous.TargetFingerprint],
                     [string.Join("; ", waiver.TargetFingerprint, waiver.ContractFamily, waiver.ContractId)],
                     previous,
                     waiver,
-                    severity,
                     findings);
             }
 
             if (HasExtendedExpiry(previous.Expires, waiver.Expires))
             {
                 AddFinding(
-                    "structured_waiver_expiry_extended",
-                    "semantic",
-                    control,
+                    new PolicyWeakeningControlContext("structured_waiver_expiry_extended", control, "semantic", severity),
                     [previous.Expires!],
                     [waiver.Expires!],
                     previous,
                     waiver,
-                    severity,
                     findings);
             }
         }
     }
 
     private static void AddFinding(
-        string kind,
-        string classification,
-        string control,
+        PolicyWeakeningControlContext controlContext,
         IReadOnlyList<string> baseValues,
         IReadOnlyList<string> currentValues,
         ArchitecturePolicyContextWaiver? previous,
         ArchitecturePolicyContextWaiver waiver,
-        string severity,
         ICollection<ArchitecturePolicyWeakeningFinding> findings) => findings.Add(CreateFinding(
-        new PolicyWeakeningControlContext(kind, control, classification, severity),
+        controlContext,
         baseValues,
         currentValues,
         previous?.Provenance,

@@ -56,12 +56,7 @@ internal sealed class ArchitectureContractSurfaceExposureTraversal
             return;
         }
 
-        Type targetType = type;
-        if (type.IsGenericType && !type.IsGenericTypeDefinition)
-        {
-            targetType = _state.TryRead(() => type.GetGenericTypeDefinition(), path,
-                "generic-definition-unavailable") ?? type;
-        }
+        Type targetType = ResolveGenericTypeDefinition(type, path);
 
         _state.AddExposure(path, targetType);
         if (!_state.EnterType(type))
@@ -71,31 +66,8 @@ internal sealed class ArchitectureContractSurfaceExposureTraversal
 
         try
         {
-            if (type.IsByRef || type.IsPointer || type.IsArray)
-            {
-                Type? element = _state.TryRead(() => type.GetElementType(), path, "element-type-unavailable");
-                if (element != null)
-                {
-                    string kind = type.IsArray ? "array_element" : type.IsPointer ? "pointer_element" : "byref_element";
-                    ScanShape(element, path.Append(kind));
-                }
-            }
-
-            if (type.IsGenericType)
-            {
-                Type[] arguments = _state.TryReadArray(
-                    () => type.GetGenericArguments(), path.Append("generic_argument"),
-                    "generic-arguments-unavailable");
-                bool nullable = IsNullable(type);
-                bool tuple = IsTuple(type);
-                for (int index = 0; index < arguments.Length; index++)
-                {
-                    string kind = nullable ? "nullable_underlying" : tuple ? "tuple_element" : "generic_argument";
-                    ArchitectureContractExposurePath childPath = path.Append(
-                        kind, index.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    ScanShape(arguments[index], childPath);
-                }
-            }
+            ScanElementShape(type, path);
+            ScanGenericArgumentShapes(type, path);
 
             if (typeof(Delegate).IsAssignableFrom(type))
             {
@@ -109,6 +81,54 @@ internal sealed class ArchitectureContractSurfaceExposureTraversal
         finally
         {
             _state.ExitType(type);
+        }
+    }
+
+    private Type ResolveGenericTypeDefinition(Type type, ArchitectureContractExposurePath path)
+    {
+        if (!type.IsGenericType || type.IsGenericTypeDefinition)
+        {
+            return type;
+        }
+
+        return _state.TryRead(() => type.GetGenericTypeDefinition(), path, "generic-definition-unavailable") ?? type;
+    }
+
+    private void ScanElementShape(Type type, ArchitectureContractExposurePath path)
+    {
+        if (!type.IsByRef && !type.IsPointer && !type.IsArray)
+        {
+            return;
+        }
+
+        Type? element = _state.TryRead(() => type.GetElementType(), path, "element-type-unavailable");
+        if (element == null)
+        {
+            return;
+        }
+
+        string kind = type.IsArray ? "array_element" : type.IsPointer ? "pointer_element" : "byref_element";
+        ScanShape(element, path.Append(kind));
+    }
+
+    private void ScanGenericArgumentShapes(Type type, ArchitectureContractExposurePath path)
+    {
+        if (!type.IsGenericType)
+        {
+            return;
+        }
+
+        Type[] arguments = _state.TryReadArray(
+            () => type.GetGenericArguments(), path.Append("generic_argument"),
+            "generic-arguments-unavailable");
+        bool nullable = IsNullable(type);
+        bool tuple = IsTuple(type);
+        for (int index = 0; index < arguments.Length; index++)
+        {
+            string kind = nullable ? "nullable_underlying" : tuple ? "tuple_element" : "generic_argument";
+            ArchitectureContractExposurePath childPath = path.Append(
+                kind, index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            ScanShape(arguments[index], childPath);
         }
     }
 

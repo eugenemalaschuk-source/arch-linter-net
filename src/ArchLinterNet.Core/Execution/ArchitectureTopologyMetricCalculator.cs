@@ -79,19 +79,14 @@ internal static class ArchitectureTopologyMetricCalculator
         string node,
         string kind)
     {
-        IReadOnlyList<ArchitectureTopologyObservedDependency> dependencies = topology.Dependencies;
         Dictionary<string, ArchitectureTopologyEvaluator.SubjectClassification> classes =
             topology.Classifications.ToDictionary(
                 classification => classification.Subject.Identity,
                 StringComparer.Ordinal);
+        bool outgoing = kind == ArchitectureMetricKinds.OutgoingComponentCount;
         List<string> reasons = new();
         List<string> contributors = new();
-        bool outgoing = kind == ArchitectureMetricKinds.OutgoingComponentCount;
-        bool hasIncompleteRequiredSource = topology.IncompleteDependencySourceIdentities.Any(identity =>
-            classes.TryGetValue(identity, out ArchitectureTopologyEvaluator.SubjectClassification? source)
-            && source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
-            && (!outgoing || source.NodeIds.Contains(node, StringComparer.Ordinal)));
-        if (hasIncompleteRequiredSource)
+        if (HasIncompleteRequiredRelationSource(topology, classes, node, outgoing))
         {
             // An omitted direct edge from a selected outgoing source or any mapped incoming source
             // can change this component's relation universe. Do not retain known edges once their
@@ -100,94 +95,123 @@ internal static class ArchitectureTopologyMetricCalculator
             return new ArchitectureMetricRawEvidence(node, null, reasons, contributors);
         }
 
-        foreach (ArchitectureTopologyObservedDependency dependency in dependencies)
+        ComponentRelationsContext context = new(session, topology, classes, node, outgoing);
+        foreach (ArchitectureTopologyObservedDependency dependency in topology.Dependencies)
         {
-            string selectedIdentity = outgoing ? dependency.SourceIdentity : dependency.TargetIdentity;
-            string otherIdentity = outgoing ? dependency.TargetIdentity : dependency.SourceIdentity;
-            ArchitectureTopologyAssemblyEndpointBinding selectedBinding = outgoing
-                ? dependency.SourceBinding
-                : dependency.TargetBinding;
-            string? selectedAssemblyName = outgoing
-                ? dependency.SourceAssemblyName
-                : dependency.TargetAssemblyName;
-            if (selectedBinding == ArchitectureTopologyAssemblyEndpointBinding.Ambiguous
-                && CouldBeSelectedNode(topology, selectedAssemblyName, node))
-            {
-                // An ambiguous endpoint cannot enter the exact classification map. If one of its
-                // candidates belongs to this node, skipping it would manufacture a trusted zero.
-                reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
-                continue;
-            }
-
-            if (!classes.TryGetValue(selectedIdentity, out ArchitectureTopologyEvaluator.SubjectClassification? selected))
-            {
-                continue;
-            }
-
-            if (selected.Disposition != ArchitectureTopologyEvaluator.Disposition.Mapped
-                || !selected.NodeIds.Contains(node, StringComparer.Ordinal))
-            {
-                continue;
-            }
-
-            ArchitectureTopologyAssemblyEndpointBinding otherBinding = outgoing
-                ? dependency.TargetBinding
-                : dependency.SourceBinding;
-            if (otherBinding == ArchitectureTopologyAssemblyEndpointBinding.Ambiguous)
-            {
-                reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
-                continue;
-            }
-
-            if (otherBinding == ArchitectureTopologyAssemblyEndpointBinding.Missing)
-            {
-                reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
-                continue;
-            }
-
-            // An endpoint excluded from the classification projection was not explicitly reviewed
-            // out of scope. Treating it as absent would make a partial count appear trustworthy.
-            if (!classes.TryGetValue(otherIdentity, out ArchitectureTopologyEvaluator.SubjectClassification? other))
-            {
-                reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
-                continue;
-            }
-
-            if (topology.Topology.SubjectKind == "project"
-                && (!HasCanonicalProjectOwner(session, selected.Subject)
-                    || !HasCanonicalProjectOwner(session, other.Subject)))
-            {
-                reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
-                continue;
-            }
-
-            if (other.Disposition == ArchitectureTopologyEvaluator.Disposition.Unmapped)
-            {
-                reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
-                continue;
-            }
-
-            if (other.Disposition == ArchitectureTopologyEvaluator.Disposition.Ambiguous)
-            {
-                reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
-                continue;
-            }
-
-            if (other.Disposition == ArchitectureTopologyEvaluator.Disposition.ReviewedOutOfScope)
-            {
-                continue;
-            }
-
-            foreach (string targetNode in other.NodeIds)
-            {
-                if (!string.Equals(targetNode, node, StringComparison.Ordinal))
-                {
-                    contributors.Add(targetNode);
-                }
-            }
+            EvaluateDependency(context, dependency, reasons, contributors);
         }
 
         return new ArchitectureMetricRawEvidence(node, null, reasons, contributors);
+    }
+
+    private static bool HasIncompleteRequiredRelationSource(
+        ArchitectureTopologyEvaluator.Projection topology,
+        IReadOnlyDictionary<string, ArchitectureTopologyEvaluator.SubjectClassification> classes,
+        string node,
+        bool outgoing) =>
+        topology.IncompleteDependencySourceIdentities.Any(identity =>
+            classes.TryGetValue(identity, out ArchitectureTopologyEvaluator.SubjectClassification? source)
+            && source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
+            && (!outgoing || source.NodeIds.Contains(node, StringComparer.Ordinal)));
+
+    // Bundles the per-node relation-evaluation inputs so EvaluateDependency stays within the
+    // reviewed parameter-count budget while remaining a pure per-dependency evidence step.
+    private sealed record ComponentRelationsContext(
+        ArchitectureAnalysisSession Session,
+        ArchitectureTopologyEvaluator.Projection Topology,
+        IReadOnlyDictionary<string, ArchitectureTopologyEvaluator.SubjectClassification> Classes,
+        string Node,
+        bool Outgoing);
+
+    private static void EvaluateDependency(
+        ComponentRelationsContext context,
+        ArchitectureTopologyObservedDependency dependency,
+        List<string> reasons,
+        List<string> contributors)
+    {
+        string selectedIdentity = context.Outgoing ? dependency.SourceIdentity : dependency.TargetIdentity;
+        string otherIdentity = context.Outgoing ? dependency.TargetIdentity : dependency.SourceIdentity;
+        ArchitectureTopologyAssemblyEndpointBinding selectedBinding = context.Outgoing
+            ? dependency.SourceBinding
+            : dependency.TargetBinding;
+        string? selectedAssemblyName = context.Outgoing
+            ? dependency.SourceAssemblyName
+            : dependency.TargetAssemblyName;
+        if (selectedBinding == ArchitectureTopologyAssemblyEndpointBinding.Ambiguous
+            && CouldBeSelectedNode(context.Topology, selectedAssemblyName, context.Node))
+        {
+            // An ambiguous endpoint cannot enter the exact classification map. If one of its
+            // candidates belongs to this node, skipping it would manufacture a trusted zero.
+            reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
+            return;
+        }
+
+        if (!context.Classes.TryGetValue(selectedIdentity, out ArchitectureTopologyEvaluator.SubjectClassification? selected))
+        {
+            return;
+        }
+
+        if (selected.Disposition != ArchitectureTopologyEvaluator.Disposition.Mapped
+            || !selected.NodeIds.Contains(context.Node, StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        ArchitectureTopologyAssemblyEndpointBinding otherBinding = context.Outgoing
+            ? dependency.TargetBinding
+            : dependency.SourceBinding;
+        if (otherBinding == ArchitectureTopologyAssemblyEndpointBinding.Ambiguous)
+        {
+            reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
+            return;
+        }
+
+        if (otherBinding == ArchitectureTopologyAssemblyEndpointBinding.Missing)
+        {
+            reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
+            return;
+        }
+
+        // An endpoint excluded from the classification projection was not explicitly reviewed
+        // out of scope. Treating it as absent would make a partial count appear trustworthy.
+        if (!context.Classes.TryGetValue(otherIdentity, out ArchitectureTopologyEvaluator.SubjectClassification? other))
+        {
+            reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
+            return;
+        }
+
+        if (context.Topology.Topology.SubjectKind == "project"
+            && (!HasCanonicalProjectOwner(context.Session, selected.Subject)
+                || !HasCanonicalProjectOwner(context.Session, other.Subject)))
+        {
+            reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+            return;
+        }
+
+        if (other.Disposition == ArchitectureTopologyEvaluator.Disposition.Unmapped)
+        {
+            reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
+            return;
+        }
+
+        if (other.Disposition == ArchitectureTopologyEvaluator.Disposition.Ambiguous)
+        {
+            reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
+            return;
+        }
+
+        if (other.Disposition == ArchitectureTopologyEvaluator.Disposition.ReviewedOutOfScope)
+        {
+            return;
+        }
+
+        foreach (string targetNode in other.NodeIds)
+        {
+            if (!string.Equals(targetNode, context.Node, StringComparison.Ordinal))
+            {
+                contributors.Add(targetNode);
+            }
+        }
     }
 
     private static bool CouldBeSelectedNode(

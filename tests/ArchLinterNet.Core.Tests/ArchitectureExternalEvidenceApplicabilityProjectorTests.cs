@@ -274,13 +274,11 @@ public sealed class ArchitectureExternalEvidenceApplicabilityProjectorTests
                     "external.scan",
                     SarifEvidenceTrustStatus.Valid,
                     authorization: new SarifEvidenceAuthorizationSnapshot(
-                        "external.scan",
-                        "Acme.Scanner",
-                        toolVersion: "7.2",
-                        run: "assessment-42",
-                        requireRepository: false,
-                        requireRevision: false,
-                        requireScope: false,
+                        new SarifEvidenceAuthorizationIdentity("external.scan", "Acme.Scanner", ToolVersion: "7.2", Run: "assessment-42"),
+                        new SarifEvidenceAuthorizationBindingRequirements(
+                            RequireRepository: false,
+                            RequireRevision: false,
+                            RequireScope: false),
                         assessmentContext: new SarifEvidenceAssessmentContext(),
                         diagnosticFilter: new SarifExternalDiagnosticFilterAuthorization(
                             ["SEC404"],

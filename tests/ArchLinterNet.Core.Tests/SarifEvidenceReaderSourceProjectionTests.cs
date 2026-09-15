@@ -280,6 +280,58 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
     }
 
     [Test]
+    public void Read_UnresolvableRuleIndexWinsOverConflictingRuleIdentifiersDetail()
+    {
+        // Index resolution is checked before the id-conflict check, matching the field order in
+        // the SARIF result (ruleIndex is read before rule.id is consulted for a conflict). A
+        // result with both an unresolvable index and mismatched ids must fail on the index first.
+        const string Rules = "\"rules\":[{\"id\":\"SEC100\"}]";
+        _repository.AddUtf8File(
+            "scan.sarif",
+            Sarif(
+                Rules,
+                "{\"ruleId\":\"SEC100\",\"ruleIndex\":5,\"rule\":{\"id\":\"OTHER\"},\"message\":{\"text\":\"x\"}}"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(result.Detail, Does.Contain("rule index 5 cannot be resolved"));
+            Assert.That(result.Detail, Does.Not.Contain("conflicting rule identifiers"));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Read_ConflictingRuleIdentifiersWithResolvableIndexIsRejectedFailClosed()
+    {
+        const string Rules = "\"rules\":[{\"id\":\"SEC100\"}]";
+        _repository.AddUtf8File(
+            "scan.sarif",
+            Sarif(
+                Rules,
+                "{\"ruleId\":\"SEC100\",\"ruleIndex\":0,\"rule\":{\"id\":\"OTHER\"},\"message\":{\"text\":\"x\"}}"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(result.Detail, Does.Contain("conflicting rule identifiers"));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
+        });
+    }
+
+    [Test]
     public void Read_ResolvesArtifactIndexesAndKeepsDistinctPaths()
     {
         const string Artifacts = "\"artifacts\":[{\"location\":{\"uri\":\"src/A.cs\"}},{\"location\":{\"uri\":\"src/B.cs\"}}]";

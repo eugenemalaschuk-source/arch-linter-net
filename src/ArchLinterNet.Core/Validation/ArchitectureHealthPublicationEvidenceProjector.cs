@@ -48,39 +48,7 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
         DateTimeOffset? horizon = null;
         foreach (ArchitectureHealthValidationOutcome receipt in receipts)
         {
-            if (string.IsNullOrWhiteSpace(receipt.Mode))
-            {
-                reasons.Add(new(MalformedWaiverReceipt, "A validation receipt must identify its evaluation mode."));
-            }
-
-            ValidationOutcome validation = receipt.Outcome;
-            if (validation is null)
-            {
-                reasons.Add(new(MissingValidationReceipt, "A validation receipt has no canonical outcome."));
-                continue;
-            }
-
-            ArchitecturePolicyInventory? inventory = validation.PolicyInventory;
-            if (inventory is null)
-            {
-                reasons.Add(new(MissingPolicyInventory, $"The '{receipt.Mode}' validation receipt has no policy inventory."));
-            }
-            else
-            {
-                ValidateInventory(inventory, receipt.Mode, reasons);
-            }
-
-            ArchitectureWaiverLifecycleAssessment? lifecycle = validation.WaiverLifecycleAssessment;
-            if (lifecycle is null)
-            {
-                reasons.Add(new(MissingWaiverReceipt, $"The '{receipt.Mode}' validation receipt has no waiver lifecycle receipt."));
-            }
-            else
-            {
-                ProcessWaivers(inventory, lifecycle, receipt.Mode, ref evaluationDate, ref horizon, reasons);
-            }
-
-            ProcessExternalEvidence(validation, receipt.Mode, reasons);
+            ProcessReceipt(receipt, ref evaluationDate, ref horizon, reasons);
         }
 
         if (reasons.Count > 0)
@@ -98,6 +66,51 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
             ArchitectureHealthPublicationEvidenceState.Ready,
             horizon,
             Array.Empty<ArchitectureHealthPublicationEvidenceReason>());
+    }
+
+    // One receipt's worth of the foreach body above, extracted so the mode/outcome/inventory/
+    // lifecycle/external-evidence branching it carries no longer inflates Project's own cognitive
+    // complexity. Behavior is unchanged: a missing outcome still short-circuits the rest of this
+    // receipt's checks exactly as the inline `continue` used to.
+    private static void ProcessReceipt(
+        ArchitectureHealthValidationOutcome receipt,
+        ref DateOnly? evaluationDate,
+        ref DateTimeOffset? horizon,
+        List<ArchitectureHealthPublicationEvidenceReason> reasons)
+    {
+        if (string.IsNullOrWhiteSpace(receipt.Mode))
+        {
+            reasons.Add(new(MalformedWaiverReceipt, "A validation receipt must identify its evaluation mode."));
+        }
+
+        ValidationOutcome validation = receipt.Outcome;
+        if (validation is null)
+        {
+            reasons.Add(new(MissingValidationReceipt, "A validation receipt has no canonical outcome."));
+            return;
+        }
+
+        ArchitecturePolicyInventory? inventory = validation.PolicyInventory;
+        if (inventory is null)
+        {
+            reasons.Add(new(MissingPolicyInventory, $"The '{receipt.Mode}' validation receipt has no policy inventory."));
+        }
+        else
+        {
+            ValidateInventory(inventory, receipt.Mode, reasons);
+        }
+
+        ArchitectureWaiverLifecycleAssessment? lifecycle = validation.WaiverLifecycleAssessment;
+        if (lifecycle is null)
+        {
+            reasons.Add(new(MissingWaiverReceipt, $"The '{receipt.Mode}' validation receipt has no waiver lifecycle receipt."));
+        }
+        else
+        {
+            ProcessWaivers(inventory, lifecycle, receipt.Mode, ref evaluationDate, ref horizon, reasons);
+        }
+
+        ProcessExternalEvidence(validation, receipt.Mode, reasons);
     }
 
     private static void ValidateInventory(
@@ -136,33 +149,7 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
             ? Array.Empty<ArchitectureWaiverLifecycleRecord>()
             : lifecycle.Records.Where(record => record is not null).ToArray();
 
-        if (lifecycle.EvaluationDate is { } lifecycleEvaluationDate)
-        {
-            if (lifecycleEvaluationDate == DateOnly.MinValue)
-            {
-                reasons.Add(new(InvalidEvaluationDate, $"The '{mode}' waiver lifecycle receipt has an invalid evaluation date."));
-            }
-            else
-            {
-                if (evaluationDate is null)
-                {
-                    evaluationDate = lifecycleEvaluationDate;
-                }
-                else if (evaluationDate.Value != lifecycleEvaluationDate)
-                {
-                    reasons.Add(new(InconsistentEvaluationDate, "Waiver lifecycle receipts do not share one evaluation date."));
-                }
-
-                if (!TryGetNextUtcDay(lifecycleEvaluationDate, out DateTimeOffset lifecycleHorizon))
-                {
-                    reasons.Add(new(InvalidEvaluationDate, "The waiver evaluation date cannot produce a finite UTC horizon."));
-                }
-                else
-                {
-                    horizon = horizon is null || lifecycleHorizon < horizon.Value ? lifecycleHorizon : horizon;
-                }
-            }
-        }
+        ProcessLifecycleEvaluationDate(lifecycle, mode, ref evaluationDate, ref horizon, reasons);
 
         if (records.Length == 0 && lifecycle.EvaluationDate is null)
         {
@@ -177,54 +164,107 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
 
         foreach (ArchitectureWaiverLifecycleRecord record in records)
         {
-            if (string.IsNullOrWhiteSpace(record.Id)
-                || string.IsNullOrWhiteSpace(record.State)
-                || record.EvaluationDate == DateOnly.MinValue)
-            {
-                reasons.Add(new(record.EvaluationDate == DateOnly.MinValue ? MissingEvaluationDate : MalformedWaiverReceipt,
-                    $"The '{mode}' waiver lifecycle receipt contains an incomplete record."));
-                continue;
-            }
-
-            if (evaluationDate is null)
-            {
-                evaluationDate = record.EvaluationDate;
-            }
-            else if (evaluationDate.Value != record.EvaluationDate)
-            {
-                reasons.Add(new(InconsistentEvaluationDate, "Waiver lifecycle receipts do not share one evaluation date."));
-            }
-
-            if (!TryGetNextUtcDay(record.EvaluationDate, out DateTimeOffset dateHorizon))
-            {
-                reasons.Add(new(InvalidEvaluationDate, "The waiver evaluation date cannot produce a finite UTC horizon."));
-                continue;
-            }
-
-            if (record.State is not ("active" or "stale"))
-            {
-                reasons.Add(new(record.State == "expired" ? ExpiredWaiver : MalformedWaiverReceipt,
-                    $"The waiver '{record.Id}' is not a currently assessable lifecycle receipt."));
-            }
-
-            if (record.Expires is { } expiry)
-            {
-                if (expiry < record.EvaluationDate || record.State == "expired")
-                {
-                    reasons.Add(new(ExpiredWaiver, $"The waiver '{record.Id}' expired before the supplied evaluation date."));
-                }
-                else if (!TryGetNextUtcDay(expiry, out DateTimeOffset expiryHorizon))
-                {
-                    reasons.Add(new(InvalidEvaluationDate, $"The waiver '{record.Id}' expiry cannot produce a finite UTC horizon."));
-                }
-                else
-                {
-                    dateHorizon = expiryHorizon < dateHorizon ? expiryHorizon : dateHorizon;
-                }
-            }
-
-            horizon = horizon is null || dateHorizon < horizon.Value ? dateHorizon : horizon;
+            ProcessWaiverRecord(record, mode, ref evaluationDate, ref horizon, reasons);
         }
+    }
+
+    // The `lifecycle.EvaluationDate is {...}` branch of ProcessWaivers above, extracted on its own:
+    // it independently establishes the shared evaluation date and folds a candidate horizon in,
+    // with the same invalid/inconsistent-date reasons as before.
+    private static void ProcessLifecycleEvaluationDate(
+        ArchitectureWaiverLifecycleAssessment lifecycle,
+        string mode,
+        ref DateOnly? evaluationDate,
+        ref DateTimeOffset? horizon,
+        List<ArchitectureHealthPublicationEvidenceReason> reasons)
+    {
+        if (lifecycle.EvaluationDate is not { } lifecycleEvaluationDate)
+        {
+            return;
+        }
+
+        if (lifecycleEvaluationDate == DateOnly.MinValue)
+        {
+            reasons.Add(new(InvalidEvaluationDate, $"The '{mode}' waiver lifecycle receipt has an invalid evaluation date."));
+            return;
+        }
+
+        if (evaluationDate is null)
+        {
+            evaluationDate = lifecycleEvaluationDate;
+        }
+        else if (evaluationDate.Value != lifecycleEvaluationDate)
+        {
+            reasons.Add(new(InconsistentEvaluationDate, "Waiver lifecycle receipts do not share one evaluation date."));
+        }
+
+        if (!TryGetNextUtcDay(lifecycleEvaluationDate, out DateTimeOffset lifecycleHorizon))
+        {
+            reasons.Add(new(InvalidEvaluationDate, "The waiver evaluation date cannot produce a finite UTC horizon."));
+        }
+        else
+        {
+            horizon = horizon is null || lifecycleHorizon < horizon.Value ? lifecycleHorizon : horizon;
+        }
+    }
+
+    // One waiver record's worth of the foreach body above. An incomplete record or one whose
+    // evaluation date cannot produce a finite horizon still stops there, matching the inline
+    // `continue`s this replaces.
+    private static void ProcessWaiverRecord(
+        ArchitectureWaiverLifecycleRecord record,
+        string mode,
+        ref DateOnly? evaluationDate,
+        ref DateTimeOffset? horizon,
+        List<ArchitectureHealthPublicationEvidenceReason> reasons)
+    {
+        if (string.IsNullOrWhiteSpace(record.Id)
+            || string.IsNullOrWhiteSpace(record.State)
+            || record.EvaluationDate == DateOnly.MinValue)
+        {
+            reasons.Add(new(record.EvaluationDate == DateOnly.MinValue ? MissingEvaluationDate : MalformedWaiverReceipt,
+                $"The '{mode}' waiver lifecycle receipt contains an incomplete record."));
+            return;
+        }
+
+        if (evaluationDate is null)
+        {
+            evaluationDate = record.EvaluationDate;
+        }
+        else if (evaluationDate.Value != record.EvaluationDate)
+        {
+            reasons.Add(new(InconsistentEvaluationDate, "Waiver lifecycle receipts do not share one evaluation date."));
+        }
+
+        if (!TryGetNextUtcDay(record.EvaluationDate, out DateTimeOffset dateHorizon))
+        {
+            reasons.Add(new(InvalidEvaluationDate, "The waiver evaluation date cannot produce a finite UTC horizon."));
+            return;
+        }
+
+        if (record.State is not ("active" or "stale"))
+        {
+            reasons.Add(new(record.State == "expired" ? ExpiredWaiver : MalformedWaiverReceipt,
+                $"The waiver '{record.Id}' is not a currently assessable lifecycle receipt."));
+        }
+
+        if (record.Expires is { } expiry)
+        {
+            if (expiry < record.EvaluationDate || record.State == "expired")
+            {
+                reasons.Add(new(ExpiredWaiver, $"The waiver '{record.Id}' expired before the supplied evaluation date."));
+            }
+            else if (!TryGetNextUtcDay(expiry, out DateTimeOffset expiryHorizon))
+            {
+                reasons.Add(new(InvalidEvaluationDate, $"The waiver '{record.Id}' expiry cannot produce a finite UTC horizon."));
+            }
+            else
+            {
+                dateHorizon = expiryHorizon < dateHorizon ? expiryHorizon : dateHorizon;
+            }
+        }
+
+        horizon = horizon is null || dateHorizon < horizon.Value ? dateHorizon : horizon;
     }
 
     private static void ProcessExternalEvidence(

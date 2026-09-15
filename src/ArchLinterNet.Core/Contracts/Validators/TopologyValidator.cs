@@ -77,45 +77,66 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
         string nodesPath = ArchitecturePolicyProvenancePath.AppendProperty(ArchitecturePolicyProvenancePath.Property("topology"), "nodes");
         for (int index = 0; index < topology.Nodes.Count; index++)
         {
-            ArchitectureTopologyNode? node = topology.Nodes[index];
-            string nodePath = ArchitecturePolicyProvenancePath.AppendIndex(nodesPath, index);
-            document.Provenance.SetValidationSubject(nodePath);
-            if (node is null)
+            ValidateNode(document, topology, topology.Nodes[index], index, nodesPath, nodeIds, mappings);
+        }
+    }
+
+    private static void ValidateNode(
+        ArchitectureContractDocument document,
+        ArchitectureTopology topology,
+        ArchitectureTopologyNode? node,
+        int index,
+        string nodesPath,
+        HashSet<string> nodeIds,
+        Dictionary<TopologySelectorIdentity, string> mappings)
+    {
+        string nodePath = ArchitecturePolicyProvenancePath.AppendIndex(nodesPath, index);
+        document.Provenance.SetValidationSubject(nodePath);
+        if (node is null)
+        {
+            throw new InvalidOperationException($"Topology node {index} must not be null.");
+        }
+
+        if (string.IsNullOrWhiteSpace(node.Id))
+        {
+            throw new InvalidOperationException($"Topology node {index} must declare a non-empty id.");
+        }
+
+        if (!nodeIds.Add(node.Id))
+        {
+            throw new InvalidOperationException($"Topology declares duplicate node id '{node.Id}'.");
+        }
+
+        if (node.Mappings is null || node.Mappings.Count == 0)
+        {
+            throw new InvalidOperationException($"Topology node '{node.Id}' must declare at least one mapping selector.");
+        }
+
+        ValidateNodeMappings(document, topology, node, nodePath, mappings);
+    }
+
+    private static void ValidateNodeMappings(
+        ArchitectureContractDocument document,
+        ArchitectureTopology topology,
+        ArchitectureTopologyNode node,
+        string nodePath,
+        Dictionary<TopologySelectorIdentity, string> mappings)
+    {
+        string mappingPath = ArchitecturePolicyProvenancePath.AppendProperty(nodePath, "mappings");
+        for (int mappingIndex = 0; mappingIndex < node.Mappings.Count; mappingIndex++)
+        {
+            string path = ArchitecturePolicyProvenancePath.AppendIndex(mappingPath, mappingIndex);
+            TopologySelectorIdentity identity = ValidateSelector(
+                document, node.Mappings[mappingIndex], topology.SubjectKind, path, $"Topology node '{node.Id}' mapping");
+            if (mappings.TryGetValue(identity, out string? existingNode))
             {
-                throw new InvalidOperationException($"Topology node {index} must not be null.");
+                string detail = string.Equals(existingNode, node.Id, StringComparison.Ordinal)
+                    ? $"Topology node '{node.Id}' declares duplicate mapping selector."
+                    : $"Topology nodes '{existingNode}' and '{node.Id}' declare the same mapping selector, which is unambiguously ambiguous.";
+                throw new InvalidOperationException(detail);
             }
 
-            if (string.IsNullOrWhiteSpace(node.Id))
-            {
-                throw new InvalidOperationException($"Topology node {index} must declare a non-empty id.");
-            }
-
-            if (!nodeIds.Add(node.Id))
-            {
-                throw new InvalidOperationException($"Topology declares duplicate node id '{node.Id}'.");
-            }
-
-            if (node.Mappings is null || node.Mappings.Count == 0)
-            {
-                throw new InvalidOperationException($"Topology node '{node.Id}' must declare at least one mapping selector.");
-            }
-
-            string mappingPath = ArchitecturePolicyProvenancePath.AppendProperty(nodePath, "mappings");
-            for (int mappingIndex = 0; mappingIndex < node.Mappings.Count; mappingIndex++)
-            {
-                string path = ArchitecturePolicyProvenancePath.AppendIndex(mappingPath, mappingIndex);
-                TopologySelectorIdentity identity = ValidateSelector(
-                    document, node.Mappings[mappingIndex], topology.SubjectKind, path, $"Topology node '{node.Id}' mapping");
-                if (mappings.TryGetValue(identity, out string? existingNode))
-                {
-                    string detail = string.Equals(existingNode, node.Id, StringComparison.Ordinal)
-                        ? $"Topology node '{node.Id}' declares duplicate mapping selector."
-                        : $"Topology nodes '{existingNode}' and '{node.Id}' declare the same mapping selector, which is unambiguously ambiguous.";
-                    throw new InvalidOperationException(detail);
-                }
-
-                mappings.Add(identity, node.Id);
-            }
+            mappings.Add(identity, node.Id);
         }
     }
 
@@ -212,6 +233,20 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
             throw new InvalidOperationException($"{label} must not be null.");
         }
 
+        string selectorKind = ResolveSelectorKind(selector, label);
+        if (!_selectorKindsBySubjectKind[subjectKind].Contains(selectorKind))
+        {
+            throw new InvalidOperationException(
+                $"{label} selector kind '{selectorKind}' is not valid for topology subject_kind '{subjectKind}'.");
+        }
+
+        ValidateSelectorTarget(document, selector, selectorKind, label);
+
+        return TopologySelectorIdentity.Create(selector, selectorKind);
+    }
+
+    private static string ResolveSelectorKind(ArchitectureTopologySubjectSelector selector, string label)
+    {
         bool layer = !string.IsNullOrWhiteSpace(selector.Layer);
         bool @namespace = !string.IsNullOrWhiteSpace(selector.Namespace);
         bool project = !string.IsNullOrWhiteSpace(selector.Project);
@@ -224,23 +259,23 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
                 $"{label} must declare exactly one of layer, namespace, project, assembly, or context.");
         }
 
-        string selectorKind = layer ? "layer"
+        return layer ? "layer"
             : @namespace ? "namespace"
             : project ? "project"
             : assembly ? "assembly"
             : "context";
-        if (!_selectorKindsBySubjectKind[subjectKind].Contains(selectorKind))
-        {
-            throw new InvalidOperationException(
-                $"{label} selector kind '{selectorKind}' is not valid for topology subject_kind '{subjectKind}'.");
-        }
+    }
 
+    private static void ValidateSelectorTarget(
+        ArchitectureContractDocument document, ArchitectureTopologySubjectSelector selector, string selectorKind, string label)
+    {
+        bool @namespace = selectorKind == "namespace";
         if (!@namespace && !string.IsNullOrWhiteSpace(selector.NamespaceSuffix))
         {
             throw new InvalidOperationException($"{label} namespace_suffix requires namespace.");
         }
 
-        if (layer && !document.Layers.ContainsKey(selector.Layer))
+        if (selectorKind == "layer" && !document.Layers.ContainsKey(selector.Layer))
         {
             throw new InvalidOperationException($"{label} references undeclared layer '{selector.Layer}'.");
         }
@@ -257,12 +292,10 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
             }
         }
 
-        if (context)
+        if (selectorKind == "context")
         {
             ValidateContext(label, selector.Context!);
         }
-
-        return TopologySelectorIdentity.Create(selector, selectorKind);
     }
 
     private static void ValidateContext(string label, ArchitectureContextSelector context)

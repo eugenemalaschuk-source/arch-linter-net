@@ -67,62 +67,93 @@ public sealed class ArchitectureGraphApplicationService(
         out List<ArchitectureViolation> violations,
         out IReadOnlyCollection<Reporting.ArchitectureCoverageSummary> coverageSummaries)
     {
-        ArchitectureContractDocument document;
+        ArchitectureContractDocument document = LoadDocument(request);
+        HashSet<string>? selectedIds = ResolveSelectedContractIds(document, request);
+        ApplyRequestedTargetFramework(document, request);
+
+        ArchitectureRunnerSetup setup = CreateRunnerSetup(request, document, selectedIds);
+        setup = _buildStatePreflightService.PrepareBuildStateRunner(request, document, selectedIds, setup);
+
+        IArchitectureContractRunner runner = setup.Runner;
+        ExecuteContracts(runner, request, out violations, out coverageSummaries);
+
+        return runner.Session;
+    }
+
+    private ArchitectureContractDocument LoadDocument(ArchitectureGraphRequest request)
+    {
         try
         {
-            document = runnerSetupService.LoadDocument(request.PolicyPath);
+            return runnerSetupService.LoadDocument(request.PolicyPath);
         }
         catch (ArchitecturePolicyImportException ex)
         {
             throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString() ?? "unknown", ex);
         }
+    }
 
+    private static HashSet<string>? ResolveSelectedContractIds(
+        ArchitectureContractDocument document,
+        ArchitectureGraphRequest request)
+    {
         HashSet<string>? selectedIds = request.ContractIds is { Count: > 0 }
             ? new HashSet<string>(request.ContractIds, StringComparer.OrdinalIgnoreCase)
             : null;
 
-        if (selectedIds != null)
+        if (selectedIds is null)
         {
-            HashSet<string> availableIds = CollectAvailableContractIds(document, request.Mode);
-            List<string> unknownIds = selectedIds.Where(id => !availableIds.Contains(id)).ToList();
-
-            if (unknownIds.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Unknown contract IDs: {string.Join(", ", unknownIds)}{Environment.NewLine}" +
-                    $"Available IDs in {request.Mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
-            }
+            return null;
         }
 
-        if (request.UsePreparedPostBuildState
-            && request.RequestedTargetFramework is not null)
+        HashSet<string> availableIds = CollectAvailableContractIds(document, request.Mode);
+        List<string> unknownIds = selectedIds.Where(id => !availableIds.Contains(id)).ToList();
+
+        if (unknownIds.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Unknown contract IDs: {string.Join(", ", unknownIds)}{Environment.NewLine}" +
+                $"Available IDs in {request.Mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
+        }
+
+        return selectedIds;
+    }
+
+    private static void ApplyRequestedTargetFramework(ArchitectureContractDocument document, ArchitectureGraphRequest request)
+    {
+        if (request.UsePreparedPostBuildState && request.RequestedTargetFramework is not null)
         {
             // MaterializePreparedRunner uses the supplied exact artifact paths; retain the
             // effective framework only for shared-framework probing, which must follow the
             // same caller-selected context rather than the policy default.
             document.Analysis.TargetFramework = request.RequestedTargetFramework;
         }
+    }
 
-        ArchitectureRunnerSetup setup = request.UsePreparedPostBuildState
-            ? runnerSetupService.MaterializePreparedRunner(
-                document,
-                request.PreparedPostBuildRunner
-                    ?? throw new InvalidOperationException("Prepared graph analysis requires validation's receipt-backed artifact selection."),
-                selectedContractIds: selectedIds,
-                enableUnmatchedIgnoreTracking: false,
-                mode: request.Mode == "all" ? null : request.Mode)
-            : runnerSetupService.BuildRunner(
-                document,
-                request.PolicyPath,
-                request.ConditionSetName,
-                selectedContractIds: selectedIds,
-                enableUnmatchedIgnoreTracking: false,
-                mode: request.Mode == "all" ? null : request.Mode);
+    private ArchitectureRunnerSetup CreateRunnerSetup(
+        ArchitectureGraphRequest request,
+        ArchitectureContractDocument document,
+        HashSet<string>? selectedIds) => request.UsePreparedPostBuildState
+        ? runnerSetupService.MaterializePreparedRunner(
+            document,
+            request.PreparedPostBuildRunner
+                ?? throw new InvalidOperationException("Prepared graph analysis requires validation's receipt-backed artifact selection."),
+            selectedContractIds: selectedIds,
+            enableUnmatchedIgnoreTracking: false,
+            mode: request.Mode == "all" ? null : request.Mode)
+        : runnerSetupService.BuildRunner(
+            document,
+            request.PolicyPath,
+            request.ConditionSetName,
+            selectedContractIds: selectedIds,
+            enableUnmatchedIgnoreTracking: false,
+            mode: request.Mode == "all" ? null : request.Mode);
 
-        setup = _buildStatePreflightService.PrepareBuildStateRunner(request, document, selectedIds, setup);
-
-        IArchitectureContractRunner runner = setup.Runner;
-
+    private void ExecuteContracts(
+        IArchitectureContractRunner runner,
+        ArchitectureGraphRequest request,
+        out List<ArchitectureViolation> violations,
+        out IReadOnlyCollection<Reporting.ArchitectureCoverageSummary> coverageSummaries)
+    {
         violations = new List<ArchitectureViolation>();
         coverageSummaries = Array.Empty<Reporting.ArchitectureCoverageSummary>();
         violations.AddRange(runner.CheckConfiguration(strict: request.Mode != ModeAudit));
@@ -145,8 +176,6 @@ public sealed class ArchitectureGraphApplicationService(
             violations.AddRange(auditExecution.Violations);
             coverageSummaries = coverageSummaries.Concat(auditExecution.CoverageSummaries).ToArray();
         }
-
-        return runner.Session;
     }
 
     private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)

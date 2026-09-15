@@ -142,10 +142,12 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
     }
 
-    private IEnumerable<ExternalIlMatch> FindMethodMatchesForValidation(
-        MethodBase method,
-        ArchitectureExternalDependencyGroup externalGroup,
-        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
+    // Isolated from the iterator below so that the try/catch and the null/empty checks that decide
+    // whether a method body is scannable at all live outside a yield-bearing method: an iterator's
+    // body only starts running on first MoveNext, so keeping this decision here keeps that timing
+    // unchanged (the checks still resolve strictly before the first candidate is produced) while
+    // removing the branching that otherwise inflates the iterator's own cognitive complexity.
+    private static bool TryGetValidationIl(MethodBase method, out byte[]? il)
     {
         MethodBody? body;
         try
@@ -154,16 +156,26 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
         catch (FileNotFoundException)
         {
-            yield break;
+            il = null;
+            return false;
         }
 
         if (body == null)
         {
-            yield break;
+            il = null;
+            return false;
         }
 
-        byte[]? il = body.GetILAsByteArray();
-        if (il == null || il.Length == 0)
+        il = body.GetILAsByteArray();
+        return il is { Length: > 0 };
+    }
+
+    private IEnumerable<ExternalIlMatch> FindMethodMatchesForValidation(
+        MethodBase method,
+        ArchitectureExternalDependencyGroup externalGroup,
+        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
+    {
+        if (!TryGetValidationIl(method, out byte[]? il))
         {
             yield break;
         }
@@ -175,7 +187,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
 
         int position = 0;
-        while (position < il.Length)
+        while (position < il!.Length)
         {
             if (!TryReadOpCode(il, ref position, out OpCode opCode))
             {
@@ -192,22 +204,9 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 continue;
             }
 
-            ResolvedMember resolved = ResolveReferencedMember(method.Module, token, genericContext);
-            if (!resolved.IsComplete || resolved.Member == null)
-            {
-                continue;
-            }
-
-            if (!matchedTypes.TryGetValue(resolved.Member, out ExternalMemberMatch? memberMatch))
-            {
-                string? matched = FindMatchedExternalType(resolved.Member, externalGroup);
-                memberMatch = matched == null
-                    ? null
-                    : new ExternalMemberMatch(matched, resolved.Member.DeclaringType?.Assembly.GetName().Name);
-                matchedTypes[resolved.Member] = memberMatch;
-            }
-
-            if (memberMatch == null)
+            ExternalMemberMatch? memberMatch = ResolveMemberMatch(
+                method, token, genericContext, externalGroup, matchedTypes, out bool resolutionComplete);
+            if (!resolutionComplete || memberMatch == null)
             {
                 continue;
             }
@@ -218,6 +217,39 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 memberMatch.MatchedType,
                 memberMatch.TargetAssembly);
         }
+    }
+
+    // Shared by both the validation iterator above and the metrics scan below: resolves one IL
+    // token to the external-group match it produces (if any), populating the per-call matchedTypes
+    // cache exactly once per distinct member. Extracting this collapses the token-resolution/cache
+    // lookup/group-match branching that used to live inline in each loop body.
+    private ExternalMemberMatch? ResolveMemberMatch(
+        MethodBase method,
+        int token,
+        IlGenericContext genericContext,
+        ArchitectureExternalDependencyGroup externalGroup,
+        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes,
+        out bool resolutionComplete)
+    {
+        ResolvedMember resolved = ResolveReferencedMember(method.Module, token, genericContext);
+        resolutionComplete = resolved.IsComplete && resolved.Member != null;
+        if (!resolutionComplete)
+        {
+            return null;
+        }
+
+        MemberInfo member = resolved.Member!;
+        if (matchedTypes.TryGetValue(member, out ExternalMemberMatch? cached))
+        {
+            return cached;
+        }
+
+        string? matched = FindMatchedExternalType(member, externalGroup);
+        ExternalMemberMatch? memberMatch = matched == null
+            ? null
+            : new ExternalMemberMatch(matched, member.DeclaringType?.Assembly.GetName().Name);
+        matchedTypes[member] = memberMatch;
+        return memberMatch;
     }
 
     private TypeScanResult ScanType(
@@ -264,10 +296,10 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
     }
 
-    private MethodScanResult ScanMethod(
-        MethodBase method,
-        ArchitectureExternalDependencyGroup externalGroup,
-        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
+    // Metrics-path counterpart of TryGetValidationIl: unlike validation, an unreadable body makes
+    // the whole method incomplete rather than a silent non-match, so this reports which of the two
+    // outcomes applies instead of just yes/no.
+    private static IlRetrievalStatus TryGetMetricsIl(MethodBase method, out byte[]? il)
     {
         MethodBody? body;
         try
@@ -276,30 +308,46 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return MethodScanResult.Incomplete;
+            il = null;
+            return IlRetrievalStatus.Incomplete;
         }
 
         if (body == null)
         {
-            return MethodScanResult.Empty;
+            il = null;
+            return IlRetrievalStatus.Empty;
         }
 
-        byte[]? il;
         try
         {
             il = body.GetILAsByteArray();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return MethodScanResult.Incomplete;
+            il = null;
+            return IlRetrievalStatus.Incomplete;
         }
 
         if (il == null)
         {
+            return IlRetrievalStatus.Incomplete;
+        }
+
+        return il.Length == 0 ? IlRetrievalStatus.Empty : IlRetrievalStatus.Ready;
+    }
+
+    private MethodScanResult ScanMethod(
+        MethodBase method,
+        ArchitectureExternalDependencyGroup externalGroup,
+        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
+    {
+        IlRetrievalStatus status = TryGetMetricsIl(method, out byte[]? il);
+        if (status == IlRetrievalStatus.Incomplete)
+        {
             return MethodScanResult.Incomplete;
         }
 
-        if (il.Length == 0)
+        if (status == IlRetrievalStatus.Empty)
         {
             return MethodScanResult.Empty;
         }
@@ -315,7 +363,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
 
         var matches = new List<ExternalIlMatch>();
         int position = 0;
-        while (position < il.Length)
+        while (position < il!.Length)
         {
             if (!TryReadOpCode(il, ref position, out OpCode opCode))
             {
@@ -332,19 +380,11 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 continue;
             }
 
-            ResolvedMember resolved = ResolveReferencedMember(method.Module, token, genericContext);
-            if (!resolved.IsComplete || resolved.Member == null)
+            ExternalMemberMatch? memberMatch = ResolveMemberMatch(
+                method, token, genericContext, externalGroup, matchedTypes, out bool resolutionComplete);
+            if (!resolutionComplete)
             {
                 return MethodScanResult.Incomplete;
-            }
-
-            if (!matchedTypes.TryGetValue(resolved.Member, out ExternalMemberMatch? memberMatch))
-            {
-                string? matched = FindMatchedExternalType(resolved.Member, externalGroup);
-                memberMatch = matched == null
-                    ? null
-                    : new ExternalMemberMatch(matched, resolved.Member.DeclaringType?.Assembly.GetName().Name);
-                matchedTypes[resolved.Member] = memberMatch;
             }
 
             if (memberMatch == null)
@@ -360,6 +400,13 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
 
         return new MethodScanResult(matches, IsComplete: true);
+    }
+
+    private enum IlRetrievalStatus
+    {
+        Empty,
+        Incomplete,
+        Ready,
     }
 
     private sealed record ExternalIlMatch(
