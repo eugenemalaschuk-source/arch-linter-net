@@ -26,39 +26,62 @@ internal static class ArchitectureExternalDependencyMetricCalculator
             topology.Classifications
                 .GroupBy(classification => classification.Subject.Identity, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
-        List<string> reasons = new();
-        List<string> contributors = new();
-        if (incompleteSourceTypes != null && incompleteSourceTypes.Any(sourceType =>
-                FindClassifications(classificationsByIdentity, topology, sourceType, session).Any(source =>
-                    source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
-                    && source.NodeIds.Contains(node, StringComparer.Ordinal))))
+
+        if (HasIncompleteRequiredSource(session, topology, classificationsByIdentity, node, incompleteSourceTypes))
         {
-            reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
-            return new ArchitectureMetricRawEvidence(node, null, reasons, contributors);
+            return new ArchitectureMetricRawEvidence(
+                node, null, [ArchitectureApplicabilityReasonCodes.MissingRequiredInput], new List<string>());
         }
 
+        List<string> reasons = new();
+        List<string> contributors = new();
         foreach (ArchitectureExternalDependencyFact fact in facts)
         {
-            foreach (ArchitectureTopologyEvaluator.SubjectClassification source in FindClassifications(
-                         classificationsByIdentity, topology, fact.SourceType, session))
-            {
-                if (source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
-                    && source.NodeIds.Contains(node, StringComparer.Ordinal))
-                {
-                    if (topology.Topology.SubjectKind == "project"
-                        && !ArchitectureTopologyMetricCalculator.HasCanonicalProjectOwner(session, source.Subject))
-                    {
-                        reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
-                    }
-                    else
-                    {
-                        contributors.Add(fact.GroupName);
-                    }
-                }
-            }
+            CollectFactEvidence(session, topology, classificationsByIdentity, node, fact, reasons, contributors);
         }
 
         return new ArchitectureMetricRawEvidence(node, null, reasons, contributors);
+    }
+
+    private static bool HasIncompleteRequiredSource(
+        ArchitectureAnalysisSession session,
+        ArchitectureTopologyEvaluator.Projection topology,
+        IReadOnlyDictionary<string, ArchitectureTopologyEvaluator.SubjectClassification[]> classificationsByIdentity,
+        string node,
+        IReadOnlySet<Type>? incompleteSourceTypes) =>
+        incompleteSourceTypes != null && incompleteSourceTypes.Any(sourceType =>
+            FindClassifications(classificationsByIdentity, topology, sourceType, session).Any(source =>
+                source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
+                && source.NodeIds.Contains(node, StringComparer.Ordinal)));
+
+    private static void CollectFactEvidence(
+        ArchitectureAnalysisSession session,
+        ArchitectureTopologyEvaluator.Projection topology,
+        IReadOnlyDictionary<string, ArchitectureTopologyEvaluator.SubjectClassification[]> classificationsByIdentity,
+        string node,
+        ArchitectureExternalDependencyFact fact,
+        List<string> reasons,
+        List<string> contributors)
+    {
+        foreach (ArchitectureTopologyEvaluator.SubjectClassification source in FindClassifications(
+                     classificationsByIdentity, topology, fact.SourceType, session))
+        {
+            if (source.Disposition != ArchitectureTopologyEvaluator.Disposition.Mapped
+                || !source.NodeIds.Contains(node, StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (topology.Topology.SubjectKind == "project"
+                && !ArchitectureTopologyMetricCalculator.HasCanonicalProjectOwner(session, source.Subject))
+            {
+                reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+            }
+            else
+            {
+                contributors.Add(fact.GroupName);
+            }
+        }
     }
 
     private static IEnumerable<ArchitectureTopologyEvaluator.SubjectClassification> FindClassifications(

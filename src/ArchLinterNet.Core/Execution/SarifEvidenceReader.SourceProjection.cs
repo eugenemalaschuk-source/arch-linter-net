@@ -89,61 +89,94 @@ internal static class SarifEvidenceSourceProjectionReader
         foreach (JsonElement rule in rules.EnumerateArray())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (rule.ValueKind != JsonValueKind.Object)
+            if (!TryReadDriverRule(rule, catalog, cancellationToken, out detail))
             {
-                detail = "Every SARIF tool driver rule must be an object.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryReadDriverRule(
+        JsonElement rule,
+        SarifDriverRuleCatalog catalog,
+        CancellationToken cancellationToken,
+        out string? detail)
+    {
+        detail = null;
+        if (rule.ValueKind != JsonValueKind.Object)
+        {
+            detail = "Every SARIF tool driver rule must be an object.";
+            return false;
+        }
+
+        if (!rule.TryGetProperty("id", out JsonElement id)
+            || id.ValueKind != JsonValueKind.String)
+        {
+            detail = "Every SARIF tool driver rule must declare a string id.";
+            return false;
+        }
+
+        string ruleId = id.GetString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(ruleId))
+        {
+            detail = "Every SARIF tool driver rule must declare a non-blank id.";
+            return false;
+        }
+
+        if (!TryReadDriverRuleTagList(rule, cancellationToken, out List<string>? tags, out detail))
+        {
+            return false;
+        }
+
+        // SARIF allows several descriptors to share an id.  Keep each descriptor in
+        // its declared ordinal slot: a result ruleIndex/rule.index is the only way to
+        // select the right descriptor (and therefore its tags) in that situation.
+        catalog.Add(ruleId, tags!);
+        return true;
+    }
+
+    private static bool TryReadDriverRuleTagList(
+        JsonElement rule,
+        CancellationToken cancellationToken,
+        out List<string>? tags,
+        out string? detail)
+    {
+        tags = [];
+        detail = null;
+        if (!rule.TryGetProperty("properties", out JsonElement properties))
+        {
+            return true;
+        }
+
+        if (properties.ValueKind != JsonValueKind.Object)
+        {
+            detail = "The SARIF tool driver rule properties member must be an object.";
+            return false;
+        }
+
+        if (!properties.TryGetProperty("tags", out JsonElement tagValues))
+        {
+            return true;
+        }
+
+        if (tagValues.ValueKind != JsonValueKind.Array)
+        {
+            detail = "The SARIF tool driver rule tags member must be an array.";
+            return false;
+        }
+
+        foreach (JsonElement tag in tagValues.EnumerateArray())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (tag.ValueKind != JsonValueKind.String)
+            {
+                detail = "Every SARIF tool driver rule tag must be a string.";
                 return false;
             }
 
-            if (!rule.TryGetProperty("id", out JsonElement id)
-                || id.ValueKind != JsonValueKind.String)
-            {
-                detail = "Every SARIF tool driver rule must declare a string id.";
-                return false;
-            }
-
-            string ruleId = id.GetString() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(ruleId))
-            {
-                detail = "Every SARIF tool driver rule must declare a non-blank id.";
-                return false;
-            }
-
-            List<string> tags = [];
-            if (rule.TryGetProperty("properties", out JsonElement properties))
-            {
-                if (properties.ValueKind != JsonValueKind.Object)
-                {
-                    detail = "The SARIF tool driver rule properties member must be an object.";
-                    return false;
-                }
-
-                if (properties.TryGetProperty("tags", out JsonElement tagValues))
-                {
-                    if (tagValues.ValueKind != JsonValueKind.Array)
-                    {
-                        detail = "The SARIF tool driver rule tags member must be an array.";
-                        return false;
-                    }
-
-                    foreach (JsonElement tag in tagValues.EnumerateArray())
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (tag.ValueKind != JsonValueKind.String)
-                        {
-                            detail = "Every SARIF tool driver rule tag must be a string.";
-                            return false;
-                        }
-
-                        tags.Add(tag.GetString() ?? string.Empty);
-                    }
-                }
-            }
-
-            // SARIF allows several descriptors to share an id.  Keep each descriptor in
-            // its declared ordinal slot: a result ruleIndex/rule.index is the only way to
-            // select the right descriptor (and therefore its tags) in that situation.
-            catalog.Add(ruleId, tags);
+            tags.Add(tag.GetString() ?? string.Empty);
         }
 
         return true;
@@ -326,72 +359,14 @@ internal static class SarifEvidenceSourceProjectionReader
         out string? detail)
     {
         resolvedRule = null;
-        detail = null;
-        if (!TryReadOptionalSourceString(result, "ruleId", resultIndex, out string? directRuleId, out detail))
+        if (!TryReadDirectRuleIdentity(result, resultIndex, out string? directRuleId, out int? directRuleIndex, out detail))
         {
             return false;
         }
 
-        if (directRuleId is not null && string.IsNullOrWhiteSpace(directRuleId))
+        if (!TryReadRuleReference(result, resultIndex, out string? referencedRuleId, out int? referencedRuleIndex, out detail))
         {
-            detail = $"The SARIF result at index {resultIndex} ruleId member must be a non-blank string when present.";
             return false;
-        }
-
-        int? directRuleIndex = null;
-        if (result.TryGetProperty("ruleIndex", out JsonElement directIndex))
-        {
-            if (!TryReadNonNegativeIndex(directIndex, "ruleIndex", resultIndex, out directRuleIndex, out detail))
-            {
-                return false;
-            }
-        }
-
-        string? referencedRuleId = null;
-        int? referencedRuleIndex = null;
-        if (result.TryGetProperty("rule", out JsonElement ruleReference))
-        {
-            if (ruleReference.ValueKind != JsonValueKind.Object)
-            {
-                detail = $"The SARIF result at index {resultIndex} rule member must be an object.";
-                return false;
-            }
-
-            if (ruleReference.TryGetProperty("id", out JsonElement referenceId))
-            {
-                if (referenceId.ValueKind != JsonValueKind.String
-                    || string.IsNullOrWhiteSpace(referenceId.GetString()))
-                {
-                    detail = $"The SARIF result at index {resultIndex} rule.id member must be a non-blank string.";
-                    return false;
-                }
-
-                referencedRuleId = referenceId.GetString();
-            }
-
-            if (ruleReference.TryGetProperty("index", out JsonElement referenceIndex))
-            {
-                if (!TryReadNonNegativeIndex(referenceIndex, "rule.index", resultIndex, out referencedRuleIndex, out detail))
-                {
-                    return false;
-                }
-            }
-
-            if (ruleReference.TryGetProperty("guid", out _)
-                && !ruleReference.TryGetProperty("id", out _)
-                && !ruleReference.TryGetProperty("index", out _))
-            {
-                detail =
-                    $"The SARIF result at index {resultIndex} rule.guid reference cannot be resolved without rule.id or rule.index.";
-                return false;
-            }
-
-            if (referencedRuleId is null && referencedRuleIndex is null)
-            {
-                detail =
-                    $"The SARIF result at index {resultIndex} rule reference must contain id or index.";
-                return false;
-            }
         }
 
         if (directRuleIndex is not null && referencedRuleIndex is not null
@@ -402,15 +377,113 @@ internal static class SarifEvidenceSourceProjectionReader
         }
 
         int? ruleIndex = directRuleIndex ?? referencedRuleIndex;
-        SarifDriverRuleDescriptor? indexedDescriptor = null;
-        if (ruleIndex is not null)
+        return TryResolveRuleIdentity(
+            driverRules, resultIndex, directRuleId, referencedRuleId, ruleIndex, out resolvedRule, out detail);
+    }
+
+    private static bool TryReadDirectRuleIdentity(
+        JsonElement result,
+        int resultIndex,
+        out string? directRuleId,
+        out int? directRuleIndex,
+        out string? detail)
+    {
+        directRuleIndex = null;
+        if (!TryReadOptionalSourceString(result, "ruleId", resultIndex, out directRuleId, out detail))
         {
-            if (!driverRules.TryResolve(ruleIndex.Value, out indexedDescriptor))
+            return false;
+        }
+
+        if (directRuleId is not null && string.IsNullOrWhiteSpace(directRuleId))
+        {
+            detail = $"The SARIF result at index {resultIndex} ruleId member must be a non-blank string when present.";
+            return false;
+        }
+
+        if (result.TryGetProperty("ruleIndex", out JsonElement directIndex)
+            && !TryReadNonNegativeIndex(directIndex, "ruleIndex", resultIndex, out directRuleIndex, out detail))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryReadRuleReference(
+        JsonElement result,
+        int resultIndex,
+        out string? referencedRuleId,
+        out int? referencedRuleIndex,
+        out string? detail)
+    {
+        referencedRuleId = null;
+        referencedRuleIndex = null;
+        detail = null;
+        if (!result.TryGetProperty("rule", out JsonElement ruleReference))
+        {
+            return true;
+        }
+
+        if (ruleReference.ValueKind != JsonValueKind.Object)
+        {
+            detail = $"The SARIF result at index {resultIndex} rule member must be an object.";
+            return false;
+        }
+
+        if (ruleReference.TryGetProperty("id", out JsonElement referenceId))
+        {
+            if (referenceId.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(referenceId.GetString()))
             {
-                detail =
-                    $"The SARIF result at index {resultIndex} rule index {ruleIndex.Value} cannot be resolved by the tool driver rules.";
+                detail = $"The SARIF result at index {resultIndex} rule.id member must be a non-blank string.";
                 return false;
             }
+
+            referencedRuleId = referenceId.GetString();
+        }
+
+        if (ruleReference.TryGetProperty("index", out JsonElement referenceIndex)
+            && !TryReadNonNegativeIndex(referenceIndex, "rule.index", resultIndex, out referencedRuleIndex, out detail))
+        {
+            return false;
+        }
+
+        if (ruleReference.TryGetProperty("guid", out _)
+            && !ruleReference.TryGetProperty("id", out _)
+            && !ruleReference.TryGetProperty("index", out _))
+        {
+            detail =
+                $"The SARIF result at index {resultIndex} rule.guid reference cannot be resolved without rule.id or rule.index.";
+            return false;
+        }
+
+        if (referencedRuleId is null && referencedRuleIndex is null)
+        {
+            detail =
+                $"The SARIF result at index {resultIndex} rule reference must contain id or index.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryResolveRuleIdentity(
+        SarifDriverRuleCatalog driverRules,
+        int resultIndex,
+        string? directRuleId,
+        string? referencedRuleId,
+        int? ruleIndex,
+        out SarifResolvedRule? resolvedRule,
+        out string? detail)
+    {
+        resolvedRule = null;
+        detail = null;
+        SarifDriverRuleDescriptor? indexedDescriptor = null;
+        if (ruleIndex is not null && !driverRules.TryResolve(ruleIndex.Value, out indexedDescriptor))
+        {
+            detail =
+                $"The SARIF result at index {resultIndex} rule index {ruleIndex.Value} cannot be resolved by the tool driver rules.";
+            return false;
         }
 
         if (directRuleId is not null && referencedRuleId is not null
@@ -420,9 +493,10 @@ internal static class SarifEvidenceSourceProjectionReader
             return false;
         }
 
-        string? ruleId = directRuleId ?? referencedRuleId ?? indexedDescriptor?.Id;
-        if (indexedDescriptor is not null && ruleId is not null
-            && !string.Equals(indexedDescriptor.Id, ruleId, StringComparison.Ordinal))
+        string? ruleId = directRuleId ?? referencedRuleId;
+        string? resolvedRuleId = ruleId ?? indexedDescriptor?.Id;
+        if (indexedDescriptor is not null && resolvedRuleId is not null
+            && !string.Equals(indexedDescriptor.Id, resolvedRuleId, StringComparison.Ordinal))
         {
             detail = $"The SARIF result at index {resultIndex} rule reference does not match its rule index.";
             return false;
@@ -434,12 +508,12 @@ internal static class SarifEvidenceSourceProjectionReader
             return true;
         }
 
-        if (ruleId is null)
+        if (resolvedRuleId is null)
         {
             return true;
         }
 
-        if (driverRules.TryResolveUnique(ruleId, out SarifDriverRuleDescriptor? uniqueDescriptor, out bool isAmbiguous))
+        if (driverRules.TryResolveUnique(resolvedRuleId, out SarifDriverRuleDescriptor? uniqueDescriptor, out bool isAmbiguous))
         {
             resolvedRule = new SarifResolvedRule(uniqueDescriptor!.Id, uniqueDescriptor.Tags);
             return true;
@@ -448,14 +522,14 @@ internal static class SarifEvidenceSourceProjectionReader
         if (isAmbiguous)
         {
             detail =
-                $"The SARIF result at index {resultIndex} rule id '{ruleId}' resolves to multiple tool driver descriptors; " +
+                $"The SARIF result at index {resultIndex} rule id '{resolvedRuleId}' resolves to multiple tool driver descriptors; " +
                 "a ruleIndex or rule.index is required.";
             return false;
         }
 
         // A producer can emit a rule without cataloguing it in tool.driver.rules. Its
         // identifier remains a trusted source fact, but there are no descriptor tags.
-        resolvedRule = new SarifResolvedRule(ruleId, Array.Empty<string>());
+        resolvedRule = new SarifResolvedRule(resolvedRuleId, Array.Empty<string>());
         return true;
     }
 

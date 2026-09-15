@@ -1,8 +1,10 @@
+using System.Reflection;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
@@ -43,6 +45,15 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         public BuildStatePreflightResult ResultToReturn { get; set; } =
             new(Array.Empty<BuildStatePreflightDiagnostic>());
 
+        // Simulates the preflight itself failing (an unexpected exception, or cancellation) rather
+        // than returning a blocked-but-normal result -- the disposal-ownership regression tests
+        // below need this to reach the exception paths in each ResolveSetup branch.
+        public Exception? ExceptionToThrow { get; set; }
+
+        // 0 (default) throws on every call once ExceptionToThrow is set; a positive value throws
+        // only on that 1-based call number, letting earlier calls succeed normally.
+        public int ThrowOnCallNumber { get; set; }
+
         public BuildStatePreflightResult Prepare(BuildStatePreflightRequest request)
         {
             CallOrder?.Add(request.PreparationMode == BuildPreparationMode.EnsureBuilt
@@ -50,6 +61,12 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
                 : "VerifyPostBuild");
             PrepareCallCount++;
             RequestsReceived.Add(request);
+
+            if (ExceptionToThrow is not null && (ThrowOnCallNumber == 0 || ThrowOnCallNumber == PrepareCallCount))
+            {
+                throw ExceptionToThrow;
+            }
+
             return ResultsToReturn is { Count: > 0 } ? ResultsToReturn.Dequeue() : ResultToReturn;
         }
     }
@@ -59,7 +76,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     internal static ArchitectureDiscoveredProject FixtureProject() =>
         new("Fixture.csproj", "Fixture", _value);
 
-    private static ArchitectureRunnerPreparation CreatePreparedRunner(ProjectDiscoveryResult discovery) => new(
+    internal static ArchitectureRunnerPreparation CreatePreparedRunner(ProjectDiscoveryResult discovery) => new(
         "/fake/repository/root",
         null,
         discovery,

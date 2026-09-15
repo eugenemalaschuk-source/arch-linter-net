@@ -125,6 +125,25 @@ public sealed class MetricBudgetContractTests
     [TestCase("id: negative-maximum\n      metric: type-count\n      maximum: -1", "maximum must be non-negative")]
     [TestCase("id: inverted\n      metric: type-count\n      minimum: 4\n      maximum: 3", "minimum must be less than or equal to maximum")]
     [TestCase("id: unknown-metric\n      metric: missing\n      maximum: 3", "references unknown metric")]
+    [TestCase("id: blank-metric\n      metric: \" \"\n      maximum: 3", "non-empty metric ID")]
+    [TestCase(
+        "id: bad-mode\n      metric: type-count\n      baseline_mode: worse\n      maximum: 3",
+        "unsupported baseline_mode")]
+    [TestCase(
+        "id: minimum-with-mode\n      metric: type-count\n      baseline_mode: max_delta\n      max_delta: 1\n      minimum: 1",
+        "cannot declare 'minimum' with baseline_mode")]
+    [TestCase(
+        "id: missing-max-delta\n      metric: type-count\n      baseline_mode: max_delta\n      maximum: 3",
+        "requires 'max_delta' with baseline_mode 'max_delta'")]
+    [TestCase(
+        "id: unexpected-max-delta\n      metric: type-count\n      baseline_mode: no_worse_than_baseline\n      max_delta: 1\n      maximum: 3",
+        "must not declare 'max_delta' with baseline_mode 'no_worse_than_baseline'")]
+    [TestCase(
+        "id: max-delta-without-mode\n      metric: type-count\n      max_delta: 1\n      maximum: 3",
+        "may declare 'max_delta' only with baseline_mode 'max_delta'")]
+    [TestCase(
+        "id: negative-max-delta\n      metric: type-count\n      baseline_mode: max_delta\n      max_delta: -1\n      maximum: 3",
+        "max_delta must be non-negative")]
     public void Load_InvalidBoundsOrReference_RejectsBudget(string budget, string expectedMessage)
     {
         string path = WriteFile("dependencies.arch.yml", Policy(BudgetBlock(budget)));
