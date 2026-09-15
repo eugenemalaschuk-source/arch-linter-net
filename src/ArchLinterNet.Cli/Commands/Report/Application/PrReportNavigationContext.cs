@@ -53,6 +53,27 @@ internal static class PrReportTransportContext
     /// <summary>Converts a canonical source path to a safe repository-relative path.</summary>
     public static string? RepositoryRelativePath(string? value, string? repositoryRoot)
     {
+        string? normalized = NormalizeSourcePath(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        string root = (repositoryRoot ?? string.Empty).Trim().Replace('\\', '/').TrimEnd('/');
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        normalized = RemoveRepositoryRoot(normalized, root, comparison);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        return SafePathSegments(normalized);
+    }
+
+    private static string? NormalizeSourcePath(string? value)
+    {
         if (string.IsNullOrWhiteSpace(value))
         {
             return null;
@@ -65,51 +86,44 @@ internal static class PrReportTransportContext
             return null;
         }
 
-        string? sourcePath = SourcePathPart(normalized);
-        if (sourcePath is null)
+        return SourcePathPart(normalized);
+    }
+
+    private static string? RemoveRepositoryRoot(
+        string normalized,
+        string root,
+        StringComparison comparison)
+    {
+        if (string.IsNullOrEmpty(root))
+        {
+            return normalized.StartsWith('/') ? null : normalized;
+        }
+
+        if (string.Equals(normalized, root, comparison))
         {
             return null;
         }
 
-        normalized = sourcePath;
-        string root = (repositoryRoot ?? string.Empty).Trim().Replace('\\', '/').TrimEnd('/');
-        StringComparison comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-        if (!string.IsNullOrEmpty(root))
+        string prefix = root + "/";
+        if (normalized.StartsWith(prefix, comparison))
         {
-            if (string.Equals(normalized, root, comparison))
-            {
-                return null;
-            }
-
-            string prefix = root + "/";
-            if (normalized.StartsWith(prefix, comparison))
-            {
-                normalized = normalized[prefix.Length..];
-            }
-            else if (normalized.StartsWith('/'))
-            {
-                return null;
-            }
-        }
-        else if (normalized.StartsWith('/'))
-        {
-            return null;
+            return normalized[prefix.Length..];
         }
 
+        return normalized.StartsWith('/') ? null : normalized;
+    }
+
+    private static string? SafePathSegments(string normalized)
+    {
         if (normalized.Contains(':'))
         {
             return null;
         }
 
         string[] segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0 || segments.Any(segment => segment is "." or ".."))
-        {
-            return null;
-        }
-
-        return string.Join("/", segments);
+        return segments.Length == 0 || segments.Any(segment => segment is "." or "..")
+            ? null
+            : string.Join("/", segments);
     }
 
     private static string? SourcePathPart(string normalized)
