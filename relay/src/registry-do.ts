@@ -187,6 +187,51 @@ export class RelayRegistryDurableObject {
     });
   }
 
+  private async handleLookup(body: Record<string, unknown>): Promise<Response | undefined> {
+    if (typeof body.alias !== "string") return undefined;
+    const binding = await this.binding(body.alias, body.include_tombstoned === true);
+    return binding ? json(200, { found: true, ...binding }) : json(404, { found: false });
+  }
+
+  private async handleRegister(body: Record<string, unknown>): Promise<Response | undefined> {
+    if (!validateRegistryEntry(body.entry)) return undefined;
+    return json(await this.registerEntry(body.entry) ? 201 : 409, { ok: true });
+  }
+
+  private async handleRevoke(body: Record<string, unknown>): Promise<Response | undefined> {
+    if (typeof body.alias !== "string") return undefined;
+    const result = await this.revokeAlias(
+      body.alias,
+      Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined,
+      Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
+    let status: number;
+    if (result === "conflict") status = 409;
+    else if (result) status = 200;
+    else status = 404;
+    return json(status, { ok: result === true });
+  }
+
+  private async handleReconcileIdentity(body: Record<string, unknown>): Promise<Response | undefined> {
+    if (typeof body.alias !== "string" || typeof body.owner !== "string" || typeof body.repository !== "string" || !Number.isSafeInteger(body.repository_id) || !Number.isSafeInteger(body.repository_owner_id)) return undefined;
+    const binding = await this.reconcileIdentity(body.alias, body.owner, body.repository, body.repository_id as number, body.repository_owner_id as number, Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined, Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
+    return binding ? json(200, { ok: true, ...binding }) : json(409, { error: "identity_mismatch" });
+  }
+
+  private async handleRotate(body: Record<string, unknown>): Promise<Response | undefined> {
+    if (typeof body.alias !== "string" || !validateRegistryEntry(body.entry)) return undefined;
+    const binding = await this.rotateEntry(body.alias, body.entry, Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined, Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
+    return binding ? json(200, { ok: true, ...binding }) : json(409, { error: "rotation_conflict" });
+  }
+
+  private async dispatchOperation(operation: string | undefined, body: Record<string, unknown>): Promise<Response | undefined> {
+    if (operation === "lookup") return this.handleLookup(body);
+    if (operation === "register") return this.handleRegister(body);
+    if (operation === "revoke") return this.handleRevoke(body);
+    if (operation === "reconcile-identity") return this.handleReconcileIdentity(body);
+    if (operation === "rotate") return this.handleRotate(body);
+    return undefined;
+  }
+
   async fetch(request: Request): Promise<Response> {
     try {
       await this.initialized;
@@ -194,31 +239,8 @@ export class RelayRegistryDurableObject {
       const pathParts = new URL(request.url).pathname.split("/").filter(Boolean);
       const operation = pathParts.at(-1);
       const body = await boundedBody(request);
-      if (operation === "lookup" && typeof body.alias === "string") {
-        const binding = await this.binding(body.alias, body.include_tombstoned === true);
-        return binding ? json(200, { found: true, ...binding }) : json(404, { found: false });
-      }
-      if (operation === "register" && validateRegistryEntry(body.entry)) return json(await this.registerEntry(body.entry) ? 201 : 409, { ok: true });
-      if (operation === "revoke" && typeof body.alias === "string") {
-        const result = await this.revokeAlias(
-          body.alias,
-          Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined,
-          Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
-        let status: number;
-        if (result === "conflict") status = 409;
-        else if (result) status = 200;
-        else status = 404;
-        return json(status, { ok: result === true });
-      }
-      if (operation === "reconcile-identity" && typeof body.alias === "string" && typeof body.owner === "string" && typeof body.repository === "string" && Number.isSafeInteger(body.repository_id) && Number.isSafeInteger(body.repository_owner_id)) {
-        const binding = await this.reconcileIdentity(body.alias, body.owner, body.repository, body.repository_id as number, body.repository_owner_id as number, Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined, Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
-        return binding ? json(200, { ok: true, ...binding }) : json(409, { error: "identity_mismatch" });
-      }
-      if (operation === "rotate" && typeof body.alias === "string" && validateRegistryEntry(body.entry)) {
-        const binding = await this.rotateEntry(body.alias, body.entry, Number.isSafeInteger(body.expected_revision) ? body.expected_revision as number : undefined, Number.isSafeInteger(body.expected_barrier_epoch) ? body.expected_barrier_epoch as number : undefined);
-        return binding ? json(200, { ok: true, ...binding }) : json(409, { error: "rotation_conflict" });
-      }
-      return json(404, { error: "unknown_route" });
+      const response = await this.dispatchOperation(operation, body);
+      return response ?? json(404, { error: "unknown_route" });
     } catch { return json(503, { error: "storage_unavailable" }); }
   }
 }

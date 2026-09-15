@@ -114,6 +114,27 @@ describe("public Relay read seam", () => {
     expect((await readPublicRepresentation(new Request("https://relay.test"), beyondLease, "json", entry)).status).toBe(404);
   });
 
+  it("fails closed on a malformed persisted generation or an empty payload", async () => {
+    // Regression for the validateReadState() -> resolveGeneration() /
+    // resolveReadFields() extraction: a persisted row with a non-positive
+    // generation, or a zero-length canonical payload, must still be rejected
+    // before any freshness or digest check runs.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T10:15:00Z"));
+
+    const zeroGeneration = await state(headlineBytes);
+    zeroGeneration.generation = 0;
+    expect((await readPublicRepresentation(new Request("https://relay.test"), zeroGeneration, "json", entry)).status).toBe(404);
+
+    const nonNumericGeneration = await state(headlineBytes);
+    nonNumericGeneration.generation = "7";
+    expect((await readPublicRepresentation(new Request("https://relay.test"), nonNumericGeneration, "json", entry)).status).toBe(404);
+
+    const emptyPayload = await state(headlineBytes);
+    emptyPayload.payload = "";
+    expect((await readPublicRepresentation(new Request("https://relay.test"), emptyPayload, "json", entry)).status).toBe(404);
+  });
+
   it("renders a fixed freshness SVG with safe text and a visible UTC boundary", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-12T10:15:00Z"));
