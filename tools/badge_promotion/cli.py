@@ -441,6 +441,44 @@ def _update_publication_ref(api: GitHubApi, current_ref: Any, update_ref_path: s
         api.request(f"/repos/{repository}/git/refs", method="POST", value={"ref": "refs/heads/architecture-health-badge", "sha": commit_sha})
 
 
+def _prepare_raw_publication(
+    api: GitHubApi,
+    config,
+    payload: bytes,
+    evidence: EvidenceContext | None,
+    status: str,
+    reason: str,
+    current_ref: Any,
+    repository: str,
+) -> str:
+    parent = current_ref.get("object", {}).get("sha") if current_ref else os.environ.get("GITHUB_SHA")
+    if not isinstance(parent, str):
+        raise ProviderFailure("publication_parent_unavailable")
+    configured_ref = urllib.parse.quote(config.base_ref, safe="/")
+    base_ref = api.request(f"/repos/{repository}/git/ref/heads/{configured_ref}")
+    if base_ref.get("object", {}).get("sha") != os.environ.get("GITHUB_SHA"):
+        raise ProviderFailure("stale_base_ref")
+    parent_commit = api.request(f"/repos/{repository}/git/commits/{parent}")
+    base_tree = parent_commit.get("tree", {}).get("sha")
+    if not isinstance(base_tree, str):
+        raise ProviderFailure("publication_parent_unavailable")
+    receipt = _publication_receipt(config, payload, evidence, status, reason)
+    return _publication_commit_sha(api, repository, parent, base_tree, payload, receipt)
+
+
+def _retry_raw_publication(attempt: int, error: ProviderFailure) -> None:
+    if attempt + 1 == _MAX_RAW_PUBLICATION_ATTEMPTS:
+        raise ProviderFailure("publication_race_lost") from error
+    # GitHub may expose the newly created commit/tree slightly after the data API
+    # accepts it. Give the ref service a bounded opportunity to observe those objects.
+    print(
+        f"Architecture Health raw publication retry {attempt + 1}: {error.reason}"
+        + (f" (http {error.status_code})" if error.status_code is not None else ""),
+        file=sys.stderr,
+    )
+    time.sleep(2**attempt)
+
+
 def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceContext | None, status: str, reason: str) -> None:
     """Atomically update the fixed public raw branch; never force-push it."""
     repository = _repository_path(config.repository)
@@ -448,33 +486,12 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
     update_ref_path = f"/repos/{repository}/git/refs/heads/architecture-health-badge"
     for attempt in range(_MAX_RAW_PUBLICATION_ATTEMPTS):
         current_ref = _current_raw_ref(api, ref_path)
-        parent = current_ref.get("object", {}).get("sha") if current_ref else os.environ.get("GITHUB_SHA")
-        if not isinstance(parent, str):
-            raise ProviderFailure("publication_parent_unavailable")
-        configured_ref = urllib.parse.quote(config.base_ref, safe="/")
-        base_ref = api.request(f"/repos/{repository}/git/ref/heads/{configured_ref}")
-        if base_ref.get("object", {}).get("sha") != os.environ.get("GITHUB_SHA"):
-            raise ProviderFailure("stale_base_ref")
-        parent_commit = api.request(f"/repos/{repository}/git/commits/{parent}")
-        base_tree = parent_commit.get("tree", {}).get("sha")
-        if not isinstance(base_tree, str):
-            raise ProviderFailure("publication_parent_unavailable")
-        receipt = _publication_receipt(config, payload, evidence, status, reason)
-        commit_sha = _publication_commit_sha(api, repository, parent, base_tree, payload, receipt)
+        commit_sha = _prepare_raw_publication(api, config, payload, evidence, status, reason, current_ref, repository)
         try:
             _update_publication_ref(api, current_ref, update_ref_path, repository, commit_sha)
             return
         except ProviderFailure as error:
-            if attempt + 1 == _MAX_RAW_PUBLICATION_ATTEMPTS:
-                raise ProviderFailure("publication_race_lost") from error
-            # GitHub may expose the newly created commit/tree slightly after the data API
-            # accepts it. Give the ref service a bounded opportunity to observe those objects.
-            print(
-                f"Architecture Health raw publication retry {attempt + 1}: {error.reason}"
-                + (f" (http {error.status_code})" if error.status_code is not None else ""),
-                file=sys.stderr,
-            )
-            time.sleep(2**attempt)
+            _retry_raw_publication(attempt, error)
 
 
 def _validate_invocation(config, operation: str) -> None:
@@ -524,6 +541,25 @@ def _handle_failure(error, config, api: GitHubApi | None) -> None:
     print(json.dumps({"status": "unavailable", "reason": error.reason}, separators=(",", ":")), file=sys.stderr)
 
 
+def _prepare_relay_publication(config, decision, evidence: EvidenceContext, request: PromotionRequest) -> tuple[HttpRelayClient, str, str, str, str, int, int]:
+    digest = hashlib.sha256(decision.payload or b"").hexdigest()
+    horizon = evidence.semantic_horizon.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    client = HttpRelayClient(config.destination.endpoint or "", config.destination.alias or "", config.disclosure_profile)
+    token = issue_github_oidc_token(config.destination.audience or "")
+    # The first prepare is an observation of Relay-owned state. Local
+    # PromotionRequest defaults are never sent as CAS expectations.
+    prepared = client.prepare(
+        decision.payload or b"", digest, idempotency_key=request.idempotency_key, generation=None,
+        revocation_epoch=None, semantic_horizon=horizon, oidc_token=token,
+    )
+    challenge_id = prepared.get("challenge_id")
+    generation = prepared.get("generation")
+    revocation_epoch = prepared.get("revocation_epoch")
+    if not isinstance(challenge_id, str) or not isinstance(generation, int) or not isinstance(revocation_epoch, int):
+        raise ProviderFailure("relay_challenge_invalid")
+    return client, digest, horizon, token, challenge_id, generation, revocation_epoch
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configuration-id", required=True)
@@ -549,18 +585,7 @@ def main() -> int:
         if config.destination.adapter.value == "none":
             return _commit_private(decision, output_metadata)
         if config.destination.adapter.value == "relay":
-            digest = hashlib.sha256(decision.payload or b"").hexdigest()
-            horizon = evidence.semantic_horizon.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            client = HttpRelayClient(config.destination.endpoint or "", config.destination.alias or "", config.disclosure_profile)
-            token = issue_github_oidc_token(config.destination.audience or "")
-            # The first prepare is an observation of Relay-owned state.  Local
-            # PromotionRequest defaults are never sent as CAS expectations.
-            prepared = client.prepare(decision.payload or b"", digest, idempotency_key=request.idempotency_key, generation=None, revocation_epoch=None, semantic_horizon=horizon, oidc_token=token)
-            challenge_id = prepared.get("challenge_id")
-            generation = prepared.get("generation")
-            revocation_epoch = prepared.get("revocation_epoch")
-            if not isinstance(challenge_id, str) or not isinstance(generation, int) or not isinstance(revocation_epoch, int):
-                raise ProviderFailure("relay_challenge_invalid")
+            client, digest, horizon, token, challenge_id, generation, revocation_epoch = _prepare_relay_publication(config, decision, evidence, request)
             if args.operation == "renew":
                 client.renew(decision.payload or b"", digest, challenge_id=challenge_id, idempotency_key=request.idempotency_key, generation=generation, revocation_epoch=revocation_epoch, oidc_token=token, semantic_horizon=horizon)
             else:

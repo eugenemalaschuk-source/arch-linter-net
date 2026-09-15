@@ -227,21 +227,22 @@ def test_inventory_action_ref_matches_badge_setup_contract() -> None:
 def test_validate_version_rejects_non_ascii_unicode_digits() -> None:
     assert distribution._validate_version("0.8.19") == "0.8.19"
 
-    with pytest.raises(ValueError, match="valid 0.8.x version"):
-        distribution._validate_version("0.8.1١")
+    error = pytest.raises(ValueError, distribution._validate_version, "0.8.1١")
+    assert "valid 0.8.x version" in str(error.value)
 
 
 def test_verify_accepts_any_0_8_x_candidate_and_rejects_wrong_binding(tmp_path: Path) -> None:
     arguments, transport = _arguments(tmp_path, "0.8.19")
     distribution._verify(_verify_arguments(arguments, transport))
 
+    wrong_source = _verify_arguments(arguments, transport)
+    wrong_source.source_commit = "b" * 40
     with pytest.raises(ValueError, match="source commit"):
-        wrong_source = _verify_arguments(arguments, transport)
-        wrong_source.source_commit = "b" * 40
         distribution._verify(wrong_source)
+
+    wrong_version = _verify_arguments(arguments, transport)
+    wrong_version.version = "0.8.20"
     with pytest.raises(ValueError, match="version"):
-        wrong_version = _verify_arguments(arguments, transport)
-        wrong_version.version = "0.8.20"
         distribution._verify(wrong_version)
 
 
@@ -259,8 +260,9 @@ def test_verify_fails_closed_for_missing_tampered_or_incompatible_subjects(tmp_p
         metadata["compatibility"]["storage"] = "v2"
         metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
 
+    verification_arguments = _verify_arguments(arguments, transport)
     with pytest.raises(ValueError):
-        distribution._verify(_verify_arguments(arguments, transport))
+        distribution._verify(verification_arguments)
 
 
 def test_archive_has_sorted_regular_members_and_fixed_metadata(tmp_path: Path) -> None:
