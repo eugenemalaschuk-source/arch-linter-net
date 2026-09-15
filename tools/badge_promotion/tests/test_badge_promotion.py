@@ -203,8 +203,10 @@ def test_valid_artifact_accepts_one_canonical_trailing_newline() -> None:
     ],
 )
 def test_hostile_artifact_fails_closed(mutator, message: str) -> None:
+    archive = mutator(None)
+    current_evidence = evidence()
     with pytest.raises(ArtifactValidationError, match=message):
-        validate_artifact(mutator(None), CONFIG, evidence())
+        validate_artifact(archive, CONFIG, current_evidence)
 
 
 def test_manifest_digest_and_provenance_are_bound_to_exact_evidence() -> None:
@@ -213,8 +215,10 @@ def test_manifest_digest_and_provenance_are_bound_to_exact_evidence() -> None:
     with pytest.raises(ArtifactValidationError, match="provenance"):
         validate_artifact(artifact, CONFIG, wrong)
     bad_manifest = {"schema": CONFIG.schema_id, "kind": "architecture-health-badge", "context": {}, "payload": {}}
+    bad_archive = archive_bytes(manifest=bad_manifest)
+    current_evidence = evidence()
     with pytest.raises(ArtifactValidationError):
-        validate_artifact(archive_bytes(manifest=bad_manifest), CONFIG, evidence())
+        validate_artifact(bad_archive, CONFIG, current_evidence)
 
 
 @pytest.mark.parametrize("field", ["base_sha", "head_sha", "head_tree_sha", "run_id", "run_attempt", "job_id", "artifact_id"])

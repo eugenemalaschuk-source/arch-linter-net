@@ -104,15 +104,14 @@ def test_canonicalization_rejects_ambiguous_duplicate_content(tmp_path: Path) ->
     duplicate = raw / "In" / "runner" / "coverage.opencover.xml"
     duplicate.write_text(_xml("opencover", "different"), encoding="utf-8")
 
+    arguments = argparse.Namespace(
+        shard="core-1",
+        source_sha=_SHA,
+        coverage_root=raw,
+        output_root=tmp_path / "output",
+    )
     with pytest.raises(ValueError, match="Ambiguous opencover coverage evidence"):
-        coverage._canonicalize_shard(
-            argparse.Namespace(
-                shard="core-1",
-                source_sha=_SHA,
-                coverage_root=raw,
-                output_root=tmp_path / "output",
-            )
-        )
+        coverage._canonicalize_shard(arguments)
 
 
 @pytest.mark.parametrize("content", ["", "<CoverageSession>"])
@@ -123,15 +122,14 @@ def test_canonicalization_rejects_empty_or_corrupt_report(tmp_path: Path, conten
     target.write_text(content, encoding="utf-8")
     duplicate.write_text(content, encoding="utf-8")
 
+    arguments = argparse.Namespace(
+        shard="core-2",
+        source_sha=_SHA,
+        coverage_root=raw,
+        output_root=tmp_path / "output",
+    )
     with pytest.raises(ValueError, match="missing or empty|not parseable XML"):
-        coverage._canonicalize_shard(
-            argparse.Namespace(
-                shard="core-2",
-                source_sha=_SHA,
-                coverage_root=raw,
-                output_root=tmp_path / "output",
-            )
-        )
+        coverage._canonicalize_shard(arguments)
 
 
 def test_assemble_fails_closed_when_any_required_shard_is_missing(tmp_path: Path, monkeypatch) -> None:
@@ -155,15 +153,14 @@ def test_assemble_rejects_arbitrary_github_output_path_not_bound_to_the_runner_e
     monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "trusted-runner-file"))
     attacker_path = tmp_path / "attacker-supplied.txt"
 
+    arguments = argparse.Namespace(
+        artifacts_root=artifacts,
+        expected_sha=_SHA,
+        output_root=tmp_path / "canonical",
+        github_output=attacker_path,
+    )
     with pytest.raises(ValueError, match="does not match the runner-provided GITHUB_OUTPUT"):
-        coverage._assemble(
-            argparse.Namespace(
-                artifacts_root=artifacts,
-                expected_sha=_SHA,
-                output_root=tmp_path / "canonical",
-                github_output=attacker_path,
-            )
-        )
+        coverage._assemble(arguments)
 
 
 def test_assemble_accepts_runner_shaped_github_output_path_outside_the_workspace(
@@ -263,16 +260,15 @@ def test_sonar_verification_rejects_scanner_log_outside_runner_temp_before_read(
     analysis_json = tmp_path / "analysis.json"
     analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
 
+    arguments = argparse.Namespace(
+        inventory_root=output,
+        expected_sha=_SHA,
+        scanner_log=outside_log,
+        analysis_json=analysis_json,
+        github_output=None,
+    )
     with pytest.raises(ValueError, match="outside the runner-provided RUNNER_TEMP directory"):
-        coverage._verify_sonar(
-            argparse.Namespace(
-                inventory_root=output,
-                expected_sha=_SHA,
-                scanner_log=outside_log,
-                analysis_json=analysis_json,
-                github_output=None,
-            )
-        )
+        coverage._verify_sonar(arguments)
 
 
 def test_sonar_verification_rejects_analysis_json_outside_runner_temp_before_read(
@@ -288,16 +284,15 @@ def test_sonar_verification_rejects_analysis_json_outside_runner_temp_before_rea
     analysis_json = tmp_path / "analysis.json"
     analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
 
+    arguments = argparse.Namespace(
+        inventory_root=output,
+        expected_sha=_SHA,
+        scanner_log=log,
+        analysis_json=analysis_json,
+        github_output=None,
+    )
     with pytest.raises(ValueError, match="outside the runner-provided RUNNER_TEMP directory"):
-        coverage._verify_sonar(
-            argparse.Namespace(
-                inventory_root=output,
-                expected_sha=_SHA,
-                scanner_log=log,
-                analysis_json=analysis_json,
-                github_output=None,
-            )
-        )
+        coverage._verify_sonar(arguments)
 
 
 def test_sonar_verification_rejects_mismatched_runner_temp_root(tmp_path: Path, monkeypatch) -> None:
@@ -310,16 +305,15 @@ def test_sonar_verification_rejects_mismatched_runner_temp_root(tmp_path: Path, 
     analysis_json = tmp_path / "analysis.json"
     analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
 
+    arguments = argparse.Namespace(
+        inventory_root=output,
+        expected_sha=_SHA,
+        scanner_log=log,
+        analysis_json=analysis_json,
+        github_output=None,
+    )
     with pytest.raises(ValueError, match="outside the runner-provided RUNNER_TEMP directory"):
-        coverage._verify_sonar(
-            argparse.Namespace(
-                inventory_root=output,
-                expected_sha=_SHA,
-                scanner_log=log,
-                analysis_json=analysis_json,
-                github_output=None,
-            )
-        )
+        coverage._verify_sonar(arguments)
 
 
 def test_sonar_verification_rejects_runner_temp_symlink_escape(tmp_path: Path, monkeypatch) -> None:
@@ -340,16 +334,15 @@ def test_sonar_verification_rejects_runner_temp_symlink_escape(tmp_path: Path, m
     analysis_json = tmp_path / "analysis.json"
     analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
 
+    arguments = argparse.Namespace(
+        inventory_root=output,
+        expected_sha=_SHA,
+        scanner_log=linked_log,
+        analysis_json=analysis_json,
+        github_output=None,
+    )
     with pytest.raises(ValueError, match="outside the runner-provided RUNNER_TEMP directory"):
-        coverage._verify_sonar(
-            argparse.Namespace(
-                inventory_root=output,
-                expected_sha=_SHA,
-                scanner_log=linked_log,
-                analysis_json=analysis_json,
-                github_output=None,
-            )
-        )
+        coverage._verify_sonar(arguments)
 
 
 def test_cli_verify_inventory_round_trip(tmp_path: Path, monkeypatch) -> None:
@@ -403,16 +396,15 @@ def test_sonar_verification_rejects_stale_analysis_revision(tmp_path: Path, monk
     analysis_json = tmp_path / "analysis.json"
     analysis_json.write_text(json.dumps({"analyses": [{"revision": _OTHER_SHA}]}), encoding="utf-8")
 
+    arguments = argparse.Namespace(
+        inventory_root=output,
+        expected_sha=_SHA,
+        scanner_log=log,
+        analysis_json=analysis_json,
+        github_output=None,
+    )
     with pytest.raises(ValueError, match="Sonar analysis revision is stale/wrong"):
-        coverage._verify_sonar(
-            argparse.Namespace(
-                inventory_root=output,
-                expected_sha=_SHA,
-                scanner_log=log,
-                analysis_json=analysis_json,
-                github_output=None,
-            )
-        )
+        coverage._verify_sonar(arguments)
 
 
 def test_sonar_verification_rejects_zero_imported_main_coverage(tmp_path: Path, monkeypatch) -> None:
@@ -423,16 +415,15 @@ def test_sonar_verification_rejects_zero_imported_main_coverage(tmp_path: Path, 
     analysis_json = tmp_path / "analysis.json"
     analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
 
+    arguments = argparse.Namespace(
+        inventory_root=output,
+        expected_sha=_SHA,
+        scanner_log=log,
+        analysis_json=analysis_json,
+        github_output=None,
+    )
     with pytest.raises(ValueError, match="did not report any covered main .NET files"):
-        coverage._verify_sonar(
-            argparse.Namespace(
-                inventory_root=output,
-                expected_sha=_SHA,
-                scanner_log=log,
-                analysis_json=analysis_json,
-                github_output=None,
-            )
-        )
+        coverage._verify_sonar(arguments)
 
 
 def test_github_command_file_path_accepts_the_exact_runner_provided_transport_path(

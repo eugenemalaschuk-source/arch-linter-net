@@ -7,6 +7,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 import zipfile
 
 import pytest
@@ -53,7 +54,7 @@ def test_ruleset_fallback_fetches_details_instead_of_trusting_summaries() -> Non
         },
         failures={"/repos/owner/repo/rules/branches/main"},
     )
-    assert not _required_gate(api, "owner/repo", "Architecture Coverage", 15368, "main")
+    assert not _required_gate(cast(cli.GitHubApi, api), "owner/repo", "Architecture Coverage", 15368, "main")
     assert detail_path in api.paths
 
 
@@ -67,7 +68,7 @@ def test_ruleset_fallback_accepts_a_required_check_from_the_detail_document() ->
         },
         failures={"/repos/owner/repo/rules/branches/main"},
     )
-    assert _required_gate(api, "owner/repo", "Architecture Coverage", 15368, "main")
+    assert _required_gate(cast(cli.GitHubApi, api), "owner/repo", "Architecture Coverage", 15368, "main")
 
 
 @pytest.mark.parametrize(
@@ -94,7 +95,7 @@ def test_ruleset_fallback_requires_active_main_strict_matching_source(change: di
         {list_path: [{"id": 42}], detail_path: detail},
         failures={"/repos/owner/repo/rules/branches/main"},
     )
-    assert not _required_gate(api, "owner/repo", "Architecture Coverage", 15368, "main")
+    assert not _required_gate(cast(cli.GitHubApi, api), "owner/repo", "Architecture Coverage", 15368, "main")
 
 
 def test_ruleset_lookup_uses_configured_base_ref() -> None:
@@ -110,7 +111,7 @@ def test_ruleset_lookup_uses_configured_base_ref() -> None:
             }],
         },
     )
-    assert _required_gate(api, "owner/repo", "Architecture Coverage", 15368, "develop")
+    assert _required_gate(cast(cli.GitHubApi, api), "owner/repo", "Architecture Coverage", 15368, "develop")
     assert api.paths == [rules_path]
 
 
@@ -210,7 +211,7 @@ def test_raw_publication_stale_cas_uses_configured_base_ref(monkeypatch: pytest.
         }
     )
     monkeypatch.setenv("GITHUB_SHA", main_sha)
-    _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
+    _publish_raw(cast(cli.GitHubApi, api), config, b"payload", evidence=None, status="ready", reason="ready")
     assert base_ref_path in api.paths
 
 
@@ -312,10 +313,11 @@ def test_raw_publication_retries_ref_update_race_and_fails_closed(
     monkeypatch.setattr(cli.time, "sleep", sleeps.append)
 
     if expect_failure:
+        typed_api = cast(cli.GitHubApi, api)
         with pytest.raises(ProviderFailure, match="publication_race_lost"):
-            _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
+            _publish_raw(typed_api, config, b"payload", evidence=None, status="ready", reason="ready")
     else:
-        _publish_raw(api, config, b"payload", evidence=None, status="ready", reason="ready")
+        _publish_raw(cast(cli.GitHubApi, api), config, b"payload", evidence=None, status="ready", reason="ready")
 
     assert api.patch_attempts == len(expected_sleeps) + 1
     assert api.paths.count(ref_path) == api.patch_attempts
@@ -336,14 +338,15 @@ def test_semantic_evidence_member_is_bounded_before_decompression() -> None:
 def test_workflow_sha_is_resolved_from_the_versioned_content_endpoint() -> None:
     path = "/repos/owner/repo/contents/.github/workflows/ci.yml?ref=" + "a" * 40
     api = FakeApi({path: {"type": "file", "sha": "b" * 40}})
-    assert _workflow_blob_sha(api, "owner/repo", ".github/workflows/ci.yml", "a" * 40) == "b" * 40
+    assert _workflow_blob_sha(cast(cli.GitHubApi, api), "owner/repo", ".github/workflows/ci.yml", "a" * 40) == "b" * 40
 
 
 def test_workflow_sha_resolution_rejects_a_directory_response() -> None:
     path = "/repos/owner/repo/contents/.github/workflows?ref=" + "a" * 40
     api = FakeApi({path: [{"type": "file", "sha": "b" * 40}]})
+    typed_api = cast(cli.GitHubApi, api)
     with pytest.raises(ProviderFailure, match="workflow_mismatch"):
-        _workflow_blob_sha(api, "owner/repo", ".github/workflows", "a" * 40)
+        _workflow_blob_sha(typed_api, "owner/repo", ".github/workflows", "a" * 40)
 
 
 def test_github_artifact_download_uses_github_api_media_type(monkeypatch: pytest.MonkeyPatch) -> None:
