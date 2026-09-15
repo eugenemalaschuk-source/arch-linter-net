@@ -94,7 +94,7 @@ internal static partial class PrReportMarkdownRenderer
         ArchitecturePrReportProjection projection,
         int maxDetails)
     {
-        List<string> blockers = BuildBlockers(projection);
+        List<string> blockers = PrReportMarkdownBlockers.Build(projection);
 
         if (blockers.Count == 0)
         {

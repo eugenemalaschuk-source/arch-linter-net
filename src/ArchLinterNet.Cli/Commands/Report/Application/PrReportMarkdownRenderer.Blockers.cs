@@ -5,9 +5,9 @@ namespace ArchLinterNet.Cli.Commands.Report.Application;
 
 using static PrReportMarkdownFormatter;
 
-internal static partial class PrReportMarkdownRenderer
+internal static class PrReportMarkdownBlockers
 {
-    private static List<string> BuildBlockers(ArchitecturePrReportProjection projection)
+    internal static List<string> Build(ArchitecturePrReportProjection projection)
     {
         List<string> blockers = projection.Evidence is { } evidence
             ? BuildEvidenceBlockers(projection, evidence)
