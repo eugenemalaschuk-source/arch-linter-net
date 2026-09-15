@@ -486,6 +486,62 @@ describe("badge-relay/v1 local SQLite Durable Object", () => {
     expect(row).toMatchObject({ status: "revoked", generation: challenge.generation + 1, revocation_epoch: challenge.revocation_epoch + 1, tombstoned: 1, pending_operation_id: null });
   });
 
+  it("closes an unrecognized internal registry operation instead of executing an unvalidated route", async () => {
+    // Regression for the dispatchOperation extraction in registry-do.ts: an
+    // operation name that matches none of the SIMPLE_ADMIN_ROUTES-style
+    // handlers must still fail closed with the original unknown_route shape,
+    // not fall through to an unguarded handler.
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    const response = await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).fetch(new Request("https://relay.test/internal-registry/not-a-real-operation", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-relay-internal": "1" },
+      body: JSON.stringify({ alias })
+    })));
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "unknown_route" });
+  });
+
+  it("closes an unrecognized admin operation on a registered alias without dispatching a stale route", async () => {
+    // Regression for the handleAdminRoute -> handleAdminOperation extraction
+    // in index.ts: a syntactically valid alias with an operation segment that
+    // matches none of handleAdminSimpleOperation / handleAdminRecoverOperation
+    // / handleAdminUpgradeOperation must still resolve to unknown_route.
+    const unmatchedAlias = "a833nop1";
+    const unmatchedEntry: RegistryEntry = { ...entry, destination_alias: unmatchedAlias, consent: true };
+    const registry = (env as unknown as { REGISTRY: DurableObjectNamespace }).REGISTRY;
+    const registryStub = registry.get(registry.idFromName(REGISTRY_OBJECT_NAME));
+    expect(await runInDurableObject(registryStub, async (instance) => (instance as unknown as RelayRegistryDurableObject).registerEntry(unmatchedEntry))).toBe(true);
+    const testEnv = { ...(env as unknown as Record<string, unknown>), ADMIN_TOKEN: "admin" } as unknown as RelayEnvironment;
+    const response = await worker.fetch(new Request(`https://relay.test/badge-relay/v1/admin/${unmatchedAlias}/not-a-real-operation`, {
+      method: "POST",
+      headers: { authorization: "Bearer admin", "content-type": "application/json" }
+    }), testEnv);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "unknown_route" });
+  });
+
+  it("fails closed when the internal admin dispatch seam receives an operation none of its route helpers recognize", async () => {
+    // Regression for the RelayDurableObject.fetch -> handleAdminDispatch
+    // extraction: an "admin-*" operation that handleAdminRevokeRoute,
+    // handleAdminUpgradeRoute, and handleAdminStateRoute all decline must
+    // still leave the request failing closed (the pre-existing fallthrough
+    // re-reads the already-consumed request body, which is preserved
+    // unchanged from the original monolithic fetch and yields a generic
+    // storage_unavailable response rather than executing any route).
+    const dispatchAlias = "a833dsp1";
+    const dispatchEntry: RegistryEntry = { ...entry, destination_alias: dispatchAlias, consent: true };
+    const relay = (env as unknown as { RELAY: DurableObjectNamespace }).RELAY;
+    const stub = relay.get(relay.idFromName(dispatchAlias));
+    const response = await runInDurableObject(stub, async (instance) => (instance as unknown as RelayDurableObject).fetch(new Request(`https://relay.test/internal/admin/${dispatchAlias}/not-a-real-operation`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-relay-admin": "1", "x-relay-registry": JSON.stringify(dispatchEntry), "x-relay-registry-revision": "1", "x-relay-barrier-epoch": "1", "x-relay-registry-tombstoned": "false" },
+      body: JSON.stringify({ operation_id: "not-a-real-operation-833" })
+    })));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "storage_unavailable" });
+  });
+
   it("honors caller registry CAS values and requires operation IDs for admin mutations", async () => {
     const casAlias = "a833cas1";
     const casEntry: RegistryEntry = { ...entry, destination_alias: casAlias, consent: true };

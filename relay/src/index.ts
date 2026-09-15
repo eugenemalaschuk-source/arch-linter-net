@@ -122,7 +122,9 @@ async function adminStatus(request: Request, env: RelayEnvironment, alias: strin
   return json(result.status, result.body);
 }
 
-async function performRevokeCommit(env: RelayEnvironment, alias: string, lookup: RegistryLookup, body: Record<string, unknown>, operation: "revoke" | "uninstall" | "transfer", lifecycleOperation: "revoke" | "uninstall" | "transfer"): Promise<Response> {
+type RevokeOperation = "revoke" | "uninstall" | "transfer";
+
+async function performRevokeCommit(env: RelayEnvironment, alias: string, lookup: RegistryLookup, body: Record<string, unknown>, operation: RevokeOperation, lifecycleOperation: RevokeOperation): Promise<Response> {
   // Reserve the Relay state before the Registry CAS.  This is a two-phase
   // cross-object transition: the reservation atomically fences publishers
   // and clears the public payload, so a generation/epoch change cannot sneak
@@ -155,7 +157,7 @@ async function performRevokeCommit(env: RelayEnvironment, alias: string, lookup:
   return json(200, { ok: true, state: "revoked", tombstoned: true, operation: operation === "transfer" ? "registration_required" : operation });
 }
 
-async function adminRevoke(request: Request, env: RelayEnvironment, alias: string, operation: "revoke" | "uninstall" | "transfer" = "revoke"): Promise<Response> {
+async function adminRevoke(request: Request, env: RelayEnvironment, alias: string, operation: RevokeOperation = "revoke"): Promise<Response> {
   if (!adminAuthorized(request, env)) return json(401, { error: "unauthorized" });
   if (!isOpaqueAlias(alias)) return unknownRoute();
   const body = await readAdminBody(request);

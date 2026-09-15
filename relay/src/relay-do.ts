@@ -152,6 +152,8 @@ function parseCanonicalDateSeconds(value: unknown): number | undefined {
   return new Date(parsed).toISOString().replace(".000Z", "Z") === value ? seconds : undefined;
 }
 
+type PublishOperation = "publish" | "renew" | "recover";
+
 export class RelayDurableObject {
   private readonly state: RelayStateLike;
   private readonly sql: RelayStateLike["storage"]["sql"];
@@ -439,7 +441,7 @@ export class RelayDurableObject {
     return readPublicRepresentation(request, current, kind, entry);
   }
 
-  private checkPublishPreconditions(current: StateRow, operation: "publish" | "renew" | "recover"): Response | undefined {
+  private checkPublishPreconditions(current: StateRow, operation: PublishOperation): Response | undefined {
     if (current.pending_operation_id !== null) return this.finishError(409);
     if (operation === "recover" && current.status !== "needs-recovery") return this.finishError(409);
     return undefined;
@@ -474,19 +476,19 @@ export class RelayDurableObject {
     return { verifiedAt, verifiedAtSeconds, validUntil, validUntilSeconds };
   }
 
-  private commitPublish(body: Record<string, unknown>, profile: DisclosureProfile, payload: import("./types").CanonicalPayload, publisher: import("./types").ValidatedPublisher, operation: "publish" | "renew" | "recover", horizon: string | undefined, horizonSeconds: number, idempotencyHash: string): Response {
+  private commitPublish(body: Record<string, unknown>, profile: DisclosureProfile, payload: import("./types").CanonicalPayload, publisher: import("./types").ValidatedPublisher, operation: PublishOperation, timingInput: { horizon: string | undefined; horizonSeconds: number; idempotencyHash: string }): Response {
     const current = this.row();
     const precondition = this.checkPublishPreconditions(current, operation);
     if (precondition) return precondition;
-    const challenge = this.loadPublishChallenge(body, profile, idempotencyHash, current, publisher);
+    const challenge = this.loadPublishChallenge(body, profile, timingInput.idempotencyHash, current, publisher);
     if (challenge instanceof Response) return challenge;
     if (operation === "renew" && current.last_renewed_at !== null && nowSeconds() - current.last_renewed_at < RENEWAL_MINIMUM_SECONDS) return this.finishError(409);
     const newGeneration = current.generation + 1;
-    const timing = this.resolvePublishTiming(profile, payload, horizonSeconds);
+    const timing = this.resolvePublishTiming(profile, payload, timingInput.horizonSeconds);
     if (timing instanceof Response) return timing;
     this.sql.exec("UPDATE relay_challenges SET consumed = 1 WHERE id = ? AND consumed = 0", challenge.id).toArray();
     this.sql.exec(`UPDATE relay_state SET status='ready', profile=?, generation=?, payload=?, payload_digest=?, verified_at=?, valid_until=?, semantic_horizon=?, tombstoned=0, last_renewed_at=?, updated_at=?
-      WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0 AND status <> 'revoked'`, profile, newGeneration, body.canonical_bytes, body.canonical_digest, timing.verifiedAt, timing.validUntil, horizon, nowSeconds(), nowSeconds(), body.expected_generation, body.expected_revocation_epoch).toArray();
+      WHERE id=1 AND generation=? AND revocation_epoch=? AND tombstoned=0 AND status <> 'revoked'`, profile, newGeneration, body.canonical_bytes, body.canonical_digest, timing.verifiedAt, timing.validUntil, timingInput.horizon, nowSeconds(), nowSeconds(), body.expected_generation, body.expected_revocation_epoch).toArray();
     // SQLite UPDATE's result is not portable across the Workers cursor, so
     // re-read the row as the compare-and-set witness.
     const after = this.row();
@@ -495,7 +497,7 @@ export class RelayDurableObject {
     return response(200, { ok: true, generation: newGeneration, revocation_epoch: after.revocation_epoch, state: "ready", valid_until: timing.validUntil });
   }
 
-  private async publish(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "publish" | "renew" | "recover", internalProof?: unknown): Promise<Response> {
+  private async publish(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: PublishOperation, internalProof?: unknown): Promise<Response> {
     this.validateOperationBasics(body, operation);
     if ("trusted_context" in body) throw new AuthorizationError(403);
     const profile = asProfile(body.profile);
@@ -517,7 +519,7 @@ export class RelayDurableObject {
     }
     if (!safeInteger(body.expected_generation) || !safeInteger(body.expected_revocation_epoch)) throw new PayloadError();
     const idempotencyHash = await sha256Hex(body.idempotency_key);
-    return this.state.storage.transactionSync(() => this.commitPublish(body, profile, payload, publisher, operation, horizon, horizonSeconds, idempotencyHash));
+    return this.state.storage.transactionSync(() => this.commitPublish(body, profile, payload, publisher, operation, { horizon, horizonSeconds, idempotencyHash }));
   }
 
   private async lifecycle(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "invalidate" | "revoke"): Promise<Response> {
@@ -882,7 +884,7 @@ export class RelayDurableObject {
     proof: { valid: true; kind?: string; digest?: string; semantic_horizon?: string; tree_sha?: string };
   }): Promise<Response> {
     await this.initialized;
-    let operation: "publish" | "renew" | "recover";
+    let operation: PublishOperation;
     if (args.body.operation === "renew") operation = "renew";
     else if (args.body.operation === "recover") operation = "recover";
     else operation = "publish";

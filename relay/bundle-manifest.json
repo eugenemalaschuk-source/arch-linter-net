@@ -12,7 +12,7 @@
   "files": [
     {
       "path": "src/index.ts",
-      "sha256": "dec82b3b38bfb9a97a9253aa5d9e5a1d2c2d74f56ee817bf8460657f117ec605"
+      "sha256": "97fabd58e15594db3cf8bbd706ddb67f1f024af38252058ff09a607bcc3cf066"
     },
     {
       "path": "src/lifecycle.ts",
@@ -36,7 +36,7 @@
     },
     {
       "path": "src/relay-do.ts",
-      "sha256": "c31e7e54f4b0c8f80d2ee0229d46254fd2afbf37720bf3eb123e06b012ad611c"
+      "sha256": "849fbdf837ac92910055dbfeb6a9cbbc97d9e5a661aa1f4e6f209184b81f4a68"
     },
     {
       "path": "src/security.ts",
