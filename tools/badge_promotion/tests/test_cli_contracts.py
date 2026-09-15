@@ -313,8 +313,9 @@ def test_raw_publication_retries_ref_update_race_and_fails_closed(
     monkeypatch.setattr(cli.time, "sleep", sleeps.append)
 
     if expect_failure:
+        typed_api = cast(cli.GitHubApi, api)
         with pytest.raises(ProviderFailure, match="publication_race_lost"):
-            _publish_raw(cast(cli.GitHubApi, api), config, b"payload", evidence=None, status="ready", reason="ready")
+            _publish_raw(typed_api, config, b"payload", evidence=None, status="ready", reason="ready")
     else:
         _publish_raw(cast(cli.GitHubApi, api), config, b"payload", evidence=None, status="ready", reason="ready")
 
@@ -343,8 +344,9 @@ def test_workflow_sha_is_resolved_from_the_versioned_content_endpoint() -> None:
 def test_workflow_sha_resolution_rejects_a_directory_response() -> None:
     path = "/repos/owner/repo/contents/.github/workflows?ref=" + "a" * 40
     api = FakeApi({path: [{"type": "file", "sha": "b" * 40}]})
+    typed_api = cast(cli.GitHubApi, api)
     with pytest.raises(ProviderFailure, match="workflow_mismatch"):
-        _workflow_blob_sha(cast(cli.GitHubApi, api), "owner/repo", ".github/workflows", "a" * 40)
+        _workflow_blob_sha(typed_api, "owner/repo", ".github/workflows", "a" * 40)
 
 
 def test_github_artifact_download_uses_github_api_media_type(monkeypatch: pytest.MonkeyPatch) -> None:

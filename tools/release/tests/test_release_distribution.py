@@ -227,7 +227,9 @@ def test_inventory_action_ref_matches_badge_setup_contract() -> None:
 def test_validate_version_rejects_non_ascii_unicode_digits() -> None:
     assert distribution._validate_version("0.8.19") == "0.8.19"
 
-    error = pytest.raises(ValueError, distribution._validate_version, "0.8.1١")
+    validate_version = distribution._validate_version
+    with pytest.raises(ValueError) as error:
+        validate_version("0.8.1١")
     assert "valid 0.8.x version" in str(error.value)
 
 
