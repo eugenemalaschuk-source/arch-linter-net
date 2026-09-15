@@ -27,34 +27,6 @@ public static class AnalysisCacheOutcomeMapper
             sourceExpansion,
             mode: null);
 
-    public static AnalysisCacheOutcomeV1 ToCacheOutcome(ValidationOutcome outcome)
-    {
-        ArgumentNullException.ThrowIfNull(outcome);
-        return new AnalysisCacheOutcomeV1(
-            outcome.Passed,
-            outcome.Violations.ToArray(),
-            outcome.Cycles.ToArray(),
-            outcome.CoverageFindings.ToArray(),
-            outcome.CoverageConfig,
-            outcome.UnmatchedIgnoredViolations.ToArray(),
-            outcome.UnmatchedIgnoredViolationsConfig,
-            outcome.PolicyConsistencyFindings.ToArray(),
-            outcome.PolicyConsistencyConfig,
-            outcome.ClassificationConflicts.ToArray(),
-            outcome.ClassificationMetadataFailures.ToArray(),
-            outcome.ClassificationRoles.ToArray(),
-            outcome.ClassificationPathDeferred,
-            outcome.CycleFindings.ToArray(),
-            outcome.CoverageSummaries.ToArray(),
-            outcome.SubtractiveMatcherParticipation.ToArray(),
-            outcome.ApplicabilityExpectedEntries.ToArray(),
-            outcome.ApplicabilityRecords.ToArray())
-        {
-            Waivers = outcome.Waivers.ToArray(),
-            PolicyInventory = outcome.PolicyInventory,
-        };
-    }
-
     // Preserves the exact pre-#741 7-parameter public method signature/token. Replacing it outright
     // with the 8-parameter overload below stayed source-compatible (the added parameter was
     // optional) but broke binary compatibility for callers already compiled against the prior
@@ -142,6 +114,34 @@ public static class AnalysisCacheOutcomeMapper
                 : ArchitectureApplicabilityProjector.Project(completion, mode),
             ExternalEvidenceRequirements = externalEvidenceRequirements
                 ?? Array.Empty<ArchitectureExternalEvidenceRequirement>(),
+        };
+    }
+
+    public static AnalysisCacheOutcomeV1 ToCacheOutcome(ValidationOutcome outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        return new AnalysisCacheOutcomeV1(
+            outcome.Passed,
+            outcome.Violations.ToArray(),
+            outcome.Cycles.ToArray(),
+            outcome.CoverageFindings.ToArray(),
+            outcome.CoverageConfig,
+            outcome.UnmatchedIgnoredViolations.ToArray(),
+            outcome.UnmatchedIgnoredViolationsConfig,
+            outcome.PolicyConsistencyFindings.ToArray(),
+            outcome.PolicyConsistencyConfig,
+            outcome.ClassificationConflicts.ToArray(),
+            outcome.ClassificationMetadataFailures.ToArray(),
+            outcome.ClassificationRoles.ToArray(),
+            outcome.ClassificationPathDeferred,
+            outcome.CycleFindings.ToArray(),
+            outcome.CoverageSummaries.ToArray(),
+            outcome.SubtractiveMatcherParticipation.ToArray(),
+            outcome.ApplicabilityExpectedEntries.ToArray(),
+            outcome.ApplicabilityRecords.ToArray())
+        {
+            Waivers = outcome.Waivers.ToArray(),
+            PolicyInventory = outcome.PolicyInventory,
         };
     }
 }

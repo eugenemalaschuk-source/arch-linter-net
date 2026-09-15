@@ -71,20 +71,15 @@ internal sealed class ArchitectureContractSurfaceExposureIndex
         foreach (Type root in orderedRoots)
         {
             ArchitectureContractSurfaceExposureResult result = GetOrMaterialize(root, surfaceShape);
-            foreach (ArchitectureContractExposure exposure in result.Exposures)
+            foreach (ArchitectureContractExposure exposure in result.Exposures.Where(exposure => exposureSet.Add(exposure)))
             {
-                if (exposureSet.Add(exposure))
-                {
-                    exposures.Add(exposure);
-                }
+                exposures.Add(exposure);
             }
 
-            foreach (ArchitectureContractExposureIncompleteEvidence evidence in result.IncompleteEvidence)
+            foreach (ArchitectureContractExposureIncompleteEvidence evidence in result.IncompleteEvidence
+                .Where(evidence => incompleteSet.Add(evidence)))
             {
-                if (incompleteSet.Add(evidence))
-                {
-                    incomplete.Add(evidence);
-                }
+                incomplete.Add(evidence);
             }
 
             foreach ((ArchitectureContractExposureTarget target, Type type) in result.ReferencedTypes)

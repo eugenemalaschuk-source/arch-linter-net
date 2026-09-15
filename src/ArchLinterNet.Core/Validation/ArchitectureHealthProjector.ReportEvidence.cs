@@ -26,6 +26,7 @@ internal sealed record ArchitectureHealthReportEvidenceEnvelope(
 
 internal static class ArchitectureHealthReportEvidenceWriter
 {
+    private const string Available = "available";
     private const int ReportEvidenceSchemaVersion = 2;
     private const string ReportEvidenceKind = "architecture-health-report-evidence";
 
@@ -156,12 +157,12 @@ internal static class ArchitectureHealthReportEvidenceWriter
         bool hasExternal = HasExternalEvidence(outcome);
         return new JsonObject
         {
-            ["policy_inventory"] = outcome.PolicyInventory is null ? "unavailable" : "available",
-            ["waiver_lifecycle"] = outcome.WaiverLifecycleAssessment is null ? "unavailable" : "available",
-            ["applicability"] = outcome.AssessmentCompletionEvidence is null ? "unavailable" : "available",
-            ["topology"] = hasTopology ? "available" : "not_configured",
-            ["external_evidence"] = hasExternal ? "available" : "not_configured",
-            ["findings"] = "available",
+            ["policy_inventory"] = outcome.PolicyInventory is null ? "unavailable" : Available,
+            ["waiver_lifecycle"] = outcome.WaiverLifecycleAssessment is null ? "unavailable" : Available,
+            ["applicability"] = outcome.AssessmentCompletionEvidence is null ? "unavailable" : Available,
+            ["topology"] = hasTopology ? Available : "not_configured",
+            ["external_evidence"] = hasExternal ? Available : "not_configured",
+            ["findings"] = Available,
         };
     }
 }

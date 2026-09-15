@@ -52,12 +52,6 @@ public sealed record ValidationOutcome
     /// <summary>Immutable native conformance state before imported-diagnostic governance.</summary>
     public bool NativePassed => _nativePassed;
 
-    private bool EffectivePassed
-    {
-        get => _passed;
-        init => _passed = value;
-    }
-
     public IReadOnlyCollection<ArchitectureViolation> Violations { get; init; }
     public IReadOnlyCollection<string> Cycles { get; init; }
     public IReadOnlyCollection<ArchitectureViolation> CoverageFindings { get; init; }
@@ -244,11 +238,12 @@ public sealed record ValidationOutcome
     public ValidationOutcome WithImportedDiagnostics(ImportedExternalDiagnosticProjection importedDiagnostics)
     {
         ArgumentNullException.ThrowIfNull(importedDiagnostics);
-        return this with
+        ValidationOutcome result = this with
         {
             ImportedDiagnostics = importedDiagnostics,
-            EffectivePassed = NativePassed && !importedDiagnostics.HasBlockingFindings,
         };
+        result._passed = NativePassed && !importedDiagnostics.HasBlockingFindings;
+        return result;
     }
 
     /// <summary>Normalized applicability insufficiency findings, when the projection is present.</summary>

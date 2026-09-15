@@ -9,6 +9,8 @@ namespace ArchLinterNet.Core.Validation;
 /// <summary>Deterministic Human, JSON, and SARIF projections for one debt-gate result.</summary>
 public static class ArchitectureDebtGateFormatter
 {
+    private const string Properties = "properties";
+    private const string RuleId = "ruleId";
     private const string SarifSchema =
         "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json";
 
@@ -67,10 +69,10 @@ public static class ArchitectureDebtGateFormatter
                 : OrderWeakening(outcome.PolicyWeakening.Findings)
                     .Select(BuildWeakeningSarifResult)
                     .Concat(outcome.PolicyWeakening.ApprovedPublicApiAdditions.Select(BuildApprovedPublicApiSarifResult)))
-            .OrderBy(result => (string)result["ruleId"]!, StringComparer.Ordinal)
-            .ThenBy(result => JsonSerializer.Serialize(result["properties"]), StringComparer.Ordinal)
+            .OrderBy(result => (string)result[RuleId]!, StringComparer.Ordinal)
+            .ThenBy(result => JsonSerializer.Serialize(result[Properties]), StringComparer.Ordinal)
             .ToList();
-        object[] rules = results.Select(result => (string)result["ruleId"]!)
+        object[] rules = results.Select(result => (string)result[RuleId]!)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(ruleId => ruleId, StringComparer.Ordinal)
             .Select(ruleId => (object)new Dictionary<string, object?>
@@ -172,7 +174,7 @@ public static class ArchitectureDebtGateFormatter
         Dictionary<string, object?> result = ArchitectureBaselineSarifFormatter.BuildResult(
             lifecycle,
             "ArchLinterNet.DebtGate.Persistent." + entry.ContractId);
-        var properties = (Dictionary<string, object?>)result["properties"]!;
+        var properties = (Dictionary<string, object?>)result[Properties]!;
         properties["gate_section"] = "persistent_debt";
         properties["canonical_identity"] = ArchitectureFindingMapper.FromBaseline(lifecycle).CanonicalIdentity;
         return result;
@@ -180,10 +182,10 @@ public static class ArchitectureDebtGateFormatter
 
     private static Dictionary<string, object?> BuildWeakeningSarifResult(ArchitecturePolicyWeakeningFinding finding) => new()
     {
-        ["ruleId"] = "ArchLinterNet.DebtGate.PolicyWeakening." + finding.Kind,
+        [RuleId] = "ArchLinterNet.DebtGate.PolicyWeakening." + finding.Kind,
         ["level"] = finding.Severity switch { "error" => "error", "warn" => "warning", _ => "note" },
         ["message"] = new Dictionary<string, string> { ["text"] = $"{finding.Kind} weakens {finding.ControlIdentity}." },
-        ["properties"] = new Dictionary<string, object?>
+        [Properties] = new Dictionary<string, object?>
         {
             ["gate_section"] = "policy_weakening",
             ["identity"] = finding.Identity,
@@ -203,13 +205,13 @@ public static class ArchitectureDebtGateFormatter
     private static Dictionary<string, object?> BuildApprovedPublicApiSarifResult(
         ArchitectureApprovedPublicApiAddition approval) => new()
         {
-            ["ruleId"] = "ArchLinterNet.DebtGate.PolicyWeakening.ApprovedPublicApiAddition",
+            [RuleId] = "ArchLinterNet.DebtGate.PolicyWeakening.ApprovedPublicApiAddition",
             ["level"] = "note",
             ["message"] = new Dictionary<string, string>
             {
                 ["text"] = $"Reviewed public API additions approved for {approval.ContractId}.",
             },
-            ["properties"] = new Dictionary<string, object?>
+            [Properties] = new Dictionary<string, object?>
             {
                 ["gate_section"] = "policy_weakening",
                 ["approval"] = "approved_public_api_addition",

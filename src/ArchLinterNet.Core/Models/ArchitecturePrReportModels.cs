@@ -423,7 +423,14 @@ public sealed record ArchitecturePrReportNavigationContext(
             && attempt
             && string.Equals(segments[7], "artifacts", StringComparison.Ordinal)
             && IsDigits(segments[8]);
-        return prefix && (segments.Length == 5 || artifact || attempt || attemptArtifact)
+        bool validPath = prefix && segments.Length switch
+        {
+            5 => true,
+            7 => artifact || attempt,
+            9 => attemptArtifact,
+            _ => false,
+        };
+        return validPath
             ? $"https://github.com/{repository[0]}/{repository[1]}/{string.Join('/', segments[2..])}" : null;
     }
 
