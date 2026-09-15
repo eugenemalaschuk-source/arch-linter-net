@@ -10,8 +10,11 @@ public static class ArchitectureWaiverProfile
     public static string Resolve(ArchitectureContractDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        return string.IsNullOrWhiteSpace(document.Analysis.WaiverLifecycleProfile)
-            ? document.Version >= 2 ? Strict : Compatibility
-            : document.Analysis.WaiverLifecycleProfile;
+        if (!string.IsNullOrWhiteSpace(document.Analysis.WaiverLifecycleProfile))
+        {
+            return document.Analysis.WaiverLifecycleProfile;
+        }
+
+        return document.Version >= 2 ? Strict : Compatibility;
     }
 }

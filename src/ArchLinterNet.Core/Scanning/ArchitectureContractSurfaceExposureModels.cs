@@ -3,7 +3,7 @@ using System.Reflection;
 namespace ArchLinterNet.Core.Scanning;
 
 [Flags]
-internal enum ArchitectureContractSurfaceVisibility
+internal enum ArchitectureContractSurfaceVisibilities
 {
     None = 0,
     Public = 1 << 0,
@@ -14,20 +14,33 @@ internal enum ArchitectureContractSurfaceVisibility
     Private = 1 << 5
 }
 
+// Source-compatible value façade for existing internal callers while the enum itself follows the
+// plural naming convention required for a flags collection.
+internal static class ArchitectureContractSurfaceVisibility
+{
+    internal const ArchitectureContractSurfaceVisibilities None = ArchitectureContractSurfaceVisibilities.None;
+    internal const ArchitectureContractSurfaceVisibilities Public = ArchitectureContractSurfaceVisibilities.Public;
+    internal const ArchitectureContractSurfaceVisibilities Protected = ArchitectureContractSurfaceVisibilities.Protected;
+    internal const ArchitectureContractSurfaceVisibilities ProtectedInternal = ArchitectureContractSurfaceVisibilities.ProtectedInternal;
+    internal const ArchitectureContractSurfaceVisibilities Internal = ArchitectureContractSurfaceVisibilities.Internal;
+    internal const ArchitectureContractSurfaceVisibilities PrivateProtected = ArchitectureContractSurfaceVisibilities.PrivateProtected;
+    internal const ArchitectureContractSurfaceVisibilities Private = ArchitectureContractSurfaceVisibilities.Private;
+}
+
 // A normalized visible-contract shape. Root membership is deliberately not modeled here: callers
 // supply roots already selected by the reviewed API surface. The shape only describes which
 // declared members and nested types contribute evidence for each selected root.
 internal readonly record struct ArchitectureContractSurfaceShape
 {
-    private const ArchitectureContractSurfaceVisibility AllVisibilities =
-        ArchitectureContractSurfaceVisibility.Public |
-        ArchitectureContractSurfaceVisibility.Protected |
-        ArchitectureContractSurfaceVisibility.ProtectedInternal |
-        ArchitectureContractSurfaceVisibility.Internal |
-        ArchitectureContractSurfaceVisibility.PrivateProtected |
-        ArchitectureContractSurfaceVisibility.Private;
+    private const ArchitectureContractSurfaceVisibilities AllVisibilities =
+        ArchitectureContractSurfaceVisibilities.Public |
+        ArchitectureContractSurfaceVisibilities.Protected |
+        ArchitectureContractSurfaceVisibilities.ProtectedInternal |
+        ArchitectureContractSurfaceVisibilities.Internal |
+        ArchitectureContractSurfaceVisibilities.PrivateProtected |
+        ArchitectureContractSurfaceVisibilities.Private;
 
-    internal ArchitectureContractSurfaceShape(ArchitectureContractSurfaceVisibility visibilities)
+    internal ArchitectureContractSurfaceShape(ArchitectureContractSurfaceVisibilities visibilities)
     {
         EnsureValid(visibilities);
         Visibilities = visibilities;
@@ -35,57 +48,57 @@ internal readonly record struct ArchitectureContractSurfaceShape
 
     // Mirrors the public API surface used by #94/#525.
     internal static ArchitectureContractSurfaceShape Exported { get; } = new(
-        ArchitectureContractSurfaceVisibility.Public |
-        ArchitectureContractSurfaceVisibility.Protected |
-        ArchitectureContractSurfaceVisibility.ProtectedInternal);
+        ArchitectureContractSurfaceVisibilities.Public |
+        ArchitectureContractSurfaceVisibilities.Protected |
+        ArchitectureContractSurfaceVisibilities.ProtectedInternal);
 
-    internal ArchitectureContractSurfaceVisibility Visibilities { get; }
+    internal ArchitectureContractSurfaceVisibilities Visibilities { get; }
 
     internal void EnsureValid() => EnsureValid(Visibilities);
 
     internal bool Includes(MethodBase? method) => method != null && Includes(
         (method.Attributes & MethodAttributes.MemberAccessMask) switch
         {
-            MethodAttributes.Private => ArchitectureContractSurfaceVisibility.Private,
-            MethodAttributes.FamANDAssem => ArchitectureContractSurfaceVisibility.PrivateProtected,
-            MethodAttributes.Assembly => ArchitectureContractSurfaceVisibility.Internal,
-            MethodAttributes.Family => ArchitectureContractSurfaceVisibility.Protected,
-            MethodAttributes.FamORAssem => ArchitectureContractSurfaceVisibility.ProtectedInternal,
-            MethodAttributes.Public => ArchitectureContractSurfaceVisibility.Public,
-            _ => ArchitectureContractSurfaceVisibility.None
+            MethodAttributes.Private => ArchitectureContractSurfaceVisibilities.Private,
+            MethodAttributes.FamANDAssem => ArchitectureContractSurfaceVisibilities.PrivateProtected,
+            MethodAttributes.Assembly => ArchitectureContractSurfaceVisibilities.Internal,
+            MethodAttributes.Family => ArchitectureContractSurfaceVisibilities.Protected,
+            MethodAttributes.FamORAssem => ArchitectureContractSurfaceVisibilities.ProtectedInternal,
+            MethodAttributes.Public => ArchitectureContractSurfaceVisibilities.Public,
+            _ => ArchitectureContractSurfaceVisibilities.None
         });
 
     internal bool Includes(FieldInfo? field) => field != null && Includes(
         (field.Attributes & FieldAttributes.FieldAccessMask) switch
         {
-            FieldAttributes.Private => ArchitectureContractSurfaceVisibility.Private,
-            FieldAttributes.FamANDAssem => ArchitectureContractSurfaceVisibility.PrivateProtected,
-            FieldAttributes.Assembly => ArchitectureContractSurfaceVisibility.Internal,
-            FieldAttributes.Family => ArchitectureContractSurfaceVisibility.Protected,
-            FieldAttributes.FamORAssem => ArchitectureContractSurfaceVisibility.ProtectedInternal,
-            FieldAttributes.Public => ArchitectureContractSurfaceVisibility.Public,
-            _ => ArchitectureContractSurfaceVisibility.None
+            FieldAttributes.Private => ArchitectureContractSurfaceVisibilities.Private,
+            FieldAttributes.FamANDAssem => ArchitectureContractSurfaceVisibilities.PrivateProtected,
+            FieldAttributes.Assembly => ArchitectureContractSurfaceVisibilities.Internal,
+            FieldAttributes.Family => ArchitectureContractSurfaceVisibilities.Protected,
+            FieldAttributes.FamORAssem => ArchitectureContractSurfaceVisibilities.ProtectedInternal,
+            FieldAttributes.Public => ArchitectureContractSurfaceVisibilities.Public,
+            _ => ArchitectureContractSurfaceVisibilities.None
         });
 
     internal bool Includes(Type type) => Includes(
         (type.Attributes & TypeAttributes.VisibilityMask) switch
         {
-            TypeAttributes.NotPublic or TypeAttributes.NestedAssembly => ArchitectureContractSurfaceVisibility.Internal,
-            TypeAttributes.Public or TypeAttributes.NestedPublic => ArchitectureContractSurfaceVisibility.Public,
-            TypeAttributes.NestedPrivate => ArchitectureContractSurfaceVisibility.Private,
-            TypeAttributes.NestedFamily => ArchitectureContractSurfaceVisibility.Protected,
-            TypeAttributes.NestedFamANDAssem => ArchitectureContractSurfaceVisibility.PrivateProtected,
-            TypeAttributes.NestedFamORAssem => ArchitectureContractSurfaceVisibility.ProtectedInternal,
-            _ => ArchitectureContractSurfaceVisibility.None
+            TypeAttributes.NotPublic or TypeAttributes.NestedAssembly => ArchitectureContractSurfaceVisibilities.Internal,
+            TypeAttributes.Public or TypeAttributes.NestedPublic => ArchitectureContractSurfaceVisibilities.Public,
+            TypeAttributes.NestedPrivate => ArchitectureContractSurfaceVisibilities.Private,
+            TypeAttributes.NestedFamily => ArchitectureContractSurfaceVisibilities.Protected,
+            TypeAttributes.NestedFamANDAssem => ArchitectureContractSurfaceVisibilities.PrivateProtected,
+            TypeAttributes.NestedFamORAssem => ArchitectureContractSurfaceVisibilities.ProtectedInternal,
+            _ => ArchitectureContractSurfaceVisibilities.None
         });
 
-    private bool Includes(ArchitectureContractSurfaceVisibility visibility) =>
-        (Visibilities & visibility) != ArchitectureContractSurfaceVisibility.None;
+    private bool Includes(ArchitectureContractSurfaceVisibilities visibility) =>
+        (Visibilities & visibility) != ArchitectureContractSurfaceVisibilities.None;
 
-    private static void EnsureValid(ArchitectureContractSurfaceVisibility visibilities)
+    private static void EnsureValid(ArchitectureContractSurfaceVisibilities visibilities)
     {
-        if (visibilities == ArchitectureContractSurfaceVisibility.None ||
-            (visibilities & ~AllVisibilities) != ArchitectureContractSurfaceVisibility.None)
+        if (visibilities == ArchitectureContractSurfaceVisibilities.None ||
+            (visibilities & ~AllVisibilities) != ArchitectureContractSurfaceVisibilities.None)
         {
             throw new ArgumentOutOfRangeException(nameof(visibilities));
         }

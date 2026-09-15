@@ -47,7 +47,9 @@ internal static class ArchitectureMetricEvaluator
         var records = new List<ArchitectureApplicabilityRecord>(selected.Length);
 
         ArchitectureTopologyEvaluator.Projection? topology = topologyResult.FactProjection;
-        ArchitectureTopologyMappingEvidence? topologyEvidence = topologyResult.Records.FirstOrDefault()?.TopologyEvidence;
+        ArchitectureTopologyMappingEvidence? topologyEvidence = topologyResult.Records.Count > 0
+            ? topologyResult.Records[0].TopologyEvidence
+            : null;
         foreach (ArchitectureMetricDefinition definition in selected)
         {
             ArchitectureApplicabilityProvenance provenance =

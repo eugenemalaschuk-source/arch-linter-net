@@ -17,8 +17,6 @@ namespace ArchLinterNet.Core.Validation;
 // docs/internal/analysis-build-state-blueprint.md, "Snapshot ownership".
 public sealed class ArchitectureAnalysisSnapshot : IDisposable
 {
-    private const string ErrorSeverity = "error";
-
     private readonly ArchitectureContractDocument _document;
     private readonly string _repositoryRoot;
     private ArchitectureRunnerSetup? _setup;
@@ -73,6 +71,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         bool preparedArtifactClosureComplete = true,
         ArchitectureRunnerPreparation? preparedPostBuildRunner = null,
         Func<ArchitectureRunnerSetup>? materializeSetup = null,
+        // Keep CancellationToken before the optional waiver date to preserve the reviewed
+        // public constructor signature; CA1068 is intentionally retained for compatibility.
         CancellationToken cancellationToken = default,
         DateOnly? waiverEvaluationDate = null)
     {

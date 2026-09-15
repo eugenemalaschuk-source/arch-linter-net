@@ -304,18 +304,16 @@ public static class ArchitectureChangeReports
         }
 
         HashSet<string> findingIdentities = new(StringComparer.Ordinal);
-        foreach (ArchitectureChangeFinding finding in report.NewFindings
+        if (report.NewFindings
             .Concat(report.ExistingFindings)
-            .Concat(report.ResolvedFindings))
-        {
-            if (finding is null
+            .Concat(report.ResolvedFindings)
+            .Any(finding => finding is null
                 || string.IsNullOrWhiteSpace(finding.Identity)
-                || !findingIdentities.Add(finding.Identity))
-            {
-                throw new ArgumentException(
-                    "Architecture change report findings must have unique identities across new, existing, and resolved sections.",
-                    nameof(report));
-            }
+                || !findingIdentities.Add(finding.Identity)))
+        {
+            throw new ArgumentException(
+                "Architecture change report findings must have unique identities across new, existing, and resolved sections.",
+                nameof(report));
         }
 
         ValidateEntries(report.Added.Concat(report.Removed), nameof(report));

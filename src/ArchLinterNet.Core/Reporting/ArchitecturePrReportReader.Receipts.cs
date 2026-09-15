@@ -8,6 +8,8 @@ namespace ArchLinterNet.Core.Reporting;
 
 internal static class ArchitecturePrReportReceiptParser
 {
+    private const string ControlIdentity = "control_identity";
+    private const string State = "state";
     internal static ArchitecturePolicyInventory ReadPolicyInventory(JsonElement element)
     {
         string schema = RequiredString(element, "schema");
@@ -41,7 +43,7 @@ internal static class ArchitecturePrReportReceiptParser
         RequireObject(element, "A waiver lifecycle record");
         return new ArchitectureWaiverLifecycleRecord(
             RequiredString(element, "id"),
-            RequiredString(element, "state"),
+            RequiredString(element, State),
             RequiredString(element, "contract"),
             OptionalString(element, "contract_id"),
             RequiredString(element, "contract_group"),
@@ -107,7 +109,7 @@ internal static class ArchitecturePrReportReceiptParser
         JsonElement reasons = Required(element, "reasons", JsonValueKind.Array);
         JsonElement controls = Required(element, "controls", JsonValueKind.Array);
         return new ArchitecturePrReportApplicability(
-            RequiredString(element, "state"),
+            RequiredString(element, State),
             new ArchitecturePrReportApplicabilitySummary(
                 RequiredInt(summary, "required"),
                 RequiredInt(summary, "required_evaluable"),
@@ -131,9 +133,9 @@ internal static class ArchitecturePrReportReceiptParser
             : null;
         JsonElement reasons = Required(element, "integrity_reasons", JsonValueKind.Array);
         return new ArchitecturePrReportApplicabilityControl(
-            RequiredString(element, "control_identity"),
+            RequiredString(element, ControlIdentity),
             OptionalString(element, "membership"),
-            RequiredString(element, "state"),
+            RequiredString(element, State),
             RequiredBool(element, "integrity_valid"),
             reasons.EnumerateArray().Select(ReadApplicabilityReason).ToArray(),
             expected,
@@ -142,7 +144,7 @@ internal static class ArchitecturePrReportReceiptParser
 
     private static ArchitecturePrReportApplicabilityExpected ReadApplicabilityExpected(JsonElement element) =>
         new(
-            RequiredString(element, "control_identity"),
+            RequiredString(element, ControlIdentity),
             RequiredString(element, "family"),
             RequiredString(element, "membership"),
             ReadProvenanceReference(Required(element, "provenance", JsonValueKind.Object)));
@@ -150,9 +152,9 @@ internal static class ArchitecturePrReportReceiptParser
     private static ArchitecturePrReportApplicabilityRecord ReadApplicabilityRecord(JsonElement element)
     {
         return new ArchitecturePrReportApplicabilityRecord(
-            RequiredString(element, "control_identity"),
+            RequiredString(element, ControlIdentity),
             RequiredString(element, "family"),
-            RequiredString(element, "state"),
+            RequiredString(element, State),
             Required(element, "reasons", JsonValueKind.Array).EnumerateArray()
                 .Select(ReadApplicabilityReason).ToArray(),
             ReadProvenanceReference(Required(element, "provenance", JsonValueKind.Object)),
@@ -265,7 +267,7 @@ internal static class ArchitecturePrReportReceiptParser
         RequireObject(element, "An external-evidence trust receipt");
         string logicalId = RequiredString(element, "logical_id");
         ArchitecturePrReportExternalEvidenceTrustState state = ParseExternalEvidenceTrustState(
-            RequiredString(element, "state"));
+            RequiredString(element, State));
         SarifEvidenceTrustStatus status = ParseExternalEvidenceTrustStatus(
             RequiredString(element, "trust_status"));
         if (state != ArchitecturePrReportExternalEvidenceTrustStateMapper.Map(status))
@@ -316,12 +318,11 @@ internal static class ArchitecturePrReportReceiptParser
 
         HashSet<string> requiredIds = requirements.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
         HashSet<string> receiptIds = new(StringComparer.Ordinal);
-        foreach (ArchitecturePrReportExternalEvidenceTrustReceipt receipt in trustReceipts)
+        if (!trustReceipts
+            .Select(receipt => receipt.LogicalId)
+            .All(logicalId => requiredIds.Contains(logicalId) && receiptIds.Add(logicalId)))
         {
-            if (!requiredIds.Contains(receipt.LogicalId) || !receiptIds.Add(receipt.LogicalId))
-            {
-                throw InvalidArtifact("External-evidence trust receipts must use each declared logical id exactly once.");
-            }
+            throw InvalidArtifact("External-evidence trust receipts must use each declared logical id exactly once.");
         }
     }
 
@@ -338,21 +339,18 @@ internal static class ArchitecturePrReportReceiptParser
 
     private static SarifEvidenceTrustStatus ParseExternalEvidenceTrustStatus(string value)
     {
-        foreach (SarifEvidenceTrustStatus status in Enum.GetValues<SarifEvidenceTrustStatus>())
-        {
-            if (string.Equals(JsonNamingPolicy.SnakeCaseLower.ConvertName(status.ToString()), value, StringComparison.Ordinal))
-            {
-                return status;
-            }
-        }
-
-        throw InvalidArtifact($"Unsupported external-evidence trust status '{value}'.");
+        SarifEvidenceTrustStatus? status = Enum.GetValues<SarifEvidenceTrustStatus>()
+            .Where(candidate => string.Equals(
+                JsonNamingPolicy.SnakeCaseLower.ConvertName(candidate.ToString()), value, StringComparison.Ordinal))
+            .Select(candidate => (SarifEvidenceTrustStatus?)candidate)
+            .FirstOrDefault();
+        return status ?? throw InvalidArtifact($"Unsupported external-evidence trust status '{value}'.");
     }
 
     private static ArchitecturePrReportProvenanceReference ReadProvenanceReference(JsonElement element)
     {
         RequireObject(element, "A provenance reference");
-        return new(OptionalString(element, "family"), OptionalString(element, "control_identity"),
+        return new(OptionalString(element, "family"), OptionalString(element, ControlIdentity),
             OptionalString(element, "policy_identity"), OptionalString(element, "evidence_identity"));
     }
 
