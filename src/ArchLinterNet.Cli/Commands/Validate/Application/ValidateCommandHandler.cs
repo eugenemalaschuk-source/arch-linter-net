@@ -5,9 +5,6 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Validate.Application;
 
-// The command façade owns the unified invocation lifecycle and top-level exception routing.
-// Analysis, cache, profile, preflight, and output details live in purpose-named collaborators;
-// this type remains the sole command entry point and outcome authority.
 internal sealed class ValidateCommandHandler
 {
     // Capture before any invocation collaborators are constructed so --profile keeps measuring
@@ -48,14 +45,14 @@ internal sealed class ValidateCommandHandler
         // Must precede the general OperationCanceledException catch below (it is a subtype).
         catch (BuildStateProcessCleanupTimedOutException ex)
         {
-            _profile.CaptureCancelledProfileState(profileState, ex);
+            ValidateProfileWriter.CaptureCancelledProfileState(profileState, ex);
             _profile.WriteCancelledProfile(options, profileState);
             _errors.WriteCancellation(options, errorFormat, ex);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
         catch (OperationCanceledException ex)
         {
-            _profile.CaptureCancelledProfileState(profileState, ex);
+            ValidateProfileWriter.CaptureCancelledProfileState(profileState, ex);
             _profile.WriteCancelledProfile(options, profileState);
             _errors.WriteCancellation(options, errorFormat);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;

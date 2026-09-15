@@ -123,12 +123,9 @@ internal sealed class ValidateCommandExecution
             options.Format, mode, outcome, options.AdditionalSinks, timing, _cancellationToken);
         profileState.Output = ValidateProfileWriter.CreateOutputProfile(result);
         profileState.RenderedSinkCount = result.RenderedFormats.Count;
-        if (options.TimingsEnabled)
+        if (options.TimingsEnabled && timing is not null)
         {
-            if (timing is not null)
-            {
-                _errors.WriteTimingReport(timing);
-            }
+            _errors.WriteTimingReport(timing);
         }
 
         if (!result.Cancelled)
@@ -258,12 +255,9 @@ internal sealed class ValidateCommandExecution
             options.Format, enrichedOutcomesByMode, options.AdditionalSinks, timing, _cancellationToken);
         profileState.Output = ValidateProfileWriter.CreateOutputProfile(result);
         profileState.RenderedSinkCount = result.RenderedFormats.Count;
-        if (options.TimingsEnabled)
+        if (options.TimingsEnabled && timing is not null)
         {
-            if (timing is not null)
-            {
-                _errors.WriteTimingReport(timing);
-            }
+            _errors.WriteTimingReport(timing);
         }
 
         if (!result.Cancelled)

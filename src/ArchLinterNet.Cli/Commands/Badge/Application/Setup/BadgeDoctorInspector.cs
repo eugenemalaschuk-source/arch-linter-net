@@ -137,7 +137,7 @@ internal static class BadgeDoctorInspector
 
         try
         {
-            using HttpClient client = (clientFactory ?? CreateClient)(uri.GetLeftPart(UriPartial.Authority), null);
+            using HttpClient client = (clientFactory ?? ((baseAddress, _) => CreateClient(baseAddress)))(uri.GetLeftPart(UriPartial.Authority), null);
             using HttpRequestMessage request = new(HttpMethod.Get, uri);
             request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
             using HttpResponseMessage response = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
@@ -249,7 +249,7 @@ internal static class BadgeDoctorInspector
         return !maxAge.HasValue || !age.HasValue || age.Value <= maxAge.Value;
     }
 
-    private static HttpClient CreateClient(string baseAddress, string? token) => new()
+    private static HttpClient CreateClient(string baseAddress) => new()
     {
         BaseAddress = new Uri(baseAddress),
         Timeout = _requestTimeout,

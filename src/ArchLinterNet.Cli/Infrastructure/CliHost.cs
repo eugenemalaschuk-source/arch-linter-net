@@ -39,9 +39,15 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
         }
 
         LegacyResponse? response = null;
-        for (int i = 0; i < args.Length; i++)
+        bool skipNextArgument = false;
+        foreach (string arg in args)
         {
-            string arg = args[i];
+            if (skipNextArgument)
+            {
+                skipNextArgument = false;
+                continue;
+            }
+
             switch (arg)
             {
                 case "--help" or "-h":
@@ -51,17 +57,18 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
                     response ??= LegacyResponse.Version;
                     break;
                 case "--policy" or "-p" or "--mode" or "-m" or "--format" or "-f" or "--contract" or "--condition-set" or "--baseline":
-                    if (++i >= args.Length)
-                    {
-                        return false;
-                    }
-
+                    skipNextArgument = true;
                     break;
                 case "--strict" or "--audit" or "--json" or "--timings":
                     break;
                 default:
                     return false;
             }
+        }
+
+        if (skipNextArgument)
+        {
+            return false;
         }
 
         switch (response)
@@ -86,10 +93,10 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
     private void WriteParseErrors(ParseResult parseResult)
     {
         var handledUnmatchedTokens = new HashSet<string>(StringComparer.Ordinal);
-        foreach (ParseError error in parseResult.Errors)
+        foreach (string errorMessage in parseResult.Errors.Select(error => error.Message))
         {
             string? unmatchedToken = parseResult.UnmatchedTokens.FirstOrDefault(token =>
-                error.Message.Contains($"'{token}'", StringComparison.Ordinal));
+                errorMessage.Contains($"'{token}'", StringComparison.Ordinal));
             if (unmatchedToken is not null)
             {
                 WriteUnknownToken(unmatchedToken);
@@ -97,7 +104,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
                 continue;
             }
 
-            console.Error.WriteLine(NormalizeErrorMessage(error.Message));
+            console.Error.WriteLine(NormalizeErrorMessage(errorMessage));
         }
 
         foreach (string token in parseResult.UnmatchedTokens.Where(token => !handledUnmatchedTokens.Contains(token)))
@@ -110,7 +117,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
 
     private void WriteUnknownToken(string token)
     {
-        string kind = token.StartsWith("-", StringComparison.Ordinal)
+        string kind = token.StartsWith('-')
             ? "option"
             : "command or argument";
         console.Error.WriteLine($"Unknown {kind}: {token}");

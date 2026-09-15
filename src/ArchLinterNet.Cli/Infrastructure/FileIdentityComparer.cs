@@ -1,10 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
 namespace ArchLinterNet.Cli.Infrastructure;
 
 /// <summary>Compares existing files by operating-system identity, following symbolic links.</summary>
-internal static class FileIdentityComparer
+internal static partial class FileIdentityComparer
 {
     private const int StatBufferSize = 512;
 
@@ -78,14 +79,18 @@ internal static class FileIdentityComparer
         }
     }
 
+    [SuppressMessage(
+        "Interoperability",
+        "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute",
+        Justification = "The Windows output struct embeds ComTypes.FILETIME fields; LibraryImport source generation cannot marshal this type without assembly-wide DisableRuntimeMarshalling.")]
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetFileInformationByHandle(
         SafeFileHandle file,
         out ByHandleFileInformation information);
 
-    [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
-    private static extern int FStat(SafeFileHandle fileDescriptor, IntPtr buffer);
+    [LibraryImport("libc", SetLastError = true, EntryPoint = "fstat")]
+    private static partial int FStat(SafeFileHandle fileDescriptor, IntPtr buffer);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ByHandleFileInformation
