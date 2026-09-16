@@ -355,12 +355,12 @@ internal static class BadgeSetupCapabilityInspector
     private static bool ContainsRequiredCheck(JsonElement root, string checkName) =>
         RequiredCheckCandidates(root).Any(rule => IsRequiredCheckRule(rule, checkName));
 
-    private static IEnumerable<JsonElement> RequiredCheckCandidates(JsonElement root) => root.ValueKind switch
+    private static JsonElement.ArrayEnumerator RequiredCheckCandidates(JsonElement root) => root.ValueKind switch
     {
         JsonValueKind.Array => root.EnumerateArray(),
         JsonValueKind.Object when root.TryGetProperty("rules", out JsonElement rules)
             && rules.ValueKind == JsonValueKind.Array => rules.EnumerateArray(),
-        _ => [],
+        _ => default,
     };
 
     private static bool IsRequiredCheckRule(JsonElement rule, string checkName)

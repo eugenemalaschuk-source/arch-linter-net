@@ -80,7 +80,7 @@ internal static class PrReportMarkdownHealth
     private static string FormatExplanationLine(
         HealthExplanationView explanation,
         string classification,
-        IReadOnlyList<string> formattedReasons,
+        List<string> formattedReasons,
         int shown)
     {
         string reasons = formattedReasons.Count == 0
