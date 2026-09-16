@@ -332,11 +332,13 @@ def _producer_run(api: GitHubApi, repository: str, head_sha: str, config, check:
         job = api.request(f"/repos/{repository_path}/actions/jobs/{job_id}")
 
     run_attempt = job.get("run_attempt") if isinstance(job, dict) else None
+    job_run_id = job.get("run_id") if isinstance(job, dict) else None
+    job_head_sha = job.get("head_sha") if isinstance(job, dict) else None
     if (
         not isinstance(job, dict)
         or job.get("id") != job_id
-        or job.get("run_id") != run_id
-        or job.get("head_sha") != head_sha
+        or (job_run_id is not None and job_run_id != run_id)
+        or (job_head_sha is not None and job_head_sha != head_sha)
         or job.get("name") != config.producer.job_name
         or job.get("conclusion") != "success"
         or isinstance(run_attempt, bool)
