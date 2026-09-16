@@ -19,9 +19,9 @@ internal sealed class MetricBudgetValidator : IArchitecturePolicyDocumentValidat
     private static void ValidateGroup(
         ArchitectureContractDocument document,
         string group,
-        IReadOnlyList<ArchitectureMetricBudgetContract> budgets,
-        IReadOnlySet<string> metricIds,
-        ISet<string> budgetIds)
+        List<ArchitectureMetricBudgetContract> budgets,
+        HashSet<string> metricIds,
+        HashSet<string> budgetIds)
     {
         for (int index = 0; index < budgets.Count; index++)
         {
