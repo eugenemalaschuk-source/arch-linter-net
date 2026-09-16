@@ -146,7 +146,7 @@ class RunnerTests(unittest.TestCase):
             self.assertIn("exceeded", log.read_text())
             self.assertIn("Unable to execute", log.read_text())
 
-    def exercise_scan(self, exit_code=0, document=None, produce=True):
+    def exercise_scan(self, exit_code=0, document=None, produce=True, internal_log=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             project, work, artifacts = root / "project", root / "work", root / "artifacts"
@@ -159,15 +159,20 @@ class RunnerTests(unittest.TestCase):
                 if args[:2] == ["docker", "run"] and produce:
                     report = work / "cold/results/qodana.sarif.json"
                     report.write_text(json.dumps(sarif() if document is None else document))
+                if args[:2] == ["docker", "run"] and internal_log:
+                    internal = work / "cold/results/log/qodana.log"
+                    internal.parent.mkdir(parents=True, exist_ok=True)
+                    internal.write_text("internal diagnostic marker")
                 return exit_code
 
             with patch.object(ci, "command", side_effect=fake_command):
                 result = ci.scan(project, work, artifacts, IMAGE_ID, "cold", root / "cache", 2)
             saved = (artifacts / "cold.sarif.json").is_file()
-            return result, invocations, saved
+            log_preserved = (artifacts / "cold-log/qodana.log").is_file()
+            return result, invocations, saved, log_preserved
 
     def test_success_requires_usable_sarif_and_zero_exit(self):
-        result, commands, saved = self.exercise_scan()
+        result, commands, saved, _ = self.exercise_scan()
         self.assertEqual("completed", result["status"])
         self.assertTrue(saved)
         self.assertEqual(["docker", "rm", "--force"], commands[-1][:3])
@@ -176,20 +181,20 @@ class RunnerTests(unittest.TestCase):
             self.assertNotIn(forbidden, " ".join(commands[0]) if forbidden.startswith("/") else commands[0])
 
     def test_nonzero_exit_with_partial_report_remains_failed(self):
-        result, commands, saved = self.exercise_scan(exit_code=1, document=sarif([finding()]))
+        result, commands, saved, _ = self.exercise_scan(exit_code=1, document=sarif([finding()]))
         self.assertEqual("failed", result["status"])
         self.assertEqual(1, result["findings"])
         self.assertTrue(saved)
         self.assertEqual("rm", commands[-1][1])
 
     def test_zero_exit_without_report_is_not_clean(self):
-        result, _, saved = self.exercise_scan(produce=False)
+        result, _, saved, _ = self.exercise_scan(produce=False)
         self.assertEqual("failed", result["status"])
         self.assertNotIn("findings", result)
         self.assertFalse(saved)
 
     def test_timeout_still_removes_container(self):
-        result, commands, _ = self.exercise_scan(exit_code=124, produce=False)
+        result, commands, _, _ = self.exercise_scan(exit_code=124, produce=False)
         self.assertEqual(124, result["exit_code"])
         self.assertEqual("failed", result["status"])
         self.assertEqual("rm", commands[-1][1])
@@ -197,7 +202,7 @@ class RunnerTests(unittest.TestCase):
     def test_scanner_error_in_sarif_is_failed_but_report_is_still_published(self):
         data = sarif()
         data["runs"][0]["invocations"][0]["executionSuccessful"] = False
-        result, _, saved = self.exercise_scan(document=data)
+        result, _, saved, _ = self.exercise_scan(document=data)
         self.assertEqual("failed", result["status"])
         self.assertNotIn("findings", result)
         # The diagnostic report is preserved evidence even though the analysis is unsuccessful.
@@ -207,10 +212,56 @@ class RunnerTests(unittest.TestCase):
         data = sarif()
         data["runs"][0]["invocations"][0]["toolConfigurationNotifications"] = [
             {"level": "error", "message": {"text": "A requested project could not be configured"}}]
-        result, _, saved = self.exercise_scan(document=data)
+        result, _, saved, _ = self.exercise_scan(document=data)
         self.assertEqual("failed", result["status"])
         self.assertNotIn("findings", result)
         self.assertTrue(saved)
+
+    def test_internal_qodana_log_directory_is_copied_on_success_and_failure(self):
+        for exit_code in (0, 1):
+            with self.subTest(exit_code=exit_code):
+                _, _, _, log_preserved = self.exercise_scan(exit_code=exit_code,
+                                                            internal_log=True)
+                self.assertTrue(log_preserved)
+
+    def test_cache_measurement_failure_does_not_lose_a_completed_scan(self):
+        with patch.object(ci, "cache_bytes", side_effect=PermissionError("no access")):
+            result, _, saved, _ = self.exercise_scan(document=sarif([finding()]))
+        self.assertEqual("completed", result["status"])
+        self.assertEqual(1, result["findings"])
+        self.assertIsNone(result["cache_bytes"])
+        self.assertIn("no access", result["cache_error"])
+        self.assertTrue(saved)
+
+    def test_copy_bounded_tree_skips_symlinks_and_enforces_budgets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, destination = root / "source", root / "destination"
+            (source / "nested").mkdir(parents=True)
+            (source / "small.log").write_bytes(b"ok")
+            (source / "nested/big.log").write_bytes(b"x" * 20)
+            (source / "linked.log").symlink_to(source / "small.log")
+            ci.copy_bounded_tree(source, destination, max_file_bytes=10, max_total_bytes=100)
+            self.assertEqual("ok", (destination / "small.log").read_text())
+            self.assertFalse((destination / "nested/big.log").exists())
+            self.assertFalse((destination / "linked.log").exists())
+
+    def test_copy_bounded_tree_enforces_total_budget_across_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, destination = root / "source", root / "destination"
+            source.mkdir()
+            (source / "a.log").write_bytes(b"a" * 6)
+            (source / "b.log").write_bytes(b"b" * 6)
+            ci.copy_bounded_tree(source, destination, max_file_bytes=10, max_total_bytes=10)
+            copied = sorted(p.name for p in destination.iterdir())
+            self.assertEqual(["a.log"], copied)
+
+    def test_copy_bounded_tree_tolerates_missing_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ci.copy_bounded_tree(root / "absent", root / "destination", 10, 10)
+            self.assertFalse((root / "destination").exists())
 
     def test_cache_measurement_does_not_follow_symlinks(self):
         with tempfile.TemporaryDirectory() as tmp:

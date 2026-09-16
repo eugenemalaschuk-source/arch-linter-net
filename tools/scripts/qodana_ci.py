@@ -14,6 +14,8 @@ import time
 import uuid
 
 MAX_SARIF_BYTES = 64 * 1024 * 1024
+MAX_LOG_FILE_BYTES = 4 * 1024 * 1024
+MAX_LOG_TOTAL_BYTES = 8 * 1024 * 1024
 PROBE_RULE = "ConditionIsAlwaysTrueOrFalse"
 
 
@@ -115,6 +117,25 @@ def cache_bytes(cache: Path) -> int:
                if not path.is_symlink() and path.is_file())
 
 
+def copy_bounded_tree(source: Path, destination: Path, max_file_bytes: int,
+                       max_total_bytes: int) -> None:
+    """Copy regular files from source into destination, skipping symlinks and oversized
+    files, up to a total byte budget. Missing source is a no-op, not a failure."""
+    if source.is_symlink() or not source.is_dir():
+        return
+    remaining = max_total_bytes
+    for path in sorted(source.rglob("*")):
+        if path.is_symlink() or not path.is_file():
+            continue
+        size = path.stat().st_size
+        if size > max_file_bytes or size > remaining:
+            continue
+        target = destination / path.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(path.read_bytes())
+        remaining -= size
+
+
 def scan(project: Path, work: Path, artifacts: Path, image_id: str,
          label: str, cache: Path, timeout: int = 1200) -> dict:
     results = work / label / "results"
@@ -135,14 +156,23 @@ def scan(project: Path, work: Path, artifacts: Path, image_id: str,
     finally:
         # Killing the docker client on timeout does not kill the daemon-side container.
         command(["docker", "rm", "--force", name], log, 30)
-    evidence = {"label": label, "exit_code": exit_code,
-                "seconds": round(time.monotonic() - started, 3),
-                "cache_bytes": cache_bytes(cache), "status": "failed"}
+    # Preserve whatever diagnostic evidence exists before any later step (including the
+    # cache-size metric below) has a chance to raise and lose an already-finished scan.
     sarif = results / "qodana.sarif.json"
     if safe_regular_file(sarif):
-        # Preserve the report before validating it: a bounded, non-symlink regular file is
-        # safe to publish even when it later turns out to describe a failed/partial analysis.
+        # A bounded, non-symlink regular file is safe to publish even when it later turns
+        # out to describe a failed/partial analysis.
         (artifacts / f"{label}.sarif.json").write_bytes(sarif.read_bytes())
+    copy_bounded_tree(results / "log", artifacts / f"{label}-log",
+                      MAX_LOG_FILE_BYTES, MAX_LOG_TOTAL_BYTES)
+
+    evidence = {"label": label, "exit_code": exit_code,
+                "seconds": round(time.monotonic() - started, 3), "status": "failed"}
+    try:
+        evidence["cache_bytes"] = cache_bytes(cache)
+    except OSError as error:
+        evidence["cache_bytes"] = None
+        evidence["cache_error"] = str(error)
     try:
         evidence.update(read_inventory(sarif))
         if exit_code == 0:
