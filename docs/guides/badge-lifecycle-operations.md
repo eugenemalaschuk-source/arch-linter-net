@@ -1,9 +1,18 @@
 # Badge Relay lifecycle operations
 
+> **Upcoming candidate, not a released capability.** This Relay procedure
+> describes the upcoming v0.8.x completeness delivery. Source availability is
+> not proof of a complete packed or hosted install. Use only a reviewed
+> compatible candidate; existing public raw behavior is unchanged.
+
+See [badge adoption](badge-adoption.md) for modes, disclosure and freshness,
+and [distribution and compatibility](../reference/badge-distribution.md) for
+the required components and candidate-versus-release boundary.
+
 This runbook is the operator procedure for a registered `badge-relay/v1`
 destination. Lifecycle changes are authenticated administrative actions; public
-badge reads never expose the registry, operation journal, payload, or provider
-provenance.
+badge reads expose only the approved public projection, never the registry,
+operation journal, full Health evidence or private provider provenance.
 
 ## Plan first
 
@@ -45,7 +54,7 @@ redacted status contract.
 | Revoke/tombstone | `--operation revoke` | Retry with stale generation/epoch; expect a conflict and no payload resurrection. |
 | Disable/expire | `--operation invalidate` | Attempt a publisher write with the old generation; expect a stale/CAS rejection. |
 | Repository deletion/visibility change | `--operation invalidate` after the provider check no longer permits publication | Keep the alias unavailable until a fresh identity reconciliation and proof; never infer deletion from a caller-authored flag. |
-| Disclosure withdrawal | `--operation invalidate` | A public read must become unavailable without returning the previous payload. |
+| Permanent disclosure withdrawal | `--operation revoke` | The alias must be tombstoned; delayed publish/renew cannot restore the previous payload or consent. |
 | Remove/uninstall | `--operation remove` | Omit confirmation; expect `explicit_confirmation_required`; the alias remains tombstoned and cannot be reused. |
 | Pin rotation | `--operation rotate --workflow-ref <ref> --workflow-sha <40-hex>` | Publish with the old workflow pin; expect authorization failure. |
 | Upgrade | `--operation upgrade --to <shipped-digest>` followed by `--operation activate --to <shipped-digest>` | Unknown bundle, contract, compatibility plan, or manifest digest; expect `compatibility_conflict`. |

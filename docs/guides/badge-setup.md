@@ -1,5 +1,14 @@
 # Turnkey Architecture Health badge setup
 
+> **Upcoming candidate, not a released capability.** This Relay procedure
+> describes the upcoming v0.8.x completeness delivery. Source availability is
+> not proof of a complete packed or hosted install. Use only a reviewed
+> compatible candidate; existing public raw behavior is unchanged.
+
+See [badge adoption](badge-adoption.md) for modes, disclosure and freshness,
+and [distribution and compatibility](../reference/badge-distribution.md) for
+the required components and candidate-versus-release boundary.
+
 The packed `ArchLinterNet.Cli` tool includes the setup contract, Relay bundle,
 configuration schema, and workflow templates. Setup is intentionally a plan-
 first command: it shows the disclosure and cost decision before writing a

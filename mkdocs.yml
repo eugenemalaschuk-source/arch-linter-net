@@ -22,6 +22,7 @@ nav:
       - First policy: getting-started/first-policy.md
       - Complete governance cycle: guides/single-tool-workflow.md
       - Run in CI: guides/ci-integration.md
+      - Architecture Health badge adoption: guides/badge-adoption.md
       - Turnkey badge setup: guides/badge-setup.md
       - Badge lifecycle operations: guides/badge-lifecycle-operations.md
   - Usage:
@@ -101,6 +102,7 @@ nav:
   - Reference:
       - YAML schema: reference/yaml-schema.md
       - Architecture Health: reference/architecture-health.md
+      - Badge distribution and compatibility: reference/badge-distribution.md
       - NuGet package metadata: reference/nuget-metadata.md
       - Versioning and releases: reference/versioning-and-releases.md
       - Release process: reference/release-process.md
