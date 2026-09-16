@@ -94,3 +94,45 @@ def test_handoff_inventory_tracks_machine_readable_authority() -> None:
     ]
     for value in values:
         assert value in handoff, f"Refresh the source-audited handoff for {value}"
+
+
+@pytest.mark.parametrize(
+    ("event", "operation"),
+    (
+        ("Temporary suspension / expiry", "invalidate"),
+        ("Disclosure withdrawal", "revoke"),
+        ("Remove/uninstall", "remove"),
+    ),
+)
+def test_lifecycle_matrix_distinguishes_temporary_and_terminal_operations(
+    event: str, operation: str
+) -> None:
+    rows = [
+        line.split("|")[1:-1]
+        for line in _read(_PUBLIC[2]).splitlines()
+        if line.startswith("|") and line.split("|")[1].strip() == event
+    ]
+    assert len(rows) == 1, f"Expected one lifecycle row for {event}"
+    assert rows[0][1].strip() == f"`--operation {operation}`"
+
+
+def test_adoption_separates_pause_withdrawal_and_uninstall() -> None:
+    text = " ".join(_read(_PUBLIC[0]).split())
+    assert "`invalidate` for a temporary suspension" in text
+    assert "`revoke` to permanently withdraw disclosure consent" in text
+    assert "`remove` to uninstall" in text
+    assert "Invalidation is not a substitute for consent withdrawal" in text
+
+
+def test_terminal_alias_requires_new_consent_before_fresh_setup() -> None:
+    text = " ".join(_read(_PUBLIC[2]).split())
+    assert "A tombstoned alias cannot be recovered" in text
+    assert "new alias and explicit consent" in text
+
+
+def test_synthetic_acceptance_uses_fresh_aliases_for_terminal_scenarios() -> None:
+    section = _read(_PUBLIC[2]).split("## Synthetic acceptance checks", 1)[1]
+    text = " ".join(section.split())
+    assert "fresh disposable alias for each independent scenario" in text
+    assert "Do not execute every matrix row sequentially against one alias" in text
+    assert "separate non-tombstoned alias" in text

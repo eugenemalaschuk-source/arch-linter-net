@@ -137,12 +137,20 @@ replaying a backup. Only verified shipped bundle digests may be activated or
 rolled back. Do not silently substitute an unshipped digest or reuse a
 permanently tombstoned alias.
 
-To withdraw disclosure or uninstall, perform the authenticated invalidation or
-removal procedure, verify that the origin is unavailable, and review removal
-of the managed README/workflow blocks and adopter-owned hosting resources.
-Keep private PR checks/reports and unrelated repository content intact. Stopping
-scheduled jobs or deleting a README block alone is not immediate revocation,
-and removing a deployment does not recall cached images.
+Use `invalidate` for a temporary suspension, `revoke` to permanently withdraw
+disclosure consent, and `remove` to uninstall. Invalidation is not a substitute
+for consent withdrawal: it makes the current payload unavailable without
+permanently tombstoning the alias. Follow the authenticated lifecycle procedure
+and verify that the origin is unavailable. For revoke/remove, also verify that
+delayed publishers and renewal attempts cannot restore readiness.
+
+A revoked or removed alias stays tombstoned. Publishing again requires a new
+alias, explicit consent, a fresh setup, and new qualifying publisher proof;
+recovery or replaying an old backup cannot undo the tombstone. When uninstalling,
+review removal of the managed README/workflow blocks and adopter-owned hosting
+resources. Keep private PR checks/reports and unrelated repository content
+intact. Stopping scheduled jobs or deleting a README block alone is not immediate
+revocation, and removing a deployment does not recall cached images.
 
 Public `github-raw` users may retain their existing static-snapshot workflow.
 Migration to Relay is an explicit new disclosure/setup decision, not a silent

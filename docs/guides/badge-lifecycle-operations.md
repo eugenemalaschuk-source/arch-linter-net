@@ -48,9 +48,9 @@ redacted status contract.
 | Rename | `--operation rename --new-owner OWNER --new-repository REPO` | Change either immutable numeric repository ID; expect `identity_mismatch`. |
 | Transfer | `--operation transfer --new-owner OWNER --new-repository REPO` | Omit explicit confirmation; expect `explicit_confirmation_required`. Transfer revokes the old alias and requires a fresh setup plan. |
 | Revoke/tombstone | `--operation revoke` | Retry with stale generation/epoch; expect a conflict and no payload resurrection. |
-| Disable/expire | `--operation invalidate` | Attempt a publisher write with the old generation; expect a stale/CAS rejection. |
+| Temporary suspension / expiry | `--operation invalidate` | Attempt a publisher write with the old generation; expect a stale/CAS rejection. |
 | Repository deletion/visibility change | `--operation invalidate` after the provider check no longer permits publication | Keep the alias unavailable until a fresh identity reconciliation and proof; never infer deletion from a caller-authored flag. |
-| Disclosure withdrawal | `--operation invalidate` | A public read must become unavailable without returning the previous payload. |
+| Disclosure withdrawal | `--operation revoke` | Public reads become unavailable; delayed publish/renew/recover attempts must not restore readiness or reuse the tombstoned alias. |
 | Remove/uninstall | `--operation remove` | Omit confirmation; expect `explicit_confirmation_required`; the alias remains tombstoned and cannot be reused. |
 | Pin rotation | `--operation rotate --workflow-ref <ref> --workflow-sha <40-hex>` | Publish with the old workflow pin; expect authorization failure. |
 | Upgrade | `--operation upgrade --to <shipped-digest>` followed by `--operation activate --to <shipped-digest>` | Unknown bundle, contract, compatibility plan, or manifest digest; expect `compatibility_conflict`. |
@@ -74,6 +74,11 @@ also requires its own explicit operation ID for retry tracing and idempotency.
 
 ## Recovery and rollback
 
+Recovery applies only to a non-tombstoned registration. A tombstoned alias
+cannot be recovered; use a new alias and explicit consent, followed by fresh
+setup and qualifying publisher proof. Invalidation suspends publication but
+does not permanently withdraw consent; use revoke or remove for that boundary.
+
 1. Capture the redacted status and operation identifier.
 1. If a restore, registry mismatch, or storage incident occurred, run
    `--operation recover --dry-run`, then repeat with the administrative token
@@ -96,8 +101,19 @@ journal.
 
 ## Synthetic acceptance checks
 
-For a disposable alias, execute each positive row above in order, then run its
-negative check with the previous generation/epoch or an altered immutable ID.
+Use a fresh disposable alias for each independent scenario. Do not execute
+every matrix row sequentially against one alias: transfer, revoke, and remove
+permanently tombstone it. Exercise recovery and the compatible upgrade/rollback
+sequence on a separate non-tombstoned alias with the required verified bundles.
+Allocate another fresh alias for each terminal operation and assert that it
+cannot be re-registered or recovered afterward.
+
+For each scenario, establish its required registration, consent, and qualifying
+publisher proof first. Capture the pre-operation counters, execute the intended
+mutation, then test stale requests with those old counters or an altered
+immutable ID. Test refusal cases before a terminal operation or on a separate
+alias with the same starting conditions, so a tombstone does not mask the
+specific refusal being tested.
 Verify that public JSON/SVG reads return only the fixed representation, that a
 revoked alias returns an unavailable response, that the old pin cannot publish,
 and that status remains redacted after Durable Object eviction. Record the
