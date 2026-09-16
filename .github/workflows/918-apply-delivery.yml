@@ -16,14 +16,16 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
-      - name: Apply only the reviewed patch and remove temporary scaffolding
+      - name: Apply reviewed patch and require exact validated output tree
         run: |
           set -euo pipefail
-          echo 'ff4c77f1497ca4f7a8052b6e0a41252f5b373e62705142c238f351dd2969a98b  .github/badge-promotion/918-delivery.patch' | sha256sum -c -
           git apply --check .github/badge-promotion/918-delivery.patch
           git apply --index .github/badge-promotion/918-delivery.patch
           git rm .github/badge-promotion/918-delivery.patch .github/workflows/918-apply-delivery.yml .github/workflows/918-source-snapshot.yml
           git diff --cached --check
+          actual_tree="$(git write-tree)"
+          echo "Reviewed result tree: $actual_tree"
+          test "$actual_tree" = 6f55df0cd9085b6d5f3cceecf59cd03281d3ccee
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: deliver reviewed consumer-aware publisher revision (#918)'
           test "$(git diff --name-only 54557bb8549f282a4cafdda46ca6e0c3c1a5256f HEAD | wc -l)" -eq 10
           test -z "$(git diff --name-only 54557bb8549f282a4cafdda46ca6e0c3c1a5256f HEAD -- .github/workflows)"
