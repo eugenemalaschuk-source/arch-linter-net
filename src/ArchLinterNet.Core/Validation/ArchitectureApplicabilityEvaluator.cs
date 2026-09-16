@@ -94,7 +94,7 @@ public static class ArchitectureApplicabilityEvaluator
     {
         foreach (ArchitectureApplicabilityExpectedEntry expected in expectedEntries)
         {
-            if (expectedEntries.Count > 1)
+            if (expectedEntries.Length > 1)
             {
                 integrityReasons.Add(CreateReason(
                     ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityExpectedIdentity,

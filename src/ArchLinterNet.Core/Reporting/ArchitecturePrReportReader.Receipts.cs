@@ -306,12 +306,12 @@ internal static class ArchitecturePrReportReceiptParser
     {
         // report_evidence/v2 predates per-evidence receipts. Accept that persisted envelope, but
         // let the projector render it unavailable instead of trusting its requirement configuration.
-        if (trustReceipts.Count == 0)
+        if (trustReceipts.Length == 0)
         {
             return;
         }
 
-        if (trustReceipts.Count != requirements.Count)
+        if (trustReceipts.Length != requirements.Length)
         {
             throw InvalidArtifact("External-evidence trust receipts must match the declared requirement set exactly.");
         }
