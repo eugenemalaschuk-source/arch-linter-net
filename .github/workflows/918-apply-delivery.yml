@@ -1,0 +1,38 @@
+name: Apply reviewed publisher delivery correction
+on:
+  push:
+    branches: [fix/918-publisher-delivery-pins]
+    paths: [.github/workflows/918-apply-delivery.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'eugenemalaschuk-source/arch-linter-net' && github.ref == 'refs/heads/fix/918-publisher-delivery-pins'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+      - name: Apply only the reviewed patch and remove temporary scaffolding
+        run: |
+          set -euo pipefail
+          echo 'ff4c77f1497ca4f7a8052b6e0a41252f5b373e62705142c238f351dd2969a98b  .github/badge-promotion/918-delivery.patch' | sha256sum -c -
+          git apply --check .github/badge-promotion/918-delivery.patch
+          git apply --index .github/badge-promotion/918-delivery.patch
+          git rm .github/badge-promotion/918-delivery.patch .github/workflows/918-apply-delivery.yml .github/workflows/918-source-snapshot.yml
+          git diff --cached --check
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: deliver reviewed consumer-aware publisher revision (#918)'
+          test "$(git diff --name-only 54557bb8549f282a4cafdda46ca6e0c3c1a5256f HEAD | wc -l)" -eq 10
+          test -z "$(git diff --name-only 54557bb8549f282a4cafdda46ca6e0c3c1a5256f HEAD -- .github/workflows)"
+      - name: Verify committed source and pinned publisher contracts
+        run: |
+          set -euo pipefail
+          make test-release-evidence
+          UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv run --project tools/pyproject.toml pytest -q tools/badge_promotion/tests
+          git diff --check
+          test -z "$(git status --porcelain --untracked-files=no)"
+      - name: Publish only this branch without force
+        run: git push origin HEAD:refs/heads/fix/918-publisher-delivery-pins
