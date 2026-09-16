@@ -301,8 +301,8 @@ internal static class ArchitecturePrReportReceiptParser
     }
 
     private static void ValidateExternalEvidenceTrustReceipts(
-        IReadOnlyList<ArchitecturePrReportExternalRequirement> requirements,
-        IReadOnlyList<ArchitecturePrReportExternalEvidenceTrustReceipt> trustReceipts)
+        ArchitecturePrReportExternalRequirement[] requirements,
+        ArchitecturePrReportExternalEvidenceTrustReceipt[] trustReceipts)
     {
         // report_evidence/v2 predates per-evidence receipts. Accept that persisted envelope, but
         // let the projector render it unavailable instead of trusting its requirement configuration.

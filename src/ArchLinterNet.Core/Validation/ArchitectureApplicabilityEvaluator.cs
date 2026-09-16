@@ -62,7 +62,7 @@ public static class ArchitectureApplicabilityEvaluator
 
     private static List<ArchitectureApplicabilityAssessment> BuildExpectedAssessments(
         IReadOnlyDictionary<string, List<ArchitectureApplicabilityExpectedEntry>> expectedByIdentity,
-        IReadOnlyDictionary<string, List<ArchitectureApplicabilityRecord>> recordsByIdentity)
+        Dictionary<string, List<ArchitectureApplicabilityRecord>> recordsByIdentity)
     {
         List<ArchitectureApplicabilityAssessment> assessments = new();
         foreach (string identity in expectedByIdentity.Keys.Order(StringComparer.Ordinal))
@@ -89,7 +89,7 @@ public static class ArchitectureApplicabilityEvaluator
     }
 
     private static void AddExpectedIdentityDefects(
-        IReadOnlyList<ArchitectureApplicabilityExpectedEntry> expectedEntries,
+        ArchitectureApplicabilityExpectedEntry[] expectedEntries,
         List<ArchitectureApplicabilityReason> integrityReasons)
     {
         foreach (ArchitectureApplicabilityExpectedEntry expected in expectedEntries)
@@ -181,7 +181,7 @@ public static class ArchitectureApplicabilityEvaluator
 
     private static void AddOrphanAssessments(
         List<ArchitectureApplicabilityAssessment> assessments,
-        IReadOnlyDictionary<string, List<ArchitectureApplicabilityExpectedEntry>> expectedByIdentity,
+        Dictionary<string, List<ArchitectureApplicabilityExpectedEntry>> expectedByIdentity,
         IReadOnlyDictionary<string, List<ArchitectureApplicabilityRecord>> recordsByIdentity)
     {
         foreach (string identity in recordsByIdentity.Keys.Order(StringComparer.Ordinal))
@@ -211,7 +211,7 @@ public static class ArchitectureApplicabilityEvaluator
             .ToList();
     }
 
-    private static IReadOnlyList<ArchitectureApplicabilityReason> CollectReasons(
+    private static ArchitectureApplicabilityReason[] CollectReasons(
         IEnumerable<ArchitectureApplicabilityAssessment> assessments)
     {
         return assessments

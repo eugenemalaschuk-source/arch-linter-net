@@ -111,7 +111,7 @@ public sealed class ArchitectureDebtGateApplicationService : IArchitectureDebtGa
         };
     }
 
-    private static IReadOnlyList<ArchitecturePublicApiLiveEvidence> CapturePublicApiEvidence(
+    private static List<ArchitecturePublicApiLiveEvidence> CapturePublicApiEvidence(
         ArchitectureDebtGateRequest request,
         IArchitecturePublicApiApplicationService? publicApiService)
     {

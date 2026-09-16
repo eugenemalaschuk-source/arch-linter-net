@@ -46,7 +46,7 @@ public sealed record SarifExternalDiagnosticFilterAuthorization
     /// <summary>Whether each configured filter value must match the trusted evidence group.</summary>
     public bool RequireMatches { get; }
 
-    private static IReadOnlyList<string> CopyValues(IEnumerable<string>? values) => Array.AsReadOnly(
+    private static ReadOnlyCollection<string> CopyValues(IEnumerable<string>? values) => Array.AsReadOnly(
         (values ?? Array.Empty<string>()).OrderBy(value => value, StringComparer.Ordinal).ToArray());
 }
 

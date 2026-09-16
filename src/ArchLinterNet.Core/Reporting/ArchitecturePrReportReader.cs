@@ -229,7 +229,7 @@ public static class ArchitecturePrReportReader
     }
 
     private static void ValidateAvailabilityValue(
-        IReadOnlyDictionary<string, string> values,
+        Dictionary<string, string> values,
         string key,
         bool hasPayload,
         string available,

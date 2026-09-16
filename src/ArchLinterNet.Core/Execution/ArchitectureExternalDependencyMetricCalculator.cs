@@ -57,7 +57,7 @@ internal static class ArchitectureExternalDependencyMetricCalculator
     private static void CollectFactEvidence(
         ArchitectureAnalysisSession session,
         ArchitectureTopologyEvaluator.Projection topology,
-        IReadOnlyDictionary<string, ArchitectureTopologyEvaluator.SubjectClassification[]> classificationsByIdentity,
+        Dictionary<string, ArchitectureTopologyEvaluator.SubjectClassification[]> classificationsByIdentity,
         string node,
         ArchitectureExternalDependencyFact fact,
         List<string> reasons,
@@ -84,7 +84,7 @@ internal static class ArchitectureExternalDependencyMetricCalculator
         }
     }
 
-    private static IEnumerable<ArchitectureTopologyEvaluator.SubjectClassification> FindClassifications(
+    private static ArchitectureTopologyEvaluator.SubjectClassification[] FindClassifications(
         IReadOnlyDictionary<string, ArchitectureTopologyEvaluator.SubjectClassification[]> classificationsByIdentity,
         ArchitectureTopologyEvaluator.Projection topology,
         Type sourceType,
