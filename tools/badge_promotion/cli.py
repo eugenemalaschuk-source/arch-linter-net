@@ -310,20 +310,43 @@ def _successful_check(api: GitHubApi, repository: str, head_sha: str, config) ->
 
 
 def _producer_run(api: GitHubApi, repository: str, head_sha: str, config, check: dict[str, Any]) -> tuple[dict[str, Any], int, dict[str, Any]]:
-    run_match = re.search(r"/runs/(\d+)(?:/|$)", check.get("details_url", ""))
-    if run_match is None:
+    details_url = check.get("details_url", "")
+    run_job_match = re.search(r"/actions/runs/(\d+)/job/(\d+)(?:[/?#]|$)", details_url)
+    if run_job_match is None:
         raise ProviderFailure("producer_run_unresolved")
-    run_id = int(run_match.group(1))
-    runs = api.request(f"/repos/{_repository_path(repository)}/actions/runs?head_sha={head_sha}&event=pull_request&per_page=100")
+    run_id = int(run_job_match.group(1))
+    job_id = int(run_job_match.group(2))
+    repository_path = _repository_path(repository)
+    runs = api.request(f"/repos/{repository_path}/actions/runs?head_sha={head_sha}&event=pull_request&per_page=100")
     matching = [run for run in runs.get("workflow_runs", []) if run.get("id") == run_id and run.get("path") == config.producer.workflow_path and run.get("event") == config.producer.event and run.get("head_sha") == head_sha and run.get("conclusion") == "success"]
     if len(matching) != 1:
         raise ProviderFailure("producer_run_unresolved")
     run = matching[0]
-    jobs = api.request(f"/repos/{_repository_path(repository)}/actions/runs/{run_id}/jobs?per_page=100").get("jobs", [])
-    producer_jobs = [job for job in jobs if job.get("name") == config.producer.job_name and job.get("conclusion") == "success"]
-    if len(producer_jobs) != 1:
+
+    jobs_document = api.request(f"/repos/{repository_path}/actions/runs/{run_id}/jobs?per_page=100")
+    jobs = jobs_document.get("jobs", []) if isinstance(jobs_document, dict) else []
+    exact_jobs = [job for job in jobs if isinstance(job, dict) and job.get("id") == job_id]
+    if len(exact_jobs) == 1:
+        job = exact_jobs[0]
+    else:
+        job = api.request(f"/repos/{repository_path}/actions/jobs/{job_id}")
+
+    run_attempt = job.get("run_attempt") if isinstance(job, dict) else None
+    job_run_id = job.get("run_id") if isinstance(job, dict) else None
+    job_head_sha = job.get("head_sha") if isinstance(job, dict) else None
+    if (
+        not isinstance(job, dict)
+        or job.get("id") != job_id
+        or (job_run_id is not None and job_run_id != run_id)
+        or (job_head_sha is not None and job_head_sha != head_sha)
+        or job.get("name") != config.producer.job_name
+        or job.get("conclusion") != "success"
+        or isinstance(run_attempt, bool)
+        or not isinstance(run_attempt, int)
+        or run_attempt <= 0
+    ):
         raise ProviderFailure("producer_job_unresolved")
-    return run, run_id, producer_jobs[0]
+    return run, run_id, job
 
 
 def _selected_artifact(api: GitHubApi, repository: str, run_id: int, artifact_name: str) -> tuple[list[Any], dict[str, Any]]:
