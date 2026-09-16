@@ -27,10 +27,7 @@ public sealed class FrameworkReferenceAllowOnlyContractTests
     [TearDown]
     public void TearDown()
     {
-        if (Directory.Exists(_repoRoot))
-        {
-            Directory.Delete(_repoRoot, true);
-        }
+        FrameworkReferenceTestDirectoryCleanup.Delete(_repoRoot);
     }
 
     private string CreateProject(string assemblyName, string itemGroupBody)
