@@ -412,5 +412,5 @@ public static class ArchitecturePrReportReader
     }
 
     internal static ArgumentException InvalidArtifact(string message) =>
-        new(message, nameof(message));
+        new(message, "json");
 }
