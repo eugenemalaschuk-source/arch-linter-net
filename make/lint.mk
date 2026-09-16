@@ -132,6 +132,7 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 		tools/scripts/tests/test_check_evergreen_docs_edges.py \
 		tools/scripts/tests/test_test_coverage_badge.py \
 		tools/scripts/tests/test_verify_core_unit_shards.py \
+		tests/qodana \
 		--cov=tools/release --cov=tools/scripts --cov=tools/badge_promotion \
 		--cov-report=xml:coverage-python.xml --cov-report=term-missing
 

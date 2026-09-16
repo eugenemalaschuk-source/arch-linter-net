@@ -26,6 +26,9 @@ jobs:
       - name: Test runner contracts
         run: python3 -m unittest discover -s tests/qodana -v
 
+      - name: Test full Python tooling coverage
+        run: make test-tooling-coverage
+
       - name: Lint workflows with actionlint
         uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
         with:
@@ -42,11 +45,11 @@ jobs:
           min-severity: low
           inputs: .github/workflows
 
-      - name: Format changed workflow and documentation
+      - name: Check changed workflow and documentation formatting
         if: always()
         run: |
-          npx --yes --ignore-scripts prettier@3.9.5 --write .github/workflows/qodana*.yml qodana.yaml
-          uv run --frozen --project tools/pyproject.toml mdformat docs/internal/qodana-community-adoption.md
+          npx --yes --ignore-scripts prettier@3.9.5 --check .github/workflows/qodana*.yml qodana.yaml
+          uv run --frozen --project tools/pyproject.toml mdformat --check docs/internal/qodana-community-adoption.md
           git diff --check
 
       - name: Validate OpenSpec
@@ -54,15 +57,17 @@ jobs:
         env:
           OPENSPEC_TELEMETRY: "0"
         run: |
-          npx --yes --ignore-scripts --package=@fission-ai/openspec -- openspec --version
-          npx --yes --ignore-scripts --package=@fission-ai/openspec -- openspec validate --all
+          npx --yes --ignore-scripts --package=@fission-ai/openspec@1.13.0 -- openspec validate --all
 
-      - name: Collect formatter patch
+      - name: Collect validation evidence
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/qodana-validation"
-          git diff -- .github/workflows/qodana.yml qodana.yaml docs/internal/qodana-community-adoption.md > "$RUNNER_TEMP/qodana-validation/format.patch"
           git rev-parse HEAD > "$RUNNER_TEMP/qodana-validation/validated-sha.txt"
+          git archive --format=tar HEAD tools/scripts/qodana_ci.py tests/qodana make/lint.mk qodana.yaml .github/workflows/qodana.yml > "$RUNNER_TEMP/qodana-validation/qodana-sources.tar"
+          if [[ -f coverage-python.xml ]]; then
+            cp coverage-python.xml "$RUNNER_TEMP/qodana-validation/"
+          fi
 
       - name: Upload validation evidence
         if: always()

@@ -248,11 +248,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.burn_in:
             warm = scan(project, work, artifacts, identity, "warm", cache)
             evidence["scans"].append(warm)
+            write_evidence(artifacts, evidence, publish_summary=False)
             for label, defective in (("positive", True), ("negative", False)):
                 probe = work / f"{label}-project"
                 create_probe(probe, image, defective)
                 evidence["scans"].append(scan(probe, work, artifacts, identity, label,
                                               work / f"{label}-cache", timeout=180))
+                write_evidence(artifacts, evidence, publish_summary=False)
             evidence["burn_in_checks_passed"] = burn_in_passed(evidence["scans"])
             if not evidence["burn_in_checks_passed"]:
                 raise ValueError("Cold/warm inventory differs or positive/negative probe failed")

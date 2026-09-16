@@ -2,10 +2,6 @@ name: Qodana Community
 
 on:
   pull_request:
-  # Temporary implementation-only trigger; remove after recording burn-in evidence.
-  push:
-    branches:
-      - feat/864-qodana-community-advisory
   workflow_dispatch:
     inputs:
       burn_in:
@@ -41,7 +37,7 @@ jobs:
 
       - name: Analyze canonical solution without secrets
         env:
-          BURN_IN: ${{ github.event_name == 'push' || inputs.burn_in || false }}
+          BURN_IN: ${{ inputs.burn_in || false }}
         shell: bash
         run: |
           export QODANA_ANALYZED_SHA
