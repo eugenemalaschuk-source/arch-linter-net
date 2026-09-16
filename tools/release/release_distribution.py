@@ -76,6 +76,7 @@ _REVIEWED_BUNDLE_MEMBERS = (
     ("relay/package-lock.json", _MEDIA_JSON, "working-tree"),
     ("relay/package.json", _MEDIA_JSON, "working-tree"),
     ("relay/src/index.ts", _MEDIA_TYPESCRIPT, "working-tree"),
+    ("relay/src/lifecycle.ts", _MEDIA_TYPESCRIPT, "working-tree"),
     ("relay/src/payload.ts", _MEDIA_TYPESCRIPT, "working-tree"),
     ("relay/src/read.ts", _MEDIA_TYPESCRIPT, "working-tree"),
     ("relay/src/registry-do.ts", _MEDIA_TYPESCRIPT, "working-tree"),
