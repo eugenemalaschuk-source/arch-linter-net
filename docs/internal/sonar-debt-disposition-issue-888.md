@@ -20,10 +20,40 @@ introduced.
 | Retained with an individual public/internal-contract rationale | 4 |
 | Exact baseline keys covered | 47 |
 
-Expected Sonar result after the PR analysis: 43 baseline keys absent from the analyzed source and
-the 4 retained keys still individually explained; no rule suppression, exclusion, baseline refresh,
-or quality-gate weakening is used. The after analysis identity and SHA are filled in after the PR's
-SonarCloud run.
+The factual after-state is recorded below from the SonarCloud PR analysis. No rule suppression,
+exclusion, baseline refresh, or quality-gate weakening is used.
+
+## Factual after-state from SonarCloud
+
+The SonarCloud PR analysis completed on 2026-09-16 for the implementation head
+`4723712fe7e8fdd42b9324b4c99ac84bdee00ab8`.
+
+| Evidence | Result |
+| --- | --- |
+| Analysis identity (`lastChangeAnalysisUuid`) | `79a62a0e-5374-4c0a-bb45-0eac82fefc45` |
+| SonarCloud PR analysis | [PR 912 analysis](https://sonarcloud.io/project/pull_requests?id=eugenemalaschuk-source_arch-linter-net&pullRequest=912) |
+| CI evidence | [Coverage + Sonar job](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35122474451/job/104884720876) |
+| Analyzed SCM SHA | `4723712fe7e8fdd42b9324b4c99ac84bdee00ab8` |
+| Analysis timestamp | `2026-09-16T16:38:30+0000` |
+| Quality Gate | `OK` |
+| Coverage on new code | `92.0%` |
+| Open PR issues | `0` (bugs `0`, vulnerabilities `0`, code smells `0`) |
+
+The exact-key query for all 47 baseline keys returned **0 issues in PR 912 scope**. This is the
+after-state evidence that all 43 resolved dispositions are absent from the analyzed PR source;
+the four retained keys remain separately documented intentional dispositions and are not newly
+introduced by this PR. A project-level query confirms the retained keys remain `OPEN`:
+
+- `AaCBdZFLY_PBEBP_lJB5` — `OPEN`, CA1859, shared internal exit-code helper.
+- `AaCMbUvU1WTeVOIY0kSJ` — `OPEN`, S3871, internal enrichment-control-flow exception.
+- `AaBWsYMeacH2g16CkaeT` — `OPEN`, S2365, defensive-copy property.
+- `AaBWsYMeacH2g16CkaeU` — `OPEN`, S2365, defensive-copy property.
+
+The two new CA1859 issues reported by the earlier PR analysis were the `metricIds` and `budgetIds`
+parameters of `MetricBudgetValidator.ValidateBudget` (`AaCqJpuFbN8c1AqbXKws` and
+`AaCqJpuFbN8c1AqbXKwr`). They are both now `CLOSED` with resolution `FIXED` in the after analysis;
+the final PR issue query reports zero open issues. The disposition evidence was added after this
+analysis as a documentation-only update, so the SHA above is the analyzed implementation head.
 
 ## Complete key-by-key matrix
 
