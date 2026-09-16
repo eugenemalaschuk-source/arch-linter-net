@@ -7,8 +7,8 @@
 
 This runbook is the operator procedure for a registered `badge-relay/v1`
 destination. Lifecycle changes are authenticated administrative actions; public
-badge reads never expose the registry, operation journal, payload, or provider
-provenance.
+badge reads expose only the approved public projection, never the registry,
+operation journal, full Health evidence, or private provider provenance.
 
 ## Plan first
 

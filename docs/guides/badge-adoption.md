@@ -10,7 +10,9 @@ PR-authoritative evidence, not a second architecture evaluator. Choose the
 transport and disclosure first, then use [turnkey setup](badge-setup.md) for
 executable commands and [lifecycle operations](badge-lifecycle-operations.md)
 for administration. Those guides own the command examples; this page explains
-which path to choose and what its result does, and does not, prove.
+which path to choose and what its result does, and does not, prove. The
+[distribution and compatibility reference](../reference/badge-distribution.md)
+identifies the components and immutable identities that must accompany the CLI.
 
 ## Choose the disclosure boundary
 
@@ -33,12 +35,25 @@ of the two profiles before setup writes anything:
 | `headline-only/v1` | Minimal headline JSON for snapshot/Shields compatibility | No fresh-origin or current-main guarantee can be inferred from a cached image. |
 | `headline-plus-freshness/v1` | Headline plus bounded freshness, with direct stamped SVG as the default README path | The visible absolute expiry remains meaningful in a cached copy; it does not make caches revocable. |
 
+The exact `headline-only/v1` JSON fields are `schemaVersion`, `label`, `message`,
+and `color`. Gate, Health, ignores and rules counts appear in the fixed message;
+unknown assessment/counts remain `UNASSESSABLE` and `?`, not zero.
+`headline-plus-freshness/v1` adds only `verified_at` and `valid_until`. These
+additional timestamps require their own disclosure approval; do not silently
+upgrade a headline-only registration or add free-form fields.
+
 Only the approved canonical projection may leave the private workflow. Do not
 publish full Health JSON, findings, reports, source paths, repository identity,
 commit/tree SHAs, PR/run identifiers, private receipts, or raw provider
 responses. No secrets belong in URLs, README blocks, generated public output,
 or committed configuration. An opaque alias is not a promise that an observer
 cannot associate a hostname or README with the source repository.
+
+These are anonymous-reader limits, not a promise that infrastructure providers
+see nothing. GitHub handles repository and workflow metadata; the Relay host
+processes authentication claims and the private ownership registry. Keep the
+registry, configuration and full acceptance traces private. The runtime Relay
+is not given a source-reading PAT or GitHub App credential.
 
 ## Verify the candidate and manual prerequisites
 
@@ -135,7 +150,10 @@ the environment and are bound to the approved origin. Transfers require a
 fresh setup identity; restoration requires fresh publisher proof rather than
 replaying a backup. Only verified shipped bundle digests may be activated or
 rolled back. Do not silently substitute an unshipped digest or reuse a
-permanently tombstoned alias.
+permanently tombstoned alias. Review publisher workflow-pin rotation separately
+from operator credential rotation. During a suspected compromise, contain
+publication and rotate the affected authority; do not promise erasure of copies
+that have already been published.
 
 Use `invalidate` for a temporary suspension, `revoke` to permanently withdraw
 disclosure consent, and `remove` to uninstall. Invalidation is not a substitute

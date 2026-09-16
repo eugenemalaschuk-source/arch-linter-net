@@ -15,13 +15,16 @@ _PUBLIC = (
     _DOCS / "guides/badge-lifecycle-operations.md",
 )
 _HANDOFF = _DOCS / "internal/badge-delivery-handoff.md"
+_REFERENCE = _DOCS / "reference/badge-distribution.md"
 
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("path", (*_PUBLIC, _HANDOFF), ids=lambda p: p.stem)
+@pytest.mark.parametrize(
+    "path", (*_PUBLIC, _REFERENCE, _HANDOFF), ids=lambda p: p.stem
+)
 def test_badge_documentation_relative_links_resolve(path: Path) -> None:
     links = re.findall(r"\[[^\]]+\]\(([^\s)]+)\)", _read(path))
     assert links, f"Expected documentation cross-links in {path}"
@@ -32,7 +35,7 @@ def test_badge_documentation_relative_links_resolve(path: Path) -> None:
         target = (path.parent / unquote(parsed.path)).resolve()
         assert target.is_relative_to(_DOCS), link
         assert target.is_file(), f"{path}: missing link target {link}"
-        if path in _PUBLIC:
+        if path in (*_PUBLIC, _REFERENCE):
             assert not target.is_relative_to(_DOCS / "internal"), link
 
 
@@ -45,6 +48,7 @@ def test_adoption_precedes_executable_guides_in_navigation() -> None:
         nav.index(target) for target in targets
     )
     assert "internal/" not in nav
+    assert nav.count(_REFERENCE.relative_to(_DOCS).as_posix()) == 1
     assert re.search(r"(?m)^exclude_docs: \|\n  internal/\s*$", config)
 
 
@@ -136,3 +140,20 @@ def test_synthetic_acceptance_uses_fresh_aliases_for_terminal_scenarios() -> Non
     assert "fresh disposable alias for each independent scenario" in text
     assert "Do not execute every matrix row sequentially against one alias" in text
     assert "separate non-tombstoned alias" in text
+
+
+def test_distribution_reference_tracks_compatible_package_and_protocol_identities() -> None:
+    inventory = json.loads(
+        _read(_ROOT / ".github/badge-promotion/release-inventory.json")
+    )
+    reference = _read(_REFERENCE)
+    identities = [
+        *inventory["package_ids"],
+        *(inventory["compatibility"][key] for key in (
+            "bundle", "config", "plan", "promotion", "publication", "storage",
+        )),
+    ]
+    for identity in identities:
+        assert f"`{identity}`" in reference, f"Refresh distribution reference for {identity}"
+    assert "not a released capability" in reference
+    assert "../reference/badge-distribution.md" in _read(_PUBLIC[0])
