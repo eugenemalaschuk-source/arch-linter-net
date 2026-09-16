@@ -124,12 +124,9 @@ public sealed class ArchitectureAnalysisContext : IDisposable
         ArgumentNullException.ThrowIfNull(paths);
         lock (_consumedInputPathsGate)
         {
-            foreach (string path in paths)
+            foreach (string path in paths.Where(path => !string.IsNullOrWhiteSpace(path)))
             {
-                if (!string.IsNullOrWhiteSpace(path))
-                {
-                    _consumedInputPaths.Add(Path.GetFullPath(path));
-                }
+                _consumedInputPaths.Add(Path.GetFullPath(path));
             }
         }
     }

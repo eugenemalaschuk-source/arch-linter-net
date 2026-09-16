@@ -16,6 +16,8 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
     internal const string VersionPropertyName = "version";
     internal const string MessagePropertyName = "message";
     internal const string PropertiesKey = "properties";
+    private const string Error = "error";
+    private const string Locations = "locations";
     internal const string MethodBodyCategory = "method-body";
     internal const string MethodBodyIlCategory = "method-body-il";
     internal const string CycleRuleFallback = "dependency-cycle";
@@ -66,7 +68,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
                 .Select(finding =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    string level = finding.Severity == "warning" ? "warning" : "error";
+                    string level = finding.Severity == "warning" ? "warning" : Error;
                     return BuildViolationEntry(finding, level);
                 })
                 .OrderBy(entry => entry, new ArchitectureSarifResultEntryOrderComparer(cancellationToken))
@@ -123,7 +125,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
         IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null,
         CancellationToken cancellationToken = default)
     {
-        string level = mode == "strict" ? "error" : "warning";
+        string level = mode == "strict" ? Error : "warning";
 
         // Violations are the dominant contributor to a large report's size, so this is checked
         // per finding — not just before/after the whole SARIF document is built. The final
@@ -229,7 +231,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 
         if (forbiddenNamespace == MethodBodyCategory)
         {
-            json["locations"] = BuildPhysicalLocations(sourceType, references);
+            json[Locations] = BuildPhysicalLocations(sourceType, references);
         }
         else if (diagnostic is LayoutConventionDiagnostic { MatchedFilePath: { } matchedFilePath })
         {
@@ -238,13 +240,13 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
             // real repository-relative .cs path - using it as a physical location lets GitHub Code
             // Scanning anchor the finding to that file/line instead of falling back to a generic
             // logical (type-name) location it cannot resolve on disk.
-            json["locations"] = BuildPhysicalLocations(matchedFilePath, Array.Empty<string>());
+            json[Locations] = BuildPhysicalLocations(matchedFilePath, Array.Empty<string>());
         }
         else if (diagnostic is ImportedExternalDiagnostic importedDiagnostic
                  && ArchitectureSarifImportedDiagnosticLocationProjector.HasLocation(
                      importedDiagnostic.SourceDiagnostic.PrimaryLocation))
         {
-            json["locations"] = ArchitectureSarifImportedDiagnosticLocationProjector.Project(
+            json[Locations] = ArchitectureSarifImportedDiagnosticLocationProjector.Project(
                 importedDiagnostic.SourceDiagnostic.PrimaryLocation!,
                 sourceType,
                 LogicalLocationKindFor(diagnostic, forbiddenNamespace));
@@ -255,11 +257,11 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
             // use that real, on-disk project-file location as a physical location (in addition to the
             // structured evidence in `properties`) rather than only a generic logical (assembly-name)
             // location.
-            json["locations"] = BuildPhysicalLocations(frameworkSourcePath, Array.Empty<string>());
+            json[Locations] = BuildPhysicalLocations(frameworkSourcePath, Array.Empty<string>());
         }
         else
         {
-            json["locations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
+            json[Locations] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
         }
 
         object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
@@ -555,14 +557,14 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
         string path = match.Success ? cycle[match.Length..] : cycle;
         ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(
             new CycleDiagnostic(ruleId, match.Success ? ruleId : null, path),
-            level == "error" ? "strict" : "audit");
+            level == Error ? "strict" : "audit");
 
         var json = new Dictionary<string, object?>
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {path}" },
-            ["locations"] = BuildLogicalLocations(path, "namespace"),
+            [Locations] = BuildLogicalLocations(path, "namespace"),
             [PropertiesKey] = new Dictionary<string, object?>
             {
                 ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
@@ -577,14 +579,14 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
         string ruleId = diagnostic.ContractId ?? CycleRuleFallback;
         ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(
             diagnostic,
-            level == "error" ? "strict" : "audit");
+            level == Error ? "strict" : "audit");
 
         var json = new Dictionary<string, object?>
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {diagnostic.Path}" },
-            ["locations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
+            [Locations] = BuildLogicalLocations(diagnostic.Path, "namespace"),
             [PropertiesKey] = new Dictionary<string, object?>
             {
                 ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),

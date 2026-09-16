@@ -210,14 +210,12 @@ internal static class SarifEvidenceSourceProjectionReader
         }
 
         SarifEvidenceSourceSeverity severity = SarifEvidenceSourceSeverity.Unspecified;
-        if (result.TryGetProperty("level", out JsonElement level))
+        if (result.TryGetProperty("level", out JsonElement level)
+            && (level.ValueKind != JsonValueKind.String
+                || !TryParseSourceSeverity(level.GetString(), out severity)))
         {
-            if (level.ValueKind != JsonValueKind.String
-                || !TryParseSourceSeverity(level.GetString(), out severity))
-            {
-                detail = $"The SARIF result at index {resultIndex} level must be one of error, warning, note, or none.";
-                return false;
-            }
+            detail = $"The SARIF result at index {resultIndex} level must be one of error, warning, note, or none.";
+            return false;
         }
 
         if (!TryReadResultProject(result, resultIndex, out string? project, out detail))
@@ -430,15 +428,16 @@ internal static class SarifEvidenceSourceProjectionReader
             return false;
         }
 
-        if (ruleReference.TryGetProperty("id", out JsonElement referenceId))
+        if (ruleReference.TryGetProperty("id", out JsonElement referenceId)
+            && (referenceId.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(referenceId.GetString())))
         {
-            if (referenceId.ValueKind != JsonValueKind.String
-                || string.IsNullOrWhiteSpace(referenceId.GetString()))
-            {
-                detail = $"The SARIF result at index {resultIndex} rule.id member must be a non-blank string.";
-                return false;
-            }
+            detail = $"The SARIF result at index {resultIndex} rule.id member must be a non-blank string.";
+            return false;
+        }
 
+        if (ruleReference.TryGetProperty("id", out referenceId))
+        {
             referencedRuleId = referenceId.GetString();
         }
 

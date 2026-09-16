@@ -43,8 +43,6 @@ internal sealed class ArchitectureCoverageAnalysisService
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations) =>
         _session.CreateExecutionContext(contract, ignoredViolations);
 
-    private List<ArchitectureContractDescriptor> BuildAllDescriptors() => _session.BuildAllDescriptors();
-
     private Assembly? ResolveProjectAssembly(ArchitectureDiscoveredProject project) =>
         _matching.ResolveProjectAssembly(project);
 

@@ -13,11 +13,12 @@ namespace ArchLinterNet.Core.Contracts.RawValidators;
 internal sealed class RawExternalEvidenceNodeValidator : IArchitecturePolicyRawDocumentValidator
 {
     private const string ExternalEvidenceKey = "external_evidence";
+    private const string DiagnosticFilterKey = "diagnostic_filter";
 
     private static readonly string[] _allowedKeys =
     [
         "id", "format", "required", "tool", "tool_version", "run",
-        "require_repository", "require_revision", "require_scope", "diagnostic_filter",
+        "require_repository", "require_revision", "require_scope", DiagnosticFilterKey,
     ];
 
     public void Validate(ArchitecturePolicyRawDocument document)
@@ -62,8 +63,8 @@ internal sealed class RawExternalEvidenceNodeValidator : IArchitecturePolicyRawD
             ValidateBoolean(entry, "require_revision", index, optional: true);
             SetFieldValidationSubject(document, entryPath, entry, "require_scope");
             ValidateBoolean(entry, "require_scope", index, optional: true);
-            SetFieldValidationSubject(document, entryPath, entry, "diagnostic_filter");
-            if (RawYamlNodes.TryGetChild(entry, "diagnostic_filter", out YamlNode? filterNode))
+            SetFieldValidationSubject(document, entryPath, entry, DiagnosticFilterKey);
+            if (RawYamlNodes.TryGetChild(entry, DiagnosticFilterKey, out YamlNode? filterNode))
             {
                 ValidateDiagnosticFilter(document, filterNode, index, entryPath);
             }
@@ -76,7 +77,7 @@ internal sealed class RawExternalEvidenceNodeValidator : IArchitecturePolicyRawD
         int entryIndex,
         string entryPath)
     {
-        string filterPath = ArchitecturePolicyProvenancePath.AppendProperty(entryPath, "diagnostic_filter");
+        string filterPath = ArchitecturePolicyProvenancePath.AppendProperty(entryPath, DiagnosticFilterKey);
         document.Provenance.SetValidationSubject(filterPath);
         if (filterNode is not YamlMappingNode filter)
         {
@@ -91,7 +92,7 @@ internal sealed class RawExternalEvidenceNodeValidator : IArchitecturePolicyRawD
         ValidateStringList(document, filter, filterPath, "path_prefixes", entryIndex, optional: true, pathPrefixes: true);
         ValidateSeverity(document, filter, filterPath, entryIndex);
         SetFilterFieldValidationSubject(document, filterPath, filter, "require_matches");
-        ValidateBoolean(filter, "require_matches", entryIndex, optional: true, fieldPrefix: "diagnostic_filter");
+        ValidateBoolean(filter, "require_matches", entryIndex, optional: true, fieldPrefix: DiagnosticFilterKey);
     }
 
     private static void ValidateFilterKeys(YamlMappingNode filter, int entryIndex)

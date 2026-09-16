@@ -9,6 +9,8 @@ namespace ArchLinterNet.Core.Reporting;
 /// <summary>Reads the two canonical, local artifacts consumed by an architecture PR report.</summary>
 public static class ArchitecturePrReportReader
 {
+    private const string Available = "available";
+    private const string Unavailable = "unavailable";
     /// <summary>
     /// Parses one architecture-health/v1 artifact and one versioned architecture-change report.
     /// Analysis, policy loading, and lifecycle evaluation are deliberately outside this boundary.
@@ -199,27 +201,30 @@ public static class ArchitecturePrReportReader
             "topology",
             "waiver_lifecycle",
         ];
-        Dictionary<string, string> values = new(StringComparer.Ordinal);
-        foreach (JsonProperty property in availability.EnumerateObject())
-        {
-            if (!values.TryAdd(property.Name, RequiredString(property.Value)))
+        Dictionary<string, string> values = availability.EnumerateObject().Aggregate(
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            (map, property) =>
             {
-                throw InvalidArtifact($"The availability map repeats '{property.Name}'.");
-            }
-        }
+                if (!map.TryAdd(property.Name, RequiredString(property.Value)))
+                {
+                    throw InvalidArtifact($"The availability map repeats '{property.Name}'.");
+                }
+
+                return map;
+            });
 
         if (values.Count != expectedKeys.Length || !expectedKeys.All(values.ContainsKey))
         {
             throw InvalidArtifact("The availability map must contain exactly the supported authority keys.");
         }
 
-        ValidateAvailabilityValue(values, "policy_inventory", inventory is not null, "available", "unavailable");
-        ValidateAvailabilityValue(values, "waiver_lifecycle", lifecycle is not null, "available", "unavailable");
-        ValidateAvailabilityValue(values, "applicability", applicability is not null, "available", "unavailable");
+        ValidateAvailabilityValue(values, "policy_inventory", inventory is not null, Available, Unavailable);
+        ValidateAvailabilityValue(values, "waiver_lifecycle", lifecycle is not null, Available, Unavailable);
+        ValidateAvailabilityValue(values, "applicability", applicability is not null, Available, Unavailable);
         bool hasTopology = applicability?.Controls.Any(control => control.Record?.Topology is not null) == true;
-        ValidateAvailabilityValue(values, "topology", hasTopology, "available", "not_configured");
-        ValidateAvailabilityValue(values, "external_evidence", external is not null, "available", "not_configured");
-        ValidateAvailabilityValue(values, "findings", findings.ValueKind == JsonValueKind.Array, "available", "unavailable");
+        ValidateAvailabilityValue(values, "topology", hasTopology, Available, "not_configured");
+        ValidateAvailabilityValue(values, "external_evidence", external is not null, Available, "not_configured");
+        ValidateAvailabilityValue(values, "findings", findings.ValueKind == JsonValueKind.Array, Available, Unavailable);
         return values;
     }
 
@@ -383,12 +388,20 @@ public static class ArchitecturePrReportReader
             : text;
     }
 
-    internal static string? OptionalString(JsonElement parent, string name) =>
-        !parent.TryGetProperty(name, out JsonElement value) || value.ValueKind == JsonValueKind.Null
-            ? null
-            : value.ValueKind == JsonValueKind.String
-                ? value.GetString()
-                : throw InvalidArtifact($"The Health report artifact field '{name}' must be a string or null.");
+    internal static string? OptionalString(JsonElement parent, string name)
+    {
+        if (!parent.TryGetProperty(name, out JsonElement value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            return value.GetString();
+        }
+
+        throw InvalidArtifact($"The Health report artifact field '{name}' must be a string or null.");
+    }
 
     internal static int RequiredInt(JsonElement parent, string name)
     {

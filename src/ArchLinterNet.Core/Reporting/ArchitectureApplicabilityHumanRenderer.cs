@@ -55,12 +55,9 @@ internal static class ArchitectureApplicabilityHumanRenderer
 
         return string.Join(
             Environment.NewLine,
-            new[]
-            {
-                RenderAssessmentCompletion(projection.Completion),
-                summaryLine,
-                controls,
-            }) + findings;
+            RenderAssessmentCompletion(projection.Completion),
+            summaryLine,
+            controls) + findings;
     }
 
     internal static string RenderDiagnostic(ArchitectureApplicabilityDiagnostic applicability)

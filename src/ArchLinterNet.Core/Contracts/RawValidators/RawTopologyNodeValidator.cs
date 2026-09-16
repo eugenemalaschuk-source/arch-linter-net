@@ -8,6 +8,7 @@ namespace ArchLinterNet.Core.Contracts.RawValidators;
 // the declared universe. Validate its closed object shapes before deserialization erases unknown keys.
 internal sealed class RawTopologyNodeValidator : IArchitecturePolicyRawDocumentValidator
 {
+    private const string TopologyKey = "topology";
     private static readonly string[] _topologyKeys =
         ["mode", "subject_kind", "scope", "nodes", "allowed_edges", "out_of_scope", "stale_declarations"];
     private static readonly string[] _scopeKeys = ["allow_empty", "selectors"];
@@ -19,13 +20,13 @@ internal sealed class RawTopologyNodeValidator : IArchitecturePolicyRawDocumentV
 
     public void Validate(ArchitecturePolicyRawDocument document)
     {
-        if (!document.TryGetSection("topology", out YamlMappingNode? topology))
+        if (!document.TryGetSection(TopologyKey, out YamlMappingNode? topology))
         {
             return;
         }
 
-        document.Provenance.SetValidationSubject(ArchitecturePolicyProvenancePath.Property("topology"));
-        ValidateKnownKeys(topology, "topology", _topologyKeys);
+        document.Provenance.SetValidationSubject(ArchitecturePolicyProvenancePath.Property(TopologyKey));
+        ValidateKnownKeys(topology, TopologyKey, _topologyKeys);
         ValidateScope(document, topology);
         ValidateNodes(document, topology);
         ValidateEdges(document, topology);
@@ -195,5 +196,5 @@ internal sealed class RawTopologyNodeValidator : IArchitecturePolicyRawDocumentV
     }
 
     private static string TopologyPath(string property, int index) => ArchitecturePolicyProvenancePath.AppendIndex(
-        ArchitecturePolicyProvenancePath.AppendProperty(ArchitecturePolicyProvenancePath.Property("topology"), property), index);
+        ArchitecturePolicyProvenancePath.AppendProperty(ArchitecturePolicyProvenancePath.Property(TopologyKey), property), index);
 }

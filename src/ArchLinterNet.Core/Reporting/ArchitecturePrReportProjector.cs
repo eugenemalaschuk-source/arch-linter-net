@@ -6,6 +6,8 @@ namespace ArchLinterNet.Core.Reporting;
 /// <summary>Projects canonical Health/change artifacts without re-evaluating their authorities.</summary>
 public static class ArchitecturePrReportProjector
 {
+    private const string ExternalEvidence = "external_evidence";
+    private const string Unavailable = "unavailable";
     /// <summary>Creates the typed projection consumed by a presentation adapter.</summary>
     public static ArchitecturePrReportProjection Project(ArchitecturePrReportInput input) =>
         Project(input, input?.NavigationContext);
@@ -102,7 +104,7 @@ public static class ArchitecturePrReportProjector
         string[] expectedKeys =
         [
             "applicability",
-            "external_evidence",
+            ExternalEvidence,
             "findings",
             "policy_inventory",
             "topology",
@@ -119,12 +121,12 @@ public static class ArchitecturePrReportProjector
         }
 
         bool topology = receipt.Applicability?.Controls.Any(control => control.Record?.Topology is not null) == true;
-        return Matches(availability, "policy_inventory", receipt.PolicyInventory is not null, "unavailable")
-            && Matches(availability, "waiver_lifecycle", receipt.WaiverLifecycle is not null, "unavailable")
-            && Matches(availability, "applicability", receipt.Applicability is not null, "unavailable")
+        return Matches(availability, "policy_inventory", receipt.PolicyInventory is not null, Unavailable)
+            && Matches(availability, "waiver_lifecycle", receipt.WaiverLifecycle is not null, Unavailable)
+            && Matches(availability, "applicability", receipt.Applicability is not null, Unavailable)
             && Matches(availability, "topology", topology, "not_configured")
-            && Matches(availability, "external_evidence", receipt.ExternalEvidence is not null, "not_configured")
-            && Matches(availability, "findings", receipt.Findings is not null, "unavailable");
+            && Matches(availability, ExternalEvidence, receipt.ExternalEvidence is not null, "not_configured")
+            && Matches(availability, "findings", receipt.Findings is not null, Unavailable);
     }
 
     private static bool Matches(
@@ -236,12 +238,12 @@ public static class ArchitecturePrReportProjector
     {
         foreach (ArchitecturePrReportExternalRequirement requirement in externalEvidence.Requirements)
         {
-            references.Add(new("external_evidence", requirement.Id, null));
+            references.Add(new(ExternalEvidence, requirement.Id, null));
         }
 
         foreach (ArchitecturePrReportExternalEvidenceTrustReceipt trust in externalEvidence.TrustReceipts)
         {
-            references.Add(new("external_evidence", trust.LogicalId, trust.ArtifactPath));
+            references.Add(new(ExternalEvidence, trust.LogicalId, trust.ArtifactPath));
         }
     }
 

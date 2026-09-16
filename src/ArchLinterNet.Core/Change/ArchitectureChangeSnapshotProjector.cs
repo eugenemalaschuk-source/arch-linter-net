@@ -96,15 +96,13 @@ internal static class ArchitectureChangeSnapshotProjector
                 yield return Role(role);
             }
 
-            foreach (SemanticMetadataEntry metadata in MetadataEntries(role.Metadata))
+            foreach (SemanticMetadataEntry metadata in MetadataEntries(role.Metadata)
+                .Where(metadata => contextKeys.Add(new SemanticContextKey(role.Subject, metadata))))
             {
-                if (contextKeys.Add(new SemanticContextKey(role.Subject, metadata)))
-                {
-                    yield return new ArchitectureChangeEntry(
-                        "semantic_context",
-                        role.Subject + "|" + metadata.Key + "|" + Value(metadata.Value.Value),
-                        role.Subject + ": " + metadata.Key + "=" + Value(metadata.Value.Value));
-                }
+                yield return new ArchitectureChangeEntry(
+                    "semantic_context",
+                    role.Subject + "|" + metadata.Key + "|" + Value(metadata.Value.Value),
+                    role.Subject + ": " + metadata.Key + "=" + Value(metadata.Value.Value));
             }
         }
     }

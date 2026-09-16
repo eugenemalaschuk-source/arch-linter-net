@@ -9,6 +9,7 @@ namespace ArchLinterNet.Core.Scanning;
 // metadata evidence to the attribute scanner while preserving the original member paths.
 internal sealed class ArchitectureContractSurfaceExposureMemberScanner
 {
+    private const string MemberSegment = "member";
     internal const BindingFlags MemberFlags =
         BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic |
         BindingFlags.Instance | BindingFlags.Static;
@@ -102,7 +103,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
     private void ScanConstructors(Type type, ArchitectureContractExposurePath typePath)
     {
         ConstructorInfo[] constructors = _state.TryReadArray(
-            () => type.GetConstructors(MemberFlags), typePath.Append("member", "constructors"),
+            () => type.GetConstructors(MemberFlags), typePath.Append(MemberSegment, "constructors"),
             "constructors-unavailable");
         foreach (ConstructorInfo constructor in constructors.OrderBy(
             ArchitectureContractSurfaceExposureScanState.MemberSortKey, StringComparer.Ordinal))
@@ -113,7 +114,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
             }
 
             ArchitectureContractExposurePath memberPath = typePath.Append(
-                "member", ArchitectureContractSurfaceExposureScanState.MemberSortKey(constructor));
+                MemberSegment, ArchitectureContractSurfaceExposureScanState.MemberSortKey(constructor));
             _attributes.Scan(constructor, memberPath);
             ScanParameters(constructor, memberPath);
         }
@@ -122,7 +123,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
     private void ScanMethods(Type type, ArchitectureContractExposurePath typePath)
     {
         MethodInfo[] methods = _state.TryReadArray(
-            () => type.GetMethods(MemberFlags), typePath.Append("member", "methods"),
+            () => type.GetMethods(MemberFlags), typePath.Append(MemberSegment, "methods"),
             "methods-unavailable");
         foreach (MethodInfo method in methods.OrderBy(
             ArchitectureContractSurfaceExposureScanState.MemberSortKey, StringComparer.Ordinal))
@@ -134,7 +135,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
             }
 
             ArchitectureContractExposurePath memberPath = typePath.Append(
-                "member", ArchitectureContractSurfaceExposureScanState.MemberSortKey(method));
+                MemberSegment, ArchitectureContractSurfaceExposureScanState.MemberSortKey(method));
             _attributes.Scan(method, memberPath);
             ScanParameters(method, memberPath);
             ScanReturn(method, memberPath);
@@ -159,7 +160,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
     private void ScanProperties(Type type, ArchitectureContractExposurePath typePath)
     {
         PropertyInfo[] properties = _state.TryReadArray(
-            () => type.GetProperties(MemberFlags), typePath.Append("member", "properties"),
+            () => type.GetProperties(MemberFlags), typePath.Append(MemberSegment, "properties"),
             "properties-unavailable");
         foreach (PropertyInfo property in properties.OrderBy(
             ArchitectureContractSurfaceExposureScanState.MemberSortKey, StringComparer.Ordinal))
@@ -175,7 +176,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
             }
 
             ArchitectureContractExposurePath memberPath = typePath.Append(
-                "member", ArchitectureContractSurfaceExposureScanState.MemberSortKey(property));
+                MemberSegment, ArchitectureContractSurfaceExposureScanState.MemberSortKey(property));
             _attributes.Scan(property, memberPath);
             Type? propertyType = _state.TryRead(
                 () => property.PropertyType, memberPath.Append("return"), "property-type-unavailable");
@@ -203,7 +204,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
     private void ScanFields(Type type, ArchitectureContractExposurePath typePath)
     {
         FieldInfo[] fields = _state.TryReadArray(
-            () => type.GetFields(MemberFlags), typePath.Append("member", "fields"),
+            () => type.GetFields(MemberFlags), typePath.Append(MemberSegment, "fields"),
             "fields-unavailable");
         foreach (FieldInfo field in fields.OrderBy(
             ArchitectureContractSurfaceExposureScanState.MemberSortKey, StringComparer.Ordinal))
@@ -214,7 +215,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
             }
 
             ArchitectureContractExposurePath memberPath = typePath.Append(
-                "member", ArchitectureContractSurfaceExposureScanState.MemberSortKey(field));
+                MemberSegment, ArchitectureContractSurfaceExposureScanState.MemberSortKey(field));
             _attributes.Scan(field, memberPath);
             Type? fieldType = _state.TryRead(
                 () => field.FieldType, memberPath.Append("field_type"), "field-type-unavailable");
@@ -228,7 +229,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
     private void ScanEvents(Type type, ArchitectureContractExposurePath typePath)
     {
         EventInfo[] events = _state.TryReadArray(
-            () => type.GetEvents(MemberFlags), typePath.Append("member", "events"),
+            () => type.GetEvents(MemberFlags), typePath.Append(MemberSegment, "events"),
             "events-unavailable");
         foreach (EventInfo @event in events.OrderBy(
             ArchitectureContractSurfaceExposureScanState.MemberSortKey, StringComparer.Ordinal))
@@ -243,7 +244,7 @@ internal sealed class ArchitectureContractSurfaceExposureMemberScanner
             }
 
             ArchitectureContractExposurePath memberPath = typePath.Append(
-                "member", ArchitectureContractSurfaceExposureScanState.MemberSortKey(@event));
+                MemberSegment, ArchitectureContractSurfaceExposureScanState.MemberSortKey(@event));
             _attributes.Scan(@event, memberPath);
             if (add != null)
             {

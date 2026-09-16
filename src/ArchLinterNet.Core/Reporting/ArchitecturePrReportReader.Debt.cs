@@ -224,12 +224,18 @@ internal static class ArchitecturePrReportDebtReceiptParser
     private static DateOnly? ParseDate(JsonElement value, string name)
     {
         string? text = value.GetString();
-        return text is null
-            ? null
-            : DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out DateOnly date)
-                ? date
-                : throw InvalidArtifact($"The report artifact field '{name}' contains an invalid date.");
+        if (text is null)
+        {
+            return null;
+        }
+
+        if (DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out DateOnly date))
+        {
+            return date;
+        }
+
+        throw InvalidArtifact($"The report artifact field '{name}' contains an invalid date.");
     }
 
     internal static bool RequiredBool(JsonElement parent, string name)
@@ -249,10 +255,18 @@ internal static class ArchitecturePrReportDebtReceiptParser
         return value;
     }
 
-    internal static int? OptionalInt(JsonElement parent, string name) =>
-        !parent.TryGetProperty(name, out JsonElement value) || value.ValueKind == JsonValueKind.Null
-            ? null
-            : value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number)
-                ? number
-                : throw InvalidArtifact($"The report artifact field '{name}' must be an integer or null.");
+    internal static int? OptionalInt(JsonElement parent, string name)
+    {
+        if (!parent.TryGetProperty(name, out JsonElement value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number))
+        {
+            return number;
+        }
+
+        throw InvalidArtifact($"The report artifact field '{name}' must be an integer or null.");
+    }
 }

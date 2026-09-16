@@ -18,7 +18,7 @@ internal static class ExternalDiagnosticFilterRules
     {
         if (string.IsNullOrWhiteSpace(value)
             || value.Contains('\\')
-            || value.StartsWith("/", StringComparison.Ordinal)
+            || value.StartsWith('/')
             || value.StartsWith("~/", StringComparison.Ordinal)
             || value.Contains("//", StringComparison.Ordinal)
             || value.IndexOfAny(['*', '?', '[', ']']) >= 0

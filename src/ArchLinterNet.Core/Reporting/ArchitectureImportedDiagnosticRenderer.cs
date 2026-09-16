@@ -6,6 +6,7 @@ namespace ArchLinterNet.Core.Reporting;
 /// <summary>Renders imported diagnostics while preserving producer and governance evidence.</summary>
 internal static class ArchitectureImportedDiagnosticRenderer
 {
+    private const string Unknown = "<unknown>";
     internal static string RenderForHumans(ImportedExternalDiagnostic diagnostic, string canonicalIdentity)
     {
         SarifEvidenceSourceDiagnostic source = diagnostic.SourceDiagnostic;
@@ -16,7 +17,7 @@ internal static class ArchitectureImportedDiagnosticRenderer
         string path = EscapeHumanText(location?.Path ?? "<no source location>");
         string region = FormatRegion(location?.Region);
         string fingerprint = diagnostic.Fingerprint.Origin == SarifExternalDiagnosticFingerprintOrigin.Source
-            ? $"source:{EscapeHumanText(diagnostic.Fingerprint.SourceName ?? "<unknown>")}:{EscapeHumanText(diagnostic.Fingerprint.Value)}"
+            ? $"source:{EscapeHumanText(diagnostic.Fingerprint.SourceName ?? Unknown)}:{EscapeHumanText(diagnostic.Fingerprint.Value)}"
             : $"deterministic:{EscapeHumanText(diagnostic.Fingerprint.Value)}";
         string evidence = string.Join(
             "; ",
@@ -62,11 +63,11 @@ internal static class ArchitectureImportedDiagnosticRenderer
     private static string FormatEvidenceProvenanceForHumans(SarifEvidenceProvenance provenance)
     {
         SarifEvidenceResolvedContext? context = provenance.Context;
-        return $"logical={EscapeHumanText(provenance.LogicalId)}, tool={EscapeHumanText(provenance.ToolName ?? "<unknown>")}, "
-            + $"version={EscapeHumanText(provenance.ToolVersion ?? "<unknown>")}, run={EscapeHumanText(provenance.RunId ?? "<unknown>")}, "
-            + $"repository={EscapeHumanText(context?.Repository ?? "<unknown>")}, revision={EscapeHumanText(context?.Revision ?? "<unknown>")}, "
-            + $"scope={EscapeHumanText(context?.Scope ?? "<unknown>")}, artifact={EscapeHumanText(provenance.ArtifactPath ?? "<unknown>")}, "
-            + $"sha256={EscapeHumanText(provenance.ArtifactSha256 ?? "<unknown>")}";
+        return $"logical={EscapeHumanText(provenance.LogicalId)}, tool={EscapeHumanText(provenance.ToolName ?? Unknown)}, "
+            + $"version={EscapeHumanText(provenance.ToolVersion ?? Unknown)}, run={EscapeHumanText(provenance.RunId ?? Unknown)}, "
+            + $"repository={EscapeHumanText(context?.Repository ?? Unknown)}, revision={EscapeHumanText(context?.Revision ?? Unknown)}, "
+            + $"scope={EscapeHumanText(context?.Scope ?? Unknown)}, artifact={EscapeHumanText(provenance.ArtifactPath ?? Unknown)}, "
+            + $"sha256={EscapeHumanText(provenance.ArtifactSha256 ?? Unknown)}";
     }
 
     private static string FormatRegion(SarifEvidenceSourceRegion? region)

@@ -108,6 +108,27 @@ public sealed class ArchitecturePrReportProjectorTests
     }
 
     [Test]
+    public void Project_PreservesNineSegmentAttemptUrlsWithOpaqueSuffix()
+    {
+        string sha = new('a', 40);
+        string artifactUrl = "https://github.com/example/repository/actions/runs/123/attempts/1/future/opaque";
+        var context = new ArchitecturePrReportNavigationContext(
+            "https://github.com/example/repository",
+            sha,
+            artifactUrl);
+
+        ArchitecturePrReportProjection projection = ArchitecturePrReportProjector.Project(
+            new ArchitecturePrReportInput(Summary(), null, Change()), context);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(context.IsUsable, Is.True);
+            Assert.That(projection.NavigationContext, Is.Not.Null);
+            Assert.That(projection.NavigationContext!.ArtifactUrl, Is.EqualTo(artifactUrl));
+        });
+    }
+
+    [Test]
     public void Project_OmitsUnsafeNavigationContextWithoutChangingCanonicalSummary()
     {
         ArchitectureHealthSummary summary = Summary();

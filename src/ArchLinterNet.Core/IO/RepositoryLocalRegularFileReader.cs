@@ -251,13 +251,13 @@ internal static class RepositoryLocalRegularFileReader
     private static int OpenDirectory => OperatingSystem.IsMacOS() ? OpenDirectoryMacOs : OpenDirectoryLinux;
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "The collaborator is intentionally non-partial; explicit UTF-8 marshalling preserves the open/openat ABI.")]
-    [DllImport("libc", EntryPoint = "open", ExactSpelling = true, SetLastError = true)]
+    [DllImport("libc", EntryPoint = "open", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
     private static extern int OpenUnixDescriptor(
         [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
         int flags);
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "The collaborator is intentionally non-partial; explicit UTF-8 marshalling preserves the openat ABI.")]
-    [DllImport("libc", EntryPoint = "openat", ExactSpelling = true, SetLastError = true)]
+    [DllImport("libc", EntryPoint = "openat", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
     private static extern int OpenUnixDescriptorAt(
         SafeFileHandle directoryHandle,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string path,

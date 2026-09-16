@@ -9,6 +9,7 @@ namespace ArchLinterNet.Core.Validation;
 
 internal static class ArchitectureHealthReportReceiptEvidenceWriter
 {
+    private const string ControlIdentity = "control_identity";
     internal static JsonObject BuildPolicyInventory(ArchitecturePolicyInventory inventory) =>
         ArchitecturePolicyInventoryRenderer.FormatForJson(
             inventory,
@@ -71,7 +72,7 @@ internal static class ArchitectureHealthReportReceiptEvidenceWriter
     {
         var result = new JsonObject
         {
-            ["control_identity"] = control.ControlIdentity,
+            [ControlIdentity] = control.ControlIdentity,
             ["membership"] = control.Membership is { } membership
                 ? ArchitectureApplicabilityWireNames.MembershipToken(membership)
                 : null,
@@ -86,7 +87,7 @@ internal static class ArchitectureHealthReportReceiptEvidenceWriter
         {
             result["expected"] = new JsonObject
             {
-                ["control_identity"] = control.Expected.ControlIdentity,
+                [ControlIdentity] = control.Expected.ControlIdentity,
                 ["family"] = control.Expected.Family,
                 ["membership"] = ArchitectureApplicabilityWireNames.MembershipToken(control.Expected.Membership),
                 ["provenance"] = BuildApplicabilityProvenance(control.Expected.Provenance),
@@ -105,7 +106,7 @@ internal static class ArchitectureHealthReportReceiptEvidenceWriter
     {
         var result = new JsonObject
         {
-            ["control_identity"] = record.ControlIdentity,
+            [ControlIdentity] = record.ControlIdentity,
             ["family"] = record.Family,
             ["state"] = ArchitectureApplicabilityWireNames.StateToken(record.State),
             ["reasons"] = BuildApplicabilityReasons(record.Reasons),
@@ -147,7 +148,7 @@ internal static class ArchitectureHealthReportReceiptEvidenceWriter
         new()
         {
             ["family"] = provenance.Family,
-            ["control_identity"] = provenance.ControlIdentity,
+            [ControlIdentity] = provenance.ControlIdentity,
             ["policy_identity"] = provenance.PolicyIdentity,
         };
 

@@ -80,6 +80,19 @@ public sealed class ArchitecturePrReportReaderTests
     }
 
     [Test]
+    public void Read_InvalidArtifactPreservesJsonParameterName()
+    {
+        ArchitectureChangeReport change = ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1");
+        string healthJson = ArchitectureHealthProjector.FormatAsJson(CreateOutcome())
+            .Replace("architecture-health/v1", "architecture-health/v9", StringComparison.Ordinal);
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(
+            () => ArchitecturePrReportReader.Read(healthJson, ArchitectureChangeReports.FormatJson(change)))!;
+
+        Assert.That(exception.ParamName, Is.EqualTo("json"));
+    }
+
+    [Test]
     public void Read_RejectsHealthAndChangeArtifactsWithDifferentExecutionContextModeOrConditionSet()
     {
         string healthJson = ArchitectureHealthProjector.FormatAsJson(CreateOutcome());

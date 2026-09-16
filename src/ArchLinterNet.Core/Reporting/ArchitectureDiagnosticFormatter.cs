@@ -6,6 +6,7 @@ namespace ArchLinterNet.Core.Reporting;
 
 public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFormatter
 {
+    private const string None = "<none>";
     public static string FormatAssessmentCompletionForHumans(
         ArchitectureAssessmentCompletionEvidence? completion) =>
         ArchitectureApplicabilityHumanRenderer.RenderAssessmentCompletion(completion);
@@ -359,12 +360,12 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
     private static string FormatMetricBudgetContextForHumans(MetricBudgetDiagnostic metricBudget) =>
         $" (kind: metric_budget, metric_id: {metricBudget.MetricId}, metric_kind: {metricBudget.MetricKind}, "
-        + $"native_subject: {metricBudget.NativeSubject ?? "<none>"}, effective_scope: {metricBudget.EffectiveScope}, "
+        + $"native_subject: {metricBudget.NativeSubject ?? None}, effective_scope: {metricBudget.EffectiveScope}, "
         + $"measured_value: {metricBudget.MeasuredValue}, breached_bound: {metricBudget.BreachedBound}, "
         + $"configured_limit: {metricBudget.ConfiguredLimit}, "
-        + $"baseline_mode: {metricBudget.BaselineMode ?? "<none>"}, baseline_value: {metricBudget.BaselineValue?.ToString() ?? "<none>"}, "
-        + $"delta: {metricBudget.Delta?.ToString() ?? "<none>"}, allowed_delta: {metricBudget.AllowedDelta?.ToString() ?? "<none>"}, "
-        + $"effective_threshold: {metricBudget.EffectiveThreshold?.ToString() ?? "<none>"}, absolute_cap: {metricBudget.AbsoluteCap?.ToString() ?? "<none>"}, "
+        + $"baseline_mode: {metricBudget.BaselineMode ?? None}, baseline_value: {metricBudget.BaselineValue?.ToString() ?? None}, "
+        + $"delta: {metricBudget.Delta?.ToString() ?? None}, allowed_delta: {metricBudget.AllowedDelta?.ToString() ?? None}, "
+        + $"effective_threshold: {metricBudget.EffectiveThreshold?.ToString() ?? None}, absolute_cap: {metricBudget.AbsoluteCap?.ToString() ?? None}, "
         + $"contributors: [{string.Join(", ", metricBudget.Contributors)}])";
 
     private static string FormatDependencyContextForHumans(DependencyDiagnostic dependency)
