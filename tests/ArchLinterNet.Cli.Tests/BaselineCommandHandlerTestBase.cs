@@ -197,6 +197,8 @@ internal abstract class BaselineCommandHandlerTestBase
 
         public Action? OnGenerateBaseline { get; set; }
 
+        public Action? OnPruneBaseline { get; set; }
+
         public Exception? PruneException { get; set; }
 
         public Exception? DiffException { get; set; }
@@ -258,6 +260,7 @@ internal abstract class BaselineCommandHandlerTestBase
         public BaselinePruneOutcome PruneBaseline(BaselinePruneRequest request)
         {
             PruneRequest = request;
+            OnPruneBaseline?.Invoke();
             return PruneException == null ? PruneOutcome : throw PruneException;
         }
 

@@ -16,85 +16,14 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
             return CliExitCodes.Success;
         }
 
-        if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
-            || !BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "baseline prune", options.BaselinePath)
-            || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
-            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath))
+        if (!TryValidate(options))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         try
         {
-            BaselinePruneOutcome outcome = runtime.PruneBaseline(new BaselinePruneRequest
-            {
-                PolicyPath = options.PolicyPath,
-                BaselinePath = options.BaselinePath,
-                Mode = options.Mode,
-                ConditionSetName = options.ConditionSetName,
-                CancellationToken = cancellationToken,
-                ContractIds = options.ContractIds.ToList(),
-                PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
-                NoRestore = options.NoRestore,
-                RequestedConfiguration = options.Configuration,
-                RequestedTargetFramework = options.TargetFramework,
-                RequestedPlatform = options.Platform,
-                RequestedRuntimeIdentifier = options.RuntimeIdentifier,
-            });
-
-            if (!outcome.Succeeded)
-            {
-                if (BaselineCommandGuards.TryHandlePreflightFailure(console, options.Format, "prune", outcome.PreflightDiagnostics))
-                {
-                    return CliExitCodes.InvalidArgumentsOrRuntimeError;
-                }
-
-                WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
-                return CliExitCodes.InvalidArgumentsOrRuntimeError;
-            }
-
-            bool json = options.Format == "json";
-            BaselineWriteGate.Disposition disposition;
-            if (outcome.IsNoOp && !options.Write.DryRun && options.OutputPath != null && SamePath(options.OutputPath, options.BaselinePath))
-            {
-                // Do not turn a no-op into a read/decode/re-encode/write cycle: that can alter a
-                // BOM or original encoding even when the text is unchanged.
-                disposition = BaselineWriteGate.Disposition.Unchanged;
-            }
-            else if (outcome.IsNoOp && !options.Write.DryRun && options.OutputPath != null)
-            {
-                // Re-checked immediately before the write that actually publishes the baseline.
-                cancellationToken.ThrowIfCancellationRequested();
-
-                BaselineWriteGate gate = new(console, fileSystem);
-                if (!gate.TryCopySource(
-                        new BaselineWriteGate.Request(
-                            "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
-                            outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json, options.Format),
-                        options.BaselinePath,
-                        out disposition, cancellationToken))
-                {
-                    return CliExitCodes.InvalidArgumentsOrRuntimeError;
-                }
-            }
-            else
-            {
-                // Re-checked immediately before the write that actually publishes the baseline.
-                cancellationToken.ThrowIfCancellationRequested();
-
-                BaselineWriteGate gate = new(console, fileSystem);
-                if (!gate.TryApply(
-                        new BaselineWriteGate.Request(
-                            "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
-                            outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json, options.Format),
-                        out disposition, cancellationToken))
-                {
-                    return CliExitCodes.InvalidArgumentsOrRuntimeError;
-                }
-            }
-
-            Report(options, outcome, disposition);
-            return CliExitCodes.Success;
+            return ExecuteCore(options);
         }
         catch (OperationCanceledException)
         {
@@ -105,6 +34,83 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
             CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline prune error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private bool TryValidate(BaselinePruneCommandOptions options)
+    {
+        return BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
+            && BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "baseline prune", options.BaselinePath)
+            && BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
+            && BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath);
+    }
+
+    private int ExecuteCore(BaselinePruneCommandOptions options)
+    {
+        BaselinePruneOutcome outcome = runtime.PruneBaseline(new BaselinePruneRequest
+        {
+            PolicyPath = options.PolicyPath,
+            BaselinePath = options.BaselinePath!,
+            Mode = options.Mode,
+            ConditionSetName = options.ConditionSetName,
+            CancellationToken = cancellationToken,
+            ContractIds = options.ContractIds.ToList(),
+            PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+            NoRestore = options.NoRestore,
+            RequestedConfiguration = options.Configuration,
+            RequestedTargetFramework = options.TargetFramework,
+            RequestedPlatform = options.Platform,
+            RequestedRuntimeIdentifier = options.RuntimeIdentifier,
+        });
+
+        if (!outcome.Succeeded)
+        {
+            return HandleFailure(options, outcome);
+        }
+
+        if (!TryWrite(options, outcome, out BaselineWriteGate.Disposition disposition))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        Report(options, outcome, disposition);
+        return CliExitCodes.Success;
+    }
+
+    private int HandleFailure(BaselinePruneCommandOptions options, BaselinePruneOutcome outcome)
+    {
+        if (BaselineCommandGuards.TryHandlePreflightFailure(console, options.Format, "prune", outcome.PreflightDiagnostics))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
+        return CliExitCodes.InvalidArgumentsOrRuntimeError;
+    }
+
+    private bool TryWrite(
+        BaselinePruneCommandOptions options,
+        BaselinePruneOutcome outcome,
+        out BaselineWriteGate.Disposition disposition)
+    {
+        bool json = options.Format == "json";
+        if (outcome.IsNoOp && !options.Write.DryRun && options.OutputPath != null && SamePath(options.OutputPath, options.BaselinePath!))
+        {
+            // Do not turn a no-op into a read/decode/re-encode/write cycle: that can alter a
+            // BOM or original encoding even when the text is unchanged.
+            disposition = BaselineWriteGate.Disposition.Unchanged;
+            return true;
+        }
+
+        // Re-checked immediately before the write that actually publishes the baseline.
+        cancellationToken.ThrowIfCancellationRequested();
+
+        BaselineWriteGate gate = new(console, fileSystem);
+        BaselineWriteGate.Request request = new(
+            "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
+            outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json, options.Format);
+        return outcome.IsNoOp && !options.Write.DryRun && options.OutputPath != null
+            ? gate.TryCopySource(request, options.BaselinePath!, out disposition, cancellationToken)
+            : gate.TryApply(request, out disposition, cancellationToken);
     }
 
     private void Report(

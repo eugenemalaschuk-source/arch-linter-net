@@ -105,6 +105,26 @@ internal sealed class CliArchitectureMeasureTests : CliArchitectureTestBase
     }
 
     [Test]
+    public void MeasureHandler_CancellationPreservesUnexpectedErrorEnvelope()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        FakeCliConsole console = new();
+        var runtime = new FakeCliRuntime { ExceptionToThrow = new OperationCanceledException("cancelled", cts.Token) };
+        var handler = new MeasureCommandHandler(runtime, console, cts.Token);
+
+        int exitCode = handler.Execute(new MeasureCommandOptions(
+            "policy.yml", "human", [], null, null, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("Measure error: cancelled"));
+            Assert.That(console.StdErr, Does.Not.Contain("Measure was cancelled"));
+        });
+    }
+
+    [Test]
     public void MeasureHandler_TypedPolicyFailureWritesNormalizedJson()
     {
         ArchitecturePolicySourceDescriptor source = new(

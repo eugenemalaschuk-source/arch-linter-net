@@ -132,91 +132,96 @@ internal sealed class BadgeLifecycleCommandHandler
 
     private static bool TryValidateOptions(BadgeLifecycleCommandOptions options, out string error)
     {
-        if (!_supportedOperations.Contains(options.Operation))
-        {
-            error = "The lifecycle operation is not supported.";
-            return false;
-        }
+        string? validationError = ValidateOperation(options)
+            ?? ValidateApproval(options)
+            ?? ValidateInputPath(options)
+            ?? ValidateFormat(options)
+            ?? ValidateAliases(options)
+            ?? ValidateIdentity(options)
+            ?? ValidateDigests(options)
+            ?? ValidateAudience(options)
+            ?? ValidateFieldSizes(options)
+            ?? ValidateExpectedValues(options);
+        error = validationError ?? string.Empty;
+        return validationError is null;
+    }
 
+    private static string? ValidateOperation(BadgeLifecycleCommandOptions options) =>
+        _supportedOperations.Contains(options.Operation)
+            ? null
+            : "The lifecycle operation is not supported.";
+
+    private static string? ValidateApproval(BadgeLifecycleCommandOptions options)
+    {
         if (!options.DryRun && options.Operation is "revoke" or "transfer" or "remove" && !options.ApproveWithdrawal)
         {
-            error = "This destructive operation requires --approve-withdrawal.";
-            return false;
+            return "This destructive operation requires --approve-withdrawal.";
         }
 
-        if (!options.DryRun && options.Operation is "recover" && !options.ApproveRecovery)
-        {
-            error = "Recovery requires --approve-recovery.";
-            return false;
-        }
+        return !options.DryRun && options.Operation is "recover" && !options.ApproveRecovery
+            ? "Recovery requires --approve-recovery."
+            : null;
+    }
 
-        if (string.IsNullOrWhiteSpace(options.InputPath))
-        {
-            error = "Lifecycle requires --input <badge-relay-config.json>.";
-            return false;
-        }
+    private static string? ValidateInputPath(BadgeLifecycleCommandOptions options) =>
+        string.IsNullOrWhiteSpace(options.InputPath)
+            ? "Lifecycle requires --input <badge-relay-config.json>."
+            : null;
 
-        if (!options.Format.Equals("json", StringComparison.OrdinalIgnoreCase)
-            && !options.Format.Equals(HumanFormat, StringComparison.OrdinalIgnoreCase))
-        {
-            error = "Invalid format. Use 'json' or 'human'.";
-            return false;
-        }
+    private static string? ValidateFormat(BadgeLifecycleCommandOptions options) =>
+        options.Format.Equals("json", StringComparison.OrdinalIgnoreCase)
+            || options.Format.Equals(HumanFormat, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : "Invalid format. Use 'json' or 'human'.";
 
+    private static string? ValidateAliases(BadgeLifecycleCommandOptions options)
+    {
         if (options.Alias is not null && !BadgeSetupValidationHelpers.IsOpaqueAlias(options.Alias))
         {
-            error = "The lifecycle alias must be an approved opaque alias.";
-            return false;
+            return "The lifecycle alias must be an approved opaque alias.";
         }
 
-        if (options.NewAlias is not null && !BadgeSetupValidationHelpers.IsOpaqueAlias(options.NewAlias))
-        {
-            error = "The new lifecycle alias must be an approved opaque alias.";
-            return false;
-        }
+        return options.NewAlias is not null && !BadgeSetupValidationHelpers.IsOpaqueAlias(options.NewAlias)
+            ? "The new lifecycle alias must be an approved opaque alias."
+            : null;
+    }
 
-        if (options.NewOwner is not null && !BadgeSetupValidationHelpers.IsIdentity(options.NewOwner)
-            || options.NewRepository is not null && !BadgeSetupValidationHelpers.IsIdentity(options.NewRepository))
-        {
-            error = "The lifecycle display identity contains unsupported characters.";
-            return false;
-        }
+    private static string? ValidateIdentity(BadgeLifecycleCommandOptions options) =>
+        options.NewOwner is not null && !BadgeSetupValidationHelpers.IsIdentity(options.NewOwner)
+            || options.NewRepository is not null && !BadgeSetupValidationHelpers.IsIdentity(options.NewRepository)
+            ? "The lifecycle display identity contains unsupported characters."
+            : null;
 
+    private static string? ValidateDigests(BadgeLifecycleCommandOptions options)
+    {
         if (options.WorkflowSha is not null && !BadgeSetupValidationHelpers.IsSha(options.WorkflowSha, 40))
         {
-            error = "The workflow SHA must be a lowercase 40-character hexadecimal digest.";
-            return false;
+            return "The workflow SHA must be a lowercase 40-character hexadecimal digest.";
         }
 
-        if (options.TargetDigest is not null && !BadgeSetupValidationHelpers.IsSha(options.TargetDigest, 64))
-        {
-            error = "The lifecycle bundle digest must be a lowercase 64-character hexadecimal digest.";
-            return false;
-        }
+        return options.TargetDigest is not null && !BadgeSetupValidationHelpers.IsSha(options.TargetDigest, 64)
+            ? "The lifecycle bundle digest must be a lowercase 64-character hexadecimal digest."
+            : null;
+    }
 
-        if (options.Audience is not null && !BadgeSetupValidationHelpers.IsSafeAudience(options.Audience))
-        {
-            error = "The lifecycle audience contains unsupported characters.";
-            return false;
-        }
+    private static string? ValidateAudience(BadgeLifecycleCommandOptions options) =>
+        options.Audience is not null && !BadgeSetupValidationHelpers.IsSafeAudience(options.Audience)
+            ? "The lifecycle audience contains unsupported characters."
+            : null;
 
-        if (new[] { options.NewOwner, options.NewRepository, options.Bundle, options.ContractVersion, options.CompatibilityPlan, options.Manifest, options.WorkflowRef }
-            .Any(static value => value is not null && Encoding.UTF8.GetByteCount(value) > 16 * 1024))
-        {
-            error = "Lifecycle request fields must be at most 16 KiB.";
-            return false;
-        }
+    private static string? ValidateFieldSizes(BadgeLifecycleCommandOptions options) =>
+        new[] { options.NewOwner, options.NewRepository, options.Bundle, options.ContractVersion, options.CompatibilityPlan, options.Manifest, options.WorkflowRef }
+            .Any(static value => value is not null && Encoding.UTF8.GetByteCount(value) > 16 * 1024)
+            ? "Lifecycle request fields must be at most 16 KiB."
+            : null;
 
+    private static string? ValidateExpectedValues(BadgeLifecycleCommandOptions options)
+    {
         long? epoch = options.ExpectedRevocationEpoch ?? options.ExpectedEpoch;
-        if (options.ExpectedGeneration is <= 0 || epoch is <= 0
-            || options.ExpectedRegistryRevision is <= 0 || options.ExpectedBarrierEpoch is <= 0)
-        {
-            error = "Expected generation and epoch values must be positive integers.";
-            return false;
-        }
-
-        error = string.Empty;
-        return true;
+        return options.ExpectedGeneration is <= 0 || epoch is <= 0
+            || options.ExpectedRegistryRevision is <= 0 || options.ExpectedBarrierEpoch is <= 0
+            ? "Expected generation and epoch values must be positive integers."
+            : null;
     }
 
     private static bool TryValidateRelayConfiguration(

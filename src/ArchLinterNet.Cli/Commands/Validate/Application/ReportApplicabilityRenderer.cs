@@ -275,72 +275,97 @@ internal sealed class ReportApplicabilityRenderer
             return json;
         }
 
-        JsonNode document = JsonNode.Parse(json)
-            ?? throw new InvalidOperationException("The validation SARIF report was empty.");
-        if (document is not JsonObject payload)
+        JsonObject payload = ParseSarifPayload(json);
+        JsonArray runs = GetSarifRuns(payload);
+
+        if (runs.Count == 0)
         {
-            throw new InvalidOperationException("The validation SARIF report was not an object.");
+            AddCompletionToEmptySarif(payload, runs, completion, projection);
+        }
+        else
+        {
+            AddCompletionToSarifRuns(runs, completion, projection);
         }
 
+        return payload.ToJsonString();
+    }
+
+    private static JsonObject ParseSarifPayload(string json)
+    {
+        JsonNode document = JsonNode.Parse(json)
+            ?? throw new InvalidOperationException("The validation SARIF report was empty.");
+        return document as JsonObject
+            ?? throw new InvalidOperationException("The validation SARIF report was not an object.");
+    }
+
+    private static JsonArray GetSarifRuns(JsonObject payload)
+    {
         JsonArray runs = payload["runs"] as JsonArray ?? new JsonArray();
         if (payload["runs"] is null)
         {
             payload["runs"] = runs;
         }
 
-        if (runs.Count == 0)
-        {
-            if (projection is null)
-            {
-                JsonObject properties = payload[PropertiesPropertyName] as JsonObject ?? new JsonObject();
-                payload[PropertiesPropertyName] = properties;
-                properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion);
-            }
-            else
-            {
-                // A valid SARIF document normally has at least one run. Keep malformed/minimal
-                // formatter fakes and future hosts useful by materializing the smallest valid run
-                // when the projected findings need a result container.
-                var run = new JsonObject
-                {
-                    ["tool"] = new JsonObject
-                    {
-                        ["driver"] = new JsonObject
-                        {
-                            ["name"] = "arch-linter-net",
-                            ["rules"] = new JsonArray(),
-                        },
-                    },
-                    ["results"] = new JsonArray(),
-                    [PropertiesPropertyName] = new JsonObject
-                    {
-                        ["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion, projection),
-                    },
-                };
-                runs.Add(run);
-                AddApplicabilityFindingsToSarifRun(run, projection);
-            }
-        }
-        else
-        {
-            foreach (JsonNode? run in runs)
-            {
-                if (run is not JsonObject runObject)
-                {
-                    continue;
-                }
+        return runs;
+    }
 
-                JsonObject properties = runObject[PropertiesPropertyName] as JsonObject ?? new JsonObject();
-                runObject[PropertiesPropertyName] = properties;
-                properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion, projection);
-                if (projection is not null)
-                {
-                    AddApplicabilityFindingsToSarifRun(runObject, projection);
-                }
-            }
+    private static void AddCompletionToEmptySarif(
+        JsonObject payload,
+        JsonArray runs,
+        ArchitectureAssessmentCompletionEvidence completion,
+        ArchitectureApplicabilityProjection? projection)
+    {
+        if (projection is null)
+        {
+            JsonObject properties = payload[PropertiesPropertyName] as JsonObject ?? new JsonObject();
+            payload[PropertiesPropertyName] = properties;
+            properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion);
+            return;
         }
 
-        return payload.ToJsonString();
+        // A valid SARIF document normally has at least one run. Keep malformed/minimal
+        // formatter fakes and future hosts useful by materializing the smallest valid run
+        // when the projected findings need a result container.
+        var run = new JsonObject
+        {
+            ["tool"] = new JsonObject
+            {
+                ["driver"] = new JsonObject
+                {
+                    ["name"] = "arch-linter-net",
+                    ["rules"] = new JsonArray(),
+                },
+            },
+            ["results"] = new JsonArray(),
+            [PropertiesPropertyName] = new JsonObject
+            {
+                ["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion, projection),
+            },
+        };
+        runs.Add(run);
+        AddApplicabilityFindingsToSarifRun(run, projection);
+    }
+
+    private static void AddCompletionToSarifRuns(
+        JsonArray runs,
+        ArchitectureAssessmentCompletionEvidence completion,
+        ArchitectureApplicabilityProjection? projection)
+    {
+        foreach (JsonNode? run in runs)
+        {
+            if (run is not JsonObject runObject)
+            {
+                continue;
+            }
+
+            JsonObject properties = runObject[PropertiesPropertyName] as JsonObject ?? new JsonObject();
+            runObject[PropertiesPropertyName] = properties;
+            properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion, projection);
+            if (projection is not null)
+            {
+                AddApplicabilityFindingsToSarifRun(runObject, projection);
+            }
+        }
     }
 
     private static void AddApplicabilityFindingsToSarifRun(
