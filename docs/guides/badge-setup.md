@@ -1,10 +1,15 @@
 # Turnkey Architecture Health badge setup
 
-The packed `ArchLinterNet.Cli` tool includes the setup contract, Relay bundle,
-configuration schema, and workflow templates. Setup is intentionally a plan-
-first command: it shows the disclosure and cost decision before writing a
-consumer repository, and it never runs the architecture evaluator a second
-time.
+> Prepublication candidate guidance: use only an explicitly verified candidate.
+> This page does not establish stable-release availability. Start with
+> [badge adoption](badge-adoption.md) for transport, disclosure, and evidence
+> prerequisites.
+
+The candidate contract requires the packed `ArchLinterNet.Cli` tool to include
+the setup contract, Relay bundle, configuration schema, and workflow templates.
+Setup is intentionally a plan-first command: it shows the disclosure and cost
+decision before writing a consumer repository, and it never runs the
+architecture evaluator a second time.
 
 ## Choose a transport
 

@@ -1,5 +1,10 @@
 # Badge Relay lifecycle operations
 
+> Prepublication candidate guidance: use only an explicitly verified candidate.
+> This page does not establish stable-release availability. Start with
+> [badge adoption](badge-adoption.md) for transport, disclosure, and evidence
+> prerequisites.
+
 This runbook is the operator procedure for a registered `badge-relay/v1`
 destination. Lifecycle changes are authenticated administrative actions; public
 badge reads never expose the registry, operation journal, payload, or provider

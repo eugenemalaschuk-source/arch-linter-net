@@ -1,0 +1,96 @@
+"""Documentation drift checks, not packed or live Relay acceptance."""
+
+import json
+import re
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
+
+import pytest
+
+_ROOT = Path(__file__).resolve().parents[3]
+_DOCS = _ROOT / "docs"
+_PUBLIC = (
+    _DOCS / "guides/badge-adoption.md",
+    _DOCS / "guides/badge-setup.md",
+    _DOCS / "guides/badge-lifecycle-operations.md",
+)
+_HANDOFF = _DOCS / "internal/badge-delivery-handoff.md"
+
+
+def _read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("path", (*_PUBLIC, _HANDOFF), ids=lambda p: p.stem)
+def test_badge_documentation_relative_links_resolve(path: Path) -> None:
+    links = re.findall(r"\[[^\]]+\]\(([^\s)]+)\)", _read(path))
+    assert links, f"Expected documentation cross-links in {path}"
+    for link in links:
+        parsed = urlsplit(link)
+        if parsed.scheme or parsed.netloc or not parsed.path:
+            continue
+        target = (path.parent / unquote(parsed.path)).resolve()
+        assert target.is_relative_to(_DOCS), link
+        assert target.is_file(), f"{path}: missing link target {link}"
+        if path in _PUBLIC:
+            assert not target.is_relative_to(_DOCS / "internal"), link
+
+
+def test_adoption_precedes_executable_guides_in_navigation() -> None:
+    config = _read(_ROOT / "mkdocs.yml")
+    nav = config.split("\nnav:\n", 1)[1].split("\nexclude_docs:", 1)[0]
+    targets = [path.relative_to(_DOCS).as_posix() for path in _PUBLIC]
+    assert all(nav.count(target) == 1 for target in targets)
+    assert [nav.index(target) for target in targets] == sorted(
+        nav.index(target) for target in targets
+    )
+    assert "internal/" not in nav
+    assert re.search(r"(?m)^exclude_docs: \|\n  internal/\s*$", config)
+
+
+def test_public_guides_expose_candidate_boundary_and_single_entrypoint() -> None:
+    for path in _PUBLIC:
+        intro = _read(path).split("\n## ", 1)[0]
+        assert "Prepublication candidate guidance" in intro
+        assert "stable-release availability" in intro
+    for path in _PUBLIC[1:]:
+        assert "[badge adoption](badge-adoption.md)" in _read(path)
+    # Executable examples stay with their existing setup/lifecycle owners.
+    assert not re.search(r"(?m)^arch-linter-net ", _read(_PUBLIC[0]))
+
+
+@pytest.mark.parametrize("mode", ("none", "github-raw", "relay"))
+def test_adoption_and_setup_cover_the_same_transports(mode: str) -> None:
+    for path in _PUBLIC[:2]:
+        assert f"| `{mode}` |" in _read(path)
+
+
+@pytest.mark.parametrize("profile", ("headline-only/v1", "headline-plus-freshness/v1"))
+def test_adoption_and_setup_cover_both_disclosure_profiles(profile: str) -> None:
+    for path in _PUBLIC[:2]:
+        assert f"`{profile}`" in _read(path)
+
+
+def test_handoff_inventory_tracks_machine_readable_authority() -> None:
+    inventory = json.loads(
+        _read(_ROOT / ".github/badge-promotion/release-inventory.json")
+    )
+    handoff = _read(_HANDOFF)
+    compatibility = inventory["compatibility"]
+    values = [
+        inventory["schema"],
+        inventory["release_authority"],
+        *inventory["package_ids"],
+        *inventory["excluded"],
+        *inventory["relay"].values(),
+        *(
+            compatibility[key]
+            for key in (
+                "bundle", "config", "plan", "promotion", "publication", "storage",
+                "publisher_commit", "workflow_path", "action_path",
+                "workflow_source_sha", "action_source_sha",
+            )
+        ),
+    ]
+    for value in values:
+        assert value in handoff, f"Refresh the source-audited handoff for {value}"
