@@ -59,12 +59,12 @@ jobs:
         run: |
           npx --yes --ignore-scripts --package=@fission-ai/openspec@1.13.0 -- openspec validate --all
 
-      - name: Collect validation evidence
+      - name: Collect final validation evidence
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/qodana-validation"
           git rev-parse HEAD > "$RUNNER_TEMP/qodana-validation/validated-sha.txt"
-          git archive --format=tar HEAD tools/scripts/qodana_ci.py tests/qodana make/lint.mk qodana.yaml .github/workflows/qodana.yml > "$RUNNER_TEMP/qodana-validation/qodana-sources.tar"
+          git archive --format=tar HEAD tools/scripts/qodana_ci.py tests/qodana make/lint.mk qodana.yaml .github/workflows/qodana.yml docs/internal/qodana-community-adoption.md openspec/changes/add-qodana-community-ci > "$RUNNER_TEMP/qodana-validation/qodana-sources.tar"
           if [[ -f coverage-python.xml ]]; then
             cp coverage-python.xml "$RUNNER_TEMP/qodana-validation/"
           fi

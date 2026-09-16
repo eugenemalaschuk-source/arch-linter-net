@@ -4,11 +4,11 @@ Owner: issue #864. Lifecycle: post-v0.8.0 engineering-health stabilization.
 
 ## Current state
 
-Phase A implementation is prepared; scanner adoption is **not yet validated**. The check
-`Qodana Community .NET (advisory)` is optional, not a required merge/release gate. Do not
-add it to branch protection or a ruleset before the reviewed Phase B decision. A failed
-optional check stays visibly failed: `continue-on-error` does not turn an infrastructure
-failure into success.
+Phase A has real scanner and tooling evidence; Phase B adoption review remains incomplete.
+The check `Qodana Community .NET (advisory)` is optional, not a required merge/release gate.
+Do not add it to branch protection or a ruleset before the reviewed Phase B decision.
+A failed optional check stays visibly failed: `continue-on-error` does not turn an
+infrastructure failure into success. Draft PR #906 and issue #864 remain open.
 
 The workflow is independent of Coverage + Sonar, CodeQL, ArchLinterNet self-governance,
 package validation and all existing required checks. None of their definitions or
@@ -24,18 +24,21 @@ coverage, a release matrix or another solution restore before analysis.
 
 The image tag is a **version pin, not a manifest digest lock**. Each invocation records
 Docker's immutable image ID and uses that ID for every scan in that invocation. Compare
-separate runs only when their image IDs and analyzed commits match. Review and pin a
-registry manifest digest after a real pull, rather than inventing one. The runner accepts
-`jetbrains/qodana-cdnet:2026.2@sha256:<reviewed-manifest-digest>` in the same declaration.
-Do not substitute Docker's local image ID for a registry manifest digest.
+separate runs only when their image IDs and analyzed commits match. A registry manifest
+digest was captured in the burn-in image log below; adopting that lock still requires a
+configuration change and another real run. The runner accepts a version plus digest, but
+that spelling has not been exercised end-to-end. Do not substitute Docker's local image
+ID for a registry manifest digest.
 
-The exact selected image must still prove .NET 10, `.slnx`, configuration and inspection
-compatibility in a real run. Documentation research is not execution evidence.
+The recorded run demonstrated the canonical `.slnx`, Release configuration and .NET 10
+with Community `2026.2.672` / Inspect Code `2026.2.1`, SDK `10.0.301`, runtime `10.0.9`.
+This evidence applies to that image and checkout, not every future EAP image.
 
 ## Running and reviewing
 
-Normal PRs perform one cold scan. Fork PRs follow the same tokenless execution path.
-A local invocation requires Linux with a working Docker daemon and registry/NuGet access:
+Normal PRs perform one cold scan. Fork PRs use the same tokenless execution path; a real
+fork run remains to be recorded. A local invocation requires Linux, a working Docker
+daemon and registry/NuGet access:
 
 ```bash
 export QODANA_ANALYZED_SHA="$(git rev-parse HEAD)"
@@ -47,11 +50,12 @@ the same image/checkout/cache, and two standalone generated projects outside the
 solution. The positive project enables `ConditionIsAlwaysTrueOrFalse` and contains a
 redundant null condition. The corrected negative project must no longer report that rule.
 A missing positive diagnostic or a remaining negative diagnostic fails validation.
-Mocked runner tests do not prove that the real engine detects this inspection.
+The negative control need not have zero unrelated recommended-profile diagnostics.
 
 Once the workflow exists on the default branch, its manual `workflow_dispatch` interface
 also offers the `burn_in` boolean. Before that, use the local command; do not assume the
 Actions manual-run button is available for a workflow present only on a feature branch.
+The temporary branch-only push trigger used to obtain implementation evidence is removed.
 
 `--output` must be new or empty and outside the repository. Evidence lives under its
 `artifacts` child, uploaded as `qodana-evidence-<run-id>-<attempt>` with 14-day retention:
@@ -62,17 +66,17 @@ Actions manual-run button is available for a workflow present only on a feature 
 - `cold.sarif.json`, optional warm/probe SARIF files and scanner logs provide diagnostics.
   A nonzero scanner exit with otherwise usable SARIF remains a failed, partial analysis.
 
-Missing/malformed SARIF or an unsuccessful invocation is never interpreted as zero findings.
-Raw diagnostics remain in artifacts, not executable workflow commands or PR comments.
-Correctness/security findings need focused owning issues; duplicate and low-value findings
-need rule-specific triage. No baseline update or suppression is automatic.
+Completed phases are checkpointed before the next scan; an interrupted later probe does
+not erase completed cold/warm evidence. Missing/malformed SARIF or an unsuccessful invocation
+is never interpreted as zero findings. Raw diagnostics remain in artifacts, not executable
+workflow commands or PR comments. No baseline update or suppression is automatic.
 
 ## Limits and cost evidence
 
 The job timeout is 55 minutes. Image pulling is bounded to 300 seconds, each repository scan
 to 1,200 seconds, each probe to 180 seconds, and each container cleanup to 30 seconds.
 A timed-out Docker client is followed by explicit container removal. Cancellation of the
-whole Actions job may prevent final evidence publication; record cancelled/missing artifacts
+whole Actions job may prevent artifact publication; record cancelled/missing artifacts
 as incomplete evidence, not success.
 
 There is deliberately no cross-run/shared Actions cache. A normal run begins with an empty
@@ -97,51 +101,88 @@ and `no-new-privileges`. Network access is necessary for dependency restore.
 PR build logic and scanner reports remain untrusted. Valid SARIF is copied as a bounded
 regular file; scanner-created symlinks are not published. No privileged downstream consumer,
 security-event writer or PR-comment writer consumes these artifacts. Static workflow tests
-cover this configuration, but a real fork run remains a required adoption check.
+cover this configuration, but they do not substitute for an actual fork run.
 
-## Acceptance evidence and Phase B decision
+## Recorded burn-in evidence
 
-Initial inventory: **not collected**. Reviewed baseline: **not established**. No configured
-baseline is not a claim that the repository has zero findings.
+[Run 35072109010](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35072109010)
+on 2026-09-16 completed successfully using commit
+`caf29214dca69efc9d2893dc2270b242d14e83fc`. The temporary push-triggered run used the same
+scanner/configuration as the production workflow, before the evidence-checkpoint fix.
 
-Record each actual run in the issue with this evidence:
+[Artifact 10437360502](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35072109010/artifacts/10437360502)
+contains raw SARIF, logs and `evidence.json`. ZIP SHA-256:
+`4f9b674344b4eb562a54c5ef975dd7eab6609def32f4d0dec3da8acde4542e05`.
+Image identities are intentionally distinguished:
 
-| Evidence | State |
+- Registry manifest digest from `image.log`:
+  `sha256:9229bd0ffce00faad4cc45971a8985114ad629a6d82318eab6c25b19749fb752`.
+- Local immutable image ID used for all four scans:
+  `sha256:5a02c743e704853b9f4cc2f408f6f014a422048e55167389175ac667784b354e`.
+
+| Phase | Exit | Seconds | Findings | Control rule findings |
+| --- | --- | --- | --- | --- |
+| Canonical cold | 0 | 370.614 | 12162 | Not a probe |
+| Canonical warm | 0 | 355.057 | 12162 | Not a probe |
+| Positive probe | 0 | 34.528 | 4 | 1 |
+| Corrected negative probe | 0 | 33.515 | 3 | 0 |
+
+Cold and warm inventories have identical fingerprint
+`dc802b1bbb9cbc823bb90f91cf3cd4ca7667155a369d5bce5257646d4d12abc5`.
+Each reported 958158509 logical cache bytes. Image pull took 29.894 seconds;
+collector wall time was 824.547 seconds. This single comparison is not a general cache
+performance claim or billing measurement. Standalone probes log unavailable Git metadata;
+analysis still completes and emits valid SARIF. Cleanup can report an already-removed
+container because normal runs also use Docker `--rm`.
+
+## Initial inventory and triage boundary
+
+The canonical inventory contains 120 rule IDs: 10132 notes, 2029 warnings and 1 error.
+Paths split into 8139 findings in tests, 3891 in production source, 116 in benchmarks and
+16 in tools. These are scanner diagnostics, **not 12162 confirmed defects**.
+
+| Sample / family | Observed evidence | Initial disposition |
+| --- | --- | --- |
+| Collection expressions, method bodies, simple-type `var` | 2709 + 2154 + 2017 findings | Style/profile-review candidates, not automatic correctness failures |
+| `NotAccessedField.Compiler` | Sole error: `ArchitecturePublicApiMemberScannerTests.cs:149`, `InternalField` in the API visibility fixture | Test-fixture usage; do not delete the fixture or classify this as a production critical bug |
+| `AccessToDisposedClosure` | All 358 occur in tests; sampled `BadgeCommandHandlerTests.cs:29` captures a using-scoped document in `Assert.Multiple` | Review assertion lifetime semantics; sample is noise-prone, not proof that every finding is false |
+| `PossibleMultipleEnumeration` | 22 total, including 17 in `src` | Review production enumeration paths and input types before filing defects |
+| `RedundantAssignment` | `SarifEvidenceArtifactReader.cs:99` | Small cleanup candidate; no demonstrated functional failure |
+
+This is a complete count inventory and a **sample triage**, not a finding-by-finding review.
+Unique value versus Sonar/compiler/other gates is not established. Keep original findings
+visible; do not introduce a giant baseline, blanket exclusions or unrelated C# changes.
+Confirmed correctness/security issues need focused owning tasks; debt/noise needs justified
+rule-specific review. No reviewed baseline or promotion decision has been established.
+
+## Implementation validation and remaining acceptance
+
+[Run 35073258396](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35073258396)
+validated `f8d6b4ebf04b5cf4b66239e3e4f6a176f9e47ef8` on GitHub-hosted Ubuntu:
+
+| Check | Result |
 | --- | --- |
-| Canonical solution loads and produces understandable SARIF | Pending real scanner run |
-| Positive inspection detected and corrected negative control clean | Pending real probe run |
-| Cold/warm fingerprint agreement for identical image and commit | Pending real burn-in run |
-| Independent rerun stability, crashes and timeouts | Pending representative runs |
-| Fork execution with no secrets or unnecessary permissions | Configuration tested; execution pending |
-| Cold/warm runtime, job duration, actual billable minutes, cache size | Pending measured runs |
-| Unique actionable findings versus Sonar/compiler/other gates | Pending initial inventory review |
-| Duplicate/noisy findings, remediation burden and justified baseline | Pending initial inventory review |
-| Reviewed PROMOTE versus KEEP ADVISORY decision | Pending burn-in and maintainer review |
+| `python3 -m unittest discover -s tests/qodana -v` | 36 passed |
+| `make test-tooling-coverage` | 546 passed; Qodana runner line coverage 98.4% |
+| actionlint 1.7.12 | Passed, 13 workflows; existing configuration |
+| zizmor 1.30.1 | Passed with existing repository ignore/suppression configuration unchanged |
+| Prettier 3.9.5 / locked mdformat | Passed for workflow/configuration and the runbook at that SHA |
+| OpenSpec 1.13.0 `validate --all` | 168 passed, 0 failed; existing unrelated warnings remain |
 
-This implementation does **not** record a premature Phase B decision. It stays advisory
-because EAP reliability, compatibility and signal quality have not yet been demonstrated.
-After representative evidence is reviewed, record either PROMOTE with exact unchanged
-existing required contexts plus the new context, or KEEP ADVISORY with concrete reliability,
-noise or cost reasons. A successful command invocation alone is insufficient.
+The tooling artifact includes `validated-sha.txt`, source files and `coverage-python.xml`.
+Offline tests validate orchestration and negative paths, not scanner execution. The added
+lifecycle regression first failed on the original runner because warm evidence was not
+checkpointed before a probe; the fix saves every completed phase. Production C# is unchanged.
 
-## Implementation validation boundary
+Still required for issue completion: actual fork execution, representative independent
+reruns/reliability, job/billing evidence, deeper unique-signal/noise/debt triage and a maintainer
+reviewed PROMOTE or KEEP ADVISORY decision. Neither successful scans nor this sample review
+close Phase B. Existing required checks and rulesets remain untouched. Full repository/PR
+acceptance is separate from the tooling run above.
 
-The offline Python runner and workflow contract suite is available as:
-
-```bash
-python3 -m unittest discover -s tests/qodana -v
-```
-
-During implementation, those tests passed, including negative cases for missing/malformed
-reports, scanner failures, timeout cleanup, image selection and positive/negative proof
-requirements. They use mocks and are not scanner-runtime evidence.
-
-The implementation environment lacks Docker, .NET, actionlint, zizmor, Prettier, mdformat
-and OpenSpec. Dependency downloads are unavailable there. Actual scanner validation,
-workflow lint/formatting and OpenSpec CLI validation/archive remain required before opening
-the feature PR under `docs/ai/feature-implementation-workflow.md`. The active OpenSpec change
-is intentionally not marked archived. Issue #864 remains open until its evidence and review
-criteria are met.
+The active OpenSpec change remains unarchived while these requirements are incomplete.
+Draft PR #906 is the explicitly requested handoff exception to the ordinary
+validation/archive-before-PR lifecycle; it is not permission to mark missing evidence done.
 
 ## Upstream references
 
