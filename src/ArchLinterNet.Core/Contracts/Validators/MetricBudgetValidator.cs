@@ -37,7 +37,7 @@ internal sealed class MetricBudgetValidator : IArchitecturePolicyDocumentValidat
     }
 
     private static void ValidateBudget(
-        ArchitectureMetricBudgetContract budget, IReadOnlySet<string> metricIds, ISet<string> budgetIds)
+        ArchitectureMetricBudgetContract budget, HashSet<string> metricIds, HashSet<string> budgetIds)
     {
         if (string.IsNullOrWhiteSpace(budget.Id))
         {

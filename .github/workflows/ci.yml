@@ -375,6 +375,12 @@ jobs:
           dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --nologo -v minimal
           dotnet build src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --nologo -v minimal
 
+      - name: Run canonical architecture policy gate
+        run: make lint-architecture
+
+      - name: Run reviewed public API drift check
+        run: make public-api-check
+
       - name: Collect changed first-party files
         if: github.event_name == 'pull_request'
         id: changed_files
