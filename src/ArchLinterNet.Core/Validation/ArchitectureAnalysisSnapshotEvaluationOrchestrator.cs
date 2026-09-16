@@ -80,12 +80,9 @@ internal static class ArchitectureAnalysisSnapshotEvaluationOrchestrator
     {
         IReadOnlyList<string> waiverModes = ArchitectureWaiverLifecycleEvaluator
             .GetModesWithSelectedManualWaivers(snapshot.Document, snapshot.RequestedContractIds);
-        foreach (string waiverMode in waiverModes)
+        foreach (string waiverMode in waiverModes.Where(mode => !snapshot.HasEvaluatedMode(mode)))
         {
-            if (!snapshot.HasEvaluatedMode(waiverMode))
-            {
-                EvaluateMode(snapshot, waiverMode, timing);
-            }
+            EvaluateMode(snapshot, waiverMode, timing);
         }
 
         ArchitectureWaiverLifecycleRecord[] repositoryWaivers = waiverModes

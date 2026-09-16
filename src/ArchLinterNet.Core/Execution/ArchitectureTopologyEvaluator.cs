@@ -37,8 +37,6 @@ internal static class ArchitectureTopologyEvaluator
             incompleteDependencySourceIdentities);
         List<SubjectClassification> classifications = projection.Classifications.ToList();
 
-        Dictionary<string, SubjectClassification> classificationsByIdentity = classifications
-            .ToDictionary(classification => classification.Subject.Identity, StringComparer.Ordinal);
         Dictionary<string, string> nodeBySubject = classifications
             .Where(classification => classification.Disposition == Disposition.Mapped)
             .ToDictionary(classification => classification.Subject.Identity, classification => classification.NodeIds[0], StringComparer.Ordinal);
@@ -108,7 +106,7 @@ internal static class ArchitectureTopologyEvaluator
         var expected = new ArchitectureApplicabilityExpectedEntry(ControlIdentity, Family, membership, provenance);
 
         List<ArchitectureViolation> violations = BuildViolations(
-            topology, classifications, relationships, allowedEdges, staleNodes, staleEdges);
+            classifications, relationships, allowedEdges, staleNodes, staleEdges);
         return new Result(violations, new[] { expected }, new[] { record })
         {
             FactProjection = projection,
@@ -301,7 +299,6 @@ internal static class ArchitectureTopologyEvaluator
     }
 
     private static List<ArchitectureViolation> BuildViolations(
-        ArchitectureTopology topology,
         IReadOnlyList<SubjectClassification> classifications,
         IReadOnlyList<Relationship> relationships,
         IReadOnlySet<(string Source, string Target)> allowedEdges,
@@ -352,7 +349,8 @@ internal static class ArchitectureTopologyEvaluator
             Disposition.ReviewedOutOfScope => "reviewed_out_of_scope",
             Disposition.Unmapped => "unmapped",
             Disposition.Ambiguous => "ambiguous",
-            _ => throw new ArgumentOutOfRangeException(),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(classification), classification.Disposition, "Unknown topology disposition."),
         },
         classification.NodeIds,
         classification.ReviewedOutOfScopeId);

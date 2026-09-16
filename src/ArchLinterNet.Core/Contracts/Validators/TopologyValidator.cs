@@ -8,15 +8,19 @@ namespace ArchLinterNet.Core.Contracts.Validators;
 // deterministic, and reviewable policy model for that evaluator to consume.
 internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
 {
+    private const string NamespaceKind = "namespace";
+    private const string ProjectKind = "project";
+    private const string AssemblyKind = "assembly";
+    private const string LayerKind = "layer";
     private static readonly HashSet<string> _modes = ["partial", "exhaustive"];
-    private static readonly HashSet<string> _subjectKinds = ["type", "namespace", "project", "assembly"];
+    private static readonly HashSet<string> _subjectKinds = ["type", NamespaceKind, ProjectKind, AssemblyKind];
     private static readonly IReadOnlyDictionary<string, HashSet<string>> _selectorKindsBySubjectKind =
         new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
         {
-            ["type"] = ["layer", "namespace", "project", "assembly", "context"],
-            ["namespace"] = ["namespace", "project", "assembly"],
-            ["project"] = ["project"],
-            ["assembly"] = ["assembly"],
+            ["type"] = [LayerKind, NamespaceKind, ProjectKind, AssemblyKind, "context"],
+            [NamespaceKind] = [NamespaceKind, ProjectKind, AssemblyKind],
+            [ProjectKind] = [ProjectKind],
+            [AssemblyKind] = [AssemblyKind],
         };
 
     public void Validate(ArchitectureContractDocument document)
@@ -259,23 +263,39 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
                 $"{label} must declare exactly one of layer, namespace, project, assembly, or context.");
         }
 
-        return layer ? "layer"
-            : @namespace ? "namespace"
-            : project ? "project"
-            : assembly ? "assembly"
-            : "context";
+        if (layer)
+        {
+            return LayerKind;
+        }
+
+        if (@namespace)
+        {
+            return NamespaceKind;
+        }
+
+        if (project)
+        {
+            return ProjectKind;
+        }
+
+        if (assembly)
+        {
+            return AssemblyKind;
+        }
+
+        return "context";
     }
 
     private static void ValidateSelectorTarget(
         ArchitectureContractDocument document, ArchitectureTopologySubjectSelector selector, string selectorKind, string label)
     {
-        bool @namespace = selectorKind == "namespace";
+        bool @namespace = selectorKind == NamespaceKind;
         if (!@namespace && !string.IsNullOrWhiteSpace(selector.NamespaceSuffix))
         {
             throw new InvalidOperationException($"{label} namespace_suffix requires namespace.");
         }
 
-        if (selectorKind == "layer" && !document.Layers.ContainsKey(selector.Layer))
+        if (selectorKind == LayerKind && !document.Layers.ContainsKey(selector.Layer))
         {
             throw new InvalidOperationException($"{label} references undeclared layer '{selector.Layer}'.");
         }
@@ -344,10 +364,10 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
     {
         public static TopologySelectorIdentity Create(ArchitectureTopologySubjectSelector selector, string kind) => kind switch
         {
-            "layer" => new(kind, selector.Layer, string.Empty, null),
-            "namespace" => new(kind, selector.Namespace, selector.NamespaceSuffix, null),
-            "project" => new(kind, selector.Project, string.Empty, null),
-            "assembly" => new(kind, selector.Assembly, string.Empty, null),
+            LayerKind => new(kind, selector.Layer, string.Empty, null),
+            NamespaceKind => new(kind, selector.Namespace, selector.NamespaceSuffix, null),
+            ProjectKind => new(kind, selector.Project, string.Empty, null),
+            AssemblyKind => new(kind, selector.Assembly, string.Empty, null),
             _ => new(kind, string.Empty, string.Empty, TopologyContextIdentity.Create(selector.Context!)),
         };
     }

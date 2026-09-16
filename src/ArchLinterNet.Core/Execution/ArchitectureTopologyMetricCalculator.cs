@@ -205,12 +205,10 @@ internal static class ArchitectureTopologyMetricCalculator
             return;
         }
 
-        foreach (string targetNode in other.NodeIds)
+        foreach (string targetNode in other.NodeIds.Where(targetNode =>
+                     !string.Equals(targetNode, context.Node, StringComparison.Ordinal)))
         {
-            if (!string.Equals(targetNode, context.Node, StringComparison.Ordinal))
-            {
-                contributors.Add(targetNode);
-            }
+            contributors.Add(targetNode);
         }
     }
 

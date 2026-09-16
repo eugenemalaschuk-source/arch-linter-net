@@ -117,19 +117,6 @@ public sealed class SarifExternalDiagnosticSelector
         return input;
     }
 
-    private static bool MatchesPathPrefix(string? path, string prefix)
-    {
-        if (path is null || !ExternalDiagnosticFilterRules.IsSafePathPrefix(prefix))
-        {
-            return false;
-        }
-
-        return prefix.EndsWith("/", StringComparison.Ordinal)
-            ? path.StartsWith(prefix, StringComparison.Ordinal)
-            : string.Equals(path, prefix, StringComparison.Ordinal)
-                || path.StartsWith(prefix + "/", StringComparison.Ordinal);
-    }
-
     private static SarifExternalDiagnosticFingerprint SelectFingerprint(
         SarifEvidenceReadResult evidence,
         SarifEvidenceSourceDiagnostic source)
@@ -345,6 +332,19 @@ public sealed class SarifExternalDiagnosticSelector
             mode = default;
             return _severity.TryGetValue(SeverityToken(sourceSeverity), out string? configuredMode)
                 && TryParseGovernanceMode(configuredMode, out mode);
+        }
+
+        private static bool MatchesPathPrefix(string? path, string prefix)
+        {
+            if (path is null || !ExternalDiagnosticFilterRules.IsSafePathPrefix(prefix))
+            {
+                return false;
+            }
+
+            return prefix.EndsWith('/')
+                ? path.StartsWith(prefix, StringComparison.Ordinal)
+                : string.Equals(path, prefix, StringComparison.Ordinal)
+                    || path.StartsWith(prefix + "/", StringComparison.Ordinal);
         }
 
         private static void ValidateBounds(SarifExternalDiagnosticFilterAuthorization filter)

@@ -28,7 +28,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
             useMetadataFirstEnsureBuilt: false);
 
         return CollectCandidatesCore(
-            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, buildState, request.CancellationToken);
     }
 
     internal BaselineCandidateCollection CollectGenerateCandidates(BaselineGenerationRequest request)
@@ -40,7 +40,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
             useMetadataFirstEnsureBuilt: false);
 
         return CollectCandidatesCore(
-            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, buildState, request.CancellationToken);
     }
 
     internal BaselineCandidateCollection CollectUpdateCandidates(BaselineUpdateRequest request)
@@ -52,7 +52,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
             useMetadataFirstEnsureBuilt: false);
 
         return CollectCandidatesCore(
-            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, buildState, request.CancellationToken);
     }
 
     internal BaselineCandidateCollection CollectPruneCandidates(BaselinePruneRequest request)
@@ -64,7 +64,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
             useMetadataFirstEnsureBuilt: false);
 
         return CollectCandidatesCore(
-            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, buildState, request.CancellationToken);
     }
 
     internal BaselineCandidateCollection CollectVerifyCandidates(BaselineVerifyRequest request)
@@ -76,7 +76,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
             useMetadataFirstEnsureBuilt: true);
 
         return CollectCandidatesCore(
-            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, buildState, request.CancellationToken);
     }
 
     internal BaselineCandidateCollection CollectCandidates(
@@ -87,7 +87,7 @@ internal sealed class ArchitectureBaselineCandidateCollector(
         CancellationToken cancellationToken = default)
     {
         return CollectCandidatesCore(
-            policyPath, mode, conditionSetName, contractIds, cancellationToken, buildState: null);
+            policyPath, mode, conditionSetName, contractIds, buildState: null, cancellationToken);
     }
 
     private BuildStatePreflightResult RunBuildStatePreflight(
@@ -145,8 +145,8 @@ internal sealed class ArchitectureBaselineCandidateCollector(
         string mode,
         string? conditionSetName,
         IReadOnlyCollection<string>? contractIds,
-        CancellationToken cancellationToken,
-        BaselineBuildStateOptions? buildState)
+        BaselineBuildStateOptions? buildState,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ValidateMode(mode);
