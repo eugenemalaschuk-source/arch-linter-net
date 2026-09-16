@@ -68,7 +68,8 @@ class InventoryTests(unittest.TestCase):
 
     def test_failed_invocation_and_error_notification_are_not_clean(self):
         for invocation in ({"executionSuccessful": False},
-                           {"toolExecutionNotifications": [{"level": "error"}]}):
+                           {"toolExecutionNotifications": [{"level": "error"}]},
+                           {"toolConfigurationNotifications": [{"level": "error"}]}):
             data = sarif()
             data["runs"][0]["invocations"] = [invocation]
             with self.assertRaises(ValueError):
@@ -193,12 +194,23 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual("failed", result["status"])
         self.assertEqual("rm", commands[-1][1])
 
-    def test_scanner_error_in_sarif_is_not_published_as_valid(self):
+    def test_scanner_error_in_sarif_is_failed_but_report_is_still_published(self):
         data = sarif()
         data["runs"][0]["invocations"][0]["executionSuccessful"] = False
         result, _, saved = self.exercise_scan(document=data)
         self.assertEqual("failed", result["status"])
-        self.assertFalse(saved)
+        self.assertNotIn("findings", result)
+        # The diagnostic report is preserved evidence even though the analysis is unsuccessful.
+        self.assertTrue(saved)
+
+    def test_configuration_error_with_clean_results_is_not_a_successful_scan(self):
+        data = sarif()
+        data["runs"][0]["invocations"][0]["toolConfigurationNotifications"] = [
+            {"level": "error", "message": {"text": "A requested project could not be configured"}}]
+        result, _, saved = self.exercise_scan(document=data)
+        self.assertEqual("failed", result["status"])
+        self.assertNotIn("findings", result)
+        self.assertTrue(saved)
 
     def test_cache_measurement_does_not_follow_symlinks(self):
         with tempfile.TemporaryDirectory() as tmp:

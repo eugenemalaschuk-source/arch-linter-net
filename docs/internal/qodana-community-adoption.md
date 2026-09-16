@@ -73,6 +73,10 @@ The temporary branch-only push trigger used to obtain implementation evidence is
   cache size and an order-independent fingerprint of rule/message/location inventories.
 - `cold.sarif.json`, optional warm/probe SARIF files and scanner logs provide diagnostics.
   A nonzero scanner exit with otherwise usable SARIF remains a failed, partial analysis.
+  A bounded, non-symlink report is copied to artifacts before validation, so an unsuccessful
+  invocation, a `toolExecutionNotifications`/`toolConfigurationNotifications` infrastructure
+  error, or a scanner nonzero exit still leaves the raw SARIF available for diagnosis; only
+  the structured findings/fingerprint fields are withheld when the report is deemed unusable.
 
 Completed phases are checkpointed before the next scan; an interrupted later probe does
 not erase completed cold/warm evidence. Missing/malformed SARIF or an unsuccessful invocation

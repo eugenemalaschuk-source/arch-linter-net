@@ -41,9 +41,9 @@ def inventory(document: dict) -> dict:
         for invocation in run.get("invocations", []):
             if invocation.get("executionSuccessful") is False:
                 raise ValueError("SARIF records unsuccessful analysis")
-            notifications = invocation.get("toolExecutionNotifications", [])
-            if any(n.get("level") == "error" for n in notifications):
-                raise ValueError("SARIF records an analysis infrastructure error")
+            for key in ("toolExecutionNotifications", "toolConfigurationNotifications"):
+                if any(n.get("level") == "error" for n in invocation.get(key, [])):
+                    raise ValueError("SARIF records an analysis infrastructure error")
         results = run.get("results")
         if not isinstance(results, list):
             raise ValueError("SARIF run has no results inventory")
@@ -82,8 +82,12 @@ def inventory(document: dict) -> dict:
             "fingerprint": fingerprint}
 
 
+def safe_regular_file(path: Path) -> bool:
+    return not path.is_symlink() and path.is_file() and path.stat().st_size <= MAX_SARIF_BYTES
+
+
 def read_inventory(path: Path) -> dict:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_SARIF_BYTES:
+    if not safe_regular_file(path):
         raise ValueError("Missing, symlinked or oversized qodana.sarif.json")
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
@@ -135,10 +139,12 @@ def scan(project: Path, work: Path, artifacts: Path, image_id: str,
                 "seconds": round(time.monotonic() - started, 3),
                 "cache_bytes": cache_bytes(cache), "status": "failed"}
     sarif = results / "qodana.sarif.json"
+    if safe_regular_file(sarif):
+        # Preserve the report before validating it: a bounded, non-symlink regular file is
+        # safe to publish even when it later turns out to describe a failed/partial analysis.
+        (artifacts / f"{label}.sarif.json").write_bytes(sarif.read_bytes())
     try:
         evidence.update(read_inventory(sarif))
-        # Copy only the validated regular SARIF file; never upload scanner-created symlinks.
-        (artifacts / f"{label}.sarif.json").write_bytes(sarif.read_bytes())
         if exit_code == 0:
             evidence["status"] = "completed"
         else:
