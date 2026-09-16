@@ -83,3 +83,16 @@ SonarCloud run.
 - `make fmt`, `make lint`, `make lint-architecture`, and `make public-api-check` are required before PR creation.
 - Directly affected Core and CLI suites are required before PR creation; full cross-platform acceptance is delegated to PR CI.
 - The PR SonarCloud analysis must bind the after result to the final branch SHA and record its analysis identity here before issue closure.
+
+### Local capture on 2026-09-16
+
+- `dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter "ArchitectureChangeSnapshotProjectorTests|ArchitectureApplicabilityEvaluatorTests|ArchitectureExternalEvidenceApplicabilityProjectorTests|ArchitecturePrReportProjectorTests|ArchitecturePrReportReaderTests|ArchitectureTopologyEvaluatorTests|ArchitectureMetricApplicabilityTests|ArchitectureMetricCalculatorSeamTests|ArchitecturePolicyContextApplicationServiceTests|ArchitectureBaselineLoaderTests"`: **145 passed**.
+- `dotnet test tests/ArchLinterNet.Cli.Tests --no-restore --filter "BadgeSetupCapabilityInspectorTests|PrReportMarkdownRendererTests|ValidateCommandHandlerAssessmentCompletionTests"`: **35 passed**.
+- Full `dotnet test tests/ArchLinterNet.Core.Tests --no-restore`: **3,891 passed, 22 skipped, 8 failed**. The eight failures are `SelfPolicyNegativeRegressionTests` that receive the Windows `build_state_preflight` diagnostic before their intended negative fixture diagnostic; no touched API-risk behavior test failed. This remains an environment/build-state exception for CI to recheck.
+- `make fmt`: completed; formatter-only changes to unrelated Markdown were reverted.
+- `make lint-code-size`: passed with the repository's existing decomposition warnings.
+- `make lint-dotnet-format`: passed.
+- `make policy-check`: passed; policy-only mode intentionally deferred project/assembly facts.
+- `make lint`: blocked before completion by the unchanged dogfood reference evidence digest (`expected adfda105…`, artifact `635b723b…`).
+- `make lint-architecture`: blocked in `--ensure-built` by a Windows file lock while the running CLI process held `src/ArchLinterNet.Cli/bin/Debug/net10.0/ArchLinterNet.Core.dll` and `ArchLinterNet.CEL.dll`.
+- `make public-api-check`: blocked by the same build-state preflight; no `architecture/api/*.public-api.txt` file changed.
