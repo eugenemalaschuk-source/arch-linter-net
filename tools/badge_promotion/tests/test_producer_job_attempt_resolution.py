@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
+import sys
 from types import SimpleNamespace
 from typing import cast
 
 import pytest
 
-from badge_promotion import cli
-from badge_promotion.cli import ProviderFailure
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from badge_promotion import cli  # noqa: E402
+from badge_promotion.cli import ProviderFailure  # noqa: E402
 
 
 class FakeApi:
