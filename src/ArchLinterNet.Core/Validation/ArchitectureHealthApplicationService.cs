@@ -65,7 +65,7 @@ public sealed class ArchitectureHealthApplicationService(
     };
 
     private static ArchitectureHealthValidationOutcome[] AttachExternalEvidence(
-        IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes,
+        ArchitectureHealthValidationOutcome[] outcomes,
         IReadOnlyList<SarifEvidenceArtifactReference> artifacts,
         SarifEvidenceAssessmentContext? assessmentContext,
         CancellationToken cancellationToken)

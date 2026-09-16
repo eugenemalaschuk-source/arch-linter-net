@@ -118,7 +118,7 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
             new Dictionary<string, ArchitectureExternalEvidenceRequirement>(StringComparer.Ordinal));
     }
 
-    private static IReadOnlyList<ArchitectureApplicabilityRecord> ProjectRecords(
+    private static ArchitectureApplicabilityRecord[] ProjectRecords(
         IEnumerable<SarifEvidenceReadResult> readResults,
         SarifExternalDiagnosticSelectionResult? selection,
         IReadOnlyDictionary<string, ArchitectureExternalEvidenceRequirement> requirementsById)

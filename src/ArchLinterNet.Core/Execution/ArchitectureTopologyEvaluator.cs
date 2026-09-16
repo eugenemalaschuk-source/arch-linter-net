@@ -242,7 +242,7 @@ internal static class ArchitectureTopologyEvaluator
 
     private static List<Relationship> BuildRelationships(
         IReadOnlyList<ArchitectureTopologyObservedDependency> dependencies,
-        IReadOnlyDictionary<string, string> nodeBySubject)
+        Dictionary<string, string> nodeBySubject)
     {
         return dependencies
             .Where(dependency => nodeBySubject.ContainsKey(dependency.SourceIdentity)
@@ -266,9 +266,9 @@ internal static class ArchitectureTopologyEvaluator
 
     private static List<ArchitectureApplicabilityReason> BuildReasons(
         ArchitectureTopology topology,
-        IReadOnlyList<SubjectClassification> classifications,
-        IReadOnlyList<string> staleNodes,
-        IReadOnlyList<ArchitectureTopologyStaleEdgeEvidence> staleEdges,
+        List<SubjectClassification> classifications,
+        List<string> staleNodes,
+        List<ArchitectureTopologyStaleEdgeEvidence> staleEdges,
         ArchitectureApplicabilityProvenance provenance)
     {
         var reasonCodes = new HashSet<string>(StringComparer.Ordinal);
@@ -301,7 +301,7 @@ internal static class ArchitectureTopologyEvaluator
     private static List<ArchitectureViolation> BuildViolations(
         IReadOnlyList<SubjectClassification> classifications,
         IReadOnlyList<Relationship> relationships,
-        IReadOnlySet<(string Source, string Target)> allowedEdges,
+        HashSet<(string Source, string Target)> allowedEdges,
         IReadOnlyList<string> staleNodes,
         IReadOnlyList<ArchitectureTopologyStaleEdgeEvidence> staleEdges)
     {

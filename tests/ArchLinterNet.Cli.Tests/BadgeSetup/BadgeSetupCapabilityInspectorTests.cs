@@ -200,6 +200,28 @@ public sealed class BadgeSetupCapabilityInspectorTests
         });
     }
 
+    [TestCase("{}")]
+    [TestCase("{\"rules\":{}}")]
+    public void LiveInspectionTreatsNonArrayRulesPayloadAsNoRequiredCheckWithoutThrowing(string rulesPayload)
+    {
+        BadgeSetupConfiguration configuration = Configuration("relay", "private");
+        using EnvironmentScope scope = LiveEnvironment();
+        HttpClientFactory malformedRules = new(configuration, useRulesetFallback: false, rulesPayload: rulesPayload);
+
+        BadgeSetupCapabilityInspectionResult result = BadgeSetupCapabilityInspector.Inspect(
+            configuration,
+            Options(),
+            new MemoryFileSystem(),
+            malformedRules.Create);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Diagnostics, Is.Empty);
+            Assert.That(result.Repository.Capabilities.HasRulesApi, Is.True);
+            Assert.That(result.Repository.Capabilities.HasRequiredCheck, Is.False);
+        });
+    }
+
     private static BadgeSetupCommandOptions Options(string? capabilityEvidencePath = null) => new(
         InputPath: null,
         OutputDirectory: null,
@@ -329,7 +351,8 @@ public sealed class BadgeSetupCapabilityInspectorTests
         bool invalidOidc = false,
         bool missingBranch = false,
         bool oidcEnvelope = false,
-        bool invalidOidcSignature = false)
+        bool invalidOidcSignature = false,
+        string? rulesPayload = null)
     {
         private const string OidcKeyId = "arch-linter-net-test-key";
         private static readonly RSA _oidcSigningKey = RSA.Create(2048);
@@ -360,7 +383,7 @@ public sealed class BadgeSetupCapabilityInspectorTests
 
             if (path == "/repos/owner/repo/rules/branches/main")
             {
-                return useRulesetFallback ? NotFound() : Json(RequiredCheckRules());
+                return useRulesetFallback ? NotFound() : Json(rulesPayload ?? RequiredCheckRules());
             }
 
             if (path == "/repos/owner/repo/rulesets")

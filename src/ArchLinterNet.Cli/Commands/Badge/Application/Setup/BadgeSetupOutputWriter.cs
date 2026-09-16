@@ -227,7 +227,7 @@ internal static class BadgeSetupOutputWriter
             BadgeSetupContract.DefaultArtifactName,
             BadgeSetupContract.DefaultEvidenceArtifactName,
             BadgeSetupContract.DefaultPayloadPath);
-    private static BadgeSetupPins ResolvePins(BadgeSetupPins? configured, IReadOnlyList<GeneratedFile> relayFiles)
+    private static BadgeSetupPins ResolvePins(BadgeSetupPins? configured, List<GeneratedFile> relayFiles)
     {
         if (!AreTrustedPublisherPins(configured))
         {

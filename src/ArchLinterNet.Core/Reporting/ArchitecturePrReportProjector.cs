@@ -57,7 +57,7 @@ public static class ArchitecturePrReportProjector
         ArchitecturePrReportNavigationContext? navigationContext) =>
         Project(ArchitecturePrReportReader.Read(healthJson, changeJson), navigationContext);
 
-    private static IReadOnlyList<ArchitecturePrReportDimensionExplanation> BuildDimensionExplanations(
+    private static ArchitecturePrReportDimensionExplanation[] BuildDimensionExplanations(
         IReadOnlyList<ArchitectureHealthDimension> dimensions) =>
         dimensions
             .Where(dimension => dimension.State is not ArchitectureHealthDimensionState.Pass
@@ -137,7 +137,7 @@ public static class ArchitecturePrReportProjector
             && (value == "available" || value == absentValue)
             && hasPayload == string.Equals(value, "available", StringComparison.Ordinal);
 
-    private static IReadOnlyList<ArchitecturePrReportNavigationReference> BuildNavigation(
+    private static ArchitecturePrReportNavigationReference[] BuildNavigation(
         ArchitecturePrReportInput input)
     {
         var references = new List<ArchitecturePrReportNavigationReference>
@@ -177,7 +177,7 @@ public static class ArchitecturePrReportProjector
     }
 
     private static void AddReceiptNavigation(
-        ICollection<ArchitecturePrReportNavigationReference> references,
+        List<ArchitecturePrReportNavigationReference> references,
         ArchitecturePrReportValidationReceipt receipt)
     {
         AddProvenance(references, receipt.Provenance);
@@ -216,7 +216,7 @@ public static class ArchitecturePrReportProjector
     }
 
     private static void AddApplicabilityNavigation(
-        ICollection<ArchitecturePrReportNavigationReference> references,
+        List<ArchitecturePrReportNavigationReference> references,
         ArchitecturePrReportApplicability applicability)
     {
         foreach (ArchitecturePrReportApplicabilityControl control in applicability.Controls)
@@ -233,7 +233,7 @@ public static class ArchitecturePrReportProjector
     }
 
     private static void AddExternalEvidenceNavigation(
-        ICollection<ArchitecturePrReportNavigationReference> references,
+        List<ArchitecturePrReportNavigationReference> references,
         ArchitecturePrReportExternalEvidence externalEvidence)
     {
         foreach (ArchitecturePrReportExternalRequirement requirement in externalEvidence.Requirements)
