@@ -1,0 +1,59 @@
+name: Qodana Community
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      burn_in:
+        description: Run cold/warm comparison and positive/negative inspection probes
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qodana-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qodana:
+    name: Qodana Community .NET (advisory)
+    runs-on: ubuntu-24.04
+    # A normal PR does one bounded scan. Opt-in burn-in adds a warm run and tiny probes.
+    timeout-minutes: 55
+    permissions:
+      contents: read
+    # Intentionally NOT required. Keep infrastructure failures visible rather than
+    # converting them to success with continue-on-error. No other job depends on this one.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Test Qodana evidence and workflow contracts
+        run: python3 -m unittest discover -s tests/qodana -v
+
+      - name: Analyze canonical solution without secrets
+        env:
+          BURN_IN: ${{ inputs.burn_in || false }}
+        shell: bash
+        run: |
+          export QODANA_ANALYZED_SHA
+          QODANA_ANALYZED_SHA="$(git rev-parse HEAD)"
+          args=()
+          if [[ "$BURN_IN" == "true" ]]; then
+            args+=(--burn-in)
+          fi
+          python3 tools/scripts/qodana_ci.py \
+            --output "$RUNNER_TEMP/qodana" "${args[@]}"
+
+      - name: Upload Qodana evidence (including failures)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: qodana-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qodana/artifacts
+          if-no-files-found: error
+          retention-days: 14

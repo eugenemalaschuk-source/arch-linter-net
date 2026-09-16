@@ -1,0 +1,10 @@
+# Community .NET only: no cloud token or paid license is required.
+# Keep the version explicit; every run records the resolved immutable image ID.
+version: "1.0"
+linter: jetbrains/qodana-cdnet:2026.2
+profile:
+  name: qodana.recommended
+dotnet:
+  solution: ArchLinterNet.slnx
+  configuration: Release
+# No baseline, failThreshold, broad exclusions or automatic fixes during burn-in.
