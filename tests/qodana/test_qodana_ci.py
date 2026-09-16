@@ -32,6 +32,15 @@ def finding(rule=ci.PROBE_RULE):
                                                 "region": {"startLine": 10}}}]}
 
 
+def create_symlink_or_skip(case: unittest.TestCase, link: Path, target: Path) -> None:
+    """Some Windows accounts can't create symlinks without Developer Mode/admin rights;
+    these are the only cases in this offline suite that need one at all."""
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        case.skipTest("creating symlinks is not available on this platform")
+
+
 class InventoryTests(unittest.TestCase):
     def test_valid_empty_inventory_is_distinct_from_missing_report(self):
         self.assertEqual(0, ci.inventory(sarif())["findings"])
@@ -97,7 +106,7 @@ class InventoryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ci.inventory(sarif([item]))
 
-    def test_read_rejects_missing_malformed_symlink_and_oversize(self):
+    def test_read_rejects_missing_malformed_and_oversize(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "report.json"
             with self.assertRaises(ValueError):
@@ -106,15 +115,17 @@ class InventoryTests(unittest.TestCase):
                 path.write_text(contents)
                 with self.assertRaises(ValueError):
                     ci.read_inventory(path)
-            target = Path(tmp) / "target.json"
-            target.write_text(json.dumps(sarif()))
-            path.unlink()
-            path.symlink_to(target)
-            with self.assertRaises(ValueError):
-                ci.read_inventory(path)
-            path.unlink()
             with path.open("wb") as output:
                 output.truncate(ci.MAX_SARIF_BYTES + 1)
+            with self.assertRaises(ValueError):
+                ci.read_inventory(path)
+
+    def test_read_rejects_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target.json"
+            target.write_text(json.dumps(sarif()))
+            path = Path(tmp) / "report.json"
+            create_symlink_or_skip(self, path, target)
             with self.assertRaises(ValueError):
                 ci.read_inventory(path)
 
@@ -272,17 +283,26 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("no access", result["cache_error"])
         self.assertTrue(saved)
 
-    def test_copy_bounded_tree_skips_symlinks_and_enforces_budgets(self):
+    def test_copy_bounded_tree_enforces_per_file_budget(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source, destination = root / "source", root / "destination"
             (source / "nested").mkdir(parents=True)
             (source / "small.log").write_bytes(b"ok")
             (source / "nested/big.log").write_bytes(b"x" * 20)
-            (source / "linked.log").symlink_to(source / "small.log")
             ci.copy_bounded_tree(source, destination, max_file_bytes=10, max_total_bytes=100)
             self.assertEqual("ok", (destination / "small.log").read_text())
             self.assertFalse((destination / "nested/big.log").exists())
+
+    def test_copy_bounded_tree_skips_symlinks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, destination = root / "source", root / "destination"
+            source.mkdir()
+            (source / "small.log").write_bytes(b"ok")
+            create_symlink_or_skip(self, source / "linked.log", source / "small.log")
+            ci.copy_bounded_tree(source, destination, max_file_bytes=10, max_total_bytes=100)
+            self.assertEqual("ok", (destination / "small.log").read_text())
             self.assertFalse((destination / "linked.log").exists())
 
     def test_copy_bounded_tree_enforces_total_budget_across_files(self):
@@ -323,11 +343,58 @@ class RunnerTests(unittest.TestCase):
             self.assertIn("bad.log", errors[0])
             self.assertEqual("ok", (destination / "good.log").read_text())
 
+    def test_copy_bounded_tree_continues_past_a_metadata_check_failure(self):
+        original_is_symlink = Path.is_symlink
+
+        def flaky_is_symlink(path):
+            if path.name == "bad.log":
+                raise PermissionError("Permission denied")
+            return original_is_symlink(path)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, destination = root / "source", root / "destination"
+            source.mkdir()
+            (source / "bad.log").write_bytes(b"unreadable metadata")
+            (source / "good.log").write_bytes(b"ok")
+            with patch.object(Path, "is_symlink", flaky_is_symlink):
+                errors = ci.copy_bounded_tree(source, destination, max_file_bytes=100,
+                                              max_total_bytes=100)
+            self.assertIn("bad.log", errors[0])
+            self.assertEqual("ok", (destination / "good.log").read_text())
+
+    def test_copy_bounded_tree_records_error_when_the_whole_directory_is_unlistable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, destination = root / "source", root / "destination"
+            source.mkdir()
+            with patch.object(Path, "rglob", side_effect=PermissionError("no access")):
+                errors = ci.copy_bounded_tree(source, destination, max_file_bytes=100,
+                                              max_total_bytes=100)
+            self.assertIn("no access", errors[0])
+            self.assertFalse(destination.exists())
+
+    def test_scan_preserves_result_when_sarif_metadata_check_fails(self):
+        original_is_symlink = Path.is_symlink
+
+        def flaky_is_symlink(path):
+            if path.name == "qodana.sarif.json":
+                raise PermissionError("Permission denied")
+            return original_is_symlink(path)
+
+        with patch.object(Path, "is_symlink", flaky_is_symlink):
+            result, _, saved, _ = self.exercise_scan(document=sarif([finding()]))
+        self.assertEqual("failed", result["status"])
+        self.assertEqual(0, result["exit_code"])
+        self.assertIn("seconds", result)
+        self.assertFalse(saved)
+        self.assertIn("Permission denied", result["sarif_copy_error"])
+
     def test_cache_measurement_does_not_follow_symlinks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "file").write_bytes(b"1234")
-            (root / "link").symlink_to(root / "file")
+            create_symlink_or_skip(self, root / "link", root / "file")
             self.assertEqual(4, ci.cache_bytes(root))
 
     def test_probe_is_standalone_and_has_positive_and_corrected_forms(self):

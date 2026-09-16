@@ -123,13 +123,18 @@ def copy_bounded_tree(source: Path, destination: Path, max_file_bytes: int,
     files, up to a total byte budget. Missing source is a no-op, not a failure. A single
     unreadable file is recorded and skipped rather than losing the rest of the copy."""
     errors: list[str] = []
-    if source.is_symlink() or not source.is_dir():
+    try:
+        if source.is_symlink() or not source.is_dir():
+            return errors
+        entries = sorted(source.rglob("*"))
+    except OSError as error:
+        errors.append(f"{source}: {error}")
         return errors
     remaining = max_total_bytes
-    for path in sorted(source.rglob("*")):
-        if path.is_symlink() or not path.is_file():
-            continue
+    for path in entries:
         try:
+            if path.is_symlink() or not path.is_file():
+                continue
             size = path.stat().st_size
             if size > max_file_bytes or size > remaining:
                 continue
@@ -168,7 +173,12 @@ def scan(project: Path, work: Path, artifacts: Path, image_id: str,
     evidence = {"label": label, "exit_code": exit_code,
                 "seconds": round(time.monotonic() - started, 3), "status": "failed"}
     sarif = results / "qodana.sarif.json"
-    if safe_regular_file(sarif):
+    try:
+        sarif_is_safe = safe_regular_file(sarif)
+    except OSError as error:
+        sarif_is_safe = False
+        evidence["sarif_copy_error"] = str(error)
+    if sarif_is_safe:
         # A bounded, non-symlink regular file is safe to publish even when it later turns
         # out to describe a failed/partial analysis.
         try:
