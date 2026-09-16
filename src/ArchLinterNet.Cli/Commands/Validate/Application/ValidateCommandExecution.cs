@@ -70,51 +70,9 @@ internal sealed class ValidateCommandExecution
                 .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }))
             .Concat(nativeOutcome.DiscoveredProjectPaths));
 
-        if (ValidateCommandPreflight.FindImportFileCollision(options, nativeOutcome.PolicyImportPaths) is { } importCollision)
+        if (FindPostAnalysisInputCollision(options, nativeOutcome) is { } inputCollision)
         {
-            return WriteCollision(importCollision);
-        }
-
-        if (ValidateCommandPreflight.FindProfileFileCollision(
-                options, nativeOutcome.PolicyImportPaths, "imported policy file") is { } profileImportCollision)
-        {
-            return WriteCollision(profileImportCollision);
-        }
-
-        if (ValidateCommandPreflight.FindReceiptFileCollision(options, nativeOutcome.ResolvedAssemblyPaths) is { } receiptCollision)
-        {
-            return WriteCollision(receiptCollision);
-        }
-
-        if (ValidateCommandPreflight.FindProfileFileCollision(
-                options,
-                nativeOutcome.ResolvedAssemblyPaths.SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }),
-                "a build artifact or receipt loaded during this run") is { } profileReceiptCollision)
-        {
-            return WriteCollision(profileReceiptCollision);
-        }
-
-        if (ValidateCommandPreflight.FindDiscoveredProjectFileCollision(options, nativeOutcome.DiscoveredProjectPaths) is { } projectCollision)
-        {
-            return WriteCollision(projectCollision);
-        }
-
-        if (ValidateCommandPreflight.FindProfileFileCollision(
-                options, nativeOutcome.DiscoveredProjectPaths, "a project file loaded during this run") is { } profileProjectCollision)
-        {
-            return WriteCollision(profileProjectCollision);
-        }
-
-        if (FindExternalEvidenceReportCollision(options, nativeOutcome.RepositoryRoot) is { } evidenceReportCollision)
-        {
-            return WriteCollision(evidenceReportCollision);
-        }
-
-        if (ValidateCommandPreflight.FindProfileFileCollision(
-                options, ResolveExternalEvidencePaths(options, nativeOutcome.RepositoryRoot),
-                "an --external-evidence artifact path") is { } evidenceProfileCollision)
-        {
-            return WriteCollision(evidenceProfileCollision);
+            return WriteCollision(inputCollision);
         }
 
         ValidationOutcome outcome = ValidationExecutionSemantics.AttachExternalEvidence(
@@ -201,51 +159,9 @@ internal sealed class ValidateCommandExecution
         }
 
         ValidationOutcome firstOutcome = outcomesByMode[0].Outcome;
-        if (ValidateCommandPreflight.FindImportFileCollision(options, firstOutcome.PolicyImportPaths) is { } importCollision)
+        if (FindPostAnalysisInputCollision(options, firstOutcome) is { } inputCollision)
         {
-            return WriteCollision(importCollision);
-        }
-
-        if (ValidateCommandPreflight.FindProfileFileCollision(
-                options, firstOutcome.PolicyImportPaths, "imported policy file") is { } profileImportCollision)
-        {
-            return WriteCollision(profileImportCollision);
-        }
-
-        if (ValidateCommandPreflight.FindReceiptFileCollision(options, firstOutcome.ResolvedAssemblyPaths) is { } receiptCollision)
-        {
-            return WriteCollision(receiptCollision);
-        }
-
-        if (ValidateCommandPreflight.FindProfileFileCollision(
-                options,
-                firstOutcome.ResolvedAssemblyPaths.SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }),
-                "a build artifact or receipt loaded during this run") is { } profileReceiptCollision)
-        {
-            return WriteCollision(profileReceiptCollision);
-        }
-
-        if (ValidateCommandPreflight.FindDiscoveredProjectFileCollision(options, firstOutcome.DiscoveredProjectPaths) is { } projectCollision)
-        {
-            return WriteCollision(projectCollision);
-        }
-
-        if (ValidateCommandPreflight.FindProfileFileCollision(
-                options, firstOutcome.DiscoveredProjectPaths, "a project file loaded during this run") is { } profileProjectCollision)
-        {
-            return WriteCollision(profileProjectCollision);
-        }
-
-        if (FindExternalEvidenceReportCollision(options, firstOutcome.RepositoryRoot) is { } evidenceReportCollision)
-        {
-            return WriteCollision(evidenceReportCollision);
-        }
-
-        if (ValidateCommandPreflight.FindProfileFileCollision(
-                options, ResolveExternalEvidencePaths(options, firstOutcome.RepositoryRoot),
-                "an --external-evidence artifact path") is { } evidenceProfileCollision)
-        {
-            return WriteCollision(evidenceProfileCollision);
+            return WriteCollision(inputCollision);
         }
 
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> enrichedOutcomesByMode =
@@ -321,6 +237,27 @@ internal sealed class ValidateCommandExecution
         ValidateCommandOptions options, string repositoryRoot)
     {
         return ValidationExecutionSemantics.ResolveExternalEvidencePaths(options, repositoryRoot);
+    }
+
+    private static string? FindPostAnalysisInputCollision(
+        ValidateCommandOptions options,
+        ValidationOutcome outcome)
+    {
+        return ValidateCommandPreflight.FindImportFileCollision(options, outcome.PolicyImportPaths)
+            ?? ValidateCommandPreflight.FindProfileFileCollision(
+                options, outcome.PolicyImportPaths, "imported policy file")
+            ?? ValidateCommandPreflight.FindReceiptFileCollision(options, outcome.ResolvedAssemblyPaths)
+            ?? ValidateCommandPreflight.FindProfileFileCollision(
+                options,
+                outcome.ResolvedAssemblyPaths.SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }),
+                "a build artifact or receipt loaded during this run")
+            ?? ValidateCommandPreflight.FindDiscoveredProjectFileCollision(options, outcome.DiscoveredProjectPaths)
+            ?? ValidateCommandPreflight.FindProfileFileCollision(
+                options, outcome.DiscoveredProjectPaths, "a project file loaded during this run")
+            ?? FindExternalEvidenceReportCollision(options, outcome.RepositoryRoot)
+            ?? ValidateCommandPreflight.FindProfileFileCollision(
+                options, ResolveExternalEvidencePaths(options, outcome.RepositoryRoot),
+                "an --external-evidence artifact path");
     }
 
     private static string? FindExternalEvidenceReportCollision(
