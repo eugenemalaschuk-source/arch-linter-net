@@ -90,6 +90,12 @@
       "source": "working-tree"
     },
     {
+      "path": "relay/src/lifecycle.ts",
+      "archive_path": "relay/src/lifecycle.ts",
+      "media_kind": "text/typescript",
+      "source": "working-tree"
+    },
+    {
       "path": "relay/src/payload.ts",
       "archive_path": "relay/src/payload.ts",
       "media_kind": "text/typescript",
