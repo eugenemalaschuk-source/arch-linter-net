@@ -79,10 +79,11 @@ The temporary branch-only push trigger used to obtain implementation evidence is
   the structured findings/fingerprint fields are withheld when the report is deemed unusable.
 - `<label>-log/` mirrors Qodana's own internal results log directory (regular files only,
   no symlinks, capped per file and in total), separate from `<label>.log`'s Docker
-  stdout/stderr. It is copied before the SARIF is validated, so it survives a scan that
-  never produced a usable report. `cache_bytes` measurement runs after all evidence is
-  preserved; if it fails, `evidence.json` records `cache_bytes: null` and `cache_error`
-  instead of losing an already-completed scan's results.
+  stdout/stderr. Each per-phase evidence record (`exit_code`, `seconds`, `status`) is built
+  before any of this copying runs, so an unreadable individual SARIF or internal-log file
+  never discards an already-finished scan's core result: a copy failure is recorded as
+  `sarif_copy_error` or `log_errors` (per-file, non-fatal) instead. `cache_bytes` measurement
+  runs last; if it fails, `evidence.json` records `cache_bytes: null` and `cache_error`.
 
 Completed phases are checkpointed before the next scan; an interrupted later probe does
 not erase completed cold/warm evidence. Missing/malformed SARIF or an unsuccessful invocation

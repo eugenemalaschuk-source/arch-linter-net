@@ -165,7 +165,11 @@ class RunnerTests(unittest.TestCase):
                     internal.write_text("internal diagnostic marker")
                 return exit_code
 
-            with patch.object(ci, "command", side_effect=fake_command):
+            # os.getuid/getgid don't exist on Windows; this suite is offline and must not
+            # depend on Unix-only APIs the mocked command() never actually needs.
+            with patch.object(ci, "command", side_effect=fake_command), \
+                 patch.object(ci.os, "getuid", create=True, return_value=1000), \
+                 patch.object(ci.os, "getgid", create=True, return_value=1000):
                 result = ci.scan(project, work, artifacts, IMAGE_ID, "cold", root / "cache", 2)
             saved = (artifacts / "cold.sarif.json").is_file()
             log_preserved = (artifacts / "cold-log/qodana.log").is_file()
@@ -224,6 +228,41 @@ class RunnerTests(unittest.TestCase):
                                                             internal_log=True)
                 self.assertTrue(log_preserved)
 
+    def test_unreadable_sarif_is_recorded_but_does_not_lose_exit_code_or_duration(self):
+        original_read_bytes = Path.read_bytes
+
+        def flaky_read_bytes(path):
+            if path.name == "qodana.sarif.json":
+                raise PermissionError("Permission denied")
+            return original_read_bytes(path)
+
+        with patch.object(Path, "read_bytes", flaky_read_bytes):
+            result, _, saved, _ = self.exercise_scan(document=sarif([finding()]))
+        # read_inventory() reads the SARIF via read_text(), independent of the failed
+        # read_bytes() copy, so a valid scan still reports its real outcome and findings.
+        self.assertEqual("completed", result["status"])
+        self.assertEqual(1, result["findings"])
+        self.assertFalse(saved)
+        self.assertIn("Permission denied", result["sarif_copy_error"])
+
+    def test_unreadable_internal_log_file_is_recorded_but_does_not_lose_the_scan(self):
+        original_read_bytes = Path.read_bytes
+
+        def flaky_read_bytes(path):
+            if path.name == "qodana.log":
+                raise PermissionError("Permission denied")
+            return original_read_bytes(path)
+
+        with patch.object(Path, "read_bytes", flaky_read_bytes):
+            result, _, saved, log_preserved = self.exercise_scan(
+                document=sarif([finding()]), internal_log=True)
+        self.assertEqual("completed", result["status"])
+        self.assertEqual(1, result["findings"])
+        self.assertEqual(0, result["exit_code"])
+        self.assertTrue(saved)
+        self.assertFalse(log_preserved)
+        self.assertIn("qodana.log", result["log_errors"][0])
+
     def test_cache_measurement_failure_does_not_lose_a_completed_scan(self):
         with patch.object(ci, "cache_bytes", side_effect=PermissionError("no access")):
             result, _, saved, _ = self.exercise_scan(document=sarif([finding()]))
@@ -260,8 +299,29 @@ class RunnerTests(unittest.TestCase):
     def test_copy_bounded_tree_tolerates_missing_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            ci.copy_bounded_tree(root / "absent", root / "destination", 10, 10)
+            errors = ci.copy_bounded_tree(root / "absent", root / "destination", 10, 10)
+            self.assertEqual([], errors)
             self.assertFalse((root / "destination").exists())
+
+    def test_copy_bounded_tree_continues_past_an_unreadable_file(self):
+        original_read_bytes = Path.read_bytes
+
+        def flaky_read_bytes(path):
+            if path.name == "bad.log":
+                raise PermissionError("Permission denied")
+            return original_read_bytes(path)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, destination = root / "source", root / "destination"
+            source.mkdir()
+            (source / "bad.log").write_bytes(b"unreadable")
+            (source / "good.log").write_bytes(b"ok")
+            with patch.object(Path, "read_bytes", flaky_read_bytes):
+                errors = ci.copy_bounded_tree(source, destination, max_file_bytes=100,
+                                              max_total_bytes=100)
+            self.assertIn("bad.log", errors[0])
+            self.assertEqual("ok", (destination / "good.log").read_text())
 
     def test_cache_measurement_does_not_follow_symlinks(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -118,22 +118,28 @@ def cache_bytes(cache: Path) -> int:
 
 
 def copy_bounded_tree(source: Path, destination: Path, max_file_bytes: int,
-                       max_total_bytes: int) -> None:
+                       max_total_bytes: int) -> list[str]:
     """Copy regular files from source into destination, skipping symlinks and oversized
-    files, up to a total byte budget. Missing source is a no-op, not a failure."""
+    files, up to a total byte budget. Missing source is a no-op, not a failure. A single
+    unreadable file is recorded and skipped rather than losing the rest of the copy."""
+    errors: list[str] = []
     if source.is_symlink() or not source.is_dir():
-        return
+        return errors
     remaining = max_total_bytes
     for path in sorted(source.rglob("*")):
         if path.is_symlink() or not path.is_file():
             continue
-        size = path.stat().st_size
-        if size > max_file_bytes or size > remaining:
-            continue
-        target = destination / path.relative_to(source)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(path.read_bytes())
-        remaining -= size
+        try:
+            size = path.stat().st_size
+            if size > max_file_bytes or size > remaining:
+                continue
+            target = destination / path.relative_to(source)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(path.read_bytes())
+            remaining -= size
+        except OSError as error:
+            errors.append(f"{path}: {error}")
+    return errors
 
 
 def scan(project: Path, work: Path, artifacts: Path, image_id: str,
@@ -156,18 +162,23 @@ def scan(project: Path, work: Path, artifacts: Path, image_id: str,
     finally:
         # Killing the docker client on timeout does not kill the daemon-side container.
         command(["docker", "rm", "--force", name], log, 30)
-    # Preserve whatever diagnostic evidence exists before any later step (including the
-    # cache-size metric below) has a chance to raise and lose an already-finished scan.
+    # Build the evidence record before any evidence-preservation step below can raise;
+    # exit_code/seconds/status must survive even a file-level failure while collecting
+    # the rest of the diagnostics for an already-finished scan.
+    evidence = {"label": label, "exit_code": exit_code,
+                "seconds": round(time.monotonic() - started, 3), "status": "failed"}
     sarif = results / "qodana.sarif.json"
     if safe_regular_file(sarif):
         # A bounded, non-symlink regular file is safe to publish even when it later turns
         # out to describe a failed/partial analysis.
-        (artifacts / f"{label}.sarif.json").write_bytes(sarif.read_bytes())
-    copy_bounded_tree(results / "log", artifacts / f"{label}-log",
-                      MAX_LOG_FILE_BYTES, MAX_LOG_TOTAL_BYTES)
-
-    evidence = {"label": label, "exit_code": exit_code,
-                "seconds": round(time.monotonic() - started, 3), "status": "failed"}
+        try:
+            (artifacts / f"{label}.sarif.json").write_bytes(sarif.read_bytes())
+        except OSError as error:
+            evidence["sarif_copy_error"] = str(error)
+    log_errors = copy_bounded_tree(results / "log", artifacts / f"{label}-log",
+                                   MAX_LOG_FILE_BYTES, MAX_LOG_TOTAL_BYTES)
+    if log_errors:
+        evidence["log_errors"] = log_errors
     try:
         evidence["cache_bytes"] = cache_bytes(cache)
     except OSError as error:
