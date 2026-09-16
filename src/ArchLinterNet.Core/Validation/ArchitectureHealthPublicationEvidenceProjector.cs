@@ -300,7 +300,7 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
             reasons.Add(new(InconsistentExternalEvidenceReceipt, $"The '{mode}' external-evidence trust receipts do not match requirements."));
         }
 
-        orderedRequirements.Where(item => item.Required).ToList().ForEach(requirement =>
+        foreach (ArchitectureExternalEvidenceRequirement requirement in orderedRequirements.Where(item => item.Required))
         {
             if (!receiptIds.Contains(requirement.Id, StringComparer.Ordinal))
             {
@@ -311,7 +311,7 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
             // makes a bounded semantic horizon impossible until a future receipt supplies one.
             reasons.Add(new(RequiredExternalEvidenceHorizonUnknown,
                 $"Required external evidence '{requirement.Id}' has no finite reuse horizon."));
-        });
+        }
     }
 
     private static bool WaiverSetsEqual(
