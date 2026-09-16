@@ -419,15 +419,13 @@ public sealed record ArchitecturePrReportNavigationContext(
         bool artifact = segments.Length == 7
             && string.Equals(segments[5], "artifacts", StringComparison.Ordinal)
             && IsDigits(segments[6]);
-        bool attemptArtifact = segments.Length == 9
-            && attempt
-            && string.Equals(segments[7], "artifacts", StringComparison.Ordinal)
-            && IsDigits(segments[8]);
         bool validPath = prefix && segments.Length switch
         {
             5 => true,
             7 => artifact || attempt,
-            9 => attemptArtifact,
+            // Preserve the historical contract: once a valid attempt prefix is present,
+            // the two trailing segments were intentionally treated as opaque.
+            9 => attempt,
             _ => false,
         };
         return validPath

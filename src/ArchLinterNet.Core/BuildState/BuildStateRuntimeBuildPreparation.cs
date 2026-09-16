@@ -210,7 +210,7 @@ internal static class BuildStateRuntimeBuildPreparation
         string? runtimeIdentifier)
     {
         string[] segments = relativePath.Split(
-            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]);
         bool configurationMatches = configuration == null
             || (segments.Length > 0 && string.Equals(segments[0], configuration, StringComparison.OrdinalIgnoreCase));
         bool targetFrameworkMatches = targetFramework == null
