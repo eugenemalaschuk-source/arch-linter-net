@@ -45,6 +45,14 @@ export QODANA_ANALYZED_SHA="$(git rev-parse HEAD)"
 python3 tools/scripts/qodana_ci.py --output "$(mktemp -d)"
 ```
 
+Run this from a clean checkout (for example `git worktree add <path> HEAD`), not a working
+tree with local `bin/`/`obj/` build output. The runner mounts `--project` as-is; leftover
+build artifacts are analyzed too and can inflate the report well past a normal run. A local
+run against this repository's own dirty working tree (post-`dotnet build`) produced a 103 MB
+`qodana.sarif.json` that exceeded `MAX_SARIF_BYTES` (64 MB) and was reported as a failed,
+oversized report, even though the container's own exit code was 0. The same commit scanned
+from a clean `git worktree` produced the real 23.5 MB report below instead.
+
 For controlled validation, add `--burn-in`. This performs a cold scan, a warm scan using
 the same image/checkout/cache, and two standalone generated projects outside the canonical
 solution. The positive project enables `ConditionIsAlwaysTrueOrFalse` and contains a
@@ -134,6 +142,17 @@ collector wall time was 824.547 seconds. This single comparison is not a general
 performance claim or billing measurement. Standalone probes log unavailable Git metadata;
 analysis still completes and emits valid SARIF. Cleanup can report an already-removed
 container because normal runs also use Docker `--rm`.
+
+### Independent cross-machine repeatability
+
+A separate local cold scan of commit `f8d6b4ebf04b5cf4b66239e3e4f6a176f9e47ef8` (a clean
+`git worktree`, not the GitHub-hosted runner) reproduced the exact same fingerprint,
+`dc802b1bbb9cbc823bb90f91cf3cd4ca7667155a369d5bce5257646d4d12abc5`, and the same 12162
+findings, from a separately pulled copy of the image (macOS host, Rancher Desktop Docker,
+registry digest `sha256:9229bd0ffce00faad4cc45971a8985114ad629a6d82318eab6c25b19749fb752`).
+The commit only changed CI/runner files, so identical C# input is expected; the value here
+is that two different machines, OS/Docker runtimes and independently pulled image copies
+converged on byte-identical inventory, not just repeated runs of one cached container.
 
 ## Initial inventory and triage boundary
 

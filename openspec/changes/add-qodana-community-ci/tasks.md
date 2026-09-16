@@ -12,5 +12,9 @@
 - [x] 2.3 Obtain actual canonical scanner, cold/warm and positive/corrected-negative inspection evidence: run 35072109010, artifact 10437360502.
 - [x] 2.4 Record initial rule/severity/path inventory and bounded sample triage without suppressing findings or claiming full review.
 - [ ] 2.5 Record actual fork execution, representative independent reruns and job/billing evidence.
+      (Partial: an independent local cold scan of `f8d6b4eb` on a different machine, OS and
+      independently pulled image reproduced the identical fingerprint — see the adoption doc's
+      "Independent cross-machine repeatability" section. Fork execution and Actions job/billing
+      minutes are still unrecorded.)
 - [ ] 2.6 Complete unique-signal/noise/debt review versus existing gates and record a maintainer-reviewed PROMOTE or KEEP ADVISORY decision.
 - [ ] 2.7 Revalidate final documentation, synchronize specifications and archive only after the remaining adoption acceptance is actually complete.

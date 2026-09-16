@@ -30,7 +30,9 @@ class LifecycleTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        # Resolved because main() resolves --output; macOS's /var -> /private/var symlink
+        # would otherwise desync this from the paths main() actually passes to command().
+        self.root = Path(temporary.name).resolve()
         self.project = self.root / "repository"
         self.project.mkdir()
         (self.project / "ArchLinterNet.slnx").write_text("<Solution />\n", encoding="utf-8")
