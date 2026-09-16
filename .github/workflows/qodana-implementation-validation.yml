@@ -1,0 +1,74 @@
+name: Qodana implementation validation
+
+on:
+  push:
+    branches:
+      - feat/864-qodana-community-advisory
+    paths:
+      - .github/workflows/qodana-implementation-validation.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+
+      - name: Test runner contracts
+        run: python3 -m unittest discover -s tests/qodana -v
+
+      - name: Lint workflows with actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
+        with:
+          shellcheck: false
+          pyflakes: false
+          cache: true
+          fail-on-error: true
+
+      - name: Lint workflows with zizmor
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482
+        with:
+          advanced-security: false
+          annotations: false
+          min-severity: low
+          inputs: .github/workflows
+
+      - name: Format changed workflow and documentation
+        if: always()
+        run: |
+          npx --yes --ignore-scripts prettier@3.9.5 --write .github/workflows/qodana*.yml qodana.yaml
+          uv run --frozen --project tools/pyproject.toml mdformat docs/internal/qodana-community-adoption.md
+          git diff --check
+
+      - name: Validate OpenSpec
+        if: always()
+        env:
+          OPENSPEC_TELEMETRY: "0"
+        run: |
+          npx --yes --ignore-scripts --package=@fission-ai/openspec -- openspec --version
+          npx --yes --ignore-scripts --package=@fission-ai/openspec -- openspec validate --all
+
+      - name: Collect formatter patch
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/qodana-validation"
+          git diff -- .github/workflows/qodana.yml qodana.yaml docs/internal/qodana-community-adoption.md > "$RUNNER_TEMP/qodana-validation/format.patch"
+          git rev-parse HEAD > "$RUNNER_TEMP/qodana-validation/validated-sha.txt"
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: qodana-implementation-validation
+          path: ${{ runner.temp }}/qodana-validation
+          if-no-files-found: error
+          retention-days: 7
