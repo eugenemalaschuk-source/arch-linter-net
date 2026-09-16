@@ -6,13 +6,13 @@
   "base_sha": null,
   "head_sha": null,
   "head_tree_sha": null,
-  "main_sha": "5cf296dbc5f1b5f90522ec0a28e4095cc292edca",
+  "main_sha": "dc54fa9a0528c2f56ce6c260cfc9e12d38cfbde0",
   "main_tree_sha": null,
   "pr_number": null,
   "producer_run_id": null,
   "producer_run_attempt": null,
-  "publisher_run_id": "35080719564",
+  "publisher_run_id": "35083147367",
   "publisher_run_attempt": "1",
   "payload_sha256": "da2189f448656c69dbed7a7cd9f903372b290e0c7693a68f3e8dbf00bccf327e",
-  "published_at": "2026-09-16T09:40:46Z"
+  "published_at": "2026-09-16T10:06:45Z"
 }
