@@ -6,9 +6,10 @@ from the public MkDocs site by `exclude_docs: internal/`.
 
 ## Audit boundary and ownership
 
-The source inventory was refreshed after #907 at
-`dc54fa9a0528c2f56ce6c260cfc9e12d38cfbde0` on 2026-09-16. That SHA is the
-source-audit baseline, **not** a frozen or approved final `0.8.Z` candidate.
+The publisher source audit was refreshed after #919 at
+`54557bb8549f282a4cafdda46ca6e0c3c1a5256f` on 2026-09-16. That SHA is the
+reviewed publisher revision for the #918 delivery-pin rotation, **not** a
+frozen or approved final `0.8.Z` package candidate.
 The original audit at `ffd5e97f99cedf4982b4a9c28f1f45b3827ad7e7` identified
 the packaging defect described below; it is retained only as historical context.
 No candidate version, package hash, deployment identity, or acceptance run is
@@ -71,14 +72,26 @@ download link. A manifest containing a component name is not proof that the
 archive includes a usable copy. The four-package release family is not a
 requirement to install four packages just to use the CLI.
 
-At the audit baseline, the approved publisher commit is
-`ff9b19bfe5abcab233d490ea53f55a387dc4a8db`. The inventory binds the workflow
+After the #918 delivery-pin rotation, the approved publisher commit is
+`54557bb8549f282a4cafdda46ca6e0c3c1a5256f`. The inventory binds the workflow
 blob `88d05c010023488c29225dda8391ec43268a443b` and action blob
 `b400bd026eb8a7ab6e7d55619f0d39cfc65111e6` at that commit. These are Git
 object identities, not distribution SHA-256 digests. Copy the full pinned
 workflow/action refs from the chosen candidate inventory, not from `main` or
-this historical paragraph. Bind the separate generated producer Git-blob SHA
+this source-audit paragraph. Bind the separate generated producer Git-blob SHA
 from setup as well.
+
+The workflow/action blobs are unchanged by this rotation, but the immutable
+revision now includes the #917 exact-job attempt fix and the #919 consumer
+registry loader. Matching YAML alone does not prove that the called Python
+publisher contains those fixes. The shipped-publisher regression exports the
+approved revision and runs the current loader/attempt contract tests against
+that runtime in a separate interpreter, without using working-tree product
+code. CLI defaults, schema enums, bundle pins and release inventory must agree;
+schema and whole-bundle digests are recomputed as part of the reviewed change.
+Existing prepublication configurations are not silently rewritten or granted
+new authority. Recreate/review candidate setup outputs from the updated CLI
+and rerun affected proofs; this rotation is not hosted #834 acceptance.
 
 | Compatibility field | Audited identity |
 | --- | --- |
