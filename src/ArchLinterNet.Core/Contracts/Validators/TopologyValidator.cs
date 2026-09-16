@@ -14,7 +14,7 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
     private const string LayerKind = "layer";
     private static readonly HashSet<string> _modes = ["partial", "exhaustive"];
     private static readonly HashSet<string> _subjectKinds = ["type", NamespaceKind, ProjectKind, AssemblyKind];
-    private static readonly IReadOnlyDictionary<string, HashSet<string>> _selectorKindsBySubjectKind =
+    private static readonly Dictionary<string, HashSet<string>> _selectorKindsBySubjectKind =
         new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
         {
             ["type"] = [LayerKind, NamespaceKind, ProjectKind, AssemblyKind, "context"],

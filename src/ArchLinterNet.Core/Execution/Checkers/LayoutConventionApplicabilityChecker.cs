@@ -203,9 +203,9 @@ internal static class LayoutConventionApplicabilityChecker
         SourceSubject[] Subjects,
         Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> CandidatesByFile)
         BuildSubjects(
-            ArchitectureCheckerContext context,
-            string scope,
-            IReadOnlyDictionary<(string AssemblyName, string FullTypeName), Type> typesByIdentity)
+        ArchitectureCheckerContext context,
+        string scope,
+        Dictionary<(string AssemblyName, string FullTypeName), Type> typesByIdentity)
     {
         string normalizedScope = Normalize(scope);
         var candidatesByFile = new Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>>(StringComparer.Ordinal);

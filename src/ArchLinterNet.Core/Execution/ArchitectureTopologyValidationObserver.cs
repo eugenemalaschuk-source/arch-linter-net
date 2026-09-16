@@ -81,10 +81,10 @@ internal static class ArchitectureTopologyValidationObserver
             subjectsByIdentity.Values.OrderBy(subject => subject.Identity, StringComparer.Ordinal).ToArray());
     }
 
-    private static IReadOnlyList<ArchitectureTopologyObservedDependency> ObserveDependencies(
+    private static ArchitectureTopologyObservedDependency[] ObserveDependencies(
         ArchitectureAnalysisSession session,
         IEnumerable<Type> types,
-        IReadOnlyDictionary<Type, ArchitectureTopologyObservedSubject> subjectByType)
+        Dictionary<Type, ArchitectureTopologyObservedSubject> subjectByType)
     {
         var dependencies = new HashSet<ArchitectureTopologyObservedDependency>();
         foreach (Type source in types)

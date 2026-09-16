@@ -101,8 +101,8 @@ internal static class ArchitectureChangeSnapshotProjector
             {
                 yield return new ArchitectureChangeEntry(
                     "semantic_context",
-                    role.Subject + "|" + metadata.Key + "|" + Value(metadata.Value.Value),
-                    role.Subject + ": " + metadata.Key + "=" + Value(metadata.Value.Value));
+                    role.Subject + "|" + metadata.Key + "|" + Value(metadata.TypedValue.RawValue),
+                    role.Subject + ": " + metadata.Key + "=" + Value(metadata.TypedValue.RawValue));
             }
         }
     }
@@ -114,11 +114,11 @@ internal static class ArchitectureChangeSnapshotProjector
             new SemanticMetadataValue(entry.Value?.GetType(), entry.Value)))
         .ToArray();
 
-    private readonly record struct SemanticMetadataValue(Type? Type, object? Value);
+    private readonly record struct SemanticMetadataValue(Type? Type, object? RawValue);
 
-    private readonly record struct SemanticMetadataEntry(string Key, SemanticMetadataValue Value);
+    private readonly record struct SemanticMetadataEntry(string Key, SemanticMetadataValue TypedValue);
 
-    private readonly record struct SemanticContextKey(string Subject, SemanticMetadataEntry Metadata);
+    private readonly record struct SemanticContextKey(string Subject, SemanticMetadataEntry MetadataEntry);
 
     private sealed class SemanticRoleKey : IEquatable<SemanticRoleKey>
     {
@@ -151,7 +151,7 @@ internal static class ArchitectureChangeSnapshotProjector
             foreach (SemanticMetadataEntry metadata in _metadata)
             {
                 hash.Add(metadata.Key, StringComparer.Ordinal);
-                hash.Add(metadata.Value);
+                hash.Add(metadata.TypedValue);
             }
 
             return hash.ToHashCode();

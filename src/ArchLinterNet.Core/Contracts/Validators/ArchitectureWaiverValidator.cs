@@ -42,7 +42,7 @@ internal sealed class ArchitectureWaiverValidator : IArchitecturePolicyDocumentV
         IArchitectureContract contract,
         ArchitectureIgnoredViolation ignore,
         string profile,
-        IDictionary<string, ArchitectureIgnoredViolation> declaredIds)
+        Dictionary<string, ArchitectureIgnoredViolation> declaredIds)
     {
         if (ignore.IsBaselineImported)
         {

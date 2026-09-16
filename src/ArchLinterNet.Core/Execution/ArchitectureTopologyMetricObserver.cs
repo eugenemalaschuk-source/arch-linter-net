@@ -334,7 +334,7 @@ internal static class ArchitectureTopologyMetricObserver
             .ToArray());
 
     private static ArchitectureTopologyAssemblyEndpointBinding BindAssemblyEndpoint(
-        IReadOnlyDictionary<string, ArchitectureTopologyObservedSubject[]> subjectsByAssembly,
+        Dictionary<string, ArchitectureTopologyObservedSubject[]> subjectsByAssembly,
         string assemblyName,
         string? canonicalAssemblyIdentity,
         string? referenceIdentity,

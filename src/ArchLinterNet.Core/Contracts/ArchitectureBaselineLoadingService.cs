@@ -190,7 +190,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         return false;
     }
 
-    private static void ValidateMetricBaselines(IReadOnlyList<ArchitectureMetricBaselineEntry> entries)
+    private static void ValidateMetricBaselines(List<ArchitectureMetricBaselineEntry> entries)
     {
         var metricIds = new HashSet<string>(StringComparer.Ordinal);
         for (int index = 0; index < entries.Count; index++)

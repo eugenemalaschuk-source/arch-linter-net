@@ -121,7 +121,7 @@ internal static class ArchitectureHealthReportDebtEvidenceWriter
         IEnumerable<BuildStatePreflightDiagnostic> diagnostics,
         string mode) => BuildFindings(diagnostics.Select(item => ArchitectureFindingMapper.FromDiagnostic(item, mode)), mode);
 
-    private static IReadOnlyList<BaselineLifecycleEntry> LifecycleEntries(BaselineVerifyOutcome outcome)
+    private static BaselineLifecycleEntry[] LifecycleEntries(BaselineVerifyOutcome outcome)
     {
         if (outcome.Entries.Count > 0)
         {

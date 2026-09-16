@@ -59,13 +59,13 @@ internal static class PrReportMarkdownNavigation
         return context?.IsUsable == true ? context : null;
     }
 
-    private static void AppendBounded<T>(
+    private static void AppendBounded(
         StringBuilder builder,
         string title,
         int total,
-        IReadOnlyList<T> items,
+        List<string> items,
         int maxDetails,
-        Func<T, string> format)
+        Func<string, string> format)
     {
         if (total <= 0 || items.Count == 0)
         {

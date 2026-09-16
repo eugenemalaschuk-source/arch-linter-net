@@ -16,7 +16,7 @@ internal sealed class LayoutConventionApplicabilityValidator : IArchitecturePoli
 
     private static void ValidateGroup(
         ArchitectureContractDocument document,
-        IReadOnlyList<ArchitectureLayoutConventionApplicabilityContract> inventories,
+        List<ArchitectureLayoutConventionApplicabilityContract> inventories,
         IReadOnlyList<ArchitectureLayoutConventionContract> conventions,
         string groupName)
     {
@@ -38,7 +38,7 @@ internal sealed class LayoutConventionApplicabilityValidator : IArchitecturePoli
     private static void ValidateInventory(
         ArchitectureContractDocument document,
         ArchitectureLayoutConventionApplicabilityContract inventory,
-        IReadOnlySet<string> conventionIds)
+        HashSet<string> conventionIds)
     {
         if (string.IsNullOrWhiteSpace(inventory.Name))
         {

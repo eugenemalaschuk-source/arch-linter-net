@@ -506,7 +506,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextWaiver> ProjectWaivers(
+    private static ArchitecturePolicyContextWaiver[] ProjectWaivers(
         ArchitectureContractCatalog catalog,
         ArchitectureContractDocument document)
     {
