@@ -26,6 +26,7 @@ import zipfile
 from typing import Any
 
 from .config import ConfigValidationError, parse_config
+from .setup_registry import load_setup_registry
 from .decision import PromotionRequest, decide_promotion
 from .adapters import AdapterError, HttpRelayClient, NoneAdapter, issue_github_oidc_token
 from .model import EvidenceContext, PromotionStatus, ReasonCode
@@ -406,6 +407,8 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
 def _load_config(configuration_id: str):
     path = Path(__file__).resolve().parents[2] / ".github" / "badge-promotion" / "registry.json"
     try:
+        if configuration_id == "setup_generated":
+            return load_setup_registry(GitHubApi().request, os.environ)
         registry = json.loads(path.read_text(encoding="utf-8"))
         raw = registry["configurations"][configuration_id]
         return parse_config(raw)
