@@ -23,7 +23,7 @@ def test_reference_publisher_delegates_to_one_reusable_workflow() -> None:
 
 def test_reusable_workflow_resolves_its_action_from_the_workflow_repository() -> None:
     workflow = read_workflow("architecture-health-badge-promotion.yml")
-    assert "uses: $/.github/actions/architecture-health-badge-promotion" in workflow
+    assert "uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@" in workflow
     assert "uses: ./.github/actions/architecture-health-badge-promotion" not in workflow
 
 
