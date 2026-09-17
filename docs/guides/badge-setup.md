@@ -64,8 +64,16 @@ pinned reusable publisher context. This is deliberate: a local shell cannot
 mint the publisher-bound OIDC claim. Use the trusted reusable workflow's
 `operation: bootstrap` for the first write (it checks out the consumer's
 configured base ref, obtains the short-lived OIDC token, runs the same setup
-command, and commits only the generated managed files). The caller must first
-configure the exact required check/ruleset and review the disclosure inputs.
+command, and creates a dedicated pull request containing only the generated
+managed files). It never pushes directly to the protected base ref. The caller
+must first configure the exact required check/ruleset and review the disclosure
+inputs. The repository owner must install a GitHub App only on that consumer
+repository with `Contents: write`, `Pull requests: write`, and `Workflows: write`, then pass its App ID and private key as the reusable workflow's
+`bootstrap_writer_app_id` and `bootstrap_writer_private_key` secrets. This
+short-lived App token is used only to create the deterministic bootstrap branch
+and pull request after trusted setup succeeds; it is not used for the OIDC
+inspection or Relay publication. A PAT is not a supported substitute.
+
 The bootstrap workflow is pinned by the same immutable publisher SHA used for
 normal publication; it does not accept caller-authored capability evidence.
 
