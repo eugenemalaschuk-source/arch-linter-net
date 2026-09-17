@@ -1,7 +1,7 @@
 name: Architecture Health trusted promotion
 description: Run the versioned, repository-owned trusted badge promotion contract.
 inputs:
-  configuration-id:
+  configuration_id:
     description: Approved registry configuration identifier.
     required: true
   adapter:
@@ -38,7 +38,7 @@ runs:
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
-        CONFIGURATION_ID: ${{ inputs['configuration-id'] }}
+        CONFIGURATION_ID: ${{ inputs.configuration_id }}
         ADAPTER: ${{ inputs.adapter }}
         OPERATION: ${{ inputs.operation }}
       run: |
