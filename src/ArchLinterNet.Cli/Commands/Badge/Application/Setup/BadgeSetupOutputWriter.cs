@@ -675,6 +675,12 @@ jobs:
             ?? throw new InvalidOperationException("Relay output requires a workflow reference.");
         string workflowSha = pins.WorkflowSha
             ?? throw new InvalidOperationException("Relay output requires a workflow SHA.");
+        string subject = configuration.Destination.Subject
+            ?? $"repo:{configuration.Repository.Owner}/{configuration.Repository.Name}:ref:refs/heads/{configuration.BaseRef}";
+        if (!BadgeSetupValidationHelpers.IsSafeOidcSubject(subject))
+        {
+            throw new InvalidOperationException("Relay output requires a safe exact OIDC subject.");
+        }
         string registryEntry = Serialize(new
         {
             repository_id = repositoryId,
@@ -687,6 +693,7 @@ jobs:
             permitted_ref = $"refs/heads/{configuration.BaseRef}",
             job_workflow_ref = $"{workflowRef}@{workflowSha}",
             job_workflow_sha = workflowSha,
+            subject,
             disclosure_profile = configuration.DisclosureProfile,
             audience = configuration.Destination.Audience,
             consent = configuration.DisclosureApproved,

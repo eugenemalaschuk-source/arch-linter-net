@@ -134,6 +134,57 @@ public sealed class BadgeSetupCapabilityInspectorTests
     }
 
     [Test]
+    public void TrustedBootstrapCapturesVerifiedCustomSubjectAndCanonicalStringIds()
+    {
+        BadgeSetupConfiguration configuration = Configuration("relay", "private");
+        const string CustomSubject = "repo:owner/repo:environment:architecture-health";
+        using EnvironmentScope scope = LiveEnvironment(("ARCHLINTERNET_BOOTSTRAP", "1"));
+        HttpClientFactory factory = new(
+            configuration,
+            useRulesetFallback: false,
+            oidcEvent: "workflow_dispatch",
+            oidcIdsAsStrings: true,
+            oidcSubject: CustomSubject);
+
+        BadgeSetupCapabilityInspectionResult result = BadgeSetupCapabilityInspector.Inspect(
+            configuration,
+            Options(),
+            new MemoryFileSystem(),
+            factory.Create);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Repository.Capabilities.CanUseOidc, Is.True);
+            Assert.That(result.Repository.Capabilities.OidcSubject, Is.EqualTo(CustomSubject));
+        });
+    }
+
+    [Test]
+    public void LiveInspectionRejectsAConfiguredSubjectThatDoesNotExactlyMatch()
+    {
+        BadgeSetupConfiguration configuration = Configuration("relay", "private") with
+        {
+            Destination = Configuration("relay", "private").Destination with
+            {
+                Subject = "repo:owner/repo:ref:refs/heads/main",
+            },
+        };
+        using EnvironmentScope scope = LiveEnvironment();
+        HttpClientFactory factory = new(
+            configuration,
+            useRulesetFallback: false,
+            oidcSubject: "repo:owner/repo:environment:architecture-health");
+
+        BadgeSetupCapabilityInspectionResult result = BadgeSetupCapabilityInspector.Inspect(
+            configuration,
+            Options(),
+            new MemoryFileSystem(),
+            factory.Create);
+
+        Assert.That(result.Repository.Capabilities.CanUseOidc, Is.False);
+    }
+
+    [Test]
     public void LiveInspectionFallsBackToInheritedRulesetsAndRejectsBadIdentity()
     {
         BadgeSetupConfiguration configuration = Configuration("relay", "private");
@@ -380,6 +431,8 @@ public sealed class BadgeSetupCapabilityInspectorTests
         bool oidcEnvelope = false,
         bool invalidOidcSignature = false,
         string oidcEvent = "push",
+        bool oidcIdsAsStrings = false,
+        string? oidcSubject = null,
         string? rulesPayload = null)
     {
         private const string OidcKeyId = "arch-linter-net-test-key";
@@ -446,8 +499,8 @@ public sealed class BadgeSetupCapabilityInspectorTests
                 }
 
                 return oidcEnvelope
-                    ? Json(JsonSerializer.Serialize(new { value = CreateJwt(configuration, !invalidOidcSignature, oidcEvent) }))
-                    : JsonToken(configuration, !invalidOidcSignature, oidcEvent);
+                    ? Json(JsonSerializer.Serialize(new { value = CreateJwt(configuration, !invalidOidcSignature, oidcEvent, oidcIdsAsStrings, oidcSubject) }))
+                    : JsonToken(configuration, !invalidOidcSignature, oidcEvent, oidcIdsAsStrings, oidcSubject);
             }
 
             if (path == "/.well-known/jwks")
@@ -466,35 +519,46 @@ public sealed class BadgeSetupCapabilityInspectorTests
             Content = new StringContent(content, Encoding.UTF8, "application/json"),
         };
 
-        private static HttpResponseMessage JsonToken(BadgeSetupConfiguration configuration, bool validSignature, string oidcEvent) =>
+        private static HttpResponseMessage JsonToken(
+            BadgeSetupConfiguration configuration,
+            bool validSignature,
+            string oidcEvent,
+            bool oidcIdsAsStrings,
+            string? oidcSubject) =>
             new(HttpStatusCode.OK)
             {
-                Content = new StringContent(CreateJwt(configuration, validSignature, oidcEvent), Encoding.UTF8, "application/jwt"),
+                Content = new StringContent(CreateJwt(configuration, validSignature, oidcEvent, oidcIdsAsStrings, oidcSubject), Encoding.UTF8, "application/jwt"),
             };
 
         private static HttpResponseMessage NotFound() => new(HttpStatusCode.NotFound);
 
-        private static string CreateJwt(BadgeSetupConfiguration configuration, bool validSignature, string oidcEvent = "push")
+        private static string CreateJwt(
+            BadgeSetupConfiguration configuration,
+            bool validSignature,
+            string oidcEvent,
+            bool oidcIdsAsStrings,
+            string? oidcSubject)
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             string header = Encode(new { alg = "RS256", kid = OidcKeyId, typ = "JWT" });
-            string payload = Encode(new
+            Dictionary<string, object?> claims = new()
             {
-                iss = "https://token.actions.githubusercontent.com",
-                aud = new[] { configuration.Destination.Audience, "other-audience" },
-                repository_id = configuration.Repository.RepositoryId,
-                repository_owner_id = configuration.Repository.RepositoryOwnerId,
-                repository = "owner/repo",
-                repository_visibility = "private",
-                event_name = oidcEvent,
-                @ref = "refs/heads/main",
-                job_workflow_ref = $"{configuration.Pins!.WorkflowRef}@{configuration.Pins.WorkflowSha}",
-                job_workflow_sha = configuration.Pins.WorkflowSha,
-                sub = "repo:owner/repo:ref:refs/heads/main",
-                iat = now - 1,
-                exp = now + 300,
-                nbf = now - 1,
-            });
+                ["iss"] = "https://token.actions.githubusercontent.com",
+                ["aud"] = new[] { configuration.Destination.Audience, "other-audience" },
+                ["repository_id"] = oidcIdsAsStrings ? configuration.Repository.RepositoryId?.ToString() : configuration.Repository.RepositoryId,
+                ["repository_owner_id"] = oidcIdsAsStrings ? configuration.Repository.RepositoryOwnerId?.ToString() : configuration.Repository.RepositoryOwnerId,
+                ["repository"] = "owner/repo",
+                ["repository_visibility"] = "private",
+                ["event_name"] = oidcEvent,
+                ["ref"] = "refs/heads/main",
+                ["job_workflow_ref"] = $"{configuration.Pins!.WorkflowRef}@{configuration.Pins.WorkflowSha}",
+                ["job_workflow_sha"] = configuration.Pins.WorkflowSha,
+                ["sub"] = oidcSubject ?? "repo:owner/repo:ref:refs/heads/main",
+                ["iat"] = now - 1,
+                ["exp"] = now + 300,
+                ["nbf"] = now - 1,
+            };
+            string payload = Encode(claims);
             string signingInput = header + "." + payload;
             byte[] signature = validSignature
                 ? _oidcSigningKey.SignData(Encoding.ASCII.GetBytes(signingInput), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)

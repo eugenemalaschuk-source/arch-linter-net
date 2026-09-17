@@ -11,6 +11,18 @@
   },
   "files": [
     {
+      "path": "package-lock.json",
+      "sha256": "3cb2683ae9f78b893411b85a04873ee0c6a56c6dcf9ca36a0325ba3ae8436a7b"
+    },
+    {
+      "path": "package.json",
+      "sha256": "e5e90f777613c5b1e7a5733f2db4caa6174df8b5bf5b3444fb9f7af118d721a2"
+    },
+    {
+      "path": "schema/0.8.0/badge-relay-config.schema.json",
+      "sha256": "f8ea27654f95361f9a25ff7b9d293dcc219810b94f09374b210bbb4082058257"
+    },
+    {
       "path": "src/index.ts",
       "sha256": "97fabd58e15594db3cf8bbd706ddb67f1f024af38252058ff09a607bcc3cf066"
     },
@@ -32,7 +44,7 @@
     },
     {
       "path": "src/registry.ts",
-      "sha256": "d8bb16ea06dc44db1a869ad2746a36c07054629df9242c40977c798c460b641c"
+      "sha256": "061bf9f0961eb19a4f543f73c234b4422f9d6a496c5746d7bf960877f3f7f12c"
     },
     {
       "path": "src/relay-do.ts",
@@ -47,12 +59,8 @@
       "sha256": "024cfa6057d30f956111ec7ff2f335920ba200ed2971bc94f1d77ac97f8bdb7e"
     },
     {
-      "path": "package.json",
-      "sha256": "e5e90f777613c5b1e7a5733f2db4caa6174df8b5bf5b3444fb9f7af118d721a2"
-    },
-    {
-      "path": "package-lock.json",
-      "sha256": "3cb2683ae9f78b893411b85a04873ee0c6a56c6dcf9ca36a0325ba3ae8436a7b"
+      "path": "THIRD-PARTY-NOTICES.txt",
+      "sha256": "8aa8f443c77b381282161d35f1e4615c66e0063f6cc419f7d037186a1026542d"
     },
     {
       "path": "tsconfig.json",
@@ -61,14 +69,6 @@
     {
       "path": "wrangler.jsonc",
       "sha256": "bcd7d33f6a8eda6828de0c2a654aa6f9b4a3a85d14d78f178299356fee274377"
-    },
-    {
-      "path": "THIRD-PARTY-NOTICES.txt",
-      "sha256": "8aa8f443c77b381282161d35f1e4615c66e0063f6cc419f7d037186a1026542d"
-    },
-    {
-      "path": "schema/0.8.0/badge-relay-config.schema.json",
-      "sha256": "1fdf5ee2e528c298db8e8628becf5bd972833167d53a4facbb8a79ae2736d806"
     }
   ]
 }

@@ -92,6 +92,36 @@ public sealed class BadgeSetupEngineTests
     }
 
     [Test]
+    public void RelayRejectsUnsafeConfiguredOidcSubject()
+    {
+        BadgeSetupConfiguration configuration = RelayConfiguration(renewalEnabled: false, cadenceMinutes: 1440) with
+        {
+            Destination = RelayConfiguration(renewalEnabled: false, cadenceMinutes: 1440).Destination with
+            {
+                Subject = "repo:owner/repo:\ninvalid",
+            },
+        };
+
+        BadgeSetupPlanResult result = BadgeSetupEngine.BuildPlan(
+            configuration,
+            new(
+                "owner",
+                "repo",
+                "private",
+                new(
+                    HasRequiredCheck: true,
+                    HasRulesApi: true,
+                    CanUseOidc: true,
+                    CanUseRelay: true,
+                    ProviderPlan: "pro",
+                    RepositoryId: 123,
+                    RepositoryOwnerId: 456,
+                    ProviderQuotaAvailable: true)));
+
+        Assert.That(result.Diagnostics.Select(static item => item.Code), Does.Contain(BadgeSetupDiagnosticCodes.MalformedIdentity));
+    }
+
+    [Test]
     public void RenewalBelowThirtyMinutesIsRejected()
     {
         BadgeSetupPlanResult result = BadgeSetupEngine.BuildPlan(
@@ -660,6 +690,7 @@ public sealed class BadgeSetupEngineTests
                 Assert.That(entry.GetProperty("owner").GetString(), Is.EqualTo("owner"));
                 Assert.That(entry.GetProperty("repository").GetString(), Is.EqualTo("repo"));
                 Assert.That(entry.GetProperty("destination_alias").GetString(), Is.EqualTo("a7f4k2m9"));
+                Assert.That(entry.GetProperty("subject").GetString(), Is.EqualTo("repo:owner/repo:ref:refs/heads/main"));
                 Assert.That(entry.GetProperty("permitted_events").EnumerateArray().Select(static item => item.GetString()), Is.EquivalentTo(["push", "schedule"]));
                 Assert.That(producerSha, Is.EqualTo(registrySha));
                 Assert.That(producerSha, Is.EqualTo(BadgeSetupOutputWriter.ComputeGitBlobSha(producer)));
