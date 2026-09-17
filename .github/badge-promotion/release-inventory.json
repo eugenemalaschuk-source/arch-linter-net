@@ -32,7 +32,7 @@
     {
       "kind": "reusable-workflow",
       "path": ".github/workflows/architecture-health-badge-promotion.yml",
-      "approved_source_sha": "88b8aaaf789974699af96631f77a52fa083f718e"
+      "approved_source_sha": "b2e179b32f7c033d7879d383e5c8bc79dd3f90aa"
     },
     {
       "kind": "composite-action",
