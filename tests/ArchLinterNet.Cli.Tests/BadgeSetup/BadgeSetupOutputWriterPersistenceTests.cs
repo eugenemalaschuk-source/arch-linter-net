@@ -60,7 +60,7 @@ public sealed class BadgeSetupOutputWriterPersistenceTests
     }
 
     [TestCase("\"bundle\": \"badge-relay/v1\"", "\"bundle\": \"badge-relay/v2\"")]
-    [TestCase("\"commit\": \"17caba8fd9c28b656f8bf1439098be5e1692d167\"", "\"commit\": \"0000000000000000000000000000000000000000\"")]
+    [TestCase("\"commit\": \"640583ba47dc3d30770c5d2ef3124a089bbaba76\"", "\"commit\": \"0000000000000000000000000000000000000000\"")]
     public void RelayBundleManifestTamperIsRejectedBeforeManagedWrites(string original, string replacement)
     {
         string directory = TemporaryDirectory();
