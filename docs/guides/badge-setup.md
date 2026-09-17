@@ -59,10 +59,19 @@ Relay setup is fail-closed. `--provider-plan` is optional cost metadata only;
 when supplied, it cannot prove a required check, Rules API, OIDC, provider
 quota, or account capability. A null plan label is valid when live inspection
 proves the required capabilities.
-Before a non-dry-run Relay write, run the bounded live inspector with the
-operator's short-lived `GITHUB_TOKEN`/`GH_TOKEN`, `CF_API_TOKEN` (or
-`CLOUDFLARE_API_TOKEN`) and explicitly approve disclosure. For example (with
-adopter-specific values):
+Before a non-dry-run Relay write, the bounded live inspector must run in the
+pinned reusable publisher context. This is deliberate: a local shell cannot
+mint the publisher-bound OIDC claim. Use the trusted reusable workflow's
+`operation: bootstrap` for the first write (it checks out the consumer's
+configured base ref, obtains the short-lived OIDC token, runs the same setup
+command, and commits only the generated managed files). The caller must first
+configure the exact required check/ruleset and review the disclosure inputs.
+The bootstrap workflow is pinned by the same immutable publisher SHA used for
+normal publication; it does not accept caller-authored capability evidence.
+
+For an already bootstrapped destination, the equivalent local preview remains
+useful, but it cannot replace that trusted first write. With adopter-specific
+values, the command shape is:
 
 ```text
 arch-linter-net badge architecture-health setup \
@@ -71,7 +80,7 @@ arch-linter-net badge architecture-health setup \
   --account 0123456789abcdef0123456789abcdef --alias a7f4k2m9 \
   --endpoint https://relay.example --audience architecture-health-badge-relay/a7f4k2m9 \
   --provider-plan pro \
-  --approve-disclosure --output .
+  --approve-disclosure --output . --dry-run
 ```
 
 Missing, stale, contradictory, or unproven live capability evidence leaves the
