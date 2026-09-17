@@ -239,7 +239,7 @@ jobs:
         if: inputs.operation != 'bootstrap'
         uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@19db28a381f64667e1e32a4d50b1e2a6235e62f0
         with:
-          configuration-id: ${{ inputs['configuration-id'] }}
+          configuration_id: ${{ inputs['configuration-id'] }}
           adapter: ${{ inputs.adapter }}
           operation: ${{ inputs.operation }}
       - name: Confirm actionable promotion result
