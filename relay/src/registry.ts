@@ -3,6 +3,7 @@ import { BUNDLE, COMPATIBILITY_PLAN, CONTRACT_VERSION, FIXED_GITHUB_ISSUER, FIXE
 const ALIAS = /^a[0-9a-z]{7}$/u;
 const SHA = /^[0-9a-f]{40}$/u;
 const PERMITTED_REF = /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/u;
+const SAFE_SUBJECT = /^[^\u0000-\u001f\u007f-\u009f]{1,512}$/u;
 
 export function isOpaqueAlias(value: unknown): value is string {
   return typeof value === "string" && ALIAS.test(value);
@@ -26,6 +27,7 @@ export function validateRegistryEntry(value: unknown): value is RegistryEntry {
     && !entry.permitted_ref.endsWith("/") && !entry.permitted_ref.endsWith(".")
     && typeof entry.job_workflow_ref === "string" && entry.job_workflow_ref.length > 0 && entry.job_workflow_ref.length <= 512
     && typeof entry.job_workflow_sha === "string" && SHA.test(entry.job_workflow_sha)
+    && (entry.subject === undefined || (typeof entry.subject === "string" && SAFE_SUBJECT.test(entry.subject)))
     && (entry.disclosure_profile === "headline-only/v1" || entry.disclosure_profile === "headline-plus-freshness/v1")
     && (entry.consent === undefined || entry.consent === true)
     && (entry.bundle === undefined || entry.bundle === BUNDLE)

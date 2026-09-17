@@ -61,6 +61,7 @@ describe("relay contract helpers", () => {
     for (const invalid of ["a123", "A7f4k2m9", "b7f4k2m9", "a7f4k2m!", 7, null]) expect(isOpaqueAlias(invalid)).toBe(false);
 
     expect(validateRegistryEntry(entry)).toBe(true);
+    expect(validateRegistryEntry({ ...entry, subject: "repo:synthetic-owner-042/synthetic-repo-042:environment:architecture-health" })).toBe(true);
     expect(validateRegistryEntry({ ...entry, permitted_events: ["push", "schedule"] })).toBe(true);
     for (const invalid of [
       null,
@@ -75,6 +76,8 @@ describe("relay contract helpers", () => {
       { ...entry, permitted_ref: "refs/heads/../release" },
       { ...entry, job_workflow_ref: "" },
       { ...entry, job_workflow_sha: "bad" },
+      { ...entry, subject: "" },
+      { ...entry, subject: "repo:synthetic\nowner" },
       { ...entry, disclosure_profile: "unbounded" },
       { ...entry, consent: false }
     ]) expect(validateRegistryEntry(invalid)).toBe(false);
@@ -162,6 +165,9 @@ describe("relay contract helpers", () => {
 
     validateOidcClaims(claims(), entry, 1_100);
     validateOidcClaims(claims({ repository_id: String(entry.repository_id), repository_owner_id: String(entry.repository_owner_id) }), entry, 1_100);
+    const customSubject = "repo:synthetic-owner-042/synthetic-repo-042:environment:architecture-health";
+    validateOidcClaims(claims({ sub: customSubject }), { ...entry, subject: customSubject }, 1_100);
+    expect(() => validateOidcClaims(claims(), { ...entry, subject: customSubject }, 1_100)).toThrow(AuthorizationError);
     validateOidcClaims(claims({ event_name: "schedule" }), { ...entry, permitted_events: ["push", "schedule"] }, 1_100);
     validateOidcClaims(claims({ aud: ["another", entry.audience] }), entry, 1_100);
     for (const invalid of [

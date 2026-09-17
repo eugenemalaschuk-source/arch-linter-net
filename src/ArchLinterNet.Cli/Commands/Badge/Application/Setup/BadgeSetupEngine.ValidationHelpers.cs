@@ -13,6 +13,11 @@ internal static class BadgeSetupValidationHelpers
         && value.Length == 32
         && value.All(static character => char.IsAsciiHexDigit(character));
 
+    internal static bool IsSafeOidcSubject(string? value) =>
+        value is not null
+        && value.Length is > 0 and <= 512
+        && value.All(static character => !char.IsControl(character));
+
     internal static bool IsHttpsOrigin(string? value)
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? uri))
