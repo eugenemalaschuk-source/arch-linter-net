@@ -1,0 +1,181 @@
+name: Architecture Health capability probe
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        required: true
+        type: string
+      visibility:
+        required: true
+        type: string
+      account:
+        required: true
+        type: string
+      base-ref:
+        required: true
+        type: string
+      audience:
+        required: true
+        type: string
+      check-name:
+        required: true
+        type: string
+    secrets:
+      cf_api_token:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      id-token: write
+      pull-requests: read
+    steps:
+      - name: Probe trusted capability handoff without disclosure
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CF_API_TOKEN: ${{ secrets.cf_api_token }}
+          PROBE_REPOSITORY: ${{ inputs.repository }}
+          PROBE_VISIBILITY: ${{ inputs.visibility }}
+          PROBE_ACCOUNT: ${{ inputs.account }}
+          PROBE_BASE_REF: ${{ inputs.base-ref }}
+          PROBE_AUDIENCE: ${{ inputs.audience }}
+          PROBE_CHECK_NAME: ${{ inputs.check-name }}
+          EXPECTED_WORKFLOW_REF: ${{ github.workflow_ref }}
+          EXPECTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          results = {}
+
+          def request(url, headers=None):
+              try:
+                  with urllib.request.urlopen(
+                      urllib.request.Request(url, headers=headers or {}), timeout=5
+                  ) as response:
+                      return response.status, response.read()
+              except urllib.error.HTTPError as error:
+                  return error.code, b""
+              except OSError:
+                  return 0, b""
+
+          def decode(segment):
+              return json.loads(base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4)))
+
+          github_headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+              "User-Agent": "arch-linter-net-capability-probe",
+          }
+          repository = os.environ["PROBE_REPOSITORY"]
+          github_api = f"https://api.github.com/repos/{repository}"
+          repository_status, repository_body = request(github_api, github_headers)
+          branch_status, branch_body = request(
+              f"{github_api}/branches/{urllib.parse.quote(os.environ['PROBE_BASE_REF'], safe='')}",
+              github_headers,
+          )
+          rules_status, rules_body = request(
+              f"{github_api}/rules/branches/{urllib.parse.quote(os.environ['PROBE_BASE_REF'], safe='')}",
+              github_headers,
+          )
+          try:
+              repository_json = json.loads(repository_body)
+              branch_json = json.loads(branch_body)
+              rules_json = json.loads(rules_body)
+              results["github_repository_identity"] = (
+                  repository_status == 200
+                  and repository_json.get("visibility") == os.environ["PROBE_VISIBILITY"]
+              )
+              results["github_base_ref"] = branch_status == 200 and branch_json.get("name") == os.environ["PROBE_BASE_REF"]
+              results["github_required_check"] = (
+                  rules_status == 200
+                  and any(
+                      rule.get("type") == "required_status_checks"
+                      and rule.get("parameters", {}).get("strict_required_status_checks_policy") is True
+                      and any(
+                          check.get("context") == os.environ["PROBE_CHECK_NAME"]
+                          for check in rule.get("parameters", {}).get("required_status_checks", [])
+                      )
+                      for rule in rules_json
+                  )
+              )
+          except (TypeError, ValueError):
+              results["github_repository_identity"] = False
+              results["github_base_ref"] = False
+              results["github_required_check"] = False
+
+          token_url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL")
+          token_request = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+          results["oidc_request_environment"] = bool(token_url and token_request)
+          if token_url and token_request:
+              separator = "&" if "?" in token_url else "?"
+              oidc_status, oidc_body = request(
+                  token_url + separator + urllib.parse.urlencode({"audience": os.environ["PROBE_AUDIENCE"]}),
+                  {"Accept": "application/jwt", "Authorization": f"Bearer {token_request}"},
+              )
+              results["oidc_token_issued"] = oidc_status == 200
+              try:
+                  raw_token = oidc_body.decode()
+                  try:
+                      envelope = json.loads(raw_token)
+                      token = envelope.get("value", raw_token) if isinstance(envelope, dict) else raw_token
+                  except ValueError:
+                      token = raw_token
+                  payload = decode(token.split(".")[1])
+                  results["oidc_event"] = payload.get("event_name") == "workflow_dispatch"
+                  results["oidc_ref"] = payload.get("ref") == f"refs/heads/{os.environ['PROBE_BASE_REF']}"
+                  results["oidc_workflow_ref"] = payload.get("job_workflow_ref") == os.environ["EXPECTED_WORKFLOW_REF"]
+                  results["oidc_workflow_sha"] = payload.get("job_workflow_sha") == os.environ["EXPECTED_WORKFLOW_SHA"]
+              except (IndexError, TypeError, UnicodeDecodeError, ValueError):
+                  results["oidc_event"] = False
+                  results["oidc_ref"] = False
+                  results["oidc_workflow_ref"] = False
+                  results["oidc_workflow_sha"] = False
+          else:
+              results["oidc_token_issued"] = False
+              results["oidc_event"] = False
+              results["oidc_ref"] = False
+              results["oidc_workflow_ref"] = False
+              results["oidc_workflow_sha"] = False
+
+          jwks_status, _ = request("https://token.actions.githubusercontent.com/.well-known/jwks")
+          results["oidc_jwks"] = jwks_status == 200
+
+          cf_headers = {"Authorization": f"Bearer {os.environ['CF_API_TOKEN']}"}
+          cf_base = f"https://api.cloudflare.com/client/v4/accounts/{os.environ['PROBE_ACCOUNT']}"
+          account_status, account_body = request(cf_base, cf_headers)
+          scripts_status, _ = request(f"{cf_base}/workers/scripts", cf_headers)
+          durable_objects_status, _ = request(f"{cf_base}/workers/durable_objects/namespaces", cf_headers)
+          try:
+              account_json = json.loads(account_body)
+              results["cloudflare_account_identity"] = (
+                  account_status == 200
+                  and account_json.get("success") is True
+                  and account_json.get("result", {}).get("id") == os.environ["PROBE_ACCOUNT"]
+              )
+          except (TypeError, ValueError):
+              results["cloudflare_account_identity"] = False
+          results["cloudflare_workers"] = scripts_status == 200
+          results["cloudflare_durable_objects"] = durable_objects_status == 200
+
+          for name, value in results.items():
+              print(f"capability.{name}={'PASS' if value else 'FAIL'}")
+
+          if not all(results.values()):
+              raise SystemExit(2)
+          PY
