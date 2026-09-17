@@ -144,6 +144,7 @@ jobs:
           repository: ${{ github.repository }}
           ref: ${{ inputs.base-ref }}
           fetch-depth: 1
+          persist-credentials: false
       - name: Setup .NET for trusted bootstrap setup
         if: inputs.operation == 'bootstrap'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -225,7 +226,8 @@ jobs:
             echo "Trusted bootstrap produced no changes."
           else
             git commit -m "chore: bootstrap ArchLinterNet badge setup"
-            git push origin "HEAD:$BOOTSTRAP_BASE_REF"
+            auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:$BOOTSTRAP_BASE_REF"
           fi
       - name: Run pinned trusted promotion contract
         id: promotion
