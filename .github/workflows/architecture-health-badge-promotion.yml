@@ -183,7 +183,7 @@ jobs:
         env:
           ARCHLINTERNET_BOOTSTRAP: "1"
           GITHUB_TOKEN: ${{ github.token }}
-          CF_API_TOKEN: ${{ secrets.cf_api_token }}
+          CF_API_TOKEN: ${{ secrets['cf_api_token'] }}
           BOOTSTRAP_REPOSITORY: ${{ inputs.repository }}
           BOOTSTRAP_VISIBILITY: ${{ inputs.visibility }}
           BOOTSTRAP_MODE: ${{ inputs.mode }}

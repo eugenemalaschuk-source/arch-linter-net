@@ -40,7 +40,7 @@ def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_bounda
     assert "pull-requests: read" in workflow
     assert "packages: read" in workflow
     assert "cf_api_token:" in workflow
-    assert "CF_API_TOKEN: ${{ secrets.cf_api_token }}" in workflow
+    assert "CF_API_TOKEN: ${{ secrets['cf_api_token'] }}" in workflow
     workflow_call = workflow.split("workflow_call:", 1)[1]
     assert workflow_call.index("inputs:") < workflow_call.index("secrets:")
     assert "secrets: inherit" not in workflow
