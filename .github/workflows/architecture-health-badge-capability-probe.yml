@@ -21,6 +21,15 @@ on:
       check-name:
         required: true
         type: string
+      expected-ref:
+        required: true
+        type: string
+      expected-workflow-ref:
+        required: true
+        type: string
+      expected-workflow-sha:
+        required: true
+        type: string
     secrets:
       cf_api_token:
         required: true
@@ -50,8 +59,9 @@ jobs:
           PROBE_BASE_REF: ${{ inputs.base-ref }}
           PROBE_AUDIENCE: ${{ inputs.audience }}
           PROBE_CHECK_NAME: ${{ inputs.check-name }}
-          EXPECTED_WORKFLOW_REF: ${{ github.workflow_ref }}
-          EXPECTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          EXPECTED_REF: ${{ inputs.expected-ref }}
+          EXPECTED_WORKFLOW_REF: ${{ inputs.expected-workflow-ref }}
+          EXPECTED_WORKFLOW_SHA: ${{ inputs.expected-workflow-sha }}
         run: |
           python3 - <<'PY'
           import base64
@@ -138,7 +148,7 @@ jobs:
                       token = raw_token
                   payload = decode(token.split(".")[1])
                   results["oidc_event"] = payload.get("event_name") == "workflow_dispatch"
-                  results["oidc_ref"] = payload.get("ref") == f"refs/heads/{os.environ['PROBE_BASE_REF']}"
+                  results["oidc_ref"] = payload.get("ref") == f"refs/heads/{os.environ['EXPECTED_REF']}"
                   results["oidc_workflow_ref"] = payload.get("job_workflow_ref") == os.environ["EXPECTED_WORKFLOW_REF"]
                   results["oidc_workflow_sha"] = payload.get("job_workflow_sha") == os.environ["EXPECTED_WORKFLOW_SHA"]
               except (IndexError, TypeError, UnicodeDecodeError, ValueError):
