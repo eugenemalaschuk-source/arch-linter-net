@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -41,6 +42,28 @@ def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_bounda
     assert "actions/checkout" not in workflow
     assert "run-url" not in workflow
     assert "artifact-url" not in workflow
+
+
+def test_reusable_workflow_uses_bracket_notation_for_hyphenated_inputs() -> None:
+    workflow = read_workflow("architecture-health-badge-promotion.yml")
+    assert not re.search(r"inputs\.[A-Za-z0-9_]+-[A-Za-z0-9_-]+", workflow)
+    for input_name in (
+        "configuration-id",
+        "base-ref",
+        "cli-version",
+        "nuget-source",
+        "provider-plan",
+        "repository-id",
+        "repository-owner-id",
+        "disclosure-profile",
+        "producer-workflow",
+        "producer-job-name",
+        "check-name",
+        "check-app",
+        "artifact-name",
+        "evidence-artifact-name",
+    ):
+        assert f"inputs['{input_name}']" in workflow
 
 
 def test_action_runs_repository_owned_code_and_has_redacted_outputs() -> None:
