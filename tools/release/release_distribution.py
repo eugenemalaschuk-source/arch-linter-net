@@ -29,7 +29,7 @@ from verify_relay_dependencies import verify_relay_dependencies
 _INVENTORY_SCHEMA = "architecture-health-badge-release-inventory/v2"
 _DISTRIBUTION_SCHEMA = "architecture-health-badge-release-distribution/v1"
 _COMPATIBILITY_SCHEMA = "architecture-health-badge-relay-compatibility/v1"
-_APPROVED_PUBLISHER_COMMIT = "2aeaad1f6cd81a23cce3c79828af63a9c7745216"
+_APPROVED_PUBLISHER_COMMIT = "801bf4020efeb82ccc8c1b645e98051abdc0ea40"
 _PUBLISHER_REPOSITORY = "eugenemalaschuk-source/arch-linter-net"
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
