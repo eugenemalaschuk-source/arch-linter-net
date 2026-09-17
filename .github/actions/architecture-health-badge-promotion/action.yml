@@ -38,7 +38,7 @@ runs:
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
-        CONFIGURATION_ID: ${{ inputs.configuration-id }}
+        CONFIGURATION_ID: ${{ inputs['configuration-id'] }}
         ADAPTER: ${{ inputs.adapter }}
         OPERATION: ${{ inputs.operation }}
       run: |

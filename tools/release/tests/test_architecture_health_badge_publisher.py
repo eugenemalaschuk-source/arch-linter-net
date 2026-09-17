@@ -65,6 +65,12 @@ def test_reusable_workflow_uses_bracket_notation_for_hyphenated_inputs() -> None
     ):
         assert f"inputs['{input_name}']" in workflow
 
+    action = (ROOT / ".github" / "actions" / "architecture-health-badge-promotion" / "action.yml").read_text(
+        encoding="utf-8"
+    )
+    assert not re.search(r"inputs\.[A-Za-z0-9_]+-[A-Za-z0-9_-]+", action)
+    assert "inputs['configuration-id']" in action
+
 
 def test_action_runs_repository_owned_code_and_has_redacted_outputs() -> None:
     action = (ROOT / ".github" / "actions" / "architecture-health-badge-promotion" / "action.yml").read_text(encoding="utf-8")
