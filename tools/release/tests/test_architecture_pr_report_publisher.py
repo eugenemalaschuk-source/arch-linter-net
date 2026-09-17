@@ -282,6 +282,16 @@ def test_ci_producer_uses_per_tree_baseline_and_separate_strict_gate() -> None:
     assert "outputs.strict_coverage_outcome == 'failure'" in gate
 
 
+def test_tooling_support_materializes_the_approved_immutable_publisher() -> None:
+    workflow = _read("ci.yml")
+    tooling = workflow.split("  tooling_support_tests:\n", maxsplit=1)[1].split(
+        "      - name: Setup uv", maxsplit=1
+    )[0]
+
+    assert "fetch-depth: 0" in tooling
+    assert "persist-credentials: false" in tooling
+
+
 def test_ci_producer_passes_trusted_report_navigation_context_to_cli() -> None:
     workflow = _read("ci.yml")
     producer = _job(workflow, "architecture_pr_report_producer", "architecture_pr_report_gate")
