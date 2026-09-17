@@ -120,7 +120,7 @@ on:
         type: string
 
 concurrency:
-  group: architecture-health-badge-${{ inputs.configuration-id }}
+  group: architecture-health-badge-${{ inputs['configuration-id'] }}
   cancel-in-progress: false
 
 permissions:
@@ -142,7 +142,7 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          BOOTSTRAP_BASE_REF: ${{ inputs.base-ref }}
+          BOOTSTRAP_BASE_REF: ${{ inputs['base-ref'] }}
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/arch-linter-net-bootstrap-consumer"
@@ -159,8 +159,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CLI_VERSION: ${{ inputs.cli-version }}
-          NUGET_SOURCE: ${{ inputs.nuget-source }}
+          CLI_VERSION: ${{ inputs['cli-version'] }}
+          NUGET_SOURCE: ${{ inputs['nuget-source'] }}
         run: |
           set -euo pipefail
           config="$RUNNER_TEMP/arch-linter-net-bootstrap NuGet.Config"
@@ -185,19 +185,19 @@ jobs:
           BOOTSTRAP_ALIAS: ${{ inputs.alias }}
           BOOTSTRAP_ENDPOINT: ${{ inputs.endpoint }}
           BOOTSTRAP_AUDIENCE: ${{ inputs.audience }}
-          BOOTSTRAP_PROVIDER_PLAN: ${{ inputs.provider-plan }}
-          BOOTSTRAP_REPOSITORY_ID: ${{ inputs.repository-id }}
-          BOOTSTRAP_REPOSITORY_OWNER_ID: ${{ inputs.repository-owner-id }}
-          BOOTSTRAP_BASE_REF: ${{ inputs.base-ref }}
+          BOOTSTRAP_PROVIDER_PLAN: ${{ inputs['provider-plan'] }}
+          BOOTSTRAP_REPOSITORY_ID: ${{ inputs['repository-id'] }}
+          BOOTSTRAP_REPOSITORY_OWNER_ID: ${{ inputs['repository-owner-id'] }}
+          BOOTSTRAP_BASE_REF: ${{ inputs['base-ref'] }}
           BOOTSTRAP_POLICY: ${{ inputs.policy }}
           BOOTSTRAP_SOLUTION: ${{ inputs.solution }}
-          BOOTSTRAP_DISCLOSURE_PROFILE: ${{ inputs.disclosure-profile }}
-          BOOTSTRAP_PRODUCER_WORKFLOW: ${{ inputs.producer-workflow }}
-          BOOTSTRAP_PRODUCER_JOB: ${{ inputs.producer-job-name }}
-          BOOTSTRAP_CHECK_NAME: ${{ inputs.check-name }}
-          BOOTSTRAP_CHECK_APP: ${{ inputs.check-app }}
-          BOOTSTRAP_ARTIFACT: ${{ inputs.artifact-name }}
-          BOOTSTRAP_EVIDENCE_ARTIFACT: ${{ inputs.evidence-artifact-name }}
+          BOOTSTRAP_DISCLOSURE_PROFILE: ${{ inputs['disclosure-profile'] }}
+          BOOTSTRAP_PRODUCER_WORKFLOW: ${{ inputs['producer-workflow'] }}
+          BOOTSTRAP_PRODUCER_JOB: ${{ inputs['producer-job-name'] }}
+          BOOTSTRAP_CHECK_NAME: ${{ inputs['check-name'] }}
+          BOOTSTRAP_CHECK_APP: ${{ inputs['check-app'] }}
+          BOOTSTRAP_ARTIFACT: ${{ inputs['artifact-name'] }}
+          BOOTSTRAP_EVIDENCE_ARTIFACT: ${{ inputs['evidence-artifact-name'] }}
         run: |
           set -euo pipefail
           cd "$BOOTSTRAP_ROOT"
@@ -239,7 +239,7 @@ jobs:
         if: inputs.operation != 'bootstrap'
         uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@848713cfc277f30c36084c0f927cc0c73a95db6c
         with:
-          configuration-id: ${{ inputs.configuration-id }}
+          configuration-id: ${{ inputs['configuration-id'] }}
           adapter: ${{ inputs.adapter }}
           operation: ${{ inputs.operation }}
       - name: Confirm actionable promotion result
