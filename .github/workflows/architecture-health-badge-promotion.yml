@@ -137,14 +137,18 @@ jobs:
       id-token: write
       pull-requests: read
     steps:
-      - name: Checkout consumer for trusted bootstrap setup
+      - name: Materialize consumer for trusted bootstrap setup
         if: inputs.operation == 'bootstrap'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: ${{ github.repository }}
-          ref: ${{ inputs.base-ref }}
-          fetch-depth: 1
-          persist-credentials: false
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BOOTSTRAP_BASE_REF: ${{ inputs.base-ref }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/arch-linter-net-bootstrap-consumer"
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" clone --depth 1 --branch "$BOOTSTRAP_BASE_REF" "https://github.com/${GITHUB_REPOSITORY}.git" "$root"
+          echo "BOOTSTRAP_ROOT=$root" >> "$GITHUB_ENV"
       - name: Setup .NET for trusted bootstrap setup
         if: inputs.operation == 'bootstrap'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -196,6 +200,7 @@ jobs:
           BOOTSTRAP_EVIDENCE_ARTIFACT: ${{ inputs.evidence-artifact-name }}
         run: |
           set -euo pipefail
+          cd "$BOOTSTRAP_ROOT"
           args=(badge architecture-health setup
             --repository "$BOOTSTRAP_REPOSITORY"
             --visibility "$BOOTSTRAP_VISIBILITY"
