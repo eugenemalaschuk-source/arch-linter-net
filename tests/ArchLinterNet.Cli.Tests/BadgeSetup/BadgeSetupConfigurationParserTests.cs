@@ -14,6 +14,10 @@ public sealed class BadgeSetupConfigurationParserTests
         {
             ManagedFiles = ["README.md", "architecture-health-badge.json"],
             ProviderPlan = null,
+            Destination = ValidConfiguration().Destination with
+            {
+                Subject = "repo:owner/repo:environment:architecture-health",
+            },
         };
 
         BadgeSetupConfigurationParseResult result = BadgeSetupConfigurationParser.Parse(JsonSerializer.Serialize(configuration));
@@ -25,6 +29,7 @@ public sealed class BadgeSetupConfigurationParserTests
             Assert.That(result.Configuration!.Pins!.WorkflowSha, Is.EqualTo(BadgeSetupContract.DefaultPublisherWorkflowSha));
             Assert.That(result.Configuration.ManagedFiles, Is.EquivalentTo(["README.md", "architecture-health-badge.json"]));
             Assert.That(result.Configuration.ProviderPlan, Is.Null);
+            Assert.That(result.Configuration.Destination.Subject, Is.EqualTo("repo:owner/repo:environment:architecture-health"));
         });
     }
 

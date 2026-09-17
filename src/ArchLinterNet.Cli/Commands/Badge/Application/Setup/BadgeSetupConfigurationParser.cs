@@ -118,12 +118,13 @@ internal static class BadgeSetupConfigurationParser
             return null;
         }
 
-        RejectUnknownProperties(value, ["alias", "account", "endpoint", "audience"], diagnostics);
+        RejectUnknownProperties(value, ["alias", "account", "endpoint", "audience", "subject"], diagnostics);
         string? alias = ReadNullableString(value, "alias", diagnostics, required: true);
         string? account = ReadNullableString(value, "account", diagnostics);
         string? endpoint = ReadNullableString(value, "endpoint", diagnostics);
         string? audience = ReadNullableString(value, "audience", diagnostics);
-        return new(alias, account, endpoint, audience);
+        string? subject = ReadNullableString(value, "subject", diagnostics);
+        return new(alias, account, endpoint, audience, subject);
     }
 
     private static BadgeSetupProject? ReadProject(

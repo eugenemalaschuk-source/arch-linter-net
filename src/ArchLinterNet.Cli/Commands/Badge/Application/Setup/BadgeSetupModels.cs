@@ -45,7 +45,7 @@ internal static class BadgeSetupContract
     internal const string DefaultPublisherWorkflowRef = "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml";
     internal const string DefaultPublisherWorkflowSha = "2f5719ef606e3b89b26f6d6a2ba45c62b9270ff1";
     internal const string DefaultActionRef = "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@2f5719ef606e3b89b26f6d6a2ba45c62b9270ff1";
-    internal const string ShippedRelayBundleManifestSha256 = "fae72f19f77aea59a3af237b80fb85751568643bd3ab03dbc7da86e3e8ea93ed";
+    internal const string ShippedRelayBundleManifestSha256 = "ac838a2bd60c3e2a8400be43f26e83910b9ec4d963251d98b0667be53af3e306";
     internal const string DefaultProducerWorkflowPath = ".github/workflows/architecture-health-badge-producer.yml";
     internal const string DefaultRenewalWorkflowPath = ".github/workflows/architecture-health-badge-renewal.yml";
     internal const string DefaultCheckName = "Architecture Coverage";
@@ -112,6 +112,7 @@ internal sealed record BadgeSetupCapabilities(
     long? RepositoryId = null,
     long? RepositoryOwnerId = null,
     bool ProviderQuotaAvailable = false,
+    string? OidcSubject = null,
     string? CapabilitySource = null,
     DateTimeOffset? ObservedAt = null);
 
@@ -166,7 +167,8 @@ internal sealed record BadgeSetupConfigurationDestination(
     [property: JsonPropertyName("alias")] string? Alias,
     [property: JsonPropertyName("account")] string? Account = null,
     [property: JsonPropertyName("endpoint")] string? Endpoint = null,
-    [property: JsonPropertyName("audience")] string? Audience = null);
+    [property: JsonPropertyName("audience")] string? Audience = null,
+    [property: JsonPropertyName("subject")] string? Subject = null);
 
 internal sealed record BadgeSetupConfigurationRenewal(
     [property: JsonPropertyName("enabled")] bool Enabled,

@@ -130,6 +130,10 @@ internal sealed class BadgeSetupCommandHandler(ICliConsole console, IFileSystem 
                 RepositoryId = configuration.Repository.RepositoryId ?? inspection.Repository.Capabilities.RepositoryId,
                 RepositoryOwnerId = configuration.Repository.RepositoryOwnerId ?? inspection.Repository.Capabilities.RepositoryOwnerId,
             },
+            Destination = configuration.Destination with
+            {
+                Subject = configuration.Destination.Subject ?? inspection.Repository.Capabilities.OidcSubject,
+            },
         };
         BadgeSetupRepositoryContext context = inspection.Repository with
         {

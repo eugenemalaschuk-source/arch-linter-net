@@ -371,6 +371,13 @@ internal static class BadgeSetupEngine
                 BadgeSetupDiagnosticCodes.InvalidEndpoint,
                 privateDetail: "The destination audience contains unsupported characters."));
         }
+
+        if (configuration.Destination.Subject is not null && !IsSafeOidcSubject(configuration.Destination.Subject))
+        {
+            diagnostics.Add(BadgeSetupDiagnosticCatalog.Create(
+                BadgeSetupDiagnosticCodes.MalformedIdentity,
+                privateDetail: "The destination OIDC subject is empty, oversized, or contains control characters."));
+        }
     }
 
     private static void ValidateProject(
