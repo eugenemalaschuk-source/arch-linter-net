@@ -654,13 +654,18 @@ internal static class BadgeSetupCapabilityInspector
             string expectedWorkflowRef = $"{configuration.Pins?.WorkflowRef}@{configuration.Pins?.WorkflowSha}";
             string expectedSubject = $"repo:{configuration.Repository.Owner}/{configuration.Repository.Name}:ref:refs/heads/{configuration.BaseRef}";
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            bool bootstrap = string.Equals(
+                Environment.GetEnvironmentVariable("ARCHLINTERNET_BOOTSTRAP"),
+                "1",
+                StringComparison.Ordinal);
+            string expectedEvent = bootstrap ? "workflow_dispatch" : "push";
             return StringClaim(claims, "iss") == OidcIssuer
                 && AudienceClaimMatches(claims, configuration.Destination.Audience)
                 && PositiveClaim(claims, "repository_id") == configuration.Repository.RepositoryId
                 && PositiveClaim(claims, "repository_owner_id") == configuration.Repository.RepositoryOwnerId
                 && StringClaim(claims, "repository") == $"{configuration.Repository.Owner}/{configuration.Repository.Name}"
                 && StringClaim(claims, "repository_visibility") == configuration.Repository.Visibility
-                && StringClaim(claims, "event_name") == "push"
+                && StringClaim(claims, "event_name") == expectedEvent
                 && StringClaim(claims, "ref") == $"refs/heads/{configuration.BaseRef}"
                 && StringClaim(claims, "job_workflow_ref") == expectedWorkflowRef
                 && StringClaim(claims, "job_workflow_sha") == configuration.Pins?.WorkflowSha

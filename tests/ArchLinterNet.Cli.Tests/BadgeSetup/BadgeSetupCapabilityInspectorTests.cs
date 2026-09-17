@@ -110,6 +110,30 @@ public sealed class BadgeSetupCapabilityInspectorTests
     }
 
     [Test]
+    public void TrustedBootstrapInspectionAcceptsOnlyWorkflowDispatch()
+    {
+        BadgeSetupConfiguration configuration = Configuration("relay", "private");
+        using EnvironmentScope scope = LiveEnvironment(("ARCHLINTERNET_BOOTSTRAP", "1"));
+        HttpClientFactory factory = new(configuration, useRulesetFallback: false, oidcEvent: "workflow_dispatch");
+
+        BadgeSetupCapabilityInspectionResult accepted = BadgeSetupCapabilityInspector.Inspect(
+            configuration,
+            Options(),
+            new MemoryFileSystem(),
+            factory.Create);
+
+        Assert.That(accepted.Repository.Capabilities.CanUseOidc, Is.True);
+
+        HttpClientFactory push = new(configuration, useRulesetFallback: false, oidcEvent: "push");
+        BadgeSetupCapabilityInspectionResult rejected = BadgeSetupCapabilityInspector.Inspect(
+            configuration,
+            Options(),
+            new MemoryFileSystem(),
+            push.Create);
+        Assert.That(rejected.Repository.Capabilities.CanUseOidc, Is.False);
+    }
+
+    [Test]
     public void LiveInspectionFallsBackToInheritedRulesetsAndRejectsBadIdentity()
     {
         BadgeSetupConfiguration configuration = Configuration("relay", "private");
@@ -279,13 +303,16 @@ public sealed class BadgeSetupCapabilityInspectorTests
             relay = true,
         });
 
-    private static EnvironmentScope LiveEnvironment() => new(
-        ("GITHUB_TOKEN", "github-test-token"),
-        ("GH_TOKEN", null),
-        ("CF_API_TOKEN", "cloudflare-test-token"),
-        ("CLOUDFLARE_API_TOKEN", null),
-        ("ACTIONS_ID_TOKEN_REQUEST_URL", "https://actions.example/oidc"),
-        ("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "oidc-test-token"));
+    private static EnvironmentScope LiveEnvironment(params (string Name, string? Value)[] extra) => new(
+        [
+            ("GITHUB_TOKEN", "github-test-token"),
+            ("GH_TOKEN", null),
+            ("CF_API_TOKEN", "cloudflare-test-token"),
+            ("CLOUDFLARE_API_TOKEN", null),
+            ("ACTIONS_ID_TOKEN_REQUEST_URL", "https://actions.example/oidc"),
+            ("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "oidc-test-token"),
+            .. extra,
+        ]);
 
     private sealed class MemoryFileSystem(params (string Path, string Contents)[] files) : IFileSystem
     {
@@ -352,6 +379,7 @@ public sealed class BadgeSetupCapabilityInspectorTests
         bool missingBranch = false,
         bool oidcEnvelope = false,
         bool invalidOidcSignature = false,
+        string oidcEvent = "push",
         string? rulesPayload = null)
     {
         private const string OidcKeyId = "arch-linter-net-test-key";
@@ -418,8 +446,8 @@ public sealed class BadgeSetupCapabilityInspectorTests
                 }
 
                 return oidcEnvelope
-                    ? Json(JsonSerializer.Serialize(new { value = CreateJwt(configuration, !invalidOidcSignature) }))
-                    : JsonToken(configuration, !invalidOidcSignature);
+                    ? Json(JsonSerializer.Serialize(new { value = CreateJwt(configuration, !invalidOidcSignature, oidcEvent) }))
+                    : JsonToken(configuration, !invalidOidcSignature, oidcEvent);
             }
 
             if (path == "/.well-known/jwks")
@@ -438,15 +466,15 @@ public sealed class BadgeSetupCapabilityInspectorTests
             Content = new StringContent(content, Encoding.UTF8, "application/json"),
         };
 
-        private static HttpResponseMessage JsonToken(BadgeSetupConfiguration configuration, bool validSignature) =>
+        private static HttpResponseMessage JsonToken(BadgeSetupConfiguration configuration, bool validSignature, string oidcEvent) =>
             new(HttpStatusCode.OK)
             {
-                Content = new StringContent(CreateJwt(configuration, validSignature), Encoding.UTF8, "application/jwt"),
+                Content = new StringContent(CreateJwt(configuration, validSignature, oidcEvent), Encoding.UTF8, "application/jwt"),
             };
 
         private static HttpResponseMessage NotFound() => new(HttpStatusCode.NotFound);
 
-        private static string CreateJwt(BadgeSetupConfiguration configuration, bool validSignature)
+        private static string CreateJwt(BadgeSetupConfiguration configuration, bool validSignature, string oidcEvent = "push")
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             string header = Encode(new { alg = "RS256", kid = OidcKeyId, typ = "JWT" });
@@ -458,7 +486,7 @@ public sealed class BadgeSetupCapabilityInspectorTests
                 repository_owner_id = configuration.Repository.RepositoryOwnerId,
                 repository = "owner/repo",
                 repository_visibility = "private",
-                event_name = "push",
+                event_name = oidcEvent,
                 @ref = "refs/heads/main",
                 job_workflow_ref = $"{configuration.Pins!.WorkflowRef}@{configuration.Pins.WorkflowSha}",
                 job_workflow_sha = configuration.Pins.WorkflowSha,
