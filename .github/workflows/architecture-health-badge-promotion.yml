@@ -237,7 +237,7 @@ jobs:
       - name: Run pinned trusted promotion contract
         id: promotion
         if: inputs.operation != 'bootstrap'
-        uses: $/.github/actions/architecture-health-badge-promotion
+        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@a78c76a7a836d591a2deb6bc9c8b2dc4684cfb0c
         with:
           configuration-id: ${{ inputs.configuration-id }}
           adapter: ${{ inputs.adapter }}
