@@ -2,10 +2,6 @@ name: Architecture Health Badge Promotion
 
 on:
   workflow_call:
-    secrets:
-      cf_api_token:
-        description: Optional Cloudflare API token used only by trusted bootstrap capability inspection.
-        required: false
     inputs:
       configuration-id:
         description: Approved setup/registry entry; never an arbitrary producer selector.
@@ -122,6 +118,10 @@ on:
         required: false
         default: architecture-health
         type: string
+    secrets:
+      cf_api_token:
+        description: Optional Cloudflare API token used only by trusted bootstrap capability inspection.
+        required: false
 
 concurrency:
   group: architecture-health-badge-${{ inputs['configuration-id'] }}
