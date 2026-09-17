@@ -1,3 +1,8 @@
+## Purpose
+
+Define the safety, evidence, and review boundaries for the repository's advisory
+Qodana Community .NET analysis.
+
 ## Requirements
 
 ### Requirement: Independent advisory Community analysis
