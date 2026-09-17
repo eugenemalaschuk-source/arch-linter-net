@@ -20,19 +20,19 @@
     "publication": "architecture-health-badge-publication/v2",
     "storage": "v1",
     "publisher_repository": "eugenemalaschuk-source/arch-linter-net",
-    "publisher_commit": "54557bb8549f282a4cafdda46ca6e0c3c1a5256f",
+    "publisher_commit": "f952e833c8c64cc3e8ddf0d60cc4e5ec9f04f20d",
     "workflow_path": ".github/workflows/architecture-health-badge-promotion.yml",
     "action_path": ".github/actions/architecture-health-badge-promotion/action.yml",
-    "workflow_ref": "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml@54557bb8549f282a4cafdda46ca6e0c3c1a5256f",
-    "action_ref": "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@54557bb8549f282a4cafdda46ca6e0c3c1a5256f",
-    "workflow_source_sha": "88d05c010023488c29225dda8391ec43268a443b",
+    "workflow_ref": "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml@f952e833c8c64cc3e8ddf0d60cc4e5ec9f04f20d",
+    "action_ref": "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@f952e833c8c64cc3e8ddf0d60cc4e5ec9f04f20d",
+    "workflow_source_sha": "b3f96c009f6bd5d1e74d541d3d02809fe48651ef",
     "action_source_sha": "b400bd026eb8a7ab6e7d55619f0d39cfc65111e6"
   },
   "components": [
     {
       "kind": "reusable-workflow",
       "path": ".github/workflows/architecture-health-badge-promotion.yml",
-      "approved_source_sha": "88d05c010023488c29225dda8391ec43268a443b"
+      "approved_source_sha": "b3f96c009f6bd5d1e74d541d3d02809fe48651ef"
     },
     {
       "kind": "composite-action",
