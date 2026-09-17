@@ -12,9 +12,111 @@ on:
         required: true
         type: string
       operation:
-        description: Publish or metadata-only renew.
+        description: Bootstrap setup, publish, or metadata-only renew.
         required: false
         default: publish
+        type: string
+      cli-version:
+        description: Exact ArchLinterNet CLI package used by the trusted bootstrap operation.
+        required: false
+        default: 0.8.0
+        type: string
+      nuget-source:
+        description: Optional package source for the exact bootstrap CLI package.
+        required: false
+        default: https://api.nuget.org/v3/index.json
+        type: string
+      repository:
+        description: Consumer owner/name for bootstrap setup.
+        required: false
+        type: string
+      visibility:
+        description: Consumer repository visibility for bootstrap setup.
+        required: false
+        default: private
+        type: string
+      mode:
+        description: Consumer badge mode for bootstrap setup.
+        required: false
+        default: relay
+        type: string
+      account:
+        description: Provider account identifier for bootstrap setup.
+        required: false
+        type: string
+      alias:
+        description: Opaque Relay alias for bootstrap setup.
+        required: false
+        type: string
+      endpoint:
+        description: Relay HTTPS origin for bootstrap setup.
+        required: false
+        type: string
+      audience:
+        description: Exact OIDC audience for bootstrap setup.
+        required: false
+        type: string
+      provider-plan:
+        description: Provider plan metadata for bootstrap setup.
+        required: false
+        type: string
+      repository-id:
+        description: Immutable consumer repository ID for bootstrap setup.
+        required: false
+        type: string
+      repository-owner-id:
+        description: Immutable consumer owner ID for bootstrap setup.
+        required: false
+        type: string
+      base-ref:
+        description: Consumer branch for bootstrap setup.
+        required: false
+        default: main
+        type: string
+      policy:
+        description: Architecture policy path for bootstrap setup.
+        required: false
+        default: architecture/dependencies.arch.yml
+        type: string
+      solution:
+        description: Solution path for bootstrap setup.
+        required: false
+        default: ArchLinterNet.slnx
+        type: string
+      disclosure-profile:
+        description: Approved disclosure profile for bootstrap setup.
+        required: false
+        default: headline-only/v1
+        type: string
+      producer-workflow:
+        description: Producer workflow path for bootstrap setup.
+        required: false
+        default: .github/workflows/architecture-health-badge-producer.yml
+        type: string
+      producer-job-name:
+        description: Producer job name for bootstrap setup.
+        required: false
+        default: Architecture Coverage
+        type: string
+      check-name:
+        description: Required check name for bootstrap setup.
+        required: false
+        default: Architecture Coverage
+        type: string
+      check-app:
+        description: Required check provider for bootstrap setup.
+        required: false
+        default: GitHub Actions
+        type: string
+      artifact-name:
+        description: Producer artifact name for bootstrap setup.
+        required: false
+        default: architecture-health-badge-v1
+        type: string
+      evidence-artifact-name:
+        description: Producer semantic evidence artifact name for bootstrap setup.
+        required: false
+        default: architecture-health
         type: string
 
 concurrency:
@@ -35,15 +137,106 @@ jobs:
       id-token: write
       pull-requests: read
     steps:
+      - name: Checkout consumer for trusted bootstrap setup
+        if: inputs.operation == 'bootstrap'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.base-ref }}
+          fetch-depth: 1
+      - name: Setup .NET for trusted bootstrap setup
+        if: inputs.operation == 'bootstrap'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+      - name: Install exact bootstrap CLI
+        if: inputs.operation == 'bootstrap'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLI_VERSION: ${{ inputs.cli-version }}
+          NUGET_SOURCE: ${{ inputs.nuget-source }}
+        run: |
+          set -euo pipefail
+          config="$RUNNER_TEMP/arch-linter-net-bootstrap NuGet.Config"
+          tool="$RUNNER_TEMP/arch-linter-net-bootstrap-tool"
+          cat > "$config" <<'EOF'
+          <configuration><packageSources><clear /></packageSources></configuration>
+          EOF
+          dotnet nuget add source "$NUGET_SOURCE" --name bootstrap --username "$GITHUB_ACTOR" --password "$GITHUB_TOKEN" --store-password-in-clear-text --configfile "$config"
+          dotnet tool install ArchLinterNet.Cli --tool-path "$tool" --version "$CLI_VERSION" --configfile "$config"
+          echo "BOOTSTRAP_TOOL=$tool/arch-linter-net" >> "$GITHUB_ENV"
+          echo "BOOTSTRAP_NUGET_CONFIG=$config" >> "$GITHUB_ENV"
+      - name: Generate and commit trusted bootstrap setup
+        if: inputs.operation == 'bootstrap'
+        shell: bash
+        env:
+          ARCHLINTERNET_BOOTSTRAP: "1"
+          GITHUB_TOKEN: ${{ github.token }}
+          BOOTSTRAP_REPOSITORY: ${{ inputs.repository }}
+          BOOTSTRAP_VISIBILITY: ${{ inputs.visibility }}
+          BOOTSTRAP_MODE: ${{ inputs.mode }}
+          BOOTSTRAP_ACCOUNT: ${{ inputs.account }}
+          BOOTSTRAP_ALIAS: ${{ inputs.alias }}
+          BOOTSTRAP_ENDPOINT: ${{ inputs.endpoint }}
+          BOOTSTRAP_AUDIENCE: ${{ inputs.audience }}
+          BOOTSTRAP_PROVIDER_PLAN: ${{ inputs.provider-plan }}
+          BOOTSTRAP_REPOSITORY_ID: ${{ inputs.repository-id }}
+          BOOTSTRAP_REPOSITORY_OWNER_ID: ${{ inputs.repository-owner-id }}
+          BOOTSTRAP_BASE_REF: ${{ inputs.base-ref }}
+          BOOTSTRAP_POLICY: ${{ inputs.policy }}
+          BOOTSTRAP_SOLUTION: ${{ inputs.solution }}
+          BOOTSTRAP_DISCLOSURE_PROFILE: ${{ inputs.disclosure-profile }}
+          BOOTSTRAP_PRODUCER_WORKFLOW: ${{ inputs.producer-workflow }}
+          BOOTSTRAP_PRODUCER_JOB: ${{ inputs.producer-job-name }}
+          BOOTSTRAP_CHECK_NAME: ${{ inputs.check-name }}
+          BOOTSTRAP_CHECK_APP: ${{ inputs.check-app }}
+          BOOTSTRAP_ARTIFACT: ${{ inputs.artifact-name }}
+          BOOTSTRAP_EVIDENCE_ARTIFACT: ${{ inputs.evidence-artifact-name }}
+        run: |
+          set -euo pipefail
+          args=(badge architecture-health setup
+            --repository "$BOOTSTRAP_REPOSITORY"
+            --visibility "$BOOTSTRAP_VISIBILITY"
+            --mode "$BOOTSTRAP_MODE"
+            --account "$BOOTSTRAP_ACCOUNT"
+            --alias "$BOOTSTRAP_ALIAS"
+            --endpoint "$BOOTSTRAP_ENDPOINT"
+            --audience "$BOOTSTRAP_AUDIENCE"
+            --provider-plan "$BOOTSTRAP_PROVIDER_PLAN"
+            --repository-id "$BOOTSTRAP_REPOSITORY_ID"
+            --repository-owner-id "$BOOTSTRAP_REPOSITORY_OWNER_ID"
+            --base-ref "$BOOTSTRAP_BASE_REF"
+            --policy "$BOOTSTRAP_POLICY"
+            --solution "$BOOTSTRAP_SOLUTION"
+            --disclosure-profile "$BOOTSTRAP_DISCLOSURE_PROFILE"
+            --producer-workflow "$BOOTSTRAP_PRODUCER_WORKFLOW"
+            --producer-job-name "$BOOTSTRAP_PRODUCER_JOB"
+            --check-name "$BOOTSTRAP_CHECK_NAME"
+            --check-app "$BOOTSTRAP_CHECK_APP"
+            --artifact-name "$BOOTSTRAP_ARTIFACT"
+            --evidence-artifact-name "$BOOTSTRAP_EVIDENCE_ARTIFACT"
+            --approve-disclosure --output . --format human)
+          "$BOOTSTRAP_TOOL" "${args[@]}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- badge-relay-config.json README.md relay schema .github/badge-promotion '.github/workflows/architecture-health-badge-*'
+          if git diff --cached --quiet; then
+            echo "Trusted bootstrap produced no changes."
+          else
+            git commit -m "chore: bootstrap ArchLinterNet badge setup"
+            git push origin "HEAD:$BOOTSTRAP_BASE_REF"
+          fi
       - name: Run pinned trusted promotion contract
         id: promotion
+        if: inputs.operation != 'bootstrap'
         uses: $/.github/actions/architecture-health-badge-promotion
         with:
           configuration-id: ${{ inputs.configuration-id }}
           adapter: ${{ inputs.adapter }}
           operation: ${{ inputs.operation }}
       - name: Confirm actionable promotion result
-        if: always()
+        if: always() && inputs.operation != 'bootstrap'
         env:
           STATUS: ${{ steps.promotion.outputs.status }}
           REASON: ${{ steps.promotion.outputs.reason }}
