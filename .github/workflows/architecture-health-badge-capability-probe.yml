@@ -67,6 +67,9 @@ jobs:
           import base64
           import json
           import os
+          import subprocess
+          import tempfile
+          import time
           import urllib.error
           import urllib.parse
           import urllib.request
@@ -86,6 +89,59 @@ jobs:
 
           def decode(segment):
               return json.loads(base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4)))
+
+          def decode_bytes(segment):
+              return base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
+
+          def der_length(length):
+              if length < 128:
+                  return bytes([length])
+              encoded = length.to_bytes((length.bit_length() + 7) // 8, "big")
+              return bytes([0x80 | len(encoded)]) + encoded
+
+          def der_integer(value):
+              value = value.lstrip(b"\x00") or b"\x00"
+              if value[0] & 0x80:
+                  value = b"\x00" + value
+              return b"\x02" + der_length(len(value)) + value
+
+          def rsa_public_pem(modulus, exponent):
+              body = der_integer(modulus) + der_integer(exponent)
+              der = b"\x30" + der_length(len(body)) + body
+              text = base64.b64encode(der).decode()
+              lines = [text[index:index + 64] for index in range(0, len(text), 64)]
+              return "-----BEGIN RSA PUBLIC KEY-----\n" + "\n".join(lines) + "\n-----END RSA PUBLIC KEY-----\n"
+
+          def verify_signature(token, header, jwks):
+              if header.get("alg") != "RS256" or not isinstance(header.get("kid"), str):
+                  return False
+              key = next((item for item in jwks.get("keys", []) if item.get("kid") == header["kid"]), None)
+              if not isinstance(key, dict) or key.get("kty") != "RSA":
+                  return False
+              try:
+                  modulus = decode_bytes(key["n"])
+                  exponent = decode_bytes(key["e"])
+                  signed, _, signature = token.encode().partition(b".")
+                  signed += b"." + token.encode().split(b".", 2)[1]
+                  signature = decode_bytes(token.split(".", 2)[2])
+              except (KeyError, ValueError):
+                  return False
+              with tempfile.TemporaryDirectory() as directory:
+                  key_path = os.path.join(directory, "key.pem")
+                  payload_path = os.path.join(directory, "payload")
+                  signature_path = os.path.join(directory, "signature")
+                  with open(key_path, "w", encoding="ascii") as stream:
+                      stream.write(rsa_public_pem(modulus, exponent))
+                  with open(payload_path, "wb") as stream:
+                      stream.write(signed)
+                  with open(signature_path, "wb") as stream:
+                      stream.write(signature)
+                  return subprocess.run(
+                      ["openssl", "dgst", "-sha256", "-verify", key_path, "-signature", signature_path, payload_path],
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.DEVNULL,
+                      check=False,
+                  ).returncode == 0
 
           github_headers = {
               "Accept": "application/vnd.github+json",
@@ -146,25 +202,68 @@ jobs:
                       token = envelope.get("value", raw_token) if isinstance(envelope, dict) else raw_token
                   except ValueError:
                       token = raw_token
-                  payload = decode(token.split(".")[1])
+                  segments = token.split(".")
+                  header = decode(segments[0])
+                  payload = decode(segments[1])
                   results["oidc_event"] = payload.get("event_name") == "workflow_dispatch"
                   results["oidc_ref"] = payload.get("ref") == f"refs/heads/{os.environ['EXPECTED_REF']}"
                   results["oidc_workflow_ref"] = payload.get("job_workflow_ref") == os.environ["EXPECTED_WORKFLOW_REF"]
                   results["oidc_workflow_sha"] = payload.get("job_workflow_sha") == os.environ["EXPECTED_WORKFLOW_SHA"]
+                  results["oidc_issuer"] = payload.get("iss") == "https://token.actions.githubusercontent.com"
+                  audience = payload.get("aud")
+                  results["oidc_audience"] = (
+                      audience == os.environ["PROBE_AUDIENCE"]
+                      or isinstance(audience, list) and os.environ["PROBE_AUDIENCE"] in audience
+                  )
+                  results["oidc_repository_identity"] = (
+                      payload.get("repository") == repository
+                      and payload.get("repository_visibility") == os.environ["PROBE_VISIBILITY"]
+                      and payload.get("repository_id") == repository_json.get("id")
+                      and payload.get("repository_owner_id") == repository_json.get("owner", {}).get("id")
+                  )
+                  results["oidc_subject"] = payload.get("sub") == f"repo:{repository}:ref:refs/heads/{os.environ['EXPECTED_REF']}"
+                  now = int(time.time())
+                  results["oidc_time_window"] = (
+                      isinstance(payload.get("iat"), int)
+                      and isinstance(payload.get("nbf"), int)
+                      and isinstance(payload.get("exp"), int)
+                      and payload["iat"] <= now + 300
+                      and payload["nbf"] <= now + 300
+                      and payload["exp"] >= now - 300
+                      and payload["exp"] > payload["iat"]
+                      and payload["exp"] - payload["iat"] <= 600
+                  )
+                  jwks_status, jwks_body = request("https://token.actions.githubusercontent.com/.well-known/jwks")
+                  results["oidc_jwks"] = jwks_status == 200
+                  try:
+                      results["oidc_signature"] = results["oidc_jwks"] and verify_signature(token, header, json.loads(jwks_body))
+                  except (TypeError, ValueError):
+                      results["oidc_signature"] = False
               except (IndexError, TypeError, UnicodeDecodeError, ValueError):
                   results["oidc_event"] = False
                   results["oidc_ref"] = False
                   results["oidc_workflow_ref"] = False
                   results["oidc_workflow_sha"] = False
+                  results["oidc_issuer"] = False
+                  results["oidc_audience"] = False
+                  results["oidc_repository_identity"] = False
+                  results["oidc_subject"] = False
+                  results["oidc_time_window"] = False
+                  results["oidc_jwks"] = False
+                  results["oidc_signature"] = False
           else:
               results["oidc_token_issued"] = False
               results["oidc_event"] = False
               results["oidc_ref"] = False
               results["oidc_workflow_ref"] = False
               results["oidc_workflow_sha"] = False
-
-          jwks_status, _ = request("https://token.actions.githubusercontent.com/.well-known/jwks")
-          results["oidc_jwks"] = jwks_status == 200
+              results["oidc_issuer"] = False
+              results["oidc_audience"] = False
+              results["oidc_repository_identity"] = False
+              results["oidc_subject"] = False
+              results["oidc_time_window"] = False
+              results["oidc_jwks"] = False
+              results["oidc_signature"] = False
 
           cf_headers = {"Authorization": f"Bearer {os.environ['CF_API_TOKEN']}"}
           cf_base = f"https://api.cloudflare.com/client/v4/accounts/{os.environ['PROBE_ACCOUNT']}"
