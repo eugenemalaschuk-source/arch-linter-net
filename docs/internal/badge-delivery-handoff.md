@@ -7,7 +7,7 @@ from the public MkDocs site by `exclude_docs: internal/`.
 ## Audit boundary and ownership
 
 The publisher source audit was refreshed after #926 at
-`e3bc07450004f1ade998233e47d7f9f895646d89` on 2026-09-17. That SHA is the
+`4c19c8c2dc2f66015fd43dc3076d3c3f2ab38f6c` on 2026-09-17. That SHA is the
 reviewed publisher revision for the #918 delivery-pin rotation, **not** a
 frozen or approved final `0.8.Z` package candidate.
 The original audit at `ffd5e97f99cedf4982b4a9c28f1f45b3827ad7e7` identified
@@ -73,8 +73,8 @@ archive includes a usable copy. The four-package release family is not a
 requirement to install four packages just to use the CLI.
 
 After the #926 executable-action fix, the approved publisher commit is
-`e3bc07450004f1ade998233e47d7f9f895646d89`. The inventory binds the workflow
-blob `b2e179b32f7c033d7879d383e5c8bc79dd3f90aa` and action blob
+`4c19c8c2dc2f66015fd43dc3076d3c3f2ab38f6c`. The inventory binds the workflow
+blob `1d45f08bbd4cf62d37fc4c77f1a2714239ab5e14` and action blob
 `b400bd026eb8a7ab6e7d55619f0d39cfc65111e6` at that commit. These are Git
 object identities, not distribution SHA-256 digests. Copy the full pinned
 workflow/action refs from the chosen candidate inventory, not from `main` or
