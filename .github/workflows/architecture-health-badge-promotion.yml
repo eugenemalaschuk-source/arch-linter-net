@@ -3,7 +3,7 @@ name: Architecture Health Badge Promotion
 on:
   workflow_call:
     secrets:
-      cf-api-token:
+      cf_api_token:
         description: Optional Cloudflare API token used only by trusted bootstrap capability inspection.
         required: false
     inputs:
@@ -183,7 +183,7 @@ jobs:
         env:
           ARCHLINTERNET_BOOTSTRAP: "1"
           GITHUB_TOKEN: ${{ github.token }}
-          CF_API_TOKEN: ${{ secrets['cf-api-token'] }}
+          CF_API_TOKEN: ${{ secrets.cf_api_token }}
           BOOTSTRAP_REPOSITORY: ${{ inputs.repository }}
           BOOTSTRAP_VISIBILITY: ${{ inputs.visibility }}
           BOOTSTRAP_MODE: ${{ inputs.mode }}
