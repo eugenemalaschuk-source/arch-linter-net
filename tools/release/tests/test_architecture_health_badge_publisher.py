@@ -69,14 +69,16 @@ def test_reusable_workflow_uses_bracket_notation_for_hyphenated_inputs() -> None
         encoding="utf-8"
     )
     assert not re.search(r"inputs\.[A-Za-z0-9_]+-[A-Za-z0-9_-]+", action)
-    assert "inputs['configuration-id']" in action
+    assert "inputs.configuration_id" in action
+    assert "configuration-id:" not in action.split("runs:", 1)[0]
 
 
 def test_action_runs_repository_owned_code_and_has_redacted_outputs() -> None:
     action = (ROOT / ".github" / "actions" / "architecture-health-badge-promotion" / "action.yml").read_text(encoding="utf-8")
     assert "using: composite" in action
     assert "tools.badge_promotion.cli" in action
-    assert "configuration-id" in action
+    assert "configuration_id:" in action
+    assert "--configuration-id" in action
     assert "head-sha" in action
     assert "reason" in action
     assert "GITHUB_TOKEN: ${{ github.token }}" in action
