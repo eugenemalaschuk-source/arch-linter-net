@@ -75,7 +75,7 @@ requirement to install four packages just to use the CLI.
 After the #926 executable-action fix, the approved publisher commit is
 `801bf4020efeb82ccc8c1b645e98051abdc0ea40`. The inventory binds the workflow
 blob `5edbafd8740b155089b84c88a5507585b3883983` and action blob
-`b400bd026eb8a7ab6e7d55619f0d39cfc65111e6` at that commit. These are Git
+`c595b447b63fb6dac1c85d39e092352a7afdba97` at that commit. These are Git
 object identities, not distribution SHA-256 digests. Copy the full pinned
 workflow/action refs from the chosen candidate inventory, not from `main` or
 this source-audit paragraph. Bind the separate generated producer Git-blob SHA
