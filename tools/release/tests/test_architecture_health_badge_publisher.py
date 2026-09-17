@@ -40,6 +40,8 @@ def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_bounda
     assert "pull-requests: read" in workflow
     assert "packages: read" in workflow
     assert "cf_api_token:" in workflow
+    assert "bootstrap_writer_app_id:" in workflow
+    assert "bootstrap_writer_private_key:" in workflow
     assert "CF_API_TOKEN: ${{ secrets['cf_api_token'] }}" in workflow
     workflow_call = workflow.split("workflow_call:", 1)[1]
     assert workflow_call.index("inputs:") < workflow_call.index("secrets:")
@@ -47,6 +49,23 @@ def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_bounda
     assert "actions/checkout" not in workflow
     assert "run-url" not in workflow
     assert "artifact-url" not in workflow
+
+
+def test_protected_bootstrap_creates_a_constrained_reviewable_pull_request() -> None:
+    workflow = read_workflow("architecture-health-badge-promotion.yml")
+    assert "actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349" in workflow
+    assert "permission-contents: write" in workflow
+    assert "permission-pull-requests: write" in workflow
+    assert "permission-workflows: write" in workflow
+    assert "Trusted bootstrap requires the configured GitHub App writer credentials" in workflow
+    assert "BOOTSTRAP_WRITER_TOKEN: ${{ steps.bootstrap_writer.outputs.token }}" in workflow
+    assert 'bootstrap_branch="arch-linter-net/bootstrap/$base_sha"' in workflow
+    assert 'if: inputs.operation == \'bootstrap\' && env.BOOTSTRAP_HAS_CHANGES == \'true\'' in workflow
+    assert 'git ls-remote --exit-code --heads origin "refs/heads/$bootstrap_branch"' in workflow
+    assert 'push origin "HEAD:refs/heads/$BOOTSTRAP_BRANCH"' in workflow
+    assert '"$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls"' in workflow
+    assert 'push origin "HEAD:$BOOTSTRAP_BASE_REF"' not in workflow
+    assert "secrets: inherit" not in workflow
 
 
 def test_reusable_workflow_uses_bracket_notation_for_hyphenated_inputs() -> None:
