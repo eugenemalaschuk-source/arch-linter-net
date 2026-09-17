@@ -74,7 +74,7 @@ requirement to install four packages just to use the CLI.
 
 After the #933 parser-safe nested-action fix, the approved publisher commit is
 `17caba8fd9c28b656f8bf1439098be5e1692d167`. The inventory binds the workflow
-blob `0b08e235b511b653a1b67ec24bf114637e89613d` and action blob
+blob `6975574d5028c975fea3981c88fb0057af624076` and action blob
 `0628a09ad75bfb6c4da4acdae041a49681964a69` at that commit. These are Git
 object identities, not distribution SHA-256 digests. Copy the full pinned
 workflow/action refs from the chosen candidate inventory, not from `main` or
