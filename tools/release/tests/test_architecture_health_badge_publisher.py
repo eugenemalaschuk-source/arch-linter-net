@@ -15,7 +15,8 @@ def read_workflow(name: str) -> str:
 
 def test_reference_publisher_delegates_to_one_reusable_workflow() -> None:
     workflow = read_workflow("publish-architecture-health-badge.yml")
-    assert "uses: $/.github/workflows/architecture-health-badge-promotion.yml" in workflow
+    assert "uses: ./.github/workflows/architecture-health-badge-promotion.yml" in workflow
+    assert "uses: $/.github/workflows/architecture-health-badge-promotion.yml" not in workflow
     assert "configuration-id: reference-public-raw" in workflow
     assert "adapter: github-raw" in workflow
     assert "actions/github-script" not in workflow
