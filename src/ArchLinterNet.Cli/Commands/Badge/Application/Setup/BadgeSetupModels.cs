@@ -43,9 +43,9 @@ internal static class BadgeSetupContract
     internal const int DefaultLeaseMinutes = MaximumLeaseMinutes;
     internal const int PrivateMinutesPerRenewalJob = 1;
     internal const string DefaultPublisherWorkflowRef = "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml";
-    internal const string DefaultPublisherWorkflowSha = "c4fabcc3c4172b4777fb94e4f1ce5facd8f94eb0";
-    internal const string DefaultActionRef = "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@c4fabcc3c4172b4777fb94e4f1ce5facd8f94eb0";
-    internal const string ShippedRelayBundleManifestSha256 = "c0a9005b676ebdd28616a15185792d73518a8b6a81e57e703afdb21afd06324b";
+    internal const string DefaultPublisherWorkflowSha = "17caba8fd9c28b656f8bf1439098be5e1692d167";
+    internal const string DefaultActionRef = "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@17caba8fd9c28b656f8bf1439098be5e1692d167";
+    internal const string ShippedRelayBundleManifestSha256 = "c9a60e95b58d34978ef6f0a693c520da096715d601a5d84a52999f64a1f9136f";
     internal const string DefaultProducerWorkflowPath = ".github/workflows/architecture-health-badge-producer.yml";
     internal const string DefaultRenewalWorkflowPath = ".github/workflows/architecture-health-badge-renewal.yml";
     internal const string DefaultCheckName = "Architecture Coverage";
