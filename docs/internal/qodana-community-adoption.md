@@ -4,11 +4,18 @@ Owner: issue #864. Lifecycle: post-v0.8.0 engineering-health stabilization.
 
 ## Current state
 
-Phase A has real scanner and tooling evidence; Phase B adoption review remains incomplete.
-The check `Qodana Community .NET (advisory)` is optional, not a required merge/release gate.
-Do not add it to branch protection or a ruleset before the reviewed Phase B decision.
-A failed optional check stays visibly failed: `continue-on-error` does not turn an
-infrastructure failure into success. Draft PR #906 and issue #864 remain open.
+Phase A implementation is complete and PR #906 is merged. The Phase B burn-in review now has an
+explicit **KEEP ADVISORY** decision: `Qodana Community .NET (advisory)` remains optional and is not
+a required merge/release gate. The scanner has demonstrated repeatable execution and genuinely
+independent diagnostics, but its current repository-wide output mixes a large historical/style
+inventory with a much smaller actionable subset and has no reviewed differential/new-code baseline.
+Making the current check required would therefore prove scanner execution, not a reviewed
+regression policy.
+
+Issue #864 remains open only because a real fork/untrusted PR execution is still unrecorded and
+the active OpenSpec change must not be archived until that final trust-boundary proof is complete.
+Do not add Qodana to branch protection or a ruleset as part of #864. A failed optional check stays
+visibly failed: `continue-on-error` does not turn an infrastructure failure into success.
 
 The workflow is independent of Coverage + Sonar, CodeQL, ArchLinterNet self-governance,
 package validation and all existing required checks. None of their definitions or
@@ -30,9 +37,10 @@ configuration change and another real run. The runner accepts a version plus dig
 that spelling has not been exercised end-to-end. Do not substitute Docker's local image
 ID for a registry manifest digest.
 
-The recorded run demonstrated the canonical `.slnx`, Release configuration and .NET 10
-with Community `2026.2.672` / Inspect Code `2026.2.1`, SDK `10.0.301`, runtime `10.0.9`.
-This evidence applies to that image and checkout, not every future EAP image.
+The recorded implementation burn-in demonstrated the canonical `.slnx`, Release configuration
+and .NET 10 with Community `2026.2.672` / Inspect Code `2026.2.1`, SDK `10.0.301`, runtime
+`10.0.9`. Later ordinary PR runs continue to exercise the committed workflow. Evidence applies
+to the recorded image/checkouts, not every future EAP image.
 
 ## Running and reviewing
 
@@ -60,10 +68,9 @@ redundant null condition. The corrected negative project must no longer report t
 A missing positive diagnostic or a remaining negative diagnostic fails validation.
 The negative control need not have zero unrelated recommended-profile diagnostics.
 
-Once the workflow exists on the default branch, its manual `workflow_dispatch` interface
-also offers the `burn_in` boolean. Before that, use the local command; do not assume the
-Actions manual-run button is available for a workflow present only on a feature branch.
-The temporary branch-only push trigger used to obtain implementation evidence is removed.
+The default-branch workflow exposes a manual `workflow_dispatch` interface with the `burn_in`
+boolean. The temporary branch-only push trigger used to obtain implementation evidence was
+removed before #906 merged.
 
 `--output` must be new or empty and outside the repository. Evidence lives under its
 `artifacts` child, uploaded as `qodana-evidence-<run-id>-<attempt>` with 14-day retention:
@@ -103,10 +110,9 @@ scanner cache; the optional warm scan reuses only its own job's cache. Cache mea
 regular-file logical bytes, not compressed Actions-cache charges. Image pull duration is
 separate from scanner durations. Community builds/restores inside the scanner container.
 
-`wall_seconds` excludes checkout, test setup, artifact upload and Actions scheduling. It is
-**not GitHub-billed minutes or a monetary charge**. Record job duration from Actions and
-actual billable usage from repository/account billing separately. Do not infer free/private
-repository billing or assign a cost without that evidence.
+`wall_seconds` excludes checkout, test setup, artifact upload and Actions scheduling. GitHub's
+Actions timing endpoint is used separately below for whole-run duration and reported billable
+usage; do not infer a private-repository price from the public-repository observations.
 
 ## Trust boundaries
 
@@ -120,7 +126,8 @@ and `no-new-privileges`. Network access is necessary for dependency restore.
 PR build logic and scanner reports remain untrusted. Valid SARIF is copied as a bounded
 regular file; scanner-created symlinks are not published. No privileged downstream consumer,
 security-event writer or PR-comment writer consumes these artifacts. Static workflow tests
-cover this configuration, but they do not substitute for an actual fork run.
+cover this configuration, but they do not substitute for an actual fork run. That real fork
+execution is the remaining trust-boundary acceptance blocker for #864.
 
 ## Recorded burn-in evidence
 
@@ -165,25 +172,92 @@ The commit only changed CI/runner files, so identical C# input is expected; the 
 is that two different machines, OS/Docker runtimes and independently pulled image copies
 converged on byte-identical inventory, not just repeated runs of one cached container.
 
-## Initial inventory and triage boundary
+### Representative post-merge PR runs and Actions timing
 
-The canonical inventory contains 120 rule IDs: 10132 notes, 2029 warnings and 1 error.
+After #906 merged, the committed advisory workflow continued to complete successfully on
+independent PR heads. GitHub's Actions timing endpoint reports the following whole-run values:
+
+| Run | Date (UTC) | Result | Run duration | Reported billable Ubuntu usage |
+| --- | --- | --- | ---: | ---: |
+| [35153454405](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35153454405) | 2026-09-16 | success | 416 s | 0 ms |
+| [35181806506](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35181806506) | 2026-09-17 | success | 418 s | 0 ms |
+| [35182465418](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35182465418) | 2026-09-17 | success | 426 s | 0 ms |
+
+These runs establish a representative normal-PR runtime band of about 6:56–7:06 and provide
+actual public-repository billing API evidence. The zero billable value is an observed API
+result for these public-repository runs, not a claim about pricing for private repositories.
+Superseded/cancelled workflow attempts are not reclassified as scanner failures merely because
+a newer push cancelled obsolete work.
+
+The latest run above analyzed head `81bf2378c003d6d6f9a9ea13601d7670e603fb65` and published
+artifact `10480863073` (`sha256:1b7be742e7385d29a50620d78bf53aaa63763d515324f9cc5103630fb10386fe`).
+
+## Inventory and signal review
+
+The original canonical inventory contained 120 rule IDs: 10132 notes, 2029 warnings and 1 error.
 Paths split into 8139 findings in tests, 3891 in production source, 116 in benchmarks and
 16 in tools. These are scanner diagnostics, **not 12162 confirmed defects**.
 
-| Sample / family | Observed evidence | Initial disposition |
+The later normal PR run `35182465418` reported 12164 diagnostics: 10143 notes, 2020 warnings
+and 1 error. Its path split was 8147 in tests, 3885 in `src`, 116 in benchmarks and 16 in tools.
+The small count drift reflects repository changes between analyzed heads; it is not a stability
+failure because the source input was different.
+
+| Sample / family | Observed evidence | Review disposition |
 | --- | --- | --- |
-| Collection expressions, method bodies, simple-type `var` | 2709 + 2154 + 2017 findings | Style/profile-review candidates, not automatic correctness failures |
-| `NotAccessedField.Compiler` | Sole error: `ArchitecturePublicApiMemberScannerTests.cs:149`, `InternalField` in the API visibility fixture | Test-fixture usage; do not delete the fixture or classify this as a production critical bug |
-| `AccessToDisposedClosure` | All 358 occur in tests; sampled `BadgeCommandHandlerTests.cs:29` captures a using-scoped document in `Assert.Multiple` | Review assertion lifetime semantics; sample is noise-prone, not proof that every finding is false |
-| `PossibleMultipleEnumeration` | 22 total, including 17 in `src` | Review production enumeration paths and input types before filing defects |
+| Collection expressions, method bodies, simple-type `var` | Original inventory: 2709 + 2154 + 2017 findings | High-volume style/profile signal; useful selectively, not suitable as an unreviewed blocking baseline |
+| `NotAccessedField.Compiler` | Sole error in the original inventory: `ArchitecturePublicApiMemberScannerTests.cs:149`, `InternalField` in the API visibility fixture | Test-fixture usage; not a production critical defect |
+| `AccessToDisposedClosure` | Original inventory: all 358 occur in tests; sampled `BadgeCommandHandlerTests.cs:29` captures a using-scoped document in `Assert.Multiple` | Noise-prone family requiring lifetime-aware review; not blanket-actionable |
+| `PossibleMultipleEnumeration` | Latest run: 17 findings in `src` | Potential performance/semantic value; review individual input/enumeration lifetimes before filing fixes |
+| `UsingStatementResourceInitialization` | Latest run: `BuildStateRuntimeBuildProcessExecutor.cs:136` | Distinct resource-safety signal: object-initializer failure can precede ownership by the `using` local; low-frequency but actionable review candidate |
 | `RedundantAssignment` | `SarifEvidenceArtifactReader.cs:99` | Small cleanup candidate; no demonstrated functional failure |
 
-This is a complete count inventory and a **sample triage**, not a finding-by-finding review.
-Unique value versus Sonar/compiler/other gates is not established. Keep original findings
-visible; do not introduce a giant baseline, blanket exclusions or unrelated C# changes.
-Confirmed correctness/security issues need focused owning tasks; debt/noise needs justified
-rule-specific review. No reviewed baseline or promotion decision has been established.
+For the latest run, the **832 production-source warnings** can be grouped by inspection intent:
+
+| Review bucket | Count | Interpretation |
+| --- | ---: | --- |
+| Style / mechanical | 488 | Formatting, naming, redundant syntax, docs and similar cleanup; predominantly debt/noise for gate promotion |
+| Dead/API-shape | 243 | Unused/not-accessed members, parameters and collection-shape observations; potentially useful but reflection/serialization/public-contract context can make blanket action unsafe |
+| Nullable / dataflow | 83 | Nullable-contract and constant-condition observations; useful independent review signal, but many are contract-tightening/cleanup rather than demonstrated defects |
+| Performance | 17 | `PossibleMultipleEnumeration`; targeted review candidates |
+| Resource safety | 1 | `UsingStatementResourceInitialization`; targeted review candidate |
+
+### Comparison with existing gates
+
+The exact latest Qodana head `81bf2378c003d6d6f9a9ea13601d7670e603fb65` also completed the normal
+CI, CodeQL and Package Validation workflows successfully. SonarCloud's check on that same PR head
+reported **Quality Gate passed** and **0 new issues**. Qodana nevertheless produced the repository-wide
+inventory above. This is useful evidence that the JetBrains inspection model is not redundant with the
+existing new-code gate, but it also exposes the present promotion problem: the Qodana check does not
+have a reviewed baseline/differential policy that separates historical inventory from PR regressions.
+
+The controlled positive/negative probe proves that a supported inspection can be detected reliably.
+The production inventory proves there are plausible additional review candidates. Neither fact means
+that all 12164 diagnostics are defects or that a successful full-repository scan should become a
+blocking quality verdict.
+
+### Phase B decision — KEEP ADVISORY
+
+Decision recorded 2026-09-17: **KEEP ADVISORY**.
+
+Reasons:
+
+1. Scanner/runtime reliability is acceptable for continued advisory use: cold/warm evidence,
+   cross-machine reproduction and multiple independent post-merge PR runs are stable enough to keep
+   collecting signal.
+2. The engine adds real coverage: targeted performance, nullable/dataflow and resource-safety
+   diagnostics exist beyond the current Sonar new-code result.
+3. Signal quality is not suitable for promotion as configured: the recommended profile emits a very
+   large repository-wide historical/style inventory, while the current workflow has no reviewed
+   baseline/new-code differential defining which findings constitute a regression.
+4. Making the check required now would primarily require the scanner to execute successfully; it
+   would not create a trustworthy finding-level merge policy. That would be a fake blocking-gate
+   claim and is explicitly avoided.
+
+Therefore #864 does **not** modify branch protection/rulesets. Qodana remains a visibly separate,
+non-blocking analyzer. A future dedicated change may define a reviewed baseline/new-code policy and
+reconsider promotion after the Community .NET engine matures; that work is outside the remaining
+acceptance of #864.
 
 ## Implementation validation and remaining acceptance
 
@@ -204,15 +278,14 @@ Offline tests validate orchestration and negative paths, not scanner execution. 
 lifecycle regression first failed on the original runner because warm evidence was not
 checkpointed before a probe; the fix saves every completed phase. Production C# is unchanged.
 
-Still required for issue completion: actual fork execution, representative independent
-reruns/reliability, job/billing evidence, deeper unique-signal/noise/debt triage and a maintainer
-reviewed PROMOTE or KEEP ADVISORY decision. Neither successful scans nor this sample review
-close Phase B. Existing required checks and rulesets remain untouched. Full repository/PR
-acceptance is separate from the tooling run above.
+The representative rerun/runtime/billing evidence and Phase B signal review are now complete.
+**Still required for issue completion:** execute one real fork/untrusted PR through the committed
+workflow and record the result without exposing secrets. Static contract tests and same-repository
+PRs do not substitute for that proof.
 
-The active OpenSpec change remains unarchived while these requirements are incomplete.
-Draft PR #906 is the explicitly requested handoff exception to the ordinary
-validation/archive-before-PR lifecycle; it is not permission to mark missing evidence done.
+After that fork execution succeeds, revalidate the final documentation/specifications, complete task
+2.5, archive the active OpenSpec change, complete task 2.7 and close #864. Until then the active
+OpenSpec change remains deliberately unarchived.
 
 ## Upstream references
 
