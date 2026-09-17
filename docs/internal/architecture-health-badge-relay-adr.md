@@ -9,6 +9,25 @@ This is an internal decision record. It defines the product and security
 contract for a bounded-freshness badge transport. It does not implement or
 deploy a service.
 
+## Acceptance execution discipline
+
+Live acceptance of this contract uses a staged validation order:
+
+1. Prove the smallest external contract with a private, synthetic caller or
+   local stub first (workflow-call schema, input/secret identity, permissions,
+   OIDC prerequisites, required-check identity, and immutable pins).
+2. Run the expensive provider/consumer CI matrix only after that contract
+   probe is green. A failed parser/startup probe must not be retried through a
+   full matrix until its exact cause is understood.
+3. Treat every shipped-byte, workflow-pin, schema, bundle, or candidate change
+   as a new evidence boundary. Rotate the exact identities and rerun affected
+   proofs; do not transfer a previous candidate's PASS.
+4. During long runs, report completed green stages and the one active blocker;
+   never describe queued or skipped jobs as green.
+
+This is an execution rule for acceptance evidence, not a relaxation of the
+trust model or a replacement for the required repository gates.
+
 ## Decision
 
 The supported private-repository path is an adopter-owned Badge Relay: a
