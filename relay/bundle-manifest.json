@@ -4,10 +4,10 @@
   "compatibility_plan": "architecture-health-badge-relay/v1",
   "publisher_pins": {
     "workflow_ref": "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml",
-    "workflow_sha": "a78c76a7a836d591a2deb6bc9c8b2dc4684cfb0c",
-    "action_ref": "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@a78c76a7a836d591a2deb6bc9c8b2dc4684cfb0c",
-    "action_sha": "a78c76a7a836d591a2deb6bc9c8b2dc4684cfb0c",
-    "commit": "a78c76a7a836d591a2deb6bc9c8b2dc4684cfb0c"
+    "workflow_sha": "e3bc07450004f1ade998233e47d7f9f895646d89",
+    "action_ref": "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@e3bc07450004f1ade998233e47d7f9f895646d89",
+    "action_sha": "e3bc07450004f1ade998233e47d7f9f895646d89",
+    "commit": "e3bc07450004f1ade998233e47d7f9f895646d89"
   },
   "files": [
     {
@@ -68,7 +68,7 @@
     },
     {
       "path": "schema/0.8.0/badge-relay-config.schema.json",
-      "sha256": "14b7d584800eee1859a038fedb0c238ae67393c2f8dc9404e8debb00202d13a0"
+      "sha256": "06dd4f5a1ff275f20b9bfa27fda18e60a2dee4ec6eac6374f7613371d466ac69"
     }
   ]
 }
