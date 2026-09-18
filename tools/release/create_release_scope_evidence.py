@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Bind a candidate-selected release scope to immutable Checkpoint B evidence.
+"""Bind candidate authorization evidence to immutable Checkpoint B evidence.
 
 Release authorities are reviewed declarations in the fixed ``tools/release/scopes`` directory.
-The generator selects exactly one declaration by matching its explicit stable release target to the
-candidate manifest version; declaration filenames and caller-provided paths carry no release
-semantics. It resolves only required items' live issue-tracker states and binds that inventory,
-declaration identity/bytes, manifest digest, candidate version, and source commit into evidence.
+For a publication candidate, the generator selects exactly one declaration by matching its explicit
+stable release target to the candidate manifest version; declaration filenames and caller-provided
+paths carry no release semantics. It resolves only required items' live issue-tracker states and
+binds that inventory, declaration identity/bytes, manifest digest, candidate version, and source
+commit into evidence. A non-publishing candidate instead emits a distinct, explicitly
+non-authorizing record bound to the same immutable candidate identity; it never selects a stable
+release declaration.
 
-This release-authorizing command takes no declaration, manifest, or output path arguments. Those
-locations are fixed in the release workspace. ``build_evidence`` retains explicit paths only as a
-non-CLI test seam.
+This candidate-authorization command takes no declaration, manifest, or output path arguments.
+Those locations are fixed in the release workspace. ``build_evidence`` retains explicit paths only
+as a non-CLI test seam.
 """
 
 from __future__ import annotations
@@ -26,10 +29,12 @@ from _release_workspace import _allowed_roots, _repository_root, _safe_path  # n
 
 _DECLARATION_SCHEMA = "checkpoint-b-release-scope-declaration/v2"
 _EVIDENCE_SCHEMA = "checkpoint-b-release-scope/v2"
+_PREPUBLICATION_EVIDENCE_SCHEMA = "checkpoint-b-prepublication-authorization/v1"
 _REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _COMMIT_PATTERN = re.compile(r"^[0-9a-fA-F]{7,64}$")
 _DECLARATION_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _RELEASE_TARGET_PATTERN = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+_AUTHORIZATION_MODES = {"publication", "prepublication"}
 
 
 # Fixed release-workspace locations. The release workflow already pins these paths for every other
@@ -44,7 +49,7 @@ def _candidate_manifest_path() -> Path:
 
 
 def _output_path() -> Path:
-    return _repository_root() / "artifacts" / "checkpoint-b" / "release-scope.json"
+    return _repository_root() / "artifacts" / "checkpoint-b" / "candidate-authorization.json"
 
 
 def _repository(value: str) -> str:
@@ -68,6 +73,18 @@ def _issue_number(value: Any) -> int:
 def _release_target(value: Any, description: str) -> str:
     if not isinstance(value, str) or not _RELEASE_TARGET_PATTERN.fullmatch(value):
         raise ValueError(f"{description} must be an exact stable release target.")
+    return value
+
+
+def _candidate_version(value: Any) -> str:
+    if not isinstance(value, str) or not value or Path(value).name != value:
+        raise ValueError("Candidate manifest version is invalid.")
+    return value
+
+
+def _authorization_mode(value: str) -> str:
+    if value not in _AUTHORIZATION_MODES:
+        raise ValueError("Candidate authorization mode is invalid.")
     return value
 
 
@@ -182,10 +199,12 @@ def build_evidence(
     candidate_manifest: Path,
     source_commit: str,
     repository: str,
+    mode: str = "publication",
 ) -> dict[str, Any]:
     candidate_manifest = _safe_path(candidate_manifest, "candidate manifest")
     source_commit = _source_commit(source_commit)
     repository = _repository(repository)
+    mode = _authorization_mode(mode)
 
     try:
         manifest = json.loads(candidate_manifest.read_text(encoding="utf-8"))
@@ -195,7 +214,19 @@ def build_evidence(
         raise ValueError("Candidate manifest must be a JSON object.")
     if manifest.get("source_commit") != source_commit:
         raise ValueError("Candidate manifest source commit does not match the checked commit.")
-    candidate_version = _release_target(manifest.get("version"), "Candidate manifest version")
+    candidate_version = _candidate_version(manifest.get("version"))
+    candidate_manifest_sha256 = _sha256(candidate_manifest)
+    if mode == "prepublication":
+        return {
+            "schema": _PREPUBLICATION_EVIDENCE_SCHEMA,
+            "candidate_version": candidate_version,
+            "repository": repository,
+            "source_commit": source_commit,
+            "candidate_manifest_sha256": candidate_manifest_sha256,
+            "publication_authorized": False,
+        }
+
+    candidate_version = _release_target(candidate_version, "Candidate manifest version")
     declaration_path, declaration = _select_declaration(declarations_directory, candidate_version)
     if declaration["release_target"] != candidate_version:
         raise ValueError("Release-scope declaration target differs from the candidate manifest version.")
@@ -211,7 +242,7 @@ def build_evidence(
         "story": declaration["story"],
         "repository": repository,
         "source_commit": source_commit,
-        "candidate_manifest_sha256": _sha256(candidate_manifest),
+        "candidate_manifest_sha256": candidate_manifest_sha256,
         "required_items": [
             {**item, "state": states[item["issue"]]["state"], "title": states[item["issue"]]["title"]}
             for item in required
@@ -225,13 +256,15 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--repository", required=True)
+    parser.add_argument("--mode", choices=sorted(_AUTHORIZATION_MODES), required=True)
     arguments = parser.parse_args()
 
     evidence = build_evidence(
         _declarations_directory(),
         _candidate_manifest_path(),
         arguments.source_commit,
-        arguments.repository)
+        arguments.repository,
+        arguments.mode)
     output = _output_path()
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")

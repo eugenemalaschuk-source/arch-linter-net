@@ -12,7 +12,12 @@ from typing import Any
 
 from _release_workspace import _safe_path
 from package_manifest import _load_manifest as _load_candidate_manifest
-from create_release_scope_evidence import _declarations_directory, _select_declaration
+from create_release_scope_evidence import (
+    _PREPUBLICATION_EVIDENCE_SCHEMA,
+    _declarations_directory,
+    _repository,
+    _select_declaration,
+)
 
 _EVIDENCE_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _GATES_SCHEMA = "checkpoint-b-repository-gates/v1"
@@ -307,6 +312,45 @@ def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: s
     return scope
 
 
+def _read_candidate_authorization(path: Path, manifest: dict[str, Any], manifest_digest: str) -> dict[str, Any]:
+    """Read either stable publication authority or explicitly non-authorizing candidate evidence."""
+    authorization = _load_json(path, "candidate authorization evidence")
+    if authorization.get("schema") == _RELEASE_SCOPE_SCHEMA:
+        return _read_release_scope(path, manifest, manifest_digest)
+    if authorization.get("schema") == _PREPUBLICATION_EVIDENCE_SCHEMA:
+        _validate_prepublication_authorization(authorization, manifest, manifest_digest)
+        return authorization
+    raise ValueError("Candidate authorization schema is invalid.")
+
+
+def _validate_prepublication_authorization(
+    authorization: dict[str, Any],
+    manifest: dict[str, Any],
+    manifest_digest: str,
+) -> None:
+    if set(authorization) != {
+        "schema",
+        "candidate_version",
+        "repository",
+        "source_commit",
+        "candidate_manifest_sha256",
+        "publication_authorized",
+    }:
+        raise ValueError("Pre-publication candidate authorization fields are invalid.")
+    if authorization.get("candidate_version") != manifest["version"]:
+        raise ValueError("Pre-publication candidate version differs from the candidate manifest.")
+    if authorization.get("source_commit") != manifest["source_commit"]:
+        raise ValueError("Pre-publication candidate source commit differs from the candidate manifest.")
+    if authorization.get("candidate_manifest_sha256") != manifest_digest:
+        raise ValueError("Pre-publication candidate authorization is not bound to the candidate manifest.")
+    repository = authorization.get("repository")
+    if not isinstance(repository, str):
+        raise ValueError("Pre-publication candidate repository is invalid.")
+    _repository(repository)
+    if authorization.get("publication_authorized") is not False:
+        raise ValueError("Pre-publication candidate authorization must not authorize publication.")
+
+
 def _validate_release_scope_identity(scope: dict[str, Any], manifest: dict[str, Any]) -> None:
     if scope.get("schema") != _RELEASE_SCOPE_SCHEMA:
         raise ValueError("Release-scope schema is invalid.")
@@ -422,18 +466,32 @@ def _summary(
     _validate_platforms(records)
     failures = _failed_scenarios(records)
     defects = _policy_shape_defects(records)
-    open_scope = _release_scope_defects(scope)
+    is_publication_candidate = scope["schema"] == _RELEASE_SCOPE_SCHEMA
+    open_scope = _release_scope_defects(scope) if is_publication_candidate else []
     version = manifest["version"]
     passed = not failures and not defects and not open_scope
-    return {
-        "schema": "checkpoint-b-release-evidence/v1",
-        "checkpoint": "B",
-        "result": "passed" if passed else "failed",
-        "authorization": (
+    authorization = (
+        (
             f"PASS: the manifested {version} candidate is authorized for publication."
             if passed
             else f"FAIL: the manifested {version} candidate is NOT authorized for publication."
-        ),
+        )
+        if is_publication_candidate
+        else (
+            f"PASS: the manifested {version} candidate is verified for pre-publication assessment only "
+            "and is NOT authorized for publication."
+            if passed
+            else f"FAIL: the manifested {version} candidate did not pass pre-publication assessment and is "
+            "NOT authorized for publication."
+        )
+    )
+    return {
+        "schema": "checkpoint-b-release-evidence/v1" if is_publication_candidate
+        else "checkpoint-b-prepublication-evidence/v1",
+        "checkpoint": "B",
+        "result": "passed" if passed else "failed",
+        "authorization": authorization,
+        "publication_authorized": is_publication_candidate and passed,
         "candidate_version": version,
         "source_commit": manifest["source_commit"],
         "candidate_manifest_sha256": manifest_digest,
@@ -444,7 +502,8 @@ def _summary(
         "failed_scenarios": failures,
         "policy_shape_defects": defects,
         "open_release_scope_items": open_scope,
-        "release_scope": scope,
+        "candidate_authorization": scope,
+        "release_scope": scope if is_publication_candidate else None,
         "platforms": sorted(records, key=lambda record: str(record["platform_id"])),
         "repository_gates": gates["gates"],
     }
@@ -471,7 +530,7 @@ def _markdown(summary: dict[str, Any]) -> str:
         *[f"- {defect}" for defect in summary["policy_shape_defects"]],
         "",
     ] if summary["policy_shape_defects"] else []
-    scope = summary["release_scope"]
+    scope = summary["candidate_authorization"]
     scope_section = [
         f"## Release scope (story #{scope['story']}, target {scope['release_target']})",
         "",
@@ -502,6 +561,13 @@ def _markdown(summary: dict[str, Any]) -> str:
             *[f"- #{item['issue']} — {item['reason']}" for item in scope.get("delivered_items", [])],
             "",
         ] if scope.get("delivered_items") else []),
+    ] if scope["schema"] == _RELEASE_SCOPE_SCHEMA else [
+        "## Pre-publication candidate authorization",
+        "",
+        "- Verification scope: immutable pre-publication candidate assessment.",
+        "- Publication authority: none; this evidence cannot authorize a public release.",
+        f"- Candidate version: `{scope['candidate_version']}`",
+        "",
     ]
     return "\n".join([
         "# Packed-artifact release evidence",
@@ -510,7 +576,7 @@ def _markdown(summary: dict[str, Any]) -> str:
         f"- Tested commit: `{summary['source_commit']}`",
         f"- Candidate manifest SHA-256: `{summary['candidate_manifest_sha256']}`",
         f"- Result: **{summary['result']}**",
-        f"- Release authorization: {summary['authorization']}",
+        f"- Publication authorization: {summary['authorization']}",
         "- Private adopter identity: none; all fixtures and evidence are synthetic.",
         "",
         "## Consumer policy shape",
@@ -539,21 +605,21 @@ def main() -> int:
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--candidate-manifest", type=Path, required=True)
     parser.add_argument("--repository-gates", type=Path, required=True)
-    parser.add_argument("--release-scope", type=Path, required=True)
+    parser.add_argument("--candidate-authorization", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     arguments = parser.parse_args()
 
     candidate_manifest = _safe_path(arguments.candidate_manifest, "candidate manifest")
     input_dir = _safe_path(arguments.input_dir, "input directory")
     repository_gates = _safe_path(arguments.repository_gates, "repository-gates result")
-    release_scope = _safe_path(arguments.release_scope, "release-scope inventory")
+    candidate_authorization = _safe_path(arguments.candidate_authorization, "candidate authorization evidence")
     output_dir = _safe_path(arguments.output_dir, "output directory")
 
     manifest = _read_manifest(candidate_manifest)
     manifest_digest = _sha256(candidate_manifest)
     records = _read_records(input_dir, manifest, manifest_digest)
     gates = _read_gates(repository_gates, manifest, manifest_digest)
-    scope = _read_release_scope(release_scope, manifest, manifest_digest)
+    scope = _read_candidate_authorization(candidate_authorization, manifest, manifest_digest)
     summary = _summary(records, manifest, gates, scope, manifest_digest)
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "checkpoint-b-release-evidence.json").write_text(

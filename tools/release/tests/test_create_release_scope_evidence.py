@@ -172,6 +172,29 @@ def test_unsupported_preview_or_unmapped_candidate_target_fails_closed(
         build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
 
 
+def test_prepublication_candidate_is_bound_without_selecting_stable_release_authority(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    manifest = _manifest(tmp_path, "0.8.0-acceptance.923")
+
+    def unexpected_issue_lookup(*_args, **_kwargs):
+        raise AssertionError("A pre-publication candidate must not resolve stable release-scope issues.")
+
+    monkeypatch.setattr(generator.subprocess, "run", unexpected_issue_lookup)
+
+    evidence = build_evidence(tmp_path / "missing-scopes", manifest, _COMMIT, _REPOSITORY, "prepublication")
+
+    assert evidence == {
+        "schema": "checkpoint-b-prepublication-authorization/v1",
+        "candidate_version": "0.8.0-acceptance.923",
+        "repository": _REPOSITORY,
+        "source_commit": _COMMIT,
+        "candidate_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        "publication_authorized": False,
+    }
+
+
 def test_filename_cannot_redirect_target_selection(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     scopes = tmp_path / "scopes"
@@ -346,7 +369,7 @@ def test_main_writes_target_selected_inventory_to_the_fixed_location(tmp_path: P
     scopes = tmp_path / "scopes"
     _declaration(scopes)
     _stub_gh(monkeypatch, {525: "CLOSED", 526: "CLOSED"})
-    output = tmp_path / "artifacts" / "checkpoint-b" / "release-scope.json"
+    output = tmp_path / "artifacts" / "checkpoint-b" / "candidate-authorization.json"
     monkeypatch.setattr(generator, "_declarations_directory", lambda: scopes)
     monkeypatch.setattr(generator, "_candidate_manifest_path", lambda: _manifest(tmp_path))
     monkeypatch.setattr(generator, "_output_path", lambda: output)
@@ -359,6 +382,8 @@ def test_main_writes_target_selected_inventory_to_the_fixed_location(tmp_path: P
             _COMMIT,
             "--repository",
             _REPOSITORY,
+            "--mode",
+            "publication",
         ],
     )
 
@@ -378,6 +403,8 @@ def test_main_rejects_caller_controlled_scope_paths(monkeypatch) -> None:
             _COMMIT,
             "--repository",
             _REPOSITORY,
+            "--mode",
+            "publication",
             "--scope-dir",
             "../elsewhere",
         ],
