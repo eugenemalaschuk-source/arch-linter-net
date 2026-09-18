@@ -143,18 +143,17 @@ def test_producer_run_rejects_invalid_exact_check_job(job_change: dict[str, obje
         "details_url": f"https://github.com/{repository}/actions/runs/{run_id}/job/{selected_job_id}"
     }
 
+    typed_api = cast(cli.GitHubApi, api)
+    config = _config()
     with pytest.raises(ProviderFailure, match="producer_job_unresolved"):
-        cli._producer_run(cast(cli.GitHubApi, api), repository, head_sha, _config(), check)
+        cli._producer_run(typed_api, repository, head_sha, config, check)
 
 
 def test_producer_run_requires_job_identity_in_check_details_url() -> None:
     repository = "owner/repo"
     head_sha = "a" * 40
+    api = cast(cli.GitHubApi, FakeApi({}))
+    config = _config()
+    check = {"details_url": "https://github.com/owner/repo/actions/runs/7001"}
     with pytest.raises(ProviderFailure, match="producer_run_unresolved"):
-        cli._producer_run(
-            cast(cli.GitHubApi, FakeApi({})),
-            repository,
-            head_sha,
-            _config(),
-            {"details_url": "https://github.com/owner/repo/actions/runs/7001"},
-        )
+        cli._producer_run(api, repository, head_sha, config, check)

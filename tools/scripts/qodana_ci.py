@@ -31,52 +31,77 @@ def configured_image(project: Path) -> str:
     return declarations[0]
 
 
+def _check_invocations(run: dict) -> None:
+    for invocation in run.get("invocations", []):
+        if invocation.get("executionSuccessful") is False:
+            raise ValueError("SARIF records unsuccessful analysis")
+        for key in ("toolExecutionNotifications", "toolConfigurationNotifications"):
+            if any(n.get("level") == "error" for n in invocation.get(key, [])):
+                raise ValueError("SARIF records an analysis infrastructure error")
+
+
+def _result_rule(result: dict, driver: dict) -> str:
+    rule = result.get("ruleId")
+    if not rule:
+        index = result.get("ruleIndex")
+        if type(index) is not int or index < 0:
+            raise ValueError("SARIF result has no inspection identity")
+        rule = driver["rules"][index]["id"]
+    if not isinstance(rule, str) or not rule:
+        raise ValueError("Invalid inspection identity")
+    return rule
+
+
+def _result_message(result: dict) -> str:
+    message = result.get("message", {})
+    text = message.get("text", message.get("markdown"))
+    if not isinstance(text, str):
+        raise ValueError("SARIF result has no diagnostic message")
+    return text
+
+
+def _result_locations(result: dict, run: dict) -> list[dict]:
+    locations = []
+    for location in result.get("locations", []):
+        physical = location.get("physicalLocation", {})
+        artifact = physical.get("artifactLocation", {})
+        if "index" in artifact and "uri" not in artifact:
+            index = artifact["index"]
+            if type(index) is not int or index < 0:
+                raise ValueError("Invalid SARIF artifact index")
+            artifact = run["artifacts"][index]["location"]
+        locations.append({"uri": artifact.get("uri", ""),
+                          "region": physical.get("region", {})})
+    return locations
+
+
+def _run_findings(run: dict) -> list[dict]:
+    driver = run["tool"]["driver"]
+    if not isinstance(driver.get("name"), str) or not driver["name"]:
+        raise ValueError("SARIF has no scanner identity")
+    _check_invocations(run)
+    results = run.get("results")
+    if not isinstance(results, list):
+        raise ValueError("SARIF run has no results inventory")
+    findings = []
+    for result in results:
+        if result.get("baselineState") == "absent":
+            continue
+        rule = _result_rule(result, driver)
+        text = _result_message(result)
+        locations = _result_locations(result, run)
+        findings.append({"rule": rule, "level": result.get("level", "warning"),
+                         "message": text, "locations": locations})
+    return findings
+
+
 def inventory(document: dict) -> dict:
     """Validate useful SARIF structure and fingerprint findings, not volatile scan metadata."""
     if document.get("version") != "2.1.0" or not document.get("runs"):
         raise ValueError("Expected SARIF 2.1.0 with at least one analysis run")
     findings = []
     for run in document["runs"]:
-        driver = run["tool"]["driver"]
-        if not isinstance(driver.get("name"), str) or not driver["name"]:
-            raise ValueError("SARIF has no scanner identity")
-        for invocation in run.get("invocations", []):
-            if invocation.get("executionSuccessful") is False:
-                raise ValueError("SARIF records unsuccessful analysis")
-            for key in ("toolExecutionNotifications", "toolConfigurationNotifications"):
-                if any(n.get("level") == "error" for n in invocation.get(key, [])):
-                    raise ValueError("SARIF records an analysis infrastructure error")
-        results = run.get("results")
-        if not isinstance(results, list):
-            raise ValueError("SARIF run has no results inventory")
-        for result in results:
-            if result.get("baselineState") == "absent":
-                continue
-            rule = result.get("ruleId")
-            if not rule:
-                index = result.get("ruleIndex")
-                if type(index) is not int or index < 0:
-                    raise ValueError("SARIF result has no inspection identity")
-                rule = driver["rules"][index]["id"]
-            if not isinstance(rule, str) or not rule:
-                raise ValueError("Invalid inspection identity")
-            message = result.get("message", {})
-            text = message.get("text", message.get("markdown"))
-            if not isinstance(text, str):
-                raise ValueError("SARIF result has no diagnostic message")
-            locations = []
-            for location in result.get("locations", []):
-                physical = location.get("physicalLocation", {})
-                artifact = physical.get("artifactLocation", {})
-                if "index" in artifact and "uri" not in artifact:
-                    index = artifact["index"]
-                    if type(index) is not int or index < 0:
-                        raise ValueError("Invalid SARIF artifact index")
-                    artifact = run["artifacts"][index]["location"]
-                locations.append({"uri": artifact.get("uri", ""),
-                                  "region": physical.get("region", {})})
-            findings.append({"rule": rule, "level": result.get("level", "warning"),
-                             "message": text, "locations": locations})
+        findings.extend(_run_findings(run))
     normalized = sorted(json.dumps(f, sort_keys=True, ensure_ascii=True) for f in findings)
     fingerprint = hashlib.sha256("\n".join(normalized).encode()).hexdigest()
     return {"findings": len(findings),

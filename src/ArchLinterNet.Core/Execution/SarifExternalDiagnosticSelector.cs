@@ -247,17 +247,6 @@ public sealed class SarifExternalDiagnosticSelector
         provenance.RunId,
     ]);
 
-    private static bool TryParseGovernanceMode(string? value, out SarifExternalDiagnosticGovernanceMode mode)
-    {
-        mode = value switch
-        {
-            "strict" => SarifExternalDiagnosticGovernanceMode.Strict,
-            "audit" => SarifExternalDiagnosticGovernanceMode.Audit,
-            _ => default,
-        };
-        return value is "strict" or "audit";
-    }
-
     private static string SeverityToken(SarifEvidenceSourceSeverity severity) => severity switch
     {
         SarifEvidenceSourceSeverity.Error => "error",
@@ -289,6 +278,17 @@ public sealed class SarifExternalDiagnosticSelector
 
     private sealed class FilterMatcher
     {
+        private static bool TryParseGovernanceMode(string? value, out SarifExternalDiagnosticGovernanceMode mode)
+        {
+            mode = value switch
+            {
+                "strict" => SarifExternalDiagnosticGovernanceMode.Strict,
+                "audit" => SarifExternalDiagnosticGovernanceMode.Audit,
+                _ => default,
+            };
+            return value is "strict" or "audit";
+        }
+
         private readonly HashSet<string> _ruleIds;
         private readonly HashSet<string> _ruleTags;
         private readonly HashSet<string> _projects;

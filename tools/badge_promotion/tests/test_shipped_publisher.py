@@ -65,7 +65,8 @@ def test_shipped_publisher_satisfies_current_consumer_contracts(tmp_path: Path) 
     with tarfile.open(fileobj=io.BytesIO(exported), mode="r:") as archive:
         for member in archive:
             path = PurePosixPath(member.name)
-            assert not path.is_absolute() and ".." not in path.parts
+            assert not path.is_absolute()
+            assert ".." not in path.parts
             assert member.isdir() or member.isfile(), member.name
             if member.isfile():
                 target = isolated.joinpath(*path.parts)
