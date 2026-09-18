@@ -1,9 +1,12 @@
-# Turnkey Architecture Health badge setup
+# Architecture Health badge setup
 
-> Prepublication candidate guidance: use only an explicitly verified candidate.
-> This page does not establish stable-release availability. Start with
-> [badge adoption](badge-adoption.md) for transport, disclosure, and evidence
-> prerequisites.
+> **Experimental / opt-in Private Relay.** Full hosted/lifecycle acceptance is
+> still pending. Included Relay code is not an adoption-stable or turnkey support
+> claim; verify the exact release or candidate and matching distribution.
+> Private repositories default to `none`: no automatic cloud setup or badge egress.
+> Stable core governance, private reports, and public `github-raw` snapshots do not
+> require Relay.
+> Start with [badge adoption](badge-adoption.md) for disclosure and prerequisites.
 
 The candidate contract requires the packed `ArchLinterNet.Cli` tool to include
 the setup contract, Relay bundle, configuration schema, and workflow templates.
@@ -14,13 +17,13 @@ architecture evaluator a second time.
 ## Choose a transport
 
 Run setup from the consumer repository (or pass its explicit repository
-identity) and choose one supported mode:
+identity) and choose a mode:
 
 | Mode | Use | Hosting requirement |
 | --- | --- | --- |
 | `none` | Private checks and artifacts without public disclosure | None; no external call |
 | `github-raw` | Existing public static snapshot compatibility | Public repository only |
-| `relay` | Bounded-freshness private/public badge | Your Cloudflare Worker and SQLite Durable Object account |
+| `relay` | Experimental, opt-in bounded-freshness private/public badge | Your Cloudflare Worker and SQLite Durable Object account |
 
 Private repositories default to `none`. Selecting `github-raw` for a private
 repository is rejected. An opaque Relay alias does not hide the Relay hostname

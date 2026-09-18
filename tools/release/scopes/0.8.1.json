@@ -1,0 +1,58 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.8.1-stabilization-experimental-relay",
+  "release_target": "0.8.1",
+  "story": 806,
+  "_comment": [
+    "Maintenance scope from v0.8.0 (9d03baaf9ef357ec53f165e6bec94a087f56e661) through",
+    "inspected main e4af794f27f311e90602e8f032b6b7ff38738042 and the #975 preparation PR.",
+    "The actual candidate source is the preparation merge SHA, not either publisher pin.",
+    "This declaration does not subtract bytes: the CLI and distribution include the full",
+    "Private Relay implementation as experimental / opt-in, with hosted/lifecycle acceptance",
+    "still pending. Stable core governance, private reports and public github-raw snapshots",
+    "remain independent. Private default is none; no automatic cloud setup or badge egress.",
+    "Experimental status never waives known security, privacy, integrity, data-corruption",
+    "or false-PASS defects. No-App read-only bootstrap, verified private handoff, protected",
+    "owner setup PR and OIDC-only Relay state updates remain the supported trust model.",
+    "#806 is the release authority, not a required CLOSED prerequisite. Preparation #975,",
+    "publication #976, closure #977 and milestone 6 must not authorize their own completion.",
+    "Excluded Relay items defer full adoption acceptance, not shipment of their code.",
+    "No unrelated next-minor performance capability is included; exclusions cannot hide bytes."
+  ],
+  "required_items": [
+    {"issue": 772, "finding": "release-architecture-stabilization", "summary": "Complete behavior-preserving v0.8 evaluator, projection, formatter and Checkpoint B extraction"},
+    {"issue": 784, "finding": "self-architecture-stabilization", "summary": "Complete integrated self-policy remediation with strict Health/report/badge parity"},
+    {"issue": 788, "finding": "testing-policy-context-parity", "summary": "Preserve CLI and Testing policy-context parity in debt gates"},
+    {"issue": 800, "finding": "canonical-badge-evidence", "summary": "Expose canonical Gate and bind public badge publication to exact authoritative evidence"},
+    {"issue": 801, "finding": "actionable-health-report", "summary": "Explain non-healthy dimensions and bounded waiver/debt evidence in the PR report"},
+    {"issue": 849, "finding": "reviewed-api-expansion", "summary": "Accept exact reviewed public-API expansion without disabling policy-weakening protection"},
+    {"issue": 797, "finding": "sonar-stabilization-acceptance", "summary": "Record final post-remediation Sonar acceptance and explicit reviewed dispositions"},
+    {"issue": 835, "finding": "relay-distribution-integrity", "summary": "Integrate compatible Relay assets and immutable distribution evidence into existing delivery"},
+    {"issue": 876, "finding": "bounded-oidc-jwks-refresh", "summary": "Bound Relay JWKS refresh work under invalid OIDC traffic without weakening validation"},
+    {"issue": 913, "finding": "exact-producer-job-attempt", "summary": "Bind promotion evidence to the exact qualifying producer job attempt"},
+    {"issue": 963, "finding": "no-app-bootstrap", "summary": "Replace writer bootstrap with read-only bootstrap and content-verified private handoff"},
+    {"issue": 971, "finding": "hidden-handoff-delivery", "summary": "Preserve validated hidden managed files in the private bootstrap handoff artifact"},
+    {"issue": 973, "finding": "immutable-publisher-delivery", "summary": "Rotate the shipped workflow pin after the hidden-handoff fix while preserving the separate action pin"}
+  ],
+  "excluded_items": [
+    {"issue": 922, "reason": "Owner: @eugenemalaschuk-source. Defer the full hosted private-consumer bootstrap/adoption proof to the Relay follow-up; implementation bytes ship experimental / opt-in, not acceptance-complete."},
+    {"issue": 834, "reason": "Owner: @eugenemalaschuk-source. Defer complete exact-artifact hosted/lifecycle/adversarial Relay acceptance; normal package, provenance and release-integrity gates remain required and known unsafe or false-PASS paths are not waived."},
+    {"issue": 836, "reason": "Owner: @eugenemalaschuk-source. Defer the final tested-guide/adoption-stable verdict until #834 passes; #975 owns this patch support disclosure, not a claim that all documented hosted scenarios passed."},
+    {"issue": 825, "reason": "Owner: @eugenemalaschuk-source. Keep the full Relay adoption umbrella open until #922, #834 and #836 acceptance is complete; this is not exclusion of Relay code from packages or a dependency cycle for #806."},
+    {"issue": 650, "reason": "Owner: @eugenemalaschuk-source. Broader executable, versioned and release-gated public documentation remains separate backlog; this maintenance patch only corrects existing support claims and release-note inputs."},
+    {"issue": 787, "reason": "Owner: @eugenemalaschuk-source. Next-minor performance work is not part of the inspected maintenance candidate and must not be smuggled into this scope."}
+  ],
+  "delivered_items": [
+    {"issue": 783, "reason": "Completed whole-repository Sonar remediation context; final acceptance is required separately through #797."},
+    {"issue": 785, "reason": "Delivered release-lifecycle, milestone and public versioning governance; a milestone is not immutable release authority."},
+    {"issue": 826, "reason": "Included experimental Relay publication contracts and ADR; not a hosted adoption verdict."},
+    {"issue": 827, "reason": "Included canonical finite-horizon publication projection and disclosure profiles; not hosted acceptance."},
+    {"issue": 828, "reason": "Included experimental OIDC Relay ownership, storage and fail-closed authorization implementation."},
+    {"issue": 830, "reason": "Included trusted OIDC publisher and metadata-only renewal; updates Relay state, not consumer badge commits."},
+    {"issue": 831, "reason": "Included read-time expiry and fixed SVG rendering; no claim to recall Camo, browser or offline copies."},
+    {"issue": 832, "reason": "Included experimental setup, embedded bundle, configuration and doctor commands; not a completed turnkey service."},
+    {"issue": 833, "reason": "Included lifecycle operations, revocation, recovery and upgrade implementation; full hosted/lifecycle acceptance remains deferred."},
+    {"issue": 864, "reason": "Delivered supplementary Qodana Community advisory analysis and reviewed advisory decision; not a replacement for required gates."},
+    {"issue": 872, "reason": "Delivered immutable third-party Actions pins in canonical documentation and the existing drift guard."}
+  ]
+}

@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import textwrap
 from pathlib import Path
+
+import pytest
+import yaml
 
 
 def _workflow() -> str:
@@ -193,3 +199,53 @@ def test_independent_provenance_verification_blocks_publication_handoffs() -> No
         "  verify-prepublication-provenance:\n"
     ) < workflow.index("  release:\n")
     assert "verify-release-evidence" in release_job
+
+
+def _step_run(job: str, name: str) -> str:
+    steps = yaml.safe_load(_workflow())["jobs"][job]["steps"]
+    return next(step["run"] for step in steps if step.get("name") == name)
+
+
+def test_nuget_metadata_contains_the_experimental_support_boundary(tmp_path: Path) -> None:
+    env_file = tmp_path / "github-env"
+    run = _step_run("prepare-candidate", "Prepare NuGet package release notes")
+    subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", run],
+        env={**os.environ, "GITHUB_ENV": str(env_file), "TARGET_TAG": "v0.8.1"},
+        check=True, capture_output=True, text=True,
+    )
+    notes = env_file.read_text(encoding="utf-8")
+    assert notes.startswith("PACKAGE_RELEASE_NOTES=See GitHub release notes for v0.8.1.")
+    assert "experimental / opt-in" in notes
+    assert "full hosted/lifecycle acceptance is pending" in notes
+    assert "independent of Relay" in notes
+    assert "Private default: none" in notes
+    assert "no automatic cloud setup or badge egress" in notes
+    assert "not a waiver for known security or privacy or integrity or data-corruption or false-PASS" in notes
+    # MSBuild treats commas and semicolons as command-line property separators, even after shell quoting.
+    assert not any(separator in notes for separator in (";", ","))
+    assert notes.count("\n") == 1
+
+
+@pytest.mark.parametrize("generated_notes", ("", "## What's Changed\n* Fixes and experimental Relay changes\n"))
+def test_generated_release_notes_render_support_boundary_before_changelog(generated_notes: str) -> None:
+    run = _step_run("release", "Generate release notes after Checkpoint B")
+    # Execute the existing renderer, not a second implementation or a mocked expected string.
+    # GitHub's generated body is input; this never calls GitHub or creates a release.
+    match = re.search(r"\| \{\n(?P<body>.*?)\n\s*\} \\", run, re.DOTALL)
+    assert match is not None
+    rendered = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", textwrap.dedent(match.group("body"))],
+        input=generated_notes, capture_output=True, text=True, check=True,
+    ).stdout
+    assert rendered.startswith("## Private Relay: experimental / opt-in\n")
+    assert "full hosted/lifecycle acceptance is pending" in rendered
+    assert "default to none" in rendered
+    assert "no automatic cloud setup or badge egress" in rendered
+    assert "No free hosting or SLA is promised" in rendered
+    assert "OIDC updates Relay state, not consumer badge commits" in rendered
+    assert "not a waiver for known security, privacy, integrity, data-corruption or false-PASS" in rendered
+    assert generated_notes in rendered
+    assert "## Verify release provenance" in rendered
+    if generated_notes:
+        assert rendered.index("experimental / opt-in") < rendered.index("## What's Changed")

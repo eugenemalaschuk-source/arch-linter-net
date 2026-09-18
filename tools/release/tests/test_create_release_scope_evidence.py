@@ -429,8 +429,8 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 7
-    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4", "0.8.0"}
+    assert len(declarations) == len(by_target) == 8
+    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4", "0.8.0", "0.8.1"}
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
     assert by_target["0.7.0"]["story"] == 613
@@ -488,3 +488,38 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
             "reason": "Repository self-governance debt freeze; protects implementation debt but is not a user-facing v0.8 release capability.",
         }
     ]
+
+    patch = by_target["0.8.1"]
+    assert patch["declaration_id"] == "v0.8.1-stabilization-experimental-relay"
+    assert patch["story"] == 806
+    required = {item["issue"] for item in patch["required_items"]}
+    assert required == {772, 784, 788, 800, 801, 849, 797, 835, 876, 913, 963, 971, 973}
+    assert {item["issue"] for item in patch["excluded_items"]} == {922, 834, 836, 825, 650, 787}
+    assert {item["issue"] for item in patch["delivered_items"]} == {
+        783, 785, 826, 827, 828, 830, 831, 832, 833, 864, 872,
+    }
+    assert required.isdisjoint({806, 975, 976, 977, 825, 922, 834, 836})
+    assert all("Owner: @eugenemalaschuk-source." in item["reason"] for item in patch["excluded_items"])
+    assert "does not subtract bytes" in " ".join(patch["_comment"])
+
+
+def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoption(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    invocations = _stub_gh(monkeypatch, {825: "OPEN", 922: "OPEN", 834: "OPEN", 836: "OPEN"})
+    manifest = _manifest(tmp_path, "0.8.1")
+
+    evidence = build_evidence(generator._declarations_directory(), manifest, _COMMIT, _REPOSITORY)
+
+    assert evidence["story"] == 806
+    assert evidence["release_target"] == evidence["candidate_version"] == "0.8.1"
+    assert evidence["source_commit"] == _COMMIT
+    assert evidence["declaration_sha256"] == hashlib.sha256(
+        (generator._declarations_directory() / "0.8.1.json").read_bytes()
+    ).hexdigest()
+    assert {int(argv[3]) for argv in invocations} == {
+        772, 784, 788, 800, 801, 849, 797, 835, 876, 913, 963, 971, 973,
+    }
+    assert all(item["state"] == "closed" for item in evidence["required_items"])
+    assert {item["issue"] for item in evidence["excluded_items"]} == {922, 834, 836, 825, 650, 787}

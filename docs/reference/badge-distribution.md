@@ -1,10 +1,12 @@
 # Badge distribution and compatibility
 
-> **Upcoming candidate, not a released capability.** This inventory describes
-> the intended v0.8.x Relay delivery. It is not evidence that the currently
-> published package or a source checkout has passed clean packed and hosted
-> acceptance. Missing components block adoption; do not assemble a replacement
-> publisher or patch a downloaded bundle by hand.
+> **Experimental / opt-in Private Relay.** This inventory describes included
+> Relay code and its compatible assets, not adoption-stable support. Full
+> hosted/lifecycle acceptance is still pending. Verify availability and integrity
+> against the exact release or candidate; a source checkout is not shipment proof.
+> Missing components block adoption; do not assemble a replacement distribution.
+> Private repositories default to `none`, with no automatic cloud setup or badge
+> egress. Stable core governance and private reporting do not require Relay.
 
 Use [badge adoption](../guides/badge-adoption.md) to choose the mode,
 [setup](../guides/badge-setup.md) for installation and doctor, and
