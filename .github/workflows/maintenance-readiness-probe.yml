@@ -1,134 +1,60 @@
-name: Maintenance preparation validation
+name: Maintenance metadata boundary validation
 
 on:
   push:
     branches: [chore/975-maintenance-release-readiness]
-    paths:
-      - .github/workflows/maintenance-readiness-probe.yml
-      - .maintenance-975.patch.gz.b64
+    paths: [.github/workflows/maintenance-readiness-probe.yml]
 
 permissions:
   contents: read
 
 jobs:
-  prepare:
+  verify:
     if: github.repository == 'eugenemalaschuk-source/arch-linter-net' && github.ref == 'refs/heads/chore/975-maintenance-release-readiness'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-      issues: read
-      pull-requests: read
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 0
           persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
-      - name: Apply digest-verified preparation patch and remove temporary transport
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+      - name: Check actual MSBuild property parsing without restore or publication
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/preparation-975
-          cp .maintenance-975.patch.gz.b64 /tmp/preparation-975/transport.b64
-          python3 - <<'PY'
-          import base64
-          import gzip
-          import hashlib
-          import pathlib
-          import subprocess
-          temporary = {'.github/workflows/maintenance-readiness-probe.yml', '.maintenance-975.patch.gz.b64'}
-          prior = set(subprocess.check_output(['git', 'diff', '--name-only', 'e4af794f27f311e90602e8f032b6b7ff38738042', 'HEAD'], text=True).splitlines())
-          assert prior == temporary, prior
-          text = pathlib.Path('.maintenance-975.patch.gz.b64').read_text().strip()
-          text = text.replace('V92py0p6fY016/ElaDQB2k5V92py0p6Ts', 'V92py0p6Ts')
-          patch = gzip.decompress(base64.b64decode(text, validate=True))
-          assert hashlib.sha256(patch).hexdigest() == '8bd3d647666690d467bdc54d658a9f3fbc902679572e4d938a484a201d635776'
-          pathlib.Path('/tmp/preparation-975/preparation.patch').write_bytes(patch)
-          PY
-          git apply --check /tmp/preparation-975/preparation.patch
-          git apply /tmp/preparation-975/preparation.patch
-          git rm .github/workflows/maintenance-readiness-probe.yml .maintenance-975.patch.gz.b64
-          git add .github/workflows/release-nuget.yml README.md docs/cli/index.md docs/guides/badge-adoption.md docs/guides/badge-lifecycle-operations.md docs/guides/badge-setup.md docs/internal/badge-delivery-handoff.md docs/reference/badge-distribution.md docs/reference/versioning-and-releases.md tools/release/scopes/0.8.1.json tools/release/tests/test_badge_adoption_documentation.py tools/release/tests/test_create_release_scope_evidence.py tools/release/tests/test_release_workflow_package_subjects.py
-          git diff --cached --check
-          git diff --cached > /tmp/preparation-975/final.patch
-      - name: Run release and documentation gates
-        shell: bash
-        run: |
-          set -euo pipefail
-          make test-release-evidence docs-build lint-docs lint-code-size 2>&1 | tee /tmp/preparation-975/validation.log
-      - name: Resolve live prerequisite states and release-note categories
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh pr list --state merged --limit 150 --base main --json number,title,mergedAt,labels > /tmp/preparation-975/merged-pr-labels.json
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          import pathlib
-          import subprocess
-          path = pathlib.Path('tools/release/scopes/0.8.1.json')
-          scope = json.loads(path.read_text())
-          states = []
-          for item in scope['required_items']:
-              value = json.loads(subprocess.check_output(['gh', 'issue', 'view', str(item['issue']), '--repo', os.environ['GITHUB_REPOSITORY'], '--json', 'number,title,state'], text=True))
-              states.append(value)
-          pathlib.Path('/tmp/preparation-975/prerequisites.json').write_text(json.dumps(states, indent=2) + '\n')
-          assert all(value['state'] == 'CLOSED' for value in states)
-          pathlib.Path('/tmp/preparation-975/scope.sha256').write_text(hashlib.sha256(path.read_bytes()).hexdigest() + '\n')
-          PY
-      - name: Create validated Git objects without moving any branch or release ref
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
+          mkdir -p /tmp/metadata-975
           python3 - <<'PY'
           import json
-          import os
-          import pathlib
+          from pathlib import Path
           import subprocess
-          repository = os.environ['GITHUB_REPOSITORY']
-          assert repository == 'eugenemalaschuk-source/arch-linter-net'
-          assert os.environ['GITHUB_REF'] == 'refs/heads/chore/975-maintenance-release-readiness'
-          source = os.environ['GITHUB_SHA']
-          expected = {
-              '.github/workflows/release-nuget.yml', 'README.md', 'docs/cli/index.md',
-              'docs/guides/badge-adoption.md', 'docs/guides/badge-lifecycle-operations.md',
-              'docs/guides/badge-setup.md', 'docs/internal/badge-delivery-handoff.md',
-              'docs/reference/badge-distribution.md', 'docs/reference/versioning-and-releases.md',
-              'tools/release/scopes/0.8.1.json', 'tools/release/tests/test_badge_adoption_documentation.py',
-              'tools/release/tests/test_create_release_scope_evidence.py',
-              'tools/release/tests/test_release_workflow_package_subjects.py',
+          root = Path('/tmp/metadata-975')
+          project = root / 'Metadata.proj'
+          project.write_text('<Project><Target Name="Pack"><WriteLinesToFile File="$(OutputFile)" Lines="$(PackageReleaseNotes)" Overwrite="true" /></Target></Project>')
+          cases = {
+              'semicolon': 'Private Relay is experimental / opt-in; full hosted/lifecycle acceptance is pending.',
+              'comma': 'Relay code and assets are included, but full hosted/lifecycle acceptance is pending.',
+              'plain': 'Private Relay is experimental and opt-in. Full hosted/lifecycle acceptance is pending. Private default is none.',
+              'escaped': 'Private Relay is experimental / opt-in%3B full hosted/lifecycle acceptance is pending%2C adopter-owned infrastructure is required.',
           }
-          temporary = {'.github/workflows/maintenance-readiness-probe.yml', '.maintenance-975.patch.gz.b64'}
-          changed = set(subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines())
-          assert changed == expected | temporary, changed
-          assert not subprocess.check_output(['git', 'diff', '--name-only'], text=True).strip()
-          entries = []
-          for path in sorted(changed):
-              entry = {'path': path, 'mode': '100644', 'type': 'blob'}
-              if path in temporary:
-                  entry['sha'] = None
-              else:
-                  entry['content'] = pathlib.Path(path).read_text()
-              entries.append(entry)
-          def post(resource, payload):
-              process = subprocess.run(['gh', 'api', '--method', 'POST', f'repos/{repository}/git/{resource}', '--input', '-'], input=json.dumps(payload), text=True, capture_output=True, check=True)
-              return json.loads(process.stdout)
-          tree = post('trees', {'base_tree': subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(), 'tree': entries})
-          commit = post('commits', {'message': 'fix(release): declare v0.8.1 maintenance scope and experimental Relay support (#975)', 'tree': tree['sha'], 'parents': [source]})
-          result = {'source': source, 'tree': tree['sha'], 'commit': commit['sha'], 'ref_updated': False, 'scope': 'tools/release/scopes/0.8.1.json'}
-          pathlib.Path('/tmp/preparation-975/prepared-commit.json').write_text(json.dumps(result, indent=2) + '\n')
-          print(json.dumps(result, indent=2))
+          results = {}
+          for name, value in cases.items():
+              output = root / f'{name}.txt'
+              run = subprocess.run(['dotnet', 'msbuild', str(project), '-nologo', '-t:Pack', f'-p:OutputFile={output}', f'-p:PackageReleaseNotes={value}'], text=True, capture_output=True)
+              results[name] = {'returncode': run.returncode, 'stdout': run.stdout, 'stderr': run.stderr, 'output': output.read_text() if output.exists() else None}
+          (root / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
+          print(json.dumps(results, indent=2))
+          assert results['plain']['returncode'] == 0
+          assert results['plain']['output'].strip() == cases['plain']
+          assert results['escaped']['returncode'] == 0
+          assert results['semicolon']['returncode'] != 0
+          assert results['comma']['returncode'] != 0
           PY
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: maintenance-preparation-validation
-          path: /tmp/preparation-975/
-          if-no-files-found: error
+          name: maintenance-metadata-boundary
+          path: /tmp/metadata-975/
           retention-days: 7
+          if-no-files-found: error
