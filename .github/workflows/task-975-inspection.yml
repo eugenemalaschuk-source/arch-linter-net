@@ -1,0 +1,55 @@
+name: Task 975 read-only inspection
+
+on:
+  push:
+    branches: [task/975-release-preparation]
+    paths: [.github/workflows/task-975-inspection.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Inspect public version inventories and tracked source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/task-975"
+          git archive --format=zip --output="$RUNNER_TEMP/task-975/source.zip" HEAD
+          git log --format='%H %s' v0.8.0..e4af794f27f311e90602e8f032b6b7ff38738042 > "$RUNNER_TEMP/task-975/delta.txt"
+          git diff --stat v0.8.0 e4af794f27f311e90602e8f032b6b7ff38738042 > "$RUNNER_TEMP/task-975/delta-stat.txt"
+          git tag --list 'v*' --sort=-version:refname > "$RUNNER_TEMP/task-975/tags.txt"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/task-975/releases.json"
+          python3 - <<'PY'
+          import datetime
+          import json
+          import os
+          from pathlib import Path
+          import urllib.request
+
+          result = {"checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "source_commit": "e4af794f27f311e90602e8f032b6b7ff38738042", "packages": {}}
+          for package in ("ArchLinterNet.CEL", "ArchLinterNet.Core", "ArchLinterNet.Cli", "ArchLinterNet.Testing"):
+              url = f"https://api.nuget.org/v3-flatcontainer/{package.lower()}/index.json"
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  versions = json.load(response)["versions"]
+              result["packages"][package] = {"url": url, "versions": versions, "target_0_8_1_available": "0.8.1" not in versions}
+          text = json.dumps(result, indent=2) + "\n"
+          (Path(os.environ["RUNNER_TEMP"]) / "task-975" / "nuget-versions.json").write_text(text, encoding="utf-8")
+          print(text)
+          PY
+      - name: Upload read-only inspection
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: task-975-read-only-inspection
+          path: ${{ runner.temp }}/task-975
+          retention-days: 7
+          if-no-files-found: error
