@@ -72,9 +72,9 @@ download link. A manifest containing a component name is not proof that the
 archive includes a usable copy. The four-package release family is not a
 requirement to install four packages just to use the CLI.
 
-After #926 and #955, the approved reusable workflow commit is
-`c3aea3d5e543b5cfe522841ada580c8db2a5eac9`, with workflow blob
-`7f03b4924a5f1f51e1ff56920d9f71d307ac914c`. The composite action remains
+After #964, the approved reusable workflow commit is
+`308802c63b846b173d8c0b97d42ce9eb36d10cd2`, with workflow blob
+`71adbf9e5fe1ed6e3f700faba14e40e9fdbb32ba`. The composite action remains
 separately pinned at `6fadf3fec983e5af3077b62a52ab608ce7f73ba3`, with action
 blob `0628a09ad75bfb6c4da4acdae041a49681964a69`. These are Git-object
 identities, not distribution SHA-256 digests. Copy the full pinned
@@ -82,9 +82,9 @@ workflow/action refs from the chosen candidate inventory, not from `main` or
 this source-audit paragraph. Bind the separate generated producer Git-blob SHA
 from setup as well.
 
-The workflow blob changed in #926 to use an immutable repository-qualified
-action reference. The immutable revision also includes the #917 exact-job
-attempt fix and the #919 consumer registry loader. Matching YAML alone does not prove that the called Python
+The immutable revision includes the no-App bootstrap handoff from #964, the
+immutable repository-qualified action reference from #926, the #917 exact-job
+attempt fix, and the #919 consumer registry loader. Matching YAML alone does not prove that the called Python
 publisher contains those fixes. The shipped-publisher regression exports the
 approved revision and runs the current loader/attempt contract tests against
 that runtime in a separate interpreter, without using working-tree product
