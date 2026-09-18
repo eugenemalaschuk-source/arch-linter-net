@@ -16,11 +16,13 @@ using CheckpointScenarioResult = CheckpointBReleaseGateTests.CheckpointScenarioR
 /// </summary>
 internal sealed class CheckpointBV08FullCycleScenario(CandidatePackageFeed candidate)
 {
-    // The composed scenario legitimately runs dozens of separately bounded CLI phases. Release
-    // evidence on macOS x64 measured ~4m25 on an ordinary pass and 5m before cancellation under
-    // load; 7m keeps a bounded scenario guard while each child process remains independently
-    // limited by CheckpointBProcessRunner.ProcessCompletionTimeout (2m).
-    internal const int WatchdogMs = 420_000;
+    // The composed scenario legitimately runs dozens of separately bounded CLI phases. The
+    // canonical macOS x64 regression trace in #769 completed 30 healthy phases in ~6m08 and was
+    // cancelled at the former 7m boundary while a final health command had run for only ~6s. A
+    // nine-minute envelope leaves a bounded margin for the remaining healthy phases and runner
+    // overhead, while every child process remains independently limited by
+    // CheckpointBProcessRunner.ProcessCompletionTimeout (2m).
+    internal const int WatchdogMs = 540_000;
 
     private readonly CandidatePackageFeed _candidate = candidate;
 
