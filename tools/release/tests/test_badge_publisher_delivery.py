@@ -14,6 +14,8 @@ import release_distribution as distribution  # noqa: E402
 MODELS = ROOT / "src/ArchLinterNet.Cli/Commands/Badge/Application/Setup/BadgeSetupModels.cs"
 MANIFEST = ROOT / "relay/bundle-manifest.json"
 SCHEMA = ROOT / "schema/0.8.0/badge-relay-config.schema.json"
+NO_APP_BOOTSTRAP_WORKFLOW_COMMIT = "308802c63b846b173d8c0b97d42ce9eb36d10cd2"
+PUBLISHER_ACTION_COMMIT = "6fadf3fec983e5af3077b62a52ab608ce7f73ba3"
 
 
 def _constant(name: str) -> str:
@@ -43,6 +45,14 @@ def test_all_shipped_publisher_references_match_reviewed_inventory() -> None:
     assert schema_pins["workflow_ref"]["enum"] == [None, workflow]
     assert schema_pins["workflow_sha"]["enum"] == [None, workflow_pin]
     assert schema_pins["action_ref"]["enum"] == [None, action]
+
+
+def test_inventory_rotates_only_the_workflow_pin_to_the_no_app_bootstrap() -> None:
+    inventory = json.loads((ROOT / ".github/badge-promotion/release-inventory.json").read_text())
+    compatibility = inventory["compatibility"]
+
+    assert compatibility["publisher_commit"] == NO_APP_BOOTSTRAP_WORKFLOW_COMMIT
+    assert compatibility["action_commit"] == PUBLISHER_ACTION_COMMIT
 
 
 def test_rotated_schema_and_bundle_have_exact_installer_digests() -> None:
