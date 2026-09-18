@@ -4,13 +4,22 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 /// <summary>
-/// Pins the acceptance criterion that the seven-minute composed watchdog (#771) stays scoped to
+/// Pins the acceptance criterion that the nine-minute composed watchdog (#769) stays scoped to
 /// <c>PackedCandidate_V08FullCycle</c> alone: every other Checkpoint B scenario must keep relying
 /// on the fixture's class-level <c>[CancelAfter]</c> bound rather than acquiring its own override.
 /// </summary>
 [TestFixture]
 public sealed class CheckpointBV08FullCycleScenarioWatchdogTests
 {
+    private const int ExpectedV08FullCycleWatchdogMs = 540_000;
+
+    [Test]
+    public void V08FullCycleWatchdog_RemainsTheReviewedNineMinuteBound()
+    {
+        Assert.That(CheckpointBV08FullCycleScenario.WatchdogMs, Is.EqualTo(ExpectedV08FullCycleWatchdogMs),
+            "The composed macOS x64 envelope must remain finite and match the reviewed #769 runtime budget.");
+    }
+
     [Test]
     public void V08FullCycleWatchdog_IsScopedToItsOwnTestOnly()
     {
