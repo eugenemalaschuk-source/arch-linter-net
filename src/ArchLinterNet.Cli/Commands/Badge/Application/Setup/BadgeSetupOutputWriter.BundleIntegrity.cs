@@ -76,7 +76,7 @@ internal static class BadgeRelayBundleIntegrityValidator
             || workflowRef != BadgeSetupContract.DefaultPublisherWorkflowRef
             || workflowSha != BadgeSetupContract.DefaultPublisherWorkflowSha
             || actionRef != BadgeSetupContract.DefaultActionRef
-            || actionSha != BadgeSetupContract.DefaultPublisherWorkflowSha
+            || actionSha != BadgeSetupContract.DefaultPublisherActionSha
             || commit != BadgeSetupContract.DefaultPublisherWorkflowSha)
         {
             throw Integrity("publisher pins do not match the approved immutable commit.");
