@@ -6,9 +6,9 @@ from the public MkDocs site by `exclude_docs: internal/`.
 
 ## Audit boundary and ownership
 
-The publisher source audit was refreshed after #945 at
-`6fadf3fec983e5af3077b62a52ab608ce7f73ba3` on 2026-09-17. That SHA is the
-reviewed publisher revision for the protected-bootstrap delivery-pin rotation, **not** a
+The workflow source audit was refreshed after #971/#972 at
+`36c88c88cca708c10ade98ac1f1fee8c56c1cb30` on 2026-09-18. That SHA is the
+reviewed hidden-handoff workflow revision for the #973 delivery-pin rotation, **not** a
 frozen or approved final `0.8.Z` package candidate.
 The original audit at `ffd5e97f99cedf4982b4a9c28f1f45b3827ad7e7` identified
 the packaging defect described below; it is retained only as historical context.
@@ -72,9 +72,9 @@ download link. A manifest containing a component name is not proof that the
 archive includes a usable copy. The four-package release family is not a
 requirement to install four packages just to use the CLI.
 
-After #964, the approved reusable workflow commit is
-`308802c63b846b173d8c0b97d42ce9eb36d10cd2`, with workflow blob
-`71adbf9e5fe1ed6e3f700faba14e40e9fdbb32ba`. The composite action remains
+After #972, the approved reusable workflow commit is
+`36c88c88cca708c10ade98ac1f1fee8c56c1cb30`, with workflow blob
+`b5ed2b23d025812bdef558d45e0706c09a529ffb`. The composite action remains
 separately pinned at `6fadf3fec983e5af3077b62a52ab608ce7f73ba3`, with action
 blob `0628a09ad75bfb6c4da4acdae041a49681964a69`. These are Git-object
 identities, not distribution SHA-256 digests. Copy the full pinned
@@ -82,17 +82,27 @@ workflow/action refs from the chosen candidate inventory, not from `main` or
 this source-audit paragraph. Bind the separate generated producer Git-blob SHA
 from setup as well.
 
-The immutable revision includes the no-App bootstrap handoff from #964, the
-immutable repository-qualified action reference from #926, the #917 exact-job
-attempt fix, and the #919 consumer registry loader. Matching YAML alone does not prove that the called Python
-publisher contains those fixes. The shipped-publisher regression exports the
-approved revision and runs the current loader/attempt contract tests against
-that runtime in a separate interpreter, without using working-tree product
-code. CLI defaults, schema enums, bundle pins and release inventory must agree;
-schema and whole-bundle digests are recomputed as part of the reviewed change.
+The workflow revision includes the no-App handoff from #964 and the #972
+hidden-file transport correction. Its private artifact upload includes the
+validated managed `.github` files without broadening the staging root or
+consumer repository permissions. The independently pinned composite action
+retains its #917 exact-job-attempt and #919 consumer-registry runtime fixes.
+Matching YAML alone does not prove that the called Python publisher contains
+those fixes. The shipped-publisher regression exports the approved runtime
+and runs the current loader/attempt contract tests against it in a separate
+interpreter, without using working-tree product code. CLI defaults, schema
+enums, bundle pins and release inventory must agree; schema and whole-bundle
+digests are recomputed as part of the reviewed change.
 Existing prepublication configurations are not silently rewritten or granted
 new authority. Recreate/review candidate setup outputs from the updated CLI
 and rerun affected proofs; this rotation is not hosted #834 acceptance.
+
+`0.8.0-acceptance.925` remains historical evidence for its own package hashes
+and four-platform run, not proof of this corrected upload. Freeze a replacement
+candidate containing this rotation and the applicable post-Sonar #970 changes.
+Verify the downloaded handoff against its manifest, including `.github` members,
+before applying it through an ordinary owner-operated protected PR. Steady-state
+OIDC publication changes Relay state, never Git commits for badge refreshes.
 
 | Compatibility field | Audited identity |
 | --- | --- |
