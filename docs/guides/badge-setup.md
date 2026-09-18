@@ -64,18 +64,44 @@ pinned reusable publisher context. This is deliberate: a local shell cannot
 mint the publisher-bound OIDC claim. Use the trusted reusable workflow's
 `operation: bootstrap` for the first write (it checks out the consumer's
 configured base ref, obtains the short-lived OIDC token, runs the same setup
-command, and creates a dedicated pull request containing only the generated
-managed files). It never pushes directly to the protected base ref. The caller
-must first configure the exact required check/ruleset and review the disclosure
-inputs. The repository owner must install a GitHub App only on that consumer
-repository with `Contents: write`, `Pull requests: write`, and `Workflows: write`, then pass its App ID and private key as the reusable workflow's
-`bootstrap_writer_app_id` and `bootstrap_writer_private_key` secrets. This
-short-lived App token is used only to create the deterministic bootstrap branch
-and pull request after trusted setup succeeds; it is not used for the OIDC
-inspection or Relay publication. A PAT is not a supported substitute.
+command, and creates a private `architecture-health-bootstrap-handoff`
+artifact). It does not push a branch, create a pull request, or write any
+consumer Git reference. The caller must first configure the exact required
+check/ruleset and review the disclosure inputs. A GitHub App key and a PAT are
+not bootstrap inputs and are not supported substitutes for the OIDC inspection.
 
 The bootstrap workflow is pinned by the same immutable publisher SHA used for
 normal publication; it does not accept caller-authored capability evidence.
+
+Download that private artifact only from the consumer repository's trusted
+bootstrap run. It contains `bootstrap-handoff.json` and `payload/`, and must
+remain private: it can contain consumer configuration. On a normal local review
+branch created from the handoff's recorded base commit, run the packaged
+verifier before looking at or committing its generated diff:
+
+```text
+arch-linter-net badge architecture-health apply-handoff \
+  --input ./architecture-health-bootstrap-handoff/bootstrap-handoff.json \
+  --payload ./architecture-health-bootstrap-handoff/payload \
+  --output . \
+  --expected-base-sha <handoff base.sha> \
+  --expected-base-tree-sha <handoff base.tree_sha> \
+  --repository <handoff repository.owner/name> \
+  --repository-id <handoff repository.repository_id> \
+  --repository-owner-id <handoff repository.repository_owner_id>
+```
+
+The command independently reads `HEAD` and `HEAD^{tree}` from that local
+checkout. It rejects a stale branch, a different repository identity, unknown
+or extra paths, reparse points, non-UTF-8 files, and any byte-count or digest
+mismatch before writing a managed file. Do not commit before this command: an
+exact-base branch is the handoff's replay protection. Then inspect the local
+diff, commit it, and open the repository's ordinary protected-branch PR. Only
+that normal PR may enter `main`.
+
+This is a one-time owner review step. After it merges, ongoing publication uses
+the generated exact pinned GitHub OIDC publisher. It requires neither a GitHub
+App key nor a direct write to the base branch.
 
 For an already bootstrapped destination, the equivalent local preview remains
 useful, but it cannot replace that trusted first write. With adopter-specific

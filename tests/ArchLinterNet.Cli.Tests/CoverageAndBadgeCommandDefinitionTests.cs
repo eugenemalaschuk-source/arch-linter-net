@@ -149,6 +149,22 @@ public sealed class CoverageAndBadgeCommandDefinitionTests
         });
     }
 
+    [Test]
+    public void BadgeDefinition_ArchitectureHealthApplyHandoffSubcommand_ExposesHelp()
+    {
+        FakeConsole console = new();
+        RootCommand root = new();
+        root.Subcommands.Add(new BadgeCommandDefinition(new BadgeCommandHandler(console, new FakeFileSystem())).Create());
+
+        int exitCode = root.Parse(["badge", "architecture-health", "apply-handoff", "-h"]).Invoke();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(console.Output, Does.Contain("badge architecture-health apply-handoff"));
+        });
+    }
+
     private sealed class FakeConsole : ICliConsole
     {
         private readonly StringBuilder _output = new();
