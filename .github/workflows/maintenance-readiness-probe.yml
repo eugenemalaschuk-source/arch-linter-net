@@ -1,0 +1,62 @@
+name: Maintenance readiness read-only probe
+
+on:
+  push:
+    branches: [chore/975-maintenance-release-readiness]
+    paths: [.github/workflows/maintenance-readiness-probe.yml]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Snapshot public source and live release facts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/readiness-evidence
+          git bundle create /tmp/readiness-evidence/repository.bundle --all
+          git show-ref --tags > /tmp/readiness-evidence/tags.txt
+          git log --format='%H %s' v0.8.0..e4af794f27f311e90602e8f032b6b7ff38738042 > /tmp/readiness-evidence/commits.txt
+          git diff --stat v0.8.0 e4af794f27f311e90602e8f032b6b7ff38738042 > /tmp/readiness-evidence/delta-stat.txt
+          python3 tools/release/calculate_version.py --release-type patch --github-env /tmp/readiness-evidence/calculated.env
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" > /tmp/readiness-evidence/releases.json
+          gh api --paginate "repos/$GITHUB_REPOSITORY/issues?state=all&milestone=6&per_page=100" > /tmp/readiness-evidence/milestone-6.json
+          python3 - <<'PY'
+          import datetime
+          import json
+          import os
+          import pathlib
+          import urllib.request
+          root = pathlib.Path('/tmp/readiness-evidence')
+          values = dict(line.split('=', 1) for line in (root / 'calculated.env').read_text().splitlines())
+          target = values['PACKAGE_VERSION']
+          checks = []
+          for package in ('ArchLinterNet.CEL', 'ArchLinterNet.Core', 'ArchLinterNet.Cli', 'ArchLinterNet.Testing'):
+              url = f'https://api.nuget.org/v3-flatcontainer/{package.lower()}/index.json'
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  versions = json.load(response)['versions']
+              checks.append({'package': package, 'url': url, 'versions': versions, 'target_absent': target.lower() not in [v.lower() for v in versions]})
+          result = {'observed_at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'inspected_source': 'e4af794f27f311e90602e8f032b6b7ff38738042', 'probe_source': os.environ['GITHUB_SHA'], 'release_target': target, 'nuget': checks}
+          (root / 'nuget-checks.json').write_text(json.dumps(result, indent=2) + '\n')
+          print(json.dumps(result, indent=2))
+          assert all(check['target_absent'] for check in checks), 'Proposed version is already present on NuGet'
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: maintenance-readiness-probe
+          path: /tmp/readiness-evidence/
+          if-no-files-found: error
+          retention-days: 7
