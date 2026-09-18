@@ -295,6 +295,25 @@ def _git_blob(source_root: Path, commit: str, relative: str) -> bytes:
     return completed.stdout
 
 
+def _index_blob(source_root: Path, relative: str) -> bytes:
+    """Read the Git-clean index blob when a shallow checkout lacks a pinned commit.
+
+    The candidate checkout's index retains the exact bytes of its checked-out tree even
+    when Git's working tree has converted line endings.  It is therefore a valid
+    fallback only because the caller subsequently compares its Git blob identity with
+    the independently pinned identity in the inventory.
+    """
+    completed = subprocess.run(
+        ["git", "-C", str(source_root), "show", f":{relative}"],
+        check=False,
+        capture_output=True,
+    )  # NOSONAR(S4721,S8707)
+    if completed.returncode != 0:
+        details = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(f"Approved publisher source '{relative}' is unavailable from the checkout index: {details}")
+    return completed.stdout
+
+
 def _approved_source_bytes(source_root: Path, relative: str, inventory: dict[str, Any]) -> tuple[bytes, str, str]:
     component = next(component for component in inventory["components"] if component["path"] == relative)
     commit = _APPROVED_PUBLISHER_COMMIT if relative == _WORKFLOW_PATH else _APPROVED_PUBLISHER_ACTION_COMMIT
@@ -302,12 +321,19 @@ def _approved_source_bytes(source_root: Path, relative: str, inventory: dict[str
         contents = _git_blob(source_root, commit, relative)
     except ValueError:
         # Release verification jobs may use a shallow checkout that does not retain the reviewed
-        # bootstrap commit. The exact Git blob digest remains pinned in the checked-in inventory;
-        # accepting workspace bytes is safe only when they are byte-for-byte that reviewed blob.
-        path = _safe_source_path(source_root, relative, "approved publisher source")
-        contents = path.read_bytes()
+        # bootstrap commit. Read the current index rather than the working tree so Windows EOL
+        # conversion cannot change the immutable publisher bytes. The independently pinned blob
+        # identity below remains mandatory and rejects a staged/tampered index entry.
+        try:
+            contents = _index_blob(source_root, relative)
+        except ValueError:
+            # Non-Git test fixtures have no index. Their bytes are still accepted only if the
+            # pinned Git-blob identity matches exactly; CRLF workspace conversions therefore
+            # remain fail-closed when no Git-clean source representation exists.
+            path = _safe_source_path(source_root, relative, "approved publisher source")
+            contents = path.read_bytes()
     observed_blob = subprocess.run(
-        ["git", "hash-object", "--stdin"],
+        ["git", "-C", str(source_root), "hash-object", "--stdin"],
         input=contents,
         check=False,
         capture_output=True,

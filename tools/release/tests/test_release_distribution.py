@@ -272,6 +272,88 @@ def test_approved_workflow_and_action_sources_can_use_independent_immutable_comm
     ]
 
 
+def test_shallow_publisher_source_fallback_uses_git_clean_index_bytes_and_rejects_staged_tampering(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repository = tmp_path / "shallow-checkout"
+    action_path = repository / ".github" / "actions" / "publisher" / "action.yml"
+    action_path.parent.mkdir(parents=True)
+    relative = ".github/actions/publisher/action.yml"
+    expected_bytes = b"name: publisher\n"
+    action_path.write_bytes(expected_bytes)
+
+    for command in (
+        ["git", "init", str(repository)],
+        ["git", "-C", str(repository), "config", "user.email", "tests@example.invalid"],
+        ["git", "-C", str(repository), "config", "user.name", "Release distribution tests"],
+        ["git", "-C", str(repository), "add", "."],
+        ["git", "-C", str(repository), "commit", "-m", "seed immutable publisher source"],
+    ):
+        subprocess.run(command, check=True, capture_output=True)
+
+    expected_blob = subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", f"HEAD:{relative}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    inventory = {"components": [{"path": relative, "approved_source_sha": expected_blob}]}
+
+    def unavailable_approved_commit(*_args: object) -> bytes:
+        raise ValueError("approved commit absent from shallow checkout")
+
+    monkeypatch.setattr(distribution, "_git_blob", unavailable_approved_commit)
+
+    # GitHub's Windows checkout can materialize a text file with CRLF while the
+    # index still holds the exact immutable LF blob. The fallback must ignore
+    # mutable working-tree bytes and rebuild the same transport identity.
+    action_path.write_bytes(b"name: publisher\r\n")
+    observed_bytes, observed_blob, _ = distribution._approved_source_bytes(repository, relative, inventory)
+    assert observed_bytes == expected_bytes
+    assert observed_blob == expected_blob
+
+    # A staged replacement changes the Git-clean index blob and must remain a
+    # hard failure; the index fallback is not an authority bypass.
+    action_path.write_bytes(b"name: tampered\r\n")
+    subprocess.run(["git", "-C", str(repository), "add", relative], check=True, capture_output=True)
+    with pytest.raises(ValueError, match="digest mismatch"):
+        distribution._approved_source_bytes(repository, relative, inventory)
+
+
+def test_publisher_source_fallback_without_git_index_requires_exact_workspace_bytes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    fixture = tmp_path / "non-git-fixture"
+    relative = ".github/actions/publisher/action.yml"
+    action_path = fixture / relative
+    action_path.parent.mkdir(parents=True)
+    expected_bytes = b"name: publisher\n"
+    action_path.write_bytes(expected_bytes)
+    expected_blob = subprocess.run(
+        ["git", "hash-object", "--stdin"],
+        input=expected_bytes,
+        check=True,
+        capture_output=True,
+    ).stdout.decode("ascii").strip()
+    inventory = {"components": [{"path": relative, "approved_source_sha": expected_blob}]}
+
+    def unavailable_approved_commit(*_args: object) -> bytes:
+        raise ValueError("approved commit absent from shallow checkout")
+
+    monkeypatch.setattr(distribution, "_git_blob", unavailable_approved_commit)
+
+    # A non-Git fixture has neither the reviewed commit nor a Git-clean index.
+    # The final fallback remains valid only when the mutable file bytes reproduce
+    # the independently pinned Git blob exactly.
+    observed_bytes, observed_blob, _ = distribution._approved_source_bytes(fixture, relative, inventory)
+    assert observed_bytes == expected_bytes
+    assert observed_blob == expected_blob
+
+    action_path.write_bytes(b"name: publisher\r\n")
+    with pytest.raises(ValueError, match="digest mismatch"):
+        distribution._approved_source_bytes(fixture, relative, inventory)
+
+
 def test_validate_version_rejects_non_ascii_unicode_digits() -> None:
     assert distribution._validate_version("0.8.19") == "0.8.19"
 
