@@ -72,11 +72,12 @@ download link. A manifest containing a component name is not proof that the
 archive includes a usable copy. The four-package release family is not a
 requirement to install four packages just to use the CLI.
 
-After the #945 protected-bootstrap pull-request handoff fix, the approved
-publisher commit is `6fadf3fec983e5af3077b62a52ab608ce7f73ba3`. The inventory binds the workflow
-blob `7d9801c8e99e362d67674f77185010f1a0d57ec2` and action blob
-`0628a09ad75bfb6c4da4acdae041a49681964a69` at that commit. These are Git
-object identities, not distribution SHA-256 digests. Copy the full pinned
+After #926 and #955, the approved reusable workflow commit is
+`c3aea3d5e543b5cfe522841ada580c8db2a5eac9`, with workflow blob
+`7f03b4924a5f1f51e1ff56920d9f71d307ac914c`. The composite action remains
+separately pinned at `6fadf3fec983e5af3077b62a52ab608ce7f73ba3`, with action
+blob `0628a09ad75bfb6c4da4acdae041a49681964a69`. These are Git-object
+identities, not distribution SHA-256 digests. Copy the full pinned
 workflow/action refs from the chosen candidate inventory, not from `main` or
 this source-audit paragraph. Bind the separate generated producer Git-blob SHA
 from setup as well.
