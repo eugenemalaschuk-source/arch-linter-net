@@ -8,6 +8,8 @@ namespace ArchLinterNet.Core.BuildState;
 // runtime-specific driver generation live in the purpose-named collaborators beside this class.
 internal static class BuildStateRuntimeBuildPreparation
 {
+    private static readonly char[] PathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
+
     internal static BuildStatePreflightResult EnsureBuilt(BuildStatePreflightRequest request)
     {
         request.CancellationToken.ThrowIfCancellationRequested();
@@ -209,7 +211,7 @@ internal static class BuildStateRuntimeBuildPreparation
     private static bool MatchesRequestedOutputPath(string relativePath, string? configuration, string? targetFramework,
         string? runtimeIdentifier)
     {
-        string[] segments = relativePath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
+        string[] segments = relativePath.Split(PathSeparators);
         bool configurationMatches = configuration == null
             || (segments.Length > 0 && string.Equals(segments[0], configuration, StringComparison.OrdinalIgnoreCase));
         bool targetFrameworkMatches = targetFramework == null

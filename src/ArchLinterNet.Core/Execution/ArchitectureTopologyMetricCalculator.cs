@@ -188,7 +188,7 @@ internal static class ArchitectureTopologyMetricCalculator
         }
     }
 
-    private static bool TryRecordOtherBindingStop(
+    internal static bool TryRecordOtherBindingStop(
         ArchitectureTopologyAssemblyEndpointBinding binding,
         List<string> reasons)
     {
@@ -207,7 +207,7 @@ internal static class ArchitectureTopologyMetricCalculator
         return true;
     }
 
-    private static bool TryRecordOtherDispositionStop(
+    internal static bool TryRecordOtherDispositionStop(
         ArchitectureTopologyEvaluator.Disposition disposition,
         List<string> reasons)
     {

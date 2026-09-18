@@ -253,7 +253,7 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
         horizon = horizon is null || dateHorizon < horizon.Value ? dateHorizon : horizon;
     }
 
-    private static DateTimeOffset ApplyWaiverExpiry(
+    internal static DateTimeOffset ApplyWaiverExpiry(
         ArchitectureWaiverLifecycleRecord record,
         DateTimeOffset dateHorizon,
         List<ArchitectureHealthPublicationEvidenceReason> reasons)
