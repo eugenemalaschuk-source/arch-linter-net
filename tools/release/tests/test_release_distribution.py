@@ -188,9 +188,12 @@ def test_metadata_binds_candidate_packages_and_exact_publisher_bytes(tmp_path: P
     assert metadata["package_ids"] == list(package_manifest._PACKAGE_IDS)
     assert metadata["compatibility"] == distribution._COMPATIBILITY_IDENTITIES
     assert metadata["approved_publisher_commit"] == distribution._APPROVED_PUBLISHER_COMMIT
+    assert metadata["approved_publisher_action_commit"] == distribution._APPROVED_PUBLISHER_ACTION_COMMIT
     inventory = json.loads(INVENTORY.read_text(encoding="utf-8"))
     compatibility = inventory["compatibility"]
     assert metadata["publisher"]["action"]["ref"] == compatibility["action_ref"]
+    assert metadata["publisher"]["workflow"]["commit"] == compatibility["publisher_commit"]
+    assert metadata["publisher"]["action"]["commit"] == compatibility["action_commit"]
     assert metadata["publisher"]["workflow"]["git_blob_sha"] == compatibility["workflow_source_sha"]
     assert metadata["publisher"]["action"]["git_blob_sha"] == compatibility["action_source_sha"]
     assert metadata["publisher"]["workflow"]["sha256"] == next(
@@ -217,11 +220,56 @@ def test_inventory_action_ref_matches_badge_setup_contract() -> None:
     )
     contract = contract_path.read_text(encoding="utf-8")
     match = re.search(r'DefaultActionRef = "([^"]+)"', contract)
+    action_commit_match = re.search(r'DefaultPublisherActionSha = "([0-9a-f]{40})"', contract)
 
     assert match is not None
+    assert action_commit_match is not None
     action_ref = inventory["compatibility"]["action_ref"]
     assert action_ref == match.group(1)
+    assert inventory["compatibility"]["action_commit"] == action_commit_match.group(1)
+    assert action_ref.endswith(f"@{action_commit_match.group(1)}")
     assert "/action.yml@" not in action_ref
+
+
+def test_approved_workflow_and_action_sources_can_use_independent_immutable_commits(monkeypatch) -> None:
+    inventory = json.loads(INVENTORY.read_text(encoding="utf-8"))
+    action_commit = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
+    calls: list[tuple[str, str]] = []
+    original = distribution._git_blob
+
+    def capture(source_root: Path, commit: str, relative: str) -> bytes:
+        calls.append((commit, relative))
+        return original(source_root, commit, relative)
+
+    monkeypatch.setattr(distribution, "_APPROVED_PUBLISHER_ACTION_COMMIT", action_commit)
+    monkeypatch.setattr(distribution, "_git_blob", capture)
+    inventory["compatibility"]["action_commit"] = action_commit
+    inventory["compatibility"]["action_ref"] = (
+        f"{distribution._PUBLISHER_REPOSITORY}/{distribution._ACTION_REF_PATH}@{action_commit}"
+    )
+
+    distribution._validate_inventory_compatibility(inventory)
+    members = {member["path"]: member for member in inventory["bundle_members"]}
+    _, workflow_identity = distribution._source_bytes(
+        ROOT,
+        members[distribution._WORKFLOW_PATH],
+        "a" * 40,
+        inventory,
+    )
+    _, action_identity = distribution._source_bytes(
+        ROOT,
+        members[distribution._ACTION_PATH],
+        "a" * 40,
+        inventory,
+    )
+
+    assert workflow_identity["commit"] == distribution._APPROVED_PUBLISHER_COMMIT
+    assert action_identity["commit"] == action_commit
+
+    assert calls == [
+        (distribution._APPROVED_PUBLISHER_COMMIT, distribution._WORKFLOW_PATH),
+        (action_commit, distribution._ACTION_PATH),
+    ]
 
 
 def test_validate_version_rejects_non_ascii_unicode_digits() -> None:
@@ -345,4 +393,14 @@ def test_inventory_is_closed_to_pin_drift_and_unrelated_scope(tmp_path: Path) ->
     path = tmp_path / "inventory.json"
     path.write_text(json.dumps(value), encoding="utf-8")
     with pytest.raises(ValueError, match="exclusions"):
+        distribution._load_inventory(path)
+
+
+def test_inventory_rejects_an_unapproved_independent_action_commit(tmp_path: Path) -> None:
+    value = json.loads(INVENTORY.read_text(encoding="utf-8"))
+    value["compatibility"]["action_commit"] = "a" * 40
+    path = tmp_path / "inventory.json"
+    path.write_text(json.dumps(value), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="action commit"):
         distribution._load_inventory(path)

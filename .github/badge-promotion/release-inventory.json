@@ -21,6 +21,7 @@
     "storage": "v1",
     "publisher_repository": "eugenemalaschuk-source/arch-linter-net",
     "publisher_commit": "6fadf3fec983e5af3077b62a52ab608ce7f73ba3",
+    "action_commit": "6fadf3fec983e5af3077b62a52ab608ce7f73ba3",
     "workflow_path": ".github/workflows/architecture-health-badge-promotion.yml",
     "action_path": ".github/actions/architecture-health-badge-promotion/action.yml",
     "workflow_ref": "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml@6fadf3fec983e5af3077b62a52ab608ce7f73ba3",

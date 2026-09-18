@@ -30,6 +30,7 @@ _INVENTORY_SCHEMA = "architecture-health-badge-release-inventory/v2"
 _DISTRIBUTION_SCHEMA = "architecture-health-badge-release-distribution/v1"
 _COMPATIBILITY_SCHEMA = "architecture-health-badge-relay-compatibility/v1"
 _APPROVED_PUBLISHER_COMMIT = "6fadf3fec983e5af3077b62a52ab608ce7f73ba3"
+_APPROVED_PUBLISHER_ACTION_COMMIT = "6fadf3fec983e5af3077b62a52ab608ce7f73ba3"
 _PUBLISHER_REPOSITORY = "eugenemalaschuk-source/arch-linter-net"
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
@@ -186,6 +187,7 @@ def _validate_inventory_compatibility(value: dict[str, Any]) -> dict[str, Any]:
         *_COMPATIBILITY_IDENTITIES,
         "publisher_repository",
         "publisher_commit",
+        "action_commit",
         "workflow_path",
         "action_path",
         "workflow_ref",
@@ -202,11 +204,13 @@ def _validate_inventory_compatibility(value: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("The release inventory publisher repository is invalid.")
     if compatibility.get("publisher_commit") != _APPROVED_PUBLISHER_COMMIT:
         raise ValueError("The release inventory publisher commit is not the approved immutable pin.")
+    if compatibility.get("action_commit") != _APPROVED_PUBLISHER_ACTION_COMMIT:
+        raise ValueError("The release inventory publisher action commit is not the approved immutable pin.")
     if compatibility.get("workflow_path") != _WORKFLOW_PATH or compatibility.get("action_path") != _ACTION_PATH:
         raise ValueError("The release inventory publisher paths are invalid.")
     if compatibility.get("workflow_ref") != f"{_PUBLISHER_REPOSITORY}/{_WORKFLOW_PATH}@{_APPROVED_PUBLISHER_COMMIT}":
         raise ValueError("The release inventory workflow reference is not immutable.")
-    if compatibility.get("action_ref") != f"{_PUBLISHER_REPOSITORY}/{_ACTION_REF_PATH}@{_APPROVED_PUBLISHER_COMMIT}":
+    if compatibility.get("action_ref") != f"{_PUBLISHER_REPOSITORY}/{_ACTION_REF_PATH}@{_APPROVED_PUBLISHER_ACTION_COMMIT}":
         raise ValueError("The release inventory action reference is not immutable.")
     for key in ("workflow_source_sha", "action_source_sha"):
         if not isinstance(compatibility.get(key), str) or not _GIT_BLOB_PATTERN.fullmatch(compatibility[key]):
@@ -291,10 +295,11 @@ def _git_blob(source_root: Path, commit: str, relative: str) -> bytes:
     return completed.stdout
 
 
-def _approved_source_bytes(source_root: Path, relative: str, inventory: dict[str, Any]) -> tuple[bytes, str]:
+def _approved_source_bytes(source_root: Path, relative: str, inventory: dict[str, Any]) -> tuple[bytes, str, str]:
     component = next(component for component in inventory["components"] if component["path"] == relative)
+    commit = _APPROVED_PUBLISHER_COMMIT if relative == _WORKFLOW_PATH else _APPROVED_PUBLISHER_ACTION_COMMIT
     try:
-        contents = _git_blob(source_root, _APPROVED_PUBLISHER_COMMIT, relative)
+        contents = _git_blob(source_root, commit, relative)
     except ValueError:
         # Release verification jobs may use a shallow checkout that does not retain the reviewed
         # bootstrap commit. The exact Git blob digest remains pinned in the checked-in inventory;
@@ -310,7 +315,7 @@ def _approved_source_bytes(source_root: Path, relative: str, inventory: dict[str
     observed_sha = observed_blob.stdout.decode("ascii", errors="replace").strip()
     if observed_blob.returncode != 0 or observed_sha != component["approved_source_sha"]:
         raise ValueError(f"Approved publisher source digest mismatch: {relative}.")
-    return contents, observed_sha
+    return contents, observed_sha, commit
 
 
 def _source_bytes(source_root: Path, member: dict[str, Any], source_commit: str, inventory: dict[str, Any]) -> tuple[bytes, dict[str, Any]]:
@@ -332,11 +337,11 @@ def _source_bytes(source_root: Path, member: dict[str, Any], source_commit: str,
     else:
         if member["path"] not in (_WORKFLOW_PATH, _ACTION_PATH):
             raise ValueError("Only the approved publisher workflow and action may use an immutable source.")
-        contents, observed_sha = _approved_source_bytes(source_root, relative, inventory)
+        contents, observed_sha, approved_commit = _approved_source_bytes(source_root, relative, inventory)
         identity = {
             "kind": "approved-immutable-commit",
             "path": relative,
-            "commit": _APPROVED_PUBLISHER_COMMIT,
+            "commit": approved_commit,
             "git_blob_sha": observed_sha,
         }
     if b"synthetic" in contents.lower():
@@ -412,16 +417,19 @@ def _compatibility_metadata(
         "package_ids": list(package_manifest._PACKAGE_IDS),
         "compatibility": {key: compatibility[key] for key in _COMPATIBILITY_IDENTITIES},
         "approved_publisher_commit": compatibility["publisher_commit"],
+        "approved_publisher_action_commit": compatibility["action_commit"],
         "publisher": {
             "repository": compatibility["publisher_repository"],
             "commit": compatibility["publisher_commit"],
             "workflow": {
+                "commit": compatibility["publisher_commit"],
                 "path": compatibility["workflow_path"],
                 "ref": compatibility["workflow_ref"],
                 "git_blob_sha": workflow["source"]["git_blob_sha"],
                 "sha256": workflow["sha256"],
             },
             "action": {
+                "commit": compatibility["action_commit"],
                 "path": compatibility["action_path"],
                 "ref": compatibility["action_ref"],
                 "git_blob_sha": action["source"]["git_blob_sha"],

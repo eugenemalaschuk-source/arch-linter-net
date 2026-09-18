@@ -640,7 +640,7 @@ jobs:
                 workflow_ref = BadgeSetupContract.DefaultPublisherWorkflowRef,
                 workflow_sha = BadgeSetupContract.DefaultPublisherWorkflowSha,
                 action_ref = BadgeSetupContract.DefaultActionRef,
-                action_sha = BadgeSetupContract.DefaultPublisherWorkflowSha,
+                action_sha = BadgeSetupContract.DefaultPublisherActionSha,
                 commit = BadgeSetupContract.DefaultPublisherWorkflowSha,
             },
             files = manifestFiles
