@@ -73,8 +73,9 @@ must reject missing, unknown, incompatible or tampered components before use.
 Review upgrades and rollback using the verified bundle and storage compatibility
 plan, not merely matching filename prefixes.
 
-The approved reusable publisher is bound to an immutable **commit SHA** in the
-verified distribution. Its workflow and action source blobs are also identified.
+The approved reusable publisher workflow and composite action are bound to
+their own immutable **commit SHAs** in the verified distribution. Their source
+blobs are also identified.
 The generated consumer's `producer.workflow_sha`, in contrast, is the **Git blob
 SHA of the generated producer workflow bytes**. It is neither the publisher
 commit nor a mutable branch. Rotation requires a reviewed compatible update;

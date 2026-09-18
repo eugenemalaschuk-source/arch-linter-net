@@ -77,6 +77,16 @@ public sealed class BadgeRelayBundleIntegrityValidatorTests
     }
 
     [Test]
+    public void UnapprovedPublisherActionPinValueIsRejected()
+    {
+        AssertRejected(root => EditManifest(root, manifest =>
+        {
+            JsonObject pins = (JsonObject)manifest["publisher_pins"]!;
+            pins["action_sha"] = new string('a', 40);
+        }), "publisher pins do not match the approved immutable commit");
+    }
+
+    [Test]
     public void MissingSourceDirectoryIsRejected()
     {
         AssertRejected(root => Directory.Delete(Path.Combine(root, "src"), recursive: true), "src directory is missing");
