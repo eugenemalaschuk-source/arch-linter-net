@@ -1,3 +1,5 @@
+> **Historical / superseded.** This #945 design was implemented by #946 and later superseded by the no-App bootstrap handoff in #963/#964. It is preserved only as historical evidence. Current product authority is the canonical spec under `openspec/specs/`; do not implement the GitHub App writer model from this archived change.
+
 ## 1. Protected bootstrap implementation
 
 - [x] 1.1 Add constrained GitHub App writer credential inputs and minimum
@@ -17,5 +19,5 @@
 
 - [x] 3.1 Run focused workflow/tooling tests, policy/format checks, and
   OpenSpec validation.
-- [ ] 3.2 Open a focused PR for #945 and complete required upstream CI before
-  merge.
+- [x] 3.2 Historical implementation merged via #946 for #945; subsequently
+  superseded by #963/#964.

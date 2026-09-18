@@ -1,3 +1,5 @@
+> **Historical / superseded.** This #945 design was implemented by #946 and later superseded by the no-App bootstrap handoff in #963/#964. It is preserved only as historical evidence. Current product authority is the canonical spec under `openspec/specs/`; do not implement the GitHub App writer model from this archived change.
+
 ## ADDED Requirements
 
 ### Requirement: Protected-branch setup review guidance
