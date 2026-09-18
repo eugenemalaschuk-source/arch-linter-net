@@ -28,6 +28,22 @@ internal static class BadgeSetupOutputWriter
         GeneratedSetup generated = GenerateSetup(root, configuration, plan);
         WriteFiles(root, generated.Files);
     }
+
+    internal static void ApplyVerifiedHandoff(string outputDirectory, IReadOnlyList<GeneratedFile> files)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        ArgumentNullException.ThrowIfNull(files);
+        if (files.Count == 0 || files.Select(static file => file.Path).Distinct(StringComparer.Ordinal).Count() != files.Count)
+        {
+            throw new IOException("The verified bootstrap handoff has an invalid managed file set.");
+        }
+
+        string root = Path.GetFullPath(outputDirectory);
+        _ = SafePath(root, ReadmeFileName);
+        Directory.CreateDirectory(root);
+        _ = SafePath(root, ReadmeFileName);
+        WriteFiles(root, files);
+    }
     private static void ValidateWriteRequest(BadgeSetupConfiguration configuration, BadgeSetupPlan plan)
     {
         if (!plan.IsValid)

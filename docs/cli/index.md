@@ -33,6 +33,10 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | `arch-linter-net badge architecture-health doctor --input <badge-relay-config.json> [--public]` | Diagnose setup compatibility, evidence availability, expiry, and disclosure-safe remediation. |
 
+<!-- cli-command: badge apply-handoff -->
+
+| `arch-linter-net badge architecture-health apply-handoff --input <bootstrap-handoff.json> --output <repository-directory> --expected-base-sha <sha> --expected-base-tree-sha <tree-sha> --repository <owner/name> --repository-id <id> --repository-owner-id <id>` | Verify a private trusted bootstrap handoff against an exact local review branch, then atomically apply only its managed setup files. |
+
 <!-- cli-command: badge lifecycle -->
 
 | `arch-linter-net badge architecture-health lifecycle --operation <status|invalidate|revoke|rename|transfer|rotate|remove|recover|upgrade|activate|rollback> --input <badge-relay-config.json>` | Inspect or perform an authenticated Relay lifecycle operation; set `ARCHLINTERNET_BADGE_ADMIN_TOKEN` and the exact-matching `ARCHLINTERNET_BADGE_ADMIN_ORIGIN` for real requests, or use `--dry-run` to plan without credentials or writes. |

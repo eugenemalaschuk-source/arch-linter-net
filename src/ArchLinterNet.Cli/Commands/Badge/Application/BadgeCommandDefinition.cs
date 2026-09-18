@@ -107,6 +107,28 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
             ShowHelp: result.GetValue(doctorHelp),
             CapabilityEvidencePath: result.GetValue(doctorCapabilities),
             ObservationPath: result.GetValue(doctorObservation))));
+        Command applyHandoff = new("apply-handoff", "Verify and apply a trusted bootstrap handoff to a normal review branch.");
+        Option<string> handoffInput = new(InputOptionName);
+        Option<string> handoffPayload = new("--payload");
+        Option<string> handoffOutput = new("--output");
+        Option<string> expectedBaseSha = new("--expected-base-sha");
+        Option<string> expectedBaseTreeSha = new("--expected-base-tree-sha");
+        Option<string> expectedRepository = new("--repository");
+        Option<long?> expectedRepositoryId = new("--repository-id");
+        Option<long?> expectedRepositoryOwnerId = new("--repository-owner-id");
+        Option<bool> applyHandoffHelp = new(HelpOptionName);
+        applyHandoffHelp.Aliases.Add("-h");
+        foreach (Option option in new Option[] { handoffInput, handoffPayload, handoffOutput, expectedBaseSha, expectedBaseTreeSha, expectedRepository, expectedRepositoryId, expectedRepositoryOwnerId, applyHandoffHelp }) applyHandoff.Options.Add(option);
+        applyHandoff.SetAction(result => handler.ExecuteApplyHandoff(new BadgeSetupHandoffCommandOptions(
+            result.GetValue(handoffInput),
+            result.GetValue(handoffPayload),
+            result.GetValue(handoffOutput),
+            result.GetValue(expectedBaseSha),
+            result.GetValue(expectedBaseTreeSha),
+            result.GetValue(expectedRepository),
+            result.GetValue(expectedRepositoryId),
+            result.GetValue(expectedRepositoryOwnerId),
+            result.GetValue(applyHandoffHelp))));
         Command lifecycle = new("lifecycle", "Inspect or mutate an authenticated badge Relay registration.");
         Option<string> lifecycleOperation = new("--operation") { DefaultValueFactory = _ => "status" };
         Option<string> lifecycleInput = new(InputOptionName);
@@ -167,6 +189,7 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
             WorkflowRef: result.GetValue(lifecycleWorkflowRef))));
         health.Subcommands.Add(setup);
         health.Subcommands.Add(doctor);
+        health.Subcommands.Add(applyHandoff);
         health.Subcommands.Add(lifecycle);
         badge.Subcommands.Add(policy);
         badge.Subcommands.Add(health);
