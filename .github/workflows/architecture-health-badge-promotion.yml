@@ -324,6 +324,8 @@ jobs:
         with:
           name: architecture-health-bootstrap-handoff
           path: ${{ runner.temp }}/arch-linter-net-bootstrap-handoff
+          # The validated payload contains managed .github workflows and registry files.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
   promote:
