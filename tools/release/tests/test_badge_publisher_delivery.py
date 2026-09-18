@@ -26,20 +26,22 @@ def test_all_shipped_publisher_references_match_reviewed_inventory() -> None:
     inventory = json.loads((ROOT / ".github/badge-promotion/release-inventory.json").read_text())
     distribution._validate_inventory(inventory)
     compatibility = inventory["compatibility"]
-    pin = compatibility["publisher_commit"]
+    workflow_pin = compatibility["publisher_commit"]
+    action_pin = compatibility["action_commit"]
     workflow = compatibility["publisher_repository"] + "/" + compatibility["workflow_path"]
     action = compatibility["action_ref"]
     bundle_pins = json.loads(MANIFEST.read_text())["publisher_pins"]
     assert bundle_pins == {
-        "workflow_ref": workflow, "workflow_sha": pin,
-        "action_ref": action, "action_sha": pin, "commit": pin,
+        "workflow_ref": workflow, "workflow_sha": workflow_pin,
+        "action_ref": action, "action_sha": action_pin, "commit": workflow_pin,
     }
     assert _constant("DefaultPublisherWorkflowRef") == workflow
-    assert _constant("DefaultPublisherWorkflowSha") == pin
+    assert _constant("DefaultPublisherWorkflowSha") == workflow_pin
     assert _constant("DefaultActionRef") == action
+    assert _constant("DefaultPublisherActionSha") == action_pin
     schema_pins = json.loads(SCHEMA.read_text())["properties"]["pins"]["properties"]
     assert schema_pins["workflow_ref"]["enum"] == [None, workflow]
-    assert schema_pins["workflow_sha"]["enum"] == [None, pin]
+    assert schema_pins["workflow_sha"]["enum"] == [None, workflow_pin]
     assert schema_pins["action_ref"]["enum"] == [None, action]
 
 

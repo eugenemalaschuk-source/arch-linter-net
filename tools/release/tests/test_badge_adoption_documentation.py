@@ -91,7 +91,7 @@ def test_handoff_inventory_tracks_machine_readable_authority() -> None:
             compatibility[key]
             for key in (
                 "bundle", "config", "plan", "promotion", "publication", "storage",
-                "publisher_commit", "workflow_path", "action_path",
+                "publisher_commit", "action_commit", "workflow_path", "action_path",
                 "workflow_source_sha", "action_source_sha",
             )
         ),

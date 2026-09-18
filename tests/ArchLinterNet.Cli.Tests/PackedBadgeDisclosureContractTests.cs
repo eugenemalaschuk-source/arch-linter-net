@@ -73,7 +73,7 @@ public sealed class PackedBadgeDisclosureContractTests
                     Assert.That(manifest.RootElement.GetProperty("compatibility_plan").GetString(), Is.EqualTo("architecture-health-badge-relay/v1"));
                     Assert.That(manifest.RootElement.GetProperty("files").GetArrayLength(), Is.EqualTo(15));
                     Assert.That(manifest.RootElement.GetProperty("files").EnumerateArray().Select(entry => entry.GetProperty("path").GetString()), Does.Contain("schema/0.8.0/badge-relay-config.schema.json"));
-                    Assert.That(manifest.RootElement.GetProperty("publisher_pins").GetProperty("commit").GetString(), Is.EqualTo("6fadf3fec983e5af3077b62a52ab608ce7f73ba3"));
+                    Assert.That(manifest.RootElement.GetProperty("publisher_pins").GetProperty("commit").GetString(), Is.EqualTo("c3aea3d5e543b5cfe522841ada580c8db2a5eac9"));
                 });
             }
 
