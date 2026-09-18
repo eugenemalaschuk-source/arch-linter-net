@@ -119,7 +119,7 @@ internal static class ArchitectureMetricBudgetAnalysisService
         ArchitectureContractExecutionContext executionContext = inputs.ExecutionContexts[budget];
         if (budget.IsRelative)
         {
-            EvaluateRelativeBudget(session, budget, measurement, metricRecord, provenance, executionContext, violations, records);
+            EvaluateRelativeBudget(session, budget, measurement, (metricRecord, provenance), executionContext, violations, records);
             return;
         }
 
@@ -130,12 +130,12 @@ internal static class ArchitectureMetricBudgetAnalysisService
         ArchitectureAnalysisSession session,
         ArchitectureMetricBudgetContract budget,
         ArchitectureMetricMeasurement measurement,
-        ArchitectureApplicabilityRecord metricRecord,
-        ArchitectureApplicabilityProvenance provenance,
+        (ArchitectureApplicabilityRecord Record, ArchitectureApplicabilityProvenance Provenance) metric,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
         List<ArchitectureApplicabilityRecord> records)
     {
+        (ArchitectureApplicabilityRecord metricRecord, ArchitectureApplicabilityProvenance provenance) = metric;
         string budgetId = budget.Id ?? budget.Name;
         int measuredValue = RequiredValue(measurement);
 
