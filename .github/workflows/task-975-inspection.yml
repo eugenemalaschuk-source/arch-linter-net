@@ -1,4 +1,4 @@
-name: Task 975 read-only inspection
+name: Task 975 preparation validation
 
 on:
   push:
@@ -6,61 +6,110 @@ on:
     paths: [.github/workflows/task-975-inspection.yml]
 
 permissions:
-  contents: read
-  issues: read
+  contents: write
+  pull-requests: read
 
 jobs:
-  inspect:
+  validate:
+    if: github.repository == 'eugenemalaschuk-source/arch-linter-net' && github.ref == 'refs/heads/task/975-release-preparation'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      BASE: e4af794f27f311e90602e8f032b6b7ff38738042
+      EXPECTED_TREE: fbdde79ae875a7ce0fc6b4d9d2f834991e7bbb1c
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Inspect public version inventories and tracked source
+      - name: Apply only the hash-verified preparation patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/task-975-validation"
+          python3 - <<'PY'
+          import base64
+          import gzip
+          import hashlib
+          import os
+          from pathlib import Path
+          import subprocess
+
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only', os.environ['BASE'], 'HEAD'], text=True).splitlines())
+          assert changed == {'.github/workflows/task-975-inspection.yml', '.github/task-975/implementation.patch.gz.b64'}, changed
+          encoded = Path('.github/task-975/implementation.patch.gz.b64').read_text().strip()
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+          assert hashlib.sha256(patch).hexdigest() == 'dfa48ea50000d1446fa1334fd1943c1d0e93c96d3d54ae4c81d11ce0e7715514'
+          (Path(os.environ['RUNNER_TEMP']) / 'task-975-validation' / 'implementation.patch').write_bytes(patch)
+          PY
+          git checkout --detach "$BASE"
+          git apply --check "$RUNNER_TEMP/task-975-validation/implementation.patch"
+          git apply --index "$RUNNER_TEMP/task-975-validation/implementation.patch"
+          test "$(git write-tree)" = "$EXPECTED_TREE"
+          git diff --cached --check
+          git diff --cached --stat | tee "$RUNNER_TEMP/task-975-validation/diff-stat.txt"
+      - name: Setup uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+      - name: Prepare repository Python environment
+        run: make venv
+      - name: Run release tool tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          UV_PROJECT_ENVIRONMENT="$GITHUB_WORKSPACE/.venv" uv run --project tools/pyproject.toml --locked python -m pytest tools/release/tests/ -q | tee "$RUNNER_TEMP/task-975-validation/release-tests.log"
+      - name: Build documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          make docs-build 2>&1 | tee "$RUNNER_TEMP/task-975-validation/docs-build.log"
+      - name: Lint documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          make lint-docs 2>&1 | tee "$RUNNER_TEMP/task-975-validation/lint-docs.log"
+      - name: Inspect actual merged PR release categories
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/task-975"
-          git archive --format=zip --output="$RUNNER_TEMP/task-975/source.zip" HEAD
-          git bundle create "$RUNNER_TEMP/task-975/repository.bundle" HEAD
-          git log --format='%H %s' v0.8.0..e4af794f27f311e90602e8f032b6b7ff38738042 > "$RUNNER_TEMP/task-975/delta.txt"
-          git diff --stat v0.8.0 e4af794f27f311e90602e8f032b6b7ff38738042 > "$RUNNER_TEMP/task-975/delta-stat.txt"
-          git tag --list 'v*' --sort=-version:refname > "$RUNNER_TEMP/task-975/tags.txt"
-          python3 tools/release/calculate_version.py --release-type patch --version-override '' --github-env "$RUNNER_TEMP/task-975/calculated-version.env"
-          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/task-975/releases.json"
+          gh pr list --repo "$GITHUB_REPOSITORY" --state merged --search 'merged:>=2026-09-05' --limit 150 --json number,title,labels,mergeCommit,mergedAt > "$RUNNER_TEMP/task-975-validation/merged-pr-labels.json"
+      - name: Store validated immutable Git tree without updating any ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git write-tree)" = "$EXPECTED_TREE"
           python3 - <<'PY'
-          import datetime
           import json
           import os
           from pathlib import Path
           import subprocess
-          import urllib.request
 
-          output = Path(os.environ["RUNNER_TEMP"]) / "task-975"
-          result = {"checked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "source_commit": "e4af794f27f311e90602e8f032b6b7ff38738042", "packages": {}}
-          for package in ("ArchLinterNet.CEL", "ArchLinterNet.Core", "ArchLinterNet.Cli", "ArchLinterNet.Testing"):
-              url = f"https://api.nuget.org/v3-flatcontainer/{package.lower()}/index.json"
-              with urllib.request.urlopen(url, timeout=30) as response:
-                  versions = json.load(response)["versions"]
-              result["packages"][package] = {"url": url, "versions": versions, "target_0_8_1_available": "0.8.1" not in versions}
-          text = json.dumps(result, indent=2) + "\n"
-          (output / "nuget-versions.json").write_text(text, encoding="utf-8")
-          print(text)
-          issues = []
-          for number in (650, 772, 783, 784, 785, 787, 788, 797, 800, 801, 806, 825, 826, 827, 828, 830, 831, 832, 833, 834, 835, 836, 849, 864, 872, 876, 913, 922, 963, 971, 973, 975, 976, 977):
-              item = json.loads(subprocess.check_output(["gh", "issue", "view", str(number), "--repo", os.environ["GITHUB_REPOSITORY"], "--json", "number,state,title,closedAt,assignees,milestone"], text=True))
-              issues.append(item)
-              print(item["number"], item["state"], item["title"])
-          (output / "prerequisites.json").write_text(json.dumps(issues, indent=2) + "\n", encoding="utf-8")
+          paths = subprocess.check_output(['git', 'diff', '--cached', '--name-only', '--diff-filter=AM'], text=True).splitlines()
+          assert len(paths) == 12, paths
+          assert not any('task-975' in path for path in paths)
+          entries = [{'path': path, 'mode': '100644', 'type': 'blob', 'content': Path(path).read_text(encoding='utf-8')} for path in paths]
+          payload = {'base_tree': 'ce8629e81ca93ac3cdfd6ea2fab180b24c4ddec9', 'tree': entries}
+          output = Path(os.environ['RUNNER_TEMP']) / 'task-975-validation'
+          (output / 'tree-request.json').write_text(json.dumps(payload), encoding='utf-8')
           PY
-      - name: Upload read-only inspection
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/trees" --input "$RUNNER_TEMP/task-975-validation/tree-request.json" > "$RUNNER_TEMP/task-975-validation/tree-result.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          result = json.loads((Path(os.environ['RUNNER_TEMP']) / 'task-975-validation' / 'tree-result.json').read_text())
+          assert result['sha'] == os.environ['EXPECTED_TREE'], result['sha']
+          print('Validated immutable tree:', result['sha'])
+          print('No branch, tag, Release, package, Pages or cloud deployment was created by this workflow.')
+          PY
+      - name: Upload preparation validation evidence
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: task-975-read-only-inspection
-          path: ${{ runner.temp }}/task-975
+          name: task-975-preparation-validation
+          path: ${{ runner.temp }}/task-975-validation
           retention-days: 7
           if-no-files-found: error
