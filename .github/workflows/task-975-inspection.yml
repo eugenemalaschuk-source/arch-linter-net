@@ -16,7 +16,10 @@ jobs:
     timeout-minutes: 15
     env:
       BASE: e4af794f27f311e90602e8f032b6b7ff38738042
-      EXPECTED_TREE: fbdde79ae875a7ce0fc6b4d9d2f834991e7bbb1c
+      EXPECTED_TREE: 7b842ce4323ba6a3bdb22fbdac713b91f16bba44
+      CONTENT_TREE: 029e0e33c01a40021a6374d48edf1cf4601217ed
+      DOTNET_NOLOGO: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,11 +48,32 @@ jobs:
           git checkout --detach "$BASE"
           git apply --check "$RUNNER_TEMP/task-975-validation/implementation.patch"
           git apply --index "$RUNNER_TEMP/task-975-validation/implementation.patch"
+          test "$(git write-tree)" = fbdde79ae875a7ce0fc6b4d9d2f834991e7bbb1c
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/release-nuget.yml')
+          text = path.read_text()
+          old = next(line for line in text.splitlines() if 'echo "PACKAGE_RELEASE_NOTES=' in line)
+          new = old.replace('opt-in; full', 'opt-in. Its full').replace('governance, private', 'governance plus private').replace('none; no', 'none. There is no').replace('security, privacy, integrity, data-corruption', 'security or privacy or integrity or data-corruption')
+          assert text.count(old) == 1
+          path.write_text(text.replace(old, new))
+          path = Path('tools/release/tests/test_release_workflow_package_subjects.py')
+          text = path.read_text()
+          old = '    assert "not a waiver for known security, privacy, integrity, data-corruption or false-PASS" in notes\n    assert notes.count("\\n") == 1'
+          new = '    assert "not a waiver for known security or privacy or integrity or data-corruption or false-PASS" in notes\n    # MSBuild treats commas and semicolons as command-line property separators, even after shell quoting.\n    assert not any(separator in notes for separator in (";", ","))\n    assert notes.count("\\n") == 1'
+          assert text.count(old) == 1
+          path.write_text(text.replace(old, new))
+          PY
+          git add .github/workflows/release-nuget.yml tools/release/tests/test_release_workflow_package_subjects.py
           test "$(git write-tree)" = "$EXPECTED_TREE"
           git diff --cached --check
           git diff --cached --stat | tee "$RUNNER_TEMP/task-975-validation/diff-stat.txt"
       - name: Setup uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
       - name: Prepare repository Python environment
         run: make venv
       - name: Run release tool tests
@@ -57,6 +81,30 @@ jobs:
         run: |
           set -euo pipefail
           UV_PROJECT_ENVIRONMENT="$GITHUB_WORKSPACE/.venv" uv run --project tools/pyproject.toml --locked python -m pytest tools/release/tests/ -q | tee "$RUNNER_TEMP/task-975-validation/release-tests.log"
+      - name: Verify real MSBuild property roundtrip without building or packing
+        shell: bash
+        run: |
+          set -euo pipefail
+          .venv/bin/python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import yaml
+
+          output = Path(os.environ['RUNNER_TEMP']) / 'task-975-validation'
+          steps = yaml.safe_load(Path('.github/workflows/release-nuget.yml').read_text())['jobs']['prepare-candidate']['steps']
+          run = next(step['run'] for step in steps if step.get('name') == 'Prepare NuGet package release notes')
+          env_file = output / 'metadata.env'
+          subprocess.run(['bash', '-euo', 'pipefail', '-c', run], env={**os.environ, 'GITHUB_ENV': str(env_file), 'TARGET_TAG': 'v0.8.1'}, check=True)
+          notes = env_file.read_text().removeprefix('PACKAGE_RELEASE_NOTES=').rstrip('\n')
+          project = output / 'metadata.proj'
+          project.write_text('<Project />\n')
+          result = subprocess.check_output(['dotnet', 'msbuild', str(project), '-nologo', '-getProperty:PackageReleaseNotes', '-p:PackageReleaseNotes=' + notes], text=True).strip()
+          assert result == notes, (result, notes)
+          (output / 'msbuild-roundtrip.json').write_text(json.dumps({'passed': True, 'value': result}, indent=2) + '\n')
+          print('Real MSBuild roundtrip passed; no build or package publication.')
+          PY
       - name: Build documentation
         shell: bash
         run: |
@@ -74,7 +122,7 @@ jobs:
         run: |
           set -euo pipefail
           gh pr list --repo "$GITHUB_REPOSITORY" --state merged --search 'merged:>=2026-09-05' --limit 150 --json number,title,labels,mergeCommit,mergedAt > "$RUNNER_TEMP/task-975-validation/merged-pr-labels.json"
-      - name: Store validated immutable Git tree without updating any ref
+      - name: Store only non-workflow immutable Git objects without updating any ref
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -90,6 +138,7 @@ jobs:
           paths = subprocess.check_output(['git', 'diff', '--cached', '--name-only', '--diff-filter=AM'], text=True).splitlines()
           assert len(paths) == 12, paths
           assert not any('task-975' in path for path in paths)
+          paths.remove('.github/workflows/release-nuget.yml')
           entries = [{'path': path, 'mode': '100644', 'type': 'blob', 'content': Path(path).read_text(encoding='utf-8')} for path in paths]
           payload = {'base_tree': 'ce8629e81ca93ac3cdfd6ea2fab180b24c4ddec9', 'tree': entries}
           output = Path(os.environ['RUNNER_TEMP']) / 'task-975-validation'
@@ -101,9 +150,9 @@ jobs:
           import os
           from pathlib import Path
           result = json.loads((Path(os.environ['RUNNER_TEMP']) / 'task-975-validation' / 'tree-result.json').read_text())
-          assert result['sha'] == os.environ['EXPECTED_TREE'], result['sha']
-          print('Validated immutable tree:', result['sha'])
-          print('No branch, tag, Release, package, Pages or cloud deployment was created by this workflow.')
+          assert result['sha'] == os.environ['CONTENT_TREE'], result['sha']
+          print('Validated immutable content tree:', result['sha'])
+          print('No ref, commit, workflow change, tag, Release, package, Pages or cloud deployment was written by this step.')
           PY
       - name: Upload preparation validation evidence
         if: always()
