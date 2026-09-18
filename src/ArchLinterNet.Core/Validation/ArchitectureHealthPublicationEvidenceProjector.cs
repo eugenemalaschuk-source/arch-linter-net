@@ -248,23 +248,34 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
                 $"The waiver '{record.Id}' is not a currently assessable lifecycle receipt."));
         }
 
-        if (record.Expires is { } expiry)
-        {
-            if (expiry < record.EvaluationDate || record.State == "expired")
-            {
-                reasons.Add(new(ExpiredWaiver, $"The waiver '{record.Id}' expired before the supplied evaluation date."));
-            }
-            else if (!TryGetNextUtcDay(expiry, out DateTimeOffset expiryHorizon))
-            {
-                reasons.Add(new(InvalidEvaluationDate, $"The waiver '{record.Id}' expiry cannot produce a finite UTC horizon."));
-            }
-            else
-            {
-                dateHorizon = expiryHorizon < dateHorizon ? expiryHorizon : dateHorizon;
-            }
-        }
+        dateHorizon = ApplyWaiverExpiry(record, dateHorizon, reasons);
 
         horizon = horizon is null || dateHorizon < horizon.Value ? dateHorizon : horizon;
+    }
+
+    internal static DateTimeOffset ApplyWaiverExpiry(
+        ArchitectureWaiverLifecycleRecord record,
+        DateTimeOffset dateHorizon,
+        List<ArchitectureHealthPublicationEvidenceReason> reasons)
+    {
+        if (record.Expires is not { } expiry)
+        {
+            return dateHorizon;
+        }
+
+        if (expiry < record.EvaluationDate || record.State == "expired")
+        {
+            reasons.Add(new(ExpiredWaiver, $"The waiver '{record.Id}' expired before the supplied evaluation date."));
+            return dateHorizon;
+        }
+
+        if (!TryGetNextUtcDay(expiry, out DateTimeOffset expiryHorizon))
+        {
+            reasons.Add(new(InvalidEvaluationDate, $"The waiver '{record.Id}' expiry cannot produce a finite UTC horizon."));
+            return dateHorizon;
+        }
+
+        return expiryHorizon < dateHorizon ? expiryHorizon : dateHorizon;
     }
 
     private static void ProcessExternalEvidence(
@@ -300,17 +311,17 @@ internal static class ArchitectureHealthPublicationEvidenceProjector
             reasons.Add(new(InconsistentExternalEvidenceReceipt, $"The '{mode}' external-evidence trust receipts do not match requirements."));
         }
 
-        foreach (ArchitectureExternalEvidenceRequirement requirement in orderedRequirements.Where(item => item.Required))
+        foreach (string requirementId in orderedRequirements.Where(item => item.Required).Select(item => item.Id))
         {
-            if (!receiptIds.Contains(requirement.Id, StringComparer.Ordinal))
+            if (!receiptIds.Contains(requirementId, StringComparer.Ordinal))
             {
-                reasons.Add(new(MissingExternalEvidenceReceipt, $"Required external evidence '{requirement.Id}' has no trust receipt."));
+                reasons.Add(new(MissingExternalEvidenceReceipt, $"Required external evidence '{requirementId}' has no trust receipt."));
             }
 
             // SARIF trust receipts deliberately carry no expiry. A required artifact therefore
             // makes a bounded semantic horizon impossible until a future receipt supplies one.
             reasons.Add(new(RequiredExternalEvidenceHorizonUnknown,
-                $"Required external evidence '{requirement.Id}' has no finite reuse horizon."));
+                $"Required external evidence '{requirementId}' has no finite reuse horizon."));
         }
     }
 

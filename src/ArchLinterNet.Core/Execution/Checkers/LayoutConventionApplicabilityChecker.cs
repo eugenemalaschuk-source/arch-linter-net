@@ -285,11 +285,12 @@ internal static class LayoutConventionApplicabilityChecker
     {
         string normalizedScope = Normalize(scope);
         string normalizedPath = Normalize(path);
-        return normalizedPath == "."
-            ? normalizedScope
-            : normalizedScope == "."
-                ? normalizedPath
-                : $"{normalizedScope}/{normalizedPath}";
+        if (normalizedPath == ".")
+        {
+            return normalizedScope;
+        }
+
+        return normalizedScope == "." ? normalizedPath : $"{normalizedScope}/{normalizedPath}";
     }
 
     private static ArchitectureApplicabilityRecord Evaluable(

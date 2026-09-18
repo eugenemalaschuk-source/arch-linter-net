@@ -158,7 +158,7 @@ internal sealed class RawExternalEvidenceNodeValidator : IArchitecturePolicyRawD
                     $"external_evidence[{entryIndex}].diagnostic_filter.{key}[{valueIndex}] must be a non-blank string.");
             }
 
-            string value = scalar.Value!;
+            string value = scalar.Value;
             if (!seen.Add(value))
             {
                 throw new InvalidOperationException(
@@ -207,7 +207,7 @@ internal sealed class RawExternalEvidenceNodeValidator : IArchitecturePolicyRawD
                     $"external_evidence entry {entryIndex} diagnostic_filter.severity keys must be non-blank strings.");
             }
 
-            string sourceSeverity = severityKey.Value!;
+            string sourceSeverity = severityKey.Value;
             if (!seen.Add(sourceSeverity))
             {
                 throw new InvalidOperationException(
@@ -231,7 +231,7 @@ internal sealed class RawExternalEvidenceNodeValidator : IArchitecturePolicyRawD
                     $"external_evidence[{entryIndex}].diagnostic_filter.severity.{sourceSeverity} must be a non-blank mode string.");
             }
 
-            if (!ExternalDiagnosticFilterRules.SupportedModes.Contains(mode.Value!, StringComparer.Ordinal))
+            if (!ExternalDiagnosticFilterRules.SupportedModes.Contains(mode.Value, StringComparer.Ordinal))
             {
                 throw new InvalidOperationException(
                     $"external_evidence entry {entryIndex} diagnostic_filter.severity.{sourceSeverity} mode '{mode.Value}' is unsupported.");
