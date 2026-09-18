@@ -7,7 +7,7 @@ using ArchLinterNet.Core.Validation;
 namespace ArchLinterNet.Cli.Commands.Validate.Application;
 
 // Applicability and completion projections are rendered from the already-computed Core outcome.
-internal sealed class ReportApplicabilityRenderer
+internal static class ReportApplicabilityRenderer
 {
     private const string PropertiesPropertyName = "properties";
     private const string ProvenancePropertyName = "provenance";

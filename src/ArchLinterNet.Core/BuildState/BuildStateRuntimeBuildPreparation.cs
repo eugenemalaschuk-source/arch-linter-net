@@ -209,7 +209,7 @@ internal static class BuildStateRuntimeBuildPreparation
     private static bool MatchesRequestedOutputPath(string relativePath, string? configuration, string? targetFramework,
         string? runtimeIdentifier)
     {
-        string[] segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string[] segments = relativePath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
         bool configurationMatches = configuration == null
             || (segments.Length > 0 && string.Equals(segments[0], configuration, StringComparison.OrdinalIgnoreCase));
         bool targetFrameworkMatches = targetFramework == null

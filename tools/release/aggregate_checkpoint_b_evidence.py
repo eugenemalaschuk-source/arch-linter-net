@@ -456,6 +456,22 @@ def _release_scope_defects(scope: dict[str, Any]) -> list[str]:
     ]
 
 
+def _authorization(version: str, passed: bool, is_publication_candidate: bool) -> str:
+    if is_publication_candidate:
+        if passed:
+            return f"PASS: the manifested {version} candidate is authorized for publication."
+        return f"FAIL: the manifested {version} candidate is NOT authorized for publication."
+    if passed:
+        return (
+            f"PASS: the manifested {version} candidate is verified for pre-publication assessment only "
+            "and is NOT authorized for publication."
+        )
+    return (
+        f"FAIL: the manifested {version} candidate did not pass pre-publication assessment and is "
+        "NOT authorized for publication."
+    )
+
+
 def _summary(
     records: list[dict[str, Any]],
     manifest: dict[str, Any],
@@ -470,21 +486,7 @@ def _summary(
     open_scope = _release_scope_defects(scope) if is_publication_candidate else []
     version = manifest["version"]
     passed = not failures and not defects and not open_scope
-    authorization = (
-        (
-            f"PASS: the manifested {version} candidate is authorized for publication."
-            if passed
-            else f"FAIL: the manifested {version} candidate is NOT authorized for publication."
-        )
-        if is_publication_candidate
-        else (
-            f"PASS: the manifested {version} candidate is verified for pre-publication assessment only "
-            "and is NOT authorized for publication."
-            if passed
-            else f"FAIL: the manifested {version} candidate did not pass pre-publication assessment and is "
-            "NOT authorized for publication."
-        )
-    )
+    authorization = _authorization(version, passed, is_publication_candidate)
     return {
         "schema": "checkpoint-b-release-evidence/v1" if is_publication_candidate
         else "checkpoint-b-prepublication-evidence/v1",
@@ -509,6 +511,45 @@ def _summary(
     }
 
 
+def _reason_section(heading: str, items: list[dict[str, Any]]) -> list[str]:
+    if not items:
+        return []
+    return [heading, "", *[f"- #{item['issue']} — {item['reason']}" for item in items], ""]
+
+
+def _scope_section(scope: dict[str, Any]) -> list[str]:
+    if scope["schema"] != _RELEASE_SCOPE_SCHEMA:
+        return [
+            "## Pre-publication candidate authorization",
+            "",
+            "- Verification scope: immutable pre-publication candidate assessment.",
+            "- Publication authority: none; this evidence cannot authorize a public release.",
+            f"- Candidate version: `{scope['candidate_version']}`",
+            "",
+        ]
+    return [
+        f"## Release scope (story #{scope['story']}, target {scope['release_target']})",
+        "",
+        f"- Declaration: `{scope['declaration_id']}`",
+        f"- Declaration SHA-256: `{scope['declaration_sha256']}`",
+        f"- Candidate version: `{scope['candidate_version']}`",
+        "",
+        "| Item | Finding | State | Summary |",
+        "| --- | --- | --- | --- |",
+        *[
+            "| #{issue} | {finding} | {state} | {summary} |".format(
+                issue=item["issue"],
+                finding=item.get("finding", ""),
+                state=item["state"],
+                summary=item.get("summary") or item.get("title", ""))
+            for item in sorted(scope["required_items"], key=lambda item: item["issue"])
+        ],
+        "",
+        *_reason_section("Excluded from the release scope:", scope.get("excluded_items", [])),
+        *_reason_section("Delivered release context:", scope.get("delivered_items", [])),
+    ]
+
+
 def _markdown(summary: dict[str, Any]) -> str:
     platform_rows = ["| {platform_id} | {runtime} | {shell} | {result} |".format(**record) for record in summary["platforms"]]
     shape = summary["platforms"][0]["policy_shape"]
@@ -530,45 +571,7 @@ def _markdown(summary: dict[str, Any]) -> str:
         *[f"- {defect}" for defect in summary["policy_shape_defects"]],
         "",
     ] if summary["policy_shape_defects"] else []
-    scope = summary["candidate_authorization"]
-    scope_section = [
-        f"## Release scope (story #{scope['story']}, target {scope['release_target']})",
-        "",
-        f"- Declaration: `{scope['declaration_id']}`",
-        f"- Declaration SHA-256: `{scope['declaration_sha256']}`",
-        f"- Candidate version: `{scope['candidate_version']}`",
-        "",
-        "| Item | Finding | State | Summary |",
-        "| --- | --- | --- | --- |",
-        *[
-            "| #{issue} | {finding} | {state} | {summary} |".format(
-                issue=item["issue"],
-                finding=item.get("finding", ""),
-                state=item["state"],
-                summary=item.get("summary") or item.get("title", ""))
-            for item in sorted(scope["required_items"], key=lambda item: item["issue"])
-        ],
-        "",
-        *([
-            "Excluded from the release scope:",
-            "",
-            *[f"- #{item['issue']} — {item['reason']}" for item in scope.get("excluded_items", [])],
-            "",
-        ] if scope.get("excluded_items") else []),
-        *([
-            "Delivered release context:",
-            "",
-            *[f"- #{item['issue']} — {item['reason']}" for item in scope.get("delivered_items", [])],
-            "",
-        ] if scope.get("delivered_items") else []),
-    ] if scope["schema"] == _RELEASE_SCOPE_SCHEMA else [
-        "## Pre-publication candidate authorization",
-        "",
-        "- Verification scope: immutable pre-publication candidate assessment.",
-        "- Publication authority: none; this evidence cannot authorize a public release.",
-        f"- Candidate version: `{scope['candidate_version']}`",
-        "",
-    ]
+    scope_section = _scope_section(summary["candidate_authorization"])
     return "\n".join([
         "# Packed-artifact release evidence",
         "",

@@ -106,7 +106,7 @@ internal static class ArchitectureTopologyMetricCalculator
 
     private static bool HasIncompleteRequiredRelationSource(
         ArchitectureTopologyEvaluator.Projection topology,
-        IReadOnlyDictionary<string, ArchitectureTopologyEvaluator.SubjectClassification> classes,
+        Dictionary<string, ArchitectureTopologyEvaluator.SubjectClassification> classes,
         string node,
         bool outgoing) =>
         topology.IncompleteDependencySourceIdentities.Any(identity =>
@@ -129,14 +129,12 @@ internal static class ArchitectureTopologyMetricCalculator
         List<string> reasons,
         List<string> contributors)
     {
-        string selectedIdentity = context.Outgoing ? dependency.SourceIdentity : dependency.TargetIdentity;
-        string otherIdentity = context.Outgoing ? dependency.TargetIdentity : dependency.SourceIdentity;
-        ArchitectureTopologyAssemblyEndpointBinding selectedBinding = context.Outgoing
-            ? dependency.SourceBinding
-            : dependency.TargetBinding;
-        string? selectedAssemblyName = context.Outgoing
-            ? dependency.SourceAssemblyName
-            : dependency.TargetAssemblyName;
+        (string selectedIdentity, string otherIdentity, ArchitectureTopologyAssemblyEndpointBinding selectedBinding,
+            ArchitectureTopologyAssemblyEndpointBinding otherBinding, string? selectedAssemblyName) = context.Outgoing
+            ? (dependency.SourceIdentity, dependency.TargetIdentity, dependency.SourceBinding,
+                dependency.TargetBinding, dependency.SourceAssemblyName)
+            : (dependency.TargetIdentity, dependency.SourceIdentity, dependency.TargetBinding,
+                dependency.SourceBinding, dependency.TargetAssemblyName);
         if (selectedBinding == ArchitectureTopologyAssemblyEndpointBinding.Ambiguous
             && CouldBeSelectedNode(context.Topology, selectedAssemblyName, context.Node))
         {
@@ -157,18 +155,8 @@ internal static class ArchitectureTopologyMetricCalculator
             return;
         }
 
-        ArchitectureTopologyAssemblyEndpointBinding otherBinding = context.Outgoing
-            ? dependency.TargetBinding
-            : dependency.SourceBinding;
-        if (otherBinding == ArchitectureTopologyAssemblyEndpointBinding.Ambiguous)
+        if (TryRecordOtherBindingStop(otherBinding, reasons))
         {
-            reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
-            return;
-        }
-
-        if (otherBinding == ArchitectureTopologyAssemblyEndpointBinding.Missing)
-        {
-            reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
             return;
         }
 
@@ -188,19 +176,7 @@ internal static class ArchitectureTopologyMetricCalculator
             return;
         }
 
-        if (other.Disposition == ArchitectureTopologyEvaluator.Disposition.Unmapped)
-        {
-            reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
-            return;
-        }
-
-        if (other.Disposition == ArchitectureTopologyEvaluator.Disposition.Ambiguous)
-        {
-            reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
-            return;
-        }
-
-        if (other.Disposition == ArchitectureTopologyEvaluator.Disposition.ReviewedOutOfScope)
+        if (TryRecordOtherDispositionStop(other.Disposition, reasons))
         {
             return;
         }
@@ -209,6 +185,44 @@ internal static class ArchitectureTopologyMetricCalculator
                      !string.Equals(targetNode, context.Node, StringComparison.Ordinal)))
         {
             contributors.Add(targetNode);
+        }
+    }
+
+    private static bool TryRecordOtherBindingStop(
+        ArchitectureTopologyAssemblyEndpointBinding binding,
+        List<string> reasons)
+    {
+        string? reason = binding switch
+        {
+            ArchitectureTopologyAssemblyEndpointBinding.Ambiguous => ArchitectureApplicabilityReasonCodes.AmbiguousSubject,
+            ArchitectureTopologyAssemblyEndpointBinding.Missing => ArchitectureApplicabilityReasonCodes.UnmappedSubject,
+            _ => null,
+        };
+        if (reason is null)
+        {
+            return false;
+        }
+
+        reasons.Add(reason);
+        return true;
+    }
+
+    private static bool TryRecordOtherDispositionStop(
+        ArchitectureTopologyEvaluator.Disposition disposition,
+        List<string> reasons)
+    {
+        switch (disposition)
+        {
+            case ArchitectureTopologyEvaluator.Disposition.Unmapped:
+                reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
+                return true;
+            case ArchitectureTopologyEvaluator.Disposition.Ambiguous:
+                reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
+                return true;
+            case ArchitectureTopologyEvaluator.Disposition.ReviewedOutOfScope:
+                return true;
+            default:
+                return false;
         }
     }
 

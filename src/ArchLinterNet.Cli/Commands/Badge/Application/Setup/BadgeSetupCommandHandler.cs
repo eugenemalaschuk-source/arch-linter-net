@@ -91,25 +91,19 @@ internal sealed class BadgeSetupCommandHandler(ICliConsole console, IFileSystem 
                 }
             }
 
-            BadgeSetupPlanResult plan;
-            if (parsedObservation?.Observations is BadgeDoctorObservations observed)
-            {
-                BadgeSetupCapabilities capabilities = CapabilitiesForObservation(config, observed);
-                plan = BadgeSetupEngine.BuildPlan(config, new(config.Repository.Owner, config.Repository.Name, config.Repository.Visibility, capabilities));
-            }
-            else
+            if (parsedObservation?.Observations is not BadgeDoctorObservations observed)
             {
                 BadgeDoctorInspectionResult inspected = BadgeDoctorInspector.Inspect(
                     config,
                     options,
                     inputPath,
                     fileSystem);
-                plan = inspected.Plan;
-                return WriteDoctor(BadgeSetupEngine.RunDoctor(plan, inspected.Observations), options);
+                return WriteDoctor(BadgeSetupEngine.RunDoctor(inspected.Plan, inspected.Observations), options);
             }
 
-            BadgeDoctorObservations observations = parsedObservation!.Observations!;
-            return WriteDoctor(BadgeSetupEngine.RunDoctor(plan, observations), options);
+            BadgeSetupCapabilities capabilities = CapabilitiesForObservation(config, observed);
+            BadgeSetupPlanResult plan = BadgeSetupEngine.BuildPlan(config, new(config.Repository.Owner, config.Repository.Name, config.Repository.Visibility, capabilities));
+            return WriteDoctor(BadgeSetupEngine.RunDoctor(plan, observed), options);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException)
         {

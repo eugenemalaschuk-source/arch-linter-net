@@ -49,7 +49,7 @@ def test_adoption_precedes_executable_guides_in_navigation() -> None:
     )
     assert "internal/" not in nav
     assert nav.count(_REFERENCE.relative_to(_DOCS).as_posix()) == 1
-    assert re.search(r"(?m)^exclude_docs: \|\n  internal/\s*$", config)
+    assert re.search(r"(?m)^exclude_docs: \|\n {2}internal/\s*$", config)
 
 
 def test_public_guides_expose_candidate_boundary_and_single_entrypoint() -> None:

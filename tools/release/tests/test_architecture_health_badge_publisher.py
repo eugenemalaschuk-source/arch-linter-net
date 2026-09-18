@@ -91,7 +91,7 @@ def test_bootstrap_emits_a_private_no_app_handoff_without_consumer_remote_writes
 
 def test_reusable_workflow_uses_bracket_notation_for_hyphenated_inputs() -> None:
     workflow = read_workflow("architecture-health-badge-promotion.yml")
-    assert not re.search(r"inputs\.[A-Za-z0-9_]+-[A-Za-z0-9_-]+", workflow)
+    assert not re.search(r"inputs\.\w+-[\w-]+", workflow)
     for input_name in (
         "configuration-id",
         "base-ref",
@@ -113,7 +113,7 @@ def test_reusable_workflow_uses_bracket_notation_for_hyphenated_inputs() -> None
     action = (ROOT / ".github" / "actions" / "architecture-health-badge-promotion" / "action.yml").read_text(
         encoding="utf-8"
     )
-    assert not re.search(r"inputs\.[A-Za-z0-9_]+-[A-Za-z0-9_-]+", action)
+    assert not re.search(r"inputs\.\w+-[\w-]+", action)
     assert "inputs.configuration_id" in action
     assert "configuration-id:" not in action.split("runs:", 1)[0]
 
