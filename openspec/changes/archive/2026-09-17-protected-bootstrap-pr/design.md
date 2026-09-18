@@ -1,3 +1,5 @@
+> **Historical / superseded.** This #945 design was implemented by #946 and later superseded by the no-App bootstrap handoff in #963/#964. It is preserved only as historical evidence. Current product authority is the canonical spec under `openspec/specs/`; do not implement the GitHub App writer model from this archived change.
+
 ## Context
 
 The bootstrap reusable workflow runs only from a trusted `workflow_dispatch`
