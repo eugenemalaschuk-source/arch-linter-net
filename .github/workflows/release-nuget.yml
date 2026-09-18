@@ -268,10 +268,11 @@ jobs:
           name: checkpoint-b-repository-gates-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/checkpoint-b
 
-      - name: Resolve authoritative release scope
+      - name: Resolve candidate authorization
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 tools/release/create_release_scope_evidence.py --source-commit "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY"
+          CANDIDATE_AUTHORIZATION_MODE: ${{ inputs.publish && 'publication' || 'prepublication' }}
+        run: python3 tools/release/create_release_scope_evidence.py --source-commit "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY" --mode "$CANDIDATE_AUTHORIZATION_MODE"
 
       - name: Download platform evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
@@ -279,8 +280,8 @@ jobs:
           pattern: checkpoint-b-evidence-*
           path: artifacts/checkpoint-b/platforms
 
-      - name: Generate deterministic release evidence
-        run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --candidate-manifest artifacts/candidate/package-manifest.json --repository-gates artifacts/checkpoint-b/repository-gates.json --release-scope artifacts/checkpoint-b/release-scope.json --output-dir artifacts/checkpoint-b/release-evidence
+      - name: Generate deterministic candidate evidence
+        run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --candidate-manifest artifacts/candidate/package-manifest.json --repository-gates artifacts/checkpoint-b/repository-gates.json --candidate-authorization artifacts/checkpoint-b/candidate-authorization.json --output-dir artifacts/checkpoint-b/release-evidence
 
       - name: Upload release evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -570,6 +571,7 @@ jobs:
 
   release:
     name: Publish verified NuGet candidate
+    if: ${{ inputs.publish == true }}
     needs:
       [
         prepare-candidate,

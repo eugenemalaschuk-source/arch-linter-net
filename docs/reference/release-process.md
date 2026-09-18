@@ -36,7 +36,9 @@ A missing required platform artifact, invalid digest, failed required scenario, 
 
 ### Release-scope authority
 
-The candidate's immutable manifest version selects exactly one reviewed declaration from `tools/release/scopes/`. Declaration filenames are storage only: the explicit `release_target` inside each declaration is the mapping authority. The generator accepts no caller-provided declaration path and never infers blockers from milestone membership or mutable issue text.
+For a publication-eligible (`publish: true`) candidate, the immutable manifest version selects exactly one reviewed stable declaration from `tools/release/scopes/`. Declaration filenames are storage only: the explicit `release_target` inside each declaration is the mapping authority. The generator accepts no caller-provided declaration path and never infers blockers from milestone membership or mutable issue text.
+
+A non-publishing (`publish: false`) candidate instead receives distinct pre-publication authorization evidence bound to its exact manifest, source commit, packages, transport, platform proof, and provenance. It selects no stable declaration, resolves no release blockers, and explicitly cannot authorize NuGet publication, a tag, GitHub Release, or documentation deployment. A later public release must create a new candidate and pass stable release-scope authorization independently.
 
 Each supported target has its own release authority. v0.6.4/#527 remains available for a maintenance publication, while v0.7.0/#613 has its separate required, non-blocking, and delivered-context inventory. A preview, unknown, duplicate, malformed, or incompatible target has no authorization and fails before publication. Release evidence records the selected declaration identity and SHA-256 together with the candidate version, manifest digest, source commit, and resolved required issue states; it cannot authorize a different candidate.
 
@@ -137,7 +139,7 @@ Use `version_override` only when automatic tag-based calculation cannot be used:
 
 For normal preview continuation, leave `version_override` empty.
 
-An override does not create or redirect release-scope authority. Its calculated candidate version must still have exactly one reviewed stable declaration in `tools/release/scopes/`, or the release workflow fails closed.
+An override does not create or redirect release-scope authority. For `publish: true`, its calculated candidate version must still have exactly one reviewed stable declaration in `tools/release/scopes/`, or the release workflow fails closed. A `publish: false` review candidate may use an acceptance or preview version, but its evidence remains explicitly non-authorizing and cannot be promoted into a publication run.
 
 ## Installable main builds and GitHub Packages
 
