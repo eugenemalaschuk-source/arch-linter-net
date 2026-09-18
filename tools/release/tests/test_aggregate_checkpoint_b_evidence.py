@@ -19,6 +19,7 @@ from aggregate_checkpoint_b_evidence import (  # noqa: E402
     _read_gates,
     _read_manifest,
     _read_records,
+    _read_candidate_authorization,
     _read_release_scope,
     _summary,
 )
@@ -93,11 +94,23 @@ def _release_scope(digest: str, open_items: set[int] | None = None) -> dict:
     }
 
 
+def _prepublication_authorization(digest: str) -> dict:
+    return {
+        "schema": "checkpoint-b-prepublication-authorization/v1",
+        "candidate_version": _VERSION,
+        "repository": "owner/repo",
+        "source_commit": _COMMIT,
+        "candidate_manifest_sha256": digest,
+        "publication_authorized": False,
+    }
+
+
 def _write_corpus(
     tmp_path: Path,
     failed: dict[str, str] | None = None,
     policy_shape: dict | None = None,
     open_scope_items: set[int] | None = None,
+    prepublication: bool = False,
 ) -> tuple[Path, Path, Path, Path]:
     manifest_path = tmp_path / "package-manifest.json"
     manifest_path.write_text(json.dumps({
@@ -137,8 +150,10 @@ def _write_corpus(
         "candidate_manifest_sha256": digest,
         "gates": [{"id": "acceptance", "result": "passed"}, {"id": "openspec_strict", "result": "passed"}],
     }))
-    scope_path = tmp_path / "release-scope.json"
-    scope_path.write_text(json.dumps(_release_scope(digest, open_scope_items)))
+    scope_path = tmp_path / "candidate-authorization.json"
+    scope_path.write_text(json.dumps(
+        _prepublication_authorization(digest) if prepublication else _release_scope(digest, open_scope_items)
+    ))
     return manifest_path, platforms, gates_path, scope_path
 
 
@@ -148,7 +163,7 @@ def _aggregate(tmp_path: Path, **kwargs) -> dict:
     digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     records = _read_records(platforms, manifest, digest)
     gates = _read_gates(gates_path, manifest, digest)
-    scope = _read_release_scope(scope_path, manifest, digest)
+    scope = _read_candidate_authorization(scope_path, manifest, digest)
     return _summary(records, manifest, gates, scope, digest)
 
 
@@ -259,7 +274,7 @@ def _run_main(tmp_path: Path, **kwargs) -> tuple[int, dict, str]:
         "--input-dir", str(platforms),
         "--candidate-manifest", str(manifest_path),
         "--repository-gates", str(gates_path),
-        "--release-scope", str(scope_path),
+        "--candidate-authorization", str(scope_path),
         "--output-dir", str(output),
     ]
     # main() confines every path argument to the working directory or the repository (the same
@@ -289,6 +304,32 @@ def test_main_writes_pass_evidence_and_succeeds(tmp_path: Path) -> None:
     assert "Copied project inventories: 0" in markdown
     assert markdown.count("| passed |") == len(_REQUIRED_PLATFORMS)
     assert "Failed required scenarios" not in markdown
+
+
+def test_prepublication_candidate_evidence_passes_without_publication_authority(tmp_path: Path) -> None:
+    exit_code, summary, markdown = _run_main(tmp_path, prepublication=True)
+
+    assert exit_code == 0
+    assert summary["schema"] == "checkpoint-b-prepublication-evidence/v1"
+    assert summary["result"] == "passed"
+    assert summary["publication_authorized"] is False
+    assert summary["release_scope"] is None
+    assert summary["candidate_authorization"]["publication_authorized"] is False
+    assert "verified for pre-publication assessment only and is NOT authorized for publication" in markdown
+    assert "## Pre-publication candidate authorization" in markdown
+    assert "## Release scope" not in markdown
+
+
+def test_prepublication_candidate_evidence_cannot_claim_publication_authority(tmp_path: Path) -> None:
+    manifest_path, _, _, authorization_path = _write_corpus(tmp_path, prepublication=True)
+    authorization = json.loads(authorization_path.read_text())
+    authorization["publication_authorized"] = True
+    authorization_path.write_text(json.dumps(authorization))
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
+    with pytest.raises(ValueError, match="must not authorize publication"):
+        _read_candidate_authorization(authorization_path, manifest, digest)
 
 
 def test_main_reports_fail_and_terminates_unsuccessfully(tmp_path: Path) -> None:

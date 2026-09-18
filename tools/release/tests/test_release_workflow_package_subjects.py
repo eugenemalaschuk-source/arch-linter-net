@@ -97,15 +97,20 @@ def test_manifest_verification_uses_bash_on_windows_and_release_matrices() -> No
     assert ci_workflow.count("- name: Verify immutable candidate\n        shell: bash") == 2
 
 
-def test_release_scope_resolution_uses_the_verified_immutable_candidate() -> None:
+def test_candidate_authorization_distinguishes_prepublication_from_stable_release_scope() -> None:
     workflow = _workflow()
 
-    assert "- name: Resolve authoritative release scope" in workflow
-    assert "create_release_scope_evidence.py --source-commit \"$GITHUB_SHA\" --repository \"$GITHUB_REPOSITORY\"" in workflow
+    assert "- name: Resolve candidate authorization" in workflow
+    assert "CANDIDATE_AUTHORIZATION_MODE: ${{ inputs.publish && 'publication' || 'prepublication' }}" in workflow
+    assert "create_release_scope_evidence.py --source-commit \"$GITHUB_SHA\" --repository \"$GITHUB_REPOSITORY\" --mode \"$CANDIDATE_AUTHORIZATION_MODE\"" in workflow
+    assert "--candidate-authorization artifacts/checkpoint-b/candidate-authorization.json" in workflow
     assert "--scope-dir" not in workflow
     assert workflow.index("- name: Verify immutable candidate manifest") < workflow.index(
-        "- name: Resolve authoritative release scope"
-    ) < workflow.index("- name: Generate deterministic release evidence")
+        "- name: Resolve candidate authorization"
+    ) < workflow.index("- name: Generate deterministic candidate evidence")
+
+    release_job = _job(workflow, "release")
+    assert "if: ${{ inputs.publish == true }}" in release_job
 
 
 def test_github_release_attachment_uses_manifest_selected_subjects_without_globs() -> None:
