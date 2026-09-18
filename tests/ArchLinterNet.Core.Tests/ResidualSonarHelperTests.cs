@@ -86,7 +86,7 @@ internal sealed class ResidualSonarHelperTests
             Waiver(new DateOnly(2026, 9, 9), new DateOnly(2026, 9, 1)), horizon, reasons);
 
         Assert.That(result, Is.EqualTo(horizon));
-        Assert.That(reasons.Select(reason => reason.Code), Is.EqualTo(new[] { "expired_waiver" }));
+        Assert.That(reasons.Select(reason => reason.Code).Single(), Is.EqualTo("expired_waiver"));
     }
 
     [Test]
@@ -98,7 +98,7 @@ internal sealed class ResidualSonarHelperTests
         ArchitectureHealthPublicationEvidenceProjector.ApplyWaiverExpiry(
             Waiver(new DateOnly(2026, 9, 9), new DateOnly(2026, 12, 1)) with { State = "expired" }, horizon, reasons);
 
-        Assert.That(reasons.Select(reason => reason.Code), Is.EqualTo(new[] { "expired_waiver" }));
+        Assert.That(reasons.Select(reason => reason.Code).Single(), Is.EqualTo("expired_waiver"));
     }
 
     [Test]
@@ -111,7 +111,7 @@ internal sealed class ResidualSonarHelperTests
             Waiver(new DateOnly(2026, 9, 9), DateOnly.MaxValue), horizon, reasons);
 
         Assert.That(result, Is.EqualTo(horizon));
-        Assert.That(reasons.Select(reason => reason.Code), Is.EqualTo(new[] { "invalid_evaluation_date" }));
+        Assert.That(reasons.Select(reason => reason.Code).Single(), Is.EqualTo("invalid_evaluation_date"));
     }
 
     private static ArchitectureWaiverLifecycleRecord Waiver(DateOnly evaluationDate, DateOnly? expires) =>
