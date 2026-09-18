@@ -411,6 +411,9 @@ public static class ArchitecturePrReportReader
             : throw InvalidArtifact($"The Health report artifact field '{name}' must be a 32-bit integer.");
     }
 
-    internal static ArgumentException InvalidArtifact(string message) =>
-        new(message, "json");
+    // The artifact text reaches this reader through the public "json" argument of Read.
+    internal static ArgumentException InvalidArtifact(string message, string parameterName = ReadJsonParameterName) =>
+        new(message, parameterName);
+
+    private const string ReadJsonParameterName = "json";
 }
