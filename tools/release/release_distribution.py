@@ -179,6 +179,21 @@ def _validate_inventory_header(value: dict[str, Any]) -> None:
         raise ValueError("The release inventory package identity set is invalid.")
 
 
+def _validate_publisher_pins(compatibility: dict[str, Any]) -> None:
+    if compatibility.get("publisher_repository") != _PUBLISHER_REPOSITORY:
+        raise ValueError("The release inventory publisher repository is invalid.")
+    if compatibility.get("publisher_commit") != _APPROVED_PUBLISHER_COMMIT:
+        raise ValueError("The release inventory publisher commit is not the approved immutable pin.")
+    if compatibility.get("action_commit") != _APPROVED_PUBLISHER_ACTION_COMMIT:
+        raise ValueError("The release inventory publisher action commit is not the approved immutable pin.")
+    if compatibility.get("workflow_path") != _WORKFLOW_PATH or compatibility.get("action_path") != _ACTION_PATH:
+        raise ValueError("The release inventory publisher paths are invalid.")
+    if compatibility.get("workflow_ref") != f"{_PUBLISHER_REPOSITORY}/{_WORKFLOW_PATH}@{_APPROVED_PUBLISHER_COMMIT}":
+        raise ValueError("The release inventory workflow reference is not immutable.")
+    if compatibility.get("action_ref") != f"{_PUBLISHER_REPOSITORY}/{_ACTION_REF_PATH}@{_APPROVED_PUBLISHER_ACTION_COMMIT}":
+        raise ValueError("The release inventory action reference is not immutable.")
+
+
 def _validate_inventory_compatibility(value: dict[str, Any]) -> dict[str, Any]:
     compatibility = value.get("compatibility")
     if not isinstance(compatibility, dict):
@@ -200,18 +215,7 @@ def _validate_inventory_compatibility(value: dict[str, Any]) -> dict[str, Any]:
     for key, expected in _COMPATIBILITY_IDENTITIES.items():
         if compatibility.get(key) != expected:
             raise ValueError(f"The release inventory compatibility '{key}' is invalid.")
-    if compatibility.get("publisher_repository") != _PUBLISHER_REPOSITORY:
-        raise ValueError("The release inventory publisher repository is invalid.")
-    if compatibility.get("publisher_commit") != _APPROVED_PUBLISHER_COMMIT:
-        raise ValueError("The release inventory publisher commit is not the approved immutable pin.")
-    if compatibility.get("action_commit") != _APPROVED_PUBLISHER_ACTION_COMMIT:
-        raise ValueError("The release inventory publisher action commit is not the approved immutable pin.")
-    if compatibility.get("workflow_path") != _WORKFLOW_PATH or compatibility.get("action_path") != _ACTION_PATH:
-        raise ValueError("The release inventory publisher paths are invalid.")
-    if compatibility.get("workflow_ref") != f"{_PUBLISHER_REPOSITORY}/{_WORKFLOW_PATH}@{_APPROVED_PUBLISHER_COMMIT}":
-        raise ValueError("The release inventory workflow reference is not immutable.")
-    if compatibility.get("action_ref") != f"{_PUBLISHER_REPOSITORY}/{_ACTION_REF_PATH}@{_APPROVED_PUBLISHER_ACTION_COMMIT}":
-        raise ValueError("The release inventory action reference is not immutable.")
+    _validate_publisher_pins(compatibility)
     for key in ("workflow_source_sha", "action_source_sha"):
         if not isinstance(compatibility.get(key), str) or not _GIT_BLOB_PATTERN.fullmatch(compatibility[key]):
             raise ValueError(f"The release inventory {key} is invalid.")

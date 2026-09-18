@@ -248,7 +248,7 @@ public static class ArchitecturePrReportProjector
     }
 
     private static void AddDebtNavigation(
-        ICollection<ArchitecturePrReportNavigationReference> references,
+        List<ArchitecturePrReportNavigationReference> references,
         ArchitecturePrReportDebtGateReceipt debtGate)
     {
         foreach (ArchitecturePrReportBaselineEntry entry in debtGate.PersistentDebt.Entries)
@@ -266,7 +266,7 @@ public static class ArchitecturePrReportProjector
     }
 
     private static void AddProvenance(
-        ICollection<ArchitecturePrReportNavigationReference> references,
+        List<ArchitecturePrReportNavigationReference> references,
         ArchitecturePrReportProvenance provenance)
     {
         references.Add(new("repository", provenance.RepositoryRoot, provenance.RepositoryRoot));

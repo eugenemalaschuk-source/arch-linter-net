@@ -7,7 +7,6 @@ artifact and semantic horizon before any transport receives a payload.
 from __future__ import annotations
 
 import base64
-import binascii
 from collections.abc import Callable, Mapping
 import hashlib
 from typing import Any
@@ -36,6 +35,24 @@ def _context(environ: Mapping[str, str]) -> tuple[str, str, str]:
     return repository, sha, _parse_base_ref(ref.removeprefix("refs/heads/"))
 
 
+def _child_entry_sha(
+    request: Callable[[str], Any], repository_path: str, tree_sha: str, part: str, *, leaf: bool
+) -> str:
+    document = request(f"/repos/{repository_path}/git/trees/{tree_sha}")
+    if not isinstance(document, dict) or document.get("sha") != tree_sha or document.get("truncated") is not False:
+        raise ConfigValidationError("invalid setup registry tree")
+    entries = document.get("tree")
+    if not isinstance(entries, list):
+        raise ConfigValidationError("invalid setup registry entries")
+    matches = [entry for entry in entries if isinstance(entry, dict) and entry.get("path") == part]
+    if len(matches) != 1 or not is_sha1(matches[0].get("sha")):
+        raise ConfigValidationError("ambiguous setup registry path")
+    entry = matches[0]
+    if entry.get("type") != ("blob" if leaf else "tree") or entry.get("mode") not in ({"100644", "100755"} if leaf else {"040000"}):
+        raise ConfigValidationError("setup registry path is not regular")
+    return entry["sha"]
+
+
 def _registry_blob(request: Callable[[str], Any], repository_path: str, sha: str) -> str:
     commit = request(f"/repos/{repository_path}/git/commits/{sha}")
     tree = commit.get("tree") if isinstance(commit, dict) else None
@@ -44,20 +61,7 @@ def _registry_blob(request: Callable[[str], Any], repository_path: str, sha: str
         raise ConfigValidationError("invalid setup registry commit")
     parts = REGISTRY_PATH.split("/")
     for index, part in enumerate(parts):
-        document = request(f"/repos/{repository_path}/git/trees/{tree_sha}")
-        if not isinstance(document, dict) or document.get("sha") != tree_sha or document.get("truncated") is not False:
-            raise ConfigValidationError("invalid setup registry tree")
-        entries = document.get("tree")
-        if not isinstance(entries, list):
-            raise ConfigValidationError("invalid setup registry entries")
-        matches = [entry for entry in entries if isinstance(entry, dict) and entry.get("path") == part]
-        if len(matches) != 1 or not is_sha1(matches[0].get("sha")):
-            raise ConfigValidationError("ambiguous setup registry path")
-        entry = matches[0]
-        leaf = index == len(parts) - 1
-        if entry.get("type") != ("blob" if leaf else "tree") or entry.get("mode") not in ({"100644", "100755"} if leaf else {"040000"}):
-            raise ConfigValidationError("setup registry path is not regular")
-        tree_sha = entry["sha"]
+        tree_sha = _child_entry_sha(request, repository_path, tree_sha, part, leaf=index == len(parts) - 1)
     return tree_sha
 
 
@@ -84,7 +88,7 @@ def _registry_bytes(document: Any, expected_blob: str) -> bytes:
         raise ConfigValidationError("invalid setup registry size or identity")
     try:
         data = base64.b64decode(content.replace("\n", "").replace("\r", ""), validate=True)
-    except (ValueError, binascii.Error) as error:
+    except ValueError as error:
         raise ConfigValidationError("invalid setup registry encoding") from error
     if len(data) != size:
         raise ConfigValidationError("setup registry size mismatch")

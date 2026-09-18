@@ -17,7 +17,7 @@ internal sealed class MetricDefinitionValidator : IArchitecturePolicyDocumentVal
         }
     }
 
-    private void ValidateDefinition(ArchitectureContractDocument document, ArchitectureMetricDefinition definition, HashSet<string> ids)
+    private static void ValidateDefinition(ArchitectureContractDocument document, ArchitectureMetricDefinition definition, HashSet<string> ids)
     {
         if (string.IsNullOrWhiteSpace(definition.Id))
         {

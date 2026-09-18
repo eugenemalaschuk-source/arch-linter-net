@@ -33,10 +33,10 @@ import re
 import sys
 from pathlib import Path
 
-FENCE_LINE = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
-USES_KEY = re.compile(
-    r"""^\s*(?:-\s+)?\{?\s*["']?uses["']?\s*:\s*(?P<ref>"[^"]+"|'[^']+'|[^\s,}]+)"""
-)
+FENCE_LINE = re.compile(r"^ {0,3}(?P<fence>`{3,}+|~{3,}+)(?P<info>.*)$")
+USES_KEY_PREFIX = r"""^\s*(?:-\s+)?(?:\{\s*)?["']?uses["']?\s*:\s*"""
+USES_REF = r"""(?P<ref>"[^"]+"|'[^']+'|[^\s,}]+)"""
+USES_KEY = re.compile(USES_KEY_PREFIX + USES_REF)
 FULL_COMMIT_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 DOCKER_SHA256_DIGEST = re.compile(r"^sha256:[0-9a-fA-F]{64}$")
 YAML_LANGUAGES = {"yaml", "yml"}

@@ -103,8 +103,9 @@ class InventoryTests(unittest.TestCase):
         for key in ("ruleId", "message"):
             item = finding()
             del item[key]
+            document = sarif([item])
             with self.assertRaises(ValueError):
-                ci.inventory(sarif([item]))
+                ci.inventory(document)
 
     def test_read_rejects_missing_malformed_and_oversize(self):
         with tempfile.TemporaryDirectory() as tmp:

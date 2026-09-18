@@ -207,7 +207,7 @@ internal sealed class ValidateCommandExecution
     }
 
     private IReadOnlyList<(string Mode, ValidationOutcome Outcome)> AttachExternalEvidenceToAll(
-        ValidateCommandOptions options, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+        ValidateCommandOptions options, List<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
     {
         if (outcomesByMode.Count == 0)
         {

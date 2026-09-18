@@ -36,7 +36,7 @@ def envelope(config: dict | None = None) -> dict:
 def contents(data: bytes | None = None) -> dict:
     data = json.dumps(envelope()).encode() if data is None else data
     return {"type": "file", "path": PATH, "encoding": "base64", "size": len(data),
-            "sha": hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest(),
+            "sha": hashlib.sha1(f"blob {len(data)}\0".encode() + data, usedforsecurity=False).hexdigest(),
             "content": base64.encodebytes(data).decode()}
 
 
