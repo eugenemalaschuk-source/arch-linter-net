@@ -116,6 +116,9 @@ internal sealed class HealthCommandHandler(
         }
     }
 
+    internal int ExecuteRevalidatePublication(HealthRevalidatePublicationCommandOptions options) =>
+        new HealthRevalidatePublicationCommandHandler(console, fileSystem).Execute(options);
+
     private bool TryValidateFormat(string format)
     {
         if (format is "human" or "json")

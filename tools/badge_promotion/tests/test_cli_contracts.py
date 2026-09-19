@@ -235,7 +235,7 @@ def test_resolve_evidence_binds_manifest_attempt_to_producer_job(monkeypatch: py
     with zipfile.ZipFile(evidence_stream, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(
             "architecture-health.json",
-            b'{"report_evidence":{"publication_evidence":{"semantic_horizon":"2026-09-13T16:00:00Z"}}}',
+            b'{"report_evidence":{"publication_evidence":{"semantic_horizon":"2099-09-13T16:00:00Z"}}}',
         )
 
     class ResolveApi:

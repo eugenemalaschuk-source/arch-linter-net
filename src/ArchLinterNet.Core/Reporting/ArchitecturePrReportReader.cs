@@ -42,6 +42,26 @@ public static class ArchitecturePrReportReader
     public static ArchitecturePrReportInput Deserialize(string healthJson, string changeJson) =>
         Read(healthJson, changeJson);
 
+    /// <summary>
+    /// Reads the complete Health report-evidence envelope without loading a change report. This is
+    /// an internal boundary for trusted temporal publication revalidation; it performs no policy,
+    /// build, assembly, or architecture analysis.
+    /// </summary>
+    internal static ArchitecturePrReportEvidence ReadHealthReportEvidence(string healthJson)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(healthJson);
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(healthJson);
+            return ReadHealth(document.RootElement).Evidence
+                ?? throw InvalidArtifact("The Health artifact has no report-evidence envelope.");
+        }
+        catch (JsonException exception)
+        {
+            throw new ArgumentException("The architecture Health artifact contains malformed JSON.", exception);
+        }
+    }
+
     private static ArchitecturePrReportInput ReadHealth(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object)
