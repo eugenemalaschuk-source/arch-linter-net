@@ -43,10 +43,10 @@ internal static class BadgeSetupContract
     internal const int DefaultLeaseMinutes = MaximumLeaseMinutes;
     internal const int PrivateMinutesPerRenewalJob = 1;
     internal const string DefaultPublisherWorkflowRef = "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml";
-    internal const string DefaultPublisherWorkflowSha = "c5fe32fb0f6a83a59c8296cf164186b664e8ff42";
-    internal const string DefaultActionRef = "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@37809a25170a871601403ef68dbc42ae21bea0eb";
-    internal const string DefaultPublisherActionSha = "37809a25170a871601403ef68dbc42ae21bea0eb";
-    internal const string ShippedRelayBundleManifestSha256 = "8dda493d9aa44f8cbe705bfdea99ec045ea04a1c64a80dda818821b34c06313b";
+    internal const string DefaultPublisherWorkflowSha = "e35b0c6f41810f3460efd7e1d1ff4d7fd4571b24";
+    internal const string DefaultActionRef = "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@ac678db689a1faf2eb098d0027fc7d176a362d00";
+    internal const string DefaultPublisherActionSha = "ac678db689a1faf2eb098d0027fc7d176a362d00";
+    internal const string ShippedRelayBundleManifestSha256 = "43f141da67ff0d2da2a95d210081bffdee38ad263f5d4f36603898ec3bd0f4d0cbbb9d5d629a292a9159015a152fecd8673326678eb44a87db0c2e0d47b5481dae5f9156cf6c85d32f73477d6d1826ca8b43d457e360b5961c4560026f196331d94ebeb10cc4a611261dc1f25815a7be70b7ed67a1513c6944f93635720dcdfdb467369eca320b7534e0d42e49c7d9bd87abb9f2c463a2fcec3fc3f327277f6d610bebf27420b49ed1fd8a33e4773594092197f61b530c95869d6342eee52e4f1107668921fba37b43ab9fb675a9f91d86305019d7cd817307fe00ff379f513f66b651a8764ab842a4b06be1c3578c15d2962a531e039f40857b7beea29bf2de";
     internal const string DefaultProducerWorkflowPath = ".github/workflows/architecture-health-badge-producer.yml";
     internal const string DefaultRenewalWorkflowPath = ".github/workflows/architecture-health-badge-renewal.yml";
     internal const string DefaultCheckName = "Architecture Coverage";
