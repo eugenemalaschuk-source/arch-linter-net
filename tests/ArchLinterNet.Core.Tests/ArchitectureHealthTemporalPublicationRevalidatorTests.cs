@@ -147,6 +147,180 @@ public sealed class ArchitectureHealthTemporalPublicationRevalidatorTests
     }
 
     [Test]
+    public void Revalidate_InvalidBinding_FailsClosedBeforeParsingEvidence()
+    {
+        byte[] artifact = Artifact(Waiver("active"));
+        ArchitectureHealthTemporalPublicationReceipt receipt =
+            ArchitectureHealthTemporalPublicationRevalidator.Revalidate(
+                artifact,
+                _crossMidnightDate,
+                new ArchitectureHealthTemporalPublicationBinding(
+                    "not-a-sha256",
+                    " bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ",
+                    "not-a-commit",
+                    ProducerSha256));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(receipt.IsReady, Is.False);
+            Assert.That(receipt.Reasons.Select(item => item.Code), Does.Contain("invalid_publication_binding"));
+            Assert.That(receipt.SemanticHorizon, Is.Null);
+        });
+    }
+
+    [Test]
+    public void Revalidate_InvalidJson_FailsClosedWithMalformedEvidenceReason()
+    {
+        byte[] artifact = Encoding.UTF8.GetBytes("{");
+        ArchitectureHealthTemporalPublicationReceipt receipt = Revalidate(artifact, _crossMidnightDate);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(receipt.IsReady, Is.False);
+            Assert.That(receipt.Reasons.Select(item => item.Code), Does.Contain("malformed_report_evidence"));
+            Assert.That(receipt.SourceHealthSha256, Is.EqualTo(Digest(artifact)));
+        });
+    }
+
+    [Test]
+    public void Revalidate_InvalidEnvelopeShapes_FailClosed()
+    {
+        Action<JsonObject>[] mutations =
+        [
+            document => document["report_evidence"]!["schema_version"] = 999,
+            document => document["report_evidence"]!["kind"] = "other-kind",
+            document => document["report_evidence"]!["publication_evidence"]!["schema_id"] = "other-schema",
+            document => document["report_evidence"]!["publication_evidence"]!["state"] = "unknown",
+            document => document["report_evidence"]!["publication_evidence"]!["semantic_horizon"] = "not-a-utc-timestamp",
+            document => document["report_evidence"]!["publication_evidence"]!["reasons"] = new JsonArray
+            {
+                new JsonObject { ["code"] = "reason", ["detail"] = "detail" },
+            },
+            document =>
+            {
+                JsonObject publication = document["report_evidence"]!["publication_evidence"]!.AsObject();
+                publication["state"] = "unassessable";
+                publication["semantic_horizon"] = "still-present";
+            },
+            document =>
+            {
+                JsonObject publication = document["report_evidence"]!["publication_evidence"]!.AsObject();
+                publication["state"] = "unassessable";
+                publication["semantic_horizon"] = null;
+                publication["reasons"] = new JsonArray();
+            },
+            document => document["report_evidence"]!["publication_evidence"]!["reasons"] = new JsonArray("not-an-object"),
+        ];
+
+        foreach (Action<JsonObject> mutation in mutations)
+        {
+            ArchitectureHealthTemporalPublicationReceipt receipt = Revalidate(
+                MutatedArtifact(mutation), _crossMidnightDate);
+
+            Assert.That(receipt.IsReady, Is.False);
+            Assert.That(receipt.Reasons.Select(item => item.Code), Does.Contain("malformed_report_evidence"));
+        }
+    }
+
+    [Test]
+    public void Revalidate_MissingAndInvalidCompatibilityReceipts_FailClosed()
+    {
+        Action<JsonObject>[] mutations =
+        [
+            document => document["report_evidence"]!["validation_outcomes"]![0]!["policy_inventory"] = null,
+            document => document["report_evidence"]!["validation_outcomes"]![0]!["policy_inventory"]!["schema"] = "wrong-schema",
+            document => document["report_evidence"]!["validation_outcomes"]![0]!["waiver_lifecycle"] = null,
+            document =>
+            {
+                JsonObject lifecycle = document["report_evidence"]!["validation_outcomes"]![0]!["waiver_lifecycle"]!.AsObject();
+                lifecycle["profile"] = "";
+            },
+            document =>
+            {
+                JsonObject lifecycle = document["report_evidence"]!["validation_outcomes"]![0]!["waiver_lifecycle"]!.AsObject();
+                lifecycle["records"] = new JsonArray();
+                lifecycle["evaluation_date"] = null;
+            },
+        ];
+
+        foreach (Action<JsonObject> mutation in mutations)
+        {
+            ArchitectureHealthTemporalPublicationReceipt receipt = Revalidate(
+                MutatedArtifact(mutation), _crossMidnightDate);
+
+            Assert.That(receipt.IsReady, Is.False);
+            Assert.That(receipt.Reasons.Select(item => item.Code), Is.Not.Empty);
+        }
+    }
+
+    [Test]
+    public void Revalidate_LifecycleFailures_FailClosed()
+    {
+        Action<JsonObject>[] mutations =
+        [
+            document => document["report_evidence"]!["validation_outcomes"]![0]!["mode"] = "",
+            document => document["report_evidence"]!["validation_outcomes"]![0]!["waiver_lifecycle"]!["records"]![0]!["id"] = "",
+            document => document["report_evidence"]!["validation_outcomes"]![0]!["waiver_lifecycle"]!["records"]![0]!["state"] = "unknown",
+            document => document["report_evidence"]!["validation_outcomes"]![0]!["waiver_lifecycle"]!["records"]![0]!["evaluation_date"] = "2026-09-11",
+            document => document["report_evidence"]!["validation_outcomes"]![0]!["waiver_lifecycle"]!["records"]![0]!["expires"] = "9999-12-31",
+            document =>
+            {
+                JsonArray outcomes = document["report_evidence"]!["validation_outcomes"]!.AsArray();
+                JsonObject second = outcomes[0]!.DeepClone()!.AsObject();
+                second["mode"] = "audit";
+                second["waiver_lifecycle"]!["evaluation_date"] = "2026-09-10";
+                outcomes.Add(second);
+            },
+        ];
+
+        foreach (Action<JsonObject> mutation in mutations)
+        {
+            ArchitectureHealthTemporalPublicationReceipt receipt = Revalidate(
+                MutatedArtifact(mutation), _crossMidnightDate);
+
+            Assert.That(receipt.IsReady, Is.False);
+            Assert.That(receipt.Reasons.Select(item => item.Code), Is.Not.Empty);
+        }
+    }
+
+    [TestCase("stale", "wrong_revision", "stale_external_evidence")]
+    [TestCase("wrong_context", "wrong_scope", "invalid_external_evidence")]
+    public void Revalidate_RequiredExternalEvidenceFailure_FailsClosed(
+        string state,
+        string trustStatus,
+        string expectedReason)
+    {
+        ArchitectureHealthTemporalPublicationReceipt receipt = Revalidate(
+            MutatedArtifact(document =>
+            {
+                JsonObject external = document["report_evidence"]!["validation_outcomes"]![0]!["external_evidence"]!.AsObject();
+                external["trust_receipts"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["logical_id"] = "scanner",
+                        ["state"] = state,
+                        ["trust_status"] = trustStatus,
+                        ["reason_code"] = trustStatus,
+                        ["artifact_path"] = null,
+                        ["artifact_sha256"] = null,
+                        ["run_id"] = null,
+                        ["result_count"] = 0,
+                        ["context"] = null,
+                    },
+                };
+            }, includeExternalEvidence: true),
+            _crossMidnightDate);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(receipt.IsReady, Is.False);
+            Assert.That(receipt.Reasons.Select(item => item.Code), Does.Contain(expectedReason));
+            Assert.That(receipt.Reasons.Select(item => item.Code), Does.Contain("required_external_evidence_horizon_unknown"));
+        });
+    }
+
+    [Test]
     public void Revalidate_MalformedOrIncompleteEvidence_FailsClosedDeterministically()
     {
         byte[] malformed = Encoding.UTF8.GetBytes("{\"schema_id\":\"architecture-health/v1\"}");
@@ -170,6 +344,23 @@ public sealed class ArchitectureHealthTemporalPublicationRevalidatorTests
             date,
             new ArchitectureHealthTemporalPublicationBinding(
                 Digest(artifact), PayloadSha256, TreeSha, ProducerSha256));
+
+    private static byte[] MutatedArtifact(Action<JsonObject> mutation, bool includeExternalEvidence = false)
+    {
+        ArchitectureExternalEvidenceRequirement? external = includeExternalEvidence
+            ? new ArchitectureExternalEvidenceRequirement
+            {
+                Id = "scanner",
+                Format = "sarif",
+                Required = true,
+                Tool = "scanner",
+                Run = "run",
+            }
+            : null;
+        JsonObject document = JsonNode.Parse(Encoding.UTF8.GetString(Artifact(Waiver("active"), external)))!.AsObject();
+        mutation(document);
+        return Encoding.UTF8.GetBytes(document.ToJsonString());
+    }
 
     private static byte[] Artifact(
         ArchitectureWaiverLifecycleRecord waiver,

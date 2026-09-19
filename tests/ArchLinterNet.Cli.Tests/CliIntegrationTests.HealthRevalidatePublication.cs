@@ -8,6 +8,87 @@ namespace ArchLinterNet.Cli.Tests;
 internal sealed class CliHealthRevalidatePublicationIntegrationTests : CliIntegrationTestBase
 {
     [Test]
+    public void RevalidatePublication_HelpReturnsUsageWithoutRunningTheEvaluator()
+    {
+        var (exitCode, stdout, stderr) = RunCli("health", "revalidate-publication", "--help");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stdout, Does.Contain("health revalidate-publication"));
+            Assert.That(stdout, Does.Contain("--evaluation-date"));
+            Assert.That(stderr, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void RevalidatePublication_InvalidEvaluationDateFailsBeforeReadingInput()
+    {
+        var (exitCode, stdout, stderr) = RunCli(
+            "health", "revalidate-publication",
+            "--input", "missing-health.json",
+            "--evaluation-date", "tomorrow",
+            "--source-health-sha256", new string('a', 64),
+            "--badge-payload-sha256", new string('b', 64),
+            "--merged-tree-sha", new string('c', 40),
+            "--producer-identity-sha256", new string('d', 64));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("--evaluation-date must be an explicit UTC date"));
+        });
+    }
+
+    [Test]
+    public void RevalidatePublication_MissingBindingFailsBeforeReadingInput()
+    {
+        var (exitCode, stdout, stderr) = RunCli(
+            "health", "revalidate-publication",
+            "--input", "missing-health.json",
+            "--evaluation-date", "2026-09-10",
+            "--source-health-sha256", new string('a', 64));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("requires an input, evaluation date, and all four publication identity bindings"));
+        });
+    }
+
+    [Test]
+    public void RevalidatePublication_OutputCannotReplaceExistingInput()
+    {
+        string inputPath = Path.Combine(Path.GetTempPath(), $"architecture-health-same-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(inputPath, "{}");
+            var (exitCode, stdout, stderr) = RunCli(
+                "health", "revalidate-publication",
+                "--input", inputPath,
+                "--evaluation-date", "2026-09-10",
+                "--source-health-sha256", new string('a', 64),
+                "--badge-payload-sha256", new string('b', 64),
+                "--merged-tree-sha", new string('c', 40),
+                "--producer-identity-sha256", new string('d', 64),
+                "--output", inputPath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(2));
+                Assert.That(stdout, Is.Empty);
+                Assert.That(stderr, Does.Contain("--output must not replace the Health input artifact"));
+            });
+        }
+        finally
+        {
+            DeleteIfPresent(inputPath);
+        }
+    }
+
+    [Test]
     public void RevalidatePublication_UsesOnlySerializedHealthEvidenceAndLeavesInputUnchanged()
     {
         string baselinePath = Path.Combine(Path.GetTempPath(), $"architecture-health-{Guid.NewGuid():N}.yml");
