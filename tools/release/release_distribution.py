@@ -299,6 +299,24 @@ def _git_blob(source_root: Path, commit: str, relative: str) -> bytes:
     return completed.stdout
 
 
+def _git_blob_object(source_root: Path, blob_sha: str) -> bytes:
+    """Read an independently pinned blob when its originating commit was squashed away.
+
+    A reviewed publisher commit may no longer be reachable after a squash merge even though
+    the exact source blob is still present in the merged tree. The blob identity remains the
+    immutable boundary; the mutable checkout or index must not replace it.
+    """
+    completed = subprocess.run(
+        ["git", "-C", str(source_root), "cat-file", "blob", blob_sha],
+        check=False,
+        capture_output=True,
+    )  # NOSONAR(S4721,S8707)
+    if completed.returncode != 0:
+        details = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(f"Approved publisher blob '{blob_sha}' is unavailable: {details}")
+    return completed.stdout
+
+
 def _index_blob(source_root: Path, relative: str) -> bytes:
     """Read the Git-clean index blob when a shallow checkout lacks a pinned commit.
 
@@ -324,18 +342,21 @@ def _approved_source_bytes(source_root: Path, relative: str, inventory: dict[str
     try:
         contents = _git_blob(source_root, commit, relative)
     except ValueError:
-        # Release verification jobs may use a shallow checkout that does not retain the reviewed
-        # bootstrap commit. Read the current index rather than the working tree so Windows EOL
-        # conversion cannot change the immutable publisher bytes. The independently pinned blob
-        # identity below remains mandatory and rejects a staged/tampered index entry.
         try:
-            contents = _index_blob(source_root, relative)
+            # Squash merges can discard the reviewed commit while retaining the exact blob in a
+            # merged tree. Prefer that pinned blob over any mutable checkout representation.
+            contents = _git_blob_object(source_root, component["approved_source_sha"])
         except ValueError:
-            # Non-Git test fixtures have no index. Their bytes are still accepted only if the
-            # pinned Git-blob identity matches exactly; CRLF workspace conversions therefore
-            # remain fail-closed when no Git-clean source representation exists.
-            path = _safe_source_path(source_root, relative, "approved publisher source")
-            contents = path.read_bytes()
+            try:
+                # Release verification jobs may use a shallow checkout that has neither the
+                # reviewed commit nor its blob object. Read the Git-clean index rather than the
+                # working tree so Windows EOL conversion cannot change the immutable bytes.
+                contents = _index_blob(source_root, relative)
+            except ValueError:
+                # Non-Git test fixtures have neither a reviewed commit nor an index. Their bytes
+                # are accepted only when they reproduce the independently pinned Git blob.
+                path = _safe_source_path(source_root, relative, "approved publisher source")
+                contents = path.read_bytes()
     observed_blob = subprocess.run(
         ["git", "-C", str(source_root), "hash-object", "--stdin"],
         input=contents,
