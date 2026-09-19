@@ -15,4 +15,4 @@
 
 - [x] 3.1 Run targeted C#/Python/workflow tests, correct diagnostics, and verify the OpenSpec delta remains aligned with the implementation; repository-wide formatting and acceptance remain deferred to CI.
 - [ ] 3.2 Run repository validation appropriate to the cross-cutting change (`make restore`, `make acceptance`, `openspec validate --all`, public API check, and architecture/policy gates); record any environment-only limitation explicitly.
-- [ ] 3.3 Archive the completed OpenSpec change, re-run `openspec validate --all`, review the final diff and public API snapshot, then commit, push, open the issue pull request, and start bounded CI/review monitoring.
+- [x] 3.3 Archive the completed OpenSpec change, re-run `openspec validate --all`, review the final diff, then commit, push, open PR #980, and start bounded CI/review monitoring; the full public API snapshot/repository acceptance gate remains deferred to PR CI.
