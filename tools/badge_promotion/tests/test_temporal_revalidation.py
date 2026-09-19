@@ -253,6 +253,82 @@ def test_temporal_revalidation_fails_closed_when_revalidator_execution_times_out
         )
 
 
+def test_temporal_revalidation_retries_once_after_crossing_utc_midnight(monkeypatch) -> None:
+    first_receipt = _valid_receipt()
+    second_receipt = _valid_receipt()
+    second_receipt["evaluation_date"] = "2026-09-20"
+    second_receipt["semantic_horizon"] = "2026-09-21T00:00:00Z"
+    calls: list[datetime] = []
+    horizons = [
+        datetime(2026, 9, 20, tzinfo=timezone.utc),
+        datetime(2026, 9, 21, tzinfo=timezone.utc),
+    ]
+
+    def fake_revalidation(*_args, evaluation_date: datetime, **_kwargs):
+        calls.append(evaluation_date)
+        return ([first_receipt, second_receipt][len(calls) - 1], horizons[len(calls) - 1])
+
+    class Clock(datetime):
+        values = [
+            datetime(2026, 9, 20, 0, 0, 10, tzinfo=timezone.utc),
+            datetime(2026, 9, 20, 0, 0, 11, tzinfo=timezone.utc),
+        ]
+
+        @classmethod
+        def now(cls, tz=None):
+            current = cls.values.pop(0)
+            return current if tz is None else current.astimezone(tz)
+
+    monkeypatch.setattr(cli, "datetime", Clock)
+    monkeypatch.setattr(cli, "_run_temporal_revalidation", fake_revalidation)
+
+    receipt, horizon, temporal_verified_at = cli._run_temporal_revalidation_with_midnight_retry(
+        b"health",
+        evaluation_date=datetime(2026, 9, 19, 23, 59, 55, tzinfo=timezone.utc),
+        source_health_sha256="a" * 64,
+        badge_payload_sha256="b" * 64,
+        merged_tree_sha="c" * 40,
+        producer_identity_sha256="d" * 64,
+    )
+
+    assert [value.date() for value in calls] == [datetime(2026, 9, 19).date(), datetime(2026, 9, 20).date()]
+    assert receipt == second_receipt
+    assert horizon == datetime(2026, 9, 21, tzinfo=timezone.utc)
+    assert temporal_verified_at == datetime(2026, 9, 20, 0, 0, 11, tzinfo=timezone.utc)
+
+
+def test_temporal_revalidation_fails_closed_if_one_midnight_retry_is_still_unsafe(monkeypatch) -> None:
+    receipt = _valid_receipt()
+    calls = iter(
+        [
+            datetime(2026, 9, 20, 0, 0, 10, tzinfo=timezone.utc),
+            datetime(2026, 9, 20, 0, 0, 11, tzinfo=timezone.utc),
+        ]
+    )
+
+    def fake_revalidation(*_args, **_kwargs):
+        return receipt, datetime(2026, 9, 20, tzinfo=timezone.utc)
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            current = next(calls)
+            return current if tz is None else current.astimezone(tz)
+
+    monkeypatch.setattr(cli, "datetime", Clock)
+    monkeypatch.setattr(cli, "_run_temporal_revalidation", fake_revalidation)
+
+    with pytest.raises(cli.ProviderFailure, match="semantic_revalidation_unavailable"):
+        cli._run_temporal_revalidation_with_midnight_retry(
+            b"health",
+            evaluation_date=datetime(2026, 9, 19, 23, 59, 55, tzinfo=timezone.utc),
+            source_health_sha256="a" * 64,
+            badge_payload_sha256="b" * 64,
+            merged_tree_sha="c" * 40,
+            producer_identity_sha256="d" * 64,
+        )
+
+
 def test_resolve_evidence_then_decide_uses_post_receipt_lease_anchor(monkeypatch) -> None:
     config = parse_config(json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text()))
     repository = config.repository

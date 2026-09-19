@@ -29,6 +29,7 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
     private const string MissingWaiverReceipt = "missing_waiver_receipt";
     private const string MalformedWaiverReceipt = "malformed_waiver_receipt";
     private const string InvalidWaiver = "invalid_waiver";
+    private const string StaleWaiver = "stale_waiver";
     private const string MetadataIncompleteWaiver = "metadata_incomplete_waiver";
     private const string ExpiredWaiver = "expired_waiver";
     private const string InconsistentWaiverReceipt = "inconsistent_waiver_receipt";
@@ -318,9 +319,7 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
                 reasons.Add(new(ExpiredWaiver, $"The waiver '{record.Id}' expired before the supplied evaluation date."));
                 break;
             case "stale":
-                // Stale is a publishable health state. The canonical
-                // publication projector preserves it as failing/degrading
-                // health; temporal revalidation must not change that meaning.
+                reasons.Add(new(StaleWaiver, $"The waiver '{record.Id}' is stale and cannot be reused."));
                 break;
             case "invalid":
                 reasons.Add(new(InvalidWaiver, $"The waiver '{record.Id}' is invalid and cannot be reused."));

@@ -559,6 +559,41 @@ def _run_temporal_revalidation(
     )
 
 
+def _run_temporal_revalidation_with_midnight_retry(
+    health_bytes: bytes,
+    *,
+    evaluation_date: datetime,
+    source_health_sha256: str,
+    badge_payload_sha256: str,
+    merged_tree_sha: str,
+    producer_identity_sha256: str,
+) -> tuple[dict[str, Any], datetime, datetime]:
+    receipt, horizon = _run_temporal_revalidation(
+        health_bytes,
+        evaluation_date=evaluation_date,
+        source_health_sha256=source_health_sha256,
+        badge_payload_sha256=badge_payload_sha256,
+        merged_tree_sha=merged_tree_sha,
+        producer_identity_sha256=producer_identity_sha256,
+    )
+    temporal_verified_at = datetime.now(timezone.utc)
+    if temporal_verified_at >= horizon:
+        if temporal_verified_at.date() == evaluation_date.astimezone(timezone.utc).date():
+            raise ProviderFailure("semantic_revalidation_unavailable")
+        receipt, horizon = _run_temporal_revalidation(
+            health_bytes,
+            evaluation_date=temporal_verified_at,
+            source_health_sha256=source_health_sha256,
+            badge_payload_sha256=badge_payload_sha256,
+            merged_tree_sha=merged_tree_sha,
+            producer_identity_sha256=producer_identity_sha256,
+        )
+        temporal_verified_at = datetime.now(timezone.utc)
+    if temporal_verified_at >= horizon:
+        raise ProviderFailure("semantic_revalidation_unavailable")
+    return receipt, horizon, temporal_verified_at
+
+
 def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     repository = os.environ.get("GITHUB_REPOSITORY", "")
     base_ref = config.base_ref
@@ -615,15 +650,15 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
         source_health_sha256=hashlib.sha256(health_bytes).hexdigest(),
         producer_identity_sha256=producer_identity_sha256,
     )
-    revalidation_now = datetime.now(timezone.utc)
-    if revalidation_now >= semantic_horizon:
+    if datetime.now(timezone.utc) >= semantic_horizon:
         try:
             validated = validate_artifact(archive, config, evidence)
         except ArtifactValidationError as error:
             raise ProviderFailure(
                 error.reason.value if error.reason is not None else "artifact_invalid"
             ) from error
-        receipt, refreshed_horizon = _run_temporal_revalidation(
+        revalidation_now = datetime.now(timezone.utc)
+        receipt, refreshed_horizon, temporal_verified_at = _run_temporal_revalidation_with_midnight_retry(
             health_bytes,
             evaluation_date=revalidation_now,
             source_health_sha256=evidence.source_health_sha256 or "",
@@ -636,7 +671,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
             semantic_horizon=refreshed_horizon,
             # The producer timestamp remains provenance. A successful receipt
             # is the trusted publisher event that starts a fresh transport lease.
-            temporal_verified_at=datetime.now(timezone.utc),
+            temporal_verified_at=temporal_verified_at,
             temporal_receipt=receipt,
         )
     return evidence, archive

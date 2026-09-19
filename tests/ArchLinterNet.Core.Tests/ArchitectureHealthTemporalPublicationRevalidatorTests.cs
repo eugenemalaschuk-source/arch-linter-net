@@ -52,17 +52,16 @@ public sealed class ArchitectureHealthTemporalPublicationRevalidatorTests
     }
 
     [Test]
-    public void Revalidate_StaleLifecycleState_RemainsPublishableLikeCanonicalProjector()
+    public void Revalidate_StaleLifecycleState_FailsClosed()
     {
         ArchitectureHealthTemporalPublicationReceipt receipt = Revalidate(
             Artifact(Waiver("stale")), _crossMidnightDate);
 
         Assert.Multiple(() =>
         {
-            Assert.That(receipt.IsReady, Is.True);
-            Assert.That(receipt.SemanticHorizon,
-                Is.EqualTo(new DateTimeOffset(2026, 9, 11, 0, 0, 0, TimeSpan.Zero)));
-            Assert.That(receipt.Reasons, Is.Empty);
+            Assert.That(receipt.IsReady, Is.False);
+            Assert.That(receipt.SemanticHorizon, Is.Null);
+            Assert.That(receipt.Reasons.Select(item => item.Code), Does.Contain("stale_waiver"));
         });
     }
 

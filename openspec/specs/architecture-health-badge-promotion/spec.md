@@ -139,6 +139,11 @@ When the stored semantic horizon has elapsed, the trusted promotion path SHALL o
 - **THEN** Relay receives the refreshed finite horizon through its existing prepare/publish or renew contract
 - **AND** no second waiver, Health, or architecture evaluator runs in provider glue
 
+#### Scenario: Stale waiver evidence remains unavailable
+- **WHEN** temporal revalidation receives an otherwise bound Health envelope containing a stale waiver lifecycle record
+- **THEN** the Core receipt is unassessable with a bounded stale-waiver reason
+- **AND** raw and Relay promotion do not publish a ready payload or extend a transport lease
+
 #### Scenario: Temporal revalidation reanchors the transport lease
 - **WHEN** a trusted temporal receipt is accepted after the original producer lease has elapsed
 - **THEN** the transport lease is anchored at the trusted publisher time immediately after successful receipt validation
