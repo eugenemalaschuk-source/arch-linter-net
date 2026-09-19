@@ -131,6 +131,11 @@ class EvidenceContext:
     artifact_expired: bool
     verified_at: datetime
     semantic_horizon: datetime
+    temporal_verified_at: datetime | None = None
+    original_semantic_horizon: datetime | None = None
+    source_health_sha256: str | None = None
+    producer_identity_sha256: str | None = None
+    temporal_receipt: Mapping[str, Any] | None = None
 
 
 def is_sha256(value: Any) -> bool:

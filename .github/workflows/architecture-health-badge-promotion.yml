@@ -340,9 +340,13 @@ jobs:
       packages: read
       pull-requests: read
     steps:
+      - name: Set up .NET for trusted temporal revalidation
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
       - name: Run pinned trusted promotion contract
         id: promotion
-        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@6fadf3fec983e5af3077b62a52ab608ce7f73ba3
+        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@37809a25170a871601403ef68dbc42ae21bea0eb
         with:
           configuration_id: ${{ inputs['configuration-id'] }}
           adapter: ${{ inputs.adapter }}

@@ -120,12 +120,16 @@ def _context_reason(config: PromotionConfig, evidence: EvidenceContext) -> Reaso
 
 
 def _validity_reason(request: PromotionRequest) -> ReasonCode | None:
-    if request.now.tzinfo is None or request.deadline.tzinfo is None or request.evidence.verified_at.tzinfo is None or request.evidence.semantic_horizon.tzinfo is None:
+    lease_anchor = request.evidence.temporal_verified_at or request.evidence.verified_at
+    if request.now.tzinfo is None or request.deadline.tzinfo is None or request.evidence.verified_at.tzinfo is None or lease_anchor.tzinfo is None or request.evidence.semantic_horizon.tzinfo is None:
         return ReasonCode.SEMANTIC_HORIZON_EXPIRED
     now = request.now.astimezone(timezone.utc)
     if now >= request.deadline.astimezone(timezone.utc):
         return ReasonCode.CHALLENGE_DEADLINE_EXPIRED
-    if request.evidence.verified_at.astimezone(timezone.utc) > now or now >= request.evidence.semantic_horizon.astimezone(timezone.utc) or request.evidence.verified_at >= request.evidence.semantic_horizon:
+    verified_at = request.evidence.verified_at.astimezone(timezone.utc)
+    lease_anchor = lease_anchor.astimezone(timezone.utc)
+    horizon = request.evidence.semantic_horizon.astimezone(timezone.utc)
+    if verified_at > now or lease_anchor > now or now >= horizon or verified_at >= horizon or lease_anchor >= horizon:
         return ReasonCode.SEMANTIC_HORIZON_EXPIRED
     return None
 
@@ -178,8 +182,9 @@ def decide_promotion(config: PromotionConfig, request: PromotionRequest, previou
         if monotonic is ReasonCode.IDEMPOTENT_REPLAY and previous is not None:
             return PromotionDecision(previous.status, monotonic, disposition, previous.generation, previous.revocation_epoch, valid_until=previous.valid_until, payload_sha256=previous.payload_sha256)
         return _unavailable(request, monotonic, disposition)
+    lease_anchor = request.evidence.temporal_verified_at or request.evidence.verified_at
     valid_until = min(
-        request.evidence.verified_at.astimezone(timezone.utc) + timedelta(seconds=config.limits.max_lease_seconds),
+        lease_anchor.astimezone(timezone.utc) + timedelta(seconds=config.limits.max_lease_seconds),
         request.evidence.semantic_horizon.astimezone(timezone.utc),
     )
     if request.now.astimezone(timezone.utc) >= valid_until:

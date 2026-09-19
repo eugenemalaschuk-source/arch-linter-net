@@ -115,7 +115,8 @@ def _validate_manifest(manifest: Mapping[str, Any], config: PromotionConfig, evi
         "main_tree_sha": evidence.main_tree_sha, "workflow_path": evidence.workflow_path, "workflow_sha": evidence.workflow_sha,
         "check_name": evidence.check_name, "check_app": evidence.check_app, "job_id": evidence.job_id, "job_name": evidence.job_name,
         "artifact_id": evidence.artifact_id, "artifact_name": evidence.artifact_name,
-        "semantic_horizon": evidence.semantic_horizon.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "semantic_horizon": (evidence.original_semantic_horizon or evidence.semantic_horizon)
+        .astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     expected_context.update({key: value for key, value in optional_context.items() if key in context})
     mismatched_key = next(

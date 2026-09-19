@@ -69,9 +69,9 @@ def payload_bytes() -> bytes:
     return b'{"schemaVersion":1,"label":"architecture","message":"PASS \\u00B7 HEALTHY \\u00B7 0 ignores \\u00B7 42 rules","color":"brightgreen"}'
 
 
-def archive_bytes(*, payload: bytes | None = None, manifest: dict[str, object] | None = None, names: tuple[str, str] | None = None, symlink: bool = False) -> bytes:
+def archive_bytes(*, payload: bytes | None = None, manifest: dict[str, object] | None = None, names: tuple[str, str] | None = None, symlink: bool = False, context: EvidenceContext | None = None) -> bytes:
     payload = payload or payload_bytes()
-    current = evidence()
+    current = context or evidence()
     manifest = manifest or {
         "schema": CONFIG.schema_id,
         "kind": "architecture-health-badge",
@@ -93,7 +93,7 @@ def archive_bytes(*, payload: bytes | None = None, manifest: dict[str, object] |
             "job_name": current.job_name,
             "artifact_id": current.artifact_id,
             "artifact_name": current.artifact_name,
-            "semantic_horizon": current.semantic_horizon.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "semantic_horizon": (current.original_semantic_horizon or current.semantic_horizon).strftime("%Y-%m-%dT%H:%M:%SZ"),
         },
         "payload": {
             "path": CONFIG.producer.payload_path,
@@ -156,6 +156,19 @@ def test_valid_artifact_returns_exact_canonical_bytes() -> None:
     artifact = validate_artifact(archive_bytes(), CONFIG, evidence())
     assert artifact.payload == payload_bytes()
     assert artifact.payload_sha256 == hashlib.sha256(payload_bytes()).hexdigest()
+
+
+def test_valid_artifact_after_temporal_refresh_keeps_original_manifest_horizon() -> None:
+    current = evidence()
+    refreshed = replace(
+        current,
+        original_semantic_horizon=current.semantic_horizon,
+        semantic_horizon=current.semantic_horizon + timedelta(days=1),
+    )
+
+    artifact = validate_artifact(archive_bytes(), CONFIG, refreshed)
+
+    assert artifact.payload == payload_bytes()
 
 
 def test_valid_artifact_accepts_stringified_github_identifier_context() -> None:
@@ -272,6 +285,34 @@ def test_expired_deadline_and_semantic_horizon_fail_closed() -> None:
     assert expired.reason is ReasonCode.CHALLENGE_DEADLINE_EXPIRED
     horizon = decide_promotion(CONFIG, request(evidence=evidence(semantic_horizon=NOW)))
     assert horizon.reason is ReasonCode.SEMANTIC_HORIZON_EXPIRED
+
+
+def test_temporal_refresh_reanchors_lease_for_issue_978_times() -> None:
+    producer_verified_at = datetime(2026, 9, 18, 21, 38, 26, tzinfo=timezone.utc)
+    temporal_verified_at = datetime(2026, 9, 19, 6, 30, 39, tzinfo=timezone.utc)
+    refreshed_horizon = datetime(2026, 9, 20, tzinfo=timezone.utc)
+    refreshed = evidence(
+        verified_at=producer_verified_at,
+        temporal_verified_at=temporal_verified_at,
+        original_semantic_horizon=datetime(2026, 9, 19, tzinfo=timezone.utc),
+        semantic_horizon=refreshed_horizon,
+    )
+    archive = archive_bytes(context=refreshed)
+    refreshed = replace(refreshed, artifact_size=len(archive))
+    publisher_now = datetime(2026, 9, 19, 6, 30, 40, tzinfo=timezone.utc)
+
+    decision = decide_promotion(
+        CONFIG,
+        request(
+            archive,
+            evidence=refreshed,
+            now=publisher_now,
+            deadline=publisher_now + timedelta(minutes=5),
+        ),
+    )
+
+    assert decision.status is PromotionStatus.READY
+    assert decision.valid_until == datetime(2026, 9, 19, 7, 30, 39, tzinfo=timezone.utc)
 
 
 def test_stale_writer_and_generation_gap_cannot_overwrite_newer_state() -> None:
