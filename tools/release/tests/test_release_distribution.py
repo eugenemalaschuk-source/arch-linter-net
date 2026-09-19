@@ -272,7 +272,7 @@ def test_approved_workflow_and_action_sources_can_use_independent_immutable_comm
     ]
 
 
-def test_shallow_publisher_source_fallback_uses_git_clean_index_bytes_and_rejects_staged_tampering(
+def test_shallow_publisher_source_fallback_prefers_pinned_blob_over_staged_bytes(
     tmp_path: Path, monkeypatch
 ) -> None:
     repository = tmp_path / "shallow-checkout"
@@ -312,12 +312,14 @@ def test_shallow_publisher_source_fallback_uses_git_clean_index_bytes_and_reject
     assert observed_bytes == expected_bytes
     assert observed_blob == expected_blob
 
-    # A staged replacement changes the Git-clean index blob and must remain a
-    # hard failure; the index fallback is not an authority bypass.
+    # A staged replacement cannot replace the independently pinned blob. The
+    # immutable object remains authoritative even when the reviewed commit ref
+    # is absent from the checkout.
     action_path.write_bytes(b"name: tampered\r\n")
     subprocess.run(["git", "-C", str(repository), "add", relative], check=True, capture_output=True)
-    with pytest.raises(ValueError, match="digest mismatch"):
-        distribution._approved_source_bytes(repository, relative, inventory)
+    observed_bytes, observed_blob, _ = distribution._approved_source_bytes(repository, relative, inventory)
+    assert observed_bytes == expected_bytes
+    assert observed_blob == expected_blob
 
 
 def test_publisher_source_fallback_without_git_index_requires_exact_workspace_bytes(

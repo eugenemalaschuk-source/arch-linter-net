@@ -7,6 +7,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".github" / "workflows"
+STAGE_B_ACTION_REF = (
+    "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion"
+    "@ac678db689a1faf2eb098d0027fc7d176a362d00"
+)
 
 
 def read_workflow(name: str) -> str:
@@ -33,9 +37,9 @@ def test_reference_publisher_delegates_to_one_reusable_workflow() -> None:
 
 def test_reusable_workflow_resolves_its_action_from_the_workflow_repository() -> None:
     workflow = read_workflow("architecture-health-badge-promotion.yml")
-    inventory = json.loads((ROOT / ".github" / "badge-promotion" / "release-inventory.json").read_text(encoding="utf-8"))
-    expected_action_ref = inventory["compatibility"]["action_ref"]
-    assert f"uses: {expected_action_ref}" in workflow
+    # Stage B of #982 intentionally updates the live reusable workflow before
+    # the post-merge inventory rotation can bind the final #981 squash SHA.
+    assert f"uses: {STAGE_B_ACTION_REF}" in workflow
     assert "uses: ./.github/actions/architecture-health-badge-promotion" not in workflow
 
 
