@@ -1,0 +1,56 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.8.2-temporal-badge-publication-correctness",
+  "release_target": "0.8.2",
+  "story": 806,
+  "_comment": [
+    "Maintenance delta from published v0.8.1 (4f8d117517c2488fd4357be8089c09f488e18121) to",
+    "inspected main ac678db689a1faf2eb098d0027fc7d176a362d00 consists of the #979/#980",
+    "Architecture Health badge temporal-publication correctness fix. The actual release candidate",
+    "source is the reviewed preparation merge SHA, not a publisher workflow/action pin.",
+    "The fix preserves PR-produced Health/Gate/counts/payload authority and revalidates only",
+    "time-sensitive serialized publication evidence for the exact unchanged merged tree when the",
+    "original UTC semantic horizon has elapsed. Expired, stale, invalid, mismatched or otherwise",
+    "unverifiable temporal evidence remains fail-closed; a UTC-midnight crossing during revalidation",
+    "is retried only through the same canonical revalidation path, never by arbitrary lease extension.",
+    "Private Relay remains experimental / opt-in. #922/#834/#836/#825 are intentionally deferred",
+    "until after v0.8.2 and do not block this public github-raw correctness patch. Their code is not",
+    "subtracted from packages and experimental status does not waive security/privacy/integrity defects.",
+    "#806 remains release authority; #976/#977 and milestone closure must not authorize themselves.",
+    "No unrelated v0.9 performance or next-minor capability is included in this patch candidate."
+  ],
+  "required_items": [
+    {
+      "issue": 979,
+      "finding": "badge-temporal-publication-revalidation",
+      "summary": "Revalidate finite Architecture Health publication evidence for an exact unchanged merged tree when publication crosses the UTC semantic horizon"
+    }
+  ],
+  "excluded_items": [
+    {
+      "issue": 922,
+      "reason": "Owner: @eugenemalaschuk-source. Execute live private-consumer Cloudflare Relay acceptance only after v0.8.2; it is not a prerequisite for the public github-raw correctness patch."
+    },
+    {
+      "issue": 834,
+      "reason": "Owner: @eugenemalaschuk-source. Defer full packed/adversarial/hosted private Relay acceptance until after v0.8.2; normal package/provenance/release-integrity gates remain mandatory."
+    },
+    {
+      "issue": 836,
+      "reason": "Owner: @eugenemalaschuk-source. Defer final private Relay adoption-stable documentation/support promotion until #834 completes after v0.8.2."
+    },
+    {
+      "issue": 825,
+      "reason": "Owner: @eugenemalaschuk-source. Keep the turnkey private-repository Relay adoption umbrella open for post-v0.8.2 completion; this does not block the public badge patch."
+    },
+    {
+      "issue": 650,
+      "reason": "Owner: @eugenemalaschuk-source. Broader executable/versioned public-documentation work is separate from this narrow maintenance correctness patch."
+    },
+    {
+      "issue": 787,
+      "reason": "Owner: @eugenemalaschuk-source. v0.9 performance/scale release work is unrelated next-minor scope and is excluded from this maintenance candidate."
+    }
+  ],
+  "delivered_items": []
+}
