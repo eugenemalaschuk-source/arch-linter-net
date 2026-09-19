@@ -16,6 +16,8 @@
     "Private Relay remains experimental / opt-in. #922/#834/#836/#825 are intentionally deferred",
     "until after v0.8.2 and do not block this public github-raw correctness patch. Their code is not",
     "subtracted from packages and experimental status does not waive security/privacy/integrity defects.",
+    "The #980 squash exposed an orphan PR-local self-pin; #982 is a release-integrity blocker and",
+    "must complete its post-merge workflow/inventory rotation before official v0.8.2 publication.",
     "#806 remains release authority; #976/#977 and milestone closure must not authorize themselves.",
     "No unrelated v0.9 performance or next-minor capability is included in this patch candidate."
   ],
@@ -24,6 +26,11 @@
       "issue": 979,
       "finding": "badge-temporal-publication-revalidation",
       "summary": "Revalidate finite Architecture Health publication evidence for an exact unchanged merged tree when publication crosses the UTC semantic horizon"
+    },
+    {
+      "issue": 982,
+      "finding": "publisher-self-pin-squash-rotation",
+      "summary": "Rotate the badge publisher self-pins onto merged-history commits after the temporal publisher squash merge"
     }
   ],
   "excluded_items": [
