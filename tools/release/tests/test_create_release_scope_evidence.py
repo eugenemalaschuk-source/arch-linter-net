@@ -505,7 +505,7 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     hotfix = by_target["0.8.2"]
     assert hotfix["declaration_id"] == "v0.8.2-temporal-badge-publication-correctness"
     assert hotfix["story"] == 806
-    assert {item["issue"] for item in hotfix["required_items"]} == {979}
+    assert {item["issue"] for item in hotfix["required_items"]} == {979, 982}
     assert {item["issue"] for item in hotfix["excluded_items"]} == {922, 834, 836, 825, 650, 787}
     assert hotfix["delivered_items"] == []
     assert all("Owner: @eugenemalaschuk-source." in item["reason"] for item in hotfix["excluded_items"])
@@ -538,7 +538,7 @@ def test_shipped_v082_patch_requires_only_closed_temporal_badge_fix(
     tmp_path: Path, monkeypatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    invocations = _stub_gh(monkeypatch, {979: "CLOSED"})
+    invocations = _stub_gh(monkeypatch, {979: "CLOSED", 982: "CLOSED"})
     manifest = _manifest(tmp_path, "0.8.2")
 
     evidence = build_evidence(generator._declarations_directory(), manifest, _COMMIT, _REPOSITORY)
@@ -549,6 +549,6 @@ def test_shipped_v082_patch_requires_only_closed_temporal_badge_fix(
     assert evidence["declaration_sha256"] == hashlib.sha256(
         (generator._declarations_directory() / "0.8.2.json").read_bytes()
     ).hexdigest()
-    assert {int(argv[3]) for argv in invocations} == {979}
-    assert [(item["issue"], item["state"]) for item in evidence["required_items"]] == [(979, "closed")]
+    assert {int(argv[3]) for argv in invocations} == {979, 982}
+    assert [(item["issue"], item["state"]) for item in evidence["required_items"]] == [(979, "closed"), (982, "closed")]
     assert {item["issue"] for item in evidence["excluded_items"]} == {922, 834, 836, 825, 650, 787}
