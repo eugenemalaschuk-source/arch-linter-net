@@ -506,6 +506,23 @@ def _run_temporal_revalidation(
         raise ProviderFailure("semantic_revalidation_unavailable")
     if not command:
         raise ProviderFailure("semantic_revalidation_unavailable")
+    if project and not configured:
+        try:
+            for preparation in (
+                ["dotnet", "restore", project, "--nologo"],
+                ["dotnet", "build", project, "--configuration", "Release", "--no-restore", "--nologo"],
+            ):
+                prepared = subprocess.run(
+                    preparation,
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                    timeout=120,
+                )
+                if prepared.returncode != 0:
+                    raise ProviderFailure("semantic_revalidation_unavailable")
+        except (OSError, subprocess.SubprocessError) as error:
+            raise ProviderFailure("semantic_revalidation_unavailable") from error
     if command[-1] != "--":
         command.append("--")
     date_text = evaluation_date.astimezone(timezone.utc).date().isoformat()
@@ -617,6 +634,9 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
         evidence = replace(
             evidence,
             semantic_horizon=refreshed_horizon,
+            # The producer timestamp remains provenance. A successful receipt
+            # is the trusted publisher event that starts a fresh transport lease.
+            temporal_verified_at=datetime.now(timezone.utc),
             temporal_receipt=receipt,
         )
     return evidence, archive
@@ -666,6 +686,11 @@ def _publication_receipt(config, payload: bytes, evidence: EvidenceContext | Non
         "payload_sha256": hashlib.sha256(payload).hexdigest(),
         "source_health_sha256": evidence.source_health_sha256 if evidence else None,
         "producer_identity_sha256": evidence.producer_identity_sha256 if evidence else None,
+        "temporal_verified_at": (
+            evidence.temporal_verified_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            if evidence and evidence.temporal_verified_at
+            else None
+        ),
         "temporal_receipt": evidence.temporal_receipt if evidence else None,
         "published_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     }

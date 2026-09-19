@@ -139,6 +139,12 @@ When the stored semantic horizon has elapsed, the trusted promotion path SHALL o
 - **THEN** Relay receives the refreshed finite horizon through its existing prepare/publish or renew contract
 - **AND** no second waiver, Health, or architecture evaluator runs in provider glue
 
+#### Scenario: Temporal revalidation reanchors the transport lease
+- **WHEN** a trusted temporal receipt is accepted after the original producer lease has elapsed
+- **THEN** the transport lease is anchored at the trusted publisher time immediately after successful receipt validation
+- **AND** its deadline is the earlier of that anchor plus the configured lease duration and the refreshed semantic horizon
+- **AND** the original producer verification time remains unchanged provenance
+
 #### Scenario: Receipt mismatch or unassessable evidence remains unavailable
 - **WHEN** the temporal receipt is missing, malformed, stale, expired, unassessable, or mismatched with any bound identity
 - **THEN** raw and Relay promotion return the existing unavailable outcome, including `semantic_horizon_expired` where that is the applicable reason

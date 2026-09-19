@@ -50,16 +50,9 @@ runs:
           echo "::error::Trusted temporal revalidator project is unavailable."
           exit 1
         fi
-        dotnet restore "$revalidator_project" --nologo
-        if [[ "$?" -ne 0 ]]; then
-          echo "::error::Trusted temporal revalidator restore failed."
-          exit 1
-        fi
-        dotnet build "$revalidator_project" --configuration Release --no-restore --nologo
-        if [[ "$?" -ne 0 ]]; then
-          echo "::error::Trusted temporal revalidator build failed."
-          exit 1
-        fi
+        # The Python resolver invokes restore/build only after it has established
+        # that the existing semantic horizon has expired. Fresh publications
+        # remain metadata-only and do not depend on NuGet availability.
         export ARCHLINTERNET_REVALIDATOR_PROJECT="$revalidator_project"
         python -m tools.badge_promotion.cli \
           --configuration-id "$CONFIGURATION_ID" \

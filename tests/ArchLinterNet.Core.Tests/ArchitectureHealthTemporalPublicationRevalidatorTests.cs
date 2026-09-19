@@ -36,7 +36,6 @@ public sealed class ArchitectureHealthTemporalPublicationRevalidatorTests
     }
 
     [TestCase("expired", "expired_waiver")]
-    [TestCase("stale", "stale_waiver")]
     [TestCase("invalid", "invalid_waiver")]
     [TestCase("metadata_incomplete", "metadata_incomplete_waiver")]
     public void Revalidate_NonReusableLifecycleState_FailsClosed(string state, string reason)
@@ -49,6 +48,21 @@ public sealed class ArchitectureHealthTemporalPublicationRevalidatorTests
             Assert.That(receipt.IsReady, Is.False);
             Assert.That(receipt.SemanticHorizon, Is.Null);
             Assert.That(receipt.Reasons.Select(item => item.Code), Does.Contain(reason));
+        });
+    }
+
+    [Test]
+    public void Revalidate_StaleLifecycleState_RemainsPublishableLikeCanonicalProjector()
+    {
+        ArchitectureHealthTemporalPublicationReceipt receipt = Revalidate(
+            Artifact(Waiver("stale")), _crossMidnightDate);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(receipt.IsReady, Is.True);
+            Assert.That(receipt.SemanticHorizon,
+                Is.EqualTo(new DateTimeOffset(2026, 9, 11, 0, 0, 0, TimeSpan.Zero)));
+            Assert.That(receipt.Reasons, Is.Empty);
         });
     }
 

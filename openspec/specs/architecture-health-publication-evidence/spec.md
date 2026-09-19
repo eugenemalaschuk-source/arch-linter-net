@@ -96,10 +96,15 @@ The product SHALL provide a deterministic temporal revalidation operation for a 
 - **THEN** temporal revalidation emits an unassessable receipt with an expired-waiver reason
 - **AND** it does not improve the original result or extend its horizon
 
-#### Scenario: Stale, invalid, or incomplete lifecycle evidence fails closed
-- **WHEN** any required waiver lifecycle record is stale, invalid, metadata-incomplete, malformed, or inconsistent with its canonical receipt
+#### Scenario: Invalid or incomplete lifecycle evidence fails closed
+- **WHEN** any required waiver lifecycle record is invalid, metadata-incomplete, malformed, or inconsistent with its canonical receipt
 - **THEN** temporal revalidation emits an unassessable receipt with a stable reason
 - **AND** it does not infer validity from an unchanged tree, newer publication time, or aggregate counts
+
+#### Scenario: Stale lifecycle evidence preserves canonical failing health
+- **WHEN** a required waiver lifecycle record is stale but otherwise complete and consistent with the canonical receipt
+- **THEN** temporal revalidation preserves the canonical projector's publishable failing/degrading health semantics
+- **AND** it emits a finite horizon for the supplied evaluation date without a separate stale-waiver rejection
 
 #### Scenario: Required external evidence without a finite reuse rule remains unavailable
 - **WHEN** a required external-evidence requirement is present but its trusted receipt does not carry a finite reusable horizon
