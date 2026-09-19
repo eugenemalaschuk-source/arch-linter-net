@@ -24,7 +24,7 @@ failures. Required package, provenance and release-integrity gates remain intact
 
 The workflow source audit was refreshed for the #979 temporal revalidation authority at
 `ca1cc64b5e03d4891a09a5efa8c5001999aeffe7` on 2026-09-19. That SHA is the
-reviewed hidden-handoff workflow revision for the #973 delivery-pin rotation, **not** a
+reviewed hidden-handoff workflow revision for the #979 temporal revalidation rotation, **not** a
 frozen or approved final `0.8.Z` package candidate.
 The original audit at `ffd5e97f99cedf4982b4a9c28f1f45b3827ad7e7` identified
 the packaging defect described below; it is retained only as historical context.
