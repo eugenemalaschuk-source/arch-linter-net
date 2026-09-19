@@ -39,6 +39,7 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
     private const string InvalidExternalEvidence = "invalid_external_evidence";
     private const string StaleExternalEvidence = "stale_external_evidence";
     private const string RequiredExternalEvidenceHorizonUnknown = "required_external_evidence_horizon_unknown";
+    private const string OriginalPublicationEvidenceUnassessable = "original_publication_evidence_unassessable";
 
     internal static ArchitectureHealthTemporalPublicationReceipt Revalidate(
         ReadOnlySpan<byte> healthBytes,
@@ -68,9 +69,10 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
         }
 
         ArchitecturePrReportEvidence evidence;
+        bool originalPublicationReady;
         try
         {
-            ValidatePublicationEvidenceEnvelope(healthBytes);
+            originalPublicationReady = ValidatePublicationEvidenceEnvelope(healthBytes);
             string json = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
                 .GetString(healthBytes);
             evidence = ArchitecturePrReportReader.ReadHealthReportEvidence(json);
@@ -89,6 +91,12 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
         {
             reasons.Add(new(MalformedEvidence, exception.Message));
             return Unassessable(evaluationDate, actualSourceDigest, payloadDigest, treeSha, producerDigest, reasons);
+        }
+
+        if (!originalPublicationReady)
+        {
+            reasons.Add(new(OriginalPublicationEvidenceUnassessable,
+                "The original publication evidence was already unassessable and cannot be revived."));
         }
 
         DateTimeOffset? horizon = null;
@@ -145,7 +153,7 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
         }
     }
 
-    private static void ValidatePublicationEvidenceEnvelope(ReadOnlySpan<byte> healthBytes)
+    private static bool ValidatePublicationEvidenceEnvelope(ReadOnlySpan<byte> healthBytes)
     {
         using JsonDocument document = JsonDocument.Parse(healthBytes.ToArray());
         JsonElement root = document.RootElement;
@@ -169,18 +177,39 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
         }
 
         JsonElement horizon = Required(publication, "semantic_horizon");
-        if (horizon.ValueKind is not (JsonValueKind.Null or JsonValueKind.String))
+        if (state == "ready"
+            && (horizon.ValueKind != JsonValueKind.String
+                || !DateTimeOffset.TryParseExact(
+                    horizon.GetString(),
+                    "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                    out _)))
         {
-            throw new ArgumentException("The publication-evidence semantic horizon must be a UTC string or null.");
+            throw new ArgumentException("The ready publication-evidence semantic horizon must be a UTC timestamp.");
+        }
+        if (state == "unassessable" && horizon.ValueKind != JsonValueKind.Null)
+        {
+            throw new ArgumentException("Unassessable publication evidence must not contain a semantic horizon.");
         }
 
         JsonElement reasons = Required(publication, "reasons", JsonValueKind.Array);
+        if (state == "ready" && reasons.GetArrayLength() != 0)
+        {
+            throw new ArgumentException("Ready publication evidence must not contain reasons.");
+        }
+        if (state == "unassessable" && reasons.GetArrayLength() == 0)
+        {
+            throw new ArgumentException("Unassessable publication evidence must contain a reason.");
+        }
         foreach (JsonElement reason in reasons.EnumerateArray())
         {
             RequireObject(reason, "A publication-evidence reason");
             RequiredString(reason, "code");
             RequiredString(reason, "detail");
         }
+
+        return state == "ready";
     }
 
     private static void ProcessReceipt(

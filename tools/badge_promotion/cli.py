@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import fnmatch
 import hashlib
@@ -17,7 +18,10 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import sys
+import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -29,6 +33,7 @@ from .config import ConfigValidationError, parse_config
 from .setup_registry import load_setup_registry
 from .decision import PromotionRequest, decide_promotion
 from .adapters import AdapterError, HttpRelayClient, NoneAdapter, issue_github_oidc_token
+from .artifact import ArtifactValidationError, validate_artifact
 from .model import EvidenceContext, PromotionStatus, ReasonCode
 
 
@@ -358,17 +363,183 @@ def _selected_artifact(api: GitHubApi, repository: str, run_id: int, artifact_na
     return artifacts, selected[0]
 
 
-def _read_semantic_horizon(api: GitHubApi, artifacts: list[Any], config) -> datetime:
+def _read_semantic_evidence(api: GitHubApi, artifacts: list[Any], config) -> tuple[datetime, bytes, int]:
     evidence_artifacts = [item for item in artifacts if item.get("name") == config.producer.evidence_artifact_name and item.get("expired") is not True]
     if len(evidence_artifacts) != 1:
         raise ProviderFailure("semantic_evidence_unavailable")
-    evidence_archive = api.download(str(evidence_artifacts[0].get("archive_download_url", "")))
+    evidence_artifact = evidence_artifacts[0]
+    evidence_artifact_id = evidence_artifact.get("id")
+    if isinstance(evidence_artifact_id, bool) or not isinstance(evidence_artifact_id, int) or evidence_artifact_id <= 0:
+        raise ProviderFailure("semantic_evidence_unavailable")
+    evidence_archive = api.download(str(evidence_artifact.get("archive_download_url", "")))
     try:
         with zipfile.ZipFile(io.BytesIO(evidence_archive)) as opened:
-            health = json.loads(_read_bounded_zip_member(opened, "architecture-health.json", config.limits.max_member_bytes).decode("utf-8"))
-        return _parse_time(health["report_evidence"]["publication_evidence"]["semantic_horizon"])
+            health_bytes = _read_bounded_zip_member(opened, "architecture-health.json", config.limits.max_member_bytes)
+            health = json.loads(health_bytes.decode("utf-8"))
+        return _parse_time(health["report_evidence"]["publication_evidence"]["semantic_horizon"]), health_bytes, evidence_artifact_id
     except (KeyError, TypeError, ValueError, zipfile.BadZipFile) as error:
         raise ProviderFailure("semantic_evidence_unavailable") from error
+
+
+def _read_semantic_horizon(api: GitHubApi, artifacts: list[Any], config) -> datetime:
+    return _read_semantic_evidence(api, artifacts, config)[0]
+
+
+def _producer_identity_sha256(
+    *,
+    repository: str,
+    base_ref: str,
+    base_sha: str,
+    main_tree_sha: str,
+    head_sha: str,
+    head_tree_sha: str,
+    pr_number: int,
+    workflow_path: str,
+    workflow_sha: str,
+    check_name: str,
+    check_app: str,
+    run_id: int,
+    run_attempt: int,
+    job_id: int,
+    job_name: str,
+    artifact_id: int,
+    artifact_name: str,
+    evidence_artifact_id: int,
+) -> str:
+    identity = {
+        "artifact_id": artifact_id,
+        "artifact_name": artifact_name,
+        "base_ref": base_ref,
+        "base_sha": base_sha,
+        "check_app": check_app,
+        "check_name": check_name,
+        "evidence_artifact_id": evidence_artifact_id,
+        "head_sha": head_sha,
+        "head_tree_sha": head_tree_sha,
+        "job_id": job_id,
+        "job_name": job_name,
+        "main_tree_sha": main_tree_sha,
+        "pr_number": pr_number,
+        "repository": repository,
+        "run_attempt": run_attempt,
+        "run_id": run_id,
+        "workflow_path": workflow_path,
+        "workflow_sha": workflow_sha,
+    }
+    return hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+_TEMPORAL_RECEIPT_FIELDS = {
+    "schema_id",
+    "state",
+    "evaluation_date",
+    "semantic_horizon",
+    "source_health_sha256",
+    "badge_payload_sha256",
+    "merged_tree_sha",
+    "producer_identity_sha256",
+    "reasons",
+}
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate temporal receipt field")
+        result[key] = value
+    return result
+
+
+def _validate_temporal_receipt(
+    output: str,
+    *,
+    return_code: int,
+    evaluation_date: str,
+    source_health_sha256: str,
+    badge_payload_sha256: str,
+    merged_tree_sha: str,
+    producer_identity_sha256: str,
+) -> tuple[dict[str, Any], datetime]:
+    try:
+        receipt = json.loads(output, object_pairs_hook=_reject_duplicate_json_keys)
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ProviderFailure("semantic_revalidation_unavailable") from error
+    if not isinstance(receipt, dict) or set(receipt) != _TEMPORAL_RECEIPT_FIELDS:
+        raise ProviderFailure("semantic_revalidation_unavailable")
+    if receipt.get("schema_id") != "architecture-health-temporal-publication-receipt/v1":
+        raise ProviderFailure("semantic_revalidation_unavailable")
+    if (
+        receipt.get("evaluation_date") != evaluation_date
+        or receipt.get("source_health_sha256") != source_health_sha256
+        or receipt.get("badge_payload_sha256") != badge_payload_sha256
+        or receipt.get("merged_tree_sha") != merged_tree_sha
+        or receipt.get("producer_identity_sha256") != producer_identity_sha256
+        or not isinstance(receipt.get("reasons"), list)
+    ):
+        raise ProviderFailure("semantic_revalidation_mismatch")
+    if return_code != 0 or receipt.get("state") != "ready" or receipt["reasons"]:
+        raise ProviderFailure("semantic_evidence_unavailable")
+    horizon = _parse_time(receipt.get("semantic_horizon"))
+    return receipt, horizon
+
+
+def _run_temporal_revalidation(
+    health_bytes: bytes,
+    *,
+    evaluation_date: datetime,
+    source_health_sha256: str,
+    badge_payload_sha256: str,
+    merged_tree_sha: str,
+    producer_identity_sha256: str,
+) -> tuple[dict[str, Any], datetime]:
+    configured = os.environ.get("ARCHLINTERNET_REVALIDATOR")
+    project = os.environ.get("ARCHLINTERNET_REVALIDATOR_PROJECT")
+    if configured:
+        command = shlex.split(configured)
+    elif project:
+        command = [
+            "dotnet", "run", "--project", project,
+            "--configuration", "Release", "--no-build", "--no-restore",
+        ]
+    else:
+        raise ProviderFailure("semantic_revalidation_unavailable")
+    if not command:
+        raise ProviderFailure("semantic_revalidation_unavailable")
+    if command[-1] != "--":
+        command.append("--")
+    date_text = evaluation_date.astimezone(timezone.utc).date().isoformat()
+    arguments = [
+        "health", "revalidate-publication",
+        "--input", "{input}",
+        "--evaluation-date", date_text,
+        "--source-health-sha256", source_health_sha256,
+        "--badge-payload-sha256", badge_payload_sha256,
+        "--merged-tree-sha", merged_tree_sha,
+        "--producer-identity-sha256", producer_identity_sha256,
+    ]
+    try:
+        with tempfile.TemporaryDirectory(prefix="archlinternet-temporal-") as temporary:
+            input_path = Path(temporary) / "architecture-health.json"
+            input_path.write_bytes(health_bytes)
+            completed = subprocess.run(
+                command + [item if item != "{input}" else str(input_path) for item in arguments],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=120,
+            )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ProviderFailure("semantic_revalidation_unavailable") from error
+    return _validate_temporal_receipt(
+        completed.stdout,
+        return_code=completed.returncode,
+        evaluation_date=date_text,
+        source_health_sha256=source_health_sha256,
+        badge_payload_sha256=badge_payload_sha256,
+        merged_tree_sha=merged_tree_sha,
+        producer_identity_sha256=producer_identity_sha256,
+    )
 
 
 def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
@@ -390,17 +561,64 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     artifacts, artifact = _selected_artifact(api, repository, run_id, config.producer.artifact_name)
     archive = api.download(str(artifact.get("archive_download_url", "")))
     verified_at = _parse_time(run.get("created_at"))
-    semantic_horizon = _read_semantic_horizon(api, artifacts, config)
+    semantic_horizon, health_bytes, evidence_artifact_id = _read_semantic_evidence(api, artifacts, config)
+    job_id = int(job.get("id", 0))
+    artifact_id = int(artifact.get("id", 0))
+    artifact_name = artifact.get("name", "")
+    producer_identity_sha256 = _producer_identity_sha256(
+        repository=repository,
+        base_ref=base_ref,
+        base_sha=base_sha,
+        main_tree_sha=main_tree,
+        head_sha=head_sha,
+        head_tree_sha=head_tree,
+        pr_number=pr_number,
+        workflow_path=config.producer.workflow_path,
+        workflow_sha=workflow_sha,
+        check_name=config.producer.check_name,
+        check_app=config.producer.check_app,
+        run_id=run_id,
+        run_attempt=producer_run_attempt,
+        job_id=job_id,
+        job_name=job.get("name", ""),
+        artifact_id=artifact_id,
+        artifact_name=artifact_name,
+        evidence_artifact_id=evidence_artifact_id,
+    )
     evidence = EvidenceContext(
         repository=repository, base_ref=base_ref, base_sha=base_sha, main_tree_sha=main_tree,
         head_sha=head_sha, head_tree_sha=head_tree, pr_number=pr_number, event=config.producer.event,
         merged=True, workflow_path=config.producer.workflow_path, workflow_sha=workflow_sha,
         check_name=config.producer.check_name, check_app=config.producer.check_app, check_status="completed",
         check_conclusion="success", required_gate_present=_required_gate(api, repository, config.producer.check_name, check_app_id, config.base_ref), run_id=run_id,
-        run_attempt=producer_run_attempt, job_id=int(job.get("id", 0)), job_name=job.get("name", ""),
-        artifact_id=int(artifact.get("id", 0)), artifact_name=artifact.get("name", ""), artifact_size=len(archive),
+        run_attempt=producer_run_attempt, job_id=job_id, job_name=job.get("name", ""),
+        artifact_id=artifact_id, artifact_name=artifact_name, artifact_size=len(archive),
         artifact_expired=False, verified_at=verified_at, semantic_horizon=semantic_horizon,
+        original_semantic_horizon=semantic_horizon,
+        source_health_sha256=hashlib.sha256(health_bytes).hexdigest(),
+        producer_identity_sha256=producer_identity_sha256,
     )
+    revalidation_now = datetime.now(timezone.utc)
+    if revalidation_now >= semantic_horizon:
+        try:
+            validated = validate_artifact(archive, config, evidence)
+        except ArtifactValidationError as error:
+            raise ProviderFailure(
+                error.reason.value if error.reason is not None else "artifact_invalid"
+            ) from error
+        receipt, refreshed_horizon = _run_temporal_revalidation(
+            health_bytes,
+            evaluation_date=revalidation_now,
+            source_health_sha256=evidence.source_health_sha256 or "",
+            badge_payload_sha256=validated.payload_sha256,
+            merged_tree_sha=main_tree,
+            producer_identity_sha256=producer_identity_sha256,
+        )
+        evidence = replace(
+            evidence,
+            semantic_horizon=refreshed_horizon,
+            temporal_receipt=receipt,
+        )
     return evidence, archive
 
 
@@ -446,6 +664,9 @@ def _publication_receipt(config, payload: bytes, evidence: EvidenceContext | Non
         "producer_run_attempt": str(evidence.run_attempt) if evidence else None,
         "publisher_run_id": os.environ.get("GITHUB_RUN_ID"), "publisher_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
         "payload_sha256": hashlib.sha256(payload).hexdigest(),
+        "source_health_sha256": evidence.source_health_sha256 if evidence else None,
+        "producer_identity_sha256": evidence.producer_identity_sha256 if evidence else None,
+        "temporal_receipt": evidence.temporal_receipt if evidence else None,
         "published_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     }
 

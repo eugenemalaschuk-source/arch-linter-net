@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
@@ -81,6 +82,33 @@ public sealed class ArchitectureHealthTemporalPublicationRevalidatorTests
             Assert.That(receipt.IsReady, Is.False);
             Assert.That(receipt.Reasons.Select(item => item.Code),
                 Does.Contain("required_external_evidence_horizon_unknown"));
+        });
+    }
+
+    [Test]
+    public void Revalidate_OriginallyUnassessablePublicationEvidence_CannotBeRevived()
+    {
+        JsonObject document = JsonNode.Parse(Encoding.UTF8.GetString(Artifact(Waiver("active"))))!.AsObject();
+        JsonObject publication = document["report_evidence"]!["publication_evidence"]!.AsObject();
+        publication["state"] = "unassessable";
+        publication["semantic_horizon"] = null;
+        publication["reasons"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["code"] = "source_unavailable",
+                ["detail"] = "The original evidence was not ready.",
+            },
+        };
+
+        ArchitectureHealthTemporalPublicationReceipt receipt = Revalidate(
+            Encoding.UTF8.GetBytes(document.ToJsonString()), _crossMidnightDate);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(receipt.IsReady, Is.False);
+            Assert.That(receipt.Reasons.Select(item => item.Code),
+                Does.Contain("original_publication_evidence_unassessable"));
         });
     }
 

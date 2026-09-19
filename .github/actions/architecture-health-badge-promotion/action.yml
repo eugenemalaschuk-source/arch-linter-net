@@ -45,6 +45,22 @@ runs:
         set +e
         trusted_root="${GITHUB_ACTION_PATH}/../../.."
         cd "$trusted_root"
+        revalidator_project="$trusted_root/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj"
+        if [[ ! -f "$revalidator_project" ]]; then
+          echo "::error::Trusted temporal revalidator project is unavailable."
+          exit 1
+        fi
+        dotnet restore "$revalidator_project" --nologo
+        if [[ "$?" -ne 0 ]]; then
+          echo "::error::Trusted temporal revalidator restore failed."
+          exit 1
+        fi
+        dotnet build "$revalidator_project" --configuration Release --no-restore --nologo
+        if [[ "$?" -ne 0 ]]; then
+          echo "::error::Trusted temporal revalidator build failed."
+          exit 1
+        fi
+        export ARCHLINTERNET_REVALIDATOR_PROJECT="$revalidator_project"
         python -m tools.badge_promotion.cli \
           --configuration-id "$CONFIGURATION_ID" \
           --adapter "$ADAPTER" \

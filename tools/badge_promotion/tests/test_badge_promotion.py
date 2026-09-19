@@ -158,6 +158,19 @@ def test_valid_artifact_returns_exact_canonical_bytes() -> None:
     assert artifact.payload_sha256 == hashlib.sha256(payload_bytes()).hexdigest()
 
 
+def test_valid_artifact_after_temporal_refresh_keeps_original_manifest_horizon() -> None:
+    current = evidence()
+    refreshed = replace(
+        current,
+        original_semantic_horizon=current.semantic_horizon,
+        semantic_horizon=current.semantic_horizon + timedelta(days=1),
+    )
+
+    artifact = validate_artifact(archive_bytes(), CONFIG, refreshed)
+
+    assert artifact.payload == payload_bytes()
+
+
 def test_valid_artifact_accepts_stringified_github_identifier_context() -> None:
     current = evidence()
     payload = payload_bytes()
