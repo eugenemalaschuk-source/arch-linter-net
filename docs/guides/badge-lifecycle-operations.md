@@ -1,9 +1,12 @@
 # Badge Relay lifecycle operations
 
-> Prepublication candidate guidance: use only an explicitly verified candidate.
-> This page does not establish stable-release availability. Start with
-> [badge adoption](badge-adoption.md) for transport, disclosure, and evidence
-> prerequisites.
+> **Experimental / opt-in Private Relay.** Full hosted/lifecycle acceptance is
+> still pending. Included Relay code is not an adoption-stable or turnkey support
+> claim; verify the exact release or candidate and matching distribution.
+> Private repositories default to `none`: no automatic cloud setup or badge egress.
+> Stable core governance, private reports, and public `github-raw` snapshots do not
+> require Relay.
+> Start with [badge adoption](badge-adoption.md) for disclosure and prerequisites.
 
 This runbook is the operator procedure for a registered `badge-relay/v1`
 destination. Lifecycle changes are authenticated administrative actions; public

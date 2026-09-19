@@ -48,6 +48,25 @@ They are not used as a shortcut for unrelated capabilities planned for the next 
 
 There is no promise that every minor release has exactly one patch. A capability line may require zero, one, or several maintenance releases. The number is driven by actual adoption and stabilization needs.
 
+## Optional experimental functionality
+
+A stable package version does not make every optional integration adoption-stable.
+Private Relay is **experimental / opt-in**: its code is included, but full
+hosted/lifecycle acceptance is still pending. Existing stable core governance,
+private reporting and public `github-raw` snapshots remain independent of Relay.
+
+Private repositories default to `none`, with no automatic cloud setup or badge
+egress. An explicit opt-in requires adopter-owned Relay infrastructure, approved
+disclosure and verification of the exact installed artifacts. No free hosting or
+SLA is promised. The [adoption guide](../guides/badge-adoption.md) owns that
+support boundary; a generated release note or NuGet metadata entry must not
+silently promote it to completed turnkey support.
+
+Experimental status is not a waiver for known security, privacy, integrity,
+data-corruption or false-PASS defects. Those remain blockers. Removal of the
+experimental limitation requires completed exact-artifact hosted/lifecycle
+acceptance and a reviewed update to the public guides and release-note inputs.
+
 ## Why a patch can contain internal refactoring
 
 A patch is not limited to a one-line bug fix. ArchLinterNet deliberately separates broad behavior-preserving engineering cleanup from the critical path of a capability release when that cleanup can be deferred safely.

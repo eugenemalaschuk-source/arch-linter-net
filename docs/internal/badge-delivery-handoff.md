@@ -4,6 +4,22 @@ Status: **BLOCKED** for final #836 delivery closure. Documentation composition
 is not a release or acceptance verdict. This maintainer record is excluded
 from the public MkDocs site by `exclude_docs: internal/`.
 
+## Maintenance release decision
+
+The maintainer's 2026-09-18 decision in #806 separates the maintenance patch from
+full Relay adoption closure. #975 owns the reviewed scope and experimental/opt-in
+public claims; #976 owns the existing dry-run/publication/verification procedure;
+#977 owns the final engineering-wave audit. None is a required CLOSED prerequisite
+for its own release. Milestone 6 is not release authority.
+
+Owner: @eugenemalaschuk-source. The #922 -> #834 -> #836 -> #825 graph remains
+open for complete exact-artifact hosted/lifecycle adoption acceptance. Relay
+implementation bytes are included, not subtracted by a scope exclusion. Stable
+core governance and private reports remain independent; private default stays
+`none`, with no automatic cloud setup or badge egress. Experimental is not a
+waiver for known security, privacy, integrity, data-corruption or false-PASS
+failures. Required package, provenance and release-integrity gates remain intact.
+
 ## Audit boundary and ownership
 
 The workflow source audit was refreshed after #971/#972 at
@@ -36,7 +52,8 @@ normative, not this inventory.
 | #835 | Exact release distribution, asset integrity, packed installation integration. |
 | #834 | Packed/platform/adversarial matrix and real synthetic private GitHub -> deployed Relay -> README acceptance. |
 | #836 | Documentation composition, exact-candidate evidence review, and final prepublication verdict. |
-| #825 -> #806 | Parent closure, then reviewed release scope and verification of actually published artifacts. |
+| #825 | Full Relay adoption closure after the #922/#834/#836 evidence chain; not a blanket maintenance-patch prerequisite. |
+| #806 | Independent reviewed maintenance scope and verification of actually published artifacts. |
 
 A completed implementation checkbox does not replace a matching package,
 workflow, platform, or live acceptance result. Do not close #836/#825 merely
@@ -205,13 +222,14 @@ Current verdict: **BLOCKED**. The source packaging repair is merged; next obtain
 a fresh immutable #835 candidate and #834's matching packed/platform/live
 evidence. Then #836 reconciles every consumer command, inventory identity, and
 prerequisite against those results.
-Only a complete reviewed prepublication PASS may close #836 and then #825.
-Pass the frozen candidate and redacted evidence index to #806; #806 separately
-authorizes publication and verifies the actually released artifacts.
+Only a complete reviewed exact-artifact hosted/lifecycle PASS may close #836
+and then #825 or remove the experimental support limitation. That verdict is
+separate from the maintenance patch: #806 owns its reviewed declaration and
+existing release workflow through #975/#976, without claiming adoption stable.
 
-Already released `v0.8.0` assets remain immutable. Do not select a patch version,
-rewrite stable README/NuGet adoption claims, publish packages, deploy a
-project-owned Relay, or enable Pages deployment on ordinary `main` pushes in
-this task. No badge command changes `badge architecture-policy` or removes the
+Already released `v0.8.0` assets remain immutable. #975 may prepare the next
+reviewed patch scope and truthful README/NuGet support claims, but does not
+publish packages, deploy a project-owned Relay, or enable Pages deployment on
+ordinary `main` pushes. No badge command changes `badge architecture-policy` or removes the
 public `github-raw` compatibility path. `v0.9-performance`, #650, and #787 are
 explicitly excluded from this v0.8.x closure.

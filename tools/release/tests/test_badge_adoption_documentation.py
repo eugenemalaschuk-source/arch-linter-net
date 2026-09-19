@@ -52,11 +52,14 @@ def test_adoption_precedes_executable_guides_in_navigation() -> None:
     assert re.search(r"(?m)^exclude_docs: \|\n {2}internal/\s*$", config)
 
 
-def test_public_guides_expose_candidate_boundary_and_single_entrypoint() -> None:
+def test_public_guides_expose_experimental_boundary_and_single_entrypoint() -> None:
     for path in _PUBLIC:
         intro = _read(path).split("\n## ", 1)[0]
-        assert "Prepublication candidate guidance" in intro
-        assert "stable-release availability" in intro
+        assert "Experimental / opt-in Private Relay" in intro
+        assert "Full hosted/lifecycle acceptance" in intro
+        assert "still pending" in intro
+        assert "default to `none`" in intro
+        assert "no automatic cloud setup or badge egress" in intro
     for path in _PUBLIC[1:]:
         assert "[badge adoption](badge-adoption.md)" in _read(path)
     # Executable examples stay with their existing setup/lifecycle owners.
@@ -155,5 +158,35 @@ def test_distribution_reference_tracks_compatible_package_and_protocol_identitie
     ]
     for identity in identities:
         assert f"`{identity}`" in reference, f"Refresh distribution reference for {identity}"
-    assert "not a released capability" in reference
+    assert "Experimental / opt-in Private Relay" in reference
+    assert "not adoption-stable support" in reference
     assert "../reference/badge-distribution.md" in _read(_PUBLIC[0])
+
+
+@pytest.mark.parametrize("path", (_ROOT / "README.md", _PUBLIC[0], _DOCS / "reference/versioning-and-releases.md"), ids=lambda p: p.stem)
+def test_public_support_boundary_does_not_waive_known_unsafe_behavior(path: Path) -> None:
+    text = " ".join(re.sub(r"(?m)^> ?", "", _read(path)).split())
+    assert "experimental / opt-in" in text.lower()
+    assert "hosted/lifecycle acceptance is still pending" in text
+    assert "security, privacy," in text
+    assert "integrity," in text
+    assert "data-corruption" in text
+    assert "false-PASS" in text
+    assert "No free hosting or SLA" in text or "no free hosting or SLA" in text
+
+
+def test_handoff_keeps_full_adoption_open_without_circular_patch_authority() -> None:
+    text = " ".join(_read(_HANDOFF).split())
+    assert "#922 -> #834 -> #836 -> #825" in text
+    assert "not a blanket maintenance-patch prerequisite" in text
+    assert "None is a required CLOSED prerequisite for its own release" in text
+
+
+def test_readme_and_adoption_preserve_no_app_and_no_badge_commit_model() -> None:
+    for path in (_ROOT / "README.md", _PUBLIC[0]):
+        text = " ".join(_read(path).split())
+        assert "read-only" in text
+        assert "content-verified" in text
+        assert "protected setup PR" in text
+        assert "Relay state" in text
+        assert "every PR or renewal" in text

@@ -366,7 +366,8 @@ jobs:
 
       - name: Prepare NuGet package release notes
         shell: bash
-        run: echo "PACKAGE_RELEASE_NOTES=See GitHub release notes for $TARGET_TAG." >> "$GITHUB_ENV"
+        run: >-
+          echo "PACKAGE_RELEASE_NOTES=See GitHub release notes for $TARGET_TAG. Private Relay is experimental / opt-in. Its full hosted/lifecycle acceptance is pending. Stable core governance plus private reports and public github-raw snapshots remain independent of Relay. Private default: none. There is no automatic cloud setup or badge egress. Adopter-owned infrastructure and explicit disclosure consent are required. Experimental is not a waiver for known security or privacy or integrity or data-corruption or false-PASS defects." >> "$GITHUB_ENV"
 
       - name: Pack CEL
         run: dotnet pack src/ArchLinterNet.CEL/ArchLinterNet.CEL.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
@@ -636,6 +637,12 @@ jobs:
             '{ tag_name: $tag_name, target_commitish: $target_commitish, configuration_file_path: $configuration_file_path }' \
             | gh api --method POST repos/${{ github.repository }}/releases/generate-notes --input - --jq '.body' \
             | {
+                printf '%s\n\n' \
+                  '## Private Relay: experimental / opt-in' \
+                  'Relay code is included, but full hosted/lifecycle acceptance is pending. Stable core governance, private reports and public github-raw snapshots remain independent of Relay.' \
+                  'Private repositories default to none: no automatic cloud setup or badge egress. Explicit opt-in requires adopter-owned infrastructure and approved disclosure. No free hosting or SLA is promised.' \
+                  'Bootstrap is read-only with a private, content-verified handoff and an owner-reviewed protected setup PR. OIDC updates Relay state, not consumer badge commits.' \
+                  'Experimental is not a waiver for known security, privacy, integrity, data-corruption or false-PASS defects; those remain blockers.'
                 cat
                 printf '\n\n## Verify release provenance\n\nVerify the project-controlled release assets, GitHub provenance, and NuGet.org repository-signature boundary: https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/\n'
               } \
