@@ -117,6 +117,10 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | `arch-linter-net health ...` | Project the canonical non-compensating architecture-health/v1 summary, including bound external evidence when configured. |
 
+<!-- cli-command: health revalidate-publication -->
+
+| `arch-linter-net health revalidate-publication --input <architecture-health.json> --evaluation-date <yyyy-MM-dd> ...` | Refresh only the product-owned temporal publication receipt for unchanged serialized Health evidence; does not rerun analysis. |
+
 <!-- cli-command: graph -->
 
 | `arch-linter-net graph ...` | Export dependency graphs as JSON, DOT, or Mermaid at supported granularities. |
