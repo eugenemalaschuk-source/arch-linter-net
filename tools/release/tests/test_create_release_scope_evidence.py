@@ -422,15 +422,15 @@ def test_fixed_locations_stay_inside_the_release_workspace() -> None:
     assert generator._output_path().is_relative_to(root)
 
 
-def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> None:
+def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     declarations = [
         _read_declaration(path)
         for path in sorted(generator._declarations_directory().glob("*.json"))
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 8
-    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4", "0.8.0", "0.8.1"}
+    assert len(declarations) == len(by_target) == 9
+    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4", "0.8.0", "0.8.1", "0.8.2"}
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
     assert by_target["0.7.0"]["story"] == 613
@@ -502,6 +502,15 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
     assert all("Owner: @eugenemalaschuk-source." in item["reason"] for item in patch["excluded_items"])
     assert "does not subtract bytes" in " ".join(patch["_comment"])
 
+    hotfix = by_target["0.8.2"]
+    assert hotfix["declaration_id"] == "v0.8.2-temporal-badge-publication-correctness"
+    assert hotfix["story"] == 806
+    assert {item["issue"] for item in hotfix["required_items"]} == {979}
+    assert {item["issue"] for item in hotfix["excluded_items"]} == {922, 834, 836, 825, 650, 787}
+    assert hotfix["delivered_items"] == []
+    assert all("Owner: @eugenemalaschuk-source." in item["reason"] for item in hotfix["excluded_items"])
+    assert "Private Relay remains experimental / opt-in" in " ".join(hotfix["_comment"])
+
 
 def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoption(
     tmp_path: Path, monkeypatch
@@ -522,4 +531,24 @@ def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoptio
         772, 784, 788, 800, 801, 849, 797, 835, 876, 913, 963, 971, 973,
     }
     assert all(item["state"] == "closed" for item in evidence["required_items"])
+    assert {item["issue"] for item in evidence["excluded_items"]} == {922, 834, 836, 825, 650, 787}
+
+
+def test_shipped_v082_patch_requires_only_closed_temporal_badge_fix(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    invocations = _stub_gh(monkeypatch, {979: "CLOSED"})
+    manifest = _manifest(tmp_path, "0.8.2")
+
+    evidence = build_evidence(generator._declarations_directory(), manifest, _COMMIT, _REPOSITORY)
+
+    assert evidence["story"] == 806
+    assert evidence["release_target"] == evidence["candidate_version"] == "0.8.2"
+    assert evidence["source_commit"] == _COMMIT
+    assert evidence["declaration_sha256"] == hashlib.sha256(
+        (generator._declarations_directory() / "0.8.2.json").read_bytes()
+    ).hexdigest()
+    assert {int(argv[3]) for argv in invocations} == {979}
+    assert [(item["issue"], item["state"]) for item in evidence["required_items"]] == [(979, "closed")]
     assert {item["issue"] for item in evidence["excluded_items"]} == {922, 834, 836, 825, 650, 787}
