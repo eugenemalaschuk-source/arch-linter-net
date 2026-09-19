@@ -58,13 +58,13 @@ internal sealed class CliHealthRevalidatePublicationIntegrationTests : CliIntegr
     }
 
     [Test]
-    public void RevalidatePublicationBindingMismatchEmitsReceiptAndFailsClosedWithoutPolicy()
+    public void RevalidatePublication_BindingMismatch_FailsClosed()
     {
         string inputPath = Path.Combine(Path.GetTempPath(), $"architecture-health-invalid-{Guid.NewGuid():N}.json");
         try
         {
-            const string input = "{\"schema_id\":\"architecture-health/v1\"}";
-            File.WriteAllText(inputPath, input);
+            const string InputJson = "{\"schema_id\":\"architecture-health/v1\"}";
+            File.WriteAllText(inputPath, InputJson);
             string sourceDigest = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(inputPath)));
 
             var (exitCode, stdout, stderr) = RunCli(
