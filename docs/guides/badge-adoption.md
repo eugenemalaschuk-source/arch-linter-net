@@ -1,18 +1,37 @@
 # Adopt an Architecture Health badge
 
-> Prepublication candidate guidance: use only an explicitly verified candidate.
-> These pages do not establish stable-release availability or prove that a
-> candidate has passed private-to-public acceptance. Existing public static
-> badges remain supported; private repositories default to no publication.
+> **Experimental / opt-in Private Relay.** Full hosted/lifecycle acceptance is
+> still pending. Included Relay code is not an adoption-stable or turnkey support
+> claim; verify the exact release or candidate and matching distribution.
+> Private repositories default to `none`: no automatic cloud setup or badge egress.
+> Stable core governance, private reports, and public `github-raw` snapshots do not
+> require Relay.
 
 An Architecture Health badge is a deliberately limited public projection of
 PR-authoritative evidence, not a second architecture evaluator. Choose the
-transport and disclosure first, then use [turnkey setup](badge-setup.md) for
+transport and disclosure first, then use [setup](badge-setup.md) for
 executable commands and [lifecycle operations](badge-lifecycle-operations.md)
 for administration. Those guides own the command examples; this page explains
 which path to choose and what its result does, and does not, prove. The
 [distribution and compatibility reference](../reference/badge-distribution.md)
 identifies the components and immutable identities that must accompany the CLI.
+
+## Experimental support boundary
+
+Relay infrastructure belongs to the adopter. Included code and successful unit
+or package tests do not prove the complete hosted/lifecycle path on a particular
+provider account. Full adoption acceptance remains pending; no free hosting or
+SLA is promised. Existing core governance, required PR checks, private reports,
+and public static badges remain usable without adopting Relay.
+
+Experimental status is not a waiver for known security, privacy, integrity,
+data-corruption, or false-PASS defects. Unsafe or false-success paths must be
+blocked or fixed, not relabeled as acceptable experimental behavior.
+
+Bootstrap is read-only and produces a private, content-verified handoff. The
+owner applies it through a normal protected setup PR, without a GitHub App or
+PAT writer. Subsequent OIDC publication updates only Relay state: it does not
+commit a badge update to the consumer repository on every PR or renewal.
 
 ## Choose the disclosure boundary
 
@@ -20,7 +39,7 @@ identifies the components and immutable identities that must accompany the CLI.
 | --- | --- | --- |
 | `none` | Private checks, reports, and artifacts without a public badge | No public URL, external badge egress, hosting account, or publication credential. This is the private default. |
 | `github-raw` | Existing public-repository static snapshots | Public repository only. Private raw URLs are rejected; do not put a token in a README URL to bypass that restriction. |
-| `relay` | Opt-in bounded-freshness publication from a private or public repository | Adopter-owned Cloudflare Worker and SQLite Durable Objects, approved disclosure, verified capabilities, and the shipped compatible bundle. No custom server code. |
+| `relay` | Experimental, opt-in bounded-freshness publication from a private or public repository | Adopter-owned Cloudflare Worker and SQLite Durable Objects, approved disclosure, verified capabilities, and the shipped compatible bundle. No custom server code. |
 
 Custom or authenticated URL transports are not turnkey private-publication
 paths without their own independent acceptance. Selecting a transport does not

@@ -164,8 +164,23 @@ Generated `site/` output is a build artifact and should not be committed.
 
 ## Architecture Health badge
 
-For a private repository, the default README view is the adopter-owned Relay's
-strict, local fixed-template SVG. Register the
+Private repositories default to `none`: no automatic cloud setup or badge
+publication/egress. Core governance, required PR checks, private reports and
+public `github-raw` snapshots remain independent of Relay.
+
+**Private Relay is experimental / opt-in.** Relay code is included, but full
+hosted/lifecycle acceptance is still pending. This is not an adoption-stable or
+completed turnkey service: the adopter owns the Relay infrastructure and must
+approve disclosure and verify the exact release/candidate. No free hosting or
+SLA is promised. Experimental status never waives known security, privacy,
+integrity, data-corruption or false-PASS defects; unsafe paths remain blockers.
+
+The no-App bootstrap is read-only and delivers a private, content-verified
+handoff for an owner-reviewed protected setup PR. OIDC publication updates only
+Relay state, not consumer badge commits on every PR or renewal.
+
+After explicitly opting into Relay, the recommended README view is the
+adopter-owned Relay's strict, local fixed-template SVG. Register the
 `headline-plus-freshness/v1` profile and use the profile-selected route (or its
 explicit `.svg` route) as the one README image:
 
