@@ -22,8 +22,8 @@ failures. Required package, provenance and release-integrity gates remain intact
 
 ## Audit boundary and ownership
 
-The workflow source audit was refreshed after #971/#972 at
-`36c88c88cca708c10ade98ac1f1fee8c56c1cb30` on 2026-09-18. That SHA is the
+The workflow source audit was refreshed for the #979 temporal revalidation authority at
+`ca1cc64b5e03d4891a09a5efa8c5001999aeffe7` on 2026-09-19. That SHA is the
 reviewed hidden-handoff workflow revision for the #973 delivery-pin rotation, **not** a
 frozen or approved final `0.8.Z` package candidate.
 The original audit at `ffd5e97f99cedf4982b4a9c28f1f45b3827ad7e7` identified
@@ -89,11 +89,11 @@ download link. A manifest containing a component name is not proof that the
 archive includes a usable copy. The four-package release family is not a
 requirement to install four packages just to use the CLI.
 
-After #972, the approved reusable workflow commit is
-`36c88c88cca708c10ade98ac1f1fee8c56c1cb30`, with workflow blob
-`b5ed2b23d025812bdef558d45e0706c09a529ffb`. The composite action remains
-separately pinned at `6fadf3fec983e5af3077b62a52ab608ce7f73ba3`, with action
-blob `0628a09ad75bfb6c4da4acdae041a49681964a69`. These are Git-object
+For #979, the approved reusable workflow commit is
+`ca1cc64b5e03d4891a09a5efa8c5001999aeffe7`, with workflow blob
+`c9c39630c21a1155ab36a4f736757c1aafa18214`. The composite action is
+separately pinned at `b42d30a970c8a8c73133f9d51bf1a533f4086056`, with action
+blob `dc40593075d84567642df8daee9a262451012edf`. These are Git-object
 identities, not distribution SHA-256 digests. Copy the full pinned
 workflow/action refs from the chosen candidate inventory, not from `main` or
 this source-audit paragraph. Bind the separate generated producer Git-blob SHA

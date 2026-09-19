@@ -20,25 +20,25 @@
     "publication": "architecture-health-badge-publication/v2",
     "storage": "v1",
     "publisher_repository": "eugenemalaschuk-source/arch-linter-net",
-    "publisher_commit": "36c88c88cca708c10ade98ac1f1fee8c56c1cb30",
-    "action_commit": "6fadf3fec983e5af3077b62a52ab608ce7f73ba3",
+    "publisher_commit": "ca1cc64b5e03d4891a09a5efa8c5001999aeffe7",
+    "action_commit": "b42d30a970c8a8c73133f9d51bf1a533f4086056",
     "workflow_path": ".github/workflows/architecture-health-badge-promotion.yml",
     "action_path": ".github/actions/architecture-health-badge-promotion/action.yml",
-    "workflow_ref": "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml@36c88c88cca708c10ade98ac1f1fee8c56c1cb30",
-    "action_ref": "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@6fadf3fec983e5af3077b62a52ab608ce7f73ba3",
-    "workflow_source_sha": "b5ed2b23d025812bdef558d45e0706c09a529ffb",
-    "action_source_sha": "0628a09ad75bfb6c4da4acdae041a49681964a69"
+    "workflow_ref": "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml@ca1cc64b5e03d4891a09a5efa8c5001999aeffe7",
+    "action_ref": "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@b42d30a970c8a8c73133f9d51bf1a533f4086056",
+    "workflow_source_sha": "c9c39630c21a1155ab36a4f736757c1aafa18214",
+    "action_source_sha": "dc40593075d84567642df8daee9a262451012edf"
   },
   "components": [
     {
       "kind": "reusable-workflow",
       "path": ".github/workflows/architecture-health-badge-promotion.yml",
-      "approved_source_sha": "b5ed2b23d025812bdef558d45e0706c09a529ffb"
+      "approved_source_sha": "c9c39630c21a1155ab36a4f736757c1aafa18214"
     },
     {
       "kind": "composite-action",
       "path": ".github/actions/architecture-health-badge-promotion/action.yml",
-      "approved_source_sha": "0628a09ad75bfb6c4da4acdae041a49681964a69"
+      "approved_source_sha": "dc40593075d84567642df8daee9a262451012edf"
     }
   ],
   "relay": {

@@ -14,8 +14,8 @@ import release_distribution as distribution  # noqa: E402
 MODELS = ROOT / "src/ArchLinterNet.Cli/Commands/Badge/Application/Setup/BadgeSetupModels.cs"
 MANIFEST = ROOT / "relay/bundle-manifest.json"
 SCHEMA = ROOT / "schema/0.8.0/badge-relay-config.schema.json"
-NO_APP_BOOTSTRAP_WORKFLOW_COMMIT = "36c88c88cca708c10ade98ac1f1fee8c56c1cb30"
-PUBLISHER_ACTION_COMMIT = "6fadf3fec983e5af3077b62a52ab608ce7f73ba3"
+NO_APP_BOOTSTRAP_WORKFLOW_COMMIT = "ca1cc64b5e03d4891a09a5efa8c5001999aeffe7"
+PUBLISHER_ACTION_COMMIT = "b42d30a970c8a8c73133f9d51bf1a533f4086056"
 
 
 def _constant(name: str) -> str:

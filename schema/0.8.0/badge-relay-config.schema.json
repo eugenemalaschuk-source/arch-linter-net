@@ -56,8 +56,8 @@
       "additionalProperties": false,
       "properties": {
         "workflow_ref": { "enum": [null, "eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml"] },
-        "workflow_sha": { "enum": [null, "36c88c88cca708c10ade98ac1f1fee8c56c1cb30"] },
-        "action_ref": { "enum": [null, "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@6fadf3fec983e5af3077b62a52ab608ce7f73ba3"] },
+        "workflow_sha": { "enum": [null, "ca1cc64b5e03d4891a09a5efa8c5001999aeffe7"] },
+        "action_ref": { "enum": [null, "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@b42d30a970c8a8c73133f9d51bf1a533f4086056"] },
         "bundle_digest": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
       }
     },

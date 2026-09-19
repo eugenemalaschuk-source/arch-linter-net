@@ -29,8 +29,8 @@ from verify_relay_dependencies import verify_relay_dependencies
 _INVENTORY_SCHEMA = "architecture-health-badge-release-inventory/v2"
 _DISTRIBUTION_SCHEMA = "architecture-health-badge-release-distribution/v1"
 _COMPATIBILITY_SCHEMA = "architecture-health-badge-relay-compatibility/v1"
-_APPROVED_PUBLISHER_COMMIT = "36c88c88cca708c10ade98ac1f1fee8c56c1cb30"
-_APPROVED_PUBLISHER_ACTION_COMMIT = "6fadf3fec983e5af3077b62a52ab608ce7f73ba3"
+_APPROVED_PUBLISHER_COMMIT = "ca1cc64b5e03d4891a09a5efa8c5001999aeffe7"
+_APPROVED_PUBLISHER_ACTION_COMMIT = "b42d30a970c8a8c73133f9d51bf1a533f4086056"
 _PUBLISHER_REPOSITORY = "eugenemalaschuk-source/arch-linter-net"
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
