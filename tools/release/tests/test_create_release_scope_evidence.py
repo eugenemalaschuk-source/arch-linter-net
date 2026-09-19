@@ -534,7 +534,7 @@ def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoptio
     assert {item["issue"] for item in evidence["excluded_items"]} == {922, 834, 836, 825, 650, 787}
 
 
-def test_shipped_v082_patch_requires_only_closed_temporal_badge_fix(
+def test_shipped_v082_patch_requires_temporal_fix_and_merged_publisher_pins(
     tmp_path: Path, monkeypatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
