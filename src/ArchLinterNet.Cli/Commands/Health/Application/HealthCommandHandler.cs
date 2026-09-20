@@ -4,6 +4,7 @@ using ArchLinterNet.Cli.Commands.Baseline.Application;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyWeakening;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Health.Application;
@@ -45,6 +46,7 @@ internal sealed class HealthCommandHandler(
               --framework <tfm>        Requested target framework
               --platform <platform>    Requested platform
               --runtime <rid>          Requested runtime identifier
+              --profile <path>         Write analysis-profile/v1 counters to a file, stdout, or stderr
           -f, --format <fmt>           human or json (default: human)
           -h, --help                   Show this help message
 
@@ -95,6 +97,18 @@ internal sealed class HealthCommandHandler(
             console.Out.WriteLine(options.Format == "json"
                 ? runtime.FormatHealthAsJson(outcome)
                 : runtime.FormatHealthAsHuman(outcome));
+
+            AnalysisProfilePublisher.Write(
+                options.ProfileDestination,
+                console,
+                fileSystem,
+                outcome.AnalysisCounters,
+                outcome.Gate switch
+                {
+                    ArchitectureHealthGate.Pass => AnalysisProfileCompletionStatus.Success,
+                    ArchitectureHealthGate.Fail => AnalysisProfileCompletionStatus.ValidationFailure,
+                    _ => AnalysisProfileCompletionStatus.PreparationFailure,
+                });
 
             return outcome.Gate switch
             {

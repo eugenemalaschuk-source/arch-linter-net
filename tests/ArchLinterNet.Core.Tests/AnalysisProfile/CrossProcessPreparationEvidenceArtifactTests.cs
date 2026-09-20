@@ -7,7 +7,7 @@ namespace ArchLinterNet.Core.Tests;
 internal sealed class CrossProcessPreparationEvidenceArtifactTests
 {
     [Test]
-    public void CheckedInArtifact_ContainsBothBoundariesAndValidatesAsPreImplementationEvidence()
+    public void CheckedInArtifact_ContainsBothBoundariesAndDecisionCapableEvidence()
     {
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
         string path = Path.Combine(repositoryRoot, "docs", "internal", "prepared-analysis-reuse-evidence.json");
@@ -21,11 +21,13 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
             Assert.That(evidence.Archetypes, Has.Count.EqualTo(2));
             Assert.That(evidence.Archetypes.Select(archetype => archetype.Workflow.PreparationBoundary),
                 Is.EquivalentTo(new[] { PreparationBoundaryKind.MsBuildReceipt, PreparationBoundaryKind.StagedAssemblies }));
-            Assert.That(evidence.Archetypes.All(archetype => archetype.Decision.Outcome == PreparationDecisionOutcome.C), Is.True);
-            Assert.That(evidence.Archetypes.All(archetype => !archetype.Decision.OneProcessAlternativeEvaluated), Is.True);
-            Assert.That(evidence.Archetypes.All(archetype => !archetype.PreparedEffect.OneProcessWorkEvidenceComplete), Is.True);
-            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MissingOneProcessWorkEvidenceFamilies.Count > 0), Is.True);
-            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MeasuredOneProcessAlternativeWork is null), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.Decision.Outcome is PreparationDecisionOutcome.A or PreparationDecisionOutcome.B), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => archetype.Decision.OneProcessAlternativeEvaluated), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.OneProcessWorkEvidenceComplete), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.MissingOneProcessWorkEvidenceFamilies.Count == 0), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MeasuredOneProcessAlternativeWork.HasValue), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.WorkMeasurementBasis.Contains("counters", StringComparison.Ordinal)), Is.True);
             Assert.That(json, Does.Not.Contain("private-adopter"));

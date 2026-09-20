@@ -60,6 +60,13 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.Measure(request, timing);
     }
 
+    public (ArchitectureMetricMeasurementOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) MeasureWithCounters(
+        ArchitectureMetricMeasurementRequest request,
+        ValidationTiming? timing)
+    {
+        return _engine.MeasureWithCounters(request, timing);
+    }
+
     public string FormatResultForCiArtifacts(
         string mode,
         bool passed,
@@ -324,6 +331,12 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.EvaluateDebtGate(request);
     }
 
+    public (ArchitectureDebtGateOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) EvaluateDebtGateWithCounters(
+        ArchitectureDebtGateRequest request)
+    {
+        return _engine.EvaluateDebtGateWithCounters(request);
+    }
+
     public ArchitectureHealthOutcome EvaluateHealth(ArchitectureHealthRequest request)
     {
         return _engine.EvaluateHealth(request);
@@ -382,6 +395,12 @@ internal sealed class CliRuntime : ICliRuntime
     public ArchitectureTopologyCaptureOutcome CaptureTopology(ArchitectureTopologyCaptureRequest request)
     {
         return _engine.CaptureTopology(request);
+    }
+
+    public (ArchitectureTopologyCaptureOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) CaptureTopologyWithCounters(
+        ArchitectureTopologyCaptureRequest request)
+    {
+        return _engine.CaptureTopologyWithCounters(request);
     }
 
     public string FormatGraphAsJson(ArchitectureDependencyGraph graph)

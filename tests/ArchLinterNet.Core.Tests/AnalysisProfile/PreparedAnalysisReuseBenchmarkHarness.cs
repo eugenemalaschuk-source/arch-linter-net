@@ -630,11 +630,11 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         {
             "strict" => ["--policy", policyPath, "--mode", "strict", "--format", "json", "--profile", profilePath],
             "audit" => ["--policy", policyPath, "--mode", "audit", "--format", "json", "--profile", profilePath],
-            "no_new_debt" => ["gate", "--policy", policyPath, "--baseline", baselinePath, "--mode", "all", "--format", "json"],
-            "architecture_health" => ["health", "--policy", policyPath, "--baseline", baselinePath, "--mode", "all", "--format", "json", "--execution-context", "synthetic-issue-493"],
-            "change_snapshot" => ["change", "snapshot", "--policy", policyPath, "--mode", "strict", "--output", outputPath],
-            "topology" => ["topology", "capture", "--policy", policyPath, "--subject-kind", "assembly", "--format", "json", "--output", outputPath],
-            "measure" => ["measure", "--policy", policyPath, "--format", "json"],
+            "no_new_debt" => ["gate", "--policy", policyPath, "--baseline", baselinePath, "--mode", "all", "--format", "json", "--profile", profilePath],
+            "architecture_health" => ["health", "--policy", policyPath, "--baseline", baselinePath, "--mode", "all", "--format", "json", "--execution-context", "synthetic-issue-493", "--profile", profilePath],
+            "change_snapshot" => ["change", "snapshot", "--policy", policyPath, "--mode", "strict", "--output", outputPath, "--profile", profilePath],
+            "topology" => ["topology", "capture", "--policy", policyPath, "--subject-kind", "assembly", "--format", "json", "--output", outputPath, "--profile", profilePath],
+            "measure" => ["measure", "--policy", policyPath, "--format", "json", "--profile", profilePath],
             _ => throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown benchmark command family."),
         };
 

@@ -3,6 +3,7 @@ using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Cli.Commands.Baseline.Application;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.PolicyWeakening;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Gate.Application;
@@ -31,6 +32,7 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
               --framework <tfm>        Requested target framework
               --platform <platform>    Requested platform
               --runtime <rid>          Requested runtime identifier
+              --profile <path>         Write analysis-profile/v1 counters to a file, stdout, or stderr
           -f, --format <fmt>           human, json, or sarif (default: human)
           -h, --help                   Show this help message
 
@@ -65,7 +67,7 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
 
         try
         {
-            ArchitectureDebtGateOutcome outcome = runtime.EvaluateDebtGate(
+            (ArchitectureDebtGateOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) = runtime.EvaluateDebtGateWithCounters(
                 ArchitectureAnalysisCommandSupport.CreateDebtGateRequest(options, fileSystem, cancellationToken));
             console.Out.WriteLine(options.Format switch
             {
@@ -73,6 +75,16 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
                 "sarif" => runtime.FormatDebtGateAsSarif(outcome),
                 _ => runtime.FormatDebtGateAsHuman(outcome),
             });
+            AnalysisProfilePublisher.Write(
+                options.ProfileDestination,
+                console,
+                fileSystem,
+                counters,
+                !outcome.Succeeded
+                    ? AnalysisProfileCompletionStatus.PreparationFailure
+                    : outcome.Passed
+                        ? AnalysisProfileCompletionStatus.Success
+                        : AnalysisProfileCompletionStatus.ValidationFailure);
             if (!outcome.Succeeded)
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;

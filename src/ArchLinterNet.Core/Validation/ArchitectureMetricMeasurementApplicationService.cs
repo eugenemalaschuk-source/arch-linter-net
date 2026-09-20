@@ -19,4 +19,15 @@ public sealed class ArchitectureMetricMeasurementApplicationService(
             request.ToSnapshotRequest(), timing);
         return snapshot.Measure(request.MetricIds);
     }
+
+    internal (ArchitectureMetricMeasurementOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) MeasureWithCounters(
+        ArchitectureMetricMeasurementRequest request,
+        ValidationTiming? timing = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        using ArchitectureAnalysisSnapshot snapshot = validationApplicationService.CreateSnapshot(
+            request.ToSnapshotRequest(), timing);
+        ArchitectureMetricMeasurementOutcome outcome = snapshot.Measure(request.MetricIds);
+        return (outcome, snapshot.Counters);
+    }
 }

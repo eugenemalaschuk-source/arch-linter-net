@@ -4,6 +4,7 @@ using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Change.Application;
@@ -14,7 +15,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine("arch-linter-net change snapshot --policy <path> --output <path> [--mode strict|audit] [--baseline <path>] [--condition-set <name>] [--ensure-built] [--no-restore] [--configuration <name>] [--framework <tfm>] [--platform <platform>] [--runtime <rid>]");
+            console.Out.WriteLine("arch-linter-net change snapshot --policy <path> --output <path> [--mode strict|audit] [--baseline <path>] [--condition-set <name>] [--ensure-built] [--no-restore] [--configuration <name>] [--framework <tfm>] [--platform <platform>] [--runtime <rid>] [--profile <path>]");
             return CliExitCodes.Success;
         }
 
@@ -33,7 +34,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
-            ValidationOutcome validation = runtime.Validate(new ValidationRequest
+            (ValidationOutcome validation, ArchitectureAnalysisSnapshotCounters counters) = runtime.ValidateWithCounters(new ValidationRequest
             {
                 PolicyPath = options.PolicyPath,
                 Mode = options.Mode,
@@ -48,6 +49,12 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
             }, null);
             if (validation.PreflightBlocked)
             {
+                AnalysisProfilePublisher.Write(
+                    options.ProfileDestination,
+                    console,
+                    fileSystem,
+                    counters,
+                    AnalysisProfileCompletionStatus.PreparationFailure);
                 return FailIncompleteSnapshot("validation", validation.PreflightDiagnostics);
             }
 
@@ -93,6 +100,12 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
             ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
                 options.Mode, validation, namespaces, assemblies, baselineDebt, options.ConditionSetName);
             fileSystem.WriteAllText(options.OutputPath, ArchitectureChangeReports.SerializeSnapshot(snapshot));
+            AnalysisProfilePublisher.Write(
+                options.ProfileDestination,
+                console,
+                fileSystem,
+                counters,
+                AnalysisProfileCompletionStatus.Success);
             return CliExitCodes.Success;
         }
         catch (Exception exception)
