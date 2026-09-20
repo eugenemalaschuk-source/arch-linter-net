@@ -41,7 +41,7 @@ internal static class ArchitectureLayerTypeMatcher
         string description =
             $"Layer selector at '{layer.Selector.WhenLocation?.YamlPath}' (role: {layer.Selector.Role}, " +
             $"when: {layer.Selector.When}) for type '{ArchitectureTypeNames.SafeFullName(type)}'";
-        return ArchitectureExpressionFactService.Evaluate(
+        return expressionFacts.Evaluate(
             layer.Selector.CompiledWhen, context, description, layer.Selector.WhenLocation);
     }
 }

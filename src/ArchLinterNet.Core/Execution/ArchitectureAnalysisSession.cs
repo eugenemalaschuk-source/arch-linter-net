@@ -92,7 +92,8 @@ public sealed class ArchitectureAnalysisSession
             new ArchitectureSourceFileFactIndex.ProjectOwnership(context.ProjectDiscovery, SourceRootAssemblyOwnership: null),
             new ArchitectureSourceFileFactIndex.ConstructionOptions(
                 context.ProfilingCounters, context.CancellationToken, context.MaxParallelism));
-        ExpressionFacts = new ArchitectureExpressionFactService(RoleIndex, SourceFileFactIndex, context.ProjectDiscovery);
+        ExpressionFacts = new ArchitectureExpressionFactService(
+            RoleIndex, SourceFileFactIndex, context.ProjectDiscovery, context.ProfilingCounters, context.Timing);
         Facts = new ArchitectureAnalysisFactService(
             context,
             document,

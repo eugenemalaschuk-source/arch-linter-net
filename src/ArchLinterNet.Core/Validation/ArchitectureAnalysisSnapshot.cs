@@ -145,6 +145,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                     FactIndexMaterializations = _profilingCounters?.FactIndexMaterializations ?? 0,
                     SourceScanPasses = _profilingCounters?.SourceScanPasses ?? 0,
                     SourceFilesScanned = _profilingCounters?.SourceFilesScanned ?? 0,
+                    SelectorPredicateEvaluations = _profilingCounters?.SelectorPredicateEvaluations ?? 0,
                     ContractFamilyResultCounts = contractFamilyResultCounts,
                     CacheLookups = _cacheContext is null ? null : _cacheStats.Snapshot(),
                     ParallelScheduledWorkItems = _profilingCounters?.ParallelScheduledWorkItems ?? 0,

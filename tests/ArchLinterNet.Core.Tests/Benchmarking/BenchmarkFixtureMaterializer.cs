@@ -204,6 +204,15 @@ internal static class BenchmarkFixtureMaterializer
                 .AppendLine("      reason: Synthetic benchmark workload contract.");
         }
 
+        content.AppendLine("  strict_layers:");
+        for (int layer = 1; layer <= definition.Dimensions.LayerCount; layer++)
+        {
+            content.AppendLine($"    - id: synthetic-layer-selector-{layer:000}")
+                .AppendLine($"      name: synthetic-layer-selector-{layer:000}")
+                .AppendLine($"      layers: [synthetic_layer_{layer:00}]")
+                .AppendLine("      reason: Exercise the generated selector predicate.");
+        }
+
         content.AppendLine("  strict_layout_conventions:")
             .AppendLine("    - id: synthetic-source-fact-index")
             .AppendLine("      name: synthetic-source-fact-index")

@@ -17,12 +17,35 @@ public static class AnalysisProfileBuilder
         bool cancellationObserved,
         AnalysisProfileBuildOptions? options = null)
     {
-        IReadOnlyList<AnalysisProfilePhaseMeasurement> phases = timing is null
-            ? Array.Empty<AnalysisProfilePhaseMeasurement>()
-            : timing.Entries
-                .Select(entry => new AnalysisProfilePhaseMeasurement(
-                    entry.Name, entry.Indent, entry.Ordinal, entry.Count, entry.ElapsedMs, entry.ProcessorTimeMs))
-                .ToList();
+        List<AnalysisProfilePhaseMeasurement> phases = new();
+        bool selectorPhaseMeasured = false;
+        if (timing is not null)
+        {
+            foreach (ValidationTiming.Entry entry in timing.Entries)
+            {
+                bool isSelectorPhase = entry.Name == "selector_predicate_evaluation";
+                selectorPhaseMeasured |= isSelectorPhase;
+                phases.Add(new AnalysisProfilePhaseMeasurement(
+                    entry.Name,
+                    entry.Indent,
+                    entry.Ordinal,
+                    isSelectorPhase ? snapshotCounters.SelectorPredicateEvaluations : entry.Count,
+                    entry.HighResolutionElapsedMs ?? entry.ElapsedMs,
+                    entry.ProcessorTimeMs));
+            }
+        }
+
+        if (snapshotCounters.SelectorPredicateEvaluations > 0 && !selectorPhaseMeasured)
+        {
+            int ordinal = phases.Count == 0 ? 0 : phases.Max(phase => phase.Ordinal) + 1;
+            phases.Add(new AnalysisProfilePhaseMeasurement(
+                "selector_predicate_evaluation",
+                1,
+                ordinal,
+                snapshotCounters.SelectorPredicateEvaluations,
+                null,
+                null));
+        }
 
         // Contract-family entries carry execution counts; ordinary timing entries do not.
         Dictionary<string, int> contractFamilyCounts = new(StringComparer.Ordinal);
