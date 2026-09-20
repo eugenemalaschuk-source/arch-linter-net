@@ -2,7 +2,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Validation;
 
-namespace ArchLinterNet.Cli.Commands;
+namespace ArchLinterNet.Cli.Integration.OutputFormatting;
 
 // Publishes the deterministic counter portion of analysis-profile/v1 for commands whose
 // analysis is owned by a Core snapshot but whose output is not the validate command's report
