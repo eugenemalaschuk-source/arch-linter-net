@@ -229,7 +229,9 @@ acceptance, never as SKIP/PASS.
 
 ## Closure and publication boundary
 
-Relay-specific verdict: **BLOCKED** for adoption-stable Relay support, and intentionally optional. This does not block First Ice or core governance. If Relay adoption work resumes, obtain
+Relay-specific verdict: **BLOCKED** for adoption-stable Relay support, and
+intentionally optional. This does not block First Ice or core governance. If
+Relay adoption work resumes, obtain
 a fresh immutable #835 candidate and #834's matching packed/platform/live
 evidence. Then #836 reconciles every consumer command, inventory identity, and
 prerequisite against those results.
