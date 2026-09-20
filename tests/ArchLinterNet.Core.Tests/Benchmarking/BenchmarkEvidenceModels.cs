@@ -40,6 +40,12 @@ internal sealed record BenchmarkResourceMeasurement
         Reason = reason,
     };
 
+    public static BenchmarkResourceMeasurement NotApplicable(string reason) => new()
+    {
+        Status = BenchmarkMeasurementStatus.NotApplicable,
+        Reason = reason,
+    };
+
     public void Validate(string fieldName)
     {
         switch (Status)

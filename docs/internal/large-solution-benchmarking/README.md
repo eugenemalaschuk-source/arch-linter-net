@@ -115,3 +115,8 @@ CI logs are out of scope.
 
 The issue-specific preparation-reuse contract for #493 is documented in
 [`issue-493-prepared-analysis-evidence-contract.md`](issue-493-prepared-analysis-evidence-contract.md).
+
+The explicit harness writes the current synthetic/anonymized result to
+[`prepared-analysis-reuse-evidence.json`](../prepared-analysis-reuse-evidence.json).
+It is evidence for the pre-implementation decision only; it does not describe a
+persisted prepared-state product or authorize one.
