@@ -214,39 +214,39 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 143,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 167,
+                  "ProcessorTimeMs": 171.875
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 144,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 168,
+                  "ProcessorTimeMs": 171.875
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 107,
-                  "ProcessorTimeMs": 109.375
+                  "ElapsedMs": 189,
+                  "ProcessorTimeMs": 171.875
                 },
                 {
                   "Name": "build_state_preflight",
                   "Indent": 0,
                   "Ordinal": 4,
                   "Count": null,
-                  "ElapsedMs": 1608,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 1806,
+                  "ProcessorTimeMs": 171.875
                 },
                 {
                   "Name": "post_ensure_built_artifact_refresh",
                   "Indent": 0,
                   "Ordinal": 5,
                   "Count": null,
-                  "ElapsedMs": 19,
+                  "ElapsedMs": 18,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -254,7 +254,7 @@
                   "Indent": 0,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 12,
+                  "ElapsedMs": 11,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -262,16 +262,16 @@
                   "Indent": 1,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 36,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 43,
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "configuration_check",
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 54,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 65,
+                  "ProcessorTimeMs": 62.5
                 },
                 {
                   "Name": "policy_consistency_check",
@@ -462,7 +462,7 @@
                   "Indent": 1,
                   "Ordinal": 33,
                   "Count": 1,
-                  "ElapsedMs": 8,
+                  "ElapsedMs": 9,
                   "ProcessorTimeMs": 0
                 },
                 {
@@ -574,8 +574,8 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 17,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 18,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "post_processing",
@@ -590,15 +590,15 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 2055,
-                  "ProcessorTimeMs": 578.125
+                  "ElapsedMs": 2381,
+                  "ProcessorTimeMs": 687.5
                 },
                 {
                   "Name": "render_json",
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 32,
+                  "ElapsedMs": 34,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -618,8 +618,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 84762624,
-                "AllocatedBytesTotal": 63744984
+                "PeakWorkingSetBytes": 84492288,
+                "AllocatedBytesTotal": 63572920
               }
             },
             "completion_status": "Success",
@@ -627,7 +627,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2281,
+              "value": 2620,
               "unit": "milliseconds",
               "reason": null
             },
@@ -754,16 +754,16 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 145,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 153,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 146,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 154,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "root_resolution",
@@ -786,7 +786,7 @@
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 94,
+                  "ElapsedMs": 95,
                   "ProcessorTimeMs": 93.75
                 },
                 {
@@ -794,7 +794,7 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 94,
+                  "ElapsedMs": 95,
                   "ProcessorTimeMs": 93.75
                 },
                 {
@@ -802,24 +802,24 @@
                   "Indent": 0,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 54,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 57,
+                  "ProcessorTimeMs": 62.5
                 },
                 {
                   "Name": "configuration_check",
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 52,
-                  "ProcessorTimeMs": 62.5
+                  "ElapsedMs": 53,
+                  "ProcessorTimeMs": 46.875
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 21,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 19,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "dependency",
@@ -1003,7 +1003,7 @@
                   "Ordinal": 33,
                   "Count": 1,
                   "ElapsedMs": 9,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "layout_convention_applicability",
@@ -1114,8 +1114,8 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 18,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 17,
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "post_processing",
@@ -1130,7 +1130,7 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 407,
+                  "ElapsedMs": 418,
                   "ProcessorTimeMs": 390.625
                 },
                 {
@@ -1138,7 +1138,7 @@
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 33,
+                  "ElapsedMs": 34,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -1158,8 +1158,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 75476992,
-                "AllocatedBytesTotal": 13533456
+                "PeakWorkingSetBytes": 75231232,
+                "AllocatedBytesTotal": 13480288
               }
             },
             "completion_status": "Success",
@@ -1167,7 +1167,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 665,
+              "value": 669,
               "unit": "milliseconds",
               "reason": null
             },
@@ -1291,7 +1291,7 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 144,
+                  "ElapsedMs": 153,
                   "ProcessorTimeMs": 156.25
                 },
                 {
@@ -1299,7 +1299,7 @@
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 145,
+                  "ElapsedMs": 154,
                   "ProcessorTimeMs": 156.25
                 },
                 {
@@ -1323,7 +1323,7 @@
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 93,
+                  "ElapsedMs": 97,
                   "ProcessorTimeMs": 93.75
                 },
                 {
@@ -1331,7 +1331,7 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 94,
+                  "ElapsedMs": 98,
                   "ProcessorTimeMs": 93.75
                 },
                 {
@@ -1339,8 +1339,8 @@
                   "Indent": 0,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 53,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 58,
+                  "ProcessorTimeMs": 62.5
                 },
                 {
                   "Name": "configuration_check",
@@ -1348,14 +1348,14 @@
                   "Ordinal": 8,
                   "Count": null,
                   "ElapsedMs": 5,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 59,
+                  "ElapsedMs": 60,
                   "ProcessorTimeMs": 62.5
                 },
                 {
@@ -1651,7 +1651,7 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 3,
+                  "ElapsedMs": 2,
                   "ProcessorTimeMs": 0
                 },
                 {
@@ -1667,7 +1667,7 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 381,
+                  "ElapsedMs": 399,
                   "ProcessorTimeMs": 390.625
                 },
                 {
@@ -1675,7 +1675,7 @@
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 35,
+                  "ElapsedMs": 40,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -1695,8 +1695,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 75165696,
-                "AllocatedBytesTotal": 11416792
+                "PeakWorkingSetBytes": 74870784,
+                "AllocatedBytesTotal": 11362504
               }
             },
             "completion_status": "Success",
@@ -1704,7 +1704,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 634,
+              "value": 644,
               "unit": "milliseconds",
               "reason": null
             },
@@ -1803,7 +1803,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2249,
+              "value": 2346,
               "unit": "milliseconds",
               "reason": null
             },
@@ -1902,7 +1902,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2189,
+              "value": 2307,
               "unit": "milliseconds",
               "reason": null
             },
@@ -2001,7 +2001,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 513,
+              "value": 507,
               "unit": "milliseconds",
               "reason": null
             },
@@ -2097,7 +2097,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2181,
+              "value": 2131,
               "unit": "milliseconds",
               "reason": null
             },
@@ -2193,7 +2193,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2087,
+              "value": 2152,
               "unit": "milliseconds",
               "reason": null
             },
@@ -2293,7 +2293,7 @@
                   "Rejects": 0,
                   "Writes": 1,
                   "BytesRead": 0,
-                  "BytesWritten": 8957,
+                  "BytesWritten": 8956,
                   "IneligibleUnitCount": 0,
                   "CorruptionEvents": 0,
                   "CancelledBeforePublish": 0,
@@ -2320,23 +2320,23 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 144,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 146,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 146,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 147,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 110,
+                  "ElapsedMs": 112,
                   "ProcessorTimeMs": 109.375
                 },
                 {
@@ -2344,31 +2344,31 @@
                   "Indent": 0,
                   "Ordinal": 4,
                   "Count": null,
-                  "ElapsedMs": 1552,
-                  "ProcessorTimeMs": 93.75
+                  "ElapsedMs": 1597,
+                  "ProcessorTimeMs": 125
                 },
                 {
                   "Name": "post_ensure_built_artifact_refresh",
                   "Indent": 0,
                   "Ordinal": 5,
                   "Count": null,
-                  "ElapsedMs": 18,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 19,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "post_ensure_built_preflight",
                   "Indent": 0,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 11,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 10,
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "cache_lookup",
                   "Indent": 0,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 22,
+                  "ElapsedMs": 26,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -2384,7 +2384,7 @@
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 59,
+                  "ElapsedMs": 53,
                   "ProcessorTimeMs": 46.875
                 },
                 {
@@ -2392,7 +2392,7 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 13,
+                  "ElapsedMs": 14,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -2400,8 +2400,8 @@
                   "Indent": 1,
                   "Ordinal": 12,
                   "Count": 4,
-                  "ElapsedMs": 6,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 5,
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "layer",
@@ -2576,8 +2576,8 @@
                   "Indent": 1,
                   "Ordinal": 34,
                   "Count": 1,
-                  "ElapsedMs": 9,
-                  "ProcessorTimeMs": 0
+                  "ElapsedMs": 8,
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "layout_convention_applicability",
@@ -2688,7 +2688,7 @@
                   "Indent": 0,
                   "Ordinal": 11,
                   "Count": null,
-                  "ElapsedMs": 18,
+                  "ElapsedMs": 17,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -2704,16 +2704,16 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 2038,
-                  "ProcessorTimeMs": 562.5
+                  "ElapsedMs": 2092,
+                  "ProcessorTimeMs": 625
                 },
                 {
                   "Name": "render_json",
                   "Indent": 0,
                   "Ordinal": 49,
                   "Count": null,
-                  "ElapsedMs": 32,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 33,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "output_stream_write",
@@ -2721,7 +2721,7 @@
                   "Ordinal": 50,
                   "Count": null,
                   "ElapsedMs": 0,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 }
               ],
               "Output": {
@@ -2732,8 +2732,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 94621696,
-                "AllocatedBytesTotal": 132267824
+                "PeakWorkingSetBytes": 94404608,
+                "AllocatedBytesTotal": 132145296
               }
             },
             "completion_status": "Success",
@@ -2741,7 +2741,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2392,
+              "value": 2460,
               "unit": "milliseconds",
               "reason": null
             },
@@ -2800,7 +2800,7 @@
                   "Misses": 0,
                   "Rejects": 0,
                   "Writes": 0,
-                  "BytesRead": 8957,
+                  "BytesRead": 8956,
                   "BytesWritten": 0,
                   "IneligibleUnitCount": 0,
                   "CorruptionEvents": 0,
@@ -2828,7 +2828,7 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 162,
+                  "ElapsedMs": 186,
                   "ProcessorTimeMs": 171.875
                 },
                 {
@@ -2836,7 +2836,7 @@
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 163,
+                  "ElapsedMs": 188,
                   "ProcessorTimeMs": 171.875
                 },
                 {
@@ -2844,23 +2844,23 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 111,
-                  "ProcessorTimeMs": 109.375
+                  "ElapsedMs": 136,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "build_state_preflight",
                   "Indent": 0,
                   "Ordinal": 4,
                   "Count": null,
-                  "ElapsedMs": 1593,
-                  "ProcessorTimeMs": 171.875
+                  "ElapsedMs": 1551,
+                  "ProcessorTimeMs": 109.375
                 },
                 {
                   "Name": "post_ensure_built_artifact_refresh",
                   "Indent": 0,
                   "Ordinal": 5,
                   "Count": null,
-                  "ElapsedMs": 18,
+                  "ElapsedMs": 17,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -2868,7 +2868,7 @@
                   "Indent": 0,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 10,
+                  "ElapsedMs": 11,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -2876,7 +2876,7 @@
                   "Indent": 0,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 110,
+                  "ElapsedMs": 108,
                   "ProcessorTimeMs": 109.375
                 },
                 {
@@ -2884,8 +2884,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 2027,
-                  "ProcessorTimeMs": 609.375
+                  "ElapsedMs": 2033,
+                  "ProcessorTimeMs": 578.125
                 },
                 {
                   "Name": "render_json",
@@ -2900,8 +2900,8 @@
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 1,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 0,
+                  "ProcessorTimeMs": 0
                 }
               ],
               "Output": {
@@ -2912,8 +2912,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 85135360,
-                "AllocatedBytesTotal": 61454520
+                "PeakWorkingSetBytes": 85078016,
+                "AllocatedBytesTotal": 61471040
               }
             },
             "completion_status": "Success",
@@ -2921,7 +2921,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2248,
+              "value": 2274,
               "unit": "milliseconds",
               "reason": null
             },
@@ -3168,7 +3168,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2249,
+              "value": 2346,
               "unit": "milliseconds",
               "reason": null
             },
@@ -3267,7 +3267,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2189,
+              "value": 2307,
               "unit": "milliseconds",
               "reason": null
             },
@@ -3366,7 +3366,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 513,
+              "value": 507,
               "unit": "milliseconds",
               "reason": null
             },
@@ -3462,7 +3462,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2181,
+              "value": 2131,
               "unit": "milliseconds",
               "reason": null
             },
@@ -3558,7 +3558,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2087,
+              "value": 2152,
               "unit": "milliseconds",
               "reason": null
             },
@@ -3685,40 +3685,40 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 145,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 143,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 146,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 144,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 114,
-                  "ProcessorTimeMs": 125
+                  "ElapsedMs": 105,
+                  "ProcessorTimeMs": 93.75
                 },
                 {
                   "Name": "build_state_preflight",
                   "Indent": 0,
                   "Ordinal": 4,
                   "Count": null,
-                  "ElapsedMs": 1598,
-                  "ProcessorTimeMs": 78.125
+                  "ElapsedMs": 1589,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "post_ensure_built_artifact_refresh",
                   "Indent": 0,
                   "Ordinal": 5,
                   "Count": null,
-                  "ElapsedMs": 17,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 21,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "post_ensure_built_preflight",
@@ -3726,30 +3726,30 @@
                   "Ordinal": 6,
                   "Count": null,
                   "ElapsedMs": 11,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "assembly_resolution",
                   "Indent": 1,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 23,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 22,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "configuration_check",
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 53,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 61,
+                  "ProcessorTimeMs": 62.5
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 14,
+                  "ElapsedMs": 13,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -4045,7 +4045,7 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 18,
+                  "ElapsedMs": 17,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -4061,8 +4061,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 2037,
-                  "ProcessorTimeMs": 515.625
+                  "ElapsedMs": 2028,
+                  "ProcessorTimeMs": 593.75
                 },
                 {
                   "Name": "render_json",
@@ -4078,7 +4078,7 @@
                   "Ordinal": 49,
                   "Count": null,
                   "ElapsedMs": 0,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 0
                 }
               ],
               "Output": {
@@ -4089,8 +4089,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 84836352,
-                "AllocatedBytesTotal": 63746952
+                "PeakWorkingSetBytes": 84676608,
+                "AllocatedBytesTotal": 63690984
               }
             },
             "completion_status": "Success",
@@ -4098,7 +4098,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2267,
+              "value": 2268,
               "unit": "milliseconds",
               "reason": null
             },
@@ -4408,39 +4408,39 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 143,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 167,
+                  "ProcessorTimeMs": 171.875
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 144,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 168,
+                  "ProcessorTimeMs": 171.875
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 107,
-                  "ProcessorTimeMs": 109.375
+                  "ElapsedMs": 189,
+                  "ProcessorTimeMs": 171.875
                 },
                 {
                   "Name": "build_state_preflight",
                   "Indent": 0,
                   "Ordinal": 4,
                   "Count": null,
-                  "ElapsedMs": 1608,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 1806,
+                  "ProcessorTimeMs": 171.875
                 },
                 {
                   "Name": "post_ensure_built_artifact_refresh",
                   "Indent": 0,
                   "Ordinal": 5,
                   "Count": null,
-                  "ElapsedMs": 19,
+                  "ElapsedMs": 18,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -4448,7 +4448,7 @@
                   "Indent": 0,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 12,
+                  "ElapsedMs": 11,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -4456,16 +4456,16 @@
                   "Indent": 1,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 36,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 43,
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "configuration_check",
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 54,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 65,
+                  "ProcessorTimeMs": 62.5
                 },
                 {
                   "Name": "policy_consistency_check",
@@ -4656,7 +4656,7 @@
                   "Indent": 1,
                   "Ordinal": 33,
                   "Count": 1,
-                  "ElapsedMs": 8,
+                  "ElapsedMs": 9,
                   "ProcessorTimeMs": 0
                 },
                 {
@@ -4768,8 +4768,8 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 17,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 18,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "post_processing",
@@ -4784,15 +4784,15 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 2055,
-                  "ProcessorTimeMs": 578.125
+                  "ElapsedMs": 2381,
+                  "ProcessorTimeMs": 687.5
                 },
                 {
                   "Name": "render_json",
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 32,
+                  "ElapsedMs": 34,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -4812,8 +4812,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 84762624,
-                "AllocatedBytesTotal": 63744984
+                "PeakWorkingSetBytes": 84492288,
+                "AllocatedBytesTotal": 63572920
               }
             },
             "completion_status": "Success",
@@ -4821,7 +4821,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2281,
+              "value": 2620,
               "unit": "milliseconds",
               "reason": null
             },
@@ -4994,16 +4994,16 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 145,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 153,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 146,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 154,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "root_resolution",
@@ -5026,7 +5026,7 @@
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 94,
+                  "ElapsedMs": 95,
                   "ProcessorTimeMs": 93.75
                 },
                 {
@@ -5034,7 +5034,7 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 94,
+                  "ElapsedMs": 95,
                   "ProcessorTimeMs": 93.75
                 },
                 {
@@ -5042,24 +5042,24 @@
                   "Indent": 0,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 54,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 57,
+                  "ProcessorTimeMs": 62.5
                 },
                 {
                   "Name": "configuration_check",
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 52,
-                  "ProcessorTimeMs": 62.5
+                  "ElapsedMs": 53,
+                  "ProcessorTimeMs": 46.875
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 21,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 19,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "dependency",
@@ -5243,7 +5243,7 @@
                   "Ordinal": 33,
                   "Count": 1,
                   "ElapsedMs": 9,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "layout_convention_applicability",
@@ -5354,8 +5354,8 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 18,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 17,
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "post_processing",
@@ -5370,7 +5370,7 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 407,
+                  "ElapsedMs": 418,
                   "ProcessorTimeMs": 390.625
                 },
                 {
@@ -5378,7 +5378,7 @@
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 33,
+                  "ElapsedMs": 34,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -5398,8 +5398,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 75476992,
-                "AllocatedBytesTotal": 13533456
+                "PeakWorkingSetBytes": 75231232,
+                "AllocatedBytesTotal": 13480288
               }
             },
             "completion_status": "Success",
@@ -5407,7 +5407,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 665,
+              "value": 669,
               "unit": "milliseconds",
               "reason": null
             },
@@ -5577,7 +5577,7 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 144,
+                  "ElapsedMs": 153,
                   "ProcessorTimeMs": 156.25
                 },
                 {
@@ -5585,7 +5585,7 @@
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 145,
+                  "ElapsedMs": 154,
                   "ProcessorTimeMs": 156.25
                 },
                 {
@@ -5609,7 +5609,7 @@
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 93,
+                  "ElapsedMs": 97,
                   "ProcessorTimeMs": 93.75
                 },
                 {
@@ -5617,7 +5617,7 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 94,
+                  "ElapsedMs": 98,
                   "ProcessorTimeMs": 93.75
                 },
                 {
@@ -5625,8 +5625,8 @@
                   "Indent": 0,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 53,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 58,
+                  "ProcessorTimeMs": 62.5
                 },
                 {
                   "Name": "configuration_check",
@@ -5634,14 +5634,14 @@
                   "Ordinal": 8,
                   "Count": null,
                   "ElapsedMs": 5,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 59,
+                  "ElapsedMs": 60,
                   "ProcessorTimeMs": 62.5
                 },
                 {
@@ -5937,7 +5937,7 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 3,
+                  "ElapsedMs": 2,
                   "ProcessorTimeMs": 0
                 },
                 {
@@ -5953,7 +5953,7 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 381,
+                  "ElapsedMs": 399,
                   "ProcessorTimeMs": 390.625
                 },
                 {
@@ -5961,7 +5961,7 @@
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 35,
+                  "ElapsedMs": 40,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -5981,8 +5981,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 75165696,
-                "AllocatedBytesTotal": 11416792
+                "PeakWorkingSetBytes": 74870784,
+                "AllocatedBytesTotal": 11362504
               }
             },
             "completion_status": "Success",
@@ -5990,7 +5990,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 634,
+              "value": 644,
               "unit": "milliseconds",
               "reason": null
             },
@@ -6135,7 +6135,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2249,
+              "value": 2346,
               "unit": "milliseconds",
               "reason": null
             },
@@ -6280,7 +6280,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2189,
+              "value": 2307,
               "unit": "milliseconds",
               "reason": null
             },
@@ -6305,7 +6305,7 @@
           },
           "canonical_result": {
             "algorithm": "sha256-canonical-result/v2",
-            "sha256": "3e77eff2a3d93aa9c7f0c6cc4592785d5552f94577fc26cca282914a27eec901",
+            "sha256": "a31223cf070708280b762d903d6e7ebc3e275a11527e925bde5aedf004ed4e8e",
             "finding_count": 0,
             "completion_status": "Success",
             "exit_code": 0
@@ -6425,7 +6425,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 513,
+              "value": 507,
               "unit": "milliseconds",
               "reason": null
             },
@@ -6567,7 +6567,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2181,
+              "value": 2131,
               "unit": "milliseconds",
               "reason": null
             },
@@ -6592,7 +6592,7 @@
           },
           "canonical_result": {
             "algorithm": "sha256-canonical-result/v2",
-            "sha256": "26b17fefdd89a9effb3fc049412d07b9c4159b53128195186ef2b219f706a642",
+            "sha256": "84b642202f10802178a5cedc01b32a3a8609bc8a2e4e1575788a482f2cb05a02",
             "finding_count": 0,
             "completion_status": "Success",
             "exit_code": 0
@@ -6709,7 +6709,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2087,
+              "value": 2152,
               "unit": "milliseconds",
               "reason": null
             },
@@ -6855,7 +6855,7 @@
                   "Rejects": 0,
                   "Writes": 1,
                   "BytesRead": 0,
-                  "BytesWritten": 8957,
+                  "BytesWritten": 8956,
                   "IneligibleUnitCount": 0,
                   "CorruptionEvents": 0,
                   "CancelledBeforePublish": 0,
@@ -6882,23 +6882,23 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 144,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 146,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 146,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 147,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 110,
+                  "ElapsedMs": 112,
                   "ProcessorTimeMs": 109.375
                 },
                 {
@@ -6906,31 +6906,31 @@
                   "Indent": 0,
                   "Ordinal": 4,
                   "Count": null,
-                  "ElapsedMs": 1552,
-                  "ProcessorTimeMs": 93.75
+                  "ElapsedMs": 1597,
+                  "ProcessorTimeMs": 125
                 },
                 {
                   "Name": "post_ensure_built_artifact_refresh",
                   "Indent": 0,
                   "Ordinal": 5,
                   "Count": null,
-                  "ElapsedMs": 18,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 19,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "post_ensure_built_preflight",
                   "Indent": 0,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 11,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 10,
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "cache_lookup",
                   "Indent": 0,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 22,
+                  "ElapsedMs": 26,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -6946,7 +6946,7 @@
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 59,
+                  "ElapsedMs": 53,
                   "ProcessorTimeMs": 46.875
                 },
                 {
@@ -6954,7 +6954,7 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 13,
+                  "ElapsedMs": 14,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -6962,8 +6962,8 @@
                   "Indent": 1,
                   "Ordinal": 12,
                   "Count": 4,
-                  "ElapsedMs": 6,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 5,
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "layer",
@@ -7138,8 +7138,8 @@
                   "Indent": 1,
                   "Ordinal": 34,
                   "Count": 1,
-                  "ElapsedMs": 9,
-                  "ProcessorTimeMs": 0
+                  "ElapsedMs": 8,
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "layout_convention_applicability",
@@ -7250,7 +7250,7 @@
                   "Indent": 0,
                   "Ordinal": 11,
                   "Count": null,
-                  "ElapsedMs": 18,
+                  "ElapsedMs": 17,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -7266,16 +7266,16 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 2038,
-                  "ProcessorTimeMs": 562.5
+                  "ElapsedMs": 2092,
+                  "ProcessorTimeMs": 625
                 },
                 {
                   "Name": "render_json",
                   "Indent": 0,
                   "Ordinal": 49,
                   "Count": null,
-                  "ElapsedMs": 32,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 33,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "output_stream_write",
@@ -7283,7 +7283,7 @@
                   "Ordinal": 50,
                   "Count": null,
                   "ElapsedMs": 0,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 }
               ],
               "Output": {
@@ -7294,8 +7294,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 94621696,
-                "AllocatedBytesTotal": 132267824
+                "PeakWorkingSetBytes": 94404608,
+                "AllocatedBytesTotal": 132145296
               }
             },
             "completion_status": "Success",
@@ -7303,7 +7303,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2392,
+              "value": 2460,
               "unit": "milliseconds",
               "reason": null
             },
@@ -7408,7 +7408,7 @@
                   "Misses": 0,
                   "Rejects": 0,
                   "Writes": 0,
-                  "BytesRead": 8957,
+                  "BytesRead": 8956,
                   "BytesWritten": 0,
                   "IneligibleUnitCount": 0,
                   "CorruptionEvents": 0,
@@ -7436,7 +7436,7 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 162,
+                  "ElapsedMs": 186,
                   "ProcessorTimeMs": 171.875
                 },
                 {
@@ -7444,7 +7444,7 @@
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 163,
+                  "ElapsedMs": 188,
                   "ProcessorTimeMs": 171.875
                 },
                 {
@@ -7452,23 +7452,23 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 111,
-                  "ProcessorTimeMs": 109.375
+                  "ElapsedMs": 136,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "build_state_preflight",
                   "Indent": 0,
                   "Ordinal": 4,
                   "Count": null,
-                  "ElapsedMs": 1593,
-                  "ProcessorTimeMs": 171.875
+                  "ElapsedMs": 1551,
+                  "ProcessorTimeMs": 109.375
                 },
                 {
                   "Name": "post_ensure_built_artifact_refresh",
                   "Indent": 0,
                   "Ordinal": 5,
                   "Count": null,
-                  "ElapsedMs": 18,
+                  "ElapsedMs": 17,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -7476,7 +7476,7 @@
                   "Indent": 0,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 10,
+                  "ElapsedMs": 11,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -7484,7 +7484,7 @@
                   "Indent": 0,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 110,
+                  "ElapsedMs": 108,
                   "ProcessorTimeMs": 109.375
                 },
                 {
@@ -7492,8 +7492,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 2027,
-                  "ProcessorTimeMs": 609.375
+                  "ElapsedMs": 2033,
+                  "ProcessorTimeMs": 578.125
                 },
                 {
                   "Name": "render_json",
@@ -7508,8 +7508,8 @@
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 1,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 0,
+                  "ProcessorTimeMs": 0
                 }
               ],
               "Output": {
@@ -7520,8 +7520,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 85135360,
-                "AllocatedBytesTotal": 61454520
+                "PeakWorkingSetBytes": 85078016,
+                "AllocatedBytesTotal": 61471040
               }
             },
             "completion_status": "Success",
@@ -7529,7 +7529,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2248,
+              "value": 2274,
               "unit": "milliseconds",
               "reason": null
             },
@@ -7914,7 +7914,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2249,
+              "value": 2346,
               "unit": "milliseconds",
               "reason": null
             },
@@ -8059,7 +8059,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2189,
+              "value": 2307,
               "unit": "milliseconds",
               "reason": null
             },
@@ -8084,7 +8084,7 @@
           },
           "canonical_result": {
             "algorithm": "sha256-canonical-result/v2",
-            "sha256": "3e77eff2a3d93aa9c7f0c6cc4592785d5552f94577fc26cca282914a27eec901",
+            "sha256": "a31223cf070708280b762d903d6e7ebc3e275a11527e925bde5aedf004ed4e8e",
             "finding_count": 0,
             "completion_status": "Success",
             "exit_code": 0
@@ -8204,7 +8204,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 513,
+              "value": 507,
               "unit": "milliseconds",
               "reason": null
             },
@@ -8346,7 +8346,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2181,
+              "value": 2131,
               "unit": "milliseconds",
               "reason": null
             },
@@ -8371,7 +8371,7 @@
           },
           "canonical_result": {
             "algorithm": "sha256-canonical-result/v2",
-            "sha256": "26b17fefdd89a9effb3fc049412d07b9c4159b53128195186ef2b219f706a642",
+            "sha256": "84b642202f10802178a5cedc01b32a3a8609bc8a2e4e1575788a482f2cb05a02",
             "finding_count": 0,
             "completion_status": "Success",
             "exit_code": 0
@@ -8488,7 +8488,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2087,
+              "value": 2152,
               "unit": "milliseconds",
               "reason": null
             },
@@ -8661,40 +8661,40 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 145,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 143,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 146,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 144,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 114,
-                  "ProcessorTimeMs": 125
+                  "ElapsedMs": 105,
+                  "ProcessorTimeMs": 93.75
                 },
                 {
                   "Name": "build_state_preflight",
                   "Indent": 0,
                   "Ordinal": 4,
                   "Count": null,
-                  "ElapsedMs": 1598,
-                  "ProcessorTimeMs": 78.125
+                  "ElapsedMs": 1589,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "post_ensure_built_artifact_refresh",
                   "Indent": 0,
                   "Ordinal": 5,
                   "Count": null,
-                  "ElapsedMs": 17,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 21,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "post_ensure_built_preflight",
@@ -8702,30 +8702,30 @@
                   "Ordinal": 6,
                   "Count": null,
                   "ElapsedMs": 11,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "assembly_resolution",
                   "Indent": 1,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 23,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 22,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "configuration_check",
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 53,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 61,
+                  "ProcessorTimeMs": 62.5
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 14,
+                  "ElapsedMs": 13,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -9021,7 +9021,7 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 18,
+                  "ElapsedMs": 17,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -9037,8 +9037,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 2037,
-                  "ProcessorTimeMs": 515.625
+                  "ElapsedMs": 2028,
+                  "ProcessorTimeMs": 593.75
                 },
                 {
                   "Name": "render_json",
@@ -9054,7 +9054,7 @@
                   "Ordinal": 49,
                   "Count": null,
                   "ElapsedMs": 0,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 0
                 }
               ],
               "Output": {
@@ -9065,8 +9065,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 84836352,
-                "AllocatedBytesTotal": 63746952
+                "PeakWorkingSetBytes": 84676608,
+                "AllocatedBytesTotal": 63690984
               }
             },
             "completion_status": "Success",
@@ -9074,7 +9074,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 2267,
+              "value": 2268,
               "unit": "milliseconds",
               "reason": null
             },
@@ -9134,23 +9134,23 @@
       ],
       "prepared_effect": {
         "issue_reference": "#493",
-        "representative_process_count": 10,
-        "repeated_work_share": 0.8627450980392156862745098039,
-        "candidate_prepared_boundary_work": 26,
-        "cache_avoidable_work": 7,
+        "representative_process_count": 7,
+        "repeated_work_share": 0.7952755905511811023622047244,
+        "candidate_prepared_boundary_work": 19,
+        "cache_avoidable_work": 0,
         "prepared_state_avoidable_work": 19,
-        "cold_prepare_cost": 22,
-        "per_consumer_load_authorization_cost": 1.5,
+        "cold_prepare_cost": 18.142857142857142857142857143,
+        "per_consumer_load_authorization_cost": 1,
         "per_consumer_load_authorization_cost_lower_bound": 1,
         "per_consumer_load_authorization_cost_upper_bound": 2,
         "per_consumer_load_authorization_cost_basis": "Measured one-process projection work; used as the explicit load/authorization proxy until persisted storage exists.",
-        "measured_independent_workflow_work": 255.0,
-        "measured_one_process_alternative_work": 97.0,
+        "measured_independent_workflow_work": 127,
+        "measured_one_process_alternative_work": 93.14285714285714285714285714,
         "one_process_work_evidence_complete": true,
         "missing_one_process_work_evidence_families": [],
-        "expected_persisted_reuse_work": 37.0,
+        "expected_persisted_reuse_work": 25.142857142857142857142857143,
         "distinct_cross_process_value": true,
-        "work_measurement_basis": "Median preparation/projection counters from candidate independent profiles, shared one-process projections, and all required process-bound projections.",
+        "work_measurement_basis": "Summed preparation/projection counters for one disabled-cache independent process per required command family (strict, audit, no_new_debt, architecture_health, change_snapshot, topology, measure), matched to the shared and process-bound one-process projections. Cache miss/hit samples remain supplemental and are excluded from the comparable workload.",
         "break_even_process_count": 2,
         "cache_modes_measured": [
           "disabled",
@@ -9186,13 +9186,13 @@
         "expected_effect": {
           "issue_reference": "#493",
           "target_phase": "candidate_preparation",
-          "baseline_phase_share": 0.8627450980392156862745098039,
+          "baseline_phase_share": 0.7952755905511811023622047244,
           "current_work_model": "R x independent candidate preparation",
           "target_work_model": "one cold preparation \u002B R x load/authorization",
-          "expected_local_speedup_small": 0.8076762619941593658740091781,
-          "expected_local_speedup_medium": 5.1298357180710121886592474827,
-          "expected_local_speedup_large": 9.258727881396461023433763749,
-          "expected_end_to_end_upper_bound": 3.274000583600817041143857601,
+          "expected_local_speedup_small": 0.753731343283582089552238806,
+          "expected_local_speedup_medium": 4.0170454545454545454545454545,
+          "expected_local_speedup_large": 8.755417956656346749226006192,
+          "expected_end_to_end_upper_bound": 2.483240223463687150837988827,
           "memory_allocation_trade_off": "Storage, I/O, allocation, and peak memory remain explicitly unavailable until a prepared-state design exists.",
           "cold_path_trade_off": "The cold preparation remains a separate cost and is never counted as a cache hit.",
           "success_threshold": "Only authorize implementation after one-process sharing is insufficient and the persisted model remains materially cheaper with measured resource bounds.",
@@ -9422,16 +9422,16 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 148,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 143,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 149,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 144,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "root_resolution",
@@ -9478,15 +9478,15 @@
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 44,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 35,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 18,
+                  "ElapsedMs": 15,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -9670,7 +9670,7 @@
                   "Indent": 1,
                   "Ordinal": 33,
                   "Count": 1,
-                  "ElapsedMs": 8,
+                  "ElapsedMs": 9,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -9782,7 +9782,7 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 19,
+                  "ElapsedMs": 18,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -9798,8 +9798,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 274,
-                  "ProcessorTimeMs": 265.625
+                  "ElapsedMs": 254,
+                  "ProcessorTimeMs": 250
                 },
                 {
                   "Name": "render_json",
@@ -9826,8 +9826,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 58183680,
-                "AllocatedBytesTotal": 6955312
+                "PeakWorkingSetBytes": 58212352,
+                "AllocatedBytesTotal": 6881512
               }
             },
             "completion_status": "Success",
@@ -9835,7 +9835,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 510,
+              "value": 495,
               "unit": "milliseconds",
               "reason": null
             },
@@ -9962,7 +9962,7 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 149,
+                  "ElapsedMs": 144,
                   "ProcessorTimeMs": 140.625
                 },
                 {
@@ -9970,7 +9970,7 @@
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 151,
+                  "ElapsedMs": 145,
                   "ProcessorTimeMs": 140.625
                 },
                 {
@@ -9994,16 +9994,16 @@
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 18,
-                  "ProcessorTimeMs": 31.25
+                  "ElapsedMs": 16,
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "load_and_setup",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 18,
-                  "ProcessorTimeMs": 31.25
+                  "ElapsedMs": 17,
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "build_state_preflight",
@@ -10019,7 +10019,7 @@
                   "Ordinal": 8,
                   "Count": null,
                   "ElapsedMs": 36,
-                  "ProcessorTimeMs": 31.25
+                  "ProcessorTimeMs": 46.875
                 },
                 {
                   "Name": "policy_consistency_check",
@@ -10322,8 +10322,8 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 19,
-                  "ProcessorTimeMs": 31.25
+                  "ElapsedMs": 18,
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "post_processing",
@@ -10338,8 +10338,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 262,
-                  "ProcessorTimeMs": 250
+                  "ElapsedMs": 254,
+                  "ProcessorTimeMs": 265.625
                 },
                 {
                   "Name": "render_json",
@@ -10366,8 +10366,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 58306560,
-                "AllocatedBytesTotal": 6943064
+                "PeakWorkingSetBytes": 58216448,
+                "AllocatedBytesTotal": 6914024
               }
             },
             "completion_status": "Success",
@@ -10375,7 +10375,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 516,
+              "value": 504,
               "unit": "milliseconds",
               "reason": null
             },
@@ -10499,16 +10499,16 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 150,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 142,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 151,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 143,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "root_resolution",
@@ -10524,14 +10524,14 @@
                   "Ordinal": 5,
                   "Count": null,
                   "ElapsedMs": 0,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "assembly_resolution",
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 16,
+                  "ElapsedMs": 15,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -10539,8 +10539,8 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 17,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 16,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "build_state_preflight",
@@ -10563,7 +10563,7 @@
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 45,
+                  "ElapsedMs": 46,
                   "ProcessorTimeMs": 46.875
                 },
                 {
@@ -10875,7 +10875,7 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 244,
+                  "ElapsedMs": 235,
                   "ProcessorTimeMs": 234.375
                 },
                 {
@@ -10903,8 +10903,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 55500800,
-                "AllocatedBytesTotal": 4682072
+                "PeakWorkingSetBytes": 55455744,
+                "AllocatedBytesTotal": 4690272
               }
             },
             "completion_status": "Success",
@@ -10912,7 +10912,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 480,
+              "value": 487,
               "unit": "milliseconds",
               "reason": null
             },
@@ -11011,7 +11011,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 504,
+              "value": 550,
               "unit": "milliseconds",
               "reason": null
             },
@@ -11110,7 +11110,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 546,
+              "value": 534,
               "unit": "milliseconds",
               "reason": null
             },
@@ -11209,7 +11209,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 527,
+              "value": 510,
               "unit": "milliseconds",
               "reason": null
             },
@@ -11305,7 +11305,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 380,
+              "value": 392,
               "unit": "milliseconds",
               "reason": null
             },
@@ -11401,7 +11401,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 361,
+              "value": 363,
               "unit": "milliseconds",
               "reason": null
             },
@@ -11530,7 +11530,7 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 147,
+                  "ElapsedMs": 154,
                   "ProcessorTimeMs": 140.625
                 },
                 {
@@ -11538,15 +11538,15 @@
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 148,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 155,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 10,
+                  "ElapsedMs": 11,
                   "ProcessorTimeMs": 0
                 },
                 {
@@ -11602,7 +11602,7 @@
                   "Indent": 1,
                   "Ordinal": 11,
                   "Count": 4,
-                  "ElapsedMs": 5,
+                  "ElapsedMs": 6,
                   "ProcessorTimeMs": 0
                 },
                 {
@@ -11778,7 +11778,7 @@
                   "Indent": 1,
                   "Ordinal": 33,
                   "Count": 1,
-                  "ElapsedMs": 9,
+                  "ElapsedMs": 8,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -11906,8 +11906,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 264,
-                  "ProcessorTimeMs": 265.625
+                  "ElapsedMs": 271,
+                  "ProcessorTimeMs": 281.25
                 },
                 {
                   "Name": "render_json",
@@ -11935,7 +11935,7 @@
               },
               "Measurements": {
                 "PeakWorkingSetBytes": 58535936,
-                "AllocatedBytesTotal": 6995648
+                "AllocatedBytesTotal": 7053088
               }
             },
             "completion_status": "Success",
@@ -11943,7 +11943,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 502,
+              "value": 504,
               "unit": "milliseconds",
               "reason": null
             },
@@ -12072,23 +12072,23 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 145,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 146,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 146,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 147,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 11,
+                  "ElapsedMs": 10,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -12120,7 +12120,7 @@
                   "Indent": 1,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 11,
+                  "ElapsedMs": 12,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -12128,15 +12128,15 @@
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 36,
-                  "ProcessorTimeMs": 31.25
+                  "ElapsedMs": 37,
+                  "ProcessorTimeMs": 46.875
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 15,
+                  "ElapsedMs": 17,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -12145,7 +12145,7 @@
                   "Ordinal": 11,
                   "Count": 4,
                   "ElapsedMs": 6,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "layer",
@@ -12321,7 +12321,7 @@
                   "Ordinal": 33,
                   "Count": 1,
                   "ElapsedMs": 9,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "layout_convention_applicability",
@@ -12448,7 +12448,7 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 261,
+                  "ElapsedMs": 265,
                   "ProcessorTimeMs": 265.625
                 },
                 {
@@ -12456,8 +12456,8 @@
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 38,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 40,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "output_stream_write",
@@ -12465,7 +12465,7 @@
                   "Ordinal": 49,
                   "Count": null,
                   "ElapsedMs": 0,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 }
               ],
               "Output": {
@@ -12476,7 +12476,7 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 58503168,
+                "PeakWorkingSetBytes": 58679296,
                 "AllocatedBytesTotal": 7027440
               }
             },
@@ -12485,7 +12485,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 504,
+              "value": 509,
               "unit": "milliseconds",
               "reason": null
             },
@@ -12732,7 +12732,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 504,
+              "value": 550,
               "unit": "milliseconds",
               "reason": null
             },
@@ -12831,7 +12831,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 546,
+              "value": 534,
               "unit": "milliseconds",
               "reason": null
             },
@@ -12930,7 +12930,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 527,
+              "value": 510,
               "unit": "milliseconds",
               "reason": null
             },
@@ -13026,7 +13026,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 380,
+              "value": 392,
               "unit": "milliseconds",
               "reason": null
             },
@@ -13122,7 +13122,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 361,
+              "value": 363,
               "unit": "milliseconds",
               "reason": null
             },
@@ -13249,16 +13249,16 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 143,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 145,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 144,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 146,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "root_resolution",
@@ -13281,7 +13281,7 @@
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 15,
+                  "ElapsedMs": 24,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -13289,7 +13289,7 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 16,
+                  "ElapsedMs": 25,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -13305,7 +13305,7 @@
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 36,
+                  "ElapsedMs": 39,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -13610,7 +13610,7 @@
                   "Ordinal": 10,
                   "Count": null,
                   "ElapsedMs": 18,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "post_processing",
@@ -13625,15 +13625,15 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 253,
-                  "ProcessorTimeMs": 250
+                  "ElapsedMs": 268,
+                  "ProcessorTimeMs": 265.625
                 },
                 {
                   "Name": "render_json",
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 38,
+                  "ElapsedMs": 41,
                   "ProcessorTimeMs": 46.875
                 },
                 {
@@ -13653,8 +13653,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 58241024,
-                "AllocatedBytesTotal": 6906080
+                "PeakWorkingSetBytes": 58175488,
+                "AllocatedBytesTotal": 6955280
               }
             },
             "completion_status": "Success",
@@ -13662,7 +13662,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 492,
+              "value": 511,
               "unit": "milliseconds",
               "reason": null
             },
@@ -13972,16 +13972,16 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 148,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 143,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 149,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 144,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "root_resolution",
@@ -14028,15 +14028,15 @@
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 44,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 35,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 18,
+                  "ElapsedMs": 15,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -14220,7 +14220,7 @@
                   "Indent": 1,
                   "Ordinal": 33,
                   "Count": 1,
-                  "ElapsedMs": 8,
+                  "ElapsedMs": 9,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -14332,7 +14332,7 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 19,
+                  "ElapsedMs": 18,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -14348,8 +14348,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 274,
-                  "ProcessorTimeMs": 265.625
+                  "ElapsedMs": 254,
+                  "ProcessorTimeMs": 250
                 },
                 {
                   "Name": "render_json",
@@ -14376,8 +14376,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 58183680,
-                "AllocatedBytesTotal": 6955312
+                "PeakWorkingSetBytes": 58212352,
+                "AllocatedBytesTotal": 6881512
               }
             },
             "completion_status": "Success",
@@ -14385,7 +14385,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 510,
+              "value": 495,
               "unit": "milliseconds",
               "reason": null
             },
@@ -14558,7 +14558,7 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 149,
+                  "ElapsedMs": 144,
                   "ProcessorTimeMs": 140.625
                 },
                 {
@@ -14566,7 +14566,7 @@
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 151,
+                  "ElapsedMs": 145,
                   "ProcessorTimeMs": 140.625
                 },
                 {
@@ -14590,16 +14590,16 @@
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 18,
-                  "ProcessorTimeMs": 31.25
+                  "ElapsedMs": 16,
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "load_and_setup",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 18,
-                  "ProcessorTimeMs": 31.25
+                  "ElapsedMs": 17,
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "build_state_preflight",
@@ -14615,7 +14615,7 @@
                   "Ordinal": 8,
                   "Count": null,
                   "ElapsedMs": 36,
-                  "ProcessorTimeMs": 31.25
+                  "ProcessorTimeMs": 46.875
                 },
                 {
                   "Name": "policy_consistency_check",
@@ -14918,8 +14918,8 @@
                   "Indent": 0,
                   "Ordinal": 10,
                   "Count": null,
-                  "ElapsedMs": 19,
-                  "ProcessorTimeMs": 31.25
+                  "ElapsedMs": 18,
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "post_processing",
@@ -14934,8 +14934,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 262,
-                  "ProcessorTimeMs": 250
+                  "ElapsedMs": 254,
+                  "ProcessorTimeMs": 265.625
                 },
                 {
                   "Name": "render_json",
@@ -14962,8 +14962,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 58306560,
-                "AllocatedBytesTotal": 6943064
+                "PeakWorkingSetBytes": 58216448,
+                "AllocatedBytesTotal": 6914024
               }
             },
             "completion_status": "Success",
@@ -14971,7 +14971,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 516,
+              "value": 504,
               "unit": "milliseconds",
               "reason": null
             },
@@ -15141,16 +15141,16 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 150,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 142,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 151,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 143,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "root_resolution",
@@ -15166,14 +15166,14 @@
                   "Ordinal": 5,
                   "Count": null,
                   "ElapsedMs": 0,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "assembly_resolution",
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 16,
+                  "ElapsedMs": 15,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -15181,8 +15181,8 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 17,
-                  "ProcessorTimeMs": 15.625
+                  "ElapsedMs": 16,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "build_state_preflight",
@@ -15205,7 +15205,7 @@
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 45,
+                  "ElapsedMs": 46,
                   "ProcessorTimeMs": 46.875
                 },
                 {
@@ -15517,7 +15517,7 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 244,
+                  "ElapsedMs": 235,
                   "ProcessorTimeMs": 234.375
                 },
                 {
@@ -15545,8 +15545,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 55500800,
-                "AllocatedBytesTotal": 4682072
+                "PeakWorkingSetBytes": 55455744,
+                "AllocatedBytesTotal": 4690272
               }
             },
             "completion_status": "Success",
@@ -15554,7 +15554,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 480,
+              "value": 487,
               "unit": "milliseconds",
               "reason": null
             },
@@ -15699,7 +15699,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 504,
+              "value": 550,
               "unit": "milliseconds",
               "reason": null
             },
@@ -15844,7 +15844,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 546,
+              "value": 534,
               "unit": "milliseconds",
               "reason": null
             },
@@ -15869,7 +15869,7 @@
           },
           "canonical_result": {
             "algorithm": "sha256-canonical-result/v2",
-            "sha256": "b560c7da59f837479f39e29c53e93448075c7ee5a93618058b7618718a3fd995",
+            "sha256": "c09b610b6f92eaf4c77e85ad1ff7665219785ec8c28b1593447ffaacbdcc96c6",
             "finding_count": 0,
             "completion_status": "Success",
             "exit_code": 0
@@ -15989,7 +15989,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 527,
+              "value": 510,
               "unit": "milliseconds",
               "reason": null
             },
@@ -16131,7 +16131,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 380,
+              "value": 392,
               "unit": "milliseconds",
               "reason": null
             },
@@ -16156,7 +16156,7 @@
           },
           "canonical_result": {
             "algorithm": "sha256-canonical-result/v2",
-            "sha256": "497b4f7462c2c79c81ac6bfb09da40dd5816dd334929dd00fb117a69d87b227d",
+            "sha256": "b95f6fdbf0f702d723ba1b1dde17a2523a1ae4560eb644ab2a552eef87038f79",
             "finding_count": 0,
             "completion_status": "Success",
             "exit_code": 0
@@ -16273,7 +16273,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 361,
+              "value": 363,
               "unit": "milliseconds",
               "reason": null
             },
@@ -16448,7 +16448,7 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 147,
+                  "ElapsedMs": 154,
                   "ProcessorTimeMs": 140.625
                 },
                 {
@@ -16456,15 +16456,15 @@
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 148,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 155,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 10,
+                  "ElapsedMs": 11,
                   "ProcessorTimeMs": 0
                 },
                 {
@@ -16520,7 +16520,7 @@
                   "Indent": 1,
                   "Ordinal": 11,
                   "Count": 4,
-                  "ElapsedMs": 5,
+                  "ElapsedMs": 6,
                   "ProcessorTimeMs": 0
                 },
                 {
@@ -16696,7 +16696,7 @@
                   "Indent": 1,
                   "Ordinal": 33,
                   "Count": 1,
-                  "ElapsedMs": 9,
+                  "ElapsedMs": 8,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -16824,8 +16824,8 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 264,
-                  "ProcessorTimeMs": 265.625
+                  "ElapsedMs": 271,
+                  "ProcessorTimeMs": 281.25
                 },
                 {
                   "Name": "render_json",
@@ -16853,7 +16853,7 @@
               },
               "Measurements": {
                 "PeakWorkingSetBytes": 58535936,
-                "AllocatedBytesTotal": 6995648
+                "AllocatedBytesTotal": 7053088
               }
             },
             "completion_status": "Success",
@@ -16861,7 +16861,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 502,
+              "value": 504,
               "unit": "milliseconds",
               "reason": null
             },
@@ -17036,23 +17036,23 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 145,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 146,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 146,
-                  "ProcessorTimeMs": 156.25
+                  "ElapsedMs": 147,
+                  "ProcessorTimeMs": 140.625
                 },
                 {
                   "Name": "metadata_preparation",
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 11,
+                  "ElapsedMs": 10,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -17084,7 +17084,7 @@
                   "Indent": 1,
                   "Ordinal": 7,
                   "Count": null,
-                  "ElapsedMs": 11,
+                  "ElapsedMs": 12,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -17092,15 +17092,15 @@
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 36,
-                  "ProcessorTimeMs": 31.25
+                  "ElapsedMs": 37,
+                  "ProcessorTimeMs": 46.875
                 },
                 {
                   "Name": "policy_consistency_check",
                   "Indent": 0,
                   "Ordinal": 9,
                   "Count": null,
-                  "ElapsedMs": 15,
+                  "ElapsedMs": 17,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -17109,7 +17109,7 @@
                   "Ordinal": 11,
                   "Count": 4,
                   "ElapsedMs": 6,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 0
                 },
                 {
                   "Name": "layer",
@@ -17285,7 +17285,7 @@
                   "Ordinal": 33,
                   "Count": 1,
                   "ElapsedMs": 9,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 },
                 {
                   "Name": "layout_convention_applicability",
@@ -17412,7 +17412,7 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 261,
+                  "ElapsedMs": 265,
                   "ProcessorTimeMs": 265.625
                 },
                 {
@@ -17420,8 +17420,8 @@
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 38,
-                  "ProcessorTimeMs": 46.875
+                  "ElapsedMs": 40,
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "output_stream_write",
@@ -17429,7 +17429,7 @@
                   "Ordinal": 49,
                   "Count": null,
                   "ElapsedMs": 0,
-                  "ProcessorTimeMs": 0
+                  "ProcessorTimeMs": 15.625
                 }
               ],
               "Output": {
@@ -17440,7 +17440,7 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 58503168,
+                "PeakWorkingSetBytes": 58679296,
                 "AllocatedBytesTotal": 7027440
               }
             },
@@ -17449,7 +17449,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 504,
+              "value": 509,
               "unit": "milliseconds",
               "reason": null
             },
@@ -17834,7 +17834,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 504,
+              "value": 550,
               "unit": "milliseconds",
               "reason": null
             },
@@ -17979,7 +17979,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 546,
+              "value": 534,
               "unit": "milliseconds",
               "reason": null
             },
@@ -18004,7 +18004,7 @@
           },
           "canonical_result": {
             "algorithm": "sha256-canonical-result/v2",
-            "sha256": "b560c7da59f837479f39e29c53e93448075c7ee5a93618058b7618718a3fd995",
+            "sha256": "c09b610b6f92eaf4c77e85ad1ff7665219785ec8c28b1593447ffaacbdcc96c6",
             "finding_count": 0,
             "completion_status": "Success",
             "exit_code": 0
@@ -18124,7 +18124,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 527,
+              "value": 510,
               "unit": "milliseconds",
               "reason": null
             },
@@ -18266,7 +18266,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 380,
+              "value": 392,
               "unit": "milliseconds",
               "reason": null
             },
@@ -18291,7 +18291,7 @@
           },
           "canonical_result": {
             "algorithm": "sha256-canonical-result/v2",
-            "sha256": "497b4f7462c2c79c81ac6bfb09da40dd5816dd334929dd00fb117a69d87b227d",
+            "sha256": "b95f6fdbf0f702d723ba1b1dde17a2523a1ae4560eb644ab2a552eef87038f79",
             "finding_count": 0,
             "completion_status": "Success",
             "exit_code": 0
@@ -18408,7 +18408,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 361,
+              "value": 363,
               "unit": "milliseconds",
               "reason": null
             },
@@ -18581,16 +18581,16 @@
                   "Indent": 1,
                   "Ordinal": 2,
                   "Count": null,
-                  "ElapsedMs": 143,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 145,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "policy_composition",
                   "Indent": 0,
                   "Ordinal": 1,
                   "Count": null,
-                  "ElapsedMs": 144,
-                  "ProcessorTimeMs": 140.625
+                  "ElapsedMs": 146,
+                  "ProcessorTimeMs": 156.25
                 },
                 {
                   "Name": "root_resolution",
@@ -18613,7 +18613,7 @@
                   "Indent": 1,
                   "Ordinal": 6,
                   "Count": null,
-                  "ElapsedMs": 15,
+                  "ElapsedMs": 24,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -18621,7 +18621,7 @@
                   "Indent": 0,
                   "Ordinal": 3,
                   "Count": null,
-                  "ElapsedMs": 16,
+                  "ElapsedMs": 25,
                   "ProcessorTimeMs": 15.625
                 },
                 {
@@ -18637,7 +18637,7 @@
                   "Indent": 0,
                   "Ordinal": 8,
                   "Count": null,
-                  "ElapsedMs": 36,
+                  "ElapsedMs": 39,
                   "ProcessorTimeMs": 31.25
                 },
                 {
@@ -18942,7 +18942,7 @@
                   "Ordinal": 10,
                   "Count": null,
                   "ElapsedMs": 18,
-                  "ProcessorTimeMs": 15.625
+                  "ProcessorTimeMs": 31.25
                 },
                 {
                   "Name": "post_processing",
@@ -18957,15 +18957,15 @@
                   "Indent": 0,
                   "Ordinal": 0,
                   "Count": null,
-                  "ElapsedMs": 253,
-                  "ProcessorTimeMs": 250
+                  "ElapsedMs": 268,
+                  "ProcessorTimeMs": 265.625
                 },
                 {
                   "Name": "render_json",
                   "Indent": 0,
                   "Ordinal": 48,
                   "Count": null,
-                  "ElapsedMs": 38,
+                  "ElapsedMs": 41,
                   "ProcessorTimeMs": 46.875
                 },
                 {
@@ -18985,8 +18985,8 @@
                 "OutputFailed": false
               },
               "Measurements": {
-                "PeakWorkingSetBytes": 58241024,
-                "AllocatedBytesTotal": 6906080
+                "PeakWorkingSetBytes": 58175488,
+                "AllocatedBytesTotal": 6955280
               }
             },
             "completion_status": "Success",
@@ -18994,7 +18994,7 @@
             "output_failed": false,
             "wall_clock": {
               "status": "available",
-              "value": 492,
+              "value": 511,
               "unit": "milliseconds",
               "reason": null
             },
@@ -19054,24 +19054,24 @@
       ],
       "prepared_effect": {
         "issue_reference": "#493",
-        "representative_process_count": 10,
-        "repeated_work_share": 0.5555555555555555555555555556,
+        "representative_process_count": 7,
+        "repeated_work_share": 0.5593220338983050847457627119,
         "candidate_prepared_boundary_work": 9,
         "cache_avoidable_work": 0,
         "prepared_state_avoidable_work": 9,
-        "cold_prepare_cost": 4,
-        "per_consumer_load_authorization_cost": 1.5,
+        "cold_prepare_cost": 8.428571428571428571428571429,
+        "per_consumer_load_authorization_cost": 1,
         "per_consumer_load_authorization_cost_lower_bound": 1,
         "per_consumer_load_authorization_cost_upper_bound": 2,
         "per_consumer_load_authorization_cost_basis": "Measured one-process projection work; used as the explicit load/authorization proxy until persisted storage exists.",
-        "measured_independent_workflow_work": 90,
-        "measured_one_process_alternative_work": 45.0,
+        "measured_independent_workflow_work": 59,
+        "measured_one_process_alternative_work": 49.428571428571428571428571429,
         "one_process_work_evidence_complete": true,
         "missing_one_process_work_evidence_families": [],
-        "expected_persisted_reuse_work": 19.0,
+        "expected_persisted_reuse_work": 15.428571428571428571428571429,
         "distinct_cross_process_value": true,
-        "work_measurement_basis": "Median preparation/projection counters from candidate independent profiles, shared one-process projections, and all required process-bound projections.",
-        "break_even_process_count": 6,
+        "work_measurement_basis": "Summed preparation/projection counters for one disabled-cache independent process per required command family (strict, audit, no_new_debt, architecture_health, change_snapshot, topology, measure), matched to the shared and process-bound one-process projections. Cache miss/hit samples remain supplemental and are excluded from the comparable workload.",
+        "break_even_process_count": 3,
         "cache_modes_measured": [
           "disabled",
           "miss",
@@ -19106,13 +19106,13 @@
         "expected_effect": {
           "issue_reference": "#493",
           "target_phase": "candidate_preparation",
-          "baseline_phase_share": 0.5555555555555555555555555556,
+          "baseline_phase_share": 0.5593220338983050847457627119,
           "current_work_model": "R x independent candidate preparation",
           "target_work_model": "one cold preparation \u002B R x load/authorization",
-          "expected_local_speedup_small": 0.4040404040404040404040404041,
-          "expected_local_speedup_medium": 1.1695906432748538011695906434,
-          "expected_local_speedup_large": 1.3888888888888888888888888891,
-          "expected_end_to_end_upper_bound": 1.0876132930513595166163141994,
+          "expected_local_speedup_small": 0.5,
+          "expected_local_speedup_medium": 2.1388888888888888888888888891,
+          "expected_local_speedup_large": 3.6235294117647058823529411767,
+          "expected_end_to_end_upper_bound": 1.4241379310344827586206896552,
           "memory_allocation_trade_off": "Storage, I/O, allocation, and peak memory remain explicitly unavailable until a prepared-state design exists.",
           "cold_path_trade_off": "The cold preparation remains a separate cost and is never counted as a cache hit.",
           "success_threshold": "Only authorize implementation after one-process sharing is insufficient and the persisted model remains materially cheaper with measured resource bounds.",

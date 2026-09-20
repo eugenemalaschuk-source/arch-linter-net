@@ -9,12 +9,10 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         BenchmarkWorkloadDefinition workload,
         IReadOnlyCollection<CrossProcessProcessEvidence> processes)
     {
-        int representativeProcessCount = processes.Count(process =>
-            process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
-            process.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess);
-        IReadOnlyList<CounterWorkMeasurement> independentMeasurements = processes
-            .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
-                              process.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess)
+        IReadOnlyList<CrossProcessProcessEvidence> representativeIndependentProcesses =
+            SelectRepresentativeIndependentProcesses(processes);
+        int representativeProcessCount = representativeIndependentProcesses.Count;
+        IReadOnlyList<CounterWorkMeasurement> independentMeasurements = representativeIndependentProcesses
             .Select(process => TryReadCounterWork(process.Sample.RawAnalysisProfile))
             .Where(measurement => measurement is not null)
             .Select(measurement => measurement!)
@@ -31,23 +29,38 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             .ToList();
         Assert.That(sharedMeasurements, Is.Not.Empty,
             "Expected-effect calculations require real profile counters from the one-process projections.");
+        IReadOnlyList<string> oneProcessFamilies = processes
+            .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
+                              process.Identity.ExecutionKind is PreparationExecutionKind.InProcessProjection or
+                                  PreparationExecutionKind.ProcessBoundProjection)
+            .Select(process => process.Identity.Projection.CommandFamily)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(family => family, StringComparer.Ordinal)
+            .ToList();
+        Assert.That(oneProcessFamilies, Is.EquivalentTo(_measuredCommandFamilies),
+            "Independent and one-process effect calculations must use the same representative command-family workload.");
 
-        decimal independentPreparationWork = Median(independentMeasurements.Select(measurement => measurement.PreparationWork));
-        decimal independentProjectionWork = Median(independentMeasurements.Select(measurement => measurement.ProjectionWork));
+        decimal independentPreparationWork = independentMeasurements.Sum(measurement => measurement.PreparationWork);
+        decimal independentProjectionWork = independentMeasurements.Sum(measurement => measurement.ProjectionWork);
         decimal independentTotalWork = independentPreparationWork + independentProjectionWork;
         decimal repeatedWorkShare = independentTotalWork <= 0
             ? 0
             : independentPreparationWork / independentTotalWork;
-        decimal coldPrepareCost = Math.Max(1, Median(sharedMeasurements.Select(measurement => measurement.PreparationWork)));
-        decimal loadAuthorizationCost = Math.Max(1, Median(sharedMeasurements.Select(measurement => measurement.ProjectionWork)));
+        decimal averageIndependentWork = independentTotalWork / representativeProcessCount;
+        decimal coldPrepareCost = Math.Max(1, averageIndependentWork);
+        decimal loadAuthorizationCost = Math.Max(
+            1,
+            sharedMeasurements.Sum(measurement => measurement.ProjectionWork) / sharedMeasurements.Count);
         decimal loadCostLowerBound = Math.Max(0, sharedMeasurements.Min(measurement => measurement.ProjectionWork));
         decimal loadCostUpperBound = Math.Max(loadCostLowerBound, sharedMeasurements.Max(measurement => measurement.ProjectionWork));
-        long candidateWork = Math.Max(1, (long)Math.Ceiling(independentTotalWork));
+        long candidateWork = Math.Max(1, (long)Math.Ceiling(averageIndependentWork));
         long cacheAvoidableWork = Math.Min(
             candidateWork,
-            independentMeasurements.Max(measurement => measurement.CacheAvoidableWork));
+            (long)Math.Ceiling(
+                independentMeasurements.Sum(measurement => measurement.CacheAvoidableWork) /
+                (decimal)representativeProcessCount));
         long preparedStateAvoidableWork = candidateWork - cacheAvoidableWork;
-        decimal measuredIndependentWorkflowWork = independentTotalWork * representativeProcessCount;
+        decimal measuredIndependentWorkflowWork = independentTotalWork;
         IReadOnlyDictionary<string, IReadOnlyList<CrossProcessProcessEvidence>> processBoundFamilies = processes
             .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
                               process.Identity.ExecutionKind == PreparationExecutionKind.ProcessBoundProjection)
@@ -63,18 +76,21 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             .OrderBy(family => family, StringComparer.Ordinal)
             .ToList();
         bool oneProcessWorkEvidenceComplete = missingOneProcessWorkEvidenceFamilies.Count == 0;
+        IReadOnlyList<CounterWorkMeasurement> processBoundMeasurements = requiredProcessBoundFamilies
+            .Where(processBoundFamilies.ContainsKey)
+            .SelectMany(family => processBoundFamilies[family])
+            .Select(process => TryReadCounterWork(process.Sample.RawAnalysisProfile))
+            .Where(measurement => measurement is not null)
+            .Select(measurement => measurement!)
+            .ToList();
         decimal? measuredOneProcessAlternativeWork = oneProcessWorkEvidenceComplete
-            ? coldPrepareCost + loadAuthorizationCost * sharedMeasurements.Count +
-              processBoundFamilies
-                  .Values
-                  .SelectMany(family => family)
-                  .Select(process => TryReadCounterWork(process.Sample.RawAnalysisProfile))
-                  .Where(measurement => measurement is not null)
-                  .Select(measurement => (decimal)(measurement!.PreparationWork + measurement.ProjectionWork))
-                  .Sum()
+            ? coldPrepareCost +
+              sharedMeasurements.Sum(measurement => measurement.ProjectionWork) +
+              processBoundMeasurements
+                  .Sum(measurement => (decimal)measurement.PreparationWork + measurement.ProjectionWork)
             : null;
         string workMeasurementBasis = oneProcessWorkEvidenceComplete
-            ? "Median preparation/projection counters from candidate independent profiles, shared one-process projections, and all required process-bound projections."
+            ? $"Summed preparation/projection counters for one disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}), matched to the shared and process-bound one-process projections. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
             : $"One-process comparison is incomplete; real profile counters/work evidence are missing for: {string.Join(", ", missingOneProcessWorkEvidenceFamilies)}. Missing work is not treated as zero.";
 
         PreparedEffectContract effect = new()
@@ -120,6 +136,36 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 expectedPersistedReuseWork < measuredOneProcessAlternativeWork!.Value,
         };
     }
+
+    private static IReadOnlyList<CrossProcessProcessEvidence> SelectRepresentativeIndependentProcesses(
+        IReadOnlyCollection<CrossProcessProcessEvidence> processes)
+    {
+        List<CrossProcessProcessEvidence> selected = [];
+        foreach (string family in _measuredCommandFamilies)
+        {
+            CrossProcessProcessEvidence? process = processes
+                .Where(candidate => candidate.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
+                                    candidate.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess &&
+                                    string.Equals(candidate.Identity.Projection.CommandFamily, family, StringComparison.Ordinal) &&
+                                    string.Equals(candidate.Sample.Run.CacheMode, "disabled", StringComparison.Ordinal))
+                .OrderBy(candidate => RepresentativeProcessPreference(candidate.Sample.Run.ParallelMode))
+                .ThenBy(candidate => candidate.Identity.ProcessOrdinal)
+                .FirstOrDefault();
+            Assert.That(process, Is.Not.Null,
+                $"Expected one disabled-cache independent process for representative command family '{family}'.");
+            selected.Add(process!);
+        }
+
+        return selected;
+    }
+
+    private static int RepresentativeProcessPreference(string parallelMode) => parallelMode switch
+    {
+        "preparation-priming" => 0,
+        "bounded-parallel" => 1,
+        "sequential" => 2,
+        _ => 3,
+    };
 
     private static PreparationDecision CreateDecision(
         PreparedEffectContract effect,
@@ -173,16 +219,6 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             OneProcessAlternativeEvaluated = false,
             BreakEvenObserved = breakEvenObserved,
         };
-    }
-
-    private static decimal Median(IEnumerable<long> values)
-    {
-        long[] ordered = values.OrderBy(value => value).ToArray();
-        Assert.That(ordered, Is.Not.Empty);
-        int middle = ordered.Length / 2;
-        return ordered.Length % 2 == 1
-            ? ordered[middle]
-            : (ordered[middle - 1] + ordered[middle]) / 2m;
     }
 
     private static CounterWorkMeasurement? TryReadCounterWork(JsonElement profile)

@@ -29,7 +29,19 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
                 archetype.PreparedEffect.MissingOneProcessWorkEvidenceFamilies.Count == 0), Is.True);
             Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MeasuredOneProcessAlternativeWork.HasValue), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.RepresentativeProcessCount == archetype.Workflow.MeasuredCommandFamilies.Count), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.CandidateIndependentProcesses.Count > archetype.PreparedEffect.RepresentativeProcessCount), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.RepresentativeCandidateIndependentProcesses
+                    .Select(process => process.Identity.Projection.CommandFamily)
+                    .ToHashSet(StringComparer.Ordinal)
+                    .SetEquals(archetype.Workflow.MeasuredCommandFamilies)), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.WorkMeasurementBasis.Contains("counters", StringComparison.Ordinal)), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.WorkMeasurementBasis.Contains("Summed", StringComparison.Ordinal) &&
+                archetype.PreparedEffect.WorkMeasurementBasis.Contains("Cache miss/hit samples remain supplemental", StringComparison.Ordinal)), Is.True);
             Assert.That(json, Does.Not.Contain("private-adopter"));
             Assert.That(json, Does.Not.Contain("eugen"));
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.Processes)

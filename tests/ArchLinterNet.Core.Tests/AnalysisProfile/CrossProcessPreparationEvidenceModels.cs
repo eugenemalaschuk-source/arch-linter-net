@@ -261,6 +261,17 @@ internal sealed record CrossProcessPreparationEvidenceDocument
                           process.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess)
         .ToList();
 
+    [JsonIgnore]
+    public IReadOnlyList<CrossProcessProcessEvidence> RepresentativeCandidateIndependentProcesses =>
+        CandidateIndependentProcesses
+            .Where(process => string.Equals(process.Sample.Run.CacheMode, "disabled", StringComparison.Ordinal) &&
+                              Workflow.MeasuredCommandFamilies.Contains(
+                                  process.Identity.Projection.CommandFamily,
+                                  StringComparer.Ordinal))
+            .GroupBy(process => process.Identity.Projection.CommandFamily, StringComparer.Ordinal)
+            .Select(group => group.OrderBy(process => process.Identity.ProcessOrdinal).First())
+            .ToList();
+
     public void Validate()
     {
         if (!string.Equals(EvidenceSchemaId, SchemaId, StringComparison.Ordinal))
@@ -321,9 +332,10 @@ internal sealed record CrossProcessPreparationEvidenceDocument
             }
         }
 
-        if (CandidateIndependentProcesses.Count != PreparedEffect.RepresentativeProcessCount)
+        if (RepresentativeCandidateIndependentProcesses.Count != PreparedEffect.RepresentativeProcessCount)
         {
-            throw new InvalidOperationException("Prepared-effect R must count candidate independent processes only.");
+            throw new InvalidOperationException(
+                "Prepared-effect R must count one disabled-cache candidate independent process per representative command family; supplemental cache-mode and duplicate samples are excluded.");
         }
 
         foreach (IGrouping<string, CrossProcessProcessEvidence> group in candidateProcesses
