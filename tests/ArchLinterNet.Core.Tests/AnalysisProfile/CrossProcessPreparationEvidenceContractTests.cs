@@ -387,22 +387,25 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     private static PreparedEffectScalePoint SyntheticScalePoint(
         string label,
         decimal coldPrepareCost,
-        decimal expectedLocalSpeedup) => new()
+        decimal expectedLocalSpeedup)
     {
-        Label = label,
-        WorkloadId = $"synthetic-scale-{label}",
-        WorkloadIdentity = new string('0', 64),
-        ProjectCount = 1,
-        TypeCount = 1,
-        SourceFileCount = 1,
-        ReferenceEdgeCount = 0,
-        CommandCount = 1,
-        IndependentPreparationWork = coldPrepareCost,
-        IndependentProjectionWork = 0,
-        ColdPrepareCost = coldPrepareCost,
-        ExpectedLocalSpeedup = expectedLocalSpeedup,
-        MeasurementBasis = "Synthetic measured analysis-profile counters.",
-    };
+        return new PreparedEffectScalePoint
+        {
+            Label = label,
+            WorkloadId = $"synthetic-scale-{label}",
+            WorkloadIdentity = new string('0', 64),
+            ProjectCount = 1,
+            TypeCount = 1,
+            SourceFileCount = 1,
+            ReferenceEdgeCount = 0,
+            CommandCount = 1,
+            IndependentPreparationWork = coldPrepareCost,
+            IndependentProjectionWork = 0,
+            ColdPrepareCost = coldPrepareCost,
+            ExpectedLocalSpeedup = expectedLocalSpeedup,
+            MeasurementBasis = "Synthetic measured analysis-profile counters.",
+        };
+    }
 
     private static BenchmarkProfileSample CreateSample(JsonElement profile, int ordinal) => new()
     {
