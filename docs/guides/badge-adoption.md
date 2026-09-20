@@ -14,6 +14,7 @@ badge projection through its own trusted post-merge workflow and adopter-owned
 hosting/storage. That transport's credentials, fail-closed receipt checks,
 availability, and lifecycle remain consumer responsibilities. This is not a
 fourth ArchLinterNet transport mode, protocol, or hosted service.
+
 An Architecture Health badge is a deliberately limited public projection of
 PR-authoritative evidence, not a second architecture evaluator. Choose the
 transport and disclosure first, then use [setup](badge-setup.md) for
