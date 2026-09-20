@@ -41,6 +41,28 @@ public sealed class ChangeCommandHandlerTests
     }
 
     [Test]
+    public void CreateSnapshot_ProfileCannotOverwriteOutputOrPolicy()
+    {
+        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj"));
+        var console = new CapturingConsole();
+        var fileSystem = new CapturingFileSystem();
+        var handler = new ChangeCommandHandler(runtime, console, fileSystem);
+
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "/repo/policy.yml", "strict", null, null, "/repo/snapshot.json", false,
+            ProfileDestination: "/repo/snapshot.json"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(runtime.ValidateCallCount, Is.EqualTo(0));
+            Assert.That(fileSystem.WrittenContents, Is.Null);
+            Assert.That(console.ErrorText, Does.Contain("--profile destination"));
+            Assert.That(console.ErrorText, Does.Contain("--output"));
+        });
+    }
+
+    [Test]
     public void CreateSnapshot_ForwardsBuildStateToEveryContributor()
     {
         ArchitectureRunnerPreparation preparedRunner = PreparedRunner();

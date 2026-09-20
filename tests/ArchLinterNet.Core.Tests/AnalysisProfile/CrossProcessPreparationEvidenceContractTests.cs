@@ -82,6 +82,25 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     }
 
     [Test]
+    public void ScaleEffect_UsesDurationFieldsInsteadOfAttributionCounters()
+    {
+        PreparedEffectScalePoint original = SyntheticScalePoint("medium", 50m, 1.25m);
+        PreparedEffectScalePoint changedCounters = original with
+        {
+            IndependentPreparationWork = 500_000m,
+            IndependentProjectionWork = 250_000m,
+            PerConsumerLoadAuthorizationCost = 125_000m,
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(() => changedCounters.Validate("synthetic", representativeProcessCount: 1), Throws.Nothing);
+            Assert.That(changedCounters.ExpectedLocalSpeedup, Is.EqualTo(original.ExpectedLocalSpeedup));
+            Assert.That(changedCounters.ColdPrepareMilliseconds, Is.EqualTo(original.ColdPrepareMilliseconds));
+        });
+    }
+
+    [Test]
     public void BaseRevisionPreparation_IsExcludedFromCandidateSavings()
     {
         CrossProcessPreparationEvidenceDocument evidence = CreateEvidence();
@@ -354,6 +373,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     private static PreparedEffectContract CreateEffect(int representativeProcessCount) => new()
     {
         IssueReference = "#493",
+        CostModelUnit = PreparedEffectContract.CostModelUnitMilliseconds,
+        CostMeasurementBasis = "Synthetic Stopwatch duration measurements in milliseconds; deterministic counters are attribution only.",
         RepresentativeProcessCount = representativeProcessCount,
         RepeatedWorkShare = 0.5m,
         CandidatePreparedBoundaryWork = 100,
@@ -363,17 +384,19 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         PerConsumerLoadAuthorizationCost = 10m,
         PerConsumerLoadAuthorizationCostLowerBound = 10m,
         PerConsumerLoadAuthorizationCostUpperBound = 10m,
-        PerConsumerLoadAuthorizationCostBasis = "Synthetic contract SelectedAssemblyCount state-record load/authorization proxy; projection work is separate.",
+        PerConsumerLoadAuthorizationCostBasis = "Synthetic measured duration load/authorization proxy in milliseconds; SelectedAssemblyCount is attribution only.",
         UnavoidableProjectionWork = 0m,
         MeasuredIndependentWorkflowWork = 100m,
         MeasuredOneProcessAlternativeWork = 120m,
         OneProcessWorkEvidenceComplete = true,
         MissingOneProcessWorkEvidenceFamilies = [],
+        TimingEvidenceComplete = true,
+        MissingTimingEvidenceFamilies = [],
         ExpectedPersistedReuseWork = 60m,
         DistinctCrossProcessValue = true,
         MaterialSavingsThreshold = 0.10m,
         MeasuredMaterialSavingsRatio = 0.5m,
-        WorkMeasurementBasis = "Synthetic contract counters.",
+        WorkMeasurementBasis = "Synthetic Stopwatch duration measurements in milliseconds; deterministic counters are attribution only.",
         BreakEvenProcessCount = 2,
         CacheModesMeasured = ["disabled", "miss", "hit"],
         Resources = BoundedResources(),
@@ -424,9 +447,13 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             IndependentPreparationWork = independentPreparationWork,
             IndependentProjectionWork = 0,
             PerConsumerLoadAuthorizationCost = perConsumerLoadAuthorizationCost,
+            IndependentPreparationMilliseconds = independentPreparationWork,
+            IndependentProjectionMilliseconds = 0,
+            PerConsumerLoadAuthorizationMilliseconds = perConsumerLoadAuthorizationCost,
             ColdPrepareCost = coldPrepareCost,
+            ColdPrepareMilliseconds = coldPrepareCost,
             ExpectedLocalSpeedup = expectedLocalSpeedup,
-            MeasurementBasis = "Synthetic measured analysis-profile counters with SelectedAssemblyCount state-record load/authorization proxy.",
+            MeasurementBasis = "Synthetic Stopwatch duration measurements in milliseconds; counters are attribution only.",
         };
     }
 
@@ -445,7 +472,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         CompletionStatus = "Success",
         ExitCode = 0,
         OutputFailed = false,
-        WallClock = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no wall-clock measurement."),
+        WallClock = BenchmarkResourceMeasurement.Available(1, "milliseconds"),
+        MeasuredWallClockMilliseconds = 1m,
         ProcessorTime = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no processor-time measurement."),
         AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no allocation measurement."),
         PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no memory measurement."),

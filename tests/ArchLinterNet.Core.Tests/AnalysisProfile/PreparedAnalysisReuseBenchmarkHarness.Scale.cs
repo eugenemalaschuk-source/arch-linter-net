@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text.Json;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Validation;
@@ -74,6 +76,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             File.WriteAllText(baselinePath, "version: 3\nbaseline: {}\nmetric_baselines: []\n");
             string changePolicyPath = CreateChangeSnapshotPolicy(fixture, workload);
             List<CounterWorkMeasurement> measurements = [];
+            List<CliObservation> observations = [];
             foreach (string family in _measuredCommandFamilies)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -86,16 +89,39 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                     changePolicyPath,
                     cancellationToken);
                 _ = SuccessfulCanonicalResult(observation, $"{label}/{family}");
+                observations.Add(observation);
                 CounterWorkMeasurement? measurement = TryReadCounterWork(observation.Profile);
                 Assert.That(measurement, Is.Not.Null,
                     $"Scale point '{label}' command family '{family}' must expose real profile counters.");
                 measurements.Add(measurement!);
             }
 
-            decimal perConsumerLoadAuthorizationCost = MeasureScaleLoadAuthorizationCost(
+            ScaleTimingMeasurement scaleTiming = MeasureScaleTiming(
                 fixture,
                 workload,
                 cancellationToken);
+            IReadOnlyDictionary<string, decimal> projectionMillisecondsByFamily =
+                _measuredCommandFamilies
+                    .Select((family, index) =>
+                    {
+                        decimal projectionDuration = scaleTiming.ProjectionMillisecondsByFamily.TryGetValue(
+                            family,
+                            out decimal measuredProjection)
+                            ? measuredProjection
+                            : DurationMilliseconds(observations[index].Elapsed);
+                        return (family, projectionDuration);
+                    })
+                    .ToDictionary(item => item.family, item => item.projectionDuration, StringComparer.Ordinal);
+            decimal independentPreparationMilliseconds = observations
+                .Select((observation, index) =>
+                {
+                    decimal independentDuration = DurationMilliseconds(observation.Elapsed);
+                    decimal projectionDuration = projectionMillisecondsByFamily[_measuredCommandFamilies[index]];
+                    Assert.That(independentDuration, Is.GreaterThanOrEqualTo(projectionDuration),
+                        $"Scale point '{label}' has a projection duration greater than its independent process duration for '{_measuredCommandFamilies[index]}'.");
+                    return independentDuration - projectionDuration;
+                })
+                .Sum();
 
             points.Add(new MeasuredScalePoint(
                 label,
@@ -103,13 +129,20 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 measurements.Count,
                 measurements.Sum(measurement => measurement.PreparationWork),
                 measurements.Sum(measurement => measurement.ProjectionWork),
-                perConsumerLoadAuthorizationCost));
+                independentPreparationMilliseconds,
+                projectionMillisecondsByFamily.Values.Sum(),
+                measurements.Sum(measurement => measurement.LoadAuthorizationWork) / measurements.Count,
+                scaleTiming.LoadAuthorizationMilliseconds));
         }
 
         return points;
     }
 
-    private static decimal MeasureScaleLoadAuthorizationCost(
+    private sealed record ScaleTimingMeasurement(
+        decimal LoadAuthorizationMilliseconds,
+        IReadOnlyDictionary<string, decimal> ProjectionMillisecondsByFamily);
+
+    private static ScaleTimingMeasurement MeasureScaleTiming(
         BenchmarkMaterializedFixture fixture,
         BenchmarkWorkloadDefinition workload,
         CancellationToken cancellationToken)
@@ -126,21 +159,34 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             CancellationToken = cancellationToken,
         });
 
+        Stopwatch strictClock = Stopwatch.StartNew();
         ValidationOutcome strict = snapshot.Evaluate("strict");
+        strictClock.Stop();
         Assert.That(strict.Passed, Is.True,
             "The scale-specific strict projection must pass before measuring load/authorization work.");
-        CounterWorkMeasurement strictMeasurement = ReadRequiredCounterWork(snapshot.Counters, "scale/strict");
+        _ = ReadRequiredCounterWork(snapshot.Counters, "scale/strict");
 
+        Stopwatch auditClock = Stopwatch.StartNew();
         ValidationOutcome audit = snapshot.Evaluate("audit");
+        auditClock.Stop();
         Assert.That(audit.Passed, Is.True,
             "The scale-specific audit projection must pass before measuring load/authorization work.");
-        CounterWorkMeasurement auditMeasurement = ReadRequiredCounterWork(snapshot.Counters, "scale/audit");
+        _ = ReadRequiredCounterWork(snapshot.Counters, "scale/audit");
 
-        decimal loadAuthorizationCost =
-            (strictMeasurement.LoadAuthorizationWork + auditMeasurement.LoadAuthorizationWork) / 2m;
-        Assert.That(loadAuthorizationCost, Is.GreaterThan(0),
-            "Scale-specific load/authorization cost must come from positive measured selected-state counters.");
-        return loadAuthorizationCost;
+        JsonElement strictProfile = CreateSyntheticProfile(snapshot.Counters, "scale-strict");
+        JsonElement auditProfile = CreateSyntheticProfile(snapshot.Counters, "scale-audit");
+        decimal loadAuthorizationMilliseconds =
+            (MeasureLoadAuthorizationDuration(strictProfile) + MeasureLoadAuthorizationDuration(auditProfile)) / 2m;
+        IReadOnlyDictionary<string, decimal> projectionMillisecondsByFamily = new Dictionary<string, decimal>(StringComparer.Ordinal)
+        {
+            ["strict"] = DurationMilliseconds(strictClock.Elapsed),
+            ["audit"] = DurationMilliseconds(auditClock.Elapsed),
+        };
+        Assert.That(loadAuthorizationMilliseconds, Is.GreaterThan(0),
+            "Scale-specific load/authorization duration must be positive.");
+        Assert.That(projectionMillisecondsByFamily.Values.Sum(), Is.GreaterThan(0),
+            "Scale-specific in-process projection duration must be positive.");
+        return new ScaleTimingMeasurement(loadAuthorizationMilliseconds, projectionMillisecondsByFamily);
     }
 
     private static CounterWorkMeasurement ReadRequiredCounterWork(

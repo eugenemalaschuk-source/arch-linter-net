@@ -49,6 +49,14 @@ internal sealed class MeasureCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (!AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination,
+                _console,
+                ("--policy", options.PolicyPath)))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
             return ExecuteCore(options);
@@ -118,7 +126,8 @@ internal sealed class MeasureCommandHandler
             _console,
             _fileSystem,
             counters,
-            complete ? AnalysisProfileCompletionStatus.Success : AnalysisProfileCompletionStatus.ValidationFailure);
+            complete ? AnalysisProfileCompletionStatus.Success : AnalysisProfileCompletionStatus.ValidationFailure,
+            ("--policy", options.PolicyPath));
         return complete
             ? CliExitCodes.Success
             : CliExitCodes.InvalidArgumentsOrRuntimeError;

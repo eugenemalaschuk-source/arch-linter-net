@@ -26,7 +26,15 @@ internal sealed record PreparedEffectScalePoint
 
     public required decimal PerConsumerLoadAuthorizationCost { get; init; }
 
+    public required decimal IndependentPreparationMilliseconds { get; init; }
+
+    public required decimal IndependentProjectionMilliseconds { get; init; }
+
+    public required decimal PerConsumerLoadAuthorizationMilliseconds { get; init; }
+
     public required decimal ColdPrepareCost { get; init; }
+
+    public required decimal ColdPrepareMilliseconds { get; init; }
 
     public required decimal ExpectedLocalSpeedup { get; init; }
 
@@ -38,7 +46,9 @@ internal sealed record PreparedEffectScalePoint
             string.IsNullOrWhiteSpace(WorkloadIdentity) || string.IsNullOrWhiteSpace(MeasurementBasis) ||
             representativeProcessCount < 1 || ProjectCount < 1 || TypeCount < 1 || SourceFileCount < 1 || ReferenceEdgeCount < 0 ||
             CommandCount < 1 || IndependentPreparationWork < 0 || IndependentProjectionWork < 0 ||
-            PerConsumerLoadAuthorizationCost <= 0 || ColdPrepareCost < 0 || ExpectedLocalSpeedup <= 0)
+            IndependentPreparationMilliseconds < 0 || IndependentProjectionMilliseconds < 0 ||
+            PerConsumerLoadAuthorizationMilliseconds <= 0 || ColdPrepareMilliseconds < 0 ||
+            ExpectedLocalSpeedup <= 0)
         {
             throw new InvalidOperationException($"Scale evidence '{fieldName}' contains invalid dimensions or measurements.");
         }
@@ -50,19 +60,19 @@ internal sealed record PreparedEffectScalePoint
             throw new InvalidOperationException($"Scale evidence '{fieldName}' must retain a lowercase workload SHA-256 identity.");
         }
 
-        decimal expectedColdPrepareCost = IndependentPreparationWork / CommandCount;
-        if (ColdPrepareCost != expectedColdPrepareCost)
+        decimal expectedColdPrepareMilliseconds = IndependentPreparationMilliseconds / CommandCount;
+        if (ColdPrepareMilliseconds != expectedColdPrepareMilliseconds)
         {
             throw new InvalidOperationException(
-                $"Scale evidence '{fieldName}' must derive cold preparation from measured preparation counters and command count.");
+                $"Scale evidence '{fieldName}' must derive cold preparation from measured duration and command count.");
         }
 
-        decimal independentWork = IndependentPreparationWork + IndependentProjectionWork;
-        decimal persistedWork = ColdPrepareCost +
-            representativeProcessCount * PerConsumerLoadAuthorizationCost +
-            IndependentProjectionWork;
-        decimal expectedLocalSpeedup = persistedWork > 0
-            ? independentWork / persistedWork
+        decimal independentMilliseconds = IndependentPreparationMilliseconds + IndependentProjectionMilliseconds;
+        decimal persistedMilliseconds = ColdPrepareMilliseconds +
+            representativeProcessCount * PerConsumerLoadAuthorizationMilliseconds +
+            IndependentProjectionMilliseconds;
+        decimal expectedLocalSpeedup = persistedMilliseconds > 0
+            ? independentMilliseconds / persistedMilliseconds
             : 0;
         if (ExpectedLocalSpeedup != expectedLocalSpeedup)
         {
@@ -70,17 +80,24 @@ internal sealed record PreparedEffectScalePoint
                 $"Scale evidence '{fieldName}' must derive expected local speedup from its own measured load/authorization cost.");
         }
 
-        if (!MeasurementBasis.Contains("SelectedAssemblyCount", StringComparison.Ordinal))
+        if (!MeasurementBasis.Contains("Stopwatch", StringComparison.Ordinal) ||
+            !MeasurementBasis.Contains("milliseconds", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"Scale evidence '{fieldName}' must identify an independent selected-state load/authorization proxy.");
+                $"Scale evidence '{fieldName}' must identify stopwatch duration measurements in milliseconds.");
         }
     }
 }
 
 internal sealed record PreparedEffectContract
 {
+    public const string CostModelUnitMilliseconds = "milliseconds";
+
     public required string IssueReference { get; init; }
+
+    public required string CostModelUnit { get; init; }
+
+    public required string CostMeasurementBasis { get; init; }
 
     public required int RepresentativeProcessCount { get; init; }
 
@@ -112,6 +129,10 @@ internal sealed record PreparedEffectContract
 
     public required IReadOnlyList<string> MissingOneProcessWorkEvidenceFamilies { get; init; }
 
+    public required bool TimingEvidenceComplete { get; init; }
+
+    public required IReadOnlyList<string> MissingTimingEvidenceFamilies { get; init; }
+
     public required decimal ExpectedPersistedReuseWork { get; init; }
 
     public required bool DistinctCrossProcessValue { get; init; }
@@ -140,7 +161,10 @@ internal sealed record PreparedEffectContract
     public long PreparedStateOnlyWork => CandidatePreparedBoundaryWork - CacheAvoidableWork;
 
     [JsonIgnore]
-    public bool MateriallyCheaper => OneProcessWorkEvidenceComplete &&
+    public bool DecisionCapableEvidence => OneProcessWorkEvidenceComplete && TimingEvidenceComplete;
+
+    [JsonIgnore]
+    public bool MateriallyCheaper => DecisionCapableEvidence &&
         MeasuredOneProcessAlternativeWork is > 0 &&
         MeasuredMaterialSavingsRatio >= MaterialSavingsThreshold;
 
@@ -170,9 +194,10 @@ internal sealed record PreparedEffectContract
 
     public void Validate()
     {
-        if (!string.Equals(IssueReference, "#493", StringComparison.Ordinal))
+        if (!string.Equals(IssueReference, "#493", StringComparison.Ordinal) ||
+            !string.Equals(CostModelUnit, CostModelUnitMilliseconds, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("The prepared-effect contract must identify issue #493.");
+            throw new InvalidOperationException("The prepared-effect contract must identify issue #493 and use milliseconds for cost decisions.");
         }
 
         if (RepresentativeProcessCount < 1 || RepeatedWorkShare is < 0 or > 1 ||
@@ -190,15 +215,32 @@ internal sealed record PreparedEffectContract
         }
 
         if (string.IsNullOrWhiteSpace(PerConsumerLoadAuthorizationCostBasis) ||
-            string.IsNullOrWhiteSpace(WorkMeasurementBasis))
+            string.IsNullOrWhiteSpace(WorkMeasurementBasis) ||
+            string.IsNullOrWhiteSpace(CostMeasurementBasis))
         {
             throw new InvalidOperationException("Prepared-effect measurements require an explicit basis.");
         }
 
-        if (!PerConsumerLoadAuthorizationCostBasis.Contains("SelectedAssemblyCount", StringComparison.Ordinal))
+        if (!CostMeasurementBasis.Contains("Stopwatch", StringComparison.Ordinal) ||
+            !CostMeasurementBasis.Contains("milliseconds", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                "The load/authorization basis must identify the independent selected-state proxy.");
+                "The prepared-effect cost basis must identify stopwatch measurements in milliseconds.");
+        }
+
+        if (DecisionCapableEvidence &&
+            (!WorkMeasurementBasis.Contains("Stopwatch", StringComparison.Ordinal) ||
+             !WorkMeasurementBasis.Contains("deterministic counters", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException(
+                "Decision-capable work evidence must identify stopwatch cost units and counter attribution separately.");
+        }
+
+        if (!PerConsumerLoadAuthorizationCostBasis.Contains("duration", StringComparison.OrdinalIgnoreCase) ||
+            PerConsumerLoadAuthorizationCostBasis.Contains("SelectedAssemblyCount state-record cardinality", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "The load/authorization basis must describe a measured duration, not a counter as a cost unit.");
         }
 
         if (MissingOneProcessWorkEvidenceFamilies.Count !=
@@ -213,12 +255,17 @@ internal sealed record PreparedEffectContract
             throw new InvalidOperationException("One-process work evidence completeness must match the missing-family list.");
         }
 
-        if (OneProcessWorkEvidenceComplete && !MeasuredOneProcessAlternativeWork.HasValue)
+        if (TimingEvidenceComplete != (MissingTimingEvidenceFamilies.Count == 0))
+        {
+            throw new InvalidOperationException("Timing evidence completeness must match the missing-timing-family list.");
+        }
+
+        if (DecisionCapableEvidence && !MeasuredOneProcessAlternativeWork.HasValue)
         {
             throw new InvalidOperationException("Complete one-process work evidence must include a measured alternative cost.");
         }
 
-        decimal expectedMaterialSavingsRatio = OneProcessWorkEvidenceComplete &&
+        decimal expectedMaterialSavingsRatio = DecisionCapableEvidence &&
             MeasuredOneProcessAlternativeWork is > 0
             ? (MeasuredOneProcessAlternativeWork.Value - ExpectedPersistedReuseWork) /
               MeasuredOneProcessAlternativeWork.Value
@@ -229,7 +276,7 @@ internal sealed record PreparedEffectContract
                 "Measured material savings must be derived from the measured one-process and persisted work values.");
         }
 
-        if (!OneProcessWorkEvidenceComplete &&
+        if (!DecisionCapableEvidence &&
             (MeasuredOneProcessAlternativeWork.HasValue || DistinctCrossProcessValue ||
              MeasuredMaterialSavingsRatio != 0))
         {
@@ -254,7 +301,7 @@ internal sealed record PreparedEffectContract
             throw new InvalidOperationException("The recorded persisted reuse work does not match the expected-effect calculation.");
         }
 
-        if (OneProcessWorkEvidenceComplete &&
+        if (DecisionCapableEvidence &&
             DistinctCrossProcessValue != (ExpectedPersistedReuseWork < MeasuredOneProcessAlternativeWork!.Value))
         {
             throw new InvalidOperationException("Distinct cross-process value must be derived from measured one-process and persisted costs.");

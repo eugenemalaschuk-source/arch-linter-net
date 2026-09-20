@@ -65,6 +65,18 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (!AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination,
+                console,
+                ("--policy", options.PolicyPath),
+                ("--baseline", options.BaselinePath),
+                ("--base-context", options.BaseContextPath),
+                ("--current-context", options.CurrentContextPath),
+                ("--public-api-approval", options.PublicApiApprovalPath)))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
             (ArchitectureDebtGateOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) = runtime.EvaluateDebtGateWithCounters(
@@ -84,7 +96,12 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
                     ? AnalysisProfileCompletionStatus.PreparationFailure
                     : outcome.Passed
                         ? AnalysisProfileCompletionStatus.Success
-                        : AnalysisProfileCompletionStatus.ValidationFailure);
+                        : AnalysisProfileCompletionStatus.ValidationFailure,
+                ("--policy", options.PolicyPath),
+                ("--baseline", options.BaselinePath),
+                ("--base-context", options.BaseContextPath),
+                ("--current-context", options.CurrentContextPath),
+                ("--public-api-approval", options.PublicApiApprovalPath));
             if (!outcome.Succeeded)
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;

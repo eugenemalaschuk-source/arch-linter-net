@@ -84,6 +84,22 @@ internal sealed class HealthCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        (string Name, string? Path)[] profileProtectedPaths = new[]
+        {
+            ("--policy", (string?)options.PolicyPath),
+            ("--baseline", options.BaselinePath),
+            ("--base-context", options.BaseContextPath),
+            ("--current-context", options.CurrentContextPath),
+            ("--public-api-approval", options.PublicApiApprovalPath),
+        }
+        .Concat((externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
+            .Select(artifact => ("--external-evidence", (string?)artifact.Path)))
+        .ToArray();
+        if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileProtectedPaths))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
             ArchitectureHealthOutcome outcome = runtime.EvaluateHealth(new ArchitectureHealthRequest
@@ -108,7 +124,8 @@ internal sealed class HealthCommandHandler(
                     ArchitectureHealthGate.Pass => AnalysisProfileCompletionStatus.Success,
                     ArchitectureHealthGate.Fail => AnalysisProfileCompletionStatus.ValidationFailure,
                     _ => AnalysisProfileCompletionStatus.PreparationFailure,
-                });
+                },
+                profileProtectedPaths);
 
             return outcome.Gate switch
             {

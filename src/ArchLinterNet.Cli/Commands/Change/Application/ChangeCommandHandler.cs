@@ -25,6 +25,16 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (!AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination,
+                console,
+                ("--policy", options.PolicyPath),
+                ("--baseline", options.BaselinePath),
+                ("--output", options.OutputPath)))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
             string? outputCollision = FindSnapshotOutputCollision(options);
@@ -54,7 +64,10 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                     console,
                     fileSystem,
                     counters,
-                    AnalysisProfileCompletionStatus.PreparationFailure);
+                    AnalysisProfileCompletionStatus.PreparationFailure,
+                    ("--policy", options.PolicyPath),
+                    ("--baseline", options.BaselinePath),
+                    ("--output", options.OutputPath));
                 return FailIncompleteSnapshot("validation", validation.PreflightDiagnostics);
             }
 
@@ -97,6 +110,27 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            if (!AnalysisProfilePublisher.TryValidateDestination(
+                    options.ProfileDestination,
+                    console,
+                    ("--policy", options.PolicyPath),
+                    ("--baseline", options.BaselinePath),
+                    ("--output", options.OutputPath)) ||
+                !AnalysisProfilePublisher.TryValidateDestination(
+                    options.ProfileDestination,
+                    console,
+                    validation.PolicyImportPaths.Select(path => ("imported policy", (string?)path))
+                        .Concat(validation.ResolvedAssemblyPaths.SelectMany(path => new[]
+                        {
+                            ("a build artifact", (string?)path),
+                            ("a build receipt", (string?)BuildReceiptStore.ReceiptPathFor(path)),
+                        }))
+                        .Concat(validation.DiscoveredProjectPaths.Select(path => ("a project file", (string?)path)))
+                        .ToArray()))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
                 options.Mode, validation, namespaces, assemblies, baselineDebt, options.ConditionSetName);
             fileSystem.WriteAllText(options.OutputPath, ArchitectureChangeReports.SerializeSnapshot(snapshot));
@@ -105,7 +139,10 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 console,
                 fileSystem,
                 counters,
-                AnalysisProfileCompletionStatus.Success);
+                AnalysisProfileCompletionStatus.Success,
+                ("--policy", options.PolicyPath),
+                ("--baseline", options.BaselinePath),
+                ("--output", options.OutputPath));
             return CliExitCodes.Success;
         }
         catch (Exception exception)

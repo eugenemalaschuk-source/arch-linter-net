@@ -47,15 +47,17 @@ projection as part of the workflow.
 The decision compares the same candidate state in three forms:
 
 1. Independent one-shot processes. Each process materializes its own analysis
-   snapshot and retains its complete `analysis-profile/v1` payload. Sum
-   deterministic preparation/fact counters by candidate process ordinal.
+   snapshot and retains its complete `analysis-profile/v1` payload. Retain
+   deterministic preparation/fact counters by candidate process ordinal for
+   attribution, but use measured elapsed durations for cost decisions.
 2. One-process multi-projection execution. Safe read-only projections share one
    immutable `ArchitectureAnalysisSnapshot`/session. Record which projections
    share preparation and which remain process-bound; sharing is not assumed for
    command families that require a separate lifetime or revision.
 3. Persisted prepared-state expected effect. Model the cold prepare and each
-   consumer load/authorization cost from measured candidate work. This is an
-   expected-effect model, not a prepared implementation result.
+   consumer load/authorization cost from measured duration evidence in the
+   same unit. This is an expected-effect model, not a prepared implementation
+   result.
 
 For all three forms, compare canonical findings, canonical identity, ordering,
 completion status, exit semantics, and publication outcome. Wall-clock, CPU,
@@ -102,9 +104,10 @@ The evidence must record, for the candidate only:
 - representative process/consumer count and command mix `R`;
 - repeated-work share `p`;
 - deterministic candidate prepared-boundary counts;
-- cold prepare cost `C`;
-- representative per-consumer load/authorization cost `L`, plus a measured
-  load/authorization proxy for every small, medium, and large scale point;
+- cold prepare duration `C` in milliseconds;
+- representative per-consumer load/authorization duration `L` in
+  milliseconds, plus a repeated measured serialized-state load/authorization
+  proxy for every small, medium, and large scale point;
 - small, medium, and large expected effect derived from measured scale points
   using each point's own `L` rather than borrowing a medium-workload proxy;
 - the solution dimensions and command count represented by each scale point;
@@ -122,11 +125,17 @@ prepared-state model  = C + R × L + U
 
 Here `U` is unavoidable consume/projection work that is paid once by the
 workflow boundary in either model. It therefore cancels from the preparation
-crossover, which is evaluated as `C + R × L < R × P`. `L` must be measured independently from `U`: before a
-persisted store exists, the benchmark uses the profile's
-`SelectedAssemblyCount` state-record cardinality as a bounded, normalized
-load/authorization proxy. Projection counters such as modes, rendered/output
-sinks, and contract-family executions must not be used as `L` when they are
+crossover, which is evaluated as `C + R × L < R × P`. For each representative
+family, `P` is derived from the independent wall-clock duration minus the
+matching one-process projection duration; `U` contains those projection
+durations exactly once. `C`, `P`, `L`, and `U` must all be elapsed-duration
+values in milliseconds; deterministic counter cardinalities are never added,
+divided, or compared as if they were time. `L` must be measured independently
+from `U`: before a persisted store exists, the benchmark uses a repeated
+in-memory serialized-state load/authorization proxy and records its
+uncertainty/basis explicitly.
+`SelectedAssemblyCount` and projection counters remain attribution evidence,
+not cost units, and projection duration must not be reused as `L` when it is
 also included in `U` or in the one-process alternative.
 
 If `P <= L`, there is no persisted-state crossover under this model because

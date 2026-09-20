@@ -14,9 +14,15 @@ internal static class AnalysisProfilePublisher
         ICliConsole console,
         IFileSystem fileSystem,
         ArchitectureAnalysisSnapshotCounters counters,
-        AnalysisProfileCompletionStatus completionStatus)
+        AnalysisProfileCompletionStatus completionStatus,
+        params (string Name, string? Path)[] protectedPaths)
     {
         if (destination is null)
+        {
+            return;
+        }
+
+        if (!TryValidateDestination(destination, console, protectedPaths))
         {
             return;
         }
@@ -41,5 +47,54 @@ internal static class AnalysisProfilePublisher
                 fileSystem.WriteAllText(destination, json);
                 break;
         }
+    }
+
+    internal static bool TryValidateDestination(
+        string? destination,
+        ICliConsole console,
+        params (string Name, string? Path)[] protectedPaths)
+    {
+        if (destination is null || destination is "stdout" or "stderr")
+        {
+            return true;
+        }
+
+        string destinationPath;
+        try
+        {
+            destinationPath = System.IO.Path.GetFullPath(destination);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or IOException)
+        {
+            console.Error.WriteLine($"--profile destination '{destination}' is not a valid file path");
+            return false;
+        }
+
+        foreach ((string name, string? path) in protectedPaths)
+        {
+            if (path is null)
+            {
+                continue;
+            }
+
+            string protectedPath;
+            try
+            {
+                protectedPath = System.IO.Path.GetFullPath(path);
+            }
+            catch (Exception exception) when (exception is ArgumentException or NotSupportedException or IOException)
+            {
+                continue;
+            }
+
+            if (string.Equals(destinationPath, protectedPath, StringComparison.OrdinalIgnoreCase))
+            {
+                console.Error.WriteLine(
+                    $"--profile destination '{destination}' matches {name} path '{path}'; profile was not written");
+                return false;
+            }
+        }
+
+        return true;
     }
 }

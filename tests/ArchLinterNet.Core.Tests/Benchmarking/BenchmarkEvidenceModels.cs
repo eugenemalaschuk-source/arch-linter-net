@@ -131,6 +131,11 @@ internal sealed record BenchmarkProfileSample
 
     public required BenchmarkResourceMeasurement WallClock { get; init; }
 
+    // WallClock is retained as the integer resource summary used by the existing evidence
+    // contract. This higher-resolution value is the decision-model input for sub-process and
+    // in-process timings, where rounding a sub-millisecond sample to zero would erase evidence.
+    public decimal? MeasuredWallClockMilliseconds { get; init; }
+
     public required BenchmarkResourceMeasurement ProcessorTime { get; init; }
 
     public required BenchmarkResourceMeasurement AllocatedBytes { get; init; }
@@ -293,6 +298,11 @@ internal sealed record BenchmarkEvidenceDocument
         foreach (BenchmarkProfileSample sample in Samples)
         {
             sample.WallClock.Validate("samples.wall_clock");
+            if (sample.MeasuredWallClockMilliseconds is <= 0)
+            {
+                throw new InvalidOperationException(
+                    "A measured benchmark wall-clock duration must be positive when present.");
+            }
             sample.ProcessorTime.Validate("samples.processor_time");
             sample.AllocatedBytes.Validate("samples.allocated_bytes");
             sample.PeakManagedMemory.Validate("samples.peak_managed_memory");

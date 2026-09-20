@@ -27,9 +27,15 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
             Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.OneProcessWorkEvidenceComplete), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.MissingOneProcessWorkEvidenceFamilies.Count == 0), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.TimingEvidenceComplete), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.MissingTimingEvidenceFamilies.Count == 0), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.CostModelUnit == PreparedEffectContract.CostModelUnitMilliseconds), Is.True);
             Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MeasuredOneProcessAlternativeWork.HasValue), Is.True);
             Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MaterialSavingsThreshold == 0.10m), Is.True);
-            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MateriallyCheaper), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.Decision.Outcome != PreparationDecisionOutcome.A || archetype.PreparedEffect.MateriallyCheaper), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.ScaleEvidence
                     .Select(point => point.Label)
@@ -41,11 +47,11 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.ScaleEvidenceBasis.Contains("Measured analysis-profile/v1 counters", StringComparison.Ordinal)), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
-                archetype.PreparedEffect.ScaleEvidenceBasis.Contains("SelectedAssemblyCount", StringComparison.Ordinal)), Is.True);
+                archetype.PreparedEffect.ScaleEvidenceBasis.Contains("attribution", StringComparison.Ordinal)), Is.True);
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
-                .All(point => point.MeasurementBasis.Contains("Measured analysis-profile/v1 counters", StringComparison.Ordinal)), Is.True);
+                .All(point => point.MeasurementBasis.Contains("Stopwatch", StringComparison.Ordinal)), Is.True);
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
-                .All(point => point.MeasurementBasis.Contains("SelectedAssemblyCount", StringComparison.Ordinal)), Is.True);
+                .All(point => point.MeasurementBasis.Contains("milliseconds", StringComparison.Ordinal)), Is.True);
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
                 .All(point => point.PerConsumerLoadAuthorizationCost > 0), Is.True);
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
@@ -58,7 +64,7 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
                     archetype.PreparedEffect.RepresentativeProcessCount;
                 Assert.That(
                     archetype.PreparedEffect.ColdPrepareCost,
-                    Is.EqualTo(expectedColdPrepareCost).Within(0.000000000000000000000000001m));
+                    Is.EqualTo(expectedColdPrepareCost).Within(0.0000000000000000000000001m));
             }
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.RepresentativeProcessCount == archetype.Workflow.MeasuredCommandFamilies.Count), Is.True);
@@ -70,9 +76,9 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
                     .ToHashSet(StringComparer.Ordinal)
                     .SetEquals(archetype.Workflow.MeasuredCommandFamilies)), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
-                archetype.PreparedEffect.WorkMeasurementBasis.Contains("counters", StringComparison.Ordinal)), Is.True);
+                archetype.PreparedEffect.WorkMeasurementBasis.Contains("Stopwatch", StringComparison.Ordinal)), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
-                archetype.PreparedEffect.WorkMeasurementBasis.Contains("Summed", StringComparison.Ordinal) &&
+                archetype.PreparedEffect.WorkMeasurementBasis.Contains("deterministic counters", StringComparison.Ordinal) &&
                 archetype.PreparedEffect.WorkMeasurementBasis.Contains("Cache miss/hit samples remain supplemental", StringComparison.Ordinal)), Is.True);
             Assert.That(json, Does.Not.Contain("private-adopter"));
             Assert.That(json, Does.Not.Contain("eugen"));

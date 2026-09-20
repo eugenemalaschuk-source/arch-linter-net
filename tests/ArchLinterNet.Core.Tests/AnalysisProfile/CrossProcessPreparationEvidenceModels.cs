@@ -330,17 +330,17 @@ internal sealed record CrossProcessPreparationEvidenceDocument
         PreparedEffect.Validate();
         Decision.Validate();
 
-        if (Workflow.OneProcessAlternativeMeasured != PreparedEffect.OneProcessWorkEvidenceComplete)
+        if (Workflow.OneProcessAlternativeMeasured != PreparedEffect.DecisionCapableEvidence)
         {
             throw new InvalidOperationException(
-                "The one-process workflow flag must match process-bound work evidence completeness.");
+                "The one-process workflow flag must match complete attribution and timing evidence.");
         }
 
-        if (!PreparedEffect.OneProcessWorkEvidenceComplete &&
+        if (!PreparedEffect.DecisionCapableEvidence &&
             (Decision.Outcome != PreparationDecisionOutcome.C || Decision.OneProcessAlternativeEvaluated))
         {
             throw new InvalidOperationException(
-                "Incomplete one-process work evidence must remain non-decision-capable with Outcome C.");
+                "Incomplete one-process attribution or timing evidence must remain non-decision-capable with Outcome C.");
         }
 
         if (Decision.Outcome == PreparationDecisionOutcome.A && !PreparedEffect.Resources.HasBoundedTradeoffModel)

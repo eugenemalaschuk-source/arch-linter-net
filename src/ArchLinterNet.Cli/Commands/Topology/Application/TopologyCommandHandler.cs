@@ -31,6 +31,15 @@ internal sealed class TopologyCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (!AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination,
+                console,
+                ("--policy", options.PolicyPath),
+                ("--output", options.OutputPath)))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
             (ArchitectureTopologyCaptureOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) = runtime.CaptureTopologyWithCounters(new ArchitectureTopologyCaptureRequest
@@ -73,7 +82,9 @@ internal sealed class TopologyCommandHandler(
                 counters,
                 outcome.PreflightBlocked
                     ? AnalysisProfileCompletionStatus.PreparationFailure
-                    : AnalysisProfileCompletionStatus.Success);
+                    : AnalysisProfileCompletionStatus.Success,
+                ("--policy", options.PolicyPath),
+                ("--output", options.OutputPath));
 
             return outcome.PreflightBlocked ? CliExitCodes.InvalidArgumentsOrRuntimeError : CliExitCodes.Success;
         }

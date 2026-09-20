@@ -268,7 +268,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             Projections = processes.Select(process => process.Identity.Projection).Distinct().ToList(),
             MeasuredCommandFamilies = _measuredCommandFamilies,
             CacheModesMeasured = ["disabled", "miss", "hit"],
-            OneProcessAlternativeMeasured = effect.OneProcessWorkEvidenceComplete,
+            OneProcessAlternativeMeasured = effect.DecisionCapableEvidence,
         };
         CrossProcessPreparationEvidenceDocument evidence = new()
         {
@@ -346,16 +346,20 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             CancellationToken = cancellationToken,
         });
 
+        Stopwatch strictClock = Stopwatch.StartNew();
         ValidationOutcome strict = snapshot.Evaluate("strict");
+        strictClock.Stop();
         Assert.That(strict.Passed, Is.True,
             $"The in-process strict projection must pass. preflight={strict.PreflightBlocked}; " +
             $"preflight_diagnostics={string.Join(" | ", strict.PreflightDiagnostics.Select(diagnostic => diagnostic.State))}; " +
             $"violations={strict.Violations.Count}; cycles={strict.Cycles.Count}; coverage={strict.CoverageFindings.Count}");
-        AddProjection("strict", snapshot.Counters, strict, workload, processes, samples, ref ordinal);
+        AddProjection("strict", snapshot.Counters, strict, strictClock.Elapsed, workload, processes, samples, ref ordinal);
 
+        Stopwatch auditClock = Stopwatch.StartNew();
         ValidationOutcome audit = snapshot.Evaluate("audit");
+        auditClock.Stop();
         Assert.That(audit.Passed, Is.True, "The in-process audit projection must pass.");
-        AddProjection("audit", snapshot.Counters, audit, workload, processes, samples, ref ordinal);
+        AddProjection("audit", snapshot.Counters, audit, auditClock.Elapsed, workload, processes, samples, ref ordinal);
     }
 
     private static void AddProcessBoundOneProcessProjections(
@@ -403,6 +407,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         string family,
         ArchitectureAnalysisSnapshotCounters counters,
         ValidationOutcome outcome,
+        TimeSpan elapsed,
         BenchmarkWorkloadDefinition workload,
         ICollection<CrossProcessProcessEvidence> processes,
         ICollection<BenchmarkProfileSample> samples,
@@ -411,12 +416,12 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         ordinal++;
         string output = FormatProjectionResult(family, outcome);
         BenchmarkCanonicalResultIdentity canonical = SuccessfulCanonicalResult(
-            new CliObservation(0, TimeSpan.Zero, CreateSyntheticProfile(counters, family), output),
+            new CliObservation(0, elapsed, CreateSyntheticProfile(counters, family), output),
             family);
         JsonElement profile = CreateSyntheticProfile(counters, family);
         BenchmarkProfileSample sample = CreateSample(
             workload,
-            new CliObservation(0, TimeSpan.Zero, profile, output),
+            new CliObservation(0, elapsed, profile, output),
             ordinal,
             "disabled",
             canonical,
@@ -502,7 +507,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ColdPathTradeOff = "The cold preparation remains a separate cost and is never counted as a cache hit.",
             SuccessThreshold = "Only authorize implementation when persisted reuse is at least 10% cheaper than the measured representative one-process alternative, the measured small/medium/large matrix is decision-capable, and resource bounds are available.",
             KillCriterion = "Defer or route elsewhere when canonical equivalence, cache separation, or a representative crossover is not reproduced.",
-            Confidence = "Expected effect and small/medium/large scaling are derived from measured analysis-profile counters; each scale point has a separately measured SelectedAssemblyCount state-record load/authorization proxy, while projection/consume work remains a separate component and the persisted store remains an explicit pre-implementation proxy.",
+            Confidence = "Decision costs and small/medium/large scaling are derived from Stopwatch wall-clock durations in milliseconds; analysis-profile counters identify attribution only. Each scale point has a separately measured serialized-state load/authorization proxy, while projection/consume duration remains a separate component and the persisted store remains an explicit pre-implementation proxy.",
         };
     }
 
@@ -608,7 +613,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ExitCode = canonical.ExitCode,
             OutputFailed = false,
             WallClock = BenchmarkResourceMeasurement.Available(
-            Math.Max(0, (long)observation.Elapsed.TotalMilliseconds), "milliseconds"),
+            Math.Max(1, (long)Math.Ceiling(observation.Elapsed.TotalMilliseconds)), "milliseconds"),
+            MeasuredWallClockMilliseconds = DurationMilliseconds(observation.Elapsed),
             ProcessorTime = BenchmarkResourceMeasurement.Unavailable("Processor time is not isolated by the pre-implementation harness."),
             AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Allocation is not isolated by the pre-implementation harness."),
             PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Peak memory is not isolated by the pre-implementation harness."),
