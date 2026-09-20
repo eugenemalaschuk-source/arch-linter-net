@@ -144,6 +144,14 @@ owned by #492/#493. It does not create a competing benchmark framework or assert
 selector/layer, real-MSBuild cache-eligibility, or changed-project advisory
 findings.
 
+The current artifact's conclusion reports `build_state_preflight` separately:
+it is the dominant phase in the 1-process sample and remains roughly 82% of
+inner time across the matrix. It records the launched CLI file version and
+DLL SHA-256, the matching CLI package id/version/hash, and canonical-result
+equivalence includes the JSON contract's `cycle_diagnostics` field. NUnit
+cooperative cancellation is passed into each child-process wait and kills the
+entire process tree on cancellation or per-process timeout.
+
 ## Benchmark scenario IDs (see `docs/internal/analysis-profile-pre-optimization-baseline.md`)
 
 | Scenario ID | Measures |
