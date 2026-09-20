@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/large-solution-benchmark/v1",
+  "title": "ArchLinterNet large-solution-benchmark/v1 workload manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "generator_version", "workload_id", "shape", "compilation_mode", "dimensions", "projects", "edges", "topology", "inventory", "workflow", "pull_request_change", "workload_identity"],
+  "properties": {
+    "schema_id": { "const": "large-solution-benchmark/v1" },
+    "generator_version": { "type": "string", "minLength": 1 },
+    "workload_id": { "type": "string", "pattern": "^synthetic-[a-z0-9-]+$" },
+    "shape": { "enum": ["linear", "wide_fan_out_fan_in", "diamond", "dense", "cyclic_scc", "many_projects_few_types", "few_projects_many_types"] },
+    "compilation_mode": { "enum": ["real_ms_build", "staged_assemblies"] },
+    "dimensions": { "$ref": "#/$defs/dimensions" },
+    "projects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/project" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "topology": { "$ref": "#/$defs/topology" },
+    "inventory": { "$ref": "#/$defs/inventory" },
+    "workflow": { "$ref": "#/$defs/workflow" },
+    "pull_request_change": { "$ref": "#/$defs/pull_request_change" },
+    "workload_identity": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "$defs": {
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_count", "types_per_project", "source_files_per_project", "references_per_project", "layer_count", "selector_predicate_terms_per_layer", "contracts_per_workload", "finding_candidates", "source_root_count"],
+      "properties": {
+        "project_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "types_per_project": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "source_files_per_project": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "references_per_project": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "layer_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "selector_predicate_terms_per_layer": { "type": "integer", "minimum": 1, "maximum": 25 },
+        "contracts_per_workload": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "finding_candidates": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "source_root_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "assembly_name"],
+      "properties": { "id": { "type": "string" }, "assembly_name": { "type": "string" } }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_project_id", "to_project_id"],
+      "properties": { "from_project_id": { "type": "string" }, "to_project_id": { "type": "string" } }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_count", "reference_edge_count", "strongly_connected_component_count", "contains_cycle", "alternate_path_count"],
+      "properties": {
+        "project_count": { "type": "integer", "minimum": 1 },
+        "reference_edge_count": { "type": "integer", "minimum": 0 },
+        "strongly_connected_component_count": { "type": "integer", "minimum": 1 },
+        "contains_cycle": { "type": "boolean" },
+        "alternate_path_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_count", "assembly_count", "source_file_count", "type_count", "reference_edge_count", "layer_count", "selector_predicate_evaluation_count", "contract_count", "finding_candidate_count", "source_root_count"],
+      "properties": {
+        "project_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "assembly_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "source_file_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "type_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "reference_edge_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "layer_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "selector_predicate_evaluation_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "contract_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "finding_candidate_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "source_root_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["execution_mode", "command_families", "commands", "independent_processes"],
+      "properties": {
+        "execution_mode": { "enum": ["single_command", "full_governance", "multi_command", "pull_request"] },
+        "command_families": { "type": "array", "items": { "type": "string" } },
+        "commands": { "type": "array", "items": { "type": "string" } },
+        "independent_processes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "pull_request_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changed_project_ids", "changed_source_paths", "includes_global_input"],
+      "properties": {
+        "changed_project_ids": { "type": "array", "items": { "type": "string" } },
+        "changed_source_paths": { "type": "array", "items": { "type": "string" } },
+        "includes_global_input": { "type": "boolean" }
+      }
+    }
+  }
+}
