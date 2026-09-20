@@ -696,23 +696,17 @@ public sealed class DeferredHotPathBenchmarkHarness
             .Where(value => value.HasValue)
             .Select(value => value!.Value)
             .ToArray();
-        double[] processor = measurements
-            .Select(measurement => measurement.SelectorPhaseProcessorTimeMilliseconds)
-            .Where(value => value.HasValue)
-            .Select(value => value!.Value)
-            .ToArray();
         double[] share = measurements
             .Select(measurement => measurement.SelectorPhaseSharePercent)
             .Where(value => value.HasValue)
             .Select(value => value!.Value)
             .ToArray();
         Assert.That(elapsed, Is.Not.Empty, "Selector materiality requires measured elapsed values.");
-        Assert.That(processor, Is.Not.Empty, "Selector materiality requires measured CPU values.");
         Assert.That(share, Is.Not.Empty, "Selector materiality requires phase-share values.");
         return string.Format(
             CultureInfo.InvariantCulture,
-            "Measured selector phase time is {0:F3}–{1:F3} ms wall and {2:F3}–{3:F3} ms CPU across the matrix, representing {4:F3}–{5:F3}% of total.",
-            elapsed.Min(), elapsed.Max(), processor.Min(), processor.Max(), share.Min(), share.Max());
+            "Measured selector phase time is {0:F3}–{1:F3} ms wall across the matrix, representing {2:F3}–{3:F3}% of total; selector CPU time is intentionally not reported because process-level CPU time cannot be attributed to individual predicate evaluations.",
+            elapsed.Min(), elapsed.Max(), share.Min(), share.Max());
     }
 
     private static string CanonicalResultSha256(JsonElement result, string completionStatus, int exitCode)

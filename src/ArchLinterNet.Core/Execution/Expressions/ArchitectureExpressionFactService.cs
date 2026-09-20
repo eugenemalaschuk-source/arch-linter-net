@@ -92,7 +92,6 @@ internal sealed class ArchitectureExpressionFactService
     {
         _profilingCounters?.RecordSelectorPredicateEvaluation();
         long startedTimestamp = _timing is null ? 0 : Stopwatch.GetTimestamp();
-        long startedProcessorTimeTicks = _timing is null ? 0 : Process.GetCurrentProcess().TotalProcessorTime.Ticks;
         try
         {
             ArchitectureExpressionEvaluationResult result = ArchitectureExpressionEvaluator.Evaluate(predicate, context);
@@ -119,8 +118,7 @@ internal sealed class ArchitectureExpressionFactService
             if (_timing is not null)
             {
                 long elapsedStopwatchTicks = Stopwatch.GetTimestamp() - startedTimestamp;
-                long processorTimeTicks = Process.GetCurrentProcess().TotalProcessorTime.Ticks - startedProcessorTimeTicks;
-                _timing.RecordSelectorPredicateMeasurement(elapsedStopwatchTicks, Math.Max(0, processorTimeTicks));
+                _timing.RecordSelectorPredicateWallTime(elapsedStopwatchTicks);
             }
         }
     }

@@ -21,7 +21,7 @@ internal static class DeferredHotPathBenchmarkMarkdown
             .AppendLine("- Reuse the #502 large-solution-benchmark/v1 synthetic workload generator and materializer.")
             .AppendLine("- Vary independent dimensions at small, medium, and large sizes where the hypothesis is measurable.")
             .AppendLine("- Use deterministic workload counters before interpreting wall-clock phase values.")
-            .AppendLine("- Selector evidence uses the runtime selector_predicate_evaluation count plus high-resolution wall/CPU measurements; the report records absolute phase time and share of total. P, T, L, and S are varied one at a time.")
+            .AppendLine("- Selector evidence uses the runtime selector_predicate_evaluation count plus high-resolution aggregate wall timing; the report records absolute phase time and share of total. Selector CPU time is intentionally null because process-level CPU time cannot be attributed to individual predicate evaluations. P, T, L, and S are varied one at a time.")
             .AppendLine("- Sequential/bounded evidence runs identical staged inputs in paired processes and retains allocation, peak-working-set availability, concurrency, and canonical-result data.")
             .AppendLine("- Graph evidence covers linear, wide fan-out/fan-in, diamond, dense, and structural-only SCC shapes from #502.")
             .AppendLine("- Preserve canonical-result SHA-256 identity and completion/exit status for each profile.")
@@ -95,7 +95,7 @@ internal static class DeferredHotPathBenchmarkMarkdown
                 builder.AppendLine()
                     .AppendLine("Selector phase materiality:")
                     .AppendLine()
-                    .AppendLine("| Workload | Selector elapsed ms | Selector CPU ms | Share of total |")
+                    .AppendLine("| Workload | Selector elapsed ms | Selector CPU ms (unavailable) | Share of total |")
                     .AppendLine("|---|---:|---:|---:|");
                 foreach (DeferredHotPathMeasurement measurement in finding.Measurements)
                 {
@@ -114,7 +114,7 @@ internal static class DeferredHotPathBenchmarkMarkdown
         builder.AppendLine()
             .AppendLine("## Measurement rows")
             .AppendLine()
-            .AppendLine("| Finding | Workload | Variant | Dimension | Size | Work | Observed counter | Dominant phase | Selector elapsed ms | Selector CPU ms | Selector share | Allocated bytes | Peak working set | Canonical result |")
+            .AppendLine("| Finding | Workload | Variant | Dimension | Size | Work | Observed counter | Dominant phase | Selector elapsed ms | Selector CPU ms (unavailable) | Selector share | Allocated bytes | Peak working set | Canonical result |")
             .AppendLine("|---|---|---|---|---|---:|---|---|---:|---:|---:|---:|---:|---|");
         foreach (DeferredHotPathFindingEvidence finding in document.Findings)
         {

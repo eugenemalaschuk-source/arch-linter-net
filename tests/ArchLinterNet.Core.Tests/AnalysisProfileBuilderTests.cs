@@ -298,7 +298,7 @@ public sealed class AnalysisProfileBuilderTests
         };
         var timing = new ValidationTiming();
         using (timing.Measure("total")) { }
-        timing.RecordSelectorPredicateMeasurement(Stopwatch.Frequency / 100, TimeSpan.TicksPerMillisecond * 3);
+        timing.RecordSelectorPredicateWallTime(Stopwatch.Frequency / 100);
 
         AnalysisProfile measured = AnalysisProfileBuilder.Build(
             counters, timing, renderedSinkCount: 1, outputSinkCount: 1,
@@ -315,7 +315,7 @@ public sealed class AnalysisProfileBuilderTests
         {
             Assert.That(measuredSelector.Count, Is.EqualTo(3));
             Assert.That(measuredSelector.ElapsedMs, Is.GreaterThan(0));
-            Assert.That(measuredSelector.ProcessorTimeMs, Is.EqualTo(3));
+            Assert.That(measuredSelector.ProcessorTimeMs, Is.Null);
             Assert.That(unmeasuredSelector.Count, Is.EqualTo(3));
             Assert.That(unmeasuredSelector.ElapsedMs, Is.Null);
             Assert.That(unmeasuredSelector.ProcessorTimeMs, Is.Null);

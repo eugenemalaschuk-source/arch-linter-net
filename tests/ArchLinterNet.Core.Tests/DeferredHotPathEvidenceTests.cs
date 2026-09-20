@@ -60,7 +60,7 @@ public sealed class DeferredHotPathEvidenceTests
                     measurement.ObservedCounter == "phase.selector_predicate_evaluation.count"
                     && measurement.ObservedCounterValue is > 0
                     && measurement.SelectorPhaseElapsedMilliseconds is > 0
-                    && measurement.SelectorPhaseProcessorTimeMilliseconds is >= 0
+                    && measurement.SelectorPhaseProcessorTimeMilliseconds is null
                     && measurement.SelectorPhaseSharePercent is > 0));
             Assert.That(SelectorCounts(findings, "P=projects"), Is.EqualTo([112, 224, 448]));
             Assert.That(SelectorCounts(findings, "T=types_per_project"), Is.EqualTo([112, 224, 448]));

@@ -7,7 +7,6 @@ public sealed class ValidationTiming
     private readonly List<Entry> _entries = new();
     private int _nextOrdinal;
     private long _selectorElapsedStopwatchTicks;
-    private long _selectorProcessorTimeTicks;
     private int _selectorMeasurementCount;
 
     public IDisposable Measure(string name, int indent = 0)
@@ -82,17 +81,18 @@ public sealed class ValidationTiming
 
     // Selector predicates are counted independently from timing so ordinary validation keeps the
     // low-overhead deterministic counter. When profiling is enabled, callers add high-resolution
-    // wall/CPU samples here and this view exposes one aggregate phase instead of one phase entry
-    // per predicate invocation.
-    internal void RecordSelectorPredicateMeasurement(long elapsedStopwatchTicks, long processorTimeTicks)
+    // wall-time samples here and this view exposes one aggregate phase instead of one phase entry
+    // per predicate invocation. Process-wide CPU time is intentionally not recorded: it cannot be
+    // attributed to an individual predicate evaluation without being distorted by unrelated work
+    // or overlapping evaluations.
+    internal void RecordSelectorPredicateWallTime(long elapsedStopwatchTicks)
     {
-        if (elapsedStopwatchTicks < 0 || processorTimeTicks < 0)
+        if (elapsedStopwatchTicks < 0)
         {
             return;
         }
 
         Interlocked.Add(ref _selectorElapsedStopwatchTicks, elapsedStopwatchTicks);
-        Interlocked.Add(ref _selectorProcessorTimeTicks, processorTimeTicks);
         Interlocked.Increment(ref _selectorMeasurementCount);
     }
 
@@ -101,7 +101,7 @@ public sealed class ValidationTiming
         _entries.Add(new Entry(name, elapsedMs, processorTimeMs, indent, count, ordinal));
     }
 
-    internal sealed record Entry(string Name, long ElapsedMs, double ProcessorTimeMs, int Indent, int? Count, int Ordinal)
+    internal sealed record Entry(string Name, long ElapsedMs, double? ProcessorTimeMs, int Indent, int? Count, int Ordinal)
     {
         internal double? HighResolutionElapsedMs { get; init; }
     }
@@ -116,12 +116,11 @@ public sealed class ValidationTiming
 
         List<Entry> entries = new(_entries);
         double elapsedMs = Volatile.Read(ref _selectorElapsedStopwatchTicks) * 1000d / Stopwatch.Frequency;
-        double processorTimeMs = Volatile.Read(ref _selectorProcessorTimeTicks) / (double)TimeSpan.TicksPerMillisecond;
         int ordinal = entries.Count == 0 ? 0 : entries.Max(entry => entry.Ordinal) + 1;
         entries.Add(new Entry(
             "selector_predicate_evaluation",
             (long)Math.Round(elapsedMs),
-            processorTimeMs,
+            ProcessorTimeMs: null,
             Indent: 1,
             Count: null,
             Ordinal: ordinal)

@@ -39,9 +39,10 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 The `Phases` array may also contain `selector_predicate_evaluation` when compiled CEL
 selectors were evaluated. Its deterministic `Count` is the runtime number of predicate
 invocations recorded by the analysis session; it is not a generated workload estimate. When
-timing is enabled, its `ElapsedMs` and `ProcessorTimeMs` are high-resolution aggregate
-measurements for the predicate evaluations. When timing is not enabled, both fields are `null`,
-never synthetic zero values.
+timing is enabled, its `ElapsedMs` is a high-resolution aggregate wall-time measurement for the
+predicate evaluations. `ProcessorTimeMs` is intentionally `null`: process-level CPU time cannot
+be attributed to individual predicate evaluations. When timing is not enabled, both fields are
+`null`, never synthetic zero values.
 
 ## `Output` (actual publication)
 
@@ -77,7 +78,10 @@ When `OutputFailed` is true after analysis completed, `CompletionStatus` still d
 | `output_stream_write` | 0 | Write normal report content to stdout/stderr destinations. |
 | `output_commit` | 0 | Commit successfully staged normal file report sinks by rename. |
 
-Every phase also records `ProcessorTimeMs`, the process CPU-time delta measured during that phase. It is an environment-dependent measurement and can overlap for nested phases.
+Every ordinary phase also records `ProcessorTimeMs`, the process CPU-time delta measured during that
+phase. It is an environment-dependent measurement and can overlap for nested phases. The
+`selector_predicate_evaluation` phase is the exception: its `ProcessorTimeMs` is always `null`
+because process CPU time cannot be attributed to an individual predicate evaluation.
 
 ## Deterministic consumer-shaped regression evidence (issue #654)
 
