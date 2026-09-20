@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Tests;
@@ -16,6 +17,12 @@ internal static class BenchmarkFixtureMaterializer
             string solutionPath = WriteSolution(root, definition);
             string policyPath = WritePolicy(root, definition);
             string manifestPath = WriteBenchmarkMetadata(root, definition);
+            if (definition.CompilationMode == BenchmarkCompilationMode.StagedAssemblies)
+            {
+                StageAssemblies(root, definition, solutionPath);
+                manifestPath = WriteBenchmarkMetadata(root, definition);
+            }
+
             return new BenchmarkMaterializedFixture(definition, root, solutionPath, policyPath, manifestPath);
         }
         catch
@@ -91,11 +98,14 @@ internal static class BenchmarkFixtureMaterializer
                 int firstType = ((globalFileIndex - 1) * definition.Dimensions.TypesPerProject / filesPerProject) + 1;
                 int lastType = globalFileIndex * definition.Dimensions.TypesPerProject / filesPerProject;
                 var content = new StringBuilder();
+                if (firstType <= lastType)
+                {
+                    content.AppendLine($"namespace Synthetic.{project.AssemblyName};").AppendLine();
+                }
+
                 for (int typeIndex = firstType; typeIndex <= lastType; typeIndex++)
                 {
-                    content.AppendLine($"namespace Synthetic.{project.AssemblyName};")
-                        .AppendLine()
-                        .AppendLine($"public sealed class SourceRoot{sourceRoot:00}Type{typeIndex:000}")
+                    content.AppendLine($"public sealed class SourceRoot{sourceRoot:00}Type{typeIndex:000}")
                         .AppendLine("{")
                         .AppendLine($"    public const string Identity = \"{project.Id}-type-{typeIndex:000}\";")
                         .AppendLine("}")
@@ -133,11 +143,18 @@ internal static class BenchmarkFixtureMaterializer
         var content = new StringBuilder()
             .AppendLine("version: 1")
             .AppendLine($"name: {definition.WorkloadId}")
+            .AppendLine("classification:")
+            .AppendLine("  namespace:")
+            .AppendLine("    - namespace: Synthetic")
+            .AppendLine("      role: SyntheticBenchmarkType")
             .AppendLine("layers:");
         for (int layer = 1; layer <= definition.Dimensions.LayerCount; layer++)
         {
             content.AppendLine($"  synthetic_layer_{layer:00}:")
-                .AppendLine("    namespace: Synthetic");
+                .AppendLine("    namespace: Synthetic")
+                .AppendLine("    selector:")
+                .AppendLine("      role: SyntheticBenchmarkType")
+                .AppendLine($"      when: {BuildSelectorPredicate(definition.Dimensions.SelectorMembershipsPerLayer)}");
             if (layer > 1)
             {
                 string overlapsWith = string.Join(
@@ -149,11 +166,25 @@ internal static class BenchmarkFixtureMaterializer
             content.AppendLine();
         }
 
-        content.AppendLine("analysis:")
-            .AppendLine("  projects:");
-        foreach (BenchmarkProjectNode project in definition.Projects)
+        content.AppendLine("analysis:");
+        if (definition.CompilationMode == BenchmarkCompilationMode.StagedAssemblies)
         {
-            content.AppendLine($"    - src/{project.AssemblyName}/{project.AssemblyName}.csproj");
+            content.AppendLine("  target_assemblies:");
+            foreach (BenchmarkProjectNode project in definition.Projects)
+            {
+                content.AppendLine($"    - {project.AssemblyName}");
+            }
+
+            content.AppendLine("  assembly_search_paths:")
+                .AppendLine("    - .benchmark/staged-assemblies");
+        }
+        else
+        {
+            content.AppendLine("  projects:");
+            foreach (BenchmarkProjectNode project in definition.Projects)
+            {
+                content.AppendLine($"    - src/{project.AssemblyName}/{project.AssemblyName}.csproj");
+            }
         }
 
         content.AppendLine("contracts:")
@@ -174,8 +205,23 @@ internal static class BenchmarkFixtureMaterializer
             .AppendLine("        namespace_segment: Synthetic")
             .AppendLine("      forbidden_name_prefix: __never__")
             .AppendLine("      reason: Materialize the synthetic source fact index.");
+        for (int candidate = 1; candidate <= definition.Dimensions.FindingCandidates; candidate++)
+        {
+            content.AppendLine($"    - id: synthetic-finding-candidate-{candidate:000}")
+                .AppendLine($"      name: synthetic-finding-candidate-{candidate:000}")
+                .AppendLine("      files_matching:")
+                .AppendLine("        namespace_segment: Synthetic")
+                .AppendLine("      forbidden_name_prefix: SourceRoot")
+                .AppendLine("      reason: Synthetic benchmark finding candidate.");
+        }
         File.WriteAllText(path, content.ToString());
         return path;
+    }
+
+    private static string BuildSelectorPredicate(int membershipCount)
+    {
+        const string Predicate = "subject.kind == 'class'";
+        return $"\"{string.Join(" && ", Enumerable.Repeat(Predicate, membershipCount))}\"";
     }
 
     private static string WriteBenchmarkMetadata(string root, BenchmarkWorkloadDefinition definition)
@@ -195,12 +241,74 @@ internal static class BenchmarkFixtureMaterializer
                 BenchmarkJson.Serialize(new
                 {
                     mode = "external-staged-assemblies",
-                    assemblies = definition.Projects.Select(project => project.AssemblyName).ToList(),
+                    assemblies = definition.Projects.Select(project => new
+                    {
+                        name = project.AssemblyName,
+                        path = $"{project.AssemblyName}.dll",
+                        receipt = $"{project.AssemblyName}.dll.archlinternet-receipt.json",
+                    }).ToList(),
                     source = "synthetic-external-build",
                 }));
         }
 
         return manifestPath;
+    }
+
+    private static void StageAssemblies(string root, BenchmarkWorkloadDefinition definition, string solutionPath)
+    {
+        if (definition.Topology.ContainsCycle)
+        {
+            throw new InvalidOperationException("Cyclic synthetic workloads cannot be compiled as staged project references.");
+        }
+
+        RunDotnet(root, ["restore", solutionPath, "--nologo", "--disable-parallel"]);
+        RunDotnet(root, ["build", solutionPath, "--nologo", "--no-restore", "--verbosity", "quiet", "--maxcpucount:1"]);
+
+        string stagedDirectory = Path.Combine(root, ".benchmark", "staged-assemblies");
+        foreach (BenchmarkProjectNode project in definition.Projects)
+        {
+            string projectDirectory = Path.Combine(root, "src", project.AssemblyName);
+            string projectPath = Path.Combine(projectDirectory, $"{project.AssemblyName}.csproj");
+            string assemblyPath = Path.Combine(projectDirectory, "bin", "Debug", "net10.0", $"{project.AssemblyName}.dll");
+            string stagedAssemblyPath = Path.Combine(stagedDirectory, Path.GetFileName(assemblyPath));
+            File.Copy(assemblyPath, stagedAssemblyPath, overwrite: true);
+            BuildReceiptStore.Write(
+                stagedAssemblyPath,
+                new BuildReceiptV1(
+                    Path.Combine("src", project.AssemblyName, $"{project.AssemblyName}.csproj"),
+                    project.AssemblyName,
+                    "Debug",
+                    "net10.0",
+                    BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, root),
+                    BuildStateCanonicalHasher.ComputeContentDigest(stagedAssemblyPath)));
+        }
+    }
+
+    internal static void RunDotnet(string workingDirectory, IReadOnlyList<string> arguments)
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+        foreach (string argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using Process process = Process.Start(startInfo)!;
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> errorTask = process.StandardError.ReadToEndAsync();
+        process.WaitForExit();
+        string output = outputTask.GetAwaiter().GetResult();
+        string error = errorTask.GetAwaiter().GetResult();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Synthetic benchmark dotnet command failed: dotnet {string.Join(' ', arguments)}{Environment.NewLine}{output}{Environment.NewLine}{error}");
+        }
     }
 
     private static void DeleteDirectory(string root)
@@ -238,6 +346,11 @@ internal sealed class BenchmarkMaterializedFixture : IDisposable
 
     public string ManifestPath { get; }
 
+    public IReadOnlyList<string> StagedAssemblyPaths =>
+        Directory.Exists(Path.Combine(Root, ".benchmark", "staged-assemblies"))
+            ? Directory.GetFiles(Path.Combine(Root, ".benchmark", "staged-assemblies"), "*.dll", SearchOption.TopDirectoryOnly)
+            : Array.Empty<string>();
+
     public IReadOnlyList<string> ProjectPaths =>
         Directory.GetFiles(Path.Combine(Root, "src"), "*.csproj", SearchOption.AllDirectories);
 
@@ -251,28 +364,8 @@ internal sealed class BenchmarkMaterializedFixture : IDisposable
             throw new InvalidOperationException("Only real-MSBuild benchmark fixtures can be built by this materializer.");
         }
 
-        var startInfo = new ProcessStartInfo("dotnet")
-        {
-            WorkingDirectory = Root,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        startInfo.ArgumentList.Add("build");
-        startInfo.ArgumentList.Add(SolutionPath);
-        startInfo.ArgumentList.Add("--nologo");
-        startInfo.ArgumentList.Add("--verbosity");
-        startInfo.ArgumentList.Add("quiet");
-        startInfo.ArgumentList.Add("--maxcpucount:1");
-
-        using Process process = Process.Start(startInfo)!;
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"Synthetic benchmark fixture failed to build.{Environment.NewLine}{output}{Environment.NewLine}{error}");
-        }
+        BenchmarkFixtureMaterializer.RunDotnet(Root, ["restore", SolutionPath, "--nologo", "--disable-parallel"]);
+        BenchmarkFixtureMaterializer.RunDotnet(Root, ["build", SolutionPath, "--nologo", "--no-restore", "--verbosity", "quiet", "--maxcpucount:1"]);
     }
 
     public BenchmarkCliRun RunValidation(bool ensureBuilt = true)
@@ -291,6 +384,7 @@ internal sealed class BenchmarkMaterializedFixture : IDisposable
             RedirectStandardError = true,
             UseShellExecute = false,
         };
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
         startInfo.ArgumentList.Add(cliPath);
         startInfo.ArgumentList.Add("--policy");
         startInfo.ArgumentList.Add(PolicyPath);

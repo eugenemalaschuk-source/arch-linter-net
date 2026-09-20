@@ -62,7 +62,7 @@ internal sealed record BenchmarkDimensionSet
             throw new ArgumentOutOfRangeException(nameof(SourceFilesPerProject));
         }
 
-        if (ReferencesPerProject < 0 || LayerCount < 1 || SelectorMembershipsPerLayer < 0 ||
+        if (ReferencesPerProject < 0 || LayerCount < 1 || SelectorMembershipsPerLayer < 1 ||
             ContractsPerRoot < 1 || FindingCandidates < 0 || SourceRootCount < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(BenchmarkDimensionSet), "Workload dimensions cannot be negative and must contain at least one layer, contract, and source root.");

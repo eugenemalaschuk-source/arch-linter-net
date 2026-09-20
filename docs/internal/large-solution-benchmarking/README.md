@@ -23,11 +23,20 @@ and independent dimensions. Supported graph shapes are:
 
 Project, type, source-file, reference/edge, layer/selector, contract/finding,
 source-root, and PR-change dimensions are recorded in the manifest and derived
-inventory. `RealMsBuild` workloads own candidate compilation through ordinary
-build and receipt preparation. `StagedAssemblies` workloads write an explicit
-staged assembly manifest so preparation cost is not attributed to MSBuild. The
-materializer creates only bounded synthetic fixtures; the very-large catalog
-entry is staged and does not silently turn a normal test run into a large build.
+inventory. Type count is `projects × types_per_project`; source roots distribute
+those types and do not multiply them. Selector terms and finding candidates are
+materialized into the generated policy so their counters describe analyzer work,
+not metadata alone. Reference density adds forward edges for acyclic shapes;
+cycles are reserved for explicitly cyclic shapes.
+
+`RealMsBuild` workloads own candidate compilation through an explicit restore and
+build. `StagedAssemblies` workloads perform that external compilation before the
+analysis run, copy the resulting DLLs into `.benchmark/staged-assemblies`, and
+write an ArchLinterNet build receipt for each input. The staged policy resolves
+those DLLs through `analysis.target_assemblies` and `assembly_search_paths`, so
+preparation cost is not attributed to the analyzer. The materializer creates only
+bounded synthetic fixtures; the very-large catalog entry is staged and does not
+silently turn a normal test run into a large build.
 
 ## Evidence
 

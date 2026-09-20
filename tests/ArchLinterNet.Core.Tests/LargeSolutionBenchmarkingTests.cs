@@ -1,6 +1,6 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Resolution;
 using Json.Schema;
 using NUnit.Framework;
@@ -8,6 +8,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
+[NonParallelizable]
 public sealed class LargeSolutionBenchmarkingTests
 {
     [Test]
@@ -123,6 +124,85 @@ public sealed class LargeSolutionBenchmarkingTests
     }
 
     [Test]
+    public void ReferenceDimensionPreservesAcyclicTopologyForAcyclicShapes()
+    {
+        BenchmarkWorkloadDefinition linear = BenchmarkWorkloadGenerator.Create(
+            "synthetic-linear-reference-independence",
+            BenchmarkTopologyShape.Linear,
+            new BenchmarkDimensionSet { ProjectCount = 8, ReferencesPerProject = 5 });
+        BenchmarkWorkloadDefinition veryLarge = BenchmarkWorkloadGenerator.CreateVeryLargeSynthetic();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(linear.Topology.ContainsCycle, Is.False);
+            Assert.That(linear.Topology.StronglyConnectedComponentCount, Is.EqualTo(linear.Projects.Count));
+            Assert.That(veryLarge.Topology.ContainsCycle, Is.False);
+            Assert.That(veryLarge.Topology.StronglyConnectedComponentCount, Is.EqualTo(veryLarge.Projects.Count));
+        });
+    }
+
+    [Test]
+    public void SourceRootDimensionDoesNotInventTypes()
+    {
+        BenchmarkDimensionSet dimensions = new()
+        {
+            ProjectCount = 2,
+            TypesPerProject = 5,
+            SourceFilesPerProject = 2,
+            SourceRootCount = 4,
+        };
+        BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
+            "synthetic-source-root-type-count", BenchmarkTopologyShape.Linear, dimensions);
+        using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
+
+        int materializedTypeCount = fixture.SourcePaths
+            .Sum(path => File.ReadAllLines(path).Count(line => line.StartsWith("public sealed class ", StringComparison.Ordinal)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(workload.Inventory.TypeCount, Is.EqualTo(dimensions.ProjectCount * dimensions.TypesPerProject));
+            Assert.That(materializedTypeCount, Is.EqualTo(workload.Inventory.TypeCount));
+        });
+    }
+
+    [Test]
+    public void SelectorAndFindingDimensionsMaterializeAnalyzerWork()
+    {
+        BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
+            "synthetic-selector-finding-work",
+            BenchmarkTopologyShape.Linear,
+            new BenchmarkDimensionSet
+            {
+                ProjectCount = 2,
+                TypesPerProject = 2,
+                SourceFilesPerProject = 1,
+                LayerCount = 2,
+                SelectorMembershipsPerLayer = 3,
+                FindingCandidates = 2,
+            });
+        using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
+        string policy = File.ReadAllText(fixture.PolicyPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(policy, Does.Contain("classification:"));
+            Assert.That(
+                policy.Split("subject.kind", StringSplitOptions.None).Length - 1,
+                Is.EqualTo(workload.Dimensions.LayerCount * workload.Dimensions.SelectorMembershipsPerLayer));
+            Assert.That(policy, Does.Contain("synthetic-finding-candidate-001"));
+            Assert.That(policy, Does.Contain("forbidden_name_prefix: SourceRoot"));
+        });
+
+        fixture.Build();
+        BenchmarkCliRun run = fixture.RunValidation();
+        Assert.Multiple(() =>
+        {
+            Assert.That(run.ExitCode, Is.Not.EqualTo(0));
+            Assert.That(run.StandardOutput, Does.Contain("synthetic-finding-candidate-001"));
+        });
+    }
+
+    [Test]
     public void WorkloadIdMustBeSynthetic()
     {
         Assert.That(
@@ -155,6 +235,27 @@ public sealed class LargeSolutionBenchmarkingTests
             Assert.That(File.Exists(realFixture.SolutionPath), Is.True);
             Assert.That(File.Exists(realFixture.PolicyPath), Is.True);
             Assert.That(File.Exists(Path.Combine(stagedFixture.Root, ".benchmark", "staged-assemblies", "manifest.json")), Is.True);
+            Assert.That(stagedFixture.StagedAssemblyPaths, Has.Count.EqualTo(3));
+            Assert.That(stagedFixture.StagedAssemblyPaths.All(path => File.Exists(BuildReceiptStore.ReceiptPathFor(path))), Is.True);
+        });
+    }
+
+    [Test]
+    public void StagedAssembliesAreAcceptedAsExternalInputsWithoutEnsureBuilt()
+    {
+        BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
+            "synthetic-staged-cli", BenchmarkTopologyShape.Linear,
+            new BenchmarkDimensionSet { ProjectCount = 2, TypesPerProject = 1, SourceFilesPerProject = 1 },
+            BenchmarkCompilationMode.StagedAssemblies);
+        using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
+
+        BenchmarkCliRun run = fixture.RunValidation(ensureBuilt: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(run.ExitCode, Is.EqualTo(0), $"stdout: {run.StandardOutput}{Environment.NewLine}stderr: {run.StandardError}");
+            Assert.That(() => JsonDocument.Parse(run.StandardOutput), Throws.Nothing);
+            Assert.That(fixture.StagedAssemblyPaths, Has.Count.EqualTo(workload.Inventory.AssemblyCount));
         });
     }
 
@@ -303,6 +404,40 @@ public sealed class LargeSolutionBenchmarkingTests
     }
 
     [Test]
+    public void EvidenceMeasurementsFailClosedInTypedAndSchemaValidation()
+    {
+        BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
+            "synthetic-evidence-measurement-invariants", BenchmarkTopologyShape.Linear);
+        using JsonDocument profile = JsonDocument.Parse("{\"SchemaId\":\"analysis-profile/v1\"}");
+        BenchmarkEvidenceDocument evidence = BenchmarkEvidenceFactory.Create(
+            workload,
+            profile.RootElement.Clone(),
+            BenchmarkIdentity.CreateCanonicalResult("Success", 0, []));
+        BenchmarkProfileSample invalidSample = evidence.Samples.Single() with
+        {
+            WallClock = new BenchmarkResourceMeasurement { Status = BenchmarkMeasurementStatus.Available },
+        };
+
+        Assert.That(
+            () => (evidence with { Samples = [invalidSample] }).Validate(),
+            Throws.InvalidOperationException);
+
+        JsonObject invalidJson = JsonNode.Parse(BenchmarkEvidenceJson.Serialize(evidence))!.AsObject();
+        invalidJson["samples"]![0]!["wall_clock"] = new JsonObject
+        {
+            ["status"] = "unavailable",
+            ["value"] = 0,
+            ["unit"] = null,
+            ["reason"] = null,
+        };
+        JsonSchema schema = JsonSchema.FromText(LoadEvidenceSchema());
+        EvaluationResults validation = schema.Evaluate(
+            invalidJson, new EvaluationOptions { OutputFormat = OutputFormat.List });
+
+        Assert.That(validation.IsValid, Is.False, Describe(validation));
+    }
+
+    [Test]
     public void EvidenceDoesNotContainPrivatePathsOrRawLogs()
     {
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
@@ -343,39 +478,12 @@ public sealed class LargeSolutionBenchmarkingTests
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
 
         fixture.Build();
-        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
-        string cliPath = Path.Combine(
-            repositoryRoot,
-            "src",
-            "ArchLinterNet.Cli",
-            "bin",
-            "Debug",
-            "net10.0",
-            "ArchLinterNet.Cli.dll");
-        var startInfo = new ProcessStartInfo("dotnet")
-        {
-            WorkingDirectory = fixture.Root,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        startInfo.ArgumentList.Add(cliPath);
-        startInfo.ArgumentList.Add("--policy");
-        startInfo.ArgumentList.Add(fixture.PolicyPath);
-        startInfo.ArgumentList.Add("--strict");
-        startInfo.ArgumentList.Add("--format");
-        startInfo.ArgumentList.Add("json");
-        startInfo.ArgumentList.Add("--ensure-built");
-
-        using Process process = Process.Start(startInfo)!;
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        BenchmarkCliRun run = fixture.RunValidation();
 
         Assert.Multiple(() =>
         {
-            Assert.That(process.ExitCode, Is.EqualTo(0), $"stdout: {output}{Environment.NewLine}stderr: {error}");
-            Assert.That(() => JsonDocument.Parse(output), Throws.Nothing);
+            Assert.That(run.ExitCode, Is.EqualTo(0), $"stdout: {run.StandardOutput}{Environment.NewLine}stderr: {run.StandardError}");
+            Assert.That(() => JsonDocument.Parse(run.StandardOutput), Throws.Nothing);
         });
     }
 

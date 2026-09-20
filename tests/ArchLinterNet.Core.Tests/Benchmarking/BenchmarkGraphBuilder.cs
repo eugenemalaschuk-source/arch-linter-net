@@ -45,10 +45,10 @@ internal static class BenchmarkGraphBuilder
         for (int from = 0; from < projects.Count; from++)
         {
             int current = edges.Count(edge => edge.FromProjectId == projects[from].Id);
-            for (int distance = 1; current < referencesPerProject && distance < projects.Count; distance++)
+            for (int distance = 1; current < referencesPerProject && from + distance < projects.Count; distance++)
             {
-                int to = (from + distance) % projects.Count;
-                if (from == to || !existing.Add((projects[from].Id, projects[to].Id)))
+                int to = from + distance;
+                if (!existing.Add((projects[from].Id, projects[to].Id)))
                 {
                     continue;
                 }

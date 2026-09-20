@@ -31,7 +31,7 @@
         "source_files_per_project": { "type": "integer", "minimum": 1 },
         "references_per_project": { "type": "integer", "minimum": 0 },
         "layer_count": { "type": "integer", "minimum": 1 },
-        "selector_memberships_per_layer": { "type": "integer", "minimum": 0 },
+        "selector_memberships_per_layer": { "type": "integer", "minimum": 1 },
         "contracts_per_root": { "type": "integer", "minimum": 1 },
         "finding_candidates": { "type": "integer", "minimum": 0 },
         "source_root_count": { "type": "integer", "minimum": 1 }

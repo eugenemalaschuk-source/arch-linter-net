@@ -39,6 +39,32 @@ internal sealed record BenchmarkResourceMeasurement
         Status = BenchmarkMeasurementStatus.Unavailable,
         Reason = reason,
     };
+
+    public void Validate(string fieldName)
+    {
+        switch (Status)
+        {
+            case BenchmarkMeasurementStatus.Available:
+                if (!Value.HasValue || Value.Value < 0 || string.IsNullOrWhiteSpace(Unit) || Reason is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"Available benchmark measurement '{fieldName}' must contain a non-negative value and unit, without a reason.");
+                }
+
+                break;
+            case BenchmarkMeasurementStatus.Unavailable:
+            case BenchmarkMeasurementStatus.NotApplicable:
+                if (Value is not null || Unit is not null || string.IsNullOrWhiteSpace(Reason))
+                {
+                    throw new InvalidOperationException(
+                        $"{Status} benchmark measurement '{fieldName}' must contain a reason and no value or unit.");
+                }
+
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown benchmark measurement status for '{fieldName}'.");
+        }
+    }
 }
 
 internal sealed record BenchmarkRunDescriptor
@@ -260,6 +286,11 @@ internal sealed record BenchmarkEvidenceDocument
 
         foreach (BenchmarkProfileSample sample in Samples)
         {
+            sample.WallClock.Validate("samples.wall_clock");
+            sample.ProcessorTime.Validate("samples.processor_time");
+            sample.AllocatedBytes.Validate("samples.allocated_bytes");
+            sample.PeakManagedMemory.Validate("samples.peak_managed_memory");
+
             if (!sample.RawAnalysisProfile.TryGetProperty("SchemaId", out JsonElement schemaId) ||
                 !string.Equals(schemaId.GetString(), "analysis-profile/v1", StringComparison.Ordinal))
             {
@@ -272,10 +303,21 @@ internal sealed record BenchmarkEvidenceDocument
             }
         }
 
+        Environment.PeakWorkingSet.Validate("environment.peak_working_set");
+        Environment.ManagedAllocation.Validate("environment.managed_allocation");
+
         if (Complexity is not null && Complexity.Disposition != BenchmarkEvidenceDisposition.NotReproduced &&
             Complexity.ScalePoints.Count < 3)
         {
             throw new InvalidOperationException("A reproduced complexity claim requires at least three scale points.");
+        }
+
+        if (Complexity is not null)
+        {
+            foreach (BenchmarkScalePoint point in Complexity.ScalePoints)
+            {
+                point.AllocatedBytes.Validate($"complexity.scale_points[{point.Label}].allocated_bytes");
+            }
         }
     }
 
