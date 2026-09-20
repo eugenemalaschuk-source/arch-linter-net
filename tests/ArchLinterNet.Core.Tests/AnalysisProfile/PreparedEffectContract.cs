@@ -26,6 +26,8 @@ internal sealed record PreparedEffectContract
 
     public required string PerConsumerLoadAuthorizationCostBasis { get; init; }
 
+    public required decimal UnavoidableProjectionWork { get; init; }
+
     public required decimal MeasuredIndependentWorkflowWork { get; init; }
 
     public required decimal? MeasuredOneProcessAlternativeWork { get; init; }
@@ -57,7 +59,7 @@ internal sealed record PreparedEffectContract
         ValidateProcessCount(processCount) * ColdPrepareCost * RepeatedWorkShare;
 
     public decimal PreparedReuseCost(int processCount) =>
-        ColdPrepareCost + ValidateProcessCount(processCount) * PerConsumerLoadAuthorizationCost;
+        ColdPrepareCost + ValidateProcessCount(processCount) * PerConsumerLoadAuthorizationCost + UnavoidableProjectionWork;
 
     public decimal ExpectedSavings(int processCount) =>
         IndependentOneShotCost(processCount) - PreparedReuseCost(processCount);
@@ -71,7 +73,7 @@ internal sealed record PreparedEffectContract
             return null;
         }
 
-        decimal firstStrictlyCheaper = decimal.Floor(ColdPrepareCost / differencePerConsumer) + 1;
+        decimal firstStrictlyCheaper = decimal.Floor((ColdPrepareCost + UnavoidableProjectionWork) / differencePerConsumer) + 1;
         return firstStrictlyCheaper > int.MaxValue ? null : (int)firstStrictlyCheaper;
     }
 
@@ -88,6 +90,7 @@ internal sealed record PreparedEffectContract
             PerConsumerLoadAuthorizationCostUpperBound < PerConsumerLoadAuthorizationCostLowerBound ||
             PerConsumerLoadAuthorizationCost < PerConsumerLoadAuthorizationCostLowerBound ||
             PerConsumerLoadAuthorizationCost > PerConsumerLoadAuthorizationCostUpperBound ||
+            UnavoidableProjectionWork < 0 ||
             MeasuredIndependentWorkflowWork < 0 || MeasuredOneProcessAlternativeWork is < 0 ||
             ExpectedPersistedReuseWork < 0)
         {

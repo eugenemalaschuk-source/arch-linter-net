@@ -480,23 +480,24 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         int representativeProcessCount,
         decimal coldPrepareCost,
         decimal loadAuthorizationCost,
-        decimal repeatedWorkShare)
+        decimal repeatedWorkShare,
+        decimal unavoidableProjectionWork)
     {
         decimal Speedup(int count) =>
-            (coldPrepareCost * count * repeatedWorkShare) /
-            (coldPrepareCost + count * loadAuthorizationCost);
+            (coldPrepareCost * count * repeatedWorkShare + unavoidableProjectionWork) /
+            (coldPrepareCost + count * loadAuthorizationCost + unavoidableProjectionWork);
         return new BenchmarkExpectedEffectEvidence
         {
             IssueReference = "#493",
             TargetPhase = "candidate_preparation",
             BaselinePhaseShare = repeatedWorkShare,
             CurrentWorkModel = "R x independent candidate preparation",
-            TargetWorkModel = "one cold preparation + R x load/authorization",
+            TargetWorkModel = "one cold preparation + R x load/authorization + unavoidable projection/command work",
             ExpectedLocalSpeedupSmall = Speedup(1),
             ExpectedLocalSpeedupMedium = Speedup(representativeProcessCount),
             ExpectedLocalSpeedupLarge = Speedup(Math.Max(representativeProcessCount * 4, 2)),
             ExpectedEndToEndUpperBound = 1m / ((1m - repeatedWorkShare) + repeatedWorkShare / Math.Max(1m, Speedup(Math.Max(representativeProcessCount, 2)))),
-            MemoryAllocationTradeOff = "Storage, I/O, allocation, and peak memory remain explicitly unavailable until a prepared-state design exists.",
+            MemoryAllocationTradeOff = "Direct storage, I/O, allocation, and peak-memory measurements remain unavailable; bounded pre-implementation sensitivity ranges are recorded and must be replaced by store instrumentation.",
             ColdPathTradeOff = "The cold preparation remains a separate cost and is never counted as a cache hit.",
             SuccessThreshold = "Only authorize implementation after one-process sharing is insufficient and the persisted model remains materially cheaper with measured resource bounds.",
             KillCriterion = "Defer or route elsewhere when canonical equivalence, cache separation, or a representative crossover is not reproduced.",

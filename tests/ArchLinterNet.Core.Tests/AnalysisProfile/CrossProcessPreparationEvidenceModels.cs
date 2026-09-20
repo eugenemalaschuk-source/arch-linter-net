@@ -67,12 +67,58 @@ internal sealed record PreparationResourceEvidence
 
     public required BenchmarkResourceMeasurement PeakManagedMemory { get; init; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PreparationResourceBound? StorageBound { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PreparationResourceBound? IoOperationsBound { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PreparationResourceBound? AllocatedBytesBound { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PreparationResourceBound? PeakManagedMemoryBound { get; init; }
+
+    [JsonIgnore]
+    public bool HasBoundedTradeoffModel =>
+        StorageBound is not null &&
+        IoOperationsBound is not null &&
+        AllocatedBytesBound is not null &&
+        PeakManagedMemoryBound is not null;
+
     public void Validate(string fieldPrefix)
     {
         StorageBytes.Validate($"{fieldPrefix}.storage_bytes");
         IoOperations.Validate($"{fieldPrefix}.io_operations");
         AllocatedBytes.Validate($"{fieldPrefix}.allocated_bytes");
         PeakManagedMemory.Validate($"{fieldPrefix}.peak_managed_memory");
+        StorageBound?.Validate($"{fieldPrefix}.storage_bound");
+        IoOperationsBound?.Validate($"{fieldPrefix}.io_operations_bound");
+        AllocatedBytesBound?.Validate($"{fieldPrefix}.allocated_bytes_bound");
+        PeakManagedMemoryBound?.Validate($"{fieldPrefix}.peak_managed_memory_bound");
+    }
+}
+
+internal sealed record PreparationResourceBound
+{
+    public required long LowerBound { get; init; }
+
+    public required long UpperBound { get; init; }
+
+    public required string Unit { get; init; }
+
+    public required string Basis { get; init; }
+
+    public required string Uncertainty { get; init; }
+
+    public void Validate(string fieldName)
+    {
+        if (LowerBound < 0 || UpperBound < LowerBound || string.IsNullOrWhiteSpace(Unit) ||
+            string.IsNullOrWhiteSpace(Basis) || string.IsNullOrWhiteSpace(Uncertainty))
+        {
+            throw new InvalidOperationException(
+                $"Preparation resource bound '{fieldName}' must contain ordered non-negative bounds, a unit, basis, and uncertainty.");
+        }
     }
 }
 
@@ -295,6 +341,12 @@ internal sealed record CrossProcessPreparationEvidenceDocument
         {
             throw new InvalidOperationException(
                 "Incomplete one-process work evidence must remain non-decision-capable with Outcome C.");
+        }
+
+        if (Decision.Outcome == PreparationDecisionOutcome.A && !PreparedEffect.Resources.HasBoundedTradeoffModel)
+        {
+            throw new InvalidOperationException(
+                "Outcome A requires bounded storage, I/O, allocation, and peak-memory trade-off evidence.");
         }
 
         if (!string.Equals(Workflow.WorkloadIdentity, BenchmarkEvidence.Workload.WorkloadIdentity, StringComparison.Ordinal))

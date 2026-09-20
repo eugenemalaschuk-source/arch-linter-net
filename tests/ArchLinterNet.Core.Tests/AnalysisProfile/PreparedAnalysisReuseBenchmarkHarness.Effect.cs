@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
 
@@ -89,8 +90,12 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
               processBoundMeasurements
                   .Sum(measurement => (decimal)measurement.PreparationWork + measurement.ProjectionWork)
             : null;
+        decimal unavoidableProjectionWork = oneProcessWorkEvidenceComplete
+            ? sharedMeasurements.Sum(measurement => measurement.ProjectionWork) +
+              processBoundMeasurements.Sum(measurement => measurement.ProjectionWork)
+            : 0;
         string workMeasurementBasis = oneProcessWorkEvidenceComplete
-            ? $"Summed preparation/projection counters for one disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}), matched to the shared and process-bound one-process projections. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
+            ? $"Summed preparation/projection counters for one disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}), matched to the shared and process-bound one-process projections. The persisted comparison adds the same measured unavoidable projection/command work to its total. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
             : $"One-process comparison is incomplete; real profile counters/work evidence are missing for: {string.Join(", ", missingOneProcessWorkEvidenceFamilies)}. Missing work is not treated as zero.";
 
         PreparedEffectContract effect = new()
@@ -107,6 +112,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             PerConsumerLoadAuthorizationCostUpperBound = loadCostUpperBound,
             PerConsumerLoadAuthorizationCostBasis =
                 "Measured one-process projection work; used as the explicit load/authorization proxy until persisted storage exists.",
+            UnavoidableProjectionWork = unavoidableProjectionWork,
             MeasuredIndependentWorkflowWork = measuredIndependentWorkflowWork,
             MeasuredOneProcessAlternativeWork = measuredOneProcessAlternativeWork,
             OneProcessWorkEvidenceComplete = oneProcessWorkEvidenceComplete,
@@ -116,14 +122,13 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             WorkMeasurementBasis = workMeasurementBasis,
             BreakEvenProcessCount = null,
             CacheModesMeasured = ["disabled", "miss", "hit"],
-            Resources = new PreparationResourceEvidence
-            {
-                StorageBytes = BenchmarkResourceMeasurement.Unavailable("No persisted prepared-state store exists before implementation."),
-                IoOperations = BenchmarkResourceMeasurement.NotApplicable("No persisted prepared-state I/O exists before implementation."),
-                AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Prepared-state allocation is not isolated."),
-                PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Prepared-state memory is not isolated."),
-            },
-            ExpectedEffect = CreateExpectedEffect(representativeProcessCount, coldPrepareCost, loadAuthorizationCost, repeatedWorkShare),
+            Resources = CreatePreparationResourceEvidence(workload, representativeIndependentProcesses, representativeProcessCount),
+            ExpectedEffect = CreateExpectedEffect(
+                representativeProcessCount,
+                coldPrepareCost,
+                loadAuthorizationCost,
+                repeatedWorkShare,
+                unavoidableProjectionWork),
             ExactCacheHitSavingsExcluded = true,
         };
         int? breakEven = effect.CalculateBreakEvenProcessCount();
@@ -134,6 +139,73 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ExpectedPersistedReuseWork = expectedPersistedReuseWork,
             DistinctCrossProcessValue = oneProcessWorkEvidenceComplete &&
                 expectedPersistedReuseWork < measuredOneProcessAlternativeWork!.Value,
+        };
+    }
+
+    private static PreparationResourceEvidence CreatePreparationResourceEvidence(
+        BenchmarkWorkloadDefinition workload,
+        IReadOnlyList<CrossProcessProcessEvidence> representativeIndependentProcesses,
+        int representativeProcessCount)
+    {
+        long deterministicRecordCount = Math.Max(
+            1,
+            (long)workload.Inventory.ProjectCount +
+            workload.Inventory.AssemblyCount +
+            workload.Inventory.SourceFileCount +
+            workload.Inventory.TypeCount +
+            workload.Inventory.ReferenceEdgeCount);
+        long profilePayloadBytes = representativeIndependentProcesses
+            .Select(process => Encoding.UTF8.GetByteCount(process.Sample.RawAnalysisProfile.GetRawText()))
+            .DefaultIfEmpty(1)
+            .Max();
+        long stateLowerBound = Math.Max(1, Math.Max(checked(deterministicRecordCount * 16), profilePayloadBytes / 4));
+        long stateUpperBound = Math.Max(
+            stateLowerBound,
+            Math.Max(checked(deterministicRecordCount * 256), checked(profilePayloadBytes * 4)));
+        long allocationUpperBound = checked(stateUpperBound * 2);
+
+        return new PreparationResourceEvidence
+        {
+            StorageBytes = BenchmarkResourceMeasurement.Unavailable(
+                "Prepared-state storage is not implemented; the bounded estimate is recorded separately."),
+            IoOperations = BenchmarkResourceMeasurement.NotApplicable(
+                "Persisted prepared-state I/O does not exist before implementation; the bounded estimate is recorded separately."),
+            AllocatedBytes = BenchmarkResourceMeasurement.Unavailable(
+                "Prepared-state allocation is not isolated; the bounded estimate is recorded separately."),
+            PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable(
+                "Prepared-state memory is not isolated; the bounded estimate is recorded separately."),
+            StorageBound = new PreparationResourceBound
+            {
+                LowerBound = stateLowerBound,
+                UpperBound = stateUpperBound,
+                Unit = "bytes",
+                Basis = "Deterministic workload-record envelope plus the largest representative profile payload; this is a pre-implementation serialized-state proxy.",
+                Uncertainty = "16-256 bytes per deterministic record and 0.25x-4x profile payload; replace with store instrumentation before implementation.",
+            },
+            IoOperationsBound = new PreparationResourceBound
+            {
+                LowerBound = 2,
+                UpperBound = checked(2 + representativeProcessCount * 2L),
+                Unit = "operations",
+                Basis = "One persisted write and one authorization/read minimum, with one metadata/read allowance per representative consumer.",
+                Uncertainty = "The range covers one write plus one-to-two read/metadata operations per consumer until the store protocol is selected.",
+            },
+            AllocatedBytesBound = new PreparationResourceBound
+            {
+                LowerBound = stateLowerBound,
+                UpperBound = allocationUpperBound,
+                Unit = "bytes",
+                Basis = "Serialized-state envelope with one additional encode/decode working copy.",
+                Uncertainty = "One-to-two state copies; implementation must replace this proxy with allocation measurement.",
+            },
+            PeakManagedMemoryBound = new PreparationResourceBound
+            {
+                LowerBound = stateLowerBound,
+                UpperBound = allocationUpperBound,
+                Unit = "bytes",
+                Basis = "Serialized-state envelope held during authorization/load.",
+                Uncertainty = "One-to-two state copies; excludes unrelated host memory and requires implementation instrumentation.",
+            },
         };
     }
 
@@ -187,6 +259,18 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             effect.ExpectedSavings(effect.RepresentativeProcessCount) > 0 &&
             effect.PerConsumerLoadAuthorizationCostUpperBound <
             effect.ColdPrepareCost * effect.RepeatedWorkShare;
+        if (!effect.Resources.HasBoundedTradeoffModel)
+        {
+            return new PreparationDecision
+            {
+                Outcome = PreparationDecisionOutcome.B,
+                Route = "defer-prepared-analysis",
+                Reason = "The work crossover is measured, but Outcome A is not decision-capable without bounded storage, I/O, allocation, and peak-memory trade-off evidence.",
+                OneProcessAlternativeEvaluated = workflow.OneProcessAlternativeMeasured,
+                BreakEvenObserved = breakEvenObserved,
+            };
+        }
+
         if (effect.DistinctCrossProcessValue && breakEvenObserved)
         {
             return new PreparationDecision

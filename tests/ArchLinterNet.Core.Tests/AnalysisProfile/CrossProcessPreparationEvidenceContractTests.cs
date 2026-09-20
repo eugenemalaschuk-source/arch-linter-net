@@ -131,6 +131,17 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     }
 
     [Test]
+    public void OutcomeA_FailsClosedWithoutBoundedResourceTradeOffEvidence()
+    {
+        CrossProcessPreparationEvidenceDocument evidence = CreateEvidence() with
+        {
+            PreparedEffect = CreateEffect(1) with { Resources = UnavailableResources() },
+        };
+
+        Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
+    }
+
+    [Test]
     public void IncompleteOneProcessWorkEvidence_CannotClaimMeasuredAlternativeOrDistinctValue()
     {
         PreparedEffectContract effect = CreateEffect(1) with
@@ -304,6 +315,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         PerConsumerLoadAuthorizationCostLowerBound = 10m,
         PerConsumerLoadAuthorizationCostUpperBound = 10m,
         PerConsumerLoadAuthorizationCostBasis = "Synthetic contract projection measurement.",
+        UnavoidableProjectionWork = 0m,
         MeasuredIndependentWorkflowWork = 100m,
         MeasuredOneProcessAlternativeWork = 120m,
         OneProcessWorkEvidenceComplete = true,
@@ -313,7 +325,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         WorkMeasurementBasis = "Synthetic contract counters.",
         BreakEvenProcessCount = 3,
         CacheModesMeasured = ["disabled", "miss", "hit"],
-        Resources = UnavailableResources(),
+        Resources = BoundedResources(),
         ExpectedEffect = new BenchmarkExpectedEffectEvidence
         {
             IssueReference = "#493",
@@ -385,5 +397,22 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         },
         AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Synthetic contract does not measure prepared-state allocations."),
         PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Synthetic contract does not measure prepared-state memory."),
+    };
+
+    private static PreparationResourceEvidence BoundedResources() => UnavailableResources() with
+    {
+        StorageBound = SyntheticBound("bytes"),
+        IoOperationsBound = SyntheticBound("operations"),
+        AllocatedBytesBound = SyntheticBound("bytes"),
+        PeakManagedMemoryBound = SyntheticBound("bytes"),
+    };
+
+    private static PreparationResourceBound SyntheticBound(string unit) => new()
+    {
+        LowerBound = 1,
+        UpperBound = 4,
+        Unit = unit,
+        Basis = "Synthetic bounded resource sensitivity fixture.",
+        Uncertainty = "Synthetic fixture range.",
     };
 }
