@@ -1,8 +1,16 @@
 # Badge delivery documentation and prepublication handoff
 
-Status: **BLOCKED** for final #836 delivery closure. Documentation composition
-is not a release or acceptance verdict. This maintainer record is excluded
-from the public MkDocs site by `exclude_docs: internal/`.
+Status: **historical / optional Relay acceptance record**. Documentation
+composition is not a release or acceptance verdict. This maintainer record is
+excluded from the public MkDocs site by `exclude_docs: internal/`.
+
+The First Ice consumer no longer depends on the Relay acceptance graph. The
+consumer proof recorded in #984 uses an adopter-owned trusted post-merge
+transport: it independently verifies exact producer provenance and publishes
+only the canonical badge projection to adopter-owned hosting. Its transport
+credentials, fail-closed receipt checks, availability, and lifecycle remain
+consumer responsibilities. This evidence does not convert Relay/OIDC into
+turnkey support and does not close the optional Relay acceptance history.
 
 ## Maintenance release decision
 
@@ -32,13 +40,16 @@ No candidate version, package hash, deployment identity, or acceptance run is
 inferred from either audit. Refresh this record against the chosen candidate
 after any relevant source, schema, packaging, or pin change.
 
-The consumer entry is [badge adoption](../guides/badge-adoption.md), leading to
+For adopters that explicitly choose Relay, the entry remains
+[badge adoption](../guides/badge-adoption.md), leading to
 [setup](../guides/badge-setup.md) and the
-[lifecycle runbook](../guides/badge-lifecycle-operations.md). It composes the
-existing contracts; it introduces no new CLI, protocol, schema, runtime, or
-provider promise. OpenSpec change: not applicable to this documentation-only
-composition. The existing #826 ADR and capability specifications remain
-normative, not this inventory.
+[lifecycle runbook](../guides/badge-lifecycle-operations.md). These pages
+compose the existing Relay contracts; they introduce no new CLI, protocol,
+schema, runtime, or provider promise. Adopter-owned direct transport is an
+external consumer integration boundary, not another ArchLinterNet provider
+mode. OpenSpec change: not applicable to this documentation-only composition.
+The existing #826 ADR and capability specifications remain normative, not this
+inventory.
 
 | Owner | Authority and evidence consumed here |
 | --- | --- |
@@ -218,7 +229,9 @@ acceptance, never as SKIP/PASS.
 
 ## Closure and publication boundary
 
-Current verdict: **BLOCKED**. The source packaging repair is merged; next obtain
+Relay-specific verdict: **BLOCKED** for adoption-stable Relay support, and
+intentionally optional. This does not block First Ice or core governance. If
+Relay adoption work resumes, obtain
 a fresh immutable #835 candidate and #834's matching packed/platform/live
 evidence. Then #836 reconciles every consumer command, inventory identity, and
 prerequisite against those results.
