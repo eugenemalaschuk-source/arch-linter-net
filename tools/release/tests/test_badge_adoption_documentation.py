@@ -60,6 +60,10 @@ def test_public_guides_expose_experimental_boundary_and_single_entrypoint() -> N
         assert "still pending" in intro
         assert "default to `none`" in intro
         assert "no automatic cloud setup or badge egress" in intro
+        assert "Relay/OIDC is optional transport" in intro
+        assert "adopter-owned" in intro
+        assert "fail-closed receipt checks" in intro
+        assert "not a fourth ArchLinterNet transport mode" in intro
     for path in _PUBLIC[1:]:
         assert "[badge adoption](badge-adoption.md)" in _read(path)
     # Executable examples stay with their existing setup/lifecycle owners.
@@ -175,11 +179,15 @@ def test_public_support_boundary_does_not_waive_known_unsafe_behavior(path: Path
     assert "No free hosting or SLA" in text or "no free hosting or SLA" in text
 
 
-def test_handoff_keeps_full_adoption_open_without_circular_patch_authority() -> None:
+def test_handoff_keeps_optional_relay_history_without_consumer_dependency() -> None:
     text = " ".join(_read(_HANDOFF).split())
     assert "#922 -> #834 -> #836 -> #825" in text
     assert "not a blanket maintenance-patch prerequisite" in text
     assert "None is a required CLOSED prerequisite for its own release" in text
+    assert "First Ice consumer no longer depends on the Relay acceptance graph" in text
+    assert "adopter-owned trusted post-merge transport" in text
+    assert "external consumer integration boundary" in text
+    assert "does not block First Ice or core governance" in text
 
 
 def test_readme_and_adoption_preserve_no_app_and_no_badge_commit_model() -> None:
