@@ -56,7 +56,7 @@ internal sealed record PreparedEffectContract
     public long PreparedStateOnlyWork => CandidatePreparedBoundaryWork - CacheAvoidableWork;
 
     public decimal IndependentOneShotCost(int processCount) =>
-        ValidateProcessCount(processCount) * ColdPrepareCost * RepeatedWorkShare;
+        ValidateProcessCount(processCount) * ColdPrepareCost;
 
     public decimal PreparedReuseCost(int processCount) =>
         ColdPrepareCost + ValidateProcessCount(processCount) * PerConsumerLoadAuthorizationCost + UnavoidableProjectionWork;
@@ -66,7 +66,7 @@ internal sealed record PreparedEffectContract
 
     public int? CalculateBreakEvenProcessCount()
     {
-        decimal repeatedCostPerConsumer = ColdPrepareCost * RepeatedWorkShare;
+        decimal repeatedCostPerConsumer = ColdPrepareCost;
         decimal differencePerConsumer = repeatedCostPerConsumer - PerConsumerLoadAuthorizationCost;
         if (differencePerConsumer <= 0 || ColdPrepareCost <= 0)
         {

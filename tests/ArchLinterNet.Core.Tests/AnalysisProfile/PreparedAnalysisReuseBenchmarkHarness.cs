@@ -484,14 +484,14 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         decimal unavoidableProjectionWork)
     {
         decimal Speedup(int count) =>
-            (coldPrepareCost * count * repeatedWorkShare + unavoidableProjectionWork) /
+            (coldPrepareCost * count + unavoidableProjectionWork) /
             (coldPrepareCost + count * loadAuthorizationCost + unavoidableProjectionWork);
         return new BenchmarkExpectedEffectEvidence
         {
             IssueReference = "#493",
             TargetPhase = "candidate_preparation",
             BaselinePhaseShare = repeatedWorkShare,
-            CurrentWorkModel = "R x independent candidate preparation",
+            CurrentWorkModel = "R x independent candidate preparation/fact work",
             TargetWorkModel = "one cold preparation + R x load/authorization + unavoidable projection/command work",
             ExpectedLocalSpeedupSmall = Speedup(1),
             ExpectedLocalSpeedupMedium = Speedup(representativeProcessCount),

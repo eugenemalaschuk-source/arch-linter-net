@@ -49,11 +49,11 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(effect.CalculateBreakEvenProcessCount(), Is.EqualTo(3));
-            Assert.That(effect.BreakEvenProcessCount, Is.EqualTo(3));
+            Assert.That(effect.CalculateBreakEvenProcessCount(), Is.EqualTo(2));
+            Assert.That(effect.BreakEvenProcessCount, Is.EqualTo(2));
             Assert.That(effect.IndependentOneShotCost(3), Is.EqualTo(150m));
-            Assert.That(effect.PreparedReuseCost(3), Is.EqualTo(130m));
-            Assert.That(effect.ExpectedSavings(3), Is.EqualTo(20m));
+            Assert.That(effect.PreparedReuseCost(3), Is.EqualTo(80m));
+            Assert.That(effect.ExpectedSavings(3), Is.EqualTo(70m));
             Assert.That(effect.PreparedStateOnlyWork, Is.EqualTo(70));
             Assert.That(effect.ExactCacheHitSavingsExcluded, Is.True);
             Assert.That(effect.OneProcessWorkEvidenceComplete, Is.True);
@@ -310,7 +310,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         CandidatePreparedBoundaryWork = 100,
         CacheAvoidableWork = 30,
         PreparedStateAvoidableWork = 70,
-        ColdPrepareCost = 100m,
+        ColdPrepareCost = 50m,
         PerConsumerLoadAuthorizationCost = 10m,
         PerConsumerLoadAuthorizationCostLowerBound = 10m,
         PerConsumerLoadAuthorizationCostUpperBound = 10m,
@@ -320,10 +320,10 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         MeasuredOneProcessAlternativeWork = 120m,
         OneProcessWorkEvidenceComplete = true,
         MissingOneProcessWorkEvidenceFamilies = [],
-        ExpectedPersistedReuseWork = 110m,
+        ExpectedPersistedReuseWork = 60m,
         DistinctCrossProcessValue = true,
         WorkMeasurementBasis = "Synthetic contract counters.",
-        BreakEvenProcessCount = 3,
+        BreakEvenProcessCount = 2,
         CacheModesMeasured = ["disabled", "miss", "hit"],
         Resources = BoundedResources(),
         ExpectedEffect = new BenchmarkExpectedEffectEvidence

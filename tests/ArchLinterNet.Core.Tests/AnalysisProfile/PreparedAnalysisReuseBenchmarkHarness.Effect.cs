@@ -47,14 +47,14 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         decimal repeatedWorkShare = independentTotalWork <= 0
             ? 0
             : independentPreparationWork / independentTotalWork;
-        decimal averageIndependentWork = independentTotalWork / representativeProcessCount;
-        decimal coldPrepareCost = Math.Max(1, averageIndependentWork);
+        decimal averageIndependentPreparationWork = independentPreparationWork / representativeProcessCount;
+        decimal coldPrepareCost = averageIndependentPreparationWork;
         decimal loadAuthorizationCost = Math.Max(
             1,
             sharedMeasurements.Sum(measurement => measurement.ProjectionWork) / sharedMeasurements.Count);
         decimal loadCostLowerBound = Math.Max(0, sharedMeasurements.Min(measurement => measurement.ProjectionWork));
         decimal loadCostUpperBound = Math.Max(loadCostLowerBound, sharedMeasurements.Max(measurement => measurement.ProjectionWork));
-        long candidateWork = Math.Max(1, (long)Math.Ceiling(averageIndependentWork));
+        long candidateWork = Math.Max(0, (long)Math.Ceiling(averageIndependentPreparationWork));
         long cacheAvoidableWork = Math.Min(
             candidateWork,
             (long)Math.Ceiling(
@@ -95,7 +95,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
               processBoundMeasurements.Sum(measurement => measurement.ProjectionWork)
             : 0;
         string workMeasurementBasis = oneProcessWorkEvidenceComplete
-            ? $"Summed preparation/projection counters for one disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}), matched to the shared and process-bound one-process projections. The persisted comparison adds the same measured unavoidable projection/command work to its total. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
+            ? $"Summed preparation/projection counters for one disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}), with cold preparation derived only from independent preparation counters. The persisted comparison adds the same measured unavoidable projection/command work to its total. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
             : $"One-process comparison is incomplete; real profile counters/work evidence are missing for: {string.Join(", ", missingOneProcessWorkEvidenceFamilies)}. Missing work is not treated as zero.";
 
         PreparedEffectContract effect = new()
@@ -258,7 +258,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         bool breakEvenObserved = effect.BreakEvenProcessCount.HasValue &&
             effect.ExpectedSavings(effect.RepresentativeProcessCount) > 0 &&
             effect.PerConsumerLoadAuthorizationCostUpperBound <
-            effect.ColdPrepareCost * effect.RepeatedWorkShare;
+            effect.ColdPrepareCost;
         if (!effect.Resources.HasBoundedTradeoffModel)
         {
             return new PreparationDecision
