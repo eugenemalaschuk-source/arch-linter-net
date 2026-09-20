@@ -145,7 +145,7 @@ internal sealed record PreparedEffectContract
         MeasuredMaterialSavingsRatio >= MaterialSavingsThreshold;
 
     public decimal IndependentOneShotCost(int processCount) =>
-        ValidateProcessCount(processCount) * ColdPrepareCost;
+        ValidateProcessCount(processCount) * ColdPrepareCost + UnavoidableProjectionWork;
 
     public decimal PreparedReuseCost(int processCount) =>
         ColdPrepareCost + ValidateProcessCount(processCount) * PerConsumerLoadAuthorizationCost + UnavoidableProjectionWork;
@@ -162,7 +162,9 @@ internal sealed record PreparedEffectContract
             return null;
         }
 
-        decimal firstStrictlyCheaper = decimal.Floor((ColdPrepareCost + UnavoidableProjectionWork) / differencePerConsumer) + 1;
+        // Unavoidable projection/consume work is common to both total-cost models, so it
+        // cancels from the preparation crossover. Solve C + R x L < R x P directly.
+        decimal firstStrictlyCheaper = decimal.Floor(ColdPrepareCost / differencePerConsumer) + 1;
         return firstStrictlyCheaper > int.MaxValue ? null : (int)firstStrictlyCheaper;
     }
 

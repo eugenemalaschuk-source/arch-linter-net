@@ -62,6 +62,26 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     }
 
     [Test]
+    public void PreparationBreakEven_IgnoresCommonUnavoidableProjectionWork()
+    {
+        PreparedEffectContract withoutProjection = CreateEffect(representativeProcessCount: 1);
+        PreparedEffectContract withProjection = withoutProjection with
+        {
+            UnavoidableProjectionWork = 1_000m,
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(withProjection.CalculateBreakEvenProcessCount(),
+                Is.EqualTo(withoutProjection.CalculateBreakEvenProcessCount()));
+            Assert.That(withProjection.ExpectedSavings(3),
+                Is.EqualTo(withoutProjection.ExpectedSavings(3)));
+            Assert.That(withProjection.IndependentOneShotCost(3) - withoutProjection.IndependentOneShotCost(3),
+                Is.EqualTo(withProjection.PreparedReuseCost(3) - withoutProjection.PreparedReuseCost(3)));
+        });
+    }
+
+    [Test]
     public void BaseRevisionPreparation_IsExcludedFromCandidateSavings()
     {
         CrossProcessPreparationEvidenceDocument evidence = CreateEvidence();

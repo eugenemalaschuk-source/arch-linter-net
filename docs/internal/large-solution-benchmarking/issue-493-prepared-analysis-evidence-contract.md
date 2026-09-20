@@ -116,12 +116,13 @@ The evidence must record, for the candidate only:
 For a one-shot preparation estimate `P`, the comparison is:
 
 ```text
-independent one-shot = R × P
+independent one-shot = R × P + U
 prepared-state model  = C + R × L + U
 ```
 
 Here `U` is unavoidable consume/projection work that is paid once by the
-prepared-state workflow. `L` must be measured independently from `U`: before a
+workflow boundary in either model. It therefore cancels from the preparation
+crossover, which is evaluated as `C + R × L < R × P`. `L` must be measured independently from `U`: before a
 persisted store exists, the benchmark uses the profile's
 `SelectedAssemblyCount` state-record cardinality as a bounded, normalized
 load/authorization proxy. Projection counters such as modes, rendered/output
