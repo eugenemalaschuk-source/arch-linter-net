@@ -48,19 +48,34 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             independentMeasurements.Max(measurement => measurement.CacheAvoidableWork));
         long preparedStateAvoidableWork = candidateWork - cacheAvoidableWork;
         decimal measuredIndependentWorkflowWork = independentTotalWork * representativeProcessCount;
-        decimal measuredOneProcessAlternativeWork =
-            coldPrepareCost + loadAuthorizationCost * sharedMeasurements.Count +
-            processes
-                .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
-                                  process.Identity.ExecutionKind == PreparationExecutionKind.ProcessBoundProjection)
+        IReadOnlyDictionary<string, IReadOnlyList<CrossProcessProcessEvidence>> processBoundFamilies = processes
+            .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
+                              process.Identity.ExecutionKind == PreparationExecutionKind.ProcessBoundProjection)
+            .GroupBy(process => process.Identity.Projection.CommandFamily)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<CrossProcessProcessEvidence>)group.ToList(), StringComparer.Ordinal);
+        IReadOnlyList<string> requiredProcessBoundFamilies = _measuredCommandFamilies
+            .Except(_sharedProjectionFamilies, StringComparer.Ordinal)
+            .ToList();
+        IReadOnlyList<string> missingOneProcessWorkEvidenceFamilies = requiredProcessBoundFamilies
+            .Where(family => !processBoundFamilies.ContainsKey(family) || !processBoundFamilies[family]
                 .Select(process => TryReadCounterWork(process.Sample.RawAnalysisProfile))
-                .Where(measurement => measurement is not null)
-                .Select(measurement => (decimal)(measurement!.PreparationWork + measurement.ProjectionWork))
-                .Sum();
-        if (measuredOneProcessAlternativeWork <= 0)
-        {
-            measuredOneProcessAlternativeWork = measuredIndependentWorkflowWork;
-        }
+                .Any(measurement => measurement is not null))
+            .OrderBy(family => family, StringComparer.Ordinal)
+            .ToList();
+        bool oneProcessWorkEvidenceComplete = missingOneProcessWorkEvidenceFamilies.Count == 0;
+        decimal? measuredOneProcessAlternativeWork = oneProcessWorkEvidenceComplete
+            ? coldPrepareCost + loadAuthorizationCost * sharedMeasurements.Count +
+              processBoundFamilies
+                  .Values
+                  .SelectMany(family => family)
+                  .Select(process => TryReadCounterWork(process.Sample.RawAnalysisProfile))
+                  .Where(measurement => measurement is not null)
+                  .Select(measurement => (decimal)(measurement!.PreparationWork + measurement.ProjectionWork))
+                  .Sum()
+            : null;
+        string workMeasurementBasis = oneProcessWorkEvidenceComplete
+            ? "Median preparation/projection counters from candidate independent profiles, shared one-process projections, and all required process-bound projections."
+            : $"One-process comparison is incomplete; real profile counters/work evidence are missing for: {string.Join(", ", missingOneProcessWorkEvidenceFamilies)}. Missing work is not treated as zero.";
 
         PreparedEffectContract effect = new()
         {
@@ -78,10 +93,11 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 "Measured one-process projection work; used as the explicit load/authorization proxy until persisted storage exists.",
             MeasuredIndependentWorkflowWork = measuredIndependentWorkflowWork,
             MeasuredOneProcessAlternativeWork = measuredOneProcessAlternativeWork,
+            OneProcessWorkEvidenceComplete = oneProcessWorkEvidenceComplete,
+            MissingOneProcessWorkEvidenceFamilies = missingOneProcessWorkEvidenceFamilies,
             ExpectedPersistedReuseWork = 0,
             DistinctCrossProcessValue = false,
-            WorkMeasurementBasis =
-                "Median preparation/projection counters from candidate independent profiles and shared one-process projections; unavailable CLI subcommand counters are excluded.",
+            WorkMeasurementBasis = workMeasurementBasis,
             BreakEvenProcessCount = null,
             CacheModesMeasured = ["disabled", "miss", "hit"],
             Resources = new PreparationResourceEvidence
@@ -100,7 +116,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         {
             BreakEvenProcessCount = breakEven,
             ExpectedPersistedReuseWork = expectedPersistedReuseWork,
-            DistinctCrossProcessValue = expectedPersistedReuseWork < measuredOneProcessAlternativeWork,
+            DistinctCrossProcessValue = oneProcessWorkEvidenceComplete &&
+                expectedPersistedReuseWork < measuredOneProcessAlternativeWork!.Value,
         };
     }
 
@@ -108,6 +125,18 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         PreparedEffectContract effect,
         CrossProcessPreparationWorkflow workflow)
     {
+        if (!effect.OneProcessWorkEvidenceComplete)
+        {
+            return new PreparationDecision
+            {
+                Outcome = PreparationDecisionOutcome.C,
+                Route = "route-instrumentation-gap",
+                Reason = $"Required process-bound work evidence is missing for: {string.Join(", ", effect.MissingOneProcessWorkEvidenceFamilies)}. The one-process alternative is not decision-capable, and missing work is not treated as zero.",
+                OneProcessAlternativeEvaluated = false,
+                BreakEvenObserved = false,
+            };
+        }
+
         bool breakEvenObserved = effect.BreakEvenProcessCount.HasValue &&
             effect.ExpectedSavings(effect.RepresentativeProcessCount) > 0 &&
             effect.PerConsumerLoadAuthorizationCostUpperBound <

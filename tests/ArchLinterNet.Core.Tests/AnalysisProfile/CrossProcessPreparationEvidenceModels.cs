@@ -273,6 +273,19 @@ internal sealed record CrossProcessPreparationEvidenceDocument
         PreparedEffect.Validate();
         Decision.Validate();
 
+        if (Workflow.OneProcessAlternativeMeasured != PreparedEffect.OneProcessWorkEvidenceComplete)
+        {
+            throw new InvalidOperationException(
+                "The one-process workflow flag must match process-bound work evidence completeness.");
+        }
+
+        if (!PreparedEffect.OneProcessWorkEvidenceComplete &&
+            (Decision.Outcome != PreparationDecisionOutcome.C || Decision.OneProcessAlternativeEvaluated))
+        {
+            throw new InvalidOperationException(
+                "Incomplete one-process work evidence must remain non-decision-capable with Outcome C.");
+        }
+
         if (!string.Equals(Workflow.WorkloadIdentity, BenchmarkEvidence.Workload.WorkloadIdentity, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Cross-process evidence must use the composed benchmark workload identity.");

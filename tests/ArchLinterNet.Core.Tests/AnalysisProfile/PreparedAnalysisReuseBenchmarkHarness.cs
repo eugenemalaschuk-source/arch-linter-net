@@ -264,7 +264,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             Projections = processes.Select(process => process.Identity.Projection).Distinct().ToList(),
             MeasuredCommandFamilies = _measuredCommandFamilies,
             CacheModesMeasured = ["disabled", "miss", "hit"],
-            OneProcessAlternativeMeasured = true,
+            OneProcessAlternativeMeasured = effect.OneProcessWorkEvidenceComplete,
         };
         CrossProcessPreparationEvidenceDocument evidence = new()
         {

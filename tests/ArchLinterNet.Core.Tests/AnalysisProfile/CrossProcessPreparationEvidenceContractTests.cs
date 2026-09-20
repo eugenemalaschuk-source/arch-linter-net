@@ -56,6 +56,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             Assert.That(effect.ExpectedSavings(3), Is.EqualTo(20m));
             Assert.That(effect.PreparedStateOnlyWork, Is.EqualTo(70));
             Assert.That(effect.ExactCacheHitSavingsExcluded, Is.True);
+            Assert.That(effect.OneProcessWorkEvidenceComplete, Is.True);
+            Assert.That(effect.MissingOneProcessWorkEvidenceFamilies, Is.Empty);
         });
     }
 
@@ -126,6 +128,34 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         };
 
         Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void IncompleteOneProcessWorkEvidence_CannotClaimMeasuredAlternativeOrDistinctValue()
+    {
+        PreparedEffectContract effect = CreateEffect(1) with
+        {
+            MeasuredOneProcessAlternativeWork = null,
+            OneProcessWorkEvidenceComplete = false,
+            MissingOneProcessWorkEvidenceFamilies = ["measure"],
+            DistinctCrossProcessValue = false,
+        };
+
+        CrossProcessPreparationEvidenceDocument evidence = CreateEvidence() with
+        {
+            Workflow = CreateEvidence().Workflow with { OneProcessAlternativeMeasured = false },
+            PreparedEffect = effect,
+            Decision = new PreparationDecision
+            {
+                Outcome = PreparationDecisionOutcome.C,
+                Route = "route-instrumentation-gap",
+                Reason = "Synthetic contract records missing process-bound work evidence.",
+                OneProcessAlternativeEvaluated = false,
+                BreakEvenObserved = false,
+            },
+        };
+
+        Assert.That(() => evidence.Validate(), Throws.Nothing);
     }
 
     [Test]
@@ -276,6 +306,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         PerConsumerLoadAuthorizationCostBasis = "Synthetic contract projection measurement.",
         MeasuredIndependentWorkflowWork = 100m,
         MeasuredOneProcessAlternativeWork = 120m,
+        OneProcessWorkEvidenceComplete = true,
+        MissingOneProcessWorkEvidenceFamilies = [],
         ExpectedPersistedReuseWork = 110m,
         DistinctCrossProcessValue = true,
         WorkMeasurementBasis = "Synthetic contract counters.",

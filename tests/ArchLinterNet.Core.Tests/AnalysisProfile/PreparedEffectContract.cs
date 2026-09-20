@@ -28,7 +28,11 @@ internal sealed record PreparedEffectContract
 
     public required decimal MeasuredIndependentWorkflowWork { get; init; }
 
-    public required decimal MeasuredOneProcessAlternativeWork { get; init; }
+    public required decimal? MeasuredOneProcessAlternativeWork { get; init; }
+
+    public required bool OneProcessWorkEvidenceComplete { get; init; }
+
+    public required IReadOnlyList<string> MissingOneProcessWorkEvidenceFamilies { get; init; }
 
     public required decimal ExpectedPersistedReuseWork { get; init; }
 
@@ -84,7 +88,7 @@ internal sealed record PreparedEffectContract
             PerConsumerLoadAuthorizationCostUpperBound < PerConsumerLoadAuthorizationCostLowerBound ||
             PerConsumerLoadAuthorizationCost < PerConsumerLoadAuthorizationCostLowerBound ||
             PerConsumerLoadAuthorizationCost > PerConsumerLoadAuthorizationCostUpperBound ||
-            MeasuredIndependentWorkflowWork < 0 || MeasuredOneProcessAlternativeWork < 0 ||
+            MeasuredIndependentWorkflowWork < 0 || MeasuredOneProcessAlternativeWork is < 0 ||
             ExpectedPersistedReuseWork < 0)
         {
             throw new InvalidOperationException("Prepared-effect counts, shares, and costs must be non-negative.");
@@ -94,6 +98,30 @@ internal sealed record PreparedEffectContract
             string.IsNullOrWhiteSpace(WorkMeasurementBasis))
         {
             throw new InvalidOperationException("Prepared-effect measurements require an explicit basis.");
+        }
+
+        if (MissingOneProcessWorkEvidenceFamilies.Count !=
+                MissingOneProcessWorkEvidenceFamilies.Distinct(StringComparer.Ordinal).Count() ||
+            MissingOneProcessWorkEvidenceFamilies.Any(family => string.IsNullOrWhiteSpace(family)))
+        {
+            throw new InvalidOperationException("Missing one-process work evidence families must be unique and named.");
+        }
+
+        if (OneProcessWorkEvidenceComplete != (MissingOneProcessWorkEvidenceFamilies.Count == 0))
+        {
+            throw new InvalidOperationException("One-process work evidence completeness must match the missing-family list.");
+        }
+
+        if (OneProcessWorkEvidenceComplete && !MeasuredOneProcessAlternativeWork.HasValue)
+        {
+            throw new InvalidOperationException("Complete one-process work evidence must include a measured alternative cost.");
+        }
+
+        if (!OneProcessWorkEvidenceComplete &&
+            (MeasuredOneProcessAlternativeWork.HasValue || DistinctCrossProcessValue))
+        {
+            throw new InvalidOperationException(
+                "Incomplete one-process work evidence cannot claim a measured alternative cost or distinct cross-process value.");
         }
 
         if (CandidatePreparedBoundaryWork < 0 || CacheAvoidableWork < 0 || PreparedStateAvoidableWork < 0 ||
@@ -113,7 +141,8 @@ internal sealed record PreparedEffectContract
             throw new InvalidOperationException("The recorded persisted reuse work does not match the expected-effect calculation.");
         }
 
-        if (DistinctCrossProcessValue != (ExpectedPersistedReuseWork < MeasuredOneProcessAlternativeWork))
+        if (OneProcessWorkEvidenceComplete &&
+            DistinctCrossProcessValue != (ExpectedPersistedReuseWork < MeasuredOneProcessAlternativeWork!.Value))
         {
             throw new InvalidOperationException("Distinct cross-process value must be derived from measured one-process and persisted costs.");
         }
