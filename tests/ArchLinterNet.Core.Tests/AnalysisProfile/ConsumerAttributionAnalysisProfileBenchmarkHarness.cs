@@ -212,8 +212,8 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             try
             {
                 await process.WaitForExitAsync(linkedSource.Token);
-                string stdout = await stdoutTask;
-                string stderr = await stderrTask;
+                string stdout = await stdoutTask.WaitAsync(linkedSource.Token);
+                string stderr = await stderrTask.WaitAsync(linkedSource.Token);
                 wallClock.Stop();
 
                 Assert.That(File.Exists(profilePath), Is.True,
@@ -270,10 +270,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     {
         try
         {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
+            process.Kill(entireProcessTree: true);
         }
         catch (InvalidOperationException)
         {
