@@ -146,11 +146,15 @@ findings.
 
 The current artifact's conclusion reports `build_state_preflight` separately:
 it is the dominant phase in the 1-process sample and remains roughly 82% of
-inner time across the matrix. It records the launched CLI file version and
-DLL SHA-256, the matching CLI package id/version/hash, and canonical-result
-equivalence includes the JSON contract's `cycle_diagnostics` field. NUnit
-cooperative cancellation is passed into each child-process wait and kills the
-entire process tree on cancellation or per-process timeout.
+inner time across the matrix. The harness launches the Release CLI DLL and
+verifies that its SHA-256 equals the `tools/net10.0/any/ArchLinterNet.Cli.dll`
+entry inside the selected package before recording package provenance. It
+records the launched file version/DLL SHA-256, package id/version/file hash,
+and verified package-entry assembly hash. Canonical-result equivalence includes
+the current JSON contract's `cycle_diagnostics`, `coverage_summary`,
+`preflight_diagnostics`, and `source_set_expansion` sections. NUnit cooperative
+cancellation is passed into fixture build and each child-process wait; the
+linked timeout kills the entire process tree and uses bounded cleanup.
 
 ## Benchmark scenario IDs (see `docs/internal/analysis-profile-pre-optimization-baseline.md`)
 

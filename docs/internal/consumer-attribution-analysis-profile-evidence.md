@@ -13,8 +13,9 @@ analysis work. That establishes the ArchLinterNet inner boundary and makes
 duplicated per-process work visible. It does not turn one synthetic current-tree
 measurement into a claim about a private adopter's regression or a universal
 performance contract. The measured dominant phase is nevertheless concrete:
-`build_state_preflight` is 2,615.5 ms of the 3,205.0 ms 1-process inner median
-(81.8%); the same phase remains about 81.2–82.1% across the other scenarios.
+`build_state_preflight` is 2,563.5 ms of the 3,131.5 ms 1-process inner median
+(81.9%); the scenario medians keep the same phase at about 81.9–82.4% of inner
+time.
 
 The complete raw profiles and sample distributions are retained in
 [`consumer-attribution-analysis-profile-results.json`](consumer-attribution-analysis-profile-results.json).
@@ -37,26 +38,33 @@ combined execution, and within-process bounded assembly/source scanning. This
 artifact isolates repeated work caused by independent process count.
 
 The checked-in run was produced from source commit
-`3ecc7220a125fe8c140fa025de70686f59845e41` in Debug configuration on Windows
+`d69e135de4f8241f10fcb6c21d31b19b73c949ea` in Release configuration on Windows
 10.0.26200, .NET 10.0.12, x64, with 16 logical processors. The fixture contained
-10 projects and 30 source files; its one-time build setup took 3,130.0 ms. The
-raw artifact is 2,558,213 bytes and retains every process profile.
+10 projects and 30 source files; its one-time build setup took 3,508.0 ms. The
+raw artifact is 2,558,192 bytes and retains every process profile.
 
 ## Provenance and equivalence
 
-The evidence records the binary actually launched by every child process:
+The evidence records the Release binary actually launched by every child process:
 `CliFileVersion=0.1.0.0` and
-`CliAssemblySha256=96b37feaaae4de01d252a03aa617a46eb256392b0c95ebfb89cedd1fc1a15ceb`.
+`CliAssemblySha256=960184941645b0eae40ad4bd466cbbc898fb8f2c36ac8afebef3a5bdc5de7f6c`.
+The harness opens the selected package, hashes its
+`tools/net10.0/any/ArchLinterNet.Cli.dll` entry, and refuses to record evidence
+unless that hash equals the launched DLL. The verified package assembly hash is
+also recorded explicitly as `CliPackageAssemblySha256`.
 It also records the matching package identity:
 `ArchLinterNet.Cli` version `0.1.0-preview.658`, package SHA-256
-`4568a4aaa351237ad4f774b06277fad2bfc9d8cb5e0d0974ff93993dc9d67312`.
+`19803137bdfd2470df68e230203f25c1e857eb3ed8d8b13ff12e0651d418d175`;
+the embedded assembly SHA-256 is
+`960184941645b0eae40ad4bd466cbbc898fb8f2c36ac8afebef3a5bdc5de7f6c`.
 
-Canonical equivalence includes the current JSON contract's `cycle_diagnostics`
-field (alongside paths, violations, coverage, policy-consistency, and
-classification fields); it is not silently reduced to a nonexistent
-`cycle_findings` property. The harness also observes NUnit's cooperative
-`TestContext.CurrentContext.CancellationToken`, links it to each 300-second
-process timeout, kills the entire child process tree on cancellation, and uses
+Canonical equivalence includes the current JSON contract's
+`cycle_diagnostics`, `coverage_summary`, `preflight_diagnostics`, and
+`source_set_expansion` fields (alongside the remaining result and classification
+sections); it is not silently reduced to a nonexistent `cycle_findings` property.
+The harness observes NUnit's cooperative `TestContext.CurrentContext.CancellationToken`
+while building the fixture and while waiting for each child process, links it to
+300-second timeouts, kills the entire process tree on cancellation, and uses
 bounded cleanup.
 
 ## Observed matrix
@@ -69,11 +77,11 @@ is the summed local process envelope.
 
 | Scenario | Inner | build_state_preflight | Analysis | Outer | Envelope |
 |---|---:|---:|---:|---:|---:|
-| 1 process, sequential | 3205.0 / 3287.0 | 2615.5 / 2691.0 | 487.5 / 539.0 | 3423.3 / 3507.8 | 212.0 |
-| 2 processes, sequential | 8256.5 / 13604.0 | 6586.0 / 11851.0 | 1287.5 / 1485.0 | 9086.4 / 14293.4 | 571.4 |
-| 4 processes, sequential | 12942.0 / 16454.0 | 10532.0 / 13390.0 | 2011.0 / 2495.0 | 13847.7 / 17623.0 | 875.4 |
-| 2 processes, bounded parallel | 6820.5 / 7241.0 | 5563.5 / 5894.0 | 1044.0 / 1139.0 | 3645.6 / 3902.9 | 438.2 |
-| 4 processes, bounded parallel | 14187.0 / 14779.0 | 11698.5 / 11878.0 | 2062.5 / 2452.0 | 3832.0 / 3969.4 | 881.5 |
+| 1 process, sequential | 3131.5 / 3316.0 | 2563.5 / 2704.0 | 467.5 / 544.0 | 3334.5 / 3539.5 | 201.6 / 216.0 |
+| 2 processes, sequential | 6284.5 / 6604.0 | 5149.0 / 5417.0 | 951.0 / 980.0 | 6705.8 / 7038.9 | 398.6 / 420.2 |
+| 4 processes, sequential | 12844.5 / 13050.0 | 10582.0 / 10789.0 | 1902.5 / 1928.0 | 13698.4 / 13886.1 | 811.4 / 831.9 |
+| 2 processes, bounded parallel | 6234.0 / 6460.0 | 5113.0 / 5279.0 | 936.5 / 974.0 | 3331.4 / 3439.7 | 406.4 / 420.2 |
+| 4 processes, bounded parallel | 13408.5 / 16188.0 | 11033.0 / 13596.0 | 1966.5 / 2259.0 | 3632.9 / 4306.6 | 841.6 / 998.1 |
 
 The deterministic counters show the attribution boundary more clearly than the
 wall clock. A single process records 10 discovered projects, one project-graph
@@ -82,7 +90,7 @@ same counters are exactly 20/2/2/4 for two processes and 40/4/4/8 for four
 processes in both dispatch modes. Every process produced the same canonical
 result digest:
 
-`1aa64858ba6fc0dad28ca0e8fb3e9e446389188294a791a6a3a10702e9069a8f`
+`41a6639f73057c2dd682535e2383aefadd4e7ba4c92aa7b0156e8bb749b0c5cb`
 
 Thus bounded parallel dispatch hides duplicated inner work behind a relatively
 flat outer wall time, while the per-process profiles and aggregate counters
