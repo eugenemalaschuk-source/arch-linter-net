@@ -54,7 +54,7 @@ def test_adoption_precedes_executable_guides_in_navigation() -> None:
 
 def test_public_guides_expose_experimental_boundary_and_single_entrypoint() -> None:
     for path in _PUBLIC:
-        intro = _read(path).split("\n## ", 1)[0]
+        intro = " ".join(_read(path).split("\n## ", 1)[0].split())
         assert "Experimental / opt-in Private Relay" in intro
         assert "Full hosted/lifecycle acceptance" in intro
         assert "still pending" in intro
