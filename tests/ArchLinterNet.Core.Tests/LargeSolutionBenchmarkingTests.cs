@@ -22,7 +22,7 @@ public sealed class LargeSolutionBenchmarkingTests
             ReferencesPerProject = 3,
             LayerCount = 3,
             SelectorPredicateTermsPerLayer = 4,
-            ContractsPerRoot = 2,
+            ContractsPerWorkload = 2,
             FindingCandidates = 7,
             SourceRootCount = 2,
         };
@@ -194,6 +194,68 @@ public sealed class LargeSolutionBenchmarkingTests
         {
             Assert.That(workload.Inventory.TypeCount, Is.EqualTo(dimensions.ProjectCount * dimensions.TypesPerProject));
             Assert.That(materializedTypeCount, Is.EqualTo(workload.Inventory.TypeCount));
+        });
+    }
+
+    [Test]
+    public void SourceRootDimensionDoesNotMultiplyContractWork()
+    {
+        BenchmarkDimensionSet dimensions = new()
+        {
+            ProjectCount = 2,
+            TypesPerProject = 2,
+            SourceFilesPerProject = 1,
+            ContractsPerWorkload = 3,
+            SourceRootCount = 1,
+        };
+        BenchmarkWorkloadDefinition oneRoot = BenchmarkWorkloadGenerator.Create(
+            "synthetic-contracts-one-root", BenchmarkTopologyShape.Linear, dimensions);
+        BenchmarkWorkloadDefinition fourRoots = BenchmarkWorkloadGenerator.Create(
+            "synthetic-contracts-four-roots", BenchmarkTopologyShape.Linear, dimensions with { SourceRootCount = 4 });
+
+        using BenchmarkMaterializedFixture oneRootFixture = BenchmarkFixtureMaterializer.Materialize(oneRoot);
+        using BenchmarkMaterializedFixture fourRootsFixture = BenchmarkFixtureMaterializer.Materialize(fourRoots);
+        int oneRootContractCount = File.ReadAllText(oneRootFixture.PolicyPath)
+            .Split("id: synthetic-contract-", StringSplitOptions.None).Length - 1;
+        int fourRootContractCount = File.ReadAllText(fourRootsFixture.PolicyPath)
+            .Split("id: synthetic-contract-", StringSplitOptions.None).Length - 1;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fourRoots.Inventory.SourceFileCount, Is.GreaterThan(oneRoot.Inventory.SourceFileCount));
+            Assert.That(fourRoots.Inventory.ContractCount, Is.EqualTo(oneRoot.Inventory.ContractCount));
+            Assert.That(fourRootContractCount, Is.EqualTo(oneRootContractCount));
+            Assert.That(fourRootContractCount, Is.EqualTo(dimensions.ContractsPerWorkload));
+        });
+    }
+
+    [Test]
+    public void DerivedInventoryCountersFailClosedOnInt32Overflow()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                () => BenchmarkWorkloadGenerator.Create(
+                    "synthetic-source-file-counter-overflow",
+                    BenchmarkTopologyShape.Linear,
+                    new BenchmarkDimensionSet
+                    {
+                        ProjectCount = 2,
+                        SourceFilesPerProject = 1_073_741_824,
+                        SourceRootCount = 2,
+                    }),
+                Throws.TypeOf<ArgumentOutOfRangeException>().With.Message.Contains("source_file_count"));
+            Assert.That(
+                () => BenchmarkWorkloadGenerator.Create(
+                    "synthetic-selector-counter-overflow",
+                    BenchmarkTopologyShape.Linear,
+                    new BenchmarkDimensionSet
+                    {
+                        ProjectCount = 2,
+                        TypesPerProject = 2,
+                        LayerCount = 1_073_741_824,
+                    }),
+                Throws.TypeOf<ArgumentOutOfRangeException>().With.Message.Contains("selector_predicate_evaluation_count"));
         });
     }
 

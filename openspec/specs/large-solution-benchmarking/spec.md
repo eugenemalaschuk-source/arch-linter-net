@@ -26,6 +26,14 @@ selector_predicate_terms_per_layer`. Finding candidates SHALL select distinct
 materialized synthetic types; a candidate SHALL not apply to every synthetic
 type merely because its ID is different.
 
+Contract scale SHALL be named `contracts_per_workload` and SHALL describe
+the total generated contract count independently of `source_root_count`.
+Changing source-root count alone SHALL not change contract count or generated
+contract work. Derived deterministic counters SHALL use checked int32
+arithmetic and SHALL fail closed when a declared combination exceeds the
+representable counter range; the versioned JSON schemas SHALL declare matching
+int32 upper bounds for dimensions and deterministic counters.
+
 #### Scenario: Recreating a workload is deterministic
 
 - **WHEN** two fixture roots are generated from the same manifest and generator version
@@ -42,6 +50,17 @@ type merely because its ID is different.
 - **THEN** the generated policy contains the requested distinct selector terms
 - **AND** each finding candidate targets one distinct synthetic type
 - **AND** deterministic evidence reports the resulting selector evaluation and candidate counts rather than metadata-only IDs
+
+#### Scenario: Source roots do not multiply contract work
+
+- **WHEN** source-root count is increased while `contracts_per_workload` remains fixed
+- **THEN** source files and source-root inventory may increase
+- **AND** generated contract count and contract IDs remain unchanged
+
+#### Scenario: Derived counter overflow fails closed
+
+- **WHEN** a dimension combination would overflow a deterministic int32 counter
+- **THEN** workload generation rejects the combination before emitting a manifest or evidence document
 
 ### Requirement: The corpus supports representative topology and consumer shapes
 

@@ -30,6 +30,10 @@ materializes distinct CEL terms, and
 Finding candidates select distinct concrete synthetic types, so
 `finding_candidate_count` and `canonical_identity_candidate_count` describe
 the actual candidate work rather than N contracts applied to every type.
+Contracts use the workload-level `contracts_per_workload` dimension and are
+not multiplied by `source_root_count`; source-root scaling therefore remains
+independent of contract work. Derived int32 counters fail closed on overflow,
+and the schemas bound both input dimensions and deterministic inventory counts.
 Reference density adds forward edges for acyclic shapes;
 cycles are reserved for explicitly cyclic shapes. In v1, `CyclicScc` is a
 structural-only descriptor: the fixture rejects project-based compilation of

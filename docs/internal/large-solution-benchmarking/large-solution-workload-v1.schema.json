@@ -24,17 +24,17 @@
     "dimensions": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["project_count", "types_per_project", "source_files_per_project", "references_per_project", "layer_count", "selector_predicate_terms_per_layer", "contracts_per_root", "finding_candidates", "source_root_count"],
+      "required": ["project_count", "types_per_project", "source_files_per_project", "references_per_project", "layer_count", "selector_predicate_terms_per_layer", "contracts_per_workload", "finding_candidates", "source_root_count"],
       "properties": {
-        "project_count": { "type": "integer", "minimum": 1 },
-        "types_per_project": { "type": "integer", "minimum": 1 },
-        "source_files_per_project": { "type": "integer", "minimum": 1 },
-        "references_per_project": { "type": "integer", "minimum": 0 },
-        "layer_count": { "type": "integer", "minimum": 1 },
+        "project_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "types_per_project": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "source_files_per_project": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "references_per_project": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "layer_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
         "selector_predicate_terms_per_layer": { "type": "integer", "minimum": 1, "maximum": 25 },
-        "contracts_per_root": { "type": "integer", "minimum": 1 },
-        "finding_candidates": { "type": "integer", "minimum": 0 },
-        "source_root_count": { "type": "integer", "minimum": 1 }
+        "contracts_per_workload": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "finding_candidates": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "source_root_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
       }
     },
     "project": {
@@ -66,16 +66,16 @@
       "additionalProperties": false,
       "required": ["project_count", "assembly_count", "source_file_count", "type_count", "reference_edge_count", "layer_count", "selector_predicate_evaluation_count", "contract_count", "finding_candidate_count", "source_root_count"],
       "properties": {
-        "project_count": { "type": "integer", "minimum": 1 },
-        "assembly_count": { "type": "integer", "minimum": 0 },
-        "source_file_count": { "type": "integer", "minimum": 0 },
-        "type_count": { "type": "integer", "minimum": 0 },
-        "reference_edge_count": { "type": "integer", "minimum": 0 },
-        "layer_count": { "type": "integer", "minimum": 0 },
-        "selector_predicate_evaluation_count": { "type": "integer", "minimum": 0 },
-        "contract_count": { "type": "integer", "minimum": 0 },
-        "finding_candidate_count": { "type": "integer", "minimum": 0 },
-        "source_root_count": { "type": "integer", "minimum": 0 }
+        "project_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "assembly_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "source_file_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "type_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "reference_edge_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "layer_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "selector_predicate_evaluation_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "contract_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "finding_candidate_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "source_root_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
       }
     },
     "workflow": {

@@ -15,13 +15,10 @@ internal static class BenchmarkWorkloadGenerator
         ValidateWorkloadId(workloadId);
         BenchmarkDimensionSet resolvedDimensions = dimensions ?? DefaultDimensions(shape);
         resolvedDimensions.Validate(shape);
-        long materializedTypeCount = (long)resolvedDimensions.ProjectCount * resolvedDimensions.TypesPerProject;
-        if (materializedTypeCount > int.MaxValue)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(dimensions),
-                "The materialized type count must fit in the deterministic inventory counters.");
-        }
+        int materializedTypeCount = CheckedProduct(
+            "type_count",
+            resolvedDimensions.ProjectCount,
+            resolvedDimensions.TypesPerProject);
 
         if (resolvedDimensions.FindingCandidates > materializedTypeCount)
         {
@@ -75,7 +72,7 @@ internal static class BenchmarkWorkloadGenerator
                 ReferencesPerProject = 31,
                 LayerCount = 8,
                 SelectorPredicateTermsPerLayer = 16,
-                ContractsPerRoot = 8,
+                ContractsPerWorkload = 8,
                 FindingCandidates = 128,
                 SourceRootCount = 4,
             },
@@ -92,15 +89,44 @@ internal static class BenchmarkWorkloadGenerator
         {
             ProjectCount = dimensions.ProjectCount,
             AssemblyCount = dimensions.ProjectCount,
-            SourceFileCount = dimensions.ProjectCount * dimensions.SourceFilesPerProject * dimensions.SourceRootCount,
-            TypeCount = dimensions.ProjectCount * dimensions.TypesPerProject,
+            SourceFileCount = CheckedProduct(
+                "source_file_count",
+                dimensions.ProjectCount,
+                dimensions.SourceFilesPerProject,
+                dimensions.SourceRootCount),
+            TypeCount = CheckedProduct("type_count", dimensions.ProjectCount, dimensions.TypesPerProject),
             ReferenceEdgeCount = topology.ReferenceEdgeCount,
             LayerCount = dimensions.LayerCount,
-            SelectorPredicateEvaluationCount = dimensions.ProjectCount * dimensions.TypesPerProject * dimensions.LayerCount * dimensions.SelectorPredicateTermsPerLayer,
-            ContractCount = dimensions.ContractsPerRoot * dimensions.SourceRootCount,
+            SelectorPredicateEvaluationCount = CheckedProduct(
+                "selector_predicate_evaluation_count",
+                dimensions.ProjectCount,
+                dimensions.TypesPerProject,
+                dimensions.LayerCount,
+                dimensions.SelectorPredicateTermsPerLayer),
+            ContractCount = dimensions.ContractsPerWorkload,
             FindingCandidateCount = dimensions.FindingCandidates,
             SourceRootCount = dimensions.SourceRootCount,
         };
+    }
+
+    private static int CheckedProduct(string counterName, params int[] factors)
+    {
+        int result = 1;
+        try
+        {
+            foreach (int factor in factors)
+            {
+                result = checked(result * factor);
+            }
+        }
+        catch (OverflowException exception)
+        {
+            throw new ArgumentOutOfRangeException(
+                counterName,
+                $"Derived deterministic counter '{counterName}' exceeds Int32.MaxValue: {exception.Message}");
+        }
+
+        return result;
     }
 
     private static BenchmarkDimensionSet DefaultDimensions(BenchmarkTopologyShape shape) => shape switch
