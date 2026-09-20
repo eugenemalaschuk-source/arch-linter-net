@@ -67,15 +67,51 @@ contract: measured phase share, local and end-to-end estimate, cold/warm and
 memory/storage trade-offs, issue-specific success threshold, kill criterion,
 and uncertainty. A slow sample alone does not authorize an optimization.
 
+## Issue #493 preparation-reuse contract
+
+This is a pre-implementation decision gate, not evidence that a persisted
+prepared-analysis implementation exists. The same candidate workload is
+compared across independent one-shot processes, one process serving safe
+projections from one immutable snapshot, and a persisted prepared-state
+expected-effect model.
+
+The current full-governance command mix is represented explicitly in the
+workload manifest and evidence `workflow`: strict and audit validation,
+no-new-debt, Architecture Health, and the current-side change snapshot are
+the required command families. Topology, measure, baseline/reference, and
+public-API projections are optional and must appear only when the declared
+workflow actually invokes them. A command description must never imply an
+unmeasured projection.
+
+Every sample preserves the candidate preparation boundary. `real_ms_build`
+means the fixture owns the restore/build and records the receipt-backed build
+boundary; `staged_assemblies` means the build occurred before analysis and the
+fixture verifies the exact copied assemblies and receipts before analysis
+starts. These are two preparation shapes for the same policy semantics, not
+unrelated workloads.
+
+Candidate and base/reference revision samples are attributed separately. Base
+preparation and fact counters are not reusable candidate work and are excluded
+from candidate savings or prepared-state break-even calculations. Cache-disabled,
+cache-miss, and exact-request cache-hit modes are also distinct: work avoided by
+an `analysis-cache/v1` hit is not counted again as prepared-analysis benefit.
+
 ## Methodology and reuse
 
 Downstream issues #503, #655, #675, and #493 select or extend these workload
 descriptors rather than creating competing scale frameworks. Measurements should
 compare at least three useful sizes when practical, separate cold and warm
 behavior, distinguish cache-disabled/miss/hit and prepared/unprepared modes,
-and verify canonical findings and ordering across equivalent modes. Timing and
-memory values are observations for the declared environment, not universal SLAs.
+and verify canonical findings, identity, ordering, completion, and exit
+semantics across equivalent modes. Timing and memory values are observations
+for the declared environment, not universal SLAs. For #493, the explicit
+multi-command matrix is a manual measurement and must not run from the normal
+test or acceptance gate; deterministic schema/contract tests remain in that
+gate.
 
 Committed artifacts contain synthetic `Synthetic.ProjectNNN` identities only;
 private adopter names, repository URLs, proprietary topology, and raw private
 CI logs are out of scope.
+
+The issue-specific preparation-reuse contract for #493 is documented in
+[`issue-493-prepared-analysis-evidence-contract.md`](issue-493-prepared-analysis-evidence-contract.md).

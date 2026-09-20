@@ -83,6 +83,90 @@ phase. It is an environment-dependent measurement and can overlap for nested pha
 `selector_predicate_evaluation` phase is the exception: its `ProcessorTimeMs` is always `null`
 because process CPU time cannot be attributed to an individual predicate evaluation.
 
+## Issue #493 preparation-reuse attribution
+
+The #493 evidence contract composes `benchmark-evidence/v1` around one or more
+raw `analysis-profile/v1` documents. The profile remains the inner
+ArchLinterNet boundary; the evidence envelope adds command, process, projection,
+revision, preparation-boundary, cache, and resource attribution. These labels
+must be retained for every measured child process or in-process projection so a
+batch cannot hide which work was repeated.
+
+### Command and projection identity
+
+The full-governance workload names the command families it actually exercises:
+
+| Required or optional family | Attribution rule |
+|---|---|
+| Strict validation | Candidate projection; retain its process/projection identity and exit/publication result. |
+| Audit validation | Candidate projection; it may share an immutable snapshot only in the one-process comparison. |
+| No-new-debt | Candidate projection; do not infer it from strict or audit unless it was invoked. |
+| Architecture Health | Candidate projection; retain its own command identity even when facts are shared. |
+| Current-side change snapshot | Candidate projection; record the current-side revision role. |
+| Topology, measure, baseline/reference, public API | Optional projections; include them only when the workflow manifest declares and measures them. |
+
+An independent one-shot process owns one snapshot and its preparation counters.
+An in-process projection records the immutable snapshot/session it used and
+whether its facts were shared or remained process-bound. A projection descriptor
+is evidence of what ran; it is not permission to claim that an unsupported
+command was served by a shared snapshot.
+
+### Preparation and revision boundaries
+
+`real_ms_build` and `staged_assemblies` are distinct candidate preparation
+boundaries. The former includes fixture-owned restore/build work and its
+receipt-backed build state; the latter begins analysis from externally built,
+exactly verified staged assemblies and receipts. In both cases, the evidence
+must distinguish build/setup, `build_state_preflight`,
+`post_ensure_built_reload`, `load_and_setup`, assembly/fact materialization,
+contract evaluation, and output publication. A staged external build is not
+silently presented as analyzer preparation.
+
+Candidate and base/reference runs have separate revision roles. Base/reference
+profiles are useful for change comparisons, but their policy, project, assembly,
+fact, and contract counters are not candidate reusable work. Exclude them from
+candidate savings, prepared-state break-even, and whole-workflow candidate
+upper-bound calculations.
+
+### Cache versus prepared state
+
+The `run.cache_mode` and `run.prepared_state_mode` values describe independent
+axes. Record cache-disabled, cache-miss, and exact-request cache-hit behavior
+separately from unprepared, one-process-shared, and expected persisted-prepared
+behavior. `Cache.Hits` and cache-avoidable preparation are attributed to
+`analysis-cache/v1`; an exact-request cache hit cannot be counted as a benefit of
+persisted prepared analysis. A prepared-state value in this evidence is a model
+or measured comparison label only; it does not imply a shipped store or
+authorization protocol.
+
+### Expected effect and break-even
+
+Before any prepared-analysis implementation, record the deterministic candidate
+preparation/fact work, the cold prepare cost `C`, the representative independent
+consumer/process count and mix `R`, and the per-consumer load/authorization cost
+`L`. If one independent consumer repeats preparation cost `P`, compare:
+
+```text
+independent one-shot work = R × P
+prepared-state model       = C + R × L
+```
+
+When `P > L`, the first candidate crossover is the smallest representative
+`R` for which `R × P` exceeds `C + R × L`; otherwise record that no crossover
+was observed. Report small, medium, and large expected effects, the whole-
+workflow upper bound, storage/I/O/allocation/memory trade-offs, success and kill
+criteria, and uncertainty. An outcome A decision requires this evidence and a
+measured effect beyond the one-process alternative. Outcomes B and C must state
+whether the opportunity is deferred, not reproduced, or routed to another
+benchmark/implementation owner.
+
+The explicit #493 matrix is manual and hardware-sensitive. Refresh it through
+the issue-specific benchmark harness entry point once implementation lands;
+the harness must write the checked-in synthetic/anonymized evidence artifact
+only on explicit invocation. Normal tests validate deterministic serialization,
+field attribution, canonical equivalence, and the effect model; they do not run
+the multi-process decision matrix or rewrite measurements.
+
 ## Deterministic consumer-shaped regression evidence (issue #654)
 
 [`RepeatedWorkRegressionEvidenceTests`](../../tests/ArchLinterNet.Core.Tests/RepeatedWorkRegressionEvidenceTests.cs)
