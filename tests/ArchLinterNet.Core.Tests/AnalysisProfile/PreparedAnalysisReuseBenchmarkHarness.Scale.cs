@@ -137,9 +137,9 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         CounterWorkMeasurement auditMeasurement = ReadRequiredCounterWork(snapshot.Counters, "scale/audit");
 
         decimal loadAuthorizationCost =
-            (strictMeasurement.ProjectionWork + auditMeasurement.ProjectionWork) / 2m;
+            (strictMeasurement.LoadAuthorizationWork + auditMeasurement.LoadAuthorizationWork) / 2m;
         Assert.That(loadAuthorizationCost, Is.GreaterThan(0),
-            "Scale-specific load/authorization cost must come from positive measured projection counters.");
+            "Scale-specific load/authorization cost must come from positive measured selected-state counters.");
         return loadAuthorizationCost;
     }
 
@@ -149,7 +149,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
     {
         CounterWorkMeasurement? measurement = TryReadCounterWork(CreateSyntheticProfile(counters, projection));
         Assert.That(measurement, Is.Not.Null,
-            $"Scale-specific projection '{projection}' must expose real profile counters.");
+            $"Scale-specific projection '{projection}' must expose real profile and selected-state counters.");
         return measurement!;
     }
 }

@@ -40,8 +40,12 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
                     point.CommandCount == archetype.Workflow.MeasuredCommandFamilies.Count)), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.ScaleEvidenceBasis.Contains("Measured analysis-profile/v1 counters", StringComparison.Ordinal)), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.ScaleEvidenceBasis.Contains("SelectedAssemblyCount", StringComparison.Ordinal)), Is.True);
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
                 .All(point => point.MeasurementBasis.Contains("Measured analysis-profile/v1 counters", StringComparison.Ordinal)), Is.True);
+            Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
+                .All(point => point.MeasurementBasis.Contains("SelectedAssemblyCount", StringComparison.Ordinal)), Is.True);
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
                 .All(point => point.PerConsumerLoadAuthorizationCost > 0), Is.True);
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)

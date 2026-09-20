@@ -60,12 +60,12 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         decimal averageIndependentPreparationWork = independentPreparationWork / representativeProcessCount;
         decimal coldPrepareCost = averageIndependentPreparationWork;
         decimal loadAuthorizationCost =
-            sharedMeasurements.Sum(measurement => measurement.ProjectionWork) /
+            sharedMeasurements.Sum(measurement => measurement.LoadAuthorizationWork) /
             (decimal)sharedMeasurements.Count;
         Assert.That(loadAuthorizationCost, Is.GreaterThan(0),
-            "Load/authorization cost must come from positive measured shared-projection counters.");
-        decimal loadCostLowerBound = Math.Max(0, sharedMeasurements.Min(measurement => measurement.ProjectionWork));
-        decimal loadCostUpperBound = Math.Max(loadCostLowerBound, sharedMeasurements.Max(measurement => measurement.ProjectionWork));
+            "Load/authorization cost must come from positive measured selected-state counters.");
+        decimal loadCostLowerBound = Math.Max(0, sharedMeasurements.Min(measurement => measurement.LoadAuthorizationWork));
+        decimal loadCostUpperBound = Math.Max(loadCostLowerBound, sharedMeasurements.Max(measurement => measurement.LoadAuthorizationWork));
         long candidateWork = Math.Max(0, (long)Math.Ceiling(averageIndependentPreparationWork));
         long cacheAvoidableWork = Math.Min(
             candidateWork,
@@ -110,7 +110,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             measuredScalePoints,
             representativeProcessCount);
         string workMeasurementBasis = oneProcessWorkEvidenceComplete
-            ? $"Summed preparation/projection counters for one disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}), with cold preparation derived only from independent preparation counters. The persisted comparison adds the same measured unavoidable projection/command work to its total. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
+            ? $"Summed preparation/projection counters for one disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}), with cold preparation derived only from independent preparation counters. Load/authorization is a separate SelectedAssemblyCount state-record proxy; projection/command work is added only as the measured unavoidable projection component. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
             : $"One-process comparison is incomplete; real profile counters/work evidence are missing for: {string.Join(", ", missingOneProcessWorkEvidenceFamilies)}. Missing work is not treated as zero.";
 
         PreparedEffectContract effect = new()
@@ -126,7 +126,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             PerConsumerLoadAuthorizationCostLowerBound = loadCostLowerBound,
             PerConsumerLoadAuthorizationCostUpperBound = loadCostUpperBound,
             PerConsumerLoadAuthorizationCostBasis =
-                "Measured one-process projection work; used as the explicit load/authorization proxy until persisted storage exists.",
+                "Measured SelectedAssemblyCount state-record cardinality from the shared analysis profiles; used as the explicit load/authorization proxy until persisted storage exists. ProjectionWork is excluded from this component and retained only as consume/projection work.",
             UnavoidableProjectionWork = unavoidableProjectionWork,
             MeasuredIndependentWorkflowWork = measuredIndependentWorkflowWork,
             MeasuredOneProcessAlternativeWork = measuredOneProcessAlternativeWork,
@@ -141,7 +141,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             CacheModesMeasured = ["disabled", "miss", "hit"],
             Resources = CreatePreparationResourceEvidence(workload, representativeIndependentProcesses, representativeProcessCount),
             ScaleEvidenceBasis =
-                $"Measured analysis-profile/v1 counters for small, medium, and large {workload.CompilationMode} workloads; each point runs one cache-disabled process for every representative command family ({string.Join(", ", _measuredCommandFamilies)}) and separately measures its strict/audit projection counters as the scale-specific load/authorization proxy.",
+                $"Measured analysis-profile/v1 counters for small, medium, and large {workload.CompilationMode} workloads; each point runs one cache-disabled process for every representative command family ({string.Join(", ", _measuredCommandFamilies)}) and separately measures its SelectedAssemblyCount state-record cardinality as the scale-specific load/authorization proxy. ProjectionWork remains a separate consume/projection component.",
             ScaleEvidence = scaleEvidence,
             ExpectedEffect = CreateExpectedEffect(
                 repeatedWorkShare,
@@ -194,7 +194,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                     PerConsumerLoadAuthorizationCost = point.PerConsumerLoadAuthorizationCost,
                     ColdPrepareCost = coldPrepareCost,
                     ExpectedLocalSpeedup = expectedLocalSpeedup,
-                    MeasurementBasis = "Measured analysis-profile/v1 counters from one cache-disabled CLI process per command family plus scale-specific strict/audit projection counters for the load/authorization proxy.",
+                    MeasurementBasis = "Measured analysis-profile/v1 counters from one cache-disabled CLI process per command family plus a scale-specific SelectedAssemblyCount state-record load/authorization proxy; projection/consume counters remain separate.",
                 };
             })
             .ToList();
@@ -384,18 +384,22 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             "SourceFilesScanned");
         long projectionWork = SumProperties(counters, "ModesEvaluated", "RenderedSinkCount", "OutputSinkCount") +
             SumObject(counters, "ContractFamilyCounts");
+        // SelectedAssemblyCount is a resulting prepared-state inventory cardinality. It is used
+        // as the explicit pre-implementation load/authorization proxy and is intentionally kept
+        // separate from projection/consume counters below.
+        long loadAuthorizationWork = SumProperties(counters, "SelectedAssemblyCount");
         long cacheAvoidableWork = SumObject(
             counters.TryGetProperty("Cache", out JsonElement cache) ? cache : default,
             "AvoidedAssemblyLoads",
             "AvoidedFactIndexMaterializations",
             "AvoidedSourceScanPasses",
             "AvoidedContractExecutions");
-        if (preparationWork == 0 && projectionWork == 0)
+        if (preparationWork == 0 && projectionWork == 0 && loadAuthorizationWork == 0)
         {
             return null;
         }
 
-        return new CounterWorkMeasurement(preparationWork, projectionWork, cacheAvoidableWork);
+        return new CounterWorkMeasurement(preparationWork, projectionWork, loadAuthorizationWork, cacheAvoidableWork);
     }
 
     private static long SumProperties(JsonElement value, params string[] names) =>
@@ -425,5 +429,6 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
     private sealed record CounterWorkMeasurement(
         long PreparationWork,
         long ProjectionWork,
+        long LoadAuthorizationWork,
         long CacheAvoidableWork);
 }

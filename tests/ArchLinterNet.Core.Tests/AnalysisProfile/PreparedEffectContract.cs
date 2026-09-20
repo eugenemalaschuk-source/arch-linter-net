@@ -69,6 +69,12 @@ internal sealed record PreparedEffectScalePoint
             throw new InvalidOperationException(
                 $"Scale evidence '{fieldName}' must derive expected local speedup from its own measured load/authorization cost.");
         }
+
+        if (!MeasurementBasis.Contains("SelectedAssemblyCount", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Scale evidence '{fieldName}' must identify an independent selected-state load/authorization proxy.");
+        }
     }
 }
 
@@ -185,6 +191,12 @@ internal sealed record PreparedEffectContract
             string.IsNullOrWhiteSpace(WorkMeasurementBasis))
         {
             throw new InvalidOperationException("Prepared-effect measurements require an explicit basis.");
+        }
+
+        if (!PerConsumerLoadAuthorizationCostBasis.Contains("SelectedAssemblyCount", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "The load/authorization basis must identify the independent selected-state proxy.");
         }
 
         if (MissingOneProcessWorkEvidenceFamilies.Count !=

@@ -343,7 +343,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         PerConsumerLoadAuthorizationCost = 10m,
         PerConsumerLoadAuthorizationCostLowerBound = 10m,
         PerConsumerLoadAuthorizationCostUpperBound = 10m,
-        PerConsumerLoadAuthorizationCostBasis = "Synthetic contract projection measurement.",
+        PerConsumerLoadAuthorizationCostBasis = "Synthetic contract SelectedAssemblyCount state-record load/authorization proxy; projection work is separate.",
         UnavoidableProjectionWork = 0m,
         MeasuredIndependentWorkflowWork = 100m,
         MeasuredOneProcessAlternativeWork = 120m,
@@ -406,7 +406,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             PerConsumerLoadAuthorizationCost = perConsumerLoadAuthorizationCost,
             ColdPrepareCost = coldPrepareCost,
             ExpectedLocalSpeedup = expectedLocalSpeedup,
-            MeasurementBasis = "Synthetic measured analysis-profile counters.",
+            MeasurementBasis = "Synthetic measured analysis-profile counters with SelectedAssemblyCount state-record load/authorization proxy.",
         };
     }
 

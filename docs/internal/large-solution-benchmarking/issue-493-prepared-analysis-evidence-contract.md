@@ -117,20 +117,26 @@ For a one-shot preparation estimate `P`, the comparison is:
 
 ```text
 independent one-shot = R × P
-prepared-state model  = C + R × L
+prepared-state model  = C + R × L + U
 ```
 
-If `P <= L`, there is no persisted-state crossover under this model. If
-`P > L`, report the smallest representative `R` where the persisted model is
-cheaper. Do not count a cache hit twice, and do not authorize outcome A from
-process count alone. The current #493 gate also requires a numeric materiality
+Here `U` is unavoidable consume/projection work that is paid once by the
+prepared-state workflow. `L` must be measured independently from `U`: before a
+persisted store exists, the benchmark uses the profile's
+`SelectedAssemblyCount` state-record cardinality as a bounded, normalized
+load/authorization proxy. Projection counters such as modes, rendered/output
+sinks, and contract-family executions must not be used as `L` when they are
+also included in `U` or in the one-process alternative.
+
+If `P <= L`, there is no persisted-state crossover under this model because
+`U` is non-negative. If `P > L`, report the smallest representative `R` where
+the persisted model is cheaper. Do not count a cache hit twice, and do not
+authorize outcome A from process count alone. The current #493 gate also requires a numeric materiality
 threshold: persisted reuse must be at least 10% cheaper than the measured
 representative one-process alternative, with the ratio derived from the two
 measured costs rather than copied from prose. The three scale points must come
-from the same disabled-cache command-family matrix. Each point must also
-measure its own strict/audit projection counters as the pre-implementation
-load/authorization proxy; mixing scale-specific preparation with a fixed
-medium-shaped `L` is not decision-capable. Otherwise the decision remains
+from the same disabled-cache command-family matrix, and each point must
+measure its own independent `L`. Otherwise the decision remains
 non-authorizing until an authoritative scaling artifact is linked.
 
 ## Decision and routing
