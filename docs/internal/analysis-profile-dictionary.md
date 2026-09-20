@@ -36,6 +36,14 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 | `Cache` | Issue #365's persistent `analysis-cache/v1`. `Status` is `NotApplicable` (all fields `0`, `Mode` `"disabled"`) unless a run configured `--cache`/`WithCache()` with anything other than disabled, in which case `Status` is `Active`. `Lookups`/`Hits`/`Misses` come from real pre-run reuse checks. `Rejects`, `Writes`, `BytesRead`/`BytesWritten`, `IneligibleUnitCount`, `CorruptionEvents`, and `CancelledBeforePublish` reflect real lookup and population activity. `Mode` is `"disabled"`/`"auto"`/`"path"` (never the resolved absolute cache location). `RejectReasonCounts` maps only reject outcomes, never a normal `Missing` miss, so its values always sum to `Rejects`. | `AnalysisProfileCacheCounters` |
 | `Concurrency` | Issue #408's bounded parallel scanning. `Status` is `NotApplicable` (every numeric field `0`, including `MaxParallelism`) unless at least one scanning phase (type loading, source-file fact-index materialization) actually took the bounded-parallel code path for this run, in which case `Status` is `Active` and `MaxParallelism` reports the resolved effective degree (`--max-parallelism`/`WithMaxParallelism()`, defaulting to `max(1, min(Environment.ProcessorCount, 4))`) that was in effect for that run. `ScheduledWorkItems`/`CompletedWorkItems` count partition units (one per target assembly for type loading; one per assembly or source root for fact-index materialization). `ObservedMaxConcurrency` is the highest number of partition workers observed running concurrently. `MergeOperations` counts deterministic merge steps (one per phase that ran in parallel). | `AnalysisProfileConcurrencyCounters` |
 
+The `Phases` array may also contain `selector_predicate_evaluation` when compiled CEL
+selectors were evaluated. Its deterministic `Count` is the runtime number of predicate
+invocations recorded by the analysis session; it is not a generated workload estimate. When
+timing is enabled, its `ElapsedMs` is a high-resolution aggregate wall-time measurement for the
+predicate evaluations. `ProcessorTimeMs` is intentionally `null`: process-level CPU time cannot
+be attributed to individual predicate evaluations. When timing is not enabled, both fields are
+`null`, never synthetic zero values.
+
 ## `Output` (actual publication)
 
 `CommittedSinkCount` includes committed file sinks and successfully delivered stream sinks.
@@ -70,7 +78,10 @@ When `OutputFailed` is true after analysis completed, `CompletionStatus` still d
 | `output_stream_write` | 0 | Write normal report content to stdout/stderr destinations. |
 | `output_commit` | 0 | Commit successfully staged normal file report sinks by rename. |
 
-Every phase also records `ProcessorTimeMs`, the process CPU-time delta measured during that phase. It is an environment-dependent measurement and can overlap for nested phases.
+Every ordinary phase also records `ProcessorTimeMs`, the process CPU-time delta measured during that
+phase. It is an environment-dependent measurement and can overlap for nested phases. The
+`selector_predicate_evaluation` phase is the exception: its `ProcessorTimeMs` is always `null`
+because process CPU time cannot be attributed to an individual predicate evaluation.
 
 ## Deterministic consumer-shaped regression evidence (issue #654)
 

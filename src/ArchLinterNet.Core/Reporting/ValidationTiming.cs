@@ -6,6 +6,8 @@ public sealed class ValidationTiming
 {
     private readonly List<Entry> _entries = new();
     private int _nextOrdinal;
+    private long _selectorElapsedStopwatchTicks;
+    private int _selectorMeasurementCount;
 
     public IDisposable Measure(string name, int indent = 0)
     {
@@ -24,9 +26,10 @@ public sealed class ValidationTiming
     public void WriteReport(TextWriter writer)
     {
         Entry? totalEntry = null;
-        var phaseEntries = new List<Entry>(_entries.Count);
+        IReadOnlyList<Entry> entries = Entries;
+        var phaseEntries = new List<Entry>(entries.Count);
 
-        foreach (Entry entry in _entries)
+        foreach (Entry entry in entries)
         {
             if (entry.Name == "total")
                 totalEntry = entry;
@@ -74,14 +77,59 @@ public sealed class ValidationTiming
 
     // Read-only view for AnalysisProfileBuilder (ArchLinterNet.Core.Profiling) to derive deterministic
     // phase/count data without changing WriteReport's own human-text rendering.
-    internal IReadOnlyList<Entry> Entries => _entries;
+    internal IReadOnlyList<Entry> Entries => SnapshotEntries();
+
+    // Selector predicates are counted independently from timing so ordinary validation keeps the
+    // low-overhead deterministic counter. When profiling is enabled, callers add high-resolution
+    // wall-time samples here and this view exposes one aggregate phase instead of one phase entry
+    // per predicate invocation. Process-wide CPU time is intentionally not recorded: it cannot be
+    // attributed to an individual predicate evaluation without being distorted by unrelated work
+    // or overlapping evaluations.
+    internal void RecordSelectorPredicateWallTime(long elapsedStopwatchTicks)
+    {
+        if (elapsedStopwatchTicks < 0)
+        {
+            return;
+        }
+
+        Interlocked.Add(ref _selectorElapsedStopwatchTicks, elapsedStopwatchTicks);
+        Interlocked.Increment(ref _selectorMeasurementCount);
+    }
 
     internal void Add(string name, long elapsedMs, double processorTimeMs, int indent, int? count, int ordinal)
     {
         _entries.Add(new Entry(name, elapsedMs, processorTimeMs, indent, count, ordinal));
     }
 
-    internal sealed record Entry(string Name, long ElapsedMs, double ProcessorTimeMs, int Indent, int? Count, int Ordinal);
+    internal sealed record Entry(string Name, long ElapsedMs, double? ProcessorTimeMs, int Indent, int? Count, int Ordinal)
+    {
+        internal double? HighResolutionElapsedMs { get; init; }
+    }
+
+    private IReadOnlyList<Entry> SnapshotEntries()
+    {
+        int selectorMeasurementCount = Volatile.Read(ref _selectorMeasurementCount);
+        if (selectorMeasurementCount == 0)
+        {
+            return _entries;
+        }
+
+        List<Entry> entries = new(_entries);
+        double elapsedMs = Volatile.Read(ref _selectorElapsedStopwatchTicks) * 1000d / Stopwatch.Frequency;
+        int ordinal = entries.Count == 0 ? 0 : entries.Max(entry => entry.Ordinal) + 1;
+        entries.Add(new Entry(
+            "selector_predicate_evaluation",
+            (long)Math.Round(elapsedMs),
+            ProcessorTimeMs: null,
+            Indent: 1,
+            Count: null,
+            Ordinal: ordinal)
+        {
+            HighResolutionElapsedMs = elapsedMs,
+        });
+        entries.Sort((left, right) => left.Ordinal.CompareTo(right.Ordinal));
+        return entries;
+    }
 
     private sealed class PhaseTiming : IDisposable
     {

@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using ArchLinterNet.CEL.Compilation;
 using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution.Expressions;
@@ -18,16 +20,22 @@ internal sealed class ArchitectureExpressionFactService
     private readonly ArchitectureRoleIndex _roleIndex;
     private readonly ArchitectureSourceFileFactIndex _sourceFileFactIndex;
     private readonly ProjectDiscoveryResult? _projectDiscovery;
+    private readonly AnalysisSessionProfilingCounters? _profilingCounters;
+    private readonly ValidationTiming? _timing;
     private readonly Dictionary<Type, ArchitectureExpressionSubjectFacts> _subjectFactsCache = new();
 
     public ArchitectureExpressionFactService(
         ArchitectureRoleIndex roleIndex,
         ArchitectureSourceFileFactIndex sourceFileFactIndex,
-        ProjectDiscoveryResult? projectDiscovery)
+        ProjectDiscoveryResult? projectDiscovery,
+        AnalysisSessionProfilingCounters? profilingCounters = null,
+        ValidationTiming? timing = null)
     {
         _roleIndex = roleIndex ?? throw new ArgumentNullException(nameof(roleIndex));
         _sourceFileFactIndex = sourceFileFactIndex ?? throw new ArgumentNullException(nameof(sourceFileFactIndex));
         _projectDiscovery = projectDiscovery;
+        _profilingCounters = profilingCounters;
+        _timing = timing;
     }
 
     public ArchitectureExpressionSubjectFacts BuildSubjectFacts(Type type)
@@ -79,26 +87,39 @@ internal sealed class ArchitectureExpressionFactService
     // fallback catch. Falls back to a plain InvalidOperationException only when no location could be
     // resolved (should not happen in practice, since ArchitecturePolicyProvenanceIndex.Bind walks
     // every document unconditionally, but this method must not throw on that possibility itself).
-    public static bool Evaluate(
+    public bool Evaluate(
         CelCompiledPredicate predicate, CelEvaluationContext context, string description, ArchitecturePolicySourceLocation? location)
     {
-        ArchitectureExpressionEvaluationResult result = ArchitectureExpressionEvaluator.Evaluate(predicate, context);
-        if (!result.IsError)
+        _profilingCounters?.RecordSelectorPredicateEvaluation();
+        long startedTimestamp = _timing is null ? 0 : Stopwatch.GetTimestamp();
+        try
         {
-            return result.IsMatch;
-        }
+            ArchitectureExpressionEvaluationResult result = ArchitectureExpressionEvaluator.Evaluate(predicate, context);
+            if (!result.IsError)
+            {
+                return result.IsMatch;
+            }
 
-        string message = $"{description} 'when' expression failed to evaluate: {result.ErrorMessage}";
-        if (location is null)
+            string message = $"{description} 'when' expression failed to evaluate: {result.ErrorMessage}";
+            if (location is null)
+            {
+                throw new InvalidOperationException(message);
+            }
+
+            var diagnostic = new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.SemanticValidation,
+                location,
+                Array.Empty<ArchitecturePolicySourceLocation>(),
+                location.Source.ImportChain);
+            throw new ArchitecturePolicyValidationException(message, diagnostic, new InvalidOperationException(message));
+        }
+        finally
         {
-            throw new InvalidOperationException(message);
+            if (_timing is not null)
+            {
+                long elapsedStopwatchTicks = Stopwatch.GetTimestamp() - startedTimestamp;
+                _timing.RecordSelectorPredicateWallTime(elapsedStopwatchTicks);
+            }
         }
-
-        var diagnostic = new ArchitecturePolicyDiagnostic(
-            ArchitecturePolicyDiagnosticKind.SemanticValidation,
-            location,
-            Array.Empty<ArchitecturePolicySourceLocation>(),
-            location.Source.ImportChain);
-        throw new ArchitecturePolicyValidationException(message, diagnostic, new InvalidOperationException(message));
     }
 }

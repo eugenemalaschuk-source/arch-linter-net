@@ -2,6 +2,7 @@ using System.Reflection;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -151,6 +152,10 @@ public sealed class ArchitectureAnalysisContext : IDisposable
     // treats any value <= 1 as "run sequentially," so an unset value degrades safely rather than
     // parallelizing unexpectedly.
     public int MaxParallelism { get; init; }
+
+    // Profiling is an optional observer shared with the expression matcher so selector timing can
+    // be attributed without changing ordinary validation work.
+    internal ValidationTiming? Timing { get; init; }
 
     public void Dispose()
     {
