@@ -96,7 +96,7 @@ internal sealed record BenchmarkDeterministicWorkEvidence
 
     public required int LayerCount { get; init; }
 
-    public required int SelectorMembershipCount { get; init; }
+    public required int SelectorPredicateEvaluationCount { get; init; }
 
     public required int ContractCount { get; init; }
 

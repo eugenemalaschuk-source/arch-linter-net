@@ -37,7 +37,7 @@ internal sealed record BenchmarkDimensionSet
 
     public int LayerCount { get; init; } = 2;
 
-    public int SelectorMembershipsPerLayer { get; init; } = 2;
+    public int SelectorPredicateTermsPerLayer { get; init; } = 2;
 
     public int ContractsPerRoot { get; init; } = 2;
 
@@ -62,7 +62,7 @@ internal sealed record BenchmarkDimensionSet
             throw new ArgumentOutOfRangeException(nameof(SourceFilesPerProject));
         }
 
-        if (ReferencesPerProject < 0 || LayerCount < 1 || SelectorMembershipsPerLayer < 1 ||
+        if (ReferencesPerProject < 0 || LayerCount < 1 || SelectorPredicateTermsPerLayer is < 1 or > 25 ||
             ContractsPerRoot < 1 || FindingCandidates < 0 || SourceRootCount < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(BenchmarkDimensionSet), "Workload dimensions cannot be negative and must contain at least one layer, contract, and source root.");
@@ -112,7 +112,7 @@ internal sealed record BenchmarkInventoryCounts
 
     public required int LayerCount { get; init; }
 
-    public required int SelectorMembershipCount { get; init; }
+    public required int SelectorPredicateEvaluationCount { get; init; }
 
     public required int ContractCount { get; init; }
 

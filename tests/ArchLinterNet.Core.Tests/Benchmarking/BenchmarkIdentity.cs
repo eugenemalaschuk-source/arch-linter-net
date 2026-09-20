@@ -103,7 +103,7 @@ internal static class BenchmarkEvidenceFactory
                 TypeCount = workload.Inventory.TypeCount,
                 ReferenceEdgeCount = workload.Inventory.ReferenceEdgeCount,
                 LayerCount = workload.Inventory.LayerCount,
-                SelectorMembershipCount = workload.Inventory.SelectorMembershipCount,
+                SelectorPredicateEvaluationCount = workload.Inventory.SelectorPredicateEvaluationCount,
                 ContractCount = workload.Inventory.ContractCount,
                 FindingCandidateCount = workload.Inventory.FindingCandidateCount,
                 SourceRootCount = workload.Inventory.SourceRootCount,

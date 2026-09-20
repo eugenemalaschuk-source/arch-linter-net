@@ -21,7 +21,7 @@ public sealed class LargeSolutionBenchmarkingTests
             SourceFilesPerProject = 2,
             ReferencesPerProject = 3,
             LayerCount = 3,
-            SelectorMembershipsPerLayer = 4,
+            SelectorPredicateTermsPerLayer = 4,
             ContractsPerRoot = 2,
             FindingCandidates = 7,
             SourceRootCount = 2,
@@ -156,6 +156,8 @@ public sealed class LargeSolutionBenchmarkingTests
             Assert.That(linear.Topology.StronglyConnectedComponentCount, Is.EqualTo(linear.Projects.Count));
             Assert.That(veryLarge.Topology.ContainsCycle, Is.False);
             Assert.That(veryLarge.Topology.StronglyConnectedComponentCount, Is.EqualTo(veryLarge.Projects.Count));
+            Assert.That(veryLarge.Inventory.SelectorPredicateEvaluationCount, Is.EqualTo(65_536));
+            Assert.That(veryLarge.Inventory.FindingCandidateCount, Is.EqualTo(128));
         });
     }
 
@@ -207,7 +209,7 @@ public sealed class LargeSolutionBenchmarkingTests
                 TypesPerProject = 2,
                 SourceFilesPerProject = 1,
                 LayerCount = 2,
-                SelectorMembershipsPerLayer = 3,
+                SelectorPredicateTermsPerLayer = 3,
                 FindingCandidates = 2,
             });
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
@@ -217,9 +219,14 @@ public sealed class LargeSolutionBenchmarkingTests
         {
             Assert.That(policy, Does.Contain("classification:"));
             Assert.That(
-                policy.Split("subject.kind", StringSplitOptions.None).Length - 1,
-                Is.EqualTo(workload.Dimensions.LayerCount * workload.Dimensions.SelectorMembershipsPerLayer));
+                policy.Split("subject.simpleName.startsWith", StringSplitOptions.None).Length - 1,
+                Is.EqualTo(workload.Dimensions.LayerCount * workload.Dimensions.SelectorPredicateTermsPerLayer));
+            Assert.That(
+                workload.Inventory.SelectorPredicateEvaluationCount,
+                Is.EqualTo(workload.Inventory.TypeCount * workload.Dimensions.LayerCount * workload.Dimensions.SelectorPredicateTermsPerLayer));
             Assert.That(policy, Does.Contain("synthetic-finding-candidate-001"));
+            Assert.That(policy, Does.Contain("subject.namespace == 'Synthetic.Synthetic.Project001'"));
+            Assert.That(policy, Does.Contain("subject.simpleName == 'SourceRoot01Type001'"));
             Assert.That(policy, Does.Contain("forbidden_name_prefix: SourceRoot"));
         });
 
@@ -229,7 +236,25 @@ public sealed class LargeSolutionBenchmarkingTests
         {
             Assert.That(run.ExitCode, Is.Not.EqualTo(0));
             Assert.That(run.StandardOutput, Does.Contain("synthetic-finding-candidate-001"));
+            using JsonDocument output = JsonDocument.Parse(run.StandardOutput);
+            Assert.That(output.RootElement.GetProperty("violations").GetArrayLength(), Is.EqualTo(workload.Inventory.FindingCandidateCount));
         });
+    }
+
+    [Test]
+    public void FindingCandidatesCannotExceedMaterializedTypes()
+    {
+        Assert.That(
+            () => BenchmarkWorkloadGenerator.Create(
+                "synthetic-too-many-finding-candidates",
+                BenchmarkTopologyShape.Linear,
+                new BenchmarkDimensionSet
+                {
+                    ProjectCount = 1,
+                    TypesPerProject = 1,
+                    FindingCandidates = 2,
+                }),
+            Throws.ArgumentException);
     }
 
     [Test]

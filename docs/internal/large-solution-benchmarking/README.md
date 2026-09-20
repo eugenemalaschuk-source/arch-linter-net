@@ -24,9 +24,13 @@ and independent dimensions. Supported graph shapes are:
 Project, type, source-file, reference/edge, layer/selector, contract/finding,
 source-root, and PR-change dimensions are recorded in the manifest and derived
 inventory. Type count is `projects × types_per_project`; source roots distribute
-those types and do not multiply them. Selector terms and finding candidates are
-materialized into the generated policy so their counters describe analyzer work,
-not metadata alone. Reference density adds forward edges for acyclic shapes;
+those types and do not multiply them. `selector_predicate_terms_per_layer`
+materializes distinct CEL terms, and
+`selector_predicate_evaluation_count = projects × types × layers × terms`.
+Finding candidates select distinct concrete synthetic types, so
+`finding_candidate_count` and `canonical_identity_candidate_count` describe
+the actual candidate work rather than N contracts applied to every type.
+Reference density adds forward edges for acyclic shapes;
 cycles are reserved for explicitly cyclic shapes. In v1, `CyclicScc` is a
 structural-only descriptor: the fixture rejects project-based compilation of
 that shape because ordinary MSBuild project-reference cycles are not buildable.

@@ -3,14 +3,14 @@
   "generator_version": "1",
   "synthetic_only": true,
   "workloads": [
-    { "id": "synthetic-linear-small", "shape": "linear", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "types", "source_files", "references", "layers", "selectors", "contracts", "findings", "source_roots"] },
+    { "id": "synthetic-linear-small", "shape": "linear", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "types", "source_files", "references", "layers", "selector_predicate_terms", "contracts", "findings", "source_roots"] },
     { "id": "synthetic-wide-fan-out-fan-in", "shape": "wide_fan_out_fan_in", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "references", "contracts"] },
     { "id": "synthetic-diamond-alternate-path", "shape": "diamond", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "references", "findings"] },
-    { "id": "synthetic-dense-large", "shape": "dense", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "types", "references", "layers", "selectors", "contracts", "findings", "source_roots"] },
+    { "id": "synthetic-dense-large", "shape": "dense", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "types", "references", "layers", "selector_predicate_terms", "contracts", "findings", "source_roots"] },
     { "id": "synthetic-cyclic-scc", "shape": "cyclic_scc", "consumer_modes": ["structural_graph"], "dimensions": ["projects", "references", "contracts", "findings"] },
     { "id": "synthetic-many-projects-few-types", "shape": "many_projects_few_types", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "types", "references"] },
     { "id": "synthetic-few-projects-many-types", "shape": "few_projects_many_types", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "types", "source_roots"] },
-    { "id": "synthetic-very-large-multi-project", "shape": "dense", "consumer_modes": ["staged_assemblies", "real_ms_build"], "dimensions": ["projects", "types", "references", "layers", "selectors", "contracts", "findings", "source_roots"], "workflow": "full_governance" },
+    { "id": "synthetic-very-large-multi-project", "shape": "dense", "consumer_modes": ["staged_assemblies", "real_ms_build"], "dimensions": ["projects", "types", "references", "layers", "selector_predicate_terms", "contracts", "findings", "source_roots"], "workflow": "full_governance" },
     { "id": "synthetic-pr-shaped-change", "shape": "wide_fan_out_fan_in", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["changed_projects", "changed_sources", "global_inputs"], "workflow": "pull_request" }
   ]
 }

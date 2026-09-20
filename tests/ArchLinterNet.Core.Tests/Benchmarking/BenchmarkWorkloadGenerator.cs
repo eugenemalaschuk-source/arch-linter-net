@@ -15,6 +15,21 @@ internal static class BenchmarkWorkloadGenerator
         ValidateWorkloadId(workloadId);
         BenchmarkDimensionSet resolvedDimensions = dimensions ?? DefaultDimensions(shape);
         resolvedDimensions.Validate(shape);
+        long materializedTypeCount = (long)resolvedDimensions.ProjectCount * resolvedDimensions.TypesPerProject;
+        if (materializedTypeCount > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(dimensions),
+                "The materialized type count must fit in the deterministic inventory counters.");
+        }
+
+        if (resolvedDimensions.FindingCandidates > materializedTypeCount)
+        {
+            throw new ArgumentException(
+                "Finding candidates must target distinct materialized synthetic types.",
+                nameof(dimensions));
+        }
+
         if (independentProcesses < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(independentProcesses));
@@ -59,7 +74,7 @@ internal static class BenchmarkWorkloadGenerator
                 SourceFilesPerProject = 8,
                 ReferencesPerProject = 31,
                 LayerCount = 8,
-                SelectorMembershipsPerLayer = 16,
+                SelectorPredicateTermsPerLayer = 16,
                 ContractsPerRoot = 8,
                 FindingCandidates = 128,
                 SourceRootCount = 4,
@@ -81,7 +96,7 @@ internal static class BenchmarkWorkloadGenerator
             TypeCount = dimensions.ProjectCount * dimensions.TypesPerProject,
             ReferenceEdgeCount = topology.ReferenceEdgeCount,
             LayerCount = dimensions.LayerCount,
-            SelectorMembershipCount = dimensions.ProjectCount * dimensions.TypesPerProject * dimensions.LayerCount * dimensions.SelectorMembershipsPerLayer,
+            SelectorPredicateEvaluationCount = dimensions.ProjectCount * dimensions.TypesPerProject * dimensions.LayerCount * dimensions.SelectorPredicateTermsPerLayer,
             ContractCount = dimensions.ContractsPerRoot * dimensions.SourceRootCount,
             FindingCandidateCount = dimensions.FindingCandidates,
             SourceRootCount = dimensions.SourceRootCount,

@@ -160,7 +160,7 @@ internal static class BenchmarkFixtureMaterializer
                 .AppendLine("    namespace: Synthetic")
                 .AppendLine("    selector:")
                 .AppendLine("      role: SyntheticBenchmarkType")
-                .AppendLine($"      when: {BuildSelectorPredicate(definition.Dimensions.SelectorMembershipsPerLayer)}");
+                .AppendLine($"      when: {BuildSelectorPredicate(definition.Dimensions.SelectorPredicateTermsPerLayer)}");
             if (layer > 1)
             {
                 string overlapsWith = string.Join(
@@ -217,6 +217,7 @@ internal static class BenchmarkFixtureMaterializer
                 .AppendLine($"      name: synthetic-finding-candidate-{candidate:000}")
                 .AppendLine("      files_matching:")
                 .AppendLine("        namespace_segment: Synthetic")
+                .AppendLine($"        when: {BuildFindingCandidateSelector(definition, candidate)}")
                 .AppendLine("      forbidden_name_prefix: SourceRoot")
                 .AppendLine("      reason: Synthetic benchmark finding candidate.");
         }
@@ -224,10 +225,64 @@ internal static class BenchmarkFixtureMaterializer
         return path;
     }
 
-    private static string BuildSelectorPredicate(int membershipCount)
+    private static string BuildSelectorPredicate(int termCount)
     {
-        const string Predicate = "subject.kind == 'class'";
-        return $"\"{string.Join(" && ", Enumerable.Repeat(Predicate, membershipCount))}\"";
+        string[] truePrefixes =
+        [
+            "S",
+            "So",
+            "Sou",
+            "Sour",
+            "Sourc",
+            "Source",
+            "SourceR",
+            "SourceRo",
+            "SourceRoo",
+            "SourceRoot",
+            "Synthetic",
+            "Synthetic.",
+            "Synthetic.S",
+            "Synthetic.Sy",
+            "Synthetic.Syn",
+            "Synthetic.Synth",
+            "Synthetic.Synthe",
+            "Synthetic.Synthet",
+            "Synthetic.Syntheti",
+            "Synthetic.Synthetic",
+            "Synthetic.Synthetic.",
+            "Synthetic.Synthetic.P",
+            "Synthetic.Synthetic.Pr",
+            "Synthetic.Synthetic.Pro",
+            "Synthetic.Synthetic.Proj",
+        ];
+        IEnumerable<string> terms = Enumerable.Range(0, termCount)
+            .Select(index => index < 10
+                ? $"subject.simpleName.startsWith('{truePrefixes[index]}')"
+                : $"subject.namespace.startsWith('{truePrefixes[index]}')");
+        return $"\"{string.Join(" && ", terms)}\"";
+    }
+
+    private static string BuildFindingCandidateSelector(BenchmarkWorkloadDefinition definition, int candidate)
+    {
+        (int projectIndex, int sourceRoot, int typeOrdinal) = GetMaterializedTypeIdentity(definition, candidate);
+        BenchmarkProjectNode project = definition.Projects[projectIndex];
+        string namespaceName = $"Synthetic.{project.AssemblyName}";
+        string typeName = $"SourceRoot{sourceRoot:00}Type{typeOrdinal:000}";
+        return $"\"subject.namespace == '{namespaceName}' && subject.simpleName == '{typeName}'\"";
+    }
+
+    private static (int ProjectIndex, int SourceRoot, int TypeOrdinal) GetMaterializedTypeIdentity(
+        BenchmarkWorkloadDefinition definition,
+        int candidate)
+    {
+        int candidateIndex = candidate - 1;
+        int projectIndex = candidateIndex % definition.Dimensions.ProjectCount;
+        int typeOrdinal = (candidateIndex / definition.Dimensions.ProjectCount) + 1;
+        int filesPerProject = definition.Dimensions.SourceRootCount * definition.Dimensions.SourceFilesPerProject;
+        int globalFileIndex = ((typeOrdinal * filesPerProject) + definition.Dimensions.TypesPerProject - 1) /
+            definition.Dimensions.TypesPerProject;
+        int sourceRoot = ((globalFileIndex - 1) / definition.Dimensions.SourceFilesPerProject) + 1;
+        return (projectIndex, sourceRoot, typeOrdinal);
     }
 
     private static string WriteBenchmarkMetadata(string root, BenchmarkWorkloadDefinition definition)

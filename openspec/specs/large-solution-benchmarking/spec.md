@@ -17,6 +17,15 @@ where the selected shape permits them. Recreating a workload with the same
 manifest and generator version SHALL produce the same project topology, policy
 inputs, source identities, and expected inventory counts.
 
+Selector scale SHALL be named and counted as
+`selector_predicate_terms_per_layer`: each term SHALL be materialized as a
+distinct CEL predicate in every generated layer, and
+`selector_predicate_evaluation_count` SHALL equal
+`project_count × types_per_project × layer_count ×
+selector_predicate_terms_per_layer`. Finding candidates SHALL select distinct
+materialized synthetic types; a candidate SHALL not apply to every synthetic
+type merely because its ID is different.
+
 #### Scenario: Recreating a workload is deterministic
 
 - **WHEN** two fixture roots are generated from the same manifest and generator version
@@ -26,6 +35,13 @@ inputs, source identities, and expected inventory counts.
 
 - **WHEN** one supported dimension is changed while all other manifest values remain fixed
 - **THEN** the generated evidence identifies that dimension as the only requested scale change and preserves the workload's shape and synthetic identity namespace
+
+#### Scenario: Selector and finding dimensions describe materialized work
+
+- **WHEN** selector predicate terms or finding candidates are increased
+- **THEN** the generated policy contains the requested distinct selector terms
+- **AND** each finding candidate targets one distinct synthetic type
+- **AND** deterministic evidence reports the resulting selector evaluation and candidate counts rather than metadata-only IDs
 
 ### Requirement: The corpus supports representative topology and consumer shapes
 
