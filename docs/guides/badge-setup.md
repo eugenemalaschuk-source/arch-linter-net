@@ -8,6 +8,13 @@
 > require Relay.
 > Start with [badge adoption](badge-adoption.md) for disclosure and prerequisites.
 
+Relay/OIDC is optional transport, not a prerequisite for core governance or
+private reporting. A consumer that already owns a trusted badge transport may
+independently verify exact producer provenance and publish only the canonical
+badge projection through its own trusted post-merge workflow and adopter-owned
+hosting/storage. That transport's credentials, fail-closed receipt checks,
+availability, and lifecycle remain consumer responsibilities. This is not a
+fourth ArchLinterNet transport mode, protocol, or hosted service.
 The candidate contract requires the packed `ArchLinterNet.Cli` tool to include
 the setup contract, Relay bundle, configuration schema, and workflow templates.
 Setup is intentionally a plan-first command: it shows the disclosure and cost
