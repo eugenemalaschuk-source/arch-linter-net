@@ -21,6 +21,9 @@ internal static class DeferredHotPathBenchmarkMarkdown
             .AppendLine("- Reuse the #502 large-solution-benchmark/v1 synthetic workload generator and materializer.")
             .AppendLine("- Vary independent dimensions at small, medium, and large sizes where the hypothesis is measurable.")
             .AppendLine("- Use deterministic workload counters before interpreting wall-clock phase values.")
+            .AppendLine("- Selector evidence uses the runtime selector_predicate_evaluation phase count; P, T, L, and S are varied one at a time.")
+            .AppendLine("- Sequential/bounded evidence runs identical staged inputs in paired processes and retains allocation, peak-working-set availability, concurrency, and canonical-result data.")
+            .AppendLine("- Graph evidence covers linear, wide fan-out/fan-in, diamond, dense, and structural-only SCC shapes from #502.")
             .AppendLine("- Preserve canonical-result SHA-256 identity and completion/exit status for each profile.")
             .AppendLine("- Use staged assemblies to keep fixture compilation outside analyzer preparation; use real MSBuild only for the cache-eligibility lane.")
             .AppendLine("- The explicit harness is DeferredHotPathBenchmarkHarness; it is excluded from normal test and acceptance gates.")
@@ -52,35 +55,46 @@ internal static class DeferredHotPathBenchmarkMarkdown
                 .AppendLine(" |");
         }
 
+        builder.AppendLine();
+        for (int index = 0; index < document.Findings.Count; index++)
+        {
+            DeferredHotPathFindingEvidence finding = document.Findings[index];
+            builder.Append("### ")
+                .Append(index + 1)
+                .Append(". ")
+                .AppendLine(finding.Title)
+                .AppendLine()
+                .AppendLine(Describe(finding));
+            if (finding.TopologyEvidence.Count > 0)
+            {
+                builder.AppendLine()
+                    .AppendLine("Topology coverage:")
+                    .AppendLine()
+                    .AppendLine("| Shape | Projects | Edges | SCCs | Cycle | Status |")
+                    .AppendLine("|---|---:|---:|---:|---|---|");
+                foreach (DeferredHotPathTopologyEvidence topology in finding.TopologyEvidence)
+                {
+                    builder.Append("| ")
+                        .Append(topology.Shape)
+                        .Append(" | ")
+                        .Append(topology.ProjectCount.ToString(CultureInfo.InvariantCulture))
+                        .Append(" | ")
+                        .Append(topology.ReferenceEdgeCount.ToString(CultureInfo.InvariantCulture))
+                        .Append(" | ")
+                        .Append(topology.StronglyConnectedComponentCount.ToString(CultureInfo.InvariantCulture))
+                        .Append(" | ")
+                        .Append(topology.ContainsCycle ? "yes" : "no")
+                        .Append(" | ")
+                        .Append(topology.ExecutionStatus)
+                        .AppendLine(" |");
+                }
+            }
+        }
         builder.AppendLine()
-            .AppendLine("### 1. Type/layer membership amplification")
-            .AppendLine()
-            .AppendLine(Describe(document.Findings[0]))
-            .AppendLine()
-            .AppendLine("### 2. Repeated selector/classification work")
-            .AppendLine()
-            .AppendLine(Describe(document.Findings[1]))
-            .AppendLine()
-            .AppendLine("### 3. Graph/reachability/witness work")
-            .AppendLine()
-            .AppendLine(Describe(document.Findings[2]))
-            .AppendLine()
-            .AppendLine("### 4. Cross-process preparation/fact repetition")
-            .AppendLine()
-            .AppendLine(Describe(document.Findings[3]))
-            .AppendLine()
-            .AppendLine("### 5. Exact-request cache eligibility")
-            .AppendLine()
-            .AppendLine(Describe(document.Findings[4]))
-            .AppendLine()
-            .AppendLine("### 6. Public-API cross-process reuse")
-            .AppendLine()
-            .AppendLine(Describe(document.Findings[5]))
-            .AppendLine()
             .AppendLine("## Measurement rows")
             .AppendLine()
-            .AppendLine("| Finding | Workload | Size | Work | Observed counter | Dominant phase | Canonical result |")
-            .AppendLine("|---|---|---|---:|---|---|---|");
+            .AppendLine("| Finding | Workload | Variant | Dimension | Size | Work | Observed counter | Dominant phase | Allocated bytes | Peak working set | Canonical result |")
+            .AppendLine("|---|---|---|---|---|---:|---|---|---:|---:|---|");
         foreach (DeferredHotPathFindingEvidence finding in document.Findings)
         {
             foreach (DeferredHotPathMeasurement measurement in finding.Measurements)
@@ -89,6 +103,10 @@ internal static class DeferredHotPathBenchmarkMarkdown
                     .Append(finding.Id)
                     .Append(" | ")
                     .Append(measurement.WorkloadId)
+                    .Append(" | ")
+                    .Append(measurement.ExecutionVariant)
+                    .Append(" | ")
+                    .Append(measurement.ScaleDimension)
                     .Append(" | ")
                     .Append(measurement.Size)
                     .Append(" | ")
@@ -102,6 +120,10 @@ internal static class DeferredHotPathBenchmarkMarkdown
                     .Append(" ")
                     .Append(measurement.DominantPhaseMilliseconds?.ToString("F1", CultureInfo.InvariantCulture) ?? "n/a")
                     .Append(" ms | ")
+                    .Append(measurement.AllocatedBytes?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
+                    .Append(" | ")
+                    .Append(measurement.PeakWorkingSetBytes?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
+                    .Append(" | ")
                     .Append(measurement.CanonicalResultSha256)
                     .AppendLine(" |");
             }

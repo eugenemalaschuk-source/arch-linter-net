@@ -36,6 +36,10 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 | `Cache` | Issue #365's persistent `analysis-cache/v1`. `Status` is `NotApplicable` (all fields `0`, `Mode` `"disabled"`) unless a run configured `--cache`/`WithCache()` with anything other than disabled, in which case `Status` is `Active`. `Lookups`/`Hits`/`Misses` come from real pre-run reuse checks. `Rejects`, `Writes`, `BytesRead`/`BytesWritten`, `IneligibleUnitCount`, `CorruptionEvents`, and `CancelledBeforePublish` reflect real lookup and population activity. `Mode` is `"disabled"`/`"auto"`/`"path"` (never the resolved absolute cache location). `RejectReasonCounts` maps only reject outcomes, never a normal `Missing` miss, so its values always sum to `Rejects`. | `AnalysisProfileCacheCounters` |
 | `Concurrency` | Issue #408's bounded parallel scanning. `Status` is `NotApplicable` (every numeric field `0`, including `MaxParallelism`) unless at least one scanning phase (type loading, source-file fact-index materialization) actually took the bounded-parallel code path for this run, in which case `Status` is `Active` and `MaxParallelism` reports the resolved effective degree (`--max-parallelism`/`WithMaxParallelism()`, defaulting to `max(1, min(Environment.ProcessorCount, 4))`) that was in effect for that run. `ScheduledWorkItems`/`CompletedWorkItems` count partition units (one per target assembly for type loading; one per assembly or source root for fact-index materialization). `ObservedMaxConcurrency` is the highest number of partition workers observed running concurrently. `MergeOperations` counts deterministic merge steps (one per phase that ran in parallel). | `AnalysisProfileConcurrencyCounters` |
 
+The `Phases` array may also contain `selector_predicate_evaluation` when compiled CEL
+selectors were evaluated. Its deterministic `Count` is the runtime number of predicate
+invocations recorded by the analysis session; it is not a generated workload estimate.
+
 ## `Output` (actual publication)
 
 `CommittedSinkCount` includes committed file sinks and successfully delivered stream sinks.

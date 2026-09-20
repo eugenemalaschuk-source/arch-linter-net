@@ -521,7 +521,7 @@ internal static class LayoutConventionFileSelectorMatcher
         string description =
             $"Layout convention files_matching at '{matcher.WhenLocation?.YamlPath}' (contract: {matcher.WhenContractName}, " +
             $"when: {matcher.When}) for type '{ArchitectureTypeNames.SafeFullName(type)}'";
-        return ArchitectureExpressionFactService.Evaluate(
+        return context.ExpressionFacts.Evaluate(
             matcher.CompiledWhen!, expressionContext, description, matcher.WhenLocation);
     }
 

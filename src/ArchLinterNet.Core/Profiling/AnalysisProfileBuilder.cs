@@ -17,12 +17,24 @@ public static class AnalysisProfileBuilder
         bool cancellationObserved,
         AnalysisProfileBuildOptions? options = null)
     {
-        IReadOnlyList<AnalysisProfilePhaseMeasurement> phases = timing is null
-            ? Array.Empty<AnalysisProfilePhaseMeasurement>()
+        List<AnalysisProfilePhaseMeasurement> phases = timing is null
+            ? new List<AnalysisProfilePhaseMeasurement>()
             : timing.Entries
                 .Select(entry => new AnalysisProfilePhaseMeasurement(
                     entry.Name, entry.Indent, entry.Ordinal, entry.Count, entry.ElapsedMs, entry.ProcessorTimeMs))
                 .ToList();
+
+        if (snapshotCounters.SelectorPredicateEvaluations > 0)
+        {
+            int ordinal = phases.Count == 0 ? 0 : phases.Max(phase => phase.Ordinal) + 1;
+            phases.Add(new AnalysisProfilePhaseMeasurement(
+                "selector_predicate_evaluation",
+                1,
+                ordinal,
+                snapshotCounters.SelectorPredicateEvaluations,
+                timing is null ? null : 0,
+                timing is null ? null : 0));
+        }
 
         // Contract-family entries carry execution counts; ordinary timing entries do not.
         Dictionary<string, int> contractFamilyCounts = new(StringComparer.Ordinal);

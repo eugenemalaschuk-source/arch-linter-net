@@ -18,16 +18,19 @@ internal sealed class ArchitectureExpressionFactService
     private readonly ArchitectureRoleIndex _roleIndex;
     private readonly ArchitectureSourceFileFactIndex _sourceFileFactIndex;
     private readonly ProjectDiscoveryResult? _projectDiscovery;
+    private readonly AnalysisSessionProfilingCounters? _profilingCounters;
     private readonly Dictionary<Type, ArchitectureExpressionSubjectFacts> _subjectFactsCache = new();
 
     public ArchitectureExpressionFactService(
         ArchitectureRoleIndex roleIndex,
         ArchitectureSourceFileFactIndex sourceFileFactIndex,
-        ProjectDiscoveryResult? projectDiscovery)
+        ProjectDiscoveryResult? projectDiscovery,
+        AnalysisSessionProfilingCounters? profilingCounters = null)
     {
         _roleIndex = roleIndex ?? throw new ArgumentNullException(nameof(roleIndex));
         _sourceFileFactIndex = sourceFileFactIndex ?? throw new ArgumentNullException(nameof(sourceFileFactIndex));
         _projectDiscovery = projectDiscovery;
+        _profilingCounters = profilingCounters;
     }
 
     public ArchitectureExpressionSubjectFacts BuildSubjectFacts(Type type)
@@ -79,9 +82,10 @@ internal sealed class ArchitectureExpressionFactService
     // fallback catch. Falls back to a plain InvalidOperationException only when no location could be
     // resolved (should not happen in practice, since ArchitecturePolicyProvenanceIndex.Bind walks
     // every document unconditionally, but this method must not throw on that possibility itself).
-    public static bool Evaluate(
+    public bool Evaluate(
         CelCompiledPredicate predicate, CelEvaluationContext context, string description, ArchitecturePolicySourceLocation? location)
     {
+        _profilingCounters?.RecordSelectorPredicateEvaluation();
         ArchitectureExpressionEvaluationResult result = ArchitectureExpressionEvaluator.Evaluate(predicate, context);
         if (!result.IsError)
         {

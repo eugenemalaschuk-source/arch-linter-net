@@ -14,6 +14,7 @@ internal sealed class AnalysisSessionProfilingCounters
     private int _sessionProjectMetadataIndexMaterializations;
     private int _sourceScanPasses;
     private int _sourceFilesScanned;
+    private int _selectorPredicateEvaluations;
     private int _parallelScheduledWorkItems;
     private int _parallelCompletedWorkItems;
     private int _parallelObservedMaxConcurrency;
@@ -29,6 +30,8 @@ internal sealed class AnalysisSessionProfilingCounters
     public int SourceScanPasses => Volatile.Read(ref _sourceScanPasses);
 
     public int SourceFilesScanned => Volatile.Read(ref _sourceFilesScanned);
+
+    public int SelectorPredicateEvaluations => Volatile.Read(ref _selectorPredicateEvaluations);
 
     // Bounded parallel scanning (issue #408) instrumentation — see BoundedParallelPartitionRunner,
     // the sole writer of these fields. Zero for a run whose scanning phases all took the
@@ -62,6 +65,8 @@ internal sealed class AnalysisSessionProfilingCounters
     public void RecordSourceScanPass() => Interlocked.Increment(ref _sourceScanPasses);
 
     public void RecordSourceFileScanned() => Interlocked.Increment(ref _sourceFilesScanned);
+
+    public void RecordSelectorPredicateEvaluation() => Interlocked.Increment(ref _selectorPredicateEvaluations);
 
     public void RecordParallelScheduled(int workItemCount) =>
         Interlocked.Add(ref _parallelScheduledWorkItems, workItemCount);

@@ -79,7 +79,7 @@ internal static partial class ArchitectureContextSelectorMatcher
                 $"for source '{ArchitectureTypeNames.SafeFullName(candidateType)}'";
             CelEvaluationContext sourceContext = ArchitectureExpressionContextFactory.CreateContextualSourceContext(
                 expressionFacts.BuildSubjectFacts(candidateType));
-            return ArchitectureExpressionFactService.Evaluate(
+            return expressionFacts.Evaluate(
                 selector.CompiledWhen, sourceContext, sourceDescription, selector.WhenLocation);
         }
 
@@ -90,7 +90,7 @@ internal static partial class ArchitectureContextSelectorMatcher
             expressionFacts.BuildSubjectFacts(sourceType),
             expressionFacts.BuildSubjectFacts(candidateType),
             ArchitectureExpressionFactService.BuildDependencyFacts());
-        return ArchitectureExpressionFactService.Evaluate(
+        return expressionFacts.Evaluate(
             selector.CompiledWhen, targetContext, targetDescription, selector.WhenLocation);
     }
 

@@ -37,6 +37,11 @@ public sealed record ArchitectureAnalysisSnapshotCounters
 
     public int SourceFilesScanned { get; init; }
 
+    // Runtime count of compiled selector predicates evaluated by the session. Kept internal so
+    // analysis-profile evidence can attribute selector work without expanding the reviewed public
+    // API surface of the snapshot counters.
+    internal int SelectorPredicateEvaluations { get; init; }
+
     // Bounded parallel scanning (issue #408) instrumentation — see AnalysisProfileConcurrencyCounters,
     // which analysis-profile/v1 sources these from. MaxParallelism is the resolved effective degree
     // for this snapshot (see MaxParallelismResolver); the rest are zero when every scanning phase

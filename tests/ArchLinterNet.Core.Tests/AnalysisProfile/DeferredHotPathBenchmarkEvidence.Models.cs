@@ -43,7 +43,26 @@ internal sealed record DeferredHotPathFindingEvidence
 
     public required string Routing { get; init; }
 
+    public required IReadOnlyList<DeferredHotPathTopologyEvidence> TopologyEvidence { get; init; }
+
     public required IReadOnlyList<DeferredHotPathMeasurement> Measurements { get; init; }
+}
+
+internal sealed record DeferredHotPathTopologyEvidence
+{
+    public required string Shape { get; init; }
+
+    public required int ProjectCount { get; init; }
+
+    public required int ReferenceEdgeCount { get; init; }
+
+    public required int StronglyConnectedComponentCount { get; init; }
+
+    public required bool ContainsCycle { get; init; }
+
+    public required string ExecutionStatus { get; init; }
+
+    public required string Reason { get; init; }
 }
 
 internal sealed record DeferredHotPathMeasurement
@@ -52,7 +71,11 @@ internal sealed record DeferredHotPathMeasurement
 
     public required string Size { get; init; }
 
+    public required string ScaleDimension { get; init; }
+
     public required int ScaleValue { get; init; }
+
+    public required string ExecutionVariant { get; init; }
 
     public required int DeterministicWork { get; init; }
 
@@ -63,6 +86,10 @@ internal sealed record DeferredHotPathMeasurement
     public required string? DominantPhase { get; init; }
 
     public required double? DominantPhaseMilliseconds { get; init; }
+
+    public required long? AllocatedBytes { get; init; }
+
+    public required long? PeakWorkingSetBytes { get; init; }
 
     public required string CanonicalResultSha256 { get; init; }
 
