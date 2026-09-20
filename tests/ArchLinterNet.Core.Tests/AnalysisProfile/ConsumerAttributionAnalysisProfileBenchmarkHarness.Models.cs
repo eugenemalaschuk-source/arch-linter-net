@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -130,6 +131,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         string CliPackageId,
         string CliPackageVersion,
         string CliPackageSha256,
+        string CliPackageAssemblySha256,
         string SourceCommit,
         string Configuration)
     {
@@ -137,28 +139,30 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         {
             string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
             string cliPath = CliDllPath();
-            PackageIdentity package = PackageIdentity.Create(repositoryRoot);
+            string cliAssemblySha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(cliPath)));
+            PackageIdentity package = PackageIdentity.Create(repositoryRoot, cliAssemblySha256);
             return new EnvironmentIdentity(
                 RuntimeInformation.OSDescription,
                 RuntimeInformation.FrameworkDescription,
                 RuntimeInformation.ProcessArchitecture.ToString(),
                 Environment.ProcessorCount,
                 FileVersionInfo.GetVersionInfo(cliPath).FileVersion ?? "unknown",
-                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(cliPath))),
+                cliAssemblySha256,
                 package.Id,
                 package.Version,
                 package.Sha256,
+                package.AssemblySha256,
                 Environment.GetEnvironmentVariable("ARCH_LINTER_SOURCE_SHA") ?? "unknown",
-                "Debug");
+                "Release");
         }
     }
 
-    private sealed record PackageIdentity(string Id, string Version, string Sha256)
+    private sealed record PackageIdentity(string Id, string Version, string Sha256, string AssemblySha256)
     {
         private const string PackageId = "ArchLinterNet.Cli";
         private const string PackageExtension = ".nupkg";
 
-        public static PackageIdentity Create(string repositoryRoot)
+        public static PackageIdentity Create(string repositoryRoot, string launchedAssemblySha256)
         {
             string packagesDirectory = Path.Combine(repositoryRoot, "nupkg");
             string[] packages = Directory.EnumerateFiles(packagesDirectory, $"{PackageId}.*{PackageExtension}")
@@ -173,10 +177,28 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             string packagePath = packages[0];
             string fileName = Path.GetFileName(packagePath);
             string version = fileName[PackageId.Length..^PackageExtension.Length].TrimStart('.');
+            using ZipArchive archive = ZipFile.OpenRead(packagePath);
+            ZipArchiveEntry assemblyEntry = archive.GetEntry("tools/net10.0/any/ArchLinterNet.Cli.dll")
+                ?? throw new InvalidOperationException(
+                    $"Package '{packagePath}' does not contain tools/net10.0/any/ArchLinterNet.Cli.dll.");
+            string packageAssemblySha256;
+            using (Stream assemblyStream = assemblyEntry.Open())
+            {
+                packageAssemblySha256 = Convert.ToHexStringLower(SHA256.HashData(assemblyStream));
+            }
+
+            if (!StringComparer.Ordinal.Equals(packageAssemblySha256, launchedAssemblySha256))
+            {
+                throw new InvalidOperationException(
+                    $"Package '{packagePath}' contains CLI assembly SHA-256 '{packageAssemblySha256}', " +
+                    $"but the harness launches '{launchedAssemblySha256}'. Run `rtk make pack` before recording evidence.");
+            }
+
             return new PackageIdentity(
                 PackageId,
                 version,
-                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(packagePath))));
+                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(packagePath))),
+                packageAssemblySha256);
         }
     }
 

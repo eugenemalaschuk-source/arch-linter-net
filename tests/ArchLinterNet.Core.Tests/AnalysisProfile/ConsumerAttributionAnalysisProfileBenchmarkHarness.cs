@@ -18,6 +18,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
 {
     private const int RunsPerScenario = 10;
     private const int ProcessTimeoutMilliseconds = 300_000;
+    private const int FixtureBuildTimeoutMilliseconds = 300_000;
     private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
     private static readonly HashSet<string> _outputPhaseNames = new(StringComparer.Ordinal)
     {
@@ -29,12 +30,12 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     {
         CancellationToken cancellationToken = TestContext.CurrentContext.CancellationToken;
         Assert.That(File.Exists(CliDllPath()), Is.True,
-            $"CLI not built at {CliDllPath()} — run `dotnet build src/ArchLinterNet.Cli --no-restore` first.");
+            $"Release CLI not built at {CliDllPath()} — run `rtk make pack` first.");
 
         using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("large-multi-host");
         cancellationToken.ThrowIfCancellationRequested();
         Stopwatch buildClock = Stopwatch.StartNew();
-        fixture.Build();
+        fixture.Build(cancellationToken: cancellationToken, timeoutMilliseconds: FixtureBuildTimeoutMilliseconds);
         buildClock.Stop();
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -392,9 +393,11 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         JsonElement root = document.RootElement;
         string[] canonicalFields =
         [
-            "passed", "violations", "cycles", "cycle_diagnostics", "coverage_findings",
-            "unmatched_ignored_violations", "policy_consistency_findings", "classification_conflicts",
-            "classification_metadata_failures",
+            "passed", "mode", "violations", "cycles", "cycle_diagnostics", "coverage_findings",
+            "unmatched_ignored_violations", "policy_consistency_findings", "coverage_summary",
+            "classification_conflicts", "classification_metadata_failures", "classification_roles",
+            "classification_path_deferred", "preflight_diagnostics", "source_set_expansion",
+            "subtractive_matcher_participation",
         ];
         return string.Join("\n", canonicalFields.Select(field =>
             root.TryGetProperty(field, out JsonElement value) ? value.GetRawText() : "null"));
@@ -415,7 +418,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     }
 
     private static string CliDllPath() => Path.Combine(
-        new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
+        new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Release", "net10.0", "ArchLinterNet.Cli.dll");
 
     private static string ResultsPath() => Path.Combine(
         new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal", "consumer-attribution-analysis-profile-results.json");
