@@ -142,6 +142,34 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     }
 
     [Test]
+    public void OutcomeA_FailsClosedBelowMaterialSavingsThreshold()
+    {
+        CrossProcessPreparationEvidenceDocument evidence = CreateEvidence() with
+        {
+            PreparedEffect = CreateEffect(1) with
+            {
+                MaterialSavingsThreshold = 0.60m,
+            },
+        };
+
+        Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void MaterialSavingsRatio_MustBeDerivedFromMeasuredCosts()
+    {
+        CrossProcessPreparationEvidenceDocument evidence = CreateEvidence() with
+        {
+            PreparedEffect = CreateEffect(1) with
+            {
+                MeasuredMaterialSavingsRatio = 0.10m,
+            },
+        };
+
+        Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
+    }
+
+    [Test]
     public void IncompleteOneProcessWorkEvidence_CannotClaimMeasuredAlternativeOrDistinctValue()
     {
         PreparedEffectContract effect = CreateEffect(1) with
@@ -150,6 +178,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             OneProcessWorkEvidenceComplete = false,
             MissingOneProcessWorkEvidenceFamilies = ["measure"],
             DistinctCrossProcessValue = false,
+            MeasuredMaterialSavingsRatio = 0,
         };
 
         CrossProcessPreparationEvidenceDocument evidence = CreateEvidence() with
@@ -322,10 +351,19 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         MissingOneProcessWorkEvidenceFamilies = [],
         ExpectedPersistedReuseWork = 60m,
         DistinctCrossProcessValue = true,
+        MaterialSavingsThreshold = 0.10m,
+        MeasuredMaterialSavingsRatio = 0.5m,
         WorkMeasurementBasis = "Synthetic contract counters.",
         BreakEvenProcessCount = 2,
         CacheModesMeasured = ["disabled", "miss", "hit"],
         Resources = BoundedResources(),
+        ScaleEvidenceBasis = "Synthetic measured scale matrix for the contract test.",
+        ScaleEvidence =
+        [
+            SyntheticScalePoint("small", 50m, 1.0m),
+            SyntheticScalePoint("medium", 50m, 1.2m),
+            SyntheticScalePoint("large", 50m, 1.5m),
+        ],
         ExpectedEffect = new BenchmarkExpectedEffectEvidence
         {
             IssueReference = "#493",
@@ -344,6 +382,26 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             Confidence = "synthetic deterministic contract",
         },
         ExactCacheHitSavingsExcluded = true,
+    };
+
+    private static PreparedEffectScalePoint SyntheticScalePoint(
+        string label,
+        decimal coldPrepareCost,
+        decimal expectedLocalSpeedup) => new()
+    {
+        Label = label,
+        WorkloadId = $"synthetic-scale-{label}",
+        WorkloadIdentity = new string('0', 64),
+        ProjectCount = 1,
+        TypeCount = 1,
+        SourceFileCount = 1,
+        ReferenceEdgeCount = 0,
+        CommandCount = 1,
+        IndependentPreparationWork = coldPrepareCost,
+        IndependentProjectionWork = 0,
+        ColdPrepareCost = coldPrepareCost,
+        ExpectedLocalSpeedup = expectedLocalSpeedup,
+        MeasurementBasis = "Synthetic measured analysis-profile counters.",
     };
 
     private static BenchmarkProfileSample CreateSample(JsonElement profile, int ordinal) => new()

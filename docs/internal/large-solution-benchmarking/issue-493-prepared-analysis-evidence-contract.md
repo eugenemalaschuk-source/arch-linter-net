@@ -104,7 +104,8 @@ The evidence must record, for the candidate only:
 - deterministic candidate prepared-boundary counts;
 - cold prepare cost `C`;
 - per-consumer load/authorization cost `L`;
-- small, medium, and large expected effect;
+- small, medium, and large expected effect derived from measured scale points;
+- the solution dimensions and command count represented by each scale point;
 - first crossover `R`, or an explicit no-crossover result;
 - whole-workflow upper bound;
 - storage, I/O, allocation, and memory trade-offs;
@@ -120,15 +121,21 @@ prepared-state model  = C + R × L
 If `P <= L`, there is no persisted-state crossover under this model. If
 `P > L`, report the smallest representative `R` where the persisted model is
 cheaper. Do not count a cache hit twice, and do not authorize outcome A from
-process count alone.
+process count alone. The current #493 gate also requires a numeric materiality
+threshold: persisted reuse must be at least 10% cheaper than the measured
+representative one-process alternative, with the ratio derived from the two
+measured costs rather than copied from prose. The three scale points must come
+from the same disabled-cache command-family matrix, or the decision remains
+non-authorizing until an authoritative scaling artifact is linked.
 
 ## Decision and routing
 
 The evidence records one of the following decision routes, with a reason:
 
 - **A — authorize the prepared-analysis lane:** only when the one-process
-  alternative is insufficient and the measured expected effect, crossover, and
-  resource trade-offs meet the issue-specific contract;
+  alternative is insufficient and the measured expected effect, materiality
+  threshold, crossover, scale matrix, and resource trade-offs meet the
+  issue-specific contract;
 - **B — defer:** the current evidence does not show material distinct value,
   the one-process alternative is sufficient, or the required measurements are
   not yet available;

@@ -349,6 +349,12 @@ internal sealed record CrossProcessPreparationEvidenceDocument
                 "Outcome A requires bounded storage, I/O, allocation, and peak-memory trade-off evidence.");
         }
 
+        if (Decision.Outcome == PreparationDecisionOutcome.A && !PreparedEffect.MateriallyCheaper)
+        {
+            throw new InvalidOperationException(
+                "Outcome A requires measured savings at or above the issue-specific materiality threshold.");
+        }
+
         if (!string.Equals(Workflow.WorkloadIdentity, BenchmarkEvidence.Workload.WorkloadIdentity, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Cross-process evidence must use the composed benchmark workload identity.");

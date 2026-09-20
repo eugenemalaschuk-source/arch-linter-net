@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -6,9 +7,17 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class PreparedAnalysisReuseBenchmarkHarness
 {
+    private sealed record MeasuredScalePoint(
+        string Label,
+        BenchmarkWorkloadDefinition Workload,
+        int CommandCount,
+        decimal IndependentPreparationWork,
+        decimal IndependentProjectionWork);
+
     private static PreparedEffectContract CreateEffect(
         BenchmarkWorkloadDefinition workload,
-        IReadOnlyCollection<CrossProcessProcessEvidence> processes)
+        IReadOnlyCollection<CrossProcessProcessEvidence> processes,
+        IReadOnlyList<MeasuredScalePoint> measuredScalePoints)
     {
         IReadOnlyList<CrossProcessProcessEvidence> representativeIndependentProcesses =
             SelectRepresentativeIndependentProcesses(processes);
@@ -94,6 +103,10 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ? sharedMeasurements.Sum(measurement => measurement.ProjectionWork) +
               processBoundMeasurements.Sum(measurement => measurement.ProjectionWork)
             : 0;
+        IReadOnlyList<PreparedEffectScalePoint> scaleEvidence = CreateScaleEvidence(
+            measuredScalePoints,
+            representativeProcessCount,
+            loadAuthorizationCost);
         string workMeasurementBasis = oneProcessWorkEvidenceComplete
             ? $"Summed preparation/projection counters for one disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}), with cold preparation derived only from independent preparation counters. The persisted comparison adds the same measured unavoidable projection/command work to its total. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
             : $"One-process comparison is incomplete; real profile counters/work evidence are missing for: {string.Join(", ", missingOneProcessWorkEvidenceFamilies)}. Missing work is not treated as zero.";
@@ -119,27 +132,70 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             MissingOneProcessWorkEvidenceFamilies = missingOneProcessWorkEvidenceFamilies,
             ExpectedPersistedReuseWork = 0,
             DistinctCrossProcessValue = false,
+            MaterialSavingsThreshold = 0.10m,
+            MeasuredMaterialSavingsRatio = 0,
             WorkMeasurementBasis = workMeasurementBasis,
             BreakEvenProcessCount = null,
             CacheModesMeasured = ["disabled", "miss", "hit"],
             Resources = CreatePreparationResourceEvidence(workload, representativeIndependentProcesses, representativeProcessCount),
+            ScaleEvidenceBasis =
+                $"Measured analysis-profile/v1 counters for small, medium, and large {workload.CompilationMode} workloads; each point runs one cache-disabled process for every representative command family ({string.Join(", ", _measuredCommandFamilies)}).",
+            ScaleEvidence = scaleEvidence,
             ExpectedEffect = CreateExpectedEffect(
-                representativeProcessCount,
-                coldPrepareCost,
-                loadAuthorizationCost,
                 repeatedWorkShare,
-                unavoidableProjectionWork),
+                scaleEvidence),
             ExactCacheHitSavingsExcluded = true,
         };
         int? breakEven = effect.CalculateBreakEvenProcessCount();
         decimal expectedPersistedReuseWork = effect.PreparedReuseCost(representativeProcessCount);
+        decimal measuredMaterialSavingsRatio = measuredOneProcessAlternativeWork is > 0
+            ? (measuredOneProcessAlternativeWork.Value - expectedPersistedReuseWork) /
+              measuredOneProcessAlternativeWork.Value
+            : 0;
         return effect with
         {
             BreakEvenProcessCount = breakEven,
             ExpectedPersistedReuseWork = expectedPersistedReuseWork,
+            MeasuredMaterialSavingsRatio = measuredMaterialSavingsRatio,
             DistinctCrossProcessValue = oneProcessWorkEvidenceComplete &&
                 expectedPersistedReuseWork < measuredOneProcessAlternativeWork!.Value,
         };
+    }
+
+    private static IReadOnlyList<PreparedEffectScalePoint> CreateScaleEvidence(
+        IReadOnlyList<MeasuredScalePoint> measuredScalePoints,
+        int representativeProcessCount,
+        decimal loadAuthorizationCost)
+    {
+        return measuredScalePoints
+            .Select(point =>
+            {
+                decimal coldPrepareCost = point.IndependentPreparationWork / point.CommandCount;
+                decimal independentWork = point.IndependentPreparationWork + point.IndependentProjectionWork;
+                decimal persistedWork = coldPrepareCost +
+                    representativeProcessCount * loadAuthorizationCost +
+                    point.IndependentProjectionWork;
+                decimal expectedLocalSpeedup = persistedWork > 0
+                    ? independentWork / persistedWork
+                    : 0;
+                return new PreparedEffectScalePoint
+                {
+                    Label = point.Label,
+                    WorkloadId = point.Workload.WorkloadId,
+                    WorkloadIdentity = point.Workload.WorkloadIdentity,
+                    ProjectCount = point.Workload.Inventory.ProjectCount,
+                    TypeCount = point.Workload.Inventory.TypeCount,
+                    SourceFileCount = point.Workload.Inventory.SourceFileCount,
+                    ReferenceEdgeCount = point.Workload.Inventory.ReferenceEdgeCount,
+                    CommandCount = point.CommandCount,
+                    IndependentPreparationWork = point.IndependentPreparationWork,
+                    IndependentProjectionWork = point.IndependentProjectionWork,
+                    ColdPrepareCost = coldPrepareCost,
+                    ExpectedLocalSpeedup = expectedLocalSpeedup,
+                    MeasurementBasis = "Measured analysis-profile/v1 counters from one cache-disabled CLI process per command family.",
+                };
+            })
+            .ToList();
     }
 
     private static PreparationResourceEvidence CreatePreparationResourceEvidence(
@@ -271,13 +327,13 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             };
         }
 
-        if (effect.DistinctCrossProcessValue && breakEvenObserved)
+        if (effect.DistinctCrossProcessValue && effect.MateriallyCheaper && breakEvenObserved)
         {
             return new PreparationDecision
             {
                 Outcome = PreparationDecisionOutcome.A,
                 Route = "authorize-prepared-analysis",
-                Reason = "Measured counter work shows persisted reuse is cheaper than the measured one-process alternative at the representative process count, with a strict break-even under the measured load-cost range.",
+                Reason = $"Measured counter work shows persisted reuse is materially cheaper than the measured one-process alternative ({effect.MeasuredMaterialSavingsRatio.ToString("P1", CultureInfo.InvariantCulture)} savings versus a {effect.MaterialSavingsThreshold.ToString("P1", CultureInfo.InvariantCulture)} threshold), with a strict break-even under the measured load-cost range.",
                 OneProcessAlternativeEvaluated = workflow.OneProcessAlternativeMeasured,
                 BreakEvenObserved = true,
             };
@@ -289,7 +345,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             {
                 Outcome = PreparationDecisionOutcome.B,
                 Route = "defer-prepared-analysis",
-                Reason = "The complete one-process alternative was measured, but its measured work is no more expensive than the persisted reuse model or the load-cost range removes a strict representative crossover.",
+                Reason = $"The complete one-process alternative was measured, but persisted reuse is not materially cheaper ({effect.MeasuredMaterialSavingsRatio.ToString("P1", CultureInfo.InvariantCulture)} savings versus a {effect.MaterialSavingsThreshold.ToString("P1", CultureInfo.InvariantCulture)} threshold), its work is no more expensive, or the load-cost range removes a strict representative crossover.",
                 OneProcessAlternativeEvaluated = true,
                 BreakEvenObserved = breakEvenObserved,
             };

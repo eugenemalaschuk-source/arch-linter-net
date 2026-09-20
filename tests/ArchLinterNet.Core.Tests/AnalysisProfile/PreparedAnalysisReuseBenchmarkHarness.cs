@@ -243,7 +243,11 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             Samples = samples,
             Run = samples[0].Run,
         };
-        PreparedEffectContract effect = CreateEffect(workload, processes);
+        IReadOnlyList<MeasuredScalePoint> measuredScalePoints = MeasureScaleEvidence(
+            compilationMode,
+            repositoryRoot,
+            cancellationToken);
+        PreparedEffectContract effect = CreateEffect(workload, processes, measuredScalePoints);
         CrossProcessPreparationWorkflow workflow = new()
         {
             EvidenceSchemaId = CrossProcessPreparationWorkflow.SchemaId,
@@ -277,6 +281,102 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         };
         evidence.Validate();
         return evidence;
+    }
+
+    private static IReadOnlyList<MeasuredScalePoint> MeasureScaleEvidence(
+        BenchmarkCompilationMode compilationMode,
+        string repositoryRoot,
+        CancellationToken cancellationToken)
+    {
+        string modeId = compilationMode == BenchmarkCompilationMode.RealMsBuild
+            ? "real-msbuild"
+            : "staged-assemblies";
+        (string Label, BenchmarkDimensionSet Dimensions)[] cases =
+        [
+            ("small", new BenchmarkDimensionSet
+            {
+                ProjectCount = 1,
+                TypesPerProject = 8,
+                SourceFilesPerProject = 2,
+                ReferencesPerProject = 0,
+                LayerCount = 2,
+                SelectorPredicateTermsPerLayer = 4,
+                ContractsPerWorkload = 2,
+                SourceRootCount = 1,
+            }),
+            ("medium", new BenchmarkDimensionSet
+            {
+                ProjectCount = 1,
+                TypesPerProject = 32,
+                SourceFilesPerProject = 8,
+                ReferencesPerProject = 0,
+                LayerCount = 4,
+                SelectorPredicateTermsPerLayer = 8,
+                ContractsPerWorkload = 4,
+                SourceRootCount = 2,
+            }),
+            ("large", new BenchmarkDimensionSet
+            {
+                ProjectCount = 4,
+                TypesPerProject = 32,
+                SourceFilesPerProject = 8,
+                ReferencesPerProject = 1,
+                LayerCount = 4,
+                SelectorPredicateTermsPerLayer = 8,
+                ContractsPerWorkload = 4,
+                SourceRootCount = 2,
+            }),
+        ];
+
+        List<MeasuredScalePoint> points = [];
+        foreach ((string label, BenchmarkDimensionSet dimensions) in cases)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
+                $"synthetic-cross-process-scale-{modeId}-{label}",
+                BenchmarkTopologyShape.ManyProjectsFewTypes,
+                dimensions,
+                compilationMode,
+                BenchmarkExecutionMode.FullGovernance,
+                independentProcesses: _measuredCommandFamilies.Length);
+            using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
+            if (compilationMode == BenchmarkCompilationMode.RealMsBuild)
+            {
+                fixture.Build();
+                WriteRealMsBuildReceipts(fixture);
+            }
+
+            string baselinePath = Path.Combine(fixture.Root, "empty-baseline.arch.yml");
+            File.WriteAllText(baselinePath, "version: 3\nbaseline: {}\nmetric_baselines: []\n");
+            string changePolicyPath = CreateChangeSnapshotPolicy(fixture, workload);
+            List<CounterWorkMeasurement> measurements = [];
+            foreach (string family in _measuredCommandFamilies)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                CliObservation observation = RunCommand(
+                    fixture,
+                    family,
+                    "disabled",
+                    baselinePath,
+                    repositoryRoot,
+                    changePolicyPath,
+                    cancellationToken);
+                _ = SuccessfulCanonicalResult(observation, $"{label}/{family}");
+                CounterWorkMeasurement? measurement = TryReadCounterWork(observation.Profile);
+                Assert.That(measurement, Is.Not.Null,
+                    $"Scale point '{label}' command family '{family}' must expose real profile counters.");
+                measurements.Add(measurement!);
+            }
+
+            points.Add(new MeasuredScalePoint(
+                label,
+                workload,
+                measurements.Count,
+                measurements.Sum(measurement => measurement.PreparationWork),
+                measurements.Sum(measurement => measurement.ProjectionWork)));
+        }
+
+        return points;
     }
 
     private static IReadOnlyList<(string Family, string CacheMode)> IndependentCommandMix() =>
@@ -477,15 +577,12 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         };
 
     private static BenchmarkExpectedEffectEvidence CreateExpectedEffect(
-        int representativeProcessCount,
-        decimal coldPrepareCost,
-        decimal loadAuthorizationCost,
         decimal repeatedWorkShare,
-        decimal unavoidableProjectionWork)
+        IReadOnlyList<PreparedEffectScalePoint> scaleEvidence)
     {
-        decimal Speedup(int count) =>
-            (coldPrepareCost * count + unavoidableProjectionWork) /
-            (coldPrepareCost + count * loadAuthorizationCost + unavoidableProjectionWork);
+        PreparedEffectScalePoint small = scaleEvidence.Single(point => point.Label == "small");
+        PreparedEffectScalePoint medium = scaleEvidence.Single(point => point.Label == "medium");
+        PreparedEffectScalePoint large = scaleEvidence.Single(point => point.Label == "large");
         return new BenchmarkExpectedEffectEvidence
         {
             IssueReference = "#493",
@@ -493,15 +590,15 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             BaselinePhaseShare = repeatedWorkShare,
             CurrentWorkModel = "R x independent candidate preparation/fact work",
             TargetWorkModel = "one cold preparation + R x load/authorization + unavoidable projection/command work",
-            ExpectedLocalSpeedupSmall = Speedup(1),
-            ExpectedLocalSpeedupMedium = Speedup(representativeProcessCount),
-            ExpectedLocalSpeedupLarge = Speedup(Math.Max(representativeProcessCount * 4, 2)),
-            ExpectedEndToEndUpperBound = 1m / ((1m - repeatedWorkShare) + repeatedWorkShare / Math.Max(1m, Speedup(Math.Max(representativeProcessCount, 2)))),
+            ExpectedLocalSpeedupSmall = small.ExpectedLocalSpeedup,
+            ExpectedLocalSpeedupMedium = medium.ExpectedLocalSpeedup,
+            ExpectedLocalSpeedupLarge = large.ExpectedLocalSpeedup,
+            ExpectedEndToEndUpperBound = 1m / ((1m - repeatedWorkShare) + repeatedWorkShare / Math.Max(1m, medium.ExpectedLocalSpeedup)),
             MemoryAllocationTradeOff = "Direct storage, I/O, allocation, and peak-memory measurements remain unavailable; bounded pre-implementation sensitivity ranges are recorded and must be replaced by store instrumentation.",
             ColdPathTradeOff = "The cold preparation remains a separate cost and is never counted as a cache hit.",
-            SuccessThreshold = "Only authorize implementation after one-process sharing is insufficient and the persisted model remains materially cheaper with measured resource bounds.",
+            SuccessThreshold = "Only authorize implementation when persisted reuse is at least 10% cheaper than the measured representative one-process alternative, the measured small/medium/large matrix is decision-capable, and resource bounds are available.",
             KillCriterion = "Defer or route elsewhere when canonical equivalence, cache separation, or a representative crossover is not reproduced.",
-            Confidence = "Expected effect is derived from measured analysis-profile counters; persisted load/authorization remains an explicit proxy bounded by observed one-process projection work.",
+            Confidence = "Expected effect and small/medium/large scaling are derived from measured analysis-profile counters; persisted load/authorization remains an explicit proxy bounded by observed one-process projection work.",
         };
     }
 

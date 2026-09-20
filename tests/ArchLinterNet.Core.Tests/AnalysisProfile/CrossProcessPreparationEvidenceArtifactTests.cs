@@ -28,6 +28,16 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.MissingOneProcessWorkEvidenceFamilies.Count == 0), Is.True);
             Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MeasuredOneProcessAlternativeWork.HasValue), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MaterialSavingsThreshold == 0.10m), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MateriallyCheaper), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.ScaleEvidence
+                    .Select(point => point.Label)
+                    .ToHashSet(StringComparer.Ordinal)
+                    .SetEquals(new[] { "small", "medium", "large" })), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.ScaleEvidence.All(point =>
+                    point.CommandCount == archetype.Workflow.MeasuredCommandFamilies.Count)), Is.True);
             foreach (CrossProcessPreparationEvidenceDocument archetype in evidence.Archetypes)
             {
                 decimal measuredPreparationWork = archetype.PreparedEffect.MeasuredIndependentWorkflowWork *

@@ -2,6 +2,61 @@ using System.Text.Json.Serialization;
 
 namespace ArchLinterNet.Core.Tests;
 
+internal sealed record PreparedEffectScalePoint
+{
+    public required string Label { get; init; }
+
+    public required string WorkloadId { get; init; }
+
+    public required string WorkloadIdentity { get; init; }
+
+    public required int ProjectCount { get; init; }
+
+    public required int TypeCount { get; init; }
+
+    public required int SourceFileCount { get; init; }
+
+    public required int ReferenceEdgeCount { get; init; }
+
+    public required int CommandCount { get; init; }
+
+    public required decimal IndependentPreparationWork { get; init; }
+
+    public required decimal IndependentProjectionWork { get; init; }
+
+    public required decimal ColdPrepareCost { get; init; }
+
+    public required decimal ExpectedLocalSpeedup { get; init; }
+
+    public required string MeasurementBasis { get; init; }
+
+    public void Validate(string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(Label) || string.IsNullOrWhiteSpace(WorkloadId) ||
+            string.IsNullOrWhiteSpace(WorkloadIdentity) || string.IsNullOrWhiteSpace(MeasurementBasis) ||
+            ProjectCount < 1 || TypeCount < 1 || SourceFileCount < 1 || ReferenceEdgeCount < 0 ||
+            CommandCount < 1 || IndependentPreparationWork < 0 || IndependentProjectionWork < 0 ||
+            ColdPrepareCost < 0 || ExpectedLocalSpeedup <= 0)
+        {
+            throw new InvalidOperationException($"Scale evidence '{fieldName}' contains invalid dimensions or measurements.");
+        }
+
+        if (WorkloadIdentity.Length != 64 ||
+            WorkloadIdentity.Any(character => !Uri.IsHexDigit(character)) ||
+            WorkloadIdentity != WorkloadIdentity.ToLowerInvariant())
+        {
+            throw new InvalidOperationException($"Scale evidence '{fieldName}' must retain a lowercase workload SHA-256 identity.");
+        }
+
+        decimal expectedColdPrepareCost = IndependentPreparationWork / CommandCount;
+        if (ColdPrepareCost != expectedColdPrepareCost)
+        {
+            throw new InvalidOperationException(
+                $"Scale evidence '{fieldName}' must derive cold preparation from measured preparation counters and command count.");
+        }
+    }
+}
+
 internal sealed record PreparedEffectContract
 {
     public required string IssueReference { get; init; }
@@ -40,6 +95,10 @@ internal sealed record PreparedEffectContract
 
     public required bool DistinctCrossProcessValue { get; init; }
 
+    public required decimal MaterialSavingsThreshold { get; init; }
+
+    public required decimal MeasuredMaterialSavingsRatio { get; init; }
+
     public required string WorkMeasurementBasis { get; init; }
 
     public required int? BreakEvenProcessCount { get; init; }
@@ -48,12 +107,21 @@ internal sealed record PreparedEffectContract
 
     public required PreparationResourceEvidence Resources { get; init; }
 
+    public required string ScaleEvidenceBasis { get; init; }
+
+    public required IReadOnlyList<PreparedEffectScalePoint> ScaleEvidence { get; init; }
+
     public required BenchmarkExpectedEffectEvidence ExpectedEffect { get; init; }
 
     public required bool ExactCacheHitSavingsExcluded { get; init; }
 
     [JsonIgnore]
     public long PreparedStateOnlyWork => CandidatePreparedBoundaryWork - CacheAvoidableWork;
+
+    [JsonIgnore]
+    public bool MateriallyCheaper => OneProcessWorkEvidenceComplete &&
+        MeasuredOneProcessAlternativeWork is > 0 &&
+        MeasuredMaterialSavingsRatio >= MaterialSavingsThreshold;
 
     public decimal IndependentOneShotCost(int processCount) =>
         ValidateProcessCount(processCount) * ColdPrepareCost;
@@ -92,7 +160,8 @@ internal sealed record PreparedEffectContract
             PerConsumerLoadAuthorizationCost > PerConsumerLoadAuthorizationCostUpperBound ||
             UnavoidableProjectionWork < 0 ||
             MeasuredIndependentWorkflowWork < 0 || MeasuredOneProcessAlternativeWork is < 0 ||
-            ExpectedPersistedReuseWork < 0)
+            ExpectedPersistedReuseWork < 0 || MaterialSavingsThreshold <= 0 ||
+            MaterialSavingsThreshold > 1 || MeasuredMaterialSavingsRatio > 1)
         {
             throw new InvalidOperationException("Prepared-effect counts, shares, and costs must be non-negative.");
         }
@@ -120,11 +189,23 @@ internal sealed record PreparedEffectContract
             throw new InvalidOperationException("Complete one-process work evidence must include a measured alternative cost.");
         }
 
-        if (!OneProcessWorkEvidenceComplete &&
-            (MeasuredOneProcessAlternativeWork.HasValue || DistinctCrossProcessValue))
+        decimal expectedMaterialSavingsRatio = OneProcessWorkEvidenceComplete &&
+            MeasuredOneProcessAlternativeWork is > 0
+            ? (MeasuredOneProcessAlternativeWork.Value - ExpectedPersistedReuseWork) /
+              MeasuredOneProcessAlternativeWork.Value
+            : 0;
+        if (MeasuredMaterialSavingsRatio != expectedMaterialSavingsRatio)
         {
             throw new InvalidOperationException(
-                "Incomplete one-process work evidence cannot claim a measured alternative cost or distinct cross-process value.");
+                "Measured material savings must be derived from the measured one-process and persisted work values.");
+        }
+
+        if (!OneProcessWorkEvidenceComplete &&
+            (MeasuredOneProcessAlternativeWork.HasValue || DistinctCrossProcessValue ||
+             MeasuredMaterialSavingsRatio != 0))
+        {
+            throw new InvalidOperationException(
+                "Incomplete one-process work evidence cannot claim a measured alternative cost, material savings, or distinct cross-process value.");
         }
 
         if (CandidatePreparedBoundaryWork < 0 || CacheAvoidableWork < 0 || PreparedStateAvoidableWork < 0 ||
@@ -148,6 +229,37 @@ internal sealed record PreparedEffectContract
             DistinctCrossProcessValue != (ExpectedPersistedReuseWork < MeasuredOneProcessAlternativeWork!.Value))
         {
             throw new InvalidOperationException("Distinct cross-process value must be derived from measured one-process and persisted costs.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ScaleEvidenceBasis) || ScaleEvidence.Count < 3)
+        {
+            throw new InvalidOperationException(
+                "Prepared-effect evidence requires measured small, medium, and large scale points.");
+        }
+
+        if (ScaleEvidence.Select(point => point.Label).Distinct(StringComparer.Ordinal).Count() != ScaleEvidence.Count ||
+            !new[] { "small", "medium", "large" }.All(label =>
+                ScaleEvidence.Any(point => string.Equals(point.Label, label, StringComparison.Ordinal))))
+        {
+            throw new InvalidOperationException(
+                "Prepared-effect scale evidence must contain distinct small, medium, and large points.");
+        }
+
+        foreach (PreparedEffectScalePoint point in ScaleEvidence)
+        {
+            point.Validate($"prepared_effect.scale_evidence[{point.Label}]");
+        }
+
+        IReadOnlyDictionary<string, decimal> speedups = ScaleEvidence.ToDictionary(
+            point => point.Label,
+            point => point.ExpectedLocalSpeedup,
+            StringComparer.Ordinal);
+        if (ExpectedEffect.ExpectedLocalSpeedupSmall != speedups["small"] ||
+            ExpectedEffect.ExpectedLocalSpeedupMedium != speedups["medium"] ||
+            ExpectedEffect.ExpectedLocalSpeedupLarge != speedups["large"])
+        {
+            throw new InvalidOperationException(
+                "Expected local speedups must be copied from the measured small, medium, and large scale points.");
         }
 
         if (CacheModesMeasured.Count == 0 || CacheModesMeasured.Any(mode => !PreparationContractIdentity.IsCacheMode(mode)))
