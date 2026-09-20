@@ -42,6 +42,13 @@ cost is not attributed to the wrong adopter model.
 - **WHEN** a linear, wide, diamond, dense, or cyclic/SCC shape is materialized
 - **THEN** its manifest records the requested topology, project/reference counts, and cycle/SCC disposition, and the generated project graph matches those declarations
 
+#### Scenario: Cyclic topology fails closed at the compilation boundary
+
+- **WHEN** a `CyclicScc` workload is passed to the v1 fixture materializer
+- **THEN** materialization rejects project-based compilation with an explicit structural-only limitation
+- **AND** the workload remains available for deterministic graph/topology evidence without claiming executable MSBuild or staged-assembly coverage
+- **AND** an external IL/assembly producer is required before a future version may provide an executable cyclic staged benchmark
+
 #### Scenario: Consumer shapes preserve their preparation boundary
 
 - **WHEN** a real-MSBuild or prebuilt/staged-assembly workload is selected

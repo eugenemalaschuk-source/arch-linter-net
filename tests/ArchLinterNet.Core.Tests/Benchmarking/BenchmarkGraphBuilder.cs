@@ -34,7 +34,7 @@ internal static class BenchmarkGraphBuilder
         int referencesPerProject)
     {
         List<BenchmarkProjectEdge> edges = CreateEdges(shape, projects).ToList();
-        if (referencesPerProject <= 2 || projects.Count < 2)
+        if (referencesPerProject <= 0 || projects.Count < 2)
         {
             return edges;
         }

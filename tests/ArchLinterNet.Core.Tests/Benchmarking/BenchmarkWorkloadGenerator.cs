@@ -167,9 +167,15 @@ internal static class BenchmarkWorkloadGenerator
     {
         if (string.IsNullOrWhiteSpace(workloadId) ||
             !workloadId.StartsWith("synthetic-", StringComparison.Ordinal) ||
-            workloadId.Any(character => !(char.IsLetterOrDigit(character) || character == '-')))
+            workloadId.Length == "synthetic-".Length ||
+            workloadId["synthetic-".Length..].Any(character =>
+                !((character >= 'a' && character <= 'z') ||
+                  (character >= '0' && character <= '9') ||
+                  character == '-')))
         {
-            throw new ArgumentException("Workload IDs must be non-empty synthetic kebab-case identifiers.", nameof(workloadId));
+            throw new ArgumentException(
+                "Workload IDs must match the large-solution-workload/v1 pattern 'synthetic-[a-z0-9-]+'.",
+                nameof(workloadId));
         }
     }
 }

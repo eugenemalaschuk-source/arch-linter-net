@@ -27,7 +27,11 @@ inventory. Type count is `projects × types_per_project`; source roots distribut
 those types and do not multiply them. Selector terms and finding candidates are
 materialized into the generated policy so their counters describe analyzer work,
 not metadata alone. Reference density adds forward edges for acyclic shapes;
-cycles are reserved for explicitly cyclic shapes.
+cycles are reserved for explicitly cyclic shapes. In v1, `CyclicScc` is a
+structural-only descriptor: the fixture rejects project-based compilation of
+that shape because ordinary MSBuild project-reference cycles are not buildable.
+An external IL/assembly producer is required before it can become an executable
+staged benchmark.
 
 `RealMsBuild` workloads own candidate compilation through an explicit restore and
 build. `StagedAssemblies` workloads perform that external compilation before the

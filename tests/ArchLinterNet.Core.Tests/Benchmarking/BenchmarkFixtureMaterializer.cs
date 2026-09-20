@@ -13,6 +13,12 @@ internal static class BenchmarkFixtureMaterializer
         Directory.CreateDirectory(root);
         try
         {
+            if (definition.Topology.ContainsCycle)
+            {
+                throw new InvalidOperationException(
+                    "CyclicScc is a structural-only workload in large-solution-benchmark/v1; project-reference compilation is not supported.");
+            }
+
             WriteProjects(root, definition);
             string solutionPath = WriteSolution(root, definition);
             string policyPath = WritePolicy(root, definition);
@@ -256,11 +262,6 @@ internal static class BenchmarkFixtureMaterializer
 
     private static void StageAssemblies(string root, BenchmarkWorkloadDefinition definition, string solutionPath)
     {
-        if (definition.Topology.ContainsCycle)
-        {
-            throw new InvalidOperationException("Cyclic synthetic workloads cannot be compiled as staged project references.");
-        }
-
         RunDotnet(root, ["restore", solutionPath, "--nologo", "--disable-parallel"]);
         RunDotnet(root, ["build", solutionPath, "--nologo", "--no-restore", "--verbosity", "quiet", "--maxcpucount:1"]);
 

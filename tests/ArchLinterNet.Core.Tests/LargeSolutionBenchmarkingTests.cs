@@ -55,7 +55,7 @@ public sealed class LargeSolutionBenchmarkingTests
             BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
                 $"synthetic-{shape.ToString().ToLowerInvariant()}",
                 shape,
-                new BenchmarkDimensionSet { ProjectCount = projectCount });
+                new BenchmarkDimensionSet { ProjectCount = projectCount, ReferencesPerProject = 1 });
 
             Assert.Multiple(() =>
             {
@@ -124,6 +124,24 @@ public sealed class LargeSolutionBenchmarkingTests
     }
 
     [Test]
+    public void ReferenceDimensionChangesLinearGraphAtOneToTwo()
+    {
+        BenchmarkWorkloadDefinition one = BenchmarkWorkloadGenerator.Create(
+            "synthetic-linear-one-reference", BenchmarkTopologyShape.Linear,
+            new BenchmarkDimensionSet { ProjectCount = 8, ReferencesPerProject = 1 });
+        BenchmarkWorkloadDefinition two = BenchmarkWorkloadGenerator.Create(
+            "synthetic-linear-two-references", BenchmarkTopologyShape.Linear,
+            new BenchmarkDimensionSet { ProjectCount = 8, ReferencesPerProject = 2 });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(two.Inventory.ReferenceEdgeCount, Is.GreaterThan(one.Inventory.ReferenceEdgeCount));
+            Assert.That(two.Edges, Is.Not.EqualTo(one.Edges));
+            Assert.That(two.Topology.ContainsCycle, Is.False);
+        });
+    }
+
+    [Test]
     public void ReferenceDimensionPreservesAcyclicTopologyForAcyclicShapes()
     {
         BenchmarkWorkloadDefinition linear = BenchmarkWorkloadGenerator.Create(
@@ -139,6 +157,18 @@ public sealed class LargeSolutionBenchmarkingTests
             Assert.That(veryLarge.Topology.ContainsCycle, Is.False);
             Assert.That(veryLarge.Topology.StronglyConnectedComponentCount, Is.EqualTo(veryLarge.Projects.Count));
         });
+    }
+
+    [Test]
+    public void CyclicSccFailsClosedAsStructuralOnly()
+    {
+        BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
+            "synthetic-cyclic-structural-only", BenchmarkTopologyShape.CyclicScc,
+            new BenchmarkDimensionSet { ProjectCount = 3 });
+
+        Assert.That(
+            () => BenchmarkFixtureMaterializer.Materialize(workload),
+            Throws.InvalidOperationException.With.Message.Contains("structural-only"));
     }
 
     [Test]
@@ -210,6 +240,15 @@ public sealed class LargeSolutionBenchmarkingTests
             Throws.ArgumentException);
         Assert.That(
             () => BenchmarkWorkloadGenerator.Create("synthetic-private/name", BenchmarkTopologyShape.Linear),
+            Throws.ArgumentException);
+        Assert.That(
+            () => BenchmarkWorkloadGenerator.Create("synthetic-Foo", BenchmarkTopologyShape.Linear),
+            Throws.ArgumentException);
+        Assert.That(
+            () => BenchmarkWorkloadGenerator.Create("synthetic-é", BenchmarkTopologyShape.Linear),
+            Throws.ArgumentException);
+        Assert.That(
+            () => BenchmarkWorkloadGenerator.Create("synthetic-", BenchmarkTopologyShape.Linear),
             Throws.ArgumentException);
     }
 
