@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -15,7 +14,7 @@ namespace ArchLinterNet.Core.Tests;
 [Explicit("Hardware-sensitive consumer attribution harness — run manually for issue #461 evidence.")]
 [Category("Benchmark")]
 [CancelAfter(900_000)]
-public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
+public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
 {
     private const int RunsPerScenario = 10;
     private const int ProcessTimeoutMilliseconds = 300_000;
@@ -28,36 +27,40 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
     [Test]
     public async Task RunConsumerAttributionMatrix()
     {
+        CancellationToken cancellationToken = TestContext.CurrentContext.CancellationToken;
         Assert.That(File.Exists(CliDllPath()), Is.True,
             $"CLI not built at {CliDllPath()} — run `dotnet build src/ArchLinterNet.Cli --no-restore` first.");
 
         using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("large-multi-host");
+        cancellationToken.ThrowIfCancellationRequested();
         Stopwatch buildClock = Stopwatch.StartNew();
         fixture.Build();
         buildClock.Stop();
+        cancellationToken.ThrowIfCancellationRequested();
 
-        BatchSample priming = await RunBatchAsync(fixture, processCount: 1, dispatchMode: "sequential");
+        BatchSample priming = await RunBatchAsync(fixture, processCount: 1, dispatchMode: "sequential", cancellationToken);
         ValidateSuccessfulBatch(priming, "warm-state priming");
         int projectsPerProcess = priming.Processes[0].Counters.DiscoveredProjectCount;
 
         List<ScenarioSummary> scenarios = new();
-        ScenarioSeries single = await RunSeriesAsync(fixture, processCount: 1, dispatchMode: "sequential", prime: false);
-        scenarios.Add(Summarize(
-            "1-process-sequential", "One independent strict validation process", single));
+        ScenarioSeries single = await RunSeriesAsync(fixture, processCount: 1, dispatchMode: "sequential", prime: false, cancellationToken);
+        ScenarioSummary singleSummary = Summarize(
+            "1-process-sequential", "One independent strict validation process", single);
+        scenarios.Add(singleSummary);
 
-        ScenarioSeries sequentialTwo = await RunSeriesAsync(fixture, processCount: 2, dispatchMode: "sequential", prime: false);
+        ScenarioSeries sequentialTwo = await RunSeriesAsync(fixture, processCount: 2, dispatchMode: "sequential", prime: false, cancellationToken);
         scenarios.Add(Summarize(
             "2-process-sequential", "Two independent strict processes over one unchanged build", sequentialTwo));
 
-        ScenarioSeries sequentialFour = await RunSeriesAsync(fixture, processCount: 4, dispatchMode: "sequential", prime: false);
+        ScenarioSeries sequentialFour = await RunSeriesAsync(fixture, processCount: 4, dispatchMode: "sequential", prime: false, cancellationToken);
         scenarios.Add(Summarize(
             "4-process-sequential", "Four independent strict processes over one unchanged build", sequentialFour));
 
-        ScenarioSeries parallelTwo = await RunSeriesAsync(fixture, processCount: 2, dispatchMode: "bounded-parallel", prime: false);
+        ScenarioSeries parallelTwo = await RunSeriesAsync(fixture, processCount: 2, dispatchMode: "bounded-parallel", prime: false, cancellationToken);
         scenarios.Add(Summarize(
             "2-process-bounded-parallel", "Two independent strict processes dispatched together", parallelTwo));
 
-        ScenarioSeries parallelFour = await RunSeriesAsync(fixture, processCount: 4, dispatchMode: "bounded-parallel", prime: false);
+        ScenarioSeries parallelFour = await RunSeriesAsync(fixture, processCount: 4, dispatchMode: "bounded-parallel", prime: false, cancellationToken);
         scenarios.Add(Summarize(
             "4-process-bounded-parallel", "Four independent strict processes dispatched together", parallelFour));
 
@@ -83,7 +86,7 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
             scenarios,
             new AttributionDecision(
                 "B",
-                "ArchLinterNet inner work is measurable and is repeated once per independent process; no version regression is proven by this synthetic current-tree run.",
+                DescribeDominantPreparation(singleSummary),
                 "Outer process timing does not measure the caller's container or CI runner. Compare this artifact with consumer-side timestamps before asserting an external regression."),
             new RoutingDecision[]
             {
@@ -106,12 +109,13 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
     }
 
     private static async Task<ScenarioSeries> RunSeriesAsync(
-        AdoptionAcceptanceFixture fixture, int processCount, string dispatchMode, bool prime)
+        AdoptionAcceptanceFixture fixture, int processCount, string dispatchMode, bool prime, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         List<BatchSample> priming = new();
         if (prime)
         {
-            BatchSample primeSample = await RunBatchAsync(fixture, processCount, dispatchMode);
+            BatchSample primeSample = await RunBatchAsync(fixture, processCount, dispatchMode, cancellationToken);
             ValidateSuccessfulBatch(primeSample, $"priming {dispatchMode} x{processCount}");
             priming.Add(primeSample);
         }
@@ -119,21 +123,22 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
         List<BatchSample> samples = new(RunsPerScenario);
         for (int index = 0; index < RunsPerScenario; index++)
         {
-            samples.Add(await RunBatchAsync(fixture, processCount, dispatchMode));
+            samples.Add(await RunBatchAsync(fixture, processCount, dispatchMode, cancellationToken));
         }
 
         return new ScenarioSeries(samples, priming);
     }
 
     private static async Task<BatchSample> RunBatchAsync(
-        AdoptionAcceptanceFixture fixture, int processCount, string dispatchMode)
+        AdoptionAcceptanceFixture fixture, int processCount, string dispatchMode, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Stopwatch outerClock = Stopwatch.StartNew();
         IReadOnlyList<ProcessSample> processes;
         if (dispatchMode == "bounded-parallel")
         {
             Task<ProcessSample>[] tasks = Enumerable.Range(0, processCount)
-                .Select(_ => RunProcessAsync(fixture))
+                .Select(_ => RunProcessAsync(fixture, cancellationToken))
                 .ToArray();
             processes = await Task.WhenAll(tasks);
         }
@@ -142,7 +147,7 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
             List<ProcessSample> samples = new(processCount);
             for (int index = 0; index < processCount; index++)
             {
-                samples.Add(await RunProcessAsync(fixture));
+                samples.Add(await RunProcessAsync(fixture, cancellationToken));
             }
 
             processes = samples;
@@ -161,6 +166,7 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
             outerClock.Elapsed.TotalMilliseconds,
             processes.Sum(static process => process.CommandTotalMs),
             processes.Sum(static process => process.PreflightMs),
+            processes.Sum(static process => process.BuildStatePreflightMs),
             processes.Sum(static process => process.AnalysisOnlyMs),
             processes.Sum(static process => process.OutputMs),
             processes.Sum(static process => process.ProcessEnvelopeMs),
@@ -169,8 +175,10 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
             processes);
     }
 
-    private static async Task<ProcessSample> RunProcessAsync(AdoptionAcceptanceFixture fixture)
+    private static async Task<ProcessSample> RunProcessAsync(
+        AdoptionAcceptanceFixture fixture, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         string profilePath = Path.Combine(Path.GetTempPath(), $"arch-linter-profile-461-{Guid.NewGuid():N}.json");
         ProcessStartInfo startInfo = new("dotnet")
         {
@@ -192,42 +200,84 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
         startInfo.ArgumentList.Add("--max-parallelism");
         startInfo.ArgumentList.Add("1");
 
-        Stopwatch wallClock = Stopwatch.StartNew();
-        using Process process = Process.Start(startInfo)!;
-        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
-        Task<string> stderrTask = process.StandardError.ReadToEndAsync();
-        Task exitTask = process.WaitForExitAsync();
-        Task completed = await Task.WhenAny(exitTask, Task.Delay(ProcessTimeoutMilliseconds));
-        if (completed != exitTask)
+        try
+        {
+            Stopwatch wallClock = Stopwatch.StartNew();
+            using Process process = Process.Start(startInfo)!;
+            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderrTask = process.StandardError.ReadToEndAsync();
+            using CancellationTokenSource timeoutSource = new(TimeSpan.FromMilliseconds(ProcessTimeoutMilliseconds));
+            using CancellationTokenSource linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, timeoutSource.Token);
+            try
+            {
+                await process.WaitForExitAsync(linkedSource.Token);
+                string stdout = await stdoutTask;
+                string stderr = await stderrTask;
+                wallClock.Stop();
+
+                Assert.That(File.Exists(profilePath), Is.True,
+                    $"No profile written (exit {process.ExitCode}).{Environment.NewLine}stdout:{stdout}{Environment.NewLine}stderr:{stderr}");
+                using JsonDocument profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
+                using JsonDocument resultDocument = JsonDocument.Parse(stdout);
+                return CreateProcessSample(
+                    profileDocument.RootElement.Clone(),
+                    resultDocument.RootElement.GetRawText(),
+                    process.ExitCode,
+                    wallClock.Elapsed.TotalMilliseconds);
+            }
+            catch (OperationCanceledException) when (linkedSource.IsCancellationRequested)
+            {
+                TryKillProcessTree(process);
+                await AwaitProcessCleanupAsync(process, stdoutTask, stderrTask);
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+
+                throw new AssertionException($"ArchLinterNet CLI process exceeded {ProcessTimeoutMilliseconds}ms.");
+            }
+            catch
+            {
+                TryKillProcessTree(process);
+                await AwaitProcessCleanupAsync(process, stdoutTask, stderrTask);
+                throw;
+            }
+        }
+        finally
+        {
+            if (File.Exists(profilePath))
+            {
+                File.Delete(profilePath);
+            }
+        }
+    }
+
+    private static async Task AwaitProcessCleanupAsync(Process process, params Task<string>[] outputTasks)
+    {
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.WhenAll(outputTasks).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch
+        {
+            // The original cancellation, timeout, or process error remains authoritative.
+        }
+    }
+
+    private static void TryKillProcessTree(Process process)
+    {
+        try
         {
             if (!process.HasExited)
             {
                 process.Kill(entireProcessTree: true);
             }
-
-            throw new AssertionException($"ArchLinterNet CLI process exceeded {ProcessTimeoutMilliseconds}ms.");
         }
-
-        await exitTask;
-        string stdout = await stdoutTask;
-        string stderr = await stderrTask;
-        wallClock.Stop();
-
-        Assert.That(File.Exists(profilePath), Is.True,
-            $"No profile written (exit {process.ExitCode}).{Environment.NewLine}stdout:{stdout}{Environment.NewLine}stderr:{stderr}");
-        try
+        catch (InvalidOperationException)
         {
-            using JsonDocument profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
-            using JsonDocument resultDocument = JsonDocument.Parse(stdout);
-            return CreateProcessSample(
-                profileDocument.RootElement.Clone(),
-                resultDocument.RootElement.GetRawText(),
-                process.ExitCode,
-                wallClock.Elapsed.TotalMilliseconds);
-        }
-        finally
-        {
-            File.Delete(profilePath);
+            // The process exited between the check and Kill; cleanup is already complete.
         }
     }
 
@@ -235,6 +285,7 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
         JsonElement profile, string resultJson, int exitCode, double wallClockMs)
     {
         double preflightMs = 0;
+        double buildStatePreflightMs = 0;
         double outputMs = 0;
         double topLevelMs = 0;
         double? totalMs = null;
@@ -256,6 +307,11 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
                 preflightMs += elapsed;
             }
 
+            if (name == "build_state_preflight")
+            {
+                buildStatePreflightMs += elapsed;
+            }
+
             if (_outputPhaseNames.Contains(name))
             {
                 outputMs += elapsed;
@@ -267,6 +323,7 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
         return new ProcessSample(
             commandTotalMs,
             preflightMs,
+            buildStatePreflightMs,
             Math.Max(0, commandTotalMs - preflightMs - outputMs),
             outputMs,
             Math.Max(0, wallClockMs - commandTotalMs),
@@ -324,13 +381,21 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
             series.PrimingSamples);
     }
 
+    private static string DescribeDominantPreparation(ScenarioSummary singleSummary)
+    {
+        double preflightMs = Median(singleSummary.Samples.Select(static sample => sample.AggregateBuildStatePreflightMs));
+        double preflightShare = Median(singleSummary.Samples.Select(static sample =>
+            100 * sample.AggregateBuildStatePreflightMs / sample.AggregateCommandTotalMs));
+        return $"ArchLinterNet inner work is repeated once per independent process; in the 1-process sequential scenario, build_state_preflight is the dominant phase at {preflightMs:F1}ms of {singleSummary.MedianAggregateCommandTotalMs:F1}ms inner median ({preflightShare:F1}%). No version regression is proven by this synthetic current-tree run; consumer-side timestamps and comparable versions are still required.";
+    }
+
     private static string ExtractCanonicalResult(string json)
     {
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement root = document.RootElement;
         string[] canonicalFields =
         [
-            "passed", "violations", "cycles", "cycle_findings", "coverage_findings",
+            "passed", "violations", "cycles", "cycle_diagnostics", "coverage_findings",
             "unmatched_ignored_violations", "policy_consistency_findings", "classification_conflicts",
             "classification_metadata_failures",
         ];
@@ -358,138 +423,4 @@ public sealed class ConsumerAttributionAnalysisProfileBenchmarkHarness
     private static string ResultsPath() => Path.Combine(
         new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal", "consumer-attribution-analysis-profile-results.json");
 
-    private sealed record ProcessSample(
-        double CommandTotalMs,
-        double PreflightMs,
-        double AnalysisOnlyMs,
-        double OutputMs,
-        double ProcessEnvelopeMs,
-        string CompletionStatus,
-        int ExitCode,
-        bool OutputFailed,
-        string CanonicalResultSha256,
-        CounterTotals Counters,
-        JsonElement Profile);
-
-    private sealed record BatchSample(
-        int ProcessCount,
-        string DispatchMode,
-        double OuterWallClockMs,
-        double AggregateCommandTotalMs,
-        double AggregatePreflightMs,
-        double AggregateAnalysisOnlyMs,
-        double AggregateOutputMs,
-        double AggregateProcessEnvelopeMs,
-        CounterTotals Counters,
-        string CanonicalResultSha256,
-        IReadOnlyList<ProcessSample> Processes);
-
-    private sealed record ScenarioSeries(
-        IReadOnlyList<BatchSample> MeasuredSamples,
-        IReadOnlyList<BatchSample> PrimingSamples);
-
-    private sealed record ScenarioSummary(
-        string ScenarioId,
-        string Description,
-        int SampleCount,
-        double MedianAggregateCommandTotalMs,
-        double P95AggregateCommandTotalMs,
-        double MedianAggregateAnalysisOnlyMs,
-        double P95AggregateAnalysisOnlyMs,
-        double MedianOuterWallClockMs,
-        double P95OuterWallClockMs,
-        double MedianAggregateProcessEnvelopeMs,
-        IReadOnlyList<BatchSample> Samples,
-        IReadOnlyList<BatchSample> PrimingSamples);
-
-    private sealed record CounterTotals(
-        int PolicyCompositions,
-        int ProjectGraphEvaluations,
-        int AssemblyLoads,
-        int DiscoveredProjectCount,
-        int RetainedAssemblyCount,
-        int SelectedAssemblyCount,
-        int ModesEvaluated,
-        int SnapshotMaterializations,
-        int FactIndexMaterializations,
-        int SourceScanPasses,
-        int SourceFilesScanned,
-        int ContractExecutions,
-        int ContractResults)
-    {
-        public static CounterTotals From(JsonElement profile)
-        {
-            JsonElement counters = profile.GetProperty("Counters");
-            return new CounterTotals(
-                counters.GetProperty("PolicyCompositions").GetInt32(),
-                counters.GetProperty("ProjectGraphEvaluations").GetInt32(),
-                counters.GetProperty("AssemblyLoads").GetInt32(),
-                counters.GetProperty("DiscoveredProjectCount").GetInt32(),
-                counters.GetProperty("RetainedAssemblyCount").GetInt32(),
-                counters.GetProperty("SelectedAssemblyCount").GetInt32(),
-                counters.GetProperty("ModesEvaluated").GetInt32(),
-                counters.GetProperty("SnapshotMaterializations").GetInt32(),
-                counters.GetProperty("FactIndexMaterializations").GetInt32(),
-                counters.GetProperty("SourceScanPasses").GetInt32(),
-                counters.GetProperty("SourceFilesScanned").GetInt32(),
-                SumObject(counters.GetProperty("ContractFamilyCounts")),
-                SumObject(counters.GetProperty("ContractFamilyResultCounts")));
-        }
-
-        public static CounterTotals Sum(IEnumerable<CounterTotals> counters) => counters.Aggregate(
-            new CounterTotals(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), Add);
-
-        private static CounterTotals Add(CounterTotals left, CounterTotals right) => new(
-            left.PolicyCompositions + right.PolicyCompositions,
-            left.ProjectGraphEvaluations + right.ProjectGraphEvaluations,
-            left.AssemblyLoads + right.AssemblyLoads,
-            left.DiscoveredProjectCount + right.DiscoveredProjectCount,
-            left.RetainedAssemblyCount + right.RetainedAssemblyCount,
-            left.SelectedAssemblyCount + right.SelectedAssemblyCount,
-            left.ModesEvaluated + right.ModesEvaluated,
-            left.SnapshotMaterializations + right.SnapshotMaterializations,
-            left.FactIndexMaterializations + right.FactIndexMaterializations,
-            left.SourceScanPasses + right.SourceScanPasses,
-            left.SourceFilesScanned + right.SourceFilesScanned,
-            left.ContractExecutions + right.ContractExecutions,
-            left.ContractResults + right.ContractResults);
-
-        private static int SumObject(JsonElement value) => value.EnumerateObject().Sum(property => property.Value.GetInt32());
-    }
-
-    private sealed record BenchmarkEvidence(
-        string SchemaId,
-        string Issue,
-        EnvironmentIdentity Environment,
-        FixtureIdentity Fixture,
-        BuildPreparation BuildPreparation,
-        IReadOnlyList<ScenarioSummary> Scenarios,
-        AttributionDecision Attribution,
-        IReadOnlyList<RoutingDecision> Routing,
-        string MeasurementBoundary);
-
-    private sealed record EnvironmentIdentity(
-        string OperatingSystem,
-        string Runtime,
-        string Architecture,
-        int ProcessorCount,
-        string SourceCommit,
-        string Configuration)
-    {
-        public static EnvironmentIdentity Create() => new(
-            RuntimeInformation.OSDescription,
-            RuntimeInformation.FrameworkDescription,
-            RuntimeInformation.ProcessArchitecture.ToString(),
-            Environment.ProcessorCount,
-            Environment.GetEnvironmentVariable("ARCH_LINTER_SOURCE_SHA") ?? "unknown",
-            "Debug");
-    }
-
-    private sealed record FixtureIdentity(string Id, int ProjectCount, int SourceFileCount, string Description);
-
-    private sealed record BuildPreparation(double BuildWallClockMs, string Description);
-
-    private sealed record AttributionDecision(string State, string Conclusion, string Limitation);
-
-    private sealed record RoutingDecision(string Owner, string Decision);
 }
