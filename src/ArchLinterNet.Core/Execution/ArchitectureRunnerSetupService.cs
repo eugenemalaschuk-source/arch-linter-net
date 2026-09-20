@@ -183,7 +183,7 @@ public sealed class ArchitectureRunnerSetupService(
         ArchitectureAnalysisContext context = CreateAnalysisContext(
             preparation.RepositoryRoot, resolution, preparation.ProjectDiscovery,
             ReferenceEquals(preparation.ProjectDiscovery, ProjectDiscoveryResult.Empty) ? null : preparation.ProjectDiscovery,
-            cancellationToken, maxParallelism);
+            cancellationToken, maxParallelism, timing);
         ArchitectureContractRunner runner = CreateRunner(
             context, document, selectedContractIds, enableUnmatchedIgnoreTracking, preparation.PreprocessorSymbols);
         return new ArchitectureRunnerSetup(preparation.RepositoryRoot, runner) { AssemblyLoads = resolution.AssemblyLoads };
@@ -245,7 +245,7 @@ public sealed class ArchitectureRunnerSetupService(
                 : discovery;
 
             ArchitectureAnalysisContext context = CreateAnalysisContext(
-                repositoryRoot, resolution, discovery, attemptedDiscovery, cancellationToken, maxParallelism);
+                repositoryRoot, resolution, discovery, attemptedDiscovery, cancellationToken, maxParallelism, timing);
             runner = CreateRunner(context, document, selectedContractIds, enableUnmatchedIgnoreTracking, symbols);
 
             return new ArchitectureRunnerSetup(repositoryRoot, runner) { AssemblyLoads = resolution.AssemblyLoads };
@@ -334,7 +334,8 @@ public sealed class ArchitectureRunnerSetupService(
         ProjectDiscoveryResult discovery,
         ProjectDiscoveryResult? attemptedDiscovery,
         CancellationToken cancellationToken,
-        int? maxParallelism)
+        int? maxParallelism,
+        ValidationTiming? timing)
     {
         return new ArchitectureAnalysisContext(repositoryRoot, resolution.ResolvedAssemblies,
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery,
@@ -343,6 +344,7 @@ public sealed class ArchitectureRunnerSetupService(
             ResolvedAssemblyArtifactPaths = resolution.ResolvedAssemblyArtifactPaths,
             CancellationToken = cancellationToken,
             MaxParallelism = MaxParallelismResolver.Resolve(maxParallelism),
+            Timing = timing,
         };
     }
 

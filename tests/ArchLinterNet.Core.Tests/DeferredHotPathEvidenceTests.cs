@@ -58,7 +58,10 @@ public sealed class DeferredHotPathEvidenceTests
             Assert.That(findings.Single(finding => finding.Id == "type-layer-membership-amplification").Measurements,
                 Has.All.Matches<DeferredHotPathMeasurement>(measurement =>
                     measurement.ObservedCounter == "phase.selector_predicate_evaluation.count"
-                    && measurement.ObservedCounterValue is > 0));
+                    && measurement.ObservedCounterValue is > 0
+                    && measurement.SelectorPhaseElapsedMilliseconds is > 0
+                    && measurement.SelectorPhaseProcessorTimeMilliseconds is >= 0
+                    && measurement.SelectorPhaseSharePercent is > 0));
             Assert.That(SelectorCounts(findings, "P=projects"), Is.EqualTo([112, 224, 448]));
             Assert.That(SelectorCounts(findings, "T=types_per_project"), Is.EqualTo([112, 224, 448]));
             Assert.That(SelectorCounts(findings, "L=layers"), Is.EqualTo([128, 224, 416]));

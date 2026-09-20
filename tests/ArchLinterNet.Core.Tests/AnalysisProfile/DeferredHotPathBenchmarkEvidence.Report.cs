@@ -21,7 +21,7 @@ internal static class DeferredHotPathBenchmarkMarkdown
             .AppendLine("- Reuse the #502 large-solution-benchmark/v1 synthetic workload generator and materializer.")
             .AppendLine("- Vary independent dimensions at small, medium, and large sizes where the hypothesis is measurable.")
             .AppendLine("- Use deterministic workload counters before interpreting wall-clock phase values.")
-            .AppendLine("- Selector evidence uses the runtime selector_predicate_evaluation phase count; P, T, L, and S are varied one at a time.")
+            .AppendLine("- Selector evidence uses the runtime selector_predicate_evaluation count plus high-resolution wall/CPU measurements; the report records absolute phase time and share of total. P, T, L, and S are varied one at a time.")
             .AppendLine("- Sequential/bounded evidence runs identical staged inputs in paired processes and retains allocation, peak-working-set availability, concurrency, and canonical-result data.")
             .AppendLine("- Graph evidence covers linear, wide fan-out/fan-in, diamond, dense, and structural-only SCC shapes from #502.")
             .AppendLine("- Preserve canonical-result SHA-256 identity and completion/exit status for each profile.")
@@ -89,12 +89,33 @@ internal static class DeferredHotPathBenchmarkMarkdown
                         .AppendLine(" |");
                 }
             }
+
+            if (finding.Id == "type-layer-membership-amplification")
+            {
+                builder.AppendLine()
+                    .AppendLine("Selector phase materiality:")
+                    .AppendLine()
+                    .AppendLine("| Workload | Selector elapsed ms | Selector CPU ms | Share of total |")
+                    .AppendLine("|---|---:|---:|---:|");
+                foreach (DeferredHotPathMeasurement measurement in finding.Measurements)
+                {
+                    builder.Append("| ")
+                        .Append(measurement.WorkloadId)
+                        .Append(" | ")
+                        .Append(measurement.SelectorPhaseElapsedMilliseconds?.ToString("F3", CultureInfo.InvariantCulture) ?? "unavailable")
+                        .Append(" | ")
+                        .Append(measurement.SelectorPhaseProcessorTimeMilliseconds?.ToString("F3", CultureInfo.InvariantCulture) ?? "unavailable")
+                        .Append(" | ")
+                        .Append(measurement.SelectorPhaseSharePercent?.ToString("F3", CultureInfo.InvariantCulture) ?? "unavailable")
+                        .AppendLine("% |");
+                }
+            }
         }
         builder.AppendLine()
             .AppendLine("## Measurement rows")
             .AppendLine()
-            .AppendLine("| Finding | Workload | Variant | Dimension | Size | Work | Observed counter | Dominant phase | Allocated bytes | Peak working set | Canonical result |")
-            .AppendLine("|---|---|---|---|---|---:|---|---|---:|---:|---|");
+            .AppendLine("| Finding | Workload | Variant | Dimension | Size | Work | Observed counter | Dominant phase | Selector elapsed ms | Selector CPU ms | Selector share | Allocated bytes | Peak working set | Canonical result |")
+            .AppendLine("|---|---|---|---|---|---:|---|---|---:|---:|---:|---:|---:|---|");
         foreach (DeferredHotPathFindingEvidence finding in document.Findings)
         {
             foreach (DeferredHotPathMeasurement measurement in finding.Measurements)
@@ -120,6 +141,12 @@ internal static class DeferredHotPathBenchmarkMarkdown
                     .Append(" ")
                     .Append(measurement.DominantPhaseMilliseconds?.ToString("F1", CultureInfo.InvariantCulture) ?? "n/a")
                     .Append(" ms | ")
+                    .Append(measurement.SelectorPhaseElapsedMilliseconds?.ToString("F3", CultureInfo.InvariantCulture) ?? "unavailable")
+                    .Append(" | ")
+                    .Append(measurement.SelectorPhaseProcessorTimeMilliseconds?.ToString("F3", CultureInfo.InvariantCulture) ?? "unavailable")
+                    .Append(" | ")
+                    .Append(measurement.SelectorPhaseSharePercent?.ToString("F3", CultureInfo.InvariantCulture) ?? "unavailable")
+                    .Append(measurement.SelectorPhaseSharePercent.HasValue ? "% | " : " | ")
                     .Append(measurement.AllocatedBytes?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
                     .Append(" | ")
                     .Append(measurement.PeakWorkingSetBytes?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
@@ -139,7 +166,7 @@ internal static class DeferredHotPathBenchmarkMarkdown
             .AppendLine("- No private adopter identity, repository URL, namespace, proprietary topology, or raw private CI log is committed.")
             .AppendLine("- No universal timing SLA is claimed.")
             .AppendLine()
-            .AppendLine("OpenSpec: not applicable. This change adds an explicitly invoked internal measurement harness and evidence only; it changes no product behavior, public API, policy semantics, cache trust boundary, or documented user guarantee.")
+            .AppendLine("OpenSpec: the analysis-profile specification documents the selector phase timing semantics. This change adds internal profiling/evidence support only; it changes no public API, policy semantics, cache trust boundary, or documented user guarantee.")
             .ToString();
     }
 

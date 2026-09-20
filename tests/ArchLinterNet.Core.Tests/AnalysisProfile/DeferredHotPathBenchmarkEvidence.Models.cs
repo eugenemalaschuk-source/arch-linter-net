@@ -87,6 +87,12 @@ internal sealed record DeferredHotPathMeasurement
 
     public required double? DominantPhaseMilliseconds { get; init; }
 
+    public required double? SelectorPhaseElapsedMilliseconds { get; init; }
+
+    public required double? SelectorPhaseProcessorTimeMilliseconds { get; init; }
+
+    public required double? SelectorPhaseSharePercent { get; init; }
+
     public required long? AllocatedBytes { get; init; }
 
     public required long? PeakWorkingSetBytes { get; init; }

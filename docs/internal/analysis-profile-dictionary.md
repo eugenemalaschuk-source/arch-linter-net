@@ -38,7 +38,10 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 
 The `Phases` array may also contain `selector_predicate_evaluation` when compiled CEL
 selectors were evaluated. Its deterministic `Count` is the runtime number of predicate
-invocations recorded by the analysis session; it is not a generated workload estimate.
+invocations recorded by the analysis session; it is not a generated workload estimate. When
+timing is enabled, its `ElapsedMs` and `ProcessorTimeMs` are high-resolution aggregate
+measurements for the predicate evaluations. When timing is not enabled, both fields are `null`,
+never synthetic zero values.
 
 ## `Output` (actual publication)
 

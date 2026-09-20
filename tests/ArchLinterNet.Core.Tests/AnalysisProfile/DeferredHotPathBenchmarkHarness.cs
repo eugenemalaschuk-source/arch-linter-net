@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -130,6 +131,16 @@ public sealed class DeferredHotPathBenchmarkHarness
                 Measurements = await MeasureParallelismSeries(cancellationToken),
             },
         ];
+
+        int selectorFindingIndex = findings.FindIndex(
+            finding => finding.Id == "type-layer-membership-amplification");
+        DeferredHotPathFindingEvidence selectorFinding = findings[selectorFindingIndex];
+        string selectorMateriality = DescribeSelectorMateriality(selectorFinding.Measurements);
+        findings[selectorFindingIndex] = selectorFinding with
+        {
+            ObservedGrowth = $"{selectorFinding.ObservedGrowth} {selectorMateriality}",
+            Interpretation = $"{selectorFinding.Interpretation} {selectorMateriality}",
+        };
 
         DeferredHotPathEvidenceDocument document = new()
         {
@@ -537,6 +548,8 @@ public sealed class DeferredHotPathBenchmarkHarness
     {
         int? actualCounter = observedCounter.Value ?? ReadCounter(profile, observedCounter.Name);
         (string? phase, double? milliseconds) = DominantPhase(profile);
+        (double? selectorElapsedMs, double? selectorProcessorTimeMs, double? selectorSharePercent) =
+            SelectorPhaseMateriality(profile);
         string completionStatus = profile.GetProperty("CompletionStatus").GetString()!;
         return new DeferredHotPathMeasurement
         {
@@ -550,6 +563,9 @@ public sealed class DeferredHotPathBenchmarkHarness
             ObservedCounterValue = actualCounter,
             DominantPhase = phase,
             DominantPhaseMilliseconds = milliseconds,
+            SelectorPhaseElapsedMilliseconds = selectorElapsedMs,
+            SelectorPhaseProcessorTimeMilliseconds = selectorProcessorTimeMs,
+            SelectorPhaseSharePercent = selectorSharePercent,
             AllocatedBytes = ReadLong(profile, "Measurements.AllocatedBytesTotal"),
             PeakWorkingSetBytes = ReadLong(profile, "Measurements.PeakWorkingSetBytes"),
             CanonicalResultSha256 = CanonicalResultSha256(result, completionStatus, exitCode),
@@ -573,6 +589,44 @@ public sealed class DeferredHotPathBenchmarkHarness
         return dominant.ValueKind != JsonValueKind.Undefined
             ? (dominant.GetProperty("Name").GetString(), dominant.GetProperty("ElapsedMs").GetDouble())
             : (null, null);
+    }
+
+    private static (double? ElapsedMs, double? ProcessorTimeMs, double? SharePercent) SelectorPhaseMateriality(
+        JsonElement profile)
+    {
+        if (!profile.TryGetProperty("Phases", out JsonElement phases))
+        {
+            return (null, null, null);
+        }
+
+        JsonElement selector = phases.EnumerateArray()
+            .FirstOrDefault(phase => phase.TryGetProperty("Name", out JsonElement name)
+                && name.GetString() == "selector_predicate_evaluation");
+        if (selector.ValueKind == JsonValueKind.Undefined)
+        {
+            return (null, null, null);
+        }
+
+        double? elapsedMs = selector.TryGetProperty("ElapsedMs", out JsonElement elapsed)
+            && elapsed.ValueKind == JsonValueKind.Number
+            ? elapsed.GetDouble()
+            : null;
+        double? processorTimeMs = selector.TryGetProperty("ProcessorTimeMs", out JsonElement processorTime)
+            && processorTime.ValueKind == JsonValueKind.Number
+            ? processorTime.GetDouble()
+            : null;
+        JsonElement total = phases.EnumerateArray()
+            .FirstOrDefault(phase => phase.TryGetProperty("Name", out JsonElement name)
+                && name.GetString() == "total");
+        double? totalElapsedMs = total.ValueKind != JsonValueKind.Undefined
+            && total.TryGetProperty("ElapsedMs", out JsonElement totalElapsed)
+            && totalElapsed.ValueKind == JsonValueKind.Number
+            ? totalElapsed.GetDouble()
+            : null;
+        double? sharePercent = elapsedMs.HasValue && totalElapsedMs is > 0
+            ? elapsedMs.Value / totalElapsedMs.Value * 100
+            : null;
+        return (elapsedMs, processorTimeMs, sharePercent);
     }
 
     private static int? ReadCounter(JsonElement profile, string path)
@@ -633,6 +687,32 @@ public sealed class DeferredHotPathBenchmarkHarness
         }
 
         return current.ValueKind == JsonValueKind.String ? current.GetString() : null;
+    }
+
+    private static string DescribeSelectorMateriality(IReadOnlyList<DeferredHotPathMeasurement> measurements)
+    {
+        double[] elapsed = measurements
+            .Select(measurement => measurement.SelectorPhaseElapsedMilliseconds)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToArray();
+        double[] processor = measurements
+            .Select(measurement => measurement.SelectorPhaseProcessorTimeMilliseconds)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToArray();
+        double[] share = measurements
+            .Select(measurement => measurement.SelectorPhaseSharePercent)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToArray();
+        Assert.That(elapsed, Is.Not.Empty, "Selector materiality requires measured elapsed values.");
+        Assert.That(processor, Is.Not.Empty, "Selector materiality requires measured CPU values.");
+        Assert.That(share, Is.Not.Empty, "Selector materiality requires phase-share values.");
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "Measured selector phase time is {0:F3}–{1:F3} ms wall and {2:F3}–{3:F3} ms CPU across the matrix, representing {4:F3}–{5:F3}% of total.",
+            elapsed.Min(), elapsed.Max(), processor.Min(), processor.Max(), share.Min(), share.Max());
     }
 
     private static string CanonicalResultSha256(JsonElement result, string completionStatus, int exitCode)

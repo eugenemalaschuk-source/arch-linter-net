@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using ArchLinterNet.CEL.Compilation;
 using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution.Expressions;
@@ -19,18 +21,21 @@ internal sealed class ArchitectureExpressionFactService
     private readonly ArchitectureSourceFileFactIndex _sourceFileFactIndex;
     private readonly ProjectDiscoveryResult? _projectDiscovery;
     private readonly AnalysisSessionProfilingCounters? _profilingCounters;
+    private readonly ValidationTiming? _timing;
     private readonly Dictionary<Type, ArchitectureExpressionSubjectFacts> _subjectFactsCache = new();
 
     public ArchitectureExpressionFactService(
         ArchitectureRoleIndex roleIndex,
         ArchitectureSourceFileFactIndex sourceFileFactIndex,
         ProjectDiscoveryResult? projectDiscovery,
-        AnalysisSessionProfilingCounters? profilingCounters = null)
+        AnalysisSessionProfilingCounters? profilingCounters = null,
+        ValidationTiming? timing = null)
     {
         _roleIndex = roleIndex ?? throw new ArgumentNullException(nameof(roleIndex));
         _sourceFileFactIndex = sourceFileFactIndex ?? throw new ArgumentNullException(nameof(sourceFileFactIndex));
         _projectDiscovery = projectDiscovery;
         _profilingCounters = profilingCounters;
+        _timing = timing;
     }
 
     public ArchitectureExpressionSubjectFacts BuildSubjectFacts(Type type)
@@ -86,23 +91,37 @@ internal sealed class ArchitectureExpressionFactService
         CelCompiledPredicate predicate, CelEvaluationContext context, string description, ArchitecturePolicySourceLocation? location)
     {
         _profilingCounters?.RecordSelectorPredicateEvaluation();
-        ArchitectureExpressionEvaluationResult result = ArchitectureExpressionEvaluator.Evaluate(predicate, context);
-        if (!result.IsError)
+        long startedTimestamp = _timing is null ? 0 : Stopwatch.GetTimestamp();
+        long startedProcessorTimeTicks = _timing is null ? 0 : Process.GetCurrentProcess().TotalProcessorTime.Ticks;
+        try
         {
-            return result.IsMatch;
-        }
+            ArchitectureExpressionEvaluationResult result = ArchitectureExpressionEvaluator.Evaluate(predicate, context);
+            if (!result.IsError)
+            {
+                return result.IsMatch;
+            }
 
-        string message = $"{description} 'when' expression failed to evaluate: {result.ErrorMessage}";
-        if (location is null)
+            string message = $"{description} 'when' expression failed to evaluate: {result.ErrorMessage}";
+            if (location is null)
+            {
+                throw new InvalidOperationException(message);
+            }
+
+            var diagnostic = new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.SemanticValidation,
+                location,
+                Array.Empty<ArchitecturePolicySourceLocation>(),
+                location.Source.ImportChain);
+            throw new ArchitecturePolicyValidationException(message, diagnostic, new InvalidOperationException(message));
+        }
+        finally
         {
-            throw new InvalidOperationException(message);
+            if (_timing is not null)
+            {
+                long elapsedStopwatchTicks = Stopwatch.GetTimestamp() - startedTimestamp;
+                long processorTimeTicks = Process.GetCurrentProcess().TotalProcessorTime.Ticks - startedProcessorTimeTicks;
+                _timing.RecordSelectorPredicateMeasurement(elapsedStopwatchTicks, Math.Max(0, processorTimeTicks));
+            }
         }
-
-        var diagnostic = new ArchitecturePolicyDiagnostic(
-            ArchitecturePolicyDiagnosticKind.SemanticValidation,
-            location,
-            Array.Empty<ArchitecturePolicySourceLocation>(),
-            location.Source.ImportChain);
-        throw new ArchitecturePolicyValidationException(message, diagnostic, new InvalidOperationException(message));
     }
 }

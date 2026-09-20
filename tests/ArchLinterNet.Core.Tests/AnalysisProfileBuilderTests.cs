@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -285,6 +286,39 @@ public sealed class AnalysisProfileBuilderTests
             Assert.That(profile.Phases, Is.Not.Empty);
             Assert.That(profile.Phases, Has.All.Matches<AnalysisProfilePhaseMeasurement>(
                 phase => phase.ProcessorTimeMs is >= 0));
+        });
+    }
+
+    [Test]
+    public void Build_SelectorPhase_UsesMeasuredTimingAndNullWithoutTiming()
+    {
+        ArchitectureAnalysisSnapshotCounters counters = Counters() with
+        {
+            SelectorPredicateEvaluations = 3,
+        };
+        var timing = new ValidationTiming();
+        using (timing.Measure("total")) { }
+        timing.RecordSelectorPredicateMeasurement(Stopwatch.Frequency / 100, TimeSpan.TicksPerMillisecond * 3);
+
+        AnalysisProfile measured = AnalysisProfileBuilder.Build(
+            counters, timing, renderedSinkCount: 1, outputSinkCount: 1,
+            AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
+        AnalysisProfile unmeasured = AnalysisProfileBuilder.Build(
+            counters, timing: null, renderedSinkCount: 1, outputSinkCount: 1,
+            AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
+
+        AnalysisProfilePhaseMeasurement measuredSelector = measured.Phases.Single(
+            phase => phase.Name == "selector_predicate_evaluation");
+        AnalysisProfilePhaseMeasurement unmeasuredSelector = unmeasured.Phases.Single(
+            phase => phase.Name == "selector_predicate_evaluation");
+        Assert.Multiple(() =>
+        {
+            Assert.That(measuredSelector.Count, Is.EqualTo(3));
+            Assert.That(measuredSelector.ElapsedMs, Is.GreaterThan(0));
+            Assert.That(measuredSelector.ProcessorTimeMs, Is.EqualTo(3));
+            Assert.That(unmeasuredSelector.Count, Is.EqualTo(3));
+            Assert.That(unmeasuredSelector.ElapsedMs, Is.Null);
+            Assert.That(unmeasuredSelector.ProcessorTimeMs, Is.Null);
         });
     }
 }
