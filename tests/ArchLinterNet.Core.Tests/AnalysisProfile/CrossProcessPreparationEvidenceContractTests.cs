@@ -21,7 +21,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             Assert.That(second, Does.Contain("cross-process-preparation-evidence/v1"));
             Assert.That(second, Does.Contain("analysis-profile/v1"));
             Assert.That(roundTrip.BenchmarkEvidence.EvidenceSchemaId, Is.EqualTo(BenchmarkEvidenceDocument.SchemaId));
-            Assert.That(roundTrip.Processes, Has.Count.EqualTo(3));
+            Assert.That(roundTrip.Processes, Has.Count.EqualTo(4));
         });
     }
 
@@ -33,9 +33,10 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         Assert.Multiple(() =>
         {
             Assert.That(evidence.Processes[0].Identity.Projection.CommandFamily, Is.EqualTo("strict"));
-            Assert.That(evidence.Processes[1].Identity.Projection.CommandFamily, Is.EqualTo("architecture_health"));
-            Assert.That(evidence.Processes[2].Identity.RevisionRole, Is.EqualTo(PreparationRevisionRole.Base));
             Assert.That(evidence.Processes[1].Identity.ExecutionKind, Is.EqualTo(PreparationExecutionKind.InProcessProjection));
+            Assert.That(evidence.Processes[2].Identity.Projection.CommandFamily, Is.EqualTo("architecture_health"));
+            Assert.That(evidence.Processes[3].Identity.RevisionRole, Is.EqualTo(PreparationRevisionRole.Base));
+            Assert.That(evidence.Processes[2].Identity.ExecutionKind, Is.EqualTo(PreparationExecutionKind.InProcessProjection));
             Assert.That(evidence.CandidateIndependentProcesses, Has.Count.EqualTo(1));
             Assert.That(evidence.PreparedEffect.RepresentativeProcessCount, Is.EqualTo(1));
         });
@@ -128,6 +129,42 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     }
 
     [Test]
+    public void EquivalentModes_RejectDifferentCanonicalResults()
+    {
+        CrossProcessPreparationEvidenceDocument evidence = CreateEvidence();
+        BenchmarkCanonicalResultIdentity different = BenchmarkIdentity.CreateCanonicalResult(
+            "Success",
+            0,
+            [new BenchmarkFindingIdentity
+            {
+                ContractId = "synthetic-contract",
+                Kind = "synthetic-finding",
+                SourceAssembly = "synthetic-assembly",
+                SourceType = "Synthetic.Type",
+                SourceMember = "Synthetic.Member",
+                Location = "src/Synthetic.cs",
+            }]);
+        CrossProcessProcessEvidence altered = evidence.Processes[1] with { CanonicalResult = different };
+        evidence = evidence with { Processes = [evidence.Processes[0], altered, evidence.Processes[2], evidence.Processes[3]] };
+
+        Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void OneProcessAlternative_RejectsAnUncoveredMeasuredCommandFamily()
+    {
+        CrossProcessPreparationEvidenceDocument evidence = CreateEvidence() with
+        {
+            Workflow = CreateEvidence().Workflow with
+            {
+                MeasuredCommandFamilies = ["strict", "architecture_health", "measure"],
+            },
+        };
+
+        Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
+    }
+
+    [Test]
     public void PrivacySafeIdentity_RejectsPrivateAdopterTokens()
     {
         CrossProcessPreparationEvidenceDocument evidence = CreateEvidence() with
@@ -171,10 +208,12 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             CreateSample(profile, 1),
             CreateSample(profile, 2),
             CreateSample(profile, 3),
+            CreateSample(profile, 4),
         ];
-        PreparationProjectionIdentity strict = new() { CommandFamily = "strict", ProjectionId = "synthetic-strict-candidate", ProcessBound = true };
-        PreparationProjectionIdentity health = new() { CommandFamily = "architecture_health", ProjectionId = "synthetic-health-candidate", ProcessBound = false };
-        PreparationProjectionIdentity baseProjection = new() { CommandFamily = "strict", ProjectionId = "synthetic-strict-base", ProcessBound = true };
+        PreparationProjectionIdentity strict = new() { CommandFamily = "strict", ProjectionId = "synthetic-strict-candidate", ComparisonGroup = "strict-validation", ProcessBound = true };
+        PreparationProjectionIdentity strictInProcess = new() { CommandFamily = "strict", ProjectionId = "synthetic-strict-in-process", ComparisonGroup = "strict-validation", ProcessBound = false };
+        PreparationProjectionIdentity health = new() { CommandFamily = "architecture_health", ProjectionId = "synthetic-health-candidate", ComparisonGroup = "health-process-bound", ProcessBound = false };
+        PreparationProjectionIdentity baseProjection = new() { CommandFamily = "strict", ProjectionId = "synthetic-strict-base", ComparisonGroup = "strict-base", ProcessBound = true };
         CrossProcessPreparationWorkflow workflow = new()
         {
             EvidenceSchemaId = CrossProcessPreparationWorkflow.SchemaId,
@@ -182,15 +221,17 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             PreparationBoundary = PreparationBoundaryKind.StagedAssemblies,
             CandidateRevision = new PreparationRevisionIdentity { Role = PreparationRevisionRole.Candidate, Identity = "synthetic-candidate-revision" },
             BaseRevision = new PreparationRevisionIdentity { Role = PreparationRevisionRole.Base, Identity = "synthetic-base-revision" },
-            Projections = [strict, health, baseProjection],
+            Projections = [strict, strictInProcess, health, baseProjection],
+            MeasuredCommandFamilies = ["strict", "architecture_health"],
             CacheModesMeasured = ["disabled", "miss", "hit"],
             OneProcessAlternativeMeasured = true,
         };
         CrossProcessProcessEvidence[] processes =
         [
             CreateProcess(strict, 1, PreparationRevisionRole.Candidate, PreparationExecutionKind.IndependentProcess, samples[0], canonical),
-            CreateProcess(health, 2, PreparationRevisionRole.Candidate, PreparationExecutionKind.InProcessProjection, samples[1], canonical),
-            CreateProcess(baseProjection, 3, PreparationRevisionRole.Base, PreparationExecutionKind.IndependentProcess, samples[2], canonical),
+            CreateProcess(strictInProcess, 2, PreparationRevisionRole.Candidate, PreparationExecutionKind.InProcessProjection, samples[1], canonical),
+            CreateProcess(health, 3, PreparationRevisionRole.Candidate, PreparationExecutionKind.InProcessProjection, samples[2], canonical),
+            CreateProcess(baseProjection, 4, PreparationRevisionRole.Base, PreparationExecutionKind.IndependentProcess, samples[3], canonical),
         ];
         BenchmarkEvidenceDocument benchmarkEvidence = BenchmarkEvidenceFactory.Create(
             workload,
@@ -230,6 +271,14 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         PreparedStateAvoidableWork = 70,
         ColdPrepareCost = 100m,
         PerConsumerLoadAuthorizationCost = 10m,
+        PerConsumerLoadAuthorizationCostLowerBound = 10m,
+        PerConsumerLoadAuthorizationCostUpperBound = 10m,
+        PerConsumerLoadAuthorizationCostBasis = "Synthetic contract projection measurement.",
+        MeasuredIndependentWorkflowWork = 100m,
+        MeasuredOneProcessAlternativeWork = 120m,
+        ExpectedPersistedReuseWork = 110m,
+        DistinctCrossProcessValue = true,
+        WorkMeasurementBasis = "Synthetic contract counters.",
         BreakEvenProcessCount = 3,
         CacheModesMeasured = ["disabled", "miss", "hit"],
         Resources = UnavailableResources(),

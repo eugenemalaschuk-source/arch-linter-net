@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
@@ -14,10 +15,41 @@ namespace ArchLinterNet.Core.Tests;
 [Explicit("Cross-process preparation reuse evidence harness; run manually for issue #493.")]
 [Category("Benchmark")]
 [CancelAfter(1_200_000)]
-public sealed class PreparedAnalysisReuseBenchmarkHarness
+public sealed partial class PreparedAnalysisReuseBenchmarkHarness
 {
     private const int ProcessTimeoutMilliseconds = 300_000;
     private const string EvidencePath = "docs/internal/prepared-analysis-reuse-evidence.json";
+    private static readonly string[] _measuredCommandFamilies =
+    [
+        "strict",
+        "audit",
+        "no_new_debt",
+        "architecture_health",
+        "change_snapshot",
+        "topology",
+        "measure",
+    ];
+
+    private static readonly string[] _sharedProjectionFamilies = ["strict", "audit"];
+
+    private static readonly string[] _canonicalResultFields =
+    [
+        "passed",
+        "mode",
+        "violations",
+        "cycles",
+        "cycle_diagnostics",
+        "coverage_findings",
+        "unmatched_ignored_violations",
+        "policy_consistency_findings",
+        "coverage_summary",
+        "classification_conflicts",
+        "classification_metadata_failures",
+        "classification_roles",
+        "classification_path_deferred",
+        "source_set_expansion",
+        "subtractive_matcher_participation",
+    ];
 
     [Test]
     public void MeasureCrossProcessPreparationReuse()
@@ -164,6 +196,12 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
             ref ordinal,
             cancellationToken);
 
+        AddProcessBoundOneProcessProjections(
+            workload,
+            processes,
+            samples,
+            ref ordinal);
+
         ordinal++;
         CliObservation baseObservation = RunCommand(
             fixture,
@@ -185,6 +223,7 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
         {
             CommandFamily = "strict",
             ProjectionId = "synthetic-strict-base",
+            ComparisonGroup = "strict-base",
             ProcessBound = true,
         };
         processes.Add(CreateProcess(baseProjection, ordinal, PreparationRevisionRole.Base,
@@ -205,41 +244,36 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
             Run = samples[0].Run,
         };
         PreparedEffectContract effect = CreateEffect(workload, processes);
+        CrossProcessPreparationWorkflow workflow = new()
+        {
+            EvidenceSchemaId = CrossProcessPreparationWorkflow.SchemaId,
+            WorkloadIdentity = workload.WorkloadIdentity,
+            PreparationBoundary = compilationMode == BenchmarkCompilationMode.RealMsBuild
+                ? PreparationBoundaryKind.MsBuildReceipt
+                : PreparationBoundaryKind.StagedAssemblies,
+            CandidateRevision = new PreparationRevisionIdentity
+            {
+                Role = PreparationRevisionRole.Candidate,
+                Identity = candidateRevision,
+            },
+            BaseRevision = new PreparationRevisionIdentity
+            {
+                Role = PreparationRevisionRole.Base,
+                Identity = baseRevision,
+            },
+            Projections = processes.Select(process => process.Identity.Projection).Distinct().ToList(),
+            MeasuredCommandFamilies = _measuredCommandFamilies,
+            CacheModesMeasured = ["disabled", "miss", "hit"],
+            OneProcessAlternativeMeasured = true,
+        };
         CrossProcessPreparationEvidenceDocument evidence = new()
         {
             EvidenceSchemaId = CrossProcessPreparationEvidenceDocument.SchemaId,
             BenchmarkEvidence = benchmarkEvidence,
-            Workflow = new CrossProcessPreparationWorkflow
-            {
-                EvidenceSchemaId = CrossProcessPreparationWorkflow.SchemaId,
-                WorkloadIdentity = workload.WorkloadIdentity,
-                PreparationBoundary = compilationMode == BenchmarkCompilationMode.RealMsBuild
-                    ? PreparationBoundaryKind.MsBuildReceipt
-                    : PreparationBoundaryKind.StagedAssemblies,
-                CandidateRevision = new PreparationRevisionIdentity
-                {
-                    Role = PreparationRevisionRole.Candidate,
-                    Identity = candidateRevision,
-                },
-                BaseRevision = new PreparationRevisionIdentity
-                {
-                    Role = PreparationRevisionRole.Base,
-                    Identity = baseRevision,
-                },
-                Projections = processes.Select(process => process.Identity.Projection).Distinct().ToList(),
-                CacheModesMeasured = ["disabled", "miss", "hit"],
-                OneProcessAlternativeMeasured = true,
-            },
+            Workflow = workflow,
             Processes = processes,
             PreparedEffect = effect,
-            Decision = new PreparationDecision
-            {
-                Outcome = PreparationDecisionOutcome.B,
-                Route = "defer-prepared-analysis",
-                Reason = "The immutable one-process alternative is measured; persisted storage and authorization resources remain unavailable, so cross-process reuse is not authorized by synthetic evidence alone.",
-                OneProcessAlternativeEvaluated = true,
-                BreakEvenObserved = effect.BreakEvenProcessCount.HasValue,
-            },
+            Decision = CreateDecision(effect, workflow),
         };
         evidence.Validate();
         return evidence;
@@ -280,6 +314,7 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
         {
             CommandFamily = family,
             ProjectionId = $"synthetic-{family}-candidate-{cacheMode}-{parallelMode}",
+            ComparisonGroup = ComparisonGroupFor(family),
             ProcessBound = true,
         };
         processes.Add(CreateProcess(projection, ordinal, PreparationRevisionRole.Candidate,
@@ -299,7 +334,9 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
         using ArchitectureAnalysisSnapshot snapshot = engine.CreateSnapshot(new AnalysisSnapshotRequest
         {
             PolicyPath = fixture.PolicyPath,
-            PreparationMode = BuildPreparationMode.EnsureBuilt,
+            PreparationMode = workload.CompilationMode == BenchmarkCompilationMode.RealMsBuild
+                ? BuildPreparationMode.EnsureBuilt
+                : BuildPreparationMode.Ordinary,
             NoRestore = false,
             MaxParallelism = 1,
             CancellationToken = cancellationToken,
@@ -310,30 +347,72 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
             $"The in-process strict projection must pass. preflight={strict.PreflightBlocked}; " +
             $"preflight_diagnostics={string.Join(" | ", strict.PreflightDiagnostics.Select(diagnostic => diagnostic.State))}; " +
             $"violations={strict.Violations.Count}; cycles={strict.Cycles.Count}; coverage={strict.CoverageFindings.Count}");
-        AddProjection("strict", snapshot.Counters, workload, processes, samples, ref ordinal);
+        AddProjection("strict", snapshot.Counters, strict, workload, processes, samples, ref ordinal);
 
         ValidationOutcome audit = snapshot.Evaluate("audit");
         Assert.That(audit.Passed, Is.True, "The in-process audit projection must pass.");
-        AddProjection("audit", snapshot.Counters, workload, processes, samples, ref ordinal);
+        AddProjection("audit", snapshot.Counters, audit, workload, processes, samples, ref ordinal);
+    }
 
-        snapshot.Measure();
-        AddProjection("measure", snapshot.Counters, workload, processes, samples, ref ordinal);
+    private static void AddProcessBoundOneProcessProjections(
+        BenchmarkWorkloadDefinition workload,
+        ICollection<CrossProcessProcessEvidence> processes,
+        ICollection<BenchmarkProfileSample> samples,
+        ref int ordinal)
+    {
+        IReadOnlyList<CrossProcessProcessEvidence> processBoundSources = processes
+            .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
+                              process.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess &&
+                              !_sharedProjectionFamilies.Contains(process.Identity.Projection.CommandFamily, StringComparer.Ordinal))
+            .GroupBy(process => process.Identity.Projection.CommandFamily, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
+
+        foreach (CrossProcessProcessEvidence source in processBoundSources)
+        {
+            ordinal++;
+            BenchmarkProfileSample sample = source.Sample with
+            {
+                Run = source.Sample.Run with
+                {
+                    SampleOrdinal = ordinal,
+                    PreparedStateMode = "one_process_process_bound",
+                },
+            };
+            PreparationProjectionIdentity projection = source.Identity.Projection with
+            {
+                ProjectionId = $"{source.Identity.Projection.ProjectionId}-one-process-process-bound",
+            };
+            processes.Add(CreateProcess(
+                projection,
+                ordinal,
+                PreparationRevisionRole.Candidate,
+                PreparationExecutionKind.ProcessBoundProjection,
+                sample,
+                source.CanonicalResult,
+                workload));
+            samples.Add(sample);
+        }
     }
 
     private static void AddProjection(
         string family,
         ArchitectureAnalysisSnapshotCounters counters,
+        ValidationOutcome outcome,
         BenchmarkWorkloadDefinition workload,
         ICollection<CrossProcessProcessEvidence> processes,
         ICollection<BenchmarkProfileSample> samples,
         ref int ordinal)
     {
         ordinal++;
-        BenchmarkCanonicalResultIdentity canonical = BenchmarkIdentity.CreateCanonicalResult("Success", 0, []);
+        string output = FormatProjectionResult(family, outcome);
+        BenchmarkCanonicalResultIdentity canonical = SuccessfulCanonicalResult(
+            new CliObservation(0, TimeSpan.Zero, CreateSyntheticProfile(counters, family), output),
+            family);
         JsonElement profile = CreateSyntheticProfile(counters, family);
         BenchmarkProfileSample sample = CreateSample(
             workload,
-            new CliObservation(0, TimeSpan.Zero, profile),
+            new CliObservation(0, TimeSpan.Zero, profile, output),
             ordinal,
             "disabled",
             canonical,
@@ -343,12 +422,32 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
         {
             CommandFamily = family,
             ProjectionId = $"synthetic-{family}-in-process",
+            ComparisonGroup = ComparisonGroupFor(family),
             ProcessBound = false,
         };
         processes.Add(CreateProcess(projection, ordinal, PreparationRevisionRole.Candidate,
             PreparationExecutionKind.InProcessProjection, sample, canonical, workload));
         samples.Add(sample);
     }
+
+    private static string FormatProjectionResult(string family, ValidationOutcome outcome) =>
+        ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+            family,
+            outcome.Passed,
+            outcome.Violations,
+            outcome.Cycles,
+            outcome.CycleFindings,
+            outcome.ClassificationRoles,
+            outcome.ClassificationPathDeferred,
+            outcome.PreflightDiagnostics,
+            outcome.SourceExpansion,
+            outcome.CoverageFindings,
+            outcome.UnmatchedIgnoredViolations,
+            outcome.PolicyConsistencyFindings,
+            outcome.CoverageSummaries,
+            outcome.ClassificationConflicts,
+            outcome.ClassificationMetadataFailures,
+            outcome.SubtractiveMatcherParticipation);
 
     private static CrossProcessProcessEvidence CreateProcess(
         PreparationProjectionIdentity projection,
@@ -377,43 +476,6 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
             },
         };
 
-    private static PreparedEffectContract CreateEffect(
-        BenchmarkWorkloadDefinition workload,
-        IReadOnlyCollection<CrossProcessProcessEvidence> processes)
-    {
-        int representativeProcessCount = processes.Count(process =>
-            process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
-            process.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess);
-        long candidateWork = workload.Inventory.ProjectCount + workload.Inventory.AssemblyCount +
-            workload.Inventory.SourceFileCount + workload.Inventory.TypeCount + workload.Inventory.ReferenceEdgeCount;
-        decimal coldPrepareCost = candidateWork;
-        decimal loadAuthorizationCost = Math.Max(1, candidateWork / 8m);
-        decimal repeatedWorkShare = 0.75m;
-        PreparedEffectContract effect = new()
-        {
-            IssueReference = "#493",
-            RepresentativeProcessCount = representativeProcessCount,
-            RepeatedWorkShare = repeatedWorkShare,
-            CandidatePreparedBoundaryWork = candidateWork,
-            CacheAvoidableWork = 0,
-            PreparedStateAvoidableWork = candidateWork,
-            ColdPrepareCost = coldPrepareCost,
-            PerConsumerLoadAuthorizationCost = loadAuthorizationCost,
-            BreakEvenProcessCount = null,
-            CacheModesMeasured = ["disabled", "miss", "hit"],
-            Resources = new PreparationResourceEvidence
-            {
-                StorageBytes = BenchmarkResourceMeasurement.Unavailable("No persisted prepared-state store exists before implementation."),
-                IoOperations = BenchmarkResourceMeasurement.NotApplicable("No persisted prepared-state I/O exists before implementation."),
-                AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Prepared-state allocation is not isolated."),
-                PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Prepared-state memory is not isolated."),
-            },
-            ExpectedEffect = CreateExpectedEffect(representativeProcessCount, coldPrepareCost, loadAuthorizationCost, repeatedWorkShare),
-            ExactCacheHitSavingsExcluded = true,
-        };
-        return effect with { BreakEvenProcessCount = effect.CalculateBreakEvenProcessCount() };
-    }
-
     private static BenchmarkExpectedEffectEvidence CreateExpectedEffect(
         int representativeProcessCount,
         decimal coldPrepareCost,
@@ -438,7 +500,7 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
             ColdPathTradeOff = "The cold preparation remains a separate cost and is never counted as a cache hit.",
             SuccessThreshold = "Only authorize implementation after one-process sharing is insufficient and the persisted model remains materially cheaper with measured resource bounds.",
             KillCriterion = "Defer or route elsewhere when canonical equivalence, cache separation, or a representative crossover is not reproduced.",
-            Confidence = "Synthetic deterministic counter model; timing is environment-labelled observation.",
+            Confidence = "Expected effect is derived from measured analysis-profile counters; persisted load/authorization remains an explicit proxy bounded by observed one-process projection work.",
         };
     }
 
@@ -446,7 +508,78 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
     {
         Assert.That(observation.ExitCode, Is.EqualTo(0),
             $"Synthetic issue #493 command '{command}' failed with exit code {observation.ExitCode}.\nstdout: {observation.Output}\nstderr: {observation.Error}");
-        return BenchmarkIdentity.CreateCanonicalResult("Success", 0, []);
+        string completionStatus = observation.Profile.TryGetProperty("CompletionStatus", out JsonElement status) &&
+            status.ValueKind == JsonValueKind.String
+            ? status.GetString()!
+            : "Success";
+        string canonicalText = ExtractCanonicalResult(observation.Output);
+        return BenchmarkIdentity.CreateCanonicalResultFromCanonicalText(
+            completionStatus,
+            observation.ExitCode,
+            canonicalText,
+            CountCanonicalFindings(observation.Output));
+    }
+
+    private static string ComparisonGroupFor(string family) =>
+        family switch
+        {
+            "strict" => "strict-validation",
+            "audit" => "audit-validation",
+            _ => $"{family}-process-bound",
+        };
+
+    private static string ExtractCanonicalResult(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output);
+            JsonElement root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !_canonicalResultFields.Any(field => root.TryGetProperty(field, out _)))
+            {
+                return BenchmarkIdentity.NormalizeJson(output);
+            }
+
+            return string.Join(
+                "\n",
+                _canonicalResultFields.Select(field =>
+                    root.TryGetProperty(field, out JsonElement value) ? value.GetRawText() : "null"));
+        }
+        catch (JsonException)
+        {
+            return output.Trim();
+        }
+    }
+
+    private static int CountCanonicalFindings(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return 0;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(output);
+            JsonElement root = document.RootElement;
+            return _canonicalResultFields
+                .Where(field => field is "violations" or "cycles" or "cycle_diagnostics" or "coverage_findings" or
+                    "unmatched_ignored_violations" or "policy_consistency_findings" or "coverage_summary" or
+                    "classification_conflicts" or "classification_metadata_failures" or "classification_roles" or
+                    "preflight_diagnostics" or "subtractive_matcher_participation")
+                .Where(field => root.TryGetProperty(field, out _))
+                .Where(field => root.GetProperty(field).ValueKind == JsonValueKind.Array)
+                .Sum(field => root.GetProperty(field).GetArrayLength());
+        }
+        catch (JsonException)
+        {
+            return 0;
+        }
     }
 
     private static BenchmarkProfileSample CreateSample(
@@ -549,7 +682,9 @@ public sealed class PreparedAnalysisReuseBenchmarkHarness
         JsonElement profile = File.Exists(profilePath)
             ? JsonDocument.Parse(File.ReadAllText(profilePath)).RootElement.Clone()
             : CreateSyntheticProfile(null, family);
-        return new CliObservation(process.ExitCode, clock.Elapsed, profile, standardOutput.GetAwaiter().GetResult(), error);
+        string standardOutputText = standardOutput.GetAwaiter().GetResult();
+        string output = File.Exists(outputPath) ? File.ReadAllText(outputPath) : standardOutputText;
+        return new CliObservation(process.ExitCode, clock.Elapsed, profile, output, error);
     }
 
     private static JsonElement CreateSyntheticProfile(ArchitectureAnalysisSnapshotCounters? counters, string family)

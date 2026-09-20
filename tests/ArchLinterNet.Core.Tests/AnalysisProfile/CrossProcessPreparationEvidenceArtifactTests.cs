@@ -21,7 +21,9 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
             Assert.That(evidence.Archetypes, Has.Count.EqualTo(2));
             Assert.That(evidence.Archetypes.Select(archetype => archetype.Workflow.PreparationBoundary),
                 Is.EquivalentTo(new[] { PreparationBoundaryKind.MsBuildReceipt, PreparationBoundaryKind.StagedAssemblies }));
-            Assert.That(evidence.Archetypes.All(archetype => archetype.Decision.Outcome != PreparationDecisionOutcome.A), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => archetype.Decision.OneProcessAlternativeEvaluated), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.WorkMeasurementBasis.Contains("counters", StringComparison.Ordinal)), Is.True);
             Assert.That(json, Does.Not.Contain("private-adopter"));
             Assert.That(json, Does.Not.Contain("eugen"));
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.Processes)

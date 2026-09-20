@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ArchLinterNet.Core.Tests;
@@ -7,6 +6,7 @@ internal enum PreparationExecutionKind
 {
     IndependentProcess,
     InProcessProjection,
+    ProcessBoundProjection,
 }
 
 internal enum PreparationRevisionRole
@@ -33,6 +33,8 @@ internal sealed record PreparationProjectionIdentity
     public required string CommandFamily { get; init; }
 
     public required string ProjectionId { get; init; }
+
+    public required string ComparisonGroup { get; init; }
 
     public required bool ProcessBound { get; init; }
 }
@@ -90,6 +92,8 @@ internal sealed record CrossProcessPreparationWorkflow
 
     public required IReadOnlyList<PreparationProjectionIdentity> Projections { get; init; }
 
+    public required IReadOnlyList<string> MeasuredCommandFamilies { get; init; }
+
     public required IReadOnlyList<string> CacheModesMeasured { get; init; }
 
     public required bool OneProcessAlternativeMeasured { get; init; }
@@ -125,6 +129,20 @@ internal sealed record CrossProcessPreparationWorkflow
             }
 
             PreparationContractIdentity.ValidateToken(projection.ProjectionId, "projection_id");
+            PreparationContractIdentity.ValidateToken(projection.ComparisonGroup, "comparison_group");
+        }
+
+        if (MeasuredCommandFamilies.Any(family =>
+                Projections.All(projection => !string.Equals(projection.CommandFamily, family, StringComparison.Ordinal))))
+        {
+            throw new InvalidOperationException("Every measured command family must have a declared projection.");
+        }
+
+        if (MeasuredCommandFamilies.Count == 0 ||
+            MeasuredCommandFamilies.Any(family => !PreparationContractIdentity.IsCommandFamily(family)) ||
+            MeasuredCommandFamilies.Distinct(StringComparer.Ordinal).Count() != MeasuredCommandFamilies.Count)
+        {
+            throw new InvalidOperationException("Preparation evidence must declare each measured command family exactly once.");
         }
 
         if (CacheModesMeasured.Count == 0 || CacheModesMeasured.Any(mode => !PreparationContractIdentity.IsCacheMode(mode)))
@@ -174,6 +192,11 @@ internal sealed record CrossProcessProcessEvidence
             throw new InvalidOperationException("A process-bound projection cannot be recorded as in-process.");
         }
 
+        if (Identity.ExecutionKind == PreparationExecutionKind.ProcessBoundProjection && !Identity.Projection.ProcessBound)
+        {
+            throw new InvalidOperationException("A process-bound projection must declare a process-bound projection identity.");
+        }
+
         if (Identity.RevisionRole == PreparationRevisionRole.Base && workflow.BaseRevision is null)
         {
             throw new InvalidOperationException("Base process evidence requires a declared base revision.");
@@ -188,106 +211,6 @@ internal sealed record CrossProcessProcessEvidence
 
         Resources.Validate($"processes[{Identity.ProcessOrdinal}].resources");
     }
-}
-
-internal sealed record PreparedEffectContract
-{
-    public required string IssueReference { get; init; }
-
-    public required int RepresentativeProcessCount { get; init; }
-
-    public required decimal RepeatedWorkShare { get; init; }
-
-    public required long CandidatePreparedBoundaryWork { get; init; }
-
-    public required long CacheAvoidableWork { get; init; }
-
-    public required long PreparedStateAvoidableWork { get; init; }
-
-    public required decimal ColdPrepareCost { get; init; }
-
-    public required decimal PerConsumerLoadAuthorizationCost { get; init; }
-
-    public required int? BreakEvenProcessCount { get; init; }
-
-    public required IReadOnlyList<string> CacheModesMeasured { get; init; }
-
-    public required PreparationResourceEvidence Resources { get; init; }
-
-    public required BenchmarkExpectedEffectEvidence ExpectedEffect { get; init; }
-
-    public required bool ExactCacheHitSavingsExcluded { get; init; }
-
-    [JsonIgnore]
-    public long PreparedStateOnlyWork => CandidatePreparedBoundaryWork - CacheAvoidableWork;
-
-    public decimal IndependentOneShotCost(int processCount) =>
-        ValidateProcessCount(processCount) * ColdPrepareCost * RepeatedWorkShare;
-
-    public decimal PreparedReuseCost(int processCount) =>
-        ColdPrepareCost + ValidateProcessCount(processCount) * PerConsumerLoadAuthorizationCost;
-
-    public decimal ExpectedSavings(int processCount) =>
-        IndependentOneShotCost(processCount) - PreparedReuseCost(processCount);
-
-    public int? CalculateBreakEvenProcessCount()
-    {
-        decimal repeatedCostPerConsumer = ColdPrepareCost * RepeatedWorkShare;
-        decimal differencePerConsumer = repeatedCostPerConsumer - PerConsumerLoadAuthorizationCost;
-        if (differencePerConsumer <= 0 || ColdPrepareCost <= 0)
-        {
-            return null;
-        }
-
-        decimal firstStrictlyCheaper = decimal.Floor(ColdPrepareCost / differencePerConsumer) + 1;
-        return firstStrictlyCheaper > int.MaxValue ? null : (int)firstStrictlyCheaper;
-    }
-
-    public void Validate()
-    {
-        if (!string.Equals(IssueReference, "#493", StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("The prepared-effect contract must identify issue #493.");
-        }
-
-        if (RepresentativeProcessCount < 1 || RepeatedWorkShare is < 0 or > 1 ||
-            ColdPrepareCost < 0 || PerConsumerLoadAuthorizationCost < 0)
-        {
-            throw new InvalidOperationException("Prepared-effect counts, shares, and costs must be non-negative.");
-        }
-
-        if (CandidatePreparedBoundaryWork < 0 || CacheAvoidableWork < 0 || PreparedStateAvoidableWork < 0 ||
-            CacheAvoidableWork > CandidatePreparedBoundaryWork ||
-            PreparedStateAvoidableWork > CandidatePreparedBoundaryWork - CacheAvoidableWork)
-        {
-            throw new InvalidOperationException("Cache-avoidable and prepared-state work must be disjoint candidate work.");
-        }
-
-        if (BreakEvenProcessCount != CalculateBreakEvenProcessCount())
-        {
-            throw new InvalidOperationException("The recorded break-even point does not match the expected-effect calculation.");
-        }
-
-        if (CacheModesMeasured.Count == 0 || CacheModesMeasured.Any(mode => !PreparationContractIdentity.IsCacheMode(mode)))
-        {
-            throw new InvalidOperationException("Prepared-effect evidence must declare known cache modes.");
-        }
-
-        Resources.Validate("prepared_effect.resources");
-        if (!string.Equals(ExpectedEffect.IssueReference, "#493", StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("Expected-effect evidence must identify issue #493.");
-        }
-
-        if (!ExactCacheHitSavingsExcluded)
-        {
-            throw new InvalidOperationException("Exact analysis-cache hits must be excluded from prepared-state savings.");
-        }
-    }
-
-    private static int ValidateProcessCount(int processCount) => processCount > 0
-        ? processCount
-        : throw new ArgumentOutOfRangeException(nameof(processCount));
 }
 
 internal sealed record PreparationDecision
@@ -365,19 +288,41 @@ internal sealed record CrossProcessPreparationEvidenceDocument
             process.Validate(Workflow);
         }
 
+        IReadOnlyList<CrossProcessProcessEvidence> candidateProcesses = Processes
+            .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate)
+            .ToList();
+
+        if (Workflow.OneProcessAlternativeMeasured)
+        {
+            foreach (string family in Workflow.MeasuredCommandFamilies)
+            {
+                bool covered = candidateProcesses.Any(process =>
+                    string.Equals(process.Identity.Projection.CommandFamily, family, StringComparison.Ordinal) &&
+                    process.Identity.ExecutionKind is PreparationExecutionKind.InProcessProjection or
+                        PreparationExecutionKind.ProcessBoundProjection);
+                if (!covered)
+                {
+                    throw new InvalidOperationException(
+                        $"One-process alternative is incomplete: command family '{family}' has no shared or explicit process-bound projection.");
+                }
+            }
+        }
+
         if (CandidateIndependentProcesses.Count != PreparedEffect.RepresentativeProcessCount)
         {
             throw new InvalidOperationException("Prepared-effect R must count candidate independent processes only.");
         }
 
-        string? candidateDigest = Processes
-            .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate)
-            .Select(process => process.CanonicalResult.Sha256)
-            .Distinct(StringComparer.Ordinal)
-            .SingleOrDefault();
-        if (candidateDigest is null)
+        foreach (IGrouping<string, CrossProcessProcessEvidence> group in candidateProcesses
+                     .GroupBy(process => process.Identity.Projection.ComparisonGroup, StringComparer.Ordinal)
+                     .Where(group => group.Any(process => process.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess) &&
+                                     group.Any(process => process.Identity.ExecutionKind == PreparationExecutionKind.InProcessProjection)))
         {
-            throw new InvalidOperationException("Candidate independent processes must have equivalent canonical results.");
+            if (group.Select(process => process.CanonicalResult.Sha256).Distinct(StringComparer.Ordinal).Count() != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Equivalent preparation modes in comparison group '{group.Key}' must have equivalent canonical results.");
+            }
         }
 
         if (BenchmarkEvidence.Samples.Count != Processes.Count ||
@@ -387,6 +332,7 @@ internal sealed record CrossProcessPreparationEvidenceDocument
             throw new InvalidOperationException("The composed benchmark envelope must retain every measured process sample.");
         }
     }
+
 }
 
 internal static class PreparationContractIdentity
