@@ -38,6 +38,10 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.ScaleEvidence.All(point =>
                     point.CommandCount == archetype.Workflow.MeasuredCommandFamilies.Count)), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype =>
+                archetype.PreparedEffect.ScaleEvidenceBasis.Contains("Measured analysis-profile/v1 counters", StringComparison.Ordinal)), Is.True);
+            Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
+                .All(point => point.MeasurementBasis.Contains("Measured analysis-profile/v1 counters", StringComparison.Ordinal)), Is.True);
             foreach (CrossProcessPreparationEvidenceDocument archetype in evidence.Archetypes)
             {
                 decimal measuredPreparationWork = archetype.PreparedEffect.MeasuredIndependentWorkflowWork *
