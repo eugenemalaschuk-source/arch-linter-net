@@ -115,6 +115,47 @@ and from the broad large-solution benchmark program reserved for issue #502: it
 adds no benchmark scenarios, timing loops, generated artifacts, or performance
 baselines.
 
+## Consumer-shaped attribution evidence (issue #461)
+
+[`ConsumerAttributionAnalysisProfileBenchmarkHarness`](../../tests/ArchLinterNet.Core.Tests/AnalysisProfile/ConsumerAttributionAnalysisProfileBenchmarkHarness.cs)
+is the manual attribution harness for issue #461. It reuses the synthetic
+`large-multi-host` fixture, builds it once, and then launches independent strict
+CLI processes against that unchanged build state. The matrix varies only the
+number of processes (`R = 1, 2, 4`) and whether the caller dispatches them
+sequentially or together. Each process retains its complete `analysis-profile/v1`
+document; each batch also records outer wall time, the summed inner command and
+phase times, process-envelope time, deterministic counter totals, and a
+canonical-result SHA-256 digest.
+
+The boundary is deliberate:
+
+- `analysis-profile/v1` phases and counters are the ArchLinterNet inner boundary;
+- the harness stopwatch minus the profile command total is the local process
+  envelope, including CLI process startup and redirected-pipe overhead;
+- container, scheduler, restore-service, and CI-runner time remain caller-side
+  measurements and must not be inferred from this artifact.
+
+The checked-in [machine-readable evidence](consumer-attribution-analysis-profile-results.json)
+is synthetic/anonymized and records outcome **B** for the current measurement:
+inner ArchLinterNet work is measurable and repeated per independent process, but
+this run does not prove a version regression. It feeds the process-count shape
+and per-process counters to #502, while cross-process prepared reuse remains
+owned by #492/#493. It does not create a competing benchmark framework or assert
+selector/layer, real-MSBuild cache-eligibility, or changed-project advisory
+findings.
+
+The current artifact's conclusion reports `build_state_preflight` separately:
+it is the dominant phase in the 1-process sample and remains roughly 82% of
+inner time across the matrix. The harness launches the Release CLI DLL and
+verifies that its SHA-256 equals the `tools/net10.0/any/ArchLinterNet.Cli.dll`
+entry inside the selected package before recording package provenance. It
+records the launched file version/DLL SHA-256, package id/version/file hash,
+and verified package-entry assembly hash. Canonical-result equivalence includes
+the current JSON contract's `cycle_diagnostics`, `coverage_summary`,
+`preflight_diagnostics`, and `source_set_expansion` sections. NUnit cooperative
+cancellation is passed into fixture build and each child-process wait; the
+linked timeout kills the entire process tree and uses bounded cleanup.
+
 ## Benchmark scenario IDs (see `docs/internal/analysis-profile-pre-optimization-baseline.md`)
 
 | Scenario ID | Measures |
@@ -126,6 +167,13 @@ baselines.
 | `5a-one-report-sink` / `5b-three-report-sinks` | `--report json=stdout` alone vs. `--report human/json/sarif=stdout` together (proves #364's "one analysis, N sinks" invariant end to end). |
 | `7b-validation-failure-completion-path` | Same fixture, a policy variant with a guaranteed contract violation. |
 | `7c-preparation-failure-completion-path` | Never-built fixture copy, `--no-restore`, no receipts — build-state preflight blocks. |
+
+The #461 attribution scenarios are documented in
+[`consumer-attribution-analysis-profile-evidence.md`](consumer-attribution-analysis-profile-evidence.md)
+and use IDs `1-process-sequential`, `2-process-sequential`,
+`4-process-sequential`, `2-process-bounded-parallel`, and
+`4-process-bounded-parallel`. They are manual attribution evidence, not normal
+acceptance thresholds.
 
 Scenario 6 ("sequential execution before #408") is not a separate timed variant — every scenario above already runs sequentially, since no parallel-scanning capability exists yet. Scenario 7's "success" path is already demonstrated by scenarios 1–5.
 

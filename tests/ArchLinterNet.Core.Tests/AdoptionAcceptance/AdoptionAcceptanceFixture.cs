@@ -44,8 +44,13 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
         return new AdoptionAcceptanceFixture(id, destination);
     }
 
-    public void Build(string? configuration = null, string? targetFramework = null)
+    public void Build(
+        string? configuration = null,
+        string? targetFramework = null,
+        CancellationToken cancellationToken = default,
+        int timeoutMilliseconds = 300_000)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         string buildTarget = Directory.GetFiles(Root, "*.slnx", SearchOption.TopDirectoryOnly).SingleOrDefault()
             ?? ProjectPaths[0];
         var startInfo = new ProcessStartInfo("dotnet")
@@ -73,14 +78,34 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
             startInfo.ArgumentList.Add(targetFramework);
         }
 
-        using var process = Process.Start(startInfo)!;
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        if (process.ExitCode != 0)
+        using Process process = Process.Start(startInfo)!;
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> errorTask = process.StandardError.ReadToEndAsync();
+        using CancellationTokenSource timeoutSource = new(TimeSpan.FromMilliseconds(timeoutMilliseconds));
+        using CancellationTokenSource linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, timeoutSource.Token);
+        try
         {
-            throw new InvalidOperationException(
-                $"Fixture '{Id}' failed to build.{Environment.NewLine}{output}{Environment.NewLine}{error}");
+            process.WaitForExitAsync(linkedSource.Token).GetAwaiter().GetResult();
+            string output = outputTask.WaitAsync(linkedSource.Token).GetAwaiter().GetResult();
+            string error = errorTask.WaitAsync(linkedSource.Token).GetAwaiter().GetResult();
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Fixture '{Id}' failed to build.{Environment.NewLine}{output}{Environment.NewLine}{error}");
+            }
+        }
+        catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            TryKillProcessTree(process);
+            AwaitProcessCleanup(process, outputTask, errorTask);
+            throw new TimeoutException($"Fixture '{Id}' build exceeded {timeoutMilliseconds}ms.");
+        }
+        catch
+        {
+            TryKillProcessTree(process);
+            AwaitProcessCleanup(process, outputTask, errorTask);
+            throw;
         }
     }
 
@@ -125,6 +150,31 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
             }
 
             CopyDirectory(directory, Path.Combine(destination, name));
+        }
+    }
+
+    private static void TryKillProcessTree(Process process)
+    {
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+            // The process exited between cancellation and Kill; cleanup is already complete.
+        }
+    }
+
+    private static void AwaitProcessCleanup(Process process, params Task<string>[] outputTasks)
+    {
+        try
+        {
+            process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+            Task.WhenAll(outputTasks).WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // The original cancellation, timeout, or process error remains authoritative.
         }
     }
 }
