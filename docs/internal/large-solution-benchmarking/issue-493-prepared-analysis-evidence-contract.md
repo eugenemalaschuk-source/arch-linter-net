@@ -103,8 +103,10 @@ The evidence must record, for the candidate only:
 - repeated-work share `p`;
 - deterministic candidate prepared-boundary counts;
 - cold prepare cost `C`;
-- per-consumer load/authorization cost `L`;
-- small, medium, and large expected effect derived from measured scale points;
+- representative per-consumer load/authorization cost `L`, plus a measured
+  load/authorization proxy for every small, medium, and large scale point;
+- small, medium, and large expected effect derived from measured scale points
+  using each point's own `L` rather than borrowing a medium-workload proxy;
 - the solution dimensions and command count represented by each scale point;
 - first crossover `R`, or an explicit no-crossover result;
 - whole-workflow upper bound;
@@ -125,7 +127,10 @@ process count alone. The current #493 gate also requires a numeric materiality
 threshold: persisted reuse must be at least 10% cheaper than the measured
 representative one-process alternative, with the ratio derived from the two
 measured costs rather than copied from prose. The three scale points must come
-from the same disabled-cache command-family matrix, or the decision remains
+from the same disabled-cache command-family matrix. Each point must also
+measure its own strict/audit projection counters as the pre-implementation
+load/authorization proxy; mixing scale-specific preparation with a fixed
+medium-shaped `L` is not decision-capable. Otherwise the decision remains
 non-authorizing until an authoritative scaling artifact is linked.
 
 ## Decision and routing

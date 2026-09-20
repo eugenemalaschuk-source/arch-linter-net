@@ -1,3 +1,6 @@
+using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -89,14 +92,64 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 measurements.Add(measurement!);
             }
 
+            decimal perConsumerLoadAuthorizationCost = MeasureScaleLoadAuthorizationCost(
+                fixture,
+                workload,
+                cancellationToken);
+
             points.Add(new MeasuredScalePoint(
                 label,
                 workload,
                 measurements.Count,
                 measurements.Sum(measurement => measurement.PreparationWork),
-                measurements.Sum(measurement => measurement.ProjectionWork)));
+                measurements.Sum(measurement => measurement.ProjectionWork),
+                perConsumerLoadAuthorizationCost));
         }
 
         return points;
+    }
+
+    private static decimal MeasureScaleLoadAuthorizationCost(
+        BenchmarkMaterializedFixture fixture,
+        BenchmarkWorkloadDefinition workload,
+        CancellationToken cancellationToken)
+    {
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
+        using ArchitectureAnalysisSnapshot snapshot = engine.CreateSnapshot(new AnalysisSnapshotRequest
+        {
+            PolicyPath = fixture.PolicyPath,
+            PreparationMode = workload.CompilationMode == BenchmarkCompilationMode.RealMsBuild
+                ? BuildPreparationMode.EnsureBuilt
+                : BuildPreparationMode.Ordinary,
+            NoRestore = false,
+            MaxParallelism = 1,
+            CancellationToken = cancellationToken,
+        });
+
+        ValidationOutcome strict = snapshot.Evaluate("strict");
+        Assert.That(strict.Passed, Is.True,
+            "The scale-specific strict projection must pass before measuring load/authorization work.");
+        CounterWorkMeasurement strictMeasurement = ReadRequiredCounterWork(snapshot.Counters, "scale/strict");
+
+        ValidationOutcome audit = snapshot.Evaluate("audit");
+        Assert.That(audit.Passed, Is.True,
+            "The scale-specific audit projection must pass before measuring load/authorization work.");
+        CounterWorkMeasurement auditMeasurement = ReadRequiredCounterWork(snapshot.Counters, "scale/audit");
+
+        decimal loadAuthorizationCost =
+            (strictMeasurement.ProjectionWork + auditMeasurement.ProjectionWork) / 2m;
+        Assert.That(loadAuthorizationCost, Is.GreaterThan(0),
+            "Scale-specific load/authorization cost must come from positive measured projection counters.");
+        return loadAuthorizationCost;
+    }
+
+    private static CounterWorkMeasurement ReadRequiredCounterWork(
+        ArchitectureAnalysisSnapshotCounters counters,
+        string projection)
+    {
+        CounterWorkMeasurement? measurement = TryReadCounterWork(CreateSyntheticProfile(counters, projection));
+        Assert.That(measurement, Is.Not.Null,
+            $"Scale-specific projection '{projection}' must expose real profile counters.");
+        return measurement!;
     }
 }

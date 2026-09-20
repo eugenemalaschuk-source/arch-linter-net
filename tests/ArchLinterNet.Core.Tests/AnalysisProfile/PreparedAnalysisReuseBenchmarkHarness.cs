@@ -502,7 +502,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ColdPathTradeOff = "The cold preparation remains a separate cost and is never counted as a cache hit.",
             SuccessThreshold = "Only authorize implementation when persisted reuse is at least 10% cheaper than the measured representative one-process alternative, the measured small/medium/large matrix is decision-capable, and resource bounds are available.",
             KillCriterion = "Defer or route elsewhere when canonical equivalence, cache separation, or a representative crossover is not reproduced.",
-            Confidence = "Expected effect and small/medium/large scaling are derived from measured analysis-profile counters; persisted load/authorization remains an explicit proxy bounded by observed one-process projection work.",
+            Confidence = "Expected effect and small/medium/large scaling are derived from measured analysis-profile counters; each scale point has a separately measured strict/audit load/authorization proxy, while the persisted store remains an explicit pre-implementation proxy.",
         };
     }
 

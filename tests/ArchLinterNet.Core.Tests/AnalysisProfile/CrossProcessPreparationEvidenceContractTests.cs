@@ -361,7 +361,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         ScaleEvidence =
         [
             SyntheticScalePoint("small", 50m, 1.0m),
-            SyntheticScalePoint("medium", 50m, 1.2m),
+            SyntheticScalePoint("medium", 50m, 1.25m),
             SyntheticScalePoint("large", 50m, 1.5m),
         ],
         ExpectedEffect = new BenchmarkExpectedEffectEvidence
@@ -372,7 +372,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             CurrentWorkModel = "R x one-shot preparation",
             TargetWorkModel = "prepare + R x load/authorization",
             ExpectedLocalSpeedupSmall = 1.0m,
-            ExpectedLocalSpeedupMedium = 1.2m,
+            ExpectedLocalSpeedupMedium = 1.25m,
             ExpectedLocalSpeedupLarge = 1.5m,
             ExpectedEndToEndUpperBound = 1.3m,
             MemoryAllocationTradeOff = "Synthetic resource availability is explicit; no private machine value is claimed.",
@@ -389,6 +389,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         decimal coldPrepareCost,
         decimal expectedLocalSpeedup)
     {
+        decimal independentPreparationWork = coldPrepareCost * 2m;
+        decimal perConsumerLoadAuthorizationCost = independentPreparationWork / expectedLocalSpeedup - coldPrepareCost;
         return new PreparedEffectScalePoint
         {
             Label = label,
@@ -398,9 +400,10 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             TypeCount = 1,
             SourceFileCount = 1,
             ReferenceEdgeCount = 0,
-            CommandCount = 1,
-            IndependentPreparationWork = coldPrepareCost,
+            CommandCount = 2,
+            IndependentPreparationWork = independentPreparationWork,
             IndependentProjectionWork = 0,
+            PerConsumerLoadAuthorizationCost = perConsumerLoadAuthorizationCost,
             ColdPrepareCost = coldPrepareCost,
             ExpectedLocalSpeedup = expectedLocalSpeedup,
             MeasurementBasis = "Synthetic measured analysis-profile counters.",

@@ -24,19 +24,21 @@ internal sealed record PreparedEffectScalePoint
 
     public required decimal IndependentProjectionWork { get; init; }
 
+    public required decimal PerConsumerLoadAuthorizationCost { get; init; }
+
     public required decimal ColdPrepareCost { get; init; }
 
     public required decimal ExpectedLocalSpeedup { get; init; }
 
     public required string MeasurementBasis { get; init; }
 
-    public void Validate(string fieldName)
+    public void Validate(string fieldName, int representativeProcessCount)
     {
         if (string.IsNullOrWhiteSpace(Label) || string.IsNullOrWhiteSpace(WorkloadId) ||
             string.IsNullOrWhiteSpace(WorkloadIdentity) || string.IsNullOrWhiteSpace(MeasurementBasis) ||
-            ProjectCount < 1 || TypeCount < 1 || SourceFileCount < 1 || ReferenceEdgeCount < 0 ||
+            representativeProcessCount < 1 || ProjectCount < 1 || TypeCount < 1 || SourceFileCount < 1 || ReferenceEdgeCount < 0 ||
             CommandCount < 1 || IndependentPreparationWork < 0 || IndependentProjectionWork < 0 ||
-            ColdPrepareCost < 0 || ExpectedLocalSpeedup <= 0)
+            PerConsumerLoadAuthorizationCost <= 0 || ColdPrepareCost < 0 || ExpectedLocalSpeedup <= 0)
         {
             throw new InvalidOperationException($"Scale evidence '{fieldName}' contains invalid dimensions or measurements.");
         }
@@ -53,6 +55,19 @@ internal sealed record PreparedEffectScalePoint
         {
             throw new InvalidOperationException(
                 $"Scale evidence '{fieldName}' must derive cold preparation from measured preparation counters and command count.");
+        }
+
+        decimal independentWork = IndependentPreparationWork + IndependentProjectionWork;
+        decimal persistedWork = ColdPrepareCost +
+            representativeProcessCount * PerConsumerLoadAuthorizationCost +
+            IndependentProjectionWork;
+        decimal expectedLocalSpeedup = persistedWork > 0
+            ? independentWork / persistedWork
+            : 0;
+        if (ExpectedLocalSpeedup != expectedLocalSpeedup)
+        {
+            throw new InvalidOperationException(
+                $"Scale evidence '{fieldName}' must derive expected local speedup from its own measured load/authorization cost.");
         }
     }
 }
@@ -247,7 +262,7 @@ internal sealed record PreparedEffectContract
 
         foreach (PreparedEffectScalePoint point in ScaleEvidence)
         {
-            point.Validate($"prepared_effect.scale_evidence[{point.Label}]");
+            point.Validate($"prepared_effect.scale_evidence[{point.Label}]", RepresentativeProcessCount);
         }
 
         IReadOnlyDictionary<string, decimal> speedups = ScaleEvidence.ToDictionary(

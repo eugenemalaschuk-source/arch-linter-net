@@ -12,7 +12,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         BenchmarkWorkloadDefinition Workload,
         int CommandCount,
         decimal IndependentPreparationWork,
-        decimal IndependentProjectionWork);
+        decimal IndependentProjectionWork,
+        decimal PerConsumerLoadAuthorizationCost);
 
     private static PreparedEffectContract CreateEffect(
         BenchmarkWorkloadDefinition workload,
@@ -58,9 +59,11 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             : independentPreparationWork / independentTotalWork;
         decimal averageIndependentPreparationWork = independentPreparationWork / representativeProcessCount;
         decimal coldPrepareCost = averageIndependentPreparationWork;
-        decimal loadAuthorizationCost = Math.Max(
-            1,
-            sharedMeasurements.Sum(measurement => measurement.ProjectionWork) / sharedMeasurements.Count);
+        decimal loadAuthorizationCost =
+            sharedMeasurements.Sum(measurement => measurement.ProjectionWork) /
+            (decimal)sharedMeasurements.Count;
+        Assert.That(loadAuthorizationCost, Is.GreaterThan(0),
+            "Load/authorization cost must come from positive measured shared-projection counters.");
         decimal loadCostLowerBound = Math.Max(0, sharedMeasurements.Min(measurement => measurement.ProjectionWork));
         decimal loadCostUpperBound = Math.Max(loadCostLowerBound, sharedMeasurements.Max(measurement => measurement.ProjectionWork));
         long candidateWork = Math.Max(0, (long)Math.Ceiling(averageIndependentPreparationWork));
@@ -105,8 +108,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             : 0;
         IReadOnlyList<PreparedEffectScalePoint> scaleEvidence = CreateScaleEvidence(
             measuredScalePoints,
-            representativeProcessCount,
-            loadAuthorizationCost);
+            representativeProcessCount);
         string workMeasurementBasis = oneProcessWorkEvidenceComplete
             ? $"Summed preparation/projection counters for one disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}), with cold preparation derived only from independent preparation counters. The persisted comparison adds the same measured unavoidable projection/command work to its total. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
             : $"One-process comparison is incomplete; real profile counters/work evidence are missing for: {string.Join(", ", missingOneProcessWorkEvidenceFamilies)}. Missing work is not treated as zero.";
@@ -139,7 +141,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             CacheModesMeasured = ["disabled", "miss", "hit"],
             Resources = CreatePreparationResourceEvidence(workload, representativeIndependentProcesses, representativeProcessCount),
             ScaleEvidenceBasis =
-                $"Measured analysis-profile/v1 counters for small, medium, and large {workload.CompilationMode} workloads; each point runs one cache-disabled process for every representative command family ({string.Join(", ", _measuredCommandFamilies)}).",
+                $"Measured analysis-profile/v1 counters for small, medium, and large {workload.CompilationMode} workloads; each point runs one cache-disabled process for every representative command family ({string.Join(", ", _measuredCommandFamilies)}) and separately measures its strict/audit projection counters as the scale-specific load/authorization proxy.",
             ScaleEvidence = scaleEvidence,
             ExpectedEffect = CreateExpectedEffect(
                 repeatedWorkShare,
@@ -164,8 +166,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
 
     private static IReadOnlyList<PreparedEffectScalePoint> CreateScaleEvidence(
         IReadOnlyList<MeasuredScalePoint> measuredScalePoints,
-        int representativeProcessCount,
-        decimal loadAuthorizationCost)
+        int representativeProcessCount)
     {
         return measuredScalePoints
             .Select(point =>
@@ -173,7 +174,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 decimal coldPrepareCost = point.IndependentPreparationWork / point.CommandCount;
                 decimal independentWork = point.IndependentPreparationWork + point.IndependentProjectionWork;
                 decimal persistedWork = coldPrepareCost +
-                    representativeProcessCount * loadAuthorizationCost +
+                    representativeProcessCount * point.PerConsumerLoadAuthorizationCost +
                     point.IndependentProjectionWork;
                 decimal expectedLocalSpeedup = persistedWork > 0
                     ? independentWork / persistedWork
@@ -190,9 +191,10 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                     CommandCount = point.CommandCount,
                     IndependentPreparationWork = point.IndependentPreparationWork,
                     IndependentProjectionWork = point.IndependentProjectionWork,
+                    PerConsumerLoadAuthorizationCost = point.PerConsumerLoadAuthorizationCost,
                     ColdPrepareCost = coldPrepareCost,
                     ExpectedLocalSpeedup = expectedLocalSpeedup,
-                    MeasurementBasis = "Measured analysis-profile/v1 counters from one cache-disabled CLI process per command family.",
+                    MeasurementBasis = "Measured analysis-profile/v1 counters from one cache-disabled CLI process per command family plus scale-specific strict/audit projection counters for the load/authorization proxy.",
                 };
             })
             .ToList();
