@@ -1,4 +1,7 @@
+using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Testing;
@@ -91,6 +94,83 @@ public sealed class ArchitectureHealthTestingAdapterTests
             Is.EqualTo("A baseline path is required. Call WithBaseline(path) before requesting a baseline comparison."));
     }
 
+    [Test]
+    public void SharedSnapshot_HealthAndChangeProjection_AreEquivalentToIndependentProjection()
+    {
+        string policyPath = WritePolicy();
+        string baselinePath = WriteBaseline();
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder()
+            .AddArchLinterNetCore()
+            .Build();
+        using ArchitectureAnalysisSnapshot snapshot = engine.CreateSnapshot(new AnalysisSnapshotRequest
+        {
+            PolicyPath = policyPath,
+            BaselinePath = baselinePath,
+            PreparationMode = BuildPreparationMode.Ordinary,
+        });
+
+        ArchitectureHealthRequest healthRequest = new()
+        {
+            DebtGate = new ArchitectureDebtGateRequest
+            {
+                PolicyPath = policyPath,
+                BaselinePath = baselinePath,
+                Mode = "all",
+            },
+        };
+        ArchitectureHealthOutcome health = engine.EvaluateHealth(healthRequest, snapshot);
+        ValidationOutcome validation = health.ValidationOutcomes
+            .Single(outcome => outcome.Mode == "strict")
+            .Outcome;
+        BaselineVerifyOutcome reusedBaseline = engine.VerifyBaseline(new BaselineVerifyRequest
+        {
+            PolicyPath = policyPath,
+            BaselinePath = baselinePath,
+            Mode = "strict",
+        }, snapshot);
+        ArchitectureChangeSnapshot shared = engine.CreateChangeSnapshot(
+            snapshot,
+            "strict",
+            validation,
+            reusedBaseline,
+            conditionSetName: null);
+
+        ArchitectureGraphOutcome legacyNamespaces = engine.BuildGraph(new ArchitectureGraphRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict",
+            Level = ArchitectureGraphLevel.Namespace,
+        });
+        ArchitectureGraphOutcome legacyAssemblies = engine.BuildGraph(new ArchitectureGraphRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict",
+            Level = ArchitectureGraphLevel.Assembly,
+        });
+        BaselineDiffOutcome legacyBaseline = engine.DiffBaseline(new BaselineDiffRequest
+        {
+            PolicyPath = policyPath,
+            BaselinePath = baselinePath,
+            Mode = "strict",
+        });
+        ArchitectureChangeSnapshot independent = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            validation,
+            legacyNamespaces,
+            legacyAssemblies,
+            legacyBaseline.Frozen);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(health.ValidationOutcomes.Select(outcome => outcome.Mode), Is.EqualTo(_expectedValidationModes));
+            Assert.That(health.DebtGate.Evaluation.ReusedAnalysisSnapshot, Is.True);
+            Assert.That(ArchitectureChangeReports.SerializeSnapshot(shared),
+                Is.EqualTo(ArchitectureChangeReports.SerializeSnapshot(independent)));
+            Assert.That(snapshot.Counters.SnapshotMaterializations, Is.EqualTo(1));
+            Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(1));
+        });
+    }
+
     private string WritePolicy()
     {
         string architectureDir = Path.Combine(_tempDir, "architecture");
@@ -103,18 +183,9 @@ public sealed class ArchitectureHealthTestingAdapterTests
             layers:
               execution:
                 namespace: ArchLinterNet.Core.Execution
-              nonexistent:
-                namespace: Sample.Does.Not.Exist
 
             analysis:
               target_assemblies: [ArchLinterNet.Core]
-
-            contracts:
-              strict:
-                - id: no-execution-to-nonexistent
-                  name: execution-must-not-depend-on-nonexistent
-                  source: execution
-                  forbidden: [nonexistent]
             """);
         return policyPath;
     }

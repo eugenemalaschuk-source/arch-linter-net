@@ -56,12 +56,17 @@ internal sealed class HealthCommandDefinition(HealthCommandHandler handler)
         Option<string> evidenceRepository = new("--evidence-repository");
         Option<string> evidenceRevision = new("--evidence-revision");
         Option<string> evidenceScope = new("--evidence-scope");
+        Option<string> changeSnapshot = new("--change-snapshot")
+        {
+            Description = "Write the canonical current change snapshot from this Health analysis session.",
+        };
         options.AddTo(command);
         command.Options.Add(executionContext);
         command.Options.Add(externalEvidence);
         command.Options.Add(evidenceRepository);
         command.Options.Add(evidenceRevision);
         command.Options.Add(evidenceScope);
+        command.Options.Add(changeSnapshot);
         command.SetAction(result =>
         {
             IReadOnlyList<SarifEvidenceArtifactReference> artifacts =
@@ -86,7 +91,8 @@ internal sealed class HealthCommandDefinition(HealthCommandHandler handler)
                 result.GetValue(executionContext),
                 artifacts,
                 assessmentContext,
-                parseError);
+                parseError,
+                result.GetValue(changeSnapshot));
         });
         return command;
     }

@@ -84,7 +84,9 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IArchitectureValidationApplicationService>()));
         services.AddSingleton<IArchitectureDebtGateApplicationService>(sp =>
             sp.GetRequiredService<ArchitectureDebtGateApplicationService>());
-        services.AddSingleton<IArchitectureHealthApplicationService, ArchitectureHealthApplicationService>();
+        services.AddSingleton<ArchitectureHealthApplicationService>();
+        services.AddSingleton<IArchitectureHealthApplicationService>(sp =>
+            sp.GetRequiredService<ArchitectureHealthApplicationService>());
         services.AddSingleton<IPublicApiSnapshotStore, PublicApiSnapshotStore>();
         services.AddSingleton<ArchitecturePublicApiSurfaceResolver>();
         services.AddSingleton<IArchitecturePublicApiApplicationService>(sp =>

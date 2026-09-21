@@ -4,6 +4,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Results;
+using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 
@@ -251,26 +252,28 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             }
         }
     }
-
-    // Project ordinary evaluator observations here, at the permitted Validation-to-Execution
-    // boundary, so Topology consumes only neutral DTOs and never Execution-owned types.
     internal ArchitectureTopologyObservation CaptureTopologyObservation(string subjectKind)
+        => Project(
+            session => ArchitectureAnalysisSnapshotReviewProjector.Capture(session, subjectKind),
+            "Topology capture cannot materialize a session after build-state preflight was blocked.");
+    internal ArchitectureGraphOutcome BuildGraph(string mode, ArchitectureGraphLevel level)
+        => Project(
+            session => ArchitectureAnalysisSnapshotGraphProjector.Project(
+                session, _contractExecutor, _handlerRegistry, mode, level),
+            "Graph projection cannot materialize a session after build-state preflight was blocked.");
+    private T Project<T>(Func<ArchitectureAnalysisSession, T> projector, string blockedMessage)
     {
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_preflight.Blocked)
             {
-                throw new InvalidOperationException(
-                    "Topology capture cannot materialize a session after build-state preflight was blocked.");
+                throw new InvalidOperationException(blockedMessage);
             }
-
             _cancellationToken.ThrowIfCancellationRequested();
-            ArchitectureTopologyObservation captured = ArchitectureAnalysisSnapshotReviewProjector.Capture(
-                EnsureSetup().Runner.Session,
-                subjectKind);
+            T result = projector(EnsureSetup().Runner.Session);
             _cancellationToken.ThrowIfCancellationRequested();
-            return captured;
+            return result;
         }
     }
 
