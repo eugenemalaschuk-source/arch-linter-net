@@ -16,7 +16,7 @@ namespace ArchLinterNet.Core.Validation;
 // requested modes (strict/audit — coverage rides inside each mode via the strict_coverage/
 // audit_coverage families) can be evaluated from the same fact set. See
 // docs/internal/analysis-build-state-blueprint.md, "Snapshot ownership".
-public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
+public sealed class ArchitectureAnalysisSnapshot : IDisposable
 {
     private readonly ArchitectureContractDocument _document;
     private readonly string _repositoryRoot;
@@ -252,26 +252,28 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             }
         }
     }
-
-    // Project ordinary evaluator observations here, at the permitted Validation-to-Execution
-    // boundary, so Topology consumes only neutral DTOs and never Execution-owned types.
     internal ArchitectureTopologyObservation CaptureTopologyObservation(string subjectKind)
+        => Project(
+            session => ArchitectureAnalysisSnapshotReviewProjector.Capture(session, subjectKind),
+            "Topology capture cannot materialize a session after build-state preflight was blocked.");
+    internal ArchitectureGraphOutcome BuildGraph(string mode, ArchitectureGraphLevel level)
+        => Project(
+            session => ArchitectureAnalysisSnapshotGraphProjector.Project(
+                session, _contractExecutor, _handlerRegistry, mode, level),
+            "Graph projection cannot materialize a session after build-state preflight was blocked.");
+    private T Project<T>(Func<ArchitectureAnalysisSession, T> projector, string blockedMessage)
     {
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_preflight.Blocked)
             {
-                throw new InvalidOperationException(
-                    "Topology capture cannot materialize a session after build-state preflight was blocked.");
+                throw new InvalidOperationException(blockedMessage);
             }
-
             _cancellationToken.ThrowIfCancellationRequested();
-            ArchitectureTopologyObservation captured = ArchitectureAnalysisSnapshotReviewProjector.Capture(
-                EnsureSetup().Runner.Session,
-                subjectKind);
+            T result = projector(EnsureSetup().Runner.Session);
             _cancellationToken.ThrowIfCancellationRequested();
-            return captured;
+            return result;
         }
     }
 
