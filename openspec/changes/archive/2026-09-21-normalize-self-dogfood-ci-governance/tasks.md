@@ -2,7 +2,7 @@
 
 - [x] 1.1 Add the explicit already-prepared-build mode to the canonical architecture Make target and verify default/local semantics remain unchanged with the target tests.
 - [x] 1.2 Add candidate identity creation/verification for source SHA, tree SHA, policy digest, and CLI/Testing assembly hashes, with focused Python tests for valid, missing, and mismatched identities.
-- [x] 1.3 Replace the producer's duplicate CLI/Testing build with one solution build, manifest creation, and fail-closed candidate verification; verify the workflow contract test.
+- [x] 1.3 Replace the producer's implicit CLI launch build with an explicit CLI-host bootstrap followed by `dotnet run --no-build`, retain one authoritative solution graph preparation, add manifest creation, and verify the workflow contract.
 
 ## 2. Fan-out and evidence production
 

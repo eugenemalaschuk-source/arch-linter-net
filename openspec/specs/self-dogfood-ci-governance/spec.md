@@ -15,6 +15,11 @@ identity cannot be verified. Every strict, public-API, coverage, Health, change,
 report-producing projection SHALL verify and consume that same candidate identity through a
 non-building path.
 
+The producer MAY perform an explicit CLI-host bootstrap build solely to obtain the executable that
+starts the authoritative preparation. That bootstrap SHALL be separate from the candidate graph
+build in process accounting, and the producer SHALL invoke the CLI with `dotnet run --no-build` so
+the launch step cannot perform an implicit host rebuild.
+
 #### Scenario: A complete candidate is shared by all projections
 
 - **WHEN** the architecture producer reaches its projection phase
@@ -23,6 +28,7 @@ non-building path.
 - **AND** receipt publication occurs inside the one successful authoritative `EnsureBuilt`
   preparation, immediately after its graph build and before any fan-out process can consume the
   resulting `Current` receipts
+- **AND** the producer's CLI launch uses `--no-build` after any explicit host bootstrap
 - **AND** no projection performs an implicit rebuild or restore
 
 #### Scenario: Missing or stale candidate state fails closed

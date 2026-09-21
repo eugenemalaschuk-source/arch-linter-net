@@ -382,7 +382,11 @@ jobs:
           candidate_tree_sha="$(git rev-parse 'HEAD^{tree}')"
           test "$candidate_sha" = "$EXPECTED_HEAD_SHA"
           candidate_start_ms="$(date +%s%3N)"
-          dotnet run --no-restore --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- \
+          # Bootstrap the CLI host explicitly so the producer invocation itself cannot
+          # trigger an implicit host build. The authoritative graph build happens inside
+          # the receipt-backed --ensure-built preparation below.
+          dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --nologo --no-restore -m:1
+          dotnet run --no-build --no-restore --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- \
             --policy architecture/dependencies.arch.yml \
             --no-restore \
             --ensure-built \
@@ -711,13 +715,14 @@ jobs:
               "command_accounting": {
                   "candidate_preparation": {
                       "restore_processes": 1,
-                      "build_processes": 1,
+                      "cli_host_bootstrap_build_processes": 1,
+                      "authoritative_graph_build_processes": 1,
                       "receipt_publication_processes": 1,
                       "candidate_verification_processes": 1,
                   },
                   "base_preparation": {
                       "restore_processes": 1,
-                      "build_processes": 1,
+                      "authoritative_graph_build_processes": 1,
                       "receipt_publication_processes": 1,
                   },
                   "strict": {"projection_processes": 1, "cli_processes": 1},

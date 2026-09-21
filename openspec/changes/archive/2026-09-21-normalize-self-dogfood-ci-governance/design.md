@@ -2,7 +2,7 @@
 
 The existing `architecture_pr_report_producer` already owns the isolated checkout, restore, strict
 coverage artifacts, Health/change/report inputs, and inert publication manifests. Its current
-sequence builds CLI/Testing separately, invokes the canonical strict gate, repeats read-only
+sequence bootstraps the CLI host, invokes the canonical strict gate, repeats read-only
 projections, and invokes `change snapshot` independently of Health. The preceding
 `governance-snapshot-change-projection` change provides `health --change-snapshot` and is now the
 authoritative one-process seam for current evidence.
@@ -27,11 +27,15 @@ authoritative one-process seam for current evidence.
 
 ### Use the canonical strict target as the authority after one explicit build
 
-The producer restores once, builds the solution once, and then invokes the existing
-`make lint-architecture` authority with an explicit already-prepared-build switch. The default
-local target continues to build and verify the project graph, so the repository's canonical gate
-does not change; CI only avoids repeating the already completed build. A candidate manifest records
-the checked-out source/tree identity, policy digest, and hashes of the CLI/Testing assemblies.
+The producer restores once, explicitly builds the CLI host only as the launcher for the preparation
+command, and invokes it with `dotnet run --no-build`. That command then performs the one
+authoritative graph preparation and receipt publication through the existing
+`--ensure-built --publish-prepared-receipts` path. The CLI-host bootstrap and authoritative graph
+build are separate process-accounting entries; no implicit build is hidden inside the launch step.
+The default local target continues to build and verify the project graph, so the repository's
+canonical gate does not change; CI only avoids repeating the prepared graph build in projections.
+A candidate manifest records the checked-out source/tree identity, policy digest, and hashes of the
+CLI/Testing assemblies.
 
 Alternatives rejected: relying on timestamps or only the checkout SHA would not prove the tool
 artifact consumed by every projection; changing the canonical target to never build would weaken

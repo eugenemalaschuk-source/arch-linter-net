@@ -23,12 +23,14 @@ The governance-span median is **127.708 s**, with a range of **92.708–127.923 
 
 ## Process accounting and attribution
 
-The candidate preparation performed exactly one restore process, one authoritative graph-build
-process, and one candidate-verification process. The successful `EnsureBuilt` path wrote and
-verified receipts inside that same Core preparation call; there is no separate publisher and no
-detached proof sidecar that can promote an existing artifact. Base preparation performed one
-restore and one authoritative graph-build/receipt path. The independent projections then used
-these process counts:
+The candidate preparation performed exactly one restore process and one explicit CLI-host
+bootstrap build. The producer then invokes the CLI with `dotnet run --no-build`, so that bootstrap
+cannot turn into an implicit second host build. The receipt-backed preparation performs exactly
+one authoritative graph-build process and one candidate-verification process. The successful
+`EnsureBuilt` path wrote and verified receipts inside that same Core preparation call; there is no
+separate publisher and no detached proof sidecar that can promote an existing artifact. Base
+preparation performed one restore and one authoritative graph-build/receipt path, reusing the
+already-built candidate CLI host. The independent projections then used these process counts:
 
 | Projection | Projection processes | CLI processes |
 | --- | ---: | ---: |
