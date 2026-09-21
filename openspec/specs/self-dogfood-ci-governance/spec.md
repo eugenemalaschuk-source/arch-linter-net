@@ -8,18 +8,20 @@ safe parallel projection evidence without weakening any authoritative validation
 
 ### Requirement: The self-governance producer binds all projections to one candidate
 
-The pull-request architecture producer SHALL restore and build one candidate checkout once, publish
-receipt-backed evidence for the resulting outputs without another build or restore, record an
-immutable source/tree/tool identity, and fail closed when the expected candidate output or identity
-cannot be verified. Every strict, public-API, coverage, Health, change, and report-producing
-projection SHALL verify and consume that same candidate identity through a non-building path.
+The pull-request architecture producer SHALL restore and authoritatively build one candidate
+checkout once, publish receipt-backed evidence from that successful build/preparation path, record
+an immutable source/tree/tool identity, and fail closed when the expected candidate output or
+identity cannot be verified. Every strict, public-API, coverage, Health, change, and
+report-producing projection SHALL verify and consume that same candidate identity through a
+non-building path.
 
 #### Scenario: A complete candidate is shared by all projections
 
 - **WHEN** the architecture producer reaches its projection phase
 - **THEN** the projections use the same checked-out PR head, verified build outputs, policy digest,
   and CLI tool identity
-- **AND** the producer's receipt-publication step performs no build or restore
+- **AND** the one successful authoritative build emits a fresh, output-bound proof, which the
+  producer's receipt-publication step verifies before publishing and which performs no second build
 - **AND** no projection performs an implicit rebuild or restore
 
 #### Scenario: Missing or stale candidate state fails closed

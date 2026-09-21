@@ -382,10 +382,14 @@ jobs:
           candidate_tree_sha="$(git rev-parse 'HEAD^{tree}')"
           test "$candidate_sha" = "$EXPECTED_HEAD_SHA"
           candidate_start_ms="$(date +%s%3N)"
-          dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1
+          build_proof_nonce="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+          dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1 \
+            -p:ArchLinterNetBuildProofNonce="$build_proof_nonce"
           dotnet run --no-build --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- \
             --policy architecture/dependencies.arch.yml \
-            --publish-prepared-receipts
+            --no-restore \
+            --publish-prepared-receipts \
+            --build-proof-nonce "$build_proof_nonce"
           candidate_end_ms="$(date +%s%3N)"
           echo "candidate_start_ms=$candidate_start_ms" >> "$GITHUB_OUTPUT"
           echo "candidate_end_ms=$candidate_end_ms" >> "$GITHUB_OUTPUT"
@@ -451,11 +455,18 @@ jobs:
           set -euo pipefail
           base_start_ms="$(date +%s%3N)"
           dotnet restore "$BASE_WORKTREE/ArchLinterNet.slnx" --nologo -m:1 --disable-parallel
-          dotnet build "$BASE_WORKTREE/ArchLinterNet.slnx" --nologo --no-restore -m:1
+          # The detached base predates the proof target. Copy only this inert build-provenance
+          # target into the temporary worktree so the baseline gets the same proof contract.
+          cp "$GITHUB_WORKSPACE/Directory.Build.targets" "$BASE_WORKTREE/Directory.Build.targets"
+          build_proof_nonce="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+          dotnet build "$BASE_WORKTREE/ArchLinterNet.slnx" --nologo --no-restore -m:1 \
+            -p:ArchLinterNetBuildProofNonce="$build_proof_nonce"
           pushd "$BASE_WORKTREE"
           dotnet run --no-build --project "$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" -- \
             --policy architecture/dependencies.arch.yml \
-            --publish-prepared-receipts
+            --no-restore \
+            --publish-prepared-receipts \
+            --build-proof-nonce "$build_proof_nonce"
           popd
           base_end_ms="$(date +%s%3N)"
           echo "start_ms=$base_start_ms" >> "$GITHUB_OUTPUT"

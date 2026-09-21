@@ -1,0 +1,20 @@
+<Project>
+  <!--
+    The producer passes a fresh nonce only to the authoritative solution build.  This marker is
+    deliberately output-bound and is emitted by MSBuild after each project has built successfully;
+    receipt publication must verify it before it can promote an existing artifact to Current.
+  -->
+  <Target Name="ArchLinterNetWriteBuildProof"
+          AfterTargets="Build"
+          Condition="'$(ArchLinterNetBuildProofNonce)' != '' and '$(TargetPath)' != ''">
+    <ItemGroup>
+      <ArchLinterNetBuildProofLines Include="schema=architecture-build-proof/v1" />
+      <ArchLinterNetBuildProofLines Include="nonce=$(ArchLinterNetBuildProofNonce)" />
+      <ArchLinterNetBuildProofLines Include="project=$(MSBuildProjectFullPath)" />
+      <ArchLinterNetBuildProofLines Include="target=$(TargetPath)" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(TargetDir).arch-linter-net-build-proof"
+                      Lines="@(ArchLinterNetBuildProofLines)"
+                      Overwrite="true" />
+  </Target>
+</Project>

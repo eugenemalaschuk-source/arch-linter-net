@@ -10,4 +10,6 @@ internal sealed record BuildStatePreparedCandidateRequest(
     string? RequestedTargetFramework = null,
     string? RequestedPlatform = null,
     string? RequestedRuntimeIdentifier = null,
+    bool NoRestore = false,
+    string? BuildProofNonce = null,
     CancellationToken CancellationToken = default);

@@ -10,7 +10,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn
 
 SCHEMA = "architecture-candidate/v1"
 DEFAULT_POLICY_PATH = "architecture/dependencies.arch.yml"
@@ -129,9 +129,24 @@ def _manifest_relative_path(repository_root: Path, value: Any, description: str)
     return _relative_input(repository_root, Path(value), description)
 
 
-def _read_manifest(path: Path) -> dict[str, Any]:
-    if not path.is_file() or path.is_symlink():
-        raise CandidateIdentityError(f"Missing candidate manifest: {path}")
+def _confined_manifest_path(repository_root: Path, value: Path, description: str) -> Path:
+    supplied = value
+    candidate = (supplied if supplied.is_absolute() else repository_root / supplied).resolve()
+    if candidate == repository_root or repository_root not in candidate.parents:
+        raise CandidateIdentityError(f"{description} must be inside the repository root.")
+    if supplied.is_symlink() or candidate.is_symlink():
+        raise CandidateIdentityError(f"{description} must not be a symbolic link.")
+    return candidate
+
+
+def _reject_json_constant(constant: str) -> NoReturn:
+    raise ValueError(f"unsupported JSON constant {constant}")
+
+
+def _read_manifest(repository_root: Path, path: Path) -> dict[str, Any]:
+    safe_path = _confined_manifest_path(repository_root, path, "Candidate manifest")
+    if not safe_path.is_file():
+        raise CandidateIdentityError(f"Missing candidate manifest: {safe_path}")
 
     def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}
@@ -143,13 +158,11 @@ def _read_manifest(path: Path) -> dict[str, Any]:
 
     try:
         value = json.loads(
-            path.read_text(encoding="utf-8"),
+            safe_path.read_text(encoding="utf-8"),
             object_pairs_hook=reject_duplicate_keys,
-            parse_constant=lambda constant: (_ for _ in ()).throw(
-                ValueError(f"unsupported JSON constant {constant}")
-            ),
+            parse_constant=_reject_json_constant,
         )
-    except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as error:
+    except (OSError, UnicodeError, ValueError) as error:
         raise CandidateIdentityError(f"Candidate manifest is malformed: {error}") from error
     if not isinstance(value, dict):
         raise CandidateIdentityError("Candidate manifest must be a JSON object.")
@@ -234,7 +247,7 @@ def verify_manifest(
     """
 
     root = _repository_root(repository_root)
-    manifest = _read_manifest(manifest_path)
+    manifest = _read_manifest(root, manifest_path)
     _validate_manifest(manifest)
     if git_identity is None:
         git_identity = _git_identity
@@ -264,14 +277,13 @@ def verify_manifest(
     return manifest
 
 
-def _write_manifest(path: Path, manifest: dict[str, Any]) -> None:
-    if path.exists() and path.is_symlink():
-        raise CandidateIdentityError(f"Candidate manifest output must not be a symbolic link: {path}")
+def _write_manifest(repository_root: Path, path: Path, manifest: dict[str, Any]) -> None:
+    safe_path = _confined_manifest_path(repository_root, path, "Candidate manifest output")
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(canonical_json(manifest), encoding="utf-8", newline="\n")
+        safe_path.parent.mkdir(parents=True, exist_ok=True)
+        safe_path.write_text(canonical_json(manifest), encoding="utf-8", newline="\n")
     except OSError as error:
-        raise CandidateIdentityError(f"Cannot write candidate manifest '{path}': {error}") from error
+        raise CandidateIdentityError(f"Cannot write candidate manifest '{safe_path}': {error}") from error
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -298,19 +310,20 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
     try:
+        repository_root = _repository_root(arguments.repository_root)
         if arguments.command == "create":
             manifest = create_manifest(
-                arguments.repository_root,
+                repository_root,
                 policy_path=arguments.policy,
                 cli_assembly_path=arguments.cli_assembly,
                 testing_assembly_path=arguments.testing_assembly,
                 source_sha=arguments.source_sha,
                 tool_identity=arguments.tool_identity,
             )
-            _write_manifest(arguments.output, manifest)
+            _write_manifest(repository_root, arguments.output, manifest)
         else:
             manifest = verify_manifest(
-                arguments.repository_root,
+                repository_root,
                 arguments.manifest,
                 expected_source_sha=arguments.source_sha,
                 expected_tool_identity=arguments.tool_identity,

@@ -2,7 +2,7 @@
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
-# CI may set this after one verified solution build; local/default invocations retain the build.
+# CI may set this after one verified candidate graph build; local/default invocations retain the build.
 ARCHITECTURE_BUILD_ALREADY_PREPARED ?= false
 
 ifneq ($(filter true false,$(ARCHITECTURE_BUILD_ALREADY_PREPARED)),$(ARCHITECTURE_BUILD_ALREADY_PREPARED))
@@ -41,8 +41,8 @@ _acceptance-test: | _lint-dotnet
 
 # The single authoritative definition of "the repository satisfies its own architecture policy".
 # It is read-only with respect to the policy and the reviewed API snapshots: --ensure-built prepares
-# and verifies the project graph (replacing the explicit `dotnet build` calls this target used to
-# make), but nothing under architecture/ is ever rewritten. `SelfArchitecturePolicyTests` runs the
+# and verifies the project graph, but nothing under architecture/ is ever rewritten. The CI producer
+# may pass a build proof from its one explicit solution build; `SelfArchitecturePolicyTests` runs the
 # same policy through the ArchLinterNet.Testing adapter as parity evidence inside `make test`; it is
 # not a second definition of success.
 lint-architecture:  ## Canonical read-only strict self-policy gate (builds and verifies the project graph)

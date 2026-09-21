@@ -59,6 +59,8 @@ internal sealed class ValidateCommandExecution
             options.TargetFramework,
             options.Platform,
             options.RuntimeIdentifier,
+            options.NoRestore,
+            options.BuildProofNonce,
             _cancellationToken));
     }
 

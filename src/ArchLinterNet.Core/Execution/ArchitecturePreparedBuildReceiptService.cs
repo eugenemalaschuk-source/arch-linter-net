@@ -5,9 +5,9 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-// The producer calls this after its one explicit solution build. It only discovers output paths,
-// fingerprints the files already on disk, writes receipts, and verifies them in Ordinary mode;
-// it never enters BuildStatePreparationService.Prepare(EnsureBuilt) or invokes MSBuild.
+// The producer owns the one authoritative solution build. That build emits an output-bound proof
+// with a fresh nonce; this service only verifies those proofs and publishes receipts in Ordinary
+// mode. It never has permission to invoke the build-capable preparation path.
 internal sealed class ArchitecturePreparedBuildReceiptService(
     IArchitectureRunnerSetupService runnerSetupService)
 {
@@ -15,6 +15,11 @@ internal sealed class ArchitecturePreparedBuildReceiptService(
     {
         ArgumentNullException.ThrowIfNull(request);
         request.CancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(request.BuildProofNonce))
+        {
+            throw new InvalidOperationException(
+                "Publishing prepared receipts requires a build proof nonce from the preceding authoritative build.");
+        }
 
         ArchitectureContractDocument document = runnerSetupService.LoadDocument(
             request.PolicyPath, null, null, request.CancellationToken);
@@ -44,10 +49,12 @@ internal sealed class ArchitecturePreparedBuildReceiptService(
             preparation.ProjectDiscovery,
             resolution,
             BuildPreparationMode.Ordinary,
+            NoRestore: request.NoRestore,
             RequestedConfiguration: requestedConfiguration,
             RequestedTargetFramework: requestedTargetFramework,
             RequestedPlatform: request.RequestedPlatform,
             RequestedRuntimeIdentifier: request.RequestedRuntimeIdentifier,
-            CancellationToken: request.CancellationToken));
+            CancellationToken: request.CancellationToken),
+            request.BuildProofNonce);
     }
 }

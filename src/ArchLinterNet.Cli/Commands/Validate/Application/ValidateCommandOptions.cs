@@ -20,7 +20,8 @@ internal sealed record ValidateCommandOptions(
     string? Platform = null,
     string? RuntimeIdentifier = null,
     bool PublishPreparedReceipts = false,
-    bool UsePreparedArtifacts = false) : IValidationExecutionOptions
+    bool UsePreparedArtifacts = false,
+    string? BuildProofNonce = null) : IValidationExecutionOptions
 {
     public bool IsFormatExplicit { get; init; }
 

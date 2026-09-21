@@ -23,7 +23,11 @@ The governance-span median is **167.309 s**, with a range of **126.761–167.839
 
 ## Process accounting and attribution
 
-The candidate preparation performed exactly one restore process, one solution build process, one receipt-publication process, and one candidate-verification process. Base preparation performed one restore, one solution build, and one receipt-publication process. The independent projections then used these process counts:
+The candidate preparation performed exactly one restore process, one solution build process that
+emitted output-bound build proofs, one proof-verifying receipt-publication process, and one
+candidate-verification process. Base preparation performed one restore, one solution build that
+emitted the same proofs, and one proof-verifying receipt-publication process. The independent
+projections then used these process counts:
 
 | Projection | Projection processes | CLI processes |
 | --- | ---: | ---: |

@@ -144,6 +144,55 @@ internal static class BuildStateRuntimeBuildPreparation
         };
     }
 
+    // The CI producer invokes the real solution build outside this process, with a fresh nonce.
+    // MSBuild emits one proof beside each output only after that project build succeeds. This
+    // path verifies those output-bound proofs and then uses the ordinary evaluator; it deliberately
+    // has no fallback to EnsureBuilt, so a missing or forged proof cannot trigger another build or
+    // promote an arbitrary pre-existing artifact.
+    internal static BuildStatePreflightResult PublishPreparedReceipts(
+        BuildStatePreflightRequest request, string buildProofNonce)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(buildProofNonce);
+        request.CancellationToken.ThrowIfCancellationRequested();
+
+        BuildStateResolvedAssemblies resolution = ResolveBuiltAssemblies(request);
+        BuildStatePreflightRequest publicationRequest = request with { Resolution = resolution };
+        List<BuildStatePreflightDiagnostic> proofFailures = new();
+        Dictionary<string, ArchitectureDiscoveredProject> projectsByAssemblyName =
+            request.ProjectDiscovery.DiscoveredProjects
+                .GroupBy(project => project.AssemblyName, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        foreach (KeyValuePair<string, string> resolved in resolution.ResolvedAssemblyPaths)
+        {
+            request.CancellationToken.ThrowIfCancellationRequested();
+            if (!projectsByAssemblyName.TryGetValue(resolved.Key, out ArchitectureDiscoveredProject? project))
+            {
+                continue;
+            }
+
+            if (VerifyBuildProof(request, project, resolved.Value, buildProofNonce) is { } failure)
+            {
+                proofFailures.Add(failure);
+            }
+        }
+
+        if (proofFailures.Count > 0)
+        {
+            return new BuildStatePreflightResult(proofFailures);
+        }
+
+        BuildStatePreflightResult evaluation = BuildStatePreflightEvaluator.Evaluate(publicationRequest);
+        request.CancellationToken.ThrowIfCancellationRequested();
+        // The expected output may be UnverifiableArtifact precisely because this is the first
+        // receipt publication for a successfully built output. The proof above is the additional
+        // authorization for this transition; retain the same receipt materialization behavior as
+        // EnsureBuilt and let the post-write evaluation decide the final state.
+        WriteReceiptsForCurrentArtifacts(publicationRequest, evaluation);
+        request.CancellationToken.ThrowIfCancellationRequested();
+        return BuildStatePreflightEvaluator.Evaluate(publicationRequest);
+    }
+
     internal static string? ResolveBuiltAssemblyPath(
         BuildStatePreflightRequest request,
         ArchitectureDiscoveredProject project,
@@ -170,6 +219,100 @@ internal static class BuildStateRuntimeBuildPreparation
             projectDirectory, project.AssemblyName, request.RequestedConfiguration, request.RequestedTargetFramework,
             request.RequestedRuntimeIdentifier);
     }
+
+    private static BuildStatePreflightDiagnostic? VerifyBuildProof(
+        BuildStatePreflightRequest request,
+        ArchitectureDiscoveredProject project,
+        string assemblyPath,
+        string expectedNonce)
+    {
+        string proofPath = Path.Combine(
+            Path.GetDirectoryName(Path.GetFullPath(assemblyPath))!, ".arch-linter-net-build-proof");
+        string detail = "";
+        try
+        {
+            if (!File.Exists(proofPath))
+            {
+                detail = "No proof from the preceding authoritative build was found beside the selected output.";
+            }
+            else if ((File.GetAttributes(proofPath) & FileAttributes.ReparsePoint) != 0)
+            {
+                detail = "The authoritative build proof is a reparse point and cannot be trusted.";
+            }
+            else
+            {
+                string[] lines = File.ReadAllLines(proofPath);
+                Dictionary<string, string> values = new(StringComparer.Ordinal);
+                foreach (string line in lines)
+                {
+                    int separator = line.IndexOf('=');
+                    if (separator <= 0 || !values.TryAdd(line[..separator], line[(separator + 1)..]))
+                    {
+                        detail = "The authoritative build proof has an invalid format.";
+                        break;
+                    }
+                }
+
+                if (detail.Length == 0)
+                {
+                    string expectedProject = Path.GetFullPath(
+                        BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
+                    string expectedTarget = Path.GetFullPath(assemblyPath);
+                    if (!string.Equals(values.GetValueOrDefault("schema"), "architecture-build-proof/v1", StringComparison.Ordinal)
+                        || !string.Equals(values.GetValueOrDefault("nonce"), expectedNonce, StringComparison.Ordinal)
+                        || !PathsEqual(values.GetValueOrDefault("project"), expectedProject)
+                        || !PathsEqual(values.GetValueOrDefault("target"), expectedTarget)
+                        || values.Count != 4)
+                    {
+                        detail = "The authoritative build proof does not match the selected project, output, or nonce.";
+                    }
+                }
+            }
+        }
+        catch (IOException ex)
+        {
+            detail = $"The authoritative build proof could not be read: {ex.Message}";
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            detail = $"The authoritative build proof could not be read: {ex.Message}";
+        }
+        catch (ArgumentException ex)
+        {
+            detail = $"The authoritative build proof has an invalid path: {ex.Message}";
+        }
+        catch (NotSupportedException ex)
+        {
+            detail = $"The authoritative build proof has an unsupported path: {ex.Message}";
+        }
+
+        if (detail.Length == 0)
+        {
+            return null;
+        }
+
+        return new BuildStatePreflightDiagnostic(
+            "build-state-preflight",
+            project.Path,
+            BuildStatePreflightState.UnverifiableArtifact,
+            new BuildStatePreflightEvidence(
+                project.Path,
+                project.AssemblyName,
+                ExpectedOutputPath: assemblyPath,
+                BuildCommand: $"dotnet build \"{project.Path}\"",
+                Detail: detail));
+    }
+
+    private static bool PathsEqual(string? actual, string expected)
+    {
+        return actual is not null
+            && PathsEqual(Path.GetFullPath(actual), expected, OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal);
+    }
+
+    private static bool PathsEqual(string actual, string expected, StringComparison comparison) =>
+        string.Equals(Path.TrimEndingDirectorySeparator(actual), Path.TrimEndingDirectorySeparator(expected), comparison);
 
     internal static bool IsProjectOutput(string projectDirectory, string assemblyName, string path)
     {
@@ -220,46 +363,6 @@ internal static class BuildStateRuntimeBuildPreparation
             || segments.Any(segment => string.Equals(segment, runtimeIdentifier, StringComparison.OrdinalIgnoreCase));
 
         return configurationMatches && targetFrameworkMatches && runtimeIdentifierMatches;
-    }
-
-    internal static BuildStatePreflightResult PublishPreparedReceipts(BuildStatePreflightRequest request)
-    {
-        request.CancellationToken.ThrowIfCancellationRequested();
-
-        IReadOnlyCollection<ArchitectureDiscoveredProject> selectedProjects =
-            SelectRelevantProjectsWithTransitiveReferences(request);
-        Dictionary<string, string> resolvedPaths = new(StringComparer.Ordinal);
-        List<string> missingAssemblyNames = new();
-
-        foreach (ArchitectureDiscoveredProject project in selectedProjects)
-        {
-            request.CancellationToken.ThrowIfCancellationRequested();
-            string? projectDirectory = Path.GetDirectoryName(
-                BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
-            string? assemblyPath = ResolveBuiltAssemblyPath(request, project, projectDirectory);
-            if (assemblyPath is null)
-            {
-                missingAssemblyNames.Add(project.AssemblyName);
-            }
-            else
-            {
-                resolvedPaths[project.AssemblyName] = assemblyPath;
-            }
-        }
-
-        BuildStatePreflightRequest publicationRequest = request with
-        {
-            PreparationMode = BuildPreparationMode.Ordinary,
-            Resolution = new BuildStateResolvedAssemblies(Array.Empty<System.Reflection.Assembly>(), missingAssemblyNames)
-            {
-                ResolvedAssemblyPaths = resolvedPaths,
-            },
-        };
-        BuildStatePreflightResult evaluation = BuildStatePreflightEvaluator.Evaluate(publicationRequest);
-        request.CancellationToken.ThrowIfCancellationRequested();
-        WriteReceiptsForCurrentArtifacts(publicationRequest, evaluation);
-        request.CancellationToken.ThrowIfCancellationRequested();
-        return BuildStatePreflightEvaluator.Evaluate(publicationRequest);
     }
 
     internal static void WriteReceiptsForCurrentArtifacts(

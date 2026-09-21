@@ -36,7 +36,7 @@ def candidate_inputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[st
         "policy": policy,
         "cli": cli,
         "testing": testing,
-        "manifest": tmp_path / "candidate.json",
+        "manifest": root / "candidate.json",
     }
 
 
@@ -162,6 +162,44 @@ def test_verify_rejects_malformed_manifest(candidate_inputs: dict[str, Path | st
 
     with pytest.raises(candidate.CandidateIdentityError, match="fields are missing"):
         candidate.verify_manifest(candidate_inputs["root"], candidate_inputs["manifest"])
+
+
+def test_verify_rejects_non_finite_json_constant(candidate_inputs: dict[str, Path | str]) -> None:
+    candidate_inputs["manifest"].write_text("{\"schema\": NaN}", encoding="utf-8")
+
+    with pytest.raises(candidate.CandidateIdentityError, match="unsupported JSON constant"):
+        candidate.verify_manifest(candidate_inputs["root"], candidate_inputs["manifest"])
+
+
+def test_manifest_paths_must_remain_inside_repository(candidate_inputs: dict[str, Path | str], tmp_path: Path) -> None:
+    outside_manifest = tmp_path / "outside.json"
+    outside_manifest.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(candidate.CandidateIdentityError, match="inside the repository root"):
+        candidate.verify_manifest(candidate_inputs["root"], outside_manifest)
+
+    manifest = candidate.create_manifest(
+        candidate_inputs["root"],
+        policy_path=candidate_inputs["policy"],
+        cli_assembly_path=candidate_inputs["cli"],
+        testing_assembly_path=candidate_inputs["testing"],
+    )
+    assert candidate.main(
+        [
+            "create",
+            "--repository-root",
+            str(candidate_inputs["root"]),
+            "--manifest",
+            str(outside_manifest),
+            "--policy",
+            str(candidate_inputs["policy"]),
+            "--cli-assembly",
+            str(candidate_inputs["cli"]),
+            "--testing-assembly",
+            str(candidate_inputs["testing"]),
+        ]
+    ) == 1
+    assert manifest["schema"] == candidate.SCHEMA
 
 
 def test_create_rejects_missing_tool_identity(candidate_inputs: dict[str, Path | str]) -> None:
