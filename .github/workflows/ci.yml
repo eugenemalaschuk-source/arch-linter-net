@@ -381,7 +381,14 @@ jobs:
           candidate_sha="$(git rev-parse HEAD)"
           candidate_tree_sha="$(git rev-parse 'HEAD^{tree}')"
           test "$candidate_sha" = "$EXPECTED_HEAD_SHA"
+          candidate_start_ms="$(date +%s%3N)"
           dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1
+          dotnet run --no-build --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- \
+            --policy architecture/dependencies.arch.yml \
+            --publish-prepared-receipts
+          candidate_end_ms="$(date +%s%3N)"
+          echo "candidate_start_ms=$candidate_start_ms" >> "$GITHUB_OUTPUT"
+          echo "candidate_end_ms=$candidate_end_ms" >> "$GITHUB_OUTPUT"
           cli_assembly="$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/bin/Debug/net10.0/ArchLinterNet.Cli.dll"
           testing_assembly="$GITHUB_WORKSPACE/src/ArchLinterNet.Testing/bin/Debug/net10.0/ArchLinterNet.Testing.dll"
           test -s "$cli_assembly"
@@ -434,15 +441,39 @@ jobs:
           git worktree add --detach "$BASE_WORKTREE" "$BASE_SHA"
           echo "path=$BASE_WORKTREE" >> "$GITHUB_OUTPUT"
 
+      - name: Prepare architecture report base
+        id: architecture_report_base_preparation
+        if: steps.architecture_report_base.outcome == 'success'
+        env:
+          BASE_WORKTREE: ${{ steps.architecture_report_base.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_start_ms="$(date +%s%3N)"
+          dotnet restore "$BASE_WORKTREE/ArchLinterNet.slnx" --nologo -m:1 --disable-parallel
+          dotnet build "$BASE_WORKTREE/ArchLinterNet.slnx" --nologo --no-restore -m:1
+          pushd "$BASE_WORKTREE"
+          dotnet run --no-build --project "$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" -- \
+            --policy architecture/dependencies.arch.yml \
+            --publish-prepared-receipts
+          popd
+          base_end_ms="$(date +%s%3N)"
+          echo "start_ms=$base_start_ms" >> "$GITHUB_OUTPUT"
+          echo "end_ms=$base_end_ms" >> "$GITHUB_OUTPUT"
+
       - name: Run independent architecture projections
         id: architecture_projections
-        if: always() && steps.architecture_candidate.outcome == 'success' && steps.architecture_report_base.outcome == 'success'
+        if: always() && steps.architecture_candidate.outcome == 'success' && steps.architecture_report_base.outcome == 'success' && steps.architecture_report_base_preparation.outcome == 'success'
         continue-on-error: true
         env:
           BASE_WORKTREE: ${{ steps.architecture_report_base.outputs.path }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           EXECUTION_CONTEXT: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          CANDIDATE_START_MS: ${{ steps.architecture_candidate.outputs.candidate_start_ms }}
+          CANDIDATE_END_MS: ${{ steps.architecture_candidate.outputs.candidate_end_ms }}
+          BASE_PREPARATION_START_MS: ${{ steps.architecture_report_base_preparation.outputs.start_ms }}
+          BASE_PREPARATION_END_MS: ${{ steps.architecture_report_base_preparation.outputs.end_ms }}
           REPORT_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
           REPORT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REPORT_ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
@@ -488,7 +519,7 @@ jobs:
             if [ "${{ steps.changed_files.outcome }}" = "failure" ]; then
               DIFF_STATUS="failed"
             fi
-            make architecture-coverage-ci DIFF_STATUS="$DIFF_STATUS"
+            make architecture-coverage-ci ARCHITECTURE_BUILD_ALREADY_PREPARED=true DIFF_STATUS="$DIFF_STATUS"
           }
 
           run_report_inputs() {
@@ -498,7 +529,7 @@ jobs:
               local snapshot_args=(
                 --policy architecture/dependencies.arch.yml
                 --mode strict
-                --ensure-built
+                --use-prepared-receipts
               )
               if [[ -f architecture/baseline.arch.yml ]]; then
                 snapshot_args+=(--baseline architecture/baseline.arch.yml)
@@ -520,7 +551,7 @@ jobs:
             health_args=(
               --policy architecture/dependencies.arch.yml
               --mode strict
-              --ensure-built
+              --use-prepared-receipts
             )
             if [[ -f architecture/baseline.arch.yml ]]; then
               health_args+=(--baseline architecture/baseline.arch.yml)
@@ -636,7 +667,22 @@ jobs:
               })
           all_projection_starts = [item["start_epoch_ms"] for item in projections]
           all_projection_ends = [item["end_epoch_ms"] for item in projections]
-          governance_span_ms = max(all_projection_ends) - min(all_projection_starts) if projections else None
+          candidate_preparation = {
+              "start_epoch_ms": int(os.environ["CANDIDATE_START_MS"]),
+              "end_epoch_ms": int(os.environ["CANDIDATE_END_MS"]),
+          }
+          candidate_preparation["duration_ms"] = (
+              candidate_preparation["end_epoch_ms"] - candidate_preparation["start_epoch_ms"]
+          )
+          base_preparation = {
+              "start_epoch_ms": int(os.environ["BASE_PREPARATION_START_MS"]),
+              "end_epoch_ms": int(os.environ["BASE_PREPARATION_END_MS"]),
+          }
+          base_preparation["duration_ms"] = base_preparation["end_epoch_ms"] - base_preparation["start_epoch_ms"]
+          governance_span_ms = (
+              max(all_projection_ends) - min(candidate_preparation["start_epoch_ms"], base_preparation["start_epoch_ms"])
+              if projections else None
+          )
           command_sum_ms = sum(item["duration_ms"] for item in projections)
           evidence = {
               "schema": "architecture-ci-dag/v1",
@@ -651,19 +697,26 @@ jobs:
                   "runner_image": os.environ.get("ImageOS", "ubuntu-latest"),
               },
               "dependencies": {
-                  "candidate_build": ["restore", "source/tree/tool identity"],
-                  "strict": ["candidate_build"],
-                  "public_api": ["candidate_build"],
-                  "coverage": ["candidate_build", "changed-files"],
-                  "report_inputs": ["candidate_build", "base-reference", "changed-files"],
+                  "candidate_preparation": ["restore", "source/tree/tool identity"],
+                  "base_preparation": ["base-reference", "source/tree/tool identity"],
+                  "strict": ["candidate_preparation"],
+                  "public_api": ["candidate_preparation"],
+                  "coverage": ["candidate_preparation", "changed-files"],
+                  "report_inputs": ["candidate_preparation", "base_preparation", "changed-files"],
                   "rendering": ["health", "change", "report inputs"],
               },
               "projections": projections,
               "command_accounting": {
-                  "candidate_build": {
+                  "candidate_preparation": {
                       "restore_processes": 1,
                       "build_processes": 1,
+                      "receipt_publication_processes": 1,
                       "candidate_verification_processes": 1,
+                  },
+                  "base_preparation": {
+                      "restore_processes": 1,
+                      "build_processes": 1,
+                      "receipt_publication_processes": 1,
                   },
                   "strict": {"projection_processes": 1, "cli_processes": 1},
                   "public_api": {"projection_processes": 1, "cli_processes": 3},
@@ -671,6 +724,8 @@ jobs:
                   "report_inputs": {"projection_processes": 1, "cli_processes": 5},
               },
               "governance_span_ms": governance_span_ms,
+              "candidate_preparation": candidate_preparation,
+              "base_preparation": base_preparation,
               "projection_command_sum_ms": command_sum_ms,
               "comparison": {
                   "before_median_seconds": 204,

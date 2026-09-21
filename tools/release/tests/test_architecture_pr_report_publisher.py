@@ -272,6 +272,8 @@ def test_ci_producer_freezes_one_candidate_and_fans_out_read_only_projections() 
     assert "name: Architecture Coverage" in producer
     assert "name: Build one architecture candidate" in producer
     assert "dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1" in producer
+    assert "--publish-prepared-receipts" in producer
+    assert "name: Prepare architecture report base" in producer
     assert "architecture_candidate.py create" in producer
     assert producer.count("architecture_candidate.py verify") >= 2
     assert "run_projection strict run_strict &" in producer
@@ -280,6 +282,13 @@ def test_ci_producer_freezes_one_candidate_and_fans_out_read_only_projections() 
     assert "run_projection report_inputs run_report_inputs &" in producer
     assert "ARCHITECTURE_BUILD_ALREADY_PREPARED=true" in producer
     assert "make public-api-check ARCHITECTURE_BUILD_ALREADY_PREPARED=true" in producer
+    projection_phase = producer.split(
+        "      - name: Run independent architecture projections\n", maxsplit=1
+    )[1].split("      - name: Upload candidate identity\n", maxsplit=1)[0]
+    assert "--ensure-built" not in projection_phase
+    assert "--use-prepared-receipts" in projection_phase
+    assert "candidate_preparation" in projection_phase
+    assert "base_preparation" in projection_phase
     assert "--change-snapshot \"$output_directory/current-architecture-change-snapshot.json\"" in producer
     assert "snapshot \"$output_directory/base-architecture-change-snapshot.json\"" in producer
     assert '\n          snapshot "$output_directory/current-architecture-change-snapshot.json"' not in producer

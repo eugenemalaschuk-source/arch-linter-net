@@ -102,6 +102,40 @@ public sealed class BuildStatePreflightTests : BuildStatePreflightTestSupport
     }
 
     [Test]
+    public void PublishPreparedReceipts_DoesNotInvokeBuildCapablePreparation()
+    {
+        string projectPath = CreateProjectFixture("PreparedCandidateFixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("PreparedCandidateFixture");
+        // An external producer has already built the output. Make the source deliberately
+        // uncompilable so this test fails if receipt publication silently enters EnsureBuilt.
+        File.WriteAllText(Path.Combine(Path.GetDirectoryName(projectPath)!, "Class1.cs"), "not valid C#");
+
+        BuildStatePreflightResult result = BuildStateRuntimeBuildPreparation.PublishPreparedReceipts(
+            new BuildStatePreflightRequest(
+                _repoRoot,
+                SingleProjectDiscovery(projectPath, "PreparedCandidateFixture"),
+                SingleAssemblyResolution(assemblyPath),
+                BuildPreparationMode.Ordinary,
+                RequestedConfiguration: "Debug"));
+
+        Assert.That(result.Blocked, Is.False,
+            () => string.Join(" | ", result.Diagnostics.Select(d => $"{d.State}: {d.Evidence.Detail}")));
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
+        Assert.That(File.Exists(BuildReceiptStore.ReceiptPathFor(assemblyPath)), Is.True);
+
+        BuildStatePreflightResult ordinaryVerification = new BuildStatePreparationService().Prepare(
+            new BuildStatePreflightRequest(
+                _repoRoot,
+                SingleProjectDiscovery(projectPath, "PreparedCandidateFixture"),
+                SingleAssemblyResolution(assemblyPath),
+                BuildPreparationMode.Ordinary,
+                RequestedConfiguration: "Debug"));
+
+        Assert.That(ordinaryVerification.Blocked, Is.False);
+        Assert.That(ordinaryVerification.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
+    }
+
+    [Test]
     public void Evaluate_ReceiptMatchesCurrentFingerprint_ReportsCurrent()
     {
         string projectPath = CreateProjectFixture("Fixture", "class C {}");

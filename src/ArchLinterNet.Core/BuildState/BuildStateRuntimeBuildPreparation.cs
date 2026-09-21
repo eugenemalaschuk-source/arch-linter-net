@@ -113,7 +113,7 @@ internal static class BuildStateRuntimeBuildPreparation
         return selected.Values;
     }
 
-    private static BuildStateResolvedAssemblies ResolveBuiltAssemblies(BuildStatePreflightRequest request)
+    internal static BuildStateResolvedAssemblies ResolveBuiltAssemblies(BuildStatePreflightRequest request)
     {
         Dictionary<string, string> resolvedPaths = new(StringComparer.Ordinal);
         List<string> missing = new();
@@ -222,7 +222,47 @@ internal static class BuildStateRuntimeBuildPreparation
         return configurationMatches && targetFrameworkMatches && runtimeIdentifierMatches;
     }
 
-    private static void WriteReceiptsForCurrentArtifacts(
+    internal static BuildStatePreflightResult PublishPreparedReceipts(BuildStatePreflightRequest request)
+    {
+        request.CancellationToken.ThrowIfCancellationRequested();
+
+        IReadOnlyCollection<ArchitectureDiscoveredProject> selectedProjects =
+            SelectRelevantProjectsWithTransitiveReferences(request);
+        Dictionary<string, string> resolvedPaths = new(StringComparer.Ordinal);
+        List<string> missingAssemblyNames = new();
+
+        foreach (ArchitectureDiscoveredProject project in selectedProjects)
+        {
+            request.CancellationToken.ThrowIfCancellationRequested();
+            string? projectDirectory = Path.GetDirectoryName(
+                BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
+            string? assemblyPath = ResolveBuiltAssemblyPath(request, project, projectDirectory);
+            if (assemblyPath is null)
+            {
+                missingAssemblyNames.Add(project.AssemblyName);
+            }
+            else
+            {
+                resolvedPaths[project.AssemblyName] = assemblyPath;
+            }
+        }
+
+        BuildStatePreflightRequest publicationRequest = request with
+        {
+            PreparationMode = BuildPreparationMode.Ordinary,
+            Resolution = new BuildStateResolvedAssemblies(Array.Empty<System.Reflection.Assembly>(), missingAssemblyNames)
+            {
+                ResolvedAssemblyPaths = resolvedPaths,
+            },
+        };
+        BuildStatePreflightResult evaluation = BuildStatePreflightEvaluator.Evaluate(publicationRequest);
+        request.CancellationToken.ThrowIfCancellationRequested();
+        WriteReceiptsForCurrentArtifacts(publicationRequest, evaluation);
+        request.CancellationToken.ThrowIfCancellationRequested();
+        return BuildStatePreflightEvaluator.Evaluate(publicationRequest);
+    }
+
+    internal static void WriteReceiptsForCurrentArtifacts(
         BuildStatePreflightRequest request, BuildStatePreflightResult evaluation)
     {
         Dictionary<string, ArchitectureDiscoveredProject> projectsByPath =

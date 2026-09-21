@@ -78,6 +78,12 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
               --framework <tfm> Requested target framework for build-state preflight
               --platform <platform> Requested platform for build-state preflight
               --runtime <rid>     Requested runtime identifier for build-state preflight
+              --publish-prepared-receipts
+                                Publish receipts for an already-built candidate without building
+                                or restoring; intended for CI producer preparation
+              --use-prepared-receipts
+                                Verify and use producer-published receipts without building
+                                or restoring; intended for CI projections
           -f, --format <fmt>    Stdout output format: human, json, or sarif
                                 (default: human). See --report for additional
                                 output destinations.
@@ -136,6 +142,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> targetFrameworkOption = new("--framework");
         Option<string> platformOption = new("--platform");
         Option<string> runtimeIdentifierOption = new("--runtime");
+        Option<bool> publishPreparedReceiptsOption = new("--publish-prepared-receipts");
+        Option<bool> usePreparedArtifactsOption = new("--use-prepared-receipts");
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
         Option<bool> versionOption = new("--version");
@@ -166,6 +174,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(targetFrameworkOption);
         command.Options.Add(platformOption);
         command.Options.Add(runtimeIdentifierOption);
+        command.Options.Add(publishPreparedReceiptsOption);
+        command.Options.Add(usePreparedArtifactsOption);
         command.Options.Add(helpOption);
         command.Options.Add(versionOption);
 
@@ -191,6 +201,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             targetFrameworkOption,
             platformOption,
             runtimeIdentifierOption,
+            publishPreparedReceiptsOption,
+            usePreparedArtifactsOption,
             helpOption,
             versionOption)));
 
@@ -234,6 +246,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> targetFrameworkOption,
         Option<string> platformOption,
         Option<string> runtimeIdentifierOption,
+        Option<bool> publishPreparedReceiptsOption,
+        Option<bool> usePreparedArtifactsOption,
         Option<bool> helpOption,
         Option<bool> versionOption)
     {
@@ -284,7 +298,9 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             parseResult.GetValue(configurationOption),
             parseResult.GetValue(targetFrameworkOption),
             parseResult.GetValue(platformOption),
-            parseResult.GetValue(runtimeIdentifierOption))
+            parseResult.GetValue(runtimeIdentifierOption),
+            parseResult.GetValue(publishPreparedReceiptsOption),
+            parseResult.GetValue(usePreparedArtifactsOption))
         {
             IsFormatExplicit = isFormatExplicit,
             AdditionalSinks = additionalSinks,

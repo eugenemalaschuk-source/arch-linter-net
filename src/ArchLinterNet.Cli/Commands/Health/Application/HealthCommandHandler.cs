@@ -46,6 +46,7 @@ internal sealed class HealthCommandHandler(
               --base-context <path>    Base effective-policy context JSON (requires --current-context)
               --current-context <path> Current effective-policy context JSON (requires --base-context)
               --ensure-built           Build and receipt-verify before complete candidate collection
+              --use-prepared-receipts  Verify producer-published receipts without building or restoring
               --no-restore             Do not restore while ensuring build state
               --configuration <name>   Requested build configuration
               --framework <tfm>        Requested target framework
@@ -218,6 +219,7 @@ internal sealed class HealthCommandHandler(
                 ConditionSetName = debtGateRequest.ConditionSetName,
                 ContractIds = debtGateRequest.ContractIds,
                 PreparationMode = debtGateRequest.PreparationMode,
+                UsePreparedArtifacts = debtGateRequest.UsePreparedArtifacts,
                 NoRestore = debtGateRequest.NoRestore,
                 RequestedConfiguration = debtGateRequest.RequestedConfiguration,
                 RequestedTargetFramework = debtGateRequest.RequestedTargetFramework,

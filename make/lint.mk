@@ -11,8 +11,12 @@ endif
 
 ifeq ($(ARCHITECTURE_BUILD_ALREADY_PREPARED),true)
 ARCHITECTURE_CLI_RUN_BUILD_ARGS := --no-build
+ARCHITECTURE_BUILD_STATE_ARGS :=
+ARCHITECTURE_PREPARED_RECEIPTS_ARGS := --use-prepared-receipts
 else
 ARCHITECTURE_CLI_RUN_BUILD_ARGS :=
+ARCHITECTURE_BUILD_STATE_ARGS := --ensure-built
+ARCHITECTURE_PREPARED_RECEIPTS_ARGS :=
 endif
 
 # dotnet format, architecture self-validation, and shard-membership discovery all touch the normal
@@ -48,7 +52,7 @@ lint-architecture:  ## Canonical read-only strict self-policy gate (builds and v
 		echo "lint-architecture: using the already-prepared solution build"; \
 	fi
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- \
-		--policy "$(POLICY)" --mode strict --ensure-built
+		--policy "$(POLICY)" --mode strict $(ARCHITECTURE_BUILD_STATE_ARGS) $(ARCHITECTURE_PREPARED_RECEIPTS_ARGS)
 
 audit-architecture:  ## Run diagnostic architecture audit contracts
 	@dotnet run --project "$(CLI_PROJECT)" -- \
@@ -73,7 +77,7 @@ public-api-check:  ## Read-only diff of every reviewed public API snapshot again
 		contract="$${surface%%=*}"; snapshot="$${surface#*=}"; \
 		echo "public-api diff: $$contract"; \
 		dotnet run $(ARCHITECTURE_CLI_RUN_BUILD_ARGS) --project "$(CLI_PROJECT)" -- public-api diff \
-			--policy "$(POLICY)" --contract "$$contract" --snapshot "$$snapshot" --ensure-built || exit $$?; \
+			--policy "$(POLICY)" --contract "$$contract" --snapshot "$$snapshot" $(ARCHITECTURE_BUILD_STATE_ARGS) || exit $$?; \
 	done
 
 public-api-update-preview:  ## Preview the snapshot rewrite for every reviewed public API surface (writes nothing)
@@ -162,7 +166,7 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 # writes to architecture/. --no-build applies to the CLI host itself, which the caller builds.
 architecture-strict-json:  ## Run strict+audit validation once, writing combined JSON (CLI must already be built)
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- \
-		--policy "$(POLICY)" --mode strict,audit --ensure-built --format json \
+		--policy "$(POLICY)" --mode strict,audit $(ARCHITECTURE_BUILD_STATE_ARGS) $(ARCHITECTURE_PREPARED_RECEIPTS_ARGS) --format json \
 		> "$(PROJECT_ROOT)/architecture-results.json" || true
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- coverage extract --input architecture-results.json --mode strict --output architecture-strict.json
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- badge architecture-policy --input architecture-strict.json > /dev/null

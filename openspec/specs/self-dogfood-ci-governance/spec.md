@@ -8,16 +8,18 @@ safe parallel projection evidence without weakening any authoritative validation
 
 ### Requirement: The self-governance producer binds all projections to one candidate
 
-The pull-request architecture producer SHALL restore and prepare one candidate checkout, record an
+The pull-request architecture producer SHALL restore and build one candidate checkout once, publish
+receipt-backed evidence for the resulting outputs without another build or restore, record an
 immutable source/tree/tool identity, and fail closed when the expected candidate output or identity
 cannot be verified. Every strict, public-API, coverage, Health, change, and report-producing
-projection SHALL verify and consume that same candidate identity.
+projection SHALL verify and consume that same candidate identity through a non-building path.
 
 #### Scenario: A complete candidate is shared by all projections
 
 - **WHEN** the architecture producer reaches its projection phase
 - **THEN** the projections use the same checked-out PR head, verified build outputs, policy digest,
   and CLI tool identity
+- **AND** the producer's receipt-publication step performs no build or restore
 - **AND** no projection performs an implicit rebuild or restore
 
 #### Scenario: Missing or stale candidate state fails closed
@@ -33,6 +35,10 @@ After the shared candidate preparation, the producer SHALL schedule the strict p
 reviewed public-API verification, architecture coverage, and Health/current change evidence as
 independent projections. Each projection SHALL own its logs and generated files, and the producer
 SHALL retain canonical exit semantics and fail-closed aggregation.
+
+The base/reference checkout SHALL likewise be explicitly prepared and receipt-verified before its
+snapshot projection; the base snapshot and every candidate projection SHALL then use ordinary
+receipt-verifying preparation only.
 
 #### Scenario: Independent projections overlap safely
 
@@ -71,7 +77,10 @@ Each successful producer run SHALL emit machine-readable evidence containing the
 runner/source context, projection dependency classification, projection outcomes and durations,
 base/reference preparation, and the command/process accounting needed to compare at least three
 successful runs with the pinned 204 s median and the <=60 s target. The evidence SHALL distinguish
-governance span from the sum of projection durations and SHALL record PASS or GAP against the target.
+governance span from the sum of projection durations, SHALL start the headline governance span at
+the earliest explicit candidate/base preparation boundary, and SHALL record PASS or GAP against the
+target. Comparisons against the pinned baseline SHALL use that same preparation-inclusive boundary
+rather than a post-build projection-only span.
 
 #### Scenario: A run records performance evidence without changing authority
 

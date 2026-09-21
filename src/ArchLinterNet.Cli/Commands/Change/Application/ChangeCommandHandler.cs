@@ -15,7 +15,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine("arch-linter-net change snapshot --policy <path> --output <path> [--mode strict|audit] [--baseline <path>] [--condition-set <name>] [--ensure-built] [--no-restore] [--configuration <name>] [--framework <tfm>] [--platform <platform>] [--runtime <rid>] [--profile <path>]");
+            console.Out.WriteLine("arch-linter-net change snapshot --policy <path> --output <path> [--mode strict|audit] [--baseline <path>] [--condition-set <name>] [--ensure-built] [--use-prepared-receipts] [--no-restore] [--configuration <name>] [--framework <tfm>] [--platform <platform>] [--runtime <rid>] [--profile <path>]");
             return CliExitCodes.Success;
         }
 
@@ -51,6 +51,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 ConditionSetName = options.ConditionSetName,
                 BaselinePath = options.BaselinePath,
                 PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                UsePreparedArtifacts = options.UsePreparedArtifacts,
                 NoRestore = options.NoRestore,
                 RequestedConfiguration = options.Configuration,
                 RequestedTargetFramework = options.TargetFramework,
@@ -71,7 +72,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 return FailIncompleteSnapshot("validation", validation.PreflightDiagnostics);
             }
 
-            if (options.EnsureBuilt && validation.PreparedPostBuildRunner is null)
+            if ((options.EnsureBuilt || options.UsePreparedArtifacts) && validation.PreparedPostBuildRunner is null)
             {
                 return FailIncompleteSnapshot("validation", validation.PreflightDiagnostics);
             }
@@ -93,7 +94,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                     RequestedTargetFramework = options.TargetFramework,
                     RequestedPlatform = options.Platform,
                     RequestedRuntimeIdentifier = options.RuntimeIdentifier,
-                    UsePreparedPostBuildState = options.EnsureBuilt,
+                    UsePreparedPostBuildState = options.EnsureBuilt || options.UsePreparedArtifacts,
                     PreparedPostBuildRunner = validation.PreparedPostBuildRunner,
                 });
                 if (!baseline.Succeeded)
@@ -215,7 +216,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
             RequestedTargetFramework = options.TargetFramework,
             RequestedPlatform = options.Platform,
             RequestedRuntimeIdentifier = options.RuntimeIdentifier,
-            UsePreparedPostBuildState = options.EnsureBuilt,
+            UsePreparedPostBuildState = options.EnsureBuilt || options.UsePreparedArtifacts,
             PreparedPostBuildRunner = validation.PreparedPostBuildRunner,
         };
 
