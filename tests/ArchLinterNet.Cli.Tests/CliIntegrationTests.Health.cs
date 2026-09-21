@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ArchLinterNet.Core.Change;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -37,6 +38,42 @@ internal sealed class CliHealthIntegrationTests : CliIntegrationTestBase
         finally
         {
             DeleteIfPresent(baselinePath);
+        }
+    }
+
+    [Test]
+    public void Health_ChangeSnapshotOption_UsesCompleteCanonicalProjection()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"architecture-health-change-{Guid.NewGuid():N}.yml");
+        string snapshotPath = Path.Combine(Path.GetTempPath(), $"architecture-health-change-{Guid.NewGuid():N}.json");
+        try
+        {
+            var (generationExit, _, generationError) = RunCli(
+                "baseline", "generate", "--policy", PassingPolicy, "--output", baselinePath);
+            Assert.That(generationExit, Is.EqualTo(0), $"stderr: {generationError}");
+
+            var (exitCode, json, error) = RunCli(
+                "health", "--policy", PassingPolicy, "--baseline", baselinePath,
+                "--format", "json", "--change-snapshot", snapshotPath);
+            using JsonDocument health = JsonDocument.Parse(json);
+            ArchitectureChangeSnapshot snapshot = ArchitectureChangeReports.DeserializeSnapshot(
+                File.ReadAllText(snapshotPath));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"stderr: {error}");
+                Assert.That(health.RootElement.GetProperty("schema_id").GetString(),
+                    Is.EqualTo("architecture-health/v1"));
+                Assert.That(snapshot.SchemaVersion, Is.EqualTo(2));
+                Assert.That(snapshot.Mode, Is.EqualTo("strict"));
+                Assert.That(snapshot.Entries, Is.Not.Null);
+                Assert.That(snapshot.Findings, Is.Not.Null);
+            });
+        }
+        finally
+        {
+            DeleteIfPresent(baselinePath);
+            DeleteIfPresent(snapshotPath);
         }
     }
 

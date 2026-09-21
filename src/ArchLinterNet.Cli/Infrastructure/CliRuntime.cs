@@ -1,5 +1,6 @@
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
@@ -340,6 +341,30 @@ internal sealed class CliRuntime : ICliRuntime
     public ArchitectureHealthOutcome EvaluateHealth(ArchitectureHealthRequest request)
     {
         return _engine.EvaluateHealth(request);
+    }
+
+    public ArchitectureHealthOutcome EvaluateHealth(
+        ArchitectureHealthRequest request,
+        ArchitectureAnalysisSnapshot snapshot)
+    {
+        return _engine.EvaluateHealth(request, snapshot);
+    }
+
+    public BaselineVerifyOutcome VerifyBaseline(
+        BaselineVerifyRequest request,
+        ArchitectureAnalysisSnapshot snapshot)
+    {
+        return _engine.VerifyBaseline(request, snapshot);
+    }
+
+    public ArchitectureChangeSnapshot CreateChangeSnapshot(
+        ArchitectureAnalysisSnapshot snapshot,
+        string mode,
+        ValidationOutcome validation,
+        BaselineVerifyOutcome baseline,
+        string? conditionSetName)
+    {
+        return _engine.CreateChangeSnapshot(snapshot, mode, validation, baseline, conditionSetName);
     }
 
     public string FormatHealthAsHuman(ArchitectureHealthOutcome outcome)

@@ -2,6 +2,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Cli.Commands.Baseline.Application;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyWeakening;
 using ArchLinterNet.Core.Profiling;
@@ -37,7 +38,11 @@ internal sealed class HealthCommandHandler(
                                       Current repository identity for external-evidence context
               --evidence-revision <value>
                                       Current source revision for external-evidence context
-              --evidence-scope <value> Current assessment scope for external-evidence context
+              --evidence-scope <value>
+                                      Current assessment scope for external-evidence context
+              --change-snapshot <path>
+                                      Write the canonical current change snapshot from this same
+                                      immutable analysis session
               --base-context <path>    Base effective-policy context JSON (requires --current-context)
               --current-context <path> Current effective-policy context JSON (requires --base-context)
               --ensure-built           Build and receipt-verify before complete candidate collection
@@ -64,12 +69,23 @@ internal sealed class HealthCommandHandler(
         string? executionContext = null,
         IReadOnlyList<SarifEvidenceArtifactReference>? externalEvidenceArtifacts = null,
         SarifEvidenceAssessmentContext? externalEvidenceAssessmentContext = null,
-        string? externalEvidenceParseError = null)
+        string? externalEvidenceParseError = null,
+        string? changeSnapshotOutput = null)
     {
         if (options.ShowHelp)
         {
             console.Out.WriteLine(HelpText);
             return CliExitCodes.Success;
+        }
+
+        if (changeSnapshotOutput is not null && string.IsNullOrWhiteSpace(changeSnapshotOutput))
+        {
+            CliErrorOutputWriter.Write(
+                console,
+                options.Format,
+                "invalid-change-snapshot",
+                "--change-snapshot must name a non-empty file path.");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
@@ -101,15 +117,44 @@ internal sealed class HealthCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (changeSnapshotOutput is not null)
+        {
+            (string Name, string? Path)[] changeInputs =
+            [
+                ("--policy", options.PolicyPath),
+                ("--baseline", options.BaselinePath),
+                ("--base-context", options.BaseContextPath),
+                ("--current-context", options.CurrentContextPath),
+                ("--public-api-approval", options.PublicApiApprovalPath),
+                .. (externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
+                    .Select(artifact => ("--external-evidence", (string?)artifact.Path)),
+            ];
+            string? collision = FindOutputCollision(
+                changeSnapshotOutput,
+                changeInputs);
+            if (collision is not null)
+            {
+                console.Error.WriteLine(collision);
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+        }
+
         try
         {
-            ArchitectureHealthOutcome outcome = runtime.EvaluateHealth(new ArchitectureHealthRequest
+            ArchitectureHealthRequest healthRequest = new()
             {
                 DebtGate = ArchitectureAnalysisCommandSupport.CreateDebtGateRequest(options, fileSystem, cancellationToken),
                 ExecutionContext = executionContext,
                 ExternalEvidenceArtifacts = externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>(),
                 ExternalEvidenceAssessmentContext = externalEvidenceAssessmentContext,
-            });
+            };
+            ArchitectureHealthOutcome? outcome = changeSnapshotOutput is null
+                ? runtime.EvaluateHealth(healthRequest)
+                : EvaluateWithChangeSnapshot(options, healthRequest, changeSnapshotOutput, fileSystem);
+            if (outcome is null)
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
 
             console.Out.WriteLine(options.Format == "json"
                 ? runtime.FormatHealthAsJson(outcome)
@@ -157,6 +202,114 @@ internal sealed class HealthCommandHandler(
 
     internal int ExecuteRevalidatePublication(HealthRevalidatePublicationCommandOptions options) =>
         new HealthRevalidatePublicationCommandHandler(console, fileSystem).Execute(options);
+
+    private ArchitectureHealthOutcome? EvaluateWithChangeSnapshot(
+        ArchitectureAnalysisCommandOptions options,
+        ArchitectureHealthRequest healthRequest,
+        string changeSnapshotOutput,
+        IFileSystem outputFileSystem)
+    {
+        ArchitectureDebtGateRequest debtGateRequest = healthRequest.DebtGate;
+        using ArchitectureAnalysisSnapshot snapshot = runtime.CreateSnapshot(
+            new AnalysisSnapshotRequest
+            {
+                PolicyPath = debtGateRequest.PolicyPath,
+                BaselinePath = debtGateRequest.BaselinePath,
+                ConditionSetName = debtGateRequest.ConditionSetName,
+                ContractIds = debtGateRequest.ContractIds,
+                PreparationMode = debtGateRequest.PreparationMode,
+                NoRestore = debtGateRequest.NoRestore,
+                RequestedConfiguration = debtGateRequest.RequestedConfiguration,
+                RequestedTargetFramework = debtGateRequest.RequestedTargetFramework,
+                RequestedPlatform = debtGateRequest.RequestedPlatform,
+                RequestedRuntimeIdentifier = debtGateRequest.RequestedRuntimeIdentifier,
+                CancellationToken = debtGateRequest.CancellationToken,
+            },
+            null);
+
+        ArchitectureHealthOutcome outcome = runtime.EvaluateHealth(healthRequest, snapshot);
+        string changeMode = options.Mode == "audit" ? "audit" : "strict";
+        ValidationOutcome validation = outcome.ValidationOutcomes
+            .FirstOrDefault(candidate => candidate.Mode == changeMode)?.Outcome
+            ?? throw new InvalidOperationException(
+                $"Health did not produce the '{changeMode}' validation receipt required for the change snapshot.");
+
+        BaselineVerifyOutcome baseline = runtime.VerifyBaseline(
+            new BaselineVerifyRequest
+            {
+                PolicyPath = debtGateRequest.PolicyPath,
+                BaselinePath = debtGateRequest.BaselinePath,
+                Mode = changeMode,
+                ConditionSetName = debtGateRequest.ConditionSetName,
+                ContractIds = debtGateRequest.ContractIds,
+                PreparationMode = debtGateRequest.PreparationMode,
+                NoRestore = debtGateRequest.NoRestore,
+                RequestedConfiguration = debtGateRequest.RequestedConfiguration,
+                RequestedTargetFramework = debtGateRequest.RequestedTargetFramework,
+                RequestedPlatform = debtGateRequest.RequestedPlatform,
+                RequestedRuntimeIdentifier = debtGateRequest.RequestedRuntimeIdentifier,
+                CancellationToken = debtGateRequest.CancellationToken,
+            },
+            snapshot);
+        if (!baseline.Succeeded)
+        {
+            string detail = baseline.PreflightDiagnostics.Count == 0
+                ? "baseline candidates were not complete"
+                : "baseline build-state preflight was blocked";
+            throw new InvalidOperationException($"Could not create architecture change snapshot: {detail}.");
+        }
+
+        ArchitectureChangeSnapshot changeSnapshot = runtime.CreateChangeSnapshot(
+            snapshot,
+            changeMode,
+            validation,
+            baseline,
+            options.ConditionSetName);
+        outputFileSystem.WriteAllText(
+            changeSnapshotOutput,
+            ArchitectureChangeReports.SerializeSnapshot(changeSnapshot));
+        return outcome;
+    }
+
+    private static string? FindOutputCollision(
+        string outputPath,
+        params (string Name, string? Path)[] inputPaths)
+    {
+        string output;
+        try
+        {
+            output = Path.GetFullPath(outputPath);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or IOException)
+        {
+            return $"--change-snapshot destination '{outputPath}' is not a valid file path";
+        }
+
+        foreach ((string name, string? inputPath) in inputPaths)
+        {
+            if (inputPath is null)
+            {
+                continue;
+            }
+
+            string protectedPath;
+            try
+            {
+                protectedPath = Path.GetFullPath(inputPath);
+            }
+            catch (Exception exception) when (exception is ArgumentException or NotSupportedException or IOException)
+            {
+                continue;
+            }
+
+            if (string.Equals(output, protectedPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return $"--change-snapshot destination '{outputPath}' matches {name} input '{inputPath}'";
+            }
+        }
+
+        return null;
+    }
 
     private bool TryValidateFormat(string format)
     {

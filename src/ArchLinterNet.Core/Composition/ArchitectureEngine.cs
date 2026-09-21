@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Asmdef;
 using ArchLinterNet.Core.Asmdef.Abstractions;
+using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Graph.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -126,6 +127,61 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
     {
         return _serviceProvider.GetRequiredService<IArchitectureHealthApplicationService>()
             .Evaluate(request);
+    }
+
+    /// <summary>
+    /// Internal composite-workflow seam: reuse a caller-owned immutable snapshot for Health.
+    /// Public single-operation callers continue to use <see cref="EvaluateHealth"/> above.
+    /// </summary>
+    internal ArchitectureHealthOutcome EvaluateHealth(
+        ArchitectureHealthRequest request,
+        ArchitectureAnalysisSnapshot snapshot)
+    {
+        return _serviceProvider.GetRequiredService<ArchitectureHealthApplicationService>()
+            .Evaluate(request, snapshot);
+    }
+
+    /// <summary>
+    /// Internal composite-workflow seam: compare baseline candidates already collected by the
+    /// supplied snapshot. This preserves the legacy change-snapshot baseline mode without a
+    /// second preparation or candidate-collection lifecycle.
+    /// </summary>
+    internal BaselineVerifyOutcome VerifyBaseline(
+        BaselineVerifyRequest request,
+        ArchitectureAnalysisSnapshot snapshot)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()
+            .Verify(request, snapshot);
+    }
+
+    /// <summary>
+    /// Projects the canonical change snapshot from validation, graph, and baseline receipts
+    /// retained by one immutable candidate analysis session.
+    /// </summary>
+    internal ArchitectureChangeSnapshot CreateChangeSnapshot(
+        ArchitectureAnalysisSnapshot snapshot,
+        string mode,
+        ValidationOutcome validation,
+        BaselineVerifyOutcome baseline,
+        string? conditionSetName)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(validation);
+        ArgumentNullException.ThrowIfNull(baseline);
+
+        ArchitectureGraphOutcome namespaces = snapshot.BuildGraph(
+            mode,
+            ArchitectureGraphLevel.Namespace);
+        ArchitectureGraphOutcome assemblies = snapshot.BuildGraph(
+            mode,
+            ArchitectureGraphLevel.Assembly);
+        return ArchitectureChangeSnapshotProjector.Project(
+            mode,
+            validation,
+            namespaces,
+            assemblies,
+            baseline.Frozen,
+            conditionSetName);
     }
 
     public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)

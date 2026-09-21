@@ -16,26 +16,25 @@ public sealed class ArchitectureHealthApplicationService(
 {
     public ArchitectureHealthOutcome Evaluate(ArchitectureHealthRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        ArchitectureDebtGateRequest debtGateRequest = request.DebtGate
-            ?? throw new ArgumentException("A canonical debt-gate request is required.", nameof(request));
-        string[] modes = ResolveModes(debtGateRequest.Mode);
-        AnalysisSnapshotRequest snapshotRequest = new()
-        {
-            PolicyPath = debtGateRequest.PolicyPath,
-            BaselinePath = debtGateRequest.BaselinePath,
-            ConditionSetName = debtGateRequest.ConditionSetName,
-            ContractIds = debtGateRequest.ContractIds,
-            PreparationMode = debtGateRequest.PreparationMode,
-            NoRestore = debtGateRequest.NoRestore,
-            RequestedConfiguration = debtGateRequest.RequestedConfiguration,
-            RequestedTargetFramework = debtGateRequest.RequestedTargetFramework,
-            RequestedPlatform = debtGateRequest.RequestedPlatform,
-            RequestedRuntimeIdentifier = debtGateRequest.RequestedRuntimeIdentifier,
-            CancellationToken = debtGateRequest.CancellationToken,
-        };
+        ArchitectureDebtGateRequest debtGateRequest = RequireDebtGateRequest(request);
+        using ArchitectureAnalysisSnapshot snapshot = validationService.CreateSnapshot(
+            CreateSnapshotRequest(debtGateRequest));
+        return Evaluate(request, snapshot);
+    }
 
-        using ArchitectureAnalysisSnapshot snapshot = validationService.CreateSnapshot(snapshotRequest);
+    /// <summary>
+    /// Projects Health from a caller-owned immutable snapshot. Composite CLI workflows use this
+    /// seam to publish Health and another canonical read-only projection without creating a second
+    /// preparation or analysis lifetime. The caller retains ownership and must dispose the
+    /// snapshot after every requested projection has completed.
+    /// </summary>
+    internal ArchitectureHealthOutcome Evaluate(
+        ArchitectureHealthRequest request,
+        ArchitectureAnalysisSnapshot snapshot)
+    {
+        ArchitectureDebtGateRequest debtGateRequest = RequireDebtGateRequest(request);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        string[] modes = ResolveModes(debtGateRequest.Mode);
         ArchitectureHealthValidationOutcome[] validationOutcomes = modes
             .Select(mode => new ArchitectureHealthValidationOutcome(mode, snapshot.Evaluate(mode)))
             .ToArray();
@@ -60,6 +59,28 @@ public sealed class ArchitectureHealthApplicationService(
                 snapshot.GetCaptureConsumedInputPaths()),
         };
     }
+
+    private static ArchitectureDebtGateRequest RequireDebtGateRequest(ArchitectureHealthRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return request.DebtGate
+            ?? throw new ArgumentException("A canonical debt-gate request is required.", nameof(request));
+    }
+
+    private static AnalysisSnapshotRequest CreateSnapshotRequest(ArchitectureDebtGateRequest request) => new()
+    {
+        PolicyPath = request.PolicyPath,
+        BaselinePath = request.BaselinePath,
+        ConditionSetName = request.ConditionSetName,
+        ContractIds = request.ContractIds,
+        PreparationMode = request.PreparationMode,
+        NoRestore = request.NoRestore,
+        RequestedConfiguration = request.RequestedConfiguration,
+        RequestedTargetFramework = request.RequestedTargetFramework,
+        RequestedPlatform = request.RequestedPlatform,
+        RequestedRuntimeIdentifier = request.RequestedRuntimeIdentifier,
+        CancellationToken = request.CancellationToken,
+    };
 
     private static string[] ResolveModes(string mode) => mode switch
     {
