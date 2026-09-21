@@ -279,6 +279,7 @@ def test_ci_producer_freezes_one_candidate_and_fans_out_read_only_projections() 
     assert "run_projection coverage run_coverage &" in producer
     assert "run_projection report_inputs run_report_inputs &" in producer
     assert "ARCHITECTURE_BUILD_ALREADY_PREPARED=true" in producer
+    assert "make public-api-check ARCHITECTURE_BUILD_ALREADY_PREPARED=true" in producer
     assert "--change-snapshot \"$output_directory/current-architecture-change-snapshot.json\"" in producer
     assert "snapshot \"$output_directory/base-architecture-change-snapshot.json\"" in producer
     assert '\n          snapshot "$output_directory/current-architecture-change-snapshot.json"' not in producer

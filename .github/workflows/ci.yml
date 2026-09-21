@@ -479,7 +479,7 @@ jobs:
 
           run_public_api() {
             verify_candidate
-            make public-api-check
+            make public-api-check ARCHITECTURE_BUILD_ALREADY_PREPARED=true
           }
 
           run_coverage() {
