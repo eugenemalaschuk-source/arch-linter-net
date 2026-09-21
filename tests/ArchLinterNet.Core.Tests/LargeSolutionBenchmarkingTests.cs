@@ -447,6 +447,15 @@ public sealed class LargeSolutionBenchmarkingTests
             """);
         BenchmarkCanonicalResultIdentity result = BenchmarkIdentity.CreateCanonicalResult("Success", 0, []);
         BenchmarkEvidenceDocument evidence = BenchmarkEvidenceFactory.Create(workload, profile.RootElement.Clone(), result);
+        BenchmarkProfileSample timedSample = evidence.Samples.Single() with
+        {
+            MeasuredWallClockMilliseconds = 1.25m,
+        };
+        evidence = evidence with
+        {
+            Samples = [timedSample],
+            Run = timedSample.Run,
+        };
         string json = BenchmarkEvidenceJson.Serialize(evidence);
         BenchmarkEvidenceDocument roundTrip = BenchmarkEvidenceJson.Deserialize(json);
         JsonSchema schema = JsonSchema.FromText(LoadEvidenceSchema());
@@ -457,6 +466,7 @@ public sealed class LargeSolutionBenchmarkingTests
         {
             Assert.That(roundTrip.Workload.WorkloadIdentity, Is.EqualTo(workload.WorkloadIdentity));
             Assert.That(roundTrip.Samples.Single().RawAnalysisProfile.GetProperty("SchemaId").GetString(), Is.EqualTo("analysis-profile/v1"));
+            Assert.That(json, Does.Not.Contain("measured_wall_clock_milliseconds"));
             Assert.That(validation.IsValid, Is.True, Describe(validation));
         });
     }

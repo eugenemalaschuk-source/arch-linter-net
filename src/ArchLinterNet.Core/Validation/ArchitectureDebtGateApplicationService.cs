@@ -13,19 +13,68 @@ public sealed class ArchitectureDebtGateApplicationService : IArchitectureDebtGa
 {
     private readonly IArchitectureBaselineApplicationService _baselineService;
     private readonly IArchitecturePublicApiApplicationService? _publicApiService;
+    private readonly IArchitectureValidationApplicationService? _validationService;
 
     public ArchitectureDebtGateApplicationService(IArchitectureBaselineApplicationService baselineService)
-        : this(baselineService, null)
+        : this(baselineService, null, null)
     {
     }
 
     public ArchitectureDebtGateApplicationService(
         IArchitectureBaselineApplicationService baselineService,
         IArchitecturePublicApiApplicationService? publicApiService)
+        : this(baselineService, publicApiService, null)
+    {
+    }
+
+    internal ArchitectureDebtGateApplicationService(
+        IArchitectureBaselineApplicationService baselineService,
+        IArchitecturePublicApiApplicationService? publicApiService,
+        IArchitectureValidationApplicationService? validationService)
     {
         _baselineService = baselineService;
         _publicApiService = publicApiService;
+        _validationService = validationService;
     }
+
+    internal (ArchitectureDebtGateOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) EvaluateWithCounters(
+        ArchitectureDebtGateRequest request)
+    {
+        if (_validationService is null)
+        {
+            return (Evaluate(request), new ArchitectureAnalysisSnapshotCounters());
+        }
+
+        using ArchitectureAnalysisSnapshot snapshot = _validationService.CreateSnapshot(new AnalysisSnapshotRequest
+        {
+            PolicyPath = request.PolicyPath,
+            BaselinePath = request.BaselinePath,
+            ConditionSetName = request.ConditionSetName,
+            ContractIds = request.ContractIds,
+            PreparationMode = request.PreparationMode,
+            NoRestore = request.NoRestore,
+            RequestedConfiguration = request.RequestedConfiguration,
+            RequestedTargetFramework = request.RequestedTargetFramework,
+            RequestedPlatform = request.RequestedPlatform,
+            RequestedRuntimeIdentifier = request.RequestedRuntimeIdentifier,
+            CancellationToken = request.CancellationToken,
+        });
+        foreach (string mode in ResolveModes(request.Mode))
+        {
+            snapshot.Evaluate(mode);
+        }
+
+        ArchitectureDebtGateOutcome outcome = Evaluate(request, snapshot);
+        return (outcome, snapshot.Counters);
+    }
+
+    private static string[] ResolveModes(string mode) => mode switch
+    {
+        "strict" => ["strict"],
+        "audit" => ["audit"],
+        "all" => ["strict", "audit"],
+        _ => throw new ArgumentException("Invalid mode. Use 'strict', 'audit', or 'all'.", nameof(mode)),
+    };
 
     public ArchitectureDebtGateOutcome Evaluate(ArchitectureDebtGateRequest request)
     {
@@ -36,7 +85,14 @@ public sealed class ArchitectureDebtGateApplicationService : IArchitectureDebtGa
     public ArchitectureDebtGateOutcome Evaluate(ArchitectureDebtGateRequest request, ArchitectureAnalysisSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        return EvaluateCore(request, snapshot);
+        return EvaluateCore(request, snapshot) with
+        {
+            AnalysisInputs = ArchitectureAnalysisInputPaths.Create(
+                snapshot.GetCapturePolicyImportPaths(),
+                snapshot.GetCaptureResolvedAssemblyPaths(),
+                snapshot.GetCaptureDiscoveredProjectPaths(),
+                snapshot.GetCaptureConsumedInputPaths()),
+        };
     }
 
     private ArchitectureDebtGateOutcome EvaluateCore(

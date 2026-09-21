@@ -27,6 +27,7 @@ internal sealed class ChangeCommandDefinition(ChangeCommandHandler handler)
         Option<string> framework = new("--framework");
         Option<string> platform = new("--platform");
         Option<string> runtime = new("--runtime");
+        Option<string> profile = new("--profile");
         Option<bool> help = new("--help");
         help.Aliases.Add("-h");
         command.Options.Add(policy);
@@ -40,6 +41,7 @@ internal sealed class ChangeCommandDefinition(ChangeCommandHandler handler)
         command.Options.Add(framework);
         command.Options.Add(platform);
         command.Options.Add(runtime);
+        command.Options.Add(profile);
         command.Options.Add(help);
         command.SetAction(result => handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
             result.GetValue(policy) ?? "architecture/dependencies.arch.yml",
@@ -53,7 +55,8 @@ internal sealed class ChangeCommandDefinition(ChangeCommandHandler handler)
             result.GetValue(configuration),
             result.GetValue(framework),
             result.GetValue(platform),
-            result.GetValue(runtime))));
+            result.GetValue(runtime),
+            result.GetValue(profile))));
         return command;
     }
 

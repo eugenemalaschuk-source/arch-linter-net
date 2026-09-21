@@ -53,4 +53,8 @@ public sealed record ArchitectureMetricMeasurementOutcome(
             .Select(control => control.Record!)
             .ToArray()
         ?? Array.Empty<ArchitectureApplicabilityRecord>();
+
+    // CLI-only provenance for profile-publication collision checks. The CLI is a reviewed Core
+    // friend assembly; this is deliberately not part of the package's public result contract.
+    internal ArchitectureAnalysisInputPaths AnalysisInputs { get; init; } = ArchitectureAnalysisInputPaths.Empty;
 }

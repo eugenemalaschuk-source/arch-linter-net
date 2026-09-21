@@ -119,7 +119,7 @@ internal static class TopologyCommandGuards
 
     // One manifest feeds every topology output guard. Keeping all trust-read inputs here prevents
     // command-specific additions from silently escaping alias protection.
-    private static (string Name, string? Path)[] CreateTrustedInputManifest(
+    internal static (string Name, string? Path)[] CreateTrustedInputManifest(
         string? policyPath,
         IReadOnlyList<string> policyImportPaths,
         IReadOnlyList<string> resolvedAssemblyPaths,

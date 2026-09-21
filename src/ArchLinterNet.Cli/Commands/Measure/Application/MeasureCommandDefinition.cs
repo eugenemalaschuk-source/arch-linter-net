@@ -30,6 +30,7 @@ internal sealed class MeasureCommandDefinition(MeasureCommandHandler handler)
               --platform <platform>
                                 Requested platform
               --runtime <rid>   Requested runtime identifier
+              --profile <path>  Write analysis-profile/v1 counters to a file, stdout, or stderr
           -h, --help            Show this help message
 
         Exit codes:
@@ -55,6 +56,7 @@ internal sealed class MeasureCommandDefinition(MeasureCommandHandler handler)
         Option<string> targetFrameworkOption = new("--framework");
         Option<string> platformOption = new("--platform");
         Option<string> runtimeIdentifierOption = new("--runtime");
+        Option<string> profileOption = new("--profile");
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
 
@@ -70,6 +72,7 @@ internal sealed class MeasureCommandDefinition(MeasureCommandHandler handler)
         command.Options.Add(targetFrameworkOption);
         command.Options.Add(platformOption);
         command.Options.Add(runtimeIdentifierOption);
+        command.Options.Add(profileOption);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new MeasureCommandOptions(
@@ -85,7 +88,8 @@ internal sealed class MeasureCommandDefinition(MeasureCommandHandler handler)
             parseResult.GetValue(configurationOption),
             parseResult.GetValue(targetFrameworkOption),
             parseResult.GetValue(platformOption),
-            parseResult.GetValue(runtimeIdentifierOption))));
+            parseResult.GetValue(runtimeIdentifierOption),
+            parseResult.GetValue(profileOption))));
 
         return command;
     }

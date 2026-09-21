@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ArchLinterNet.Core.Tests;
 
@@ -37,6 +38,12 @@ internal sealed record BenchmarkResourceMeasurement
     public static BenchmarkResourceMeasurement Unavailable(string reason) => new()
     {
         Status = BenchmarkMeasurementStatus.Unavailable,
+        Reason = reason,
+    };
+
+    public static BenchmarkResourceMeasurement NotApplicable(string reason) => new()
+    {
+        Status = BenchmarkMeasurementStatus.NotApplicable,
         Reason = reason,
     };
 
@@ -124,6 +131,13 @@ internal sealed record BenchmarkProfileSample
     public required bool OutputFailed { get; init; }
 
     public required BenchmarkResourceMeasurement WallClock { get; init; }
+
+    // WallClock is retained as the integer resource summary used by the versioned evidence
+    // contract. This higher-resolution value is runtime-only decision-model input for sub-process
+    // and in-process timings, where rounding a sub-millisecond sample to zero would erase evidence.
+    // Keep it out of benchmark-evidence/v1 until the versioned schema has an explicit field.
+    [JsonIgnore]
+    public decimal? MeasuredWallClockMilliseconds { get; init; }
 
     public required BenchmarkResourceMeasurement ProcessorTime { get; init; }
 
@@ -287,6 +301,11 @@ internal sealed record BenchmarkEvidenceDocument
         foreach (BenchmarkProfileSample sample in Samples)
         {
             sample.WallClock.Validate("samples.wall_clock");
+            if (sample.MeasuredWallClockMilliseconds is <= 0)
+            {
+                throw new InvalidOperationException(
+                    "A measured benchmark wall-clock duration must be positive when present.");
+            }
             sample.ProcessorTime.Validate("samples.processor_time");
             sample.AllocatedBytes.Validate("samples.allocated_bytes");
             sample.PeakManagedMemory.Validate("samples.peak_managed_memory");

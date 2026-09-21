@@ -26,4 +26,8 @@ public sealed record ArchitectureHealthOutcome(
 
     /// <summary>Condition set used by the shared immutable Health analysis snapshot.</summary>
     public string ConditionSetName { get; init; } = string.Empty;
+
+    // CLI-only provenance for profile-publication collision checks. The CLI is a reviewed Core
+    // friend assembly; this is deliberately not part of the package's public result contract.
+    internal ArchitectureAnalysisInputPaths AnalysisInputs { get; init; } = ArchitectureAnalysisInputPaths.Empty;
 }

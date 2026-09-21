@@ -18,6 +18,18 @@ internal sealed class ArchitectureTopologyCaptureService(
 
     public ArchitectureTopologyCaptureOutcome Capture(ArchitectureTopologyCaptureRequest request)
     {
+        return CaptureCore(request).Outcome;
+    }
+
+    public (ArchitectureTopologyCaptureOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) CaptureWithCounters(
+        ArchitectureTopologyCaptureRequest request)
+    {
+        return CaptureCore(request);
+    }
+
+    private (ArchitectureTopologyCaptureOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) CaptureCore(
+        ArchitectureTopologyCaptureRequest request)
+    {
         ArgumentNullException.ThrowIfNull(request);
         ValidateSubjectKind(request.SubjectKind);
 
@@ -26,7 +38,7 @@ internal sealed class ArchitectureTopologyCaptureService(
 
         if (snapshot.Failed)
         {
-            return new ArchitectureTopologyCaptureOutcome(
+            ArchitectureTopologyCaptureOutcome outcome = new(
                 request.SubjectKind,
                 Array.Empty<ArchitectureTopologyCaptureFact>(),
                 Array.Empty<ArchitectureTopologyCaptureRelationship>(),
@@ -39,6 +51,7 @@ internal sealed class ArchitectureTopologyCaptureService(
             {
                 ConsumedInputPaths = snapshot.GetCaptureConsumedInputPaths(),
             };
+            return (outcome, snapshot.Counters);
         }
 
         ArchitectureTopologyObservation observation =
@@ -64,7 +77,7 @@ internal sealed class ArchitectureTopologyCaptureService(
             .ToArray();
 
         request.CancellationToken.ThrowIfCancellationRequested();
-        return new ArchitectureTopologyCaptureOutcome(
+        ArchitectureTopologyCaptureOutcome completed = new(
             request.SubjectKind,
             subjects,
             relationships,
@@ -76,6 +89,7 @@ internal sealed class ArchitectureTopologyCaptureService(
         {
             ConsumedInputPaths = snapshot.GetCaptureConsumedInputPaths(),
         };
+        return (completed, snapshot.Counters);
     }
 
     private static AnalysisSnapshotRequest ToSnapshotRequest(ArchitectureTopologyCaptureRequest request) => new()

@@ -53,6 +53,11 @@ public sealed class ArchitectureHealthApplicationService(
             AnalysisCounters = snapshot.Counters,
             ExecutionContext = request.ExecutionContext,
             ConditionSetName = debtGateRequest.ConditionSetName ?? string.Empty,
+            AnalysisInputs = ArchitectureAnalysisInputPaths.Create(
+                snapshot.GetCapturePolicyImportPaths(),
+                snapshot.GetCaptureResolvedAssemblyPaths(),
+                snapshot.GetCaptureDiscoveredProjectPaths(),
+                snapshot.GetCaptureConsumedInputPaths()),
         };
     }
 

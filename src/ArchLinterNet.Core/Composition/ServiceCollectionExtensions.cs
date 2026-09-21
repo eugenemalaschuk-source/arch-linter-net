@@ -66,7 +66,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureContractExecutor, ArchitectureContractExecutor>();
         services.AddSingleton<IBuildStatePreparationService, BuildStatePreparationService>();
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
-        services.AddSingleton<IArchitectureMetricMeasurementApplicationService, ArchitectureMetricMeasurementApplicationService>();
+        services.AddSingleton<ArchitectureMetricMeasurementApplicationService>();
+        services.AddSingleton<IArchitectureMetricMeasurementApplicationService>(sp =>
+            sp.GetRequiredService<ArchitectureMetricMeasurementApplicationService>());
         services.AddSingleton<IArchitecturePolicyCheckApplicationService, ArchitecturePolicyCheckApplicationService>();
         services.AddSingleton<IArchitecturePolicyContextApplicationService, ArchitecturePolicyContextApplicationService>();
         services.AddSingleton<ArchitectureBaselineCandidateCollector>();
@@ -75,7 +77,13 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<ArchitectureBaselineCandidateCollector>(),
                 sp.GetRequiredService<IArchitectureBaselineGenerator>(),
                 sp.GetRequiredService<IArchitectureBaselineLoadingService>()));
-        services.AddSingleton<IArchitectureDebtGateApplicationService, ArchitectureDebtGateApplicationService>();
+        services.AddSingleton<ArchitectureDebtGateApplicationService>(sp =>
+            new ArchitectureDebtGateApplicationService(
+                sp.GetRequiredService<IArchitectureBaselineApplicationService>(),
+                sp.GetService<IArchitecturePublicApiApplicationService>(),
+                sp.GetRequiredService<IArchitectureValidationApplicationService>()));
+        services.AddSingleton<IArchitectureDebtGateApplicationService>(sp =>
+            sp.GetRequiredService<ArchitectureDebtGateApplicationService>());
         services.AddSingleton<IArchitectureHealthApplicationService, ArchitectureHealthApplicationService>();
         services.AddSingleton<IPublicApiSnapshotStore, PublicApiSnapshotStore>();
         services.AddSingleton<ArchitecturePublicApiSurfaceResolver>();

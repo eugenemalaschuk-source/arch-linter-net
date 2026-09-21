@@ -216,6 +216,40 @@ public sealed partial class TopologyCommandHandlerTests
     }
 
     [Test]
+    public void CaptureProfile_RejectsDynamicConsumedInputBeforePublishing()
+    {
+        string source = Path.GetFullPath("src/Consumer.cs");
+        FakeConsole console = new();
+        FakeFileSystem files = new();
+        FakeRuntime runtime = new()
+        {
+            CaptureResult = new ArchitectureTopologyCaptureOutcome("assembly", [], [], "repo", [], [], [], [])
+            {
+                ConsumedInputPaths = [source],
+            },
+        };
+
+        int exitCode = new TopologyCommandHandler(runtime, console, files)
+            .Capture(new(
+                "policy.yml",
+                "assembly",
+                "json",
+                "capture.json",
+                null,
+                false,
+                ProfileDestination: source));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("--profile destination"));
+            Assert.That(console.ErrorText, Does.Contain("source input consumed during this run"));
+            Assert.That(files.DirectWrites, Is.EqualTo(0));
+            Assert.That(files.RenameCalls, Is.EqualTo(0));
+        });
+    }
+
+    [Test]
     public void CaptureOutput_PublicationFailurePreservesTargetAndCleansTemporaryFile()
     {
         FakeConsole console = new();

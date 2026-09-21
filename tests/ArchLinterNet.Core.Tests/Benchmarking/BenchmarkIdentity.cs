@@ -42,6 +42,28 @@ internal static class BenchmarkIdentity
         };
     }
 
+    public static BenchmarkCanonicalResultIdentity CreateCanonicalResultFromCanonicalText(
+        string completionStatus,
+        int exitCode,
+        string canonicalText,
+        int findingCount)
+    {
+        string canonical = BenchmarkJson.Serialize(new
+        {
+            completion_status = completionStatus,
+            exit_code = exitCode,
+            canonical_result = canonicalText,
+        });
+        return new BenchmarkCanonicalResultIdentity
+        {
+            Algorithm = "sha256-canonical-result/v2",
+            Sha256 = Sha256(canonical),
+            FindingCount = findingCount,
+            CompletionStatus = completionStatus,
+            ExitCode = exitCode,
+        };
+    }
+
     public static string NormalizePath(string path)
     {
         string normalized = path.Replace('\\', '/');

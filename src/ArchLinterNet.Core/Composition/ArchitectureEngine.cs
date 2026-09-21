@@ -63,6 +63,14 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Measure(request, timing);
     }
 
+    internal (ArchitectureMetricMeasurementOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) MeasureWithCounters(
+        ArchitectureMetricMeasurementRequest request,
+        ValidationTiming? timing = null)
+    {
+        return _serviceProvider.GetRequiredService<ArchitectureMetricMeasurementApplicationService>()
+            .MeasureWithCounters(request, timing);
+    }
+
     public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request)
     {
         return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()
@@ -104,6 +112,13 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
     {
         return _serviceProvider.GetRequiredService<IArchitectureDebtGateApplicationService>()
             .Evaluate(request);
+    }
+
+    internal (ArchitectureDebtGateOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) EvaluateDebtGateWithCounters(
+        ArchitectureDebtGateRequest request)
+    {
+        return _serviceProvider.GetRequiredService<ArchitectureDebtGateApplicationService>()
+            .EvaluateWithCounters(request);
     }
 
     /// <summary>Projects the complete architecture-health/v1 summary from existing governance authorities.</summary>
@@ -154,6 +169,13 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
     {
         return _serviceProvider.GetRequiredService<IArchitectureTopologyCaptureService>()
             .Capture(request);
+    }
+
+    internal (ArchitectureTopologyCaptureOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) CaptureTopologyWithCounters(
+        ArchitectureTopologyCaptureRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureTopologyCaptureService>()
+            .CaptureWithCounters(request);
     }
 
     public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request)

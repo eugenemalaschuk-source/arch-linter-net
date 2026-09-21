@@ -23,6 +23,7 @@ internal static class TopologyCommandHelpTexts
               --platform <name>     Build platform
               --runtime <rid>       Runtime identifier
               --max-parallelism <n> Maximum analysis parallelism
+              --profile <path>       Write analysis-profile/v1 counters to a file, stdout, or stderr
           -h, --help                Show this help message
 
         Use --ensure-built to create the verified build receipt required for a first capture.

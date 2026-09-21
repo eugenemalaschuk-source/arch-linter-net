@@ -2,6 +2,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Validate.Application;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Topology;
 using ArchLinterNet.Core.Validation;
 
@@ -30,9 +31,18 @@ internal sealed class TopologyCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (!AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination,
+                console,
+                ("--policy", options.PolicyPath),
+                ("--output", options.OutputPath)))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
-            ArchitectureTopologyCaptureOutcome outcome = runtime.CaptureTopology(new ArchitectureTopologyCaptureRequest
+            (ArchitectureTopologyCaptureOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) = runtime.CaptureTopologyWithCounters(new ArchitectureTopologyCaptureRequest
             {
                 PolicyPath = options.PolicyPath,
                 SubjectKind = options.SubjectKind,
@@ -46,6 +56,24 @@ internal sealed class TopologyCommandHandler(
                 MaxParallelism = options.MaxParallelism,
                 CancellationToken = cancellationToken,
             });
+
+            (string Name, string? Path)[] profileProtectedPaths = TopologyCommandGuards
+                .CreateTrustedInputManifest(
+                    options.PolicyPath,
+                    outcome.PolicyImportPaths,
+                    outcome.ResolvedAssemblyPaths,
+                    outcome.DiscoveredProjectPaths,
+                    outcome.ConsumedInputPaths,
+                    baselinePath: null)
+                .Append(("--output", options.OutputPath))
+                .ToArray();
+            if (!AnalysisProfilePublisher.TryValidateDestination(
+                    options.ProfileDestination,
+                    console,
+                    profileProtectedPaths))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
 
             string? collision = TopologyCommandGuards.FindCaptureOutputCollision(
                 options.OutputPath, options.PolicyPath, outcome, fileSystem);
@@ -64,6 +92,16 @@ internal sealed class TopologyCommandHandler(
             {
                 return writeResult;
             }
+
+            AnalysisProfilePublisher.Write(
+                options.ProfileDestination,
+                console,
+                fileSystem,
+                counters,
+                outcome.PreflightBlocked
+                    ? AnalysisProfileCompletionStatus.PreparationFailure
+                    : AnalysisProfileCompletionStatus.Success,
+                profileProtectedPaths);
 
             return outcome.PreflightBlocked ? CliExitCodes.InvalidArgumentsOrRuntimeError : CliExitCodes.Success;
         }
