@@ -22,7 +22,8 @@ internal sealed record ArchitectureAnalysisCommandOptions(
     string? TargetFramework,
     string? Platform,
     string? RuntimeIdentifier,
-    string? PublicApiApprovalPath = null);
+    string? PublicApiApprovalPath = null,
+    string? ProfileDestination = null);
 
 internal sealed class ArchitectureAnalysisCommandOptionSet
 {
@@ -44,6 +45,8 @@ internal sealed class ArchitectureAnalysisCommandOptionSet
     public Option<string> CurrentContext { get; } = new("--current-context");
 
     public Option<string> PublicApiApproval { get; } = new("--public-api-approval");
+
+    public Option<string> Profile { get; } = new("--profile");
 
     public Option<string> Format { get; } = WithDefault("--format", "human");
 
@@ -79,6 +82,7 @@ internal sealed class ArchitectureAnalysisCommandOptionSet
         command.Options.Add(BaseContext);
         command.Options.Add(CurrentContext);
         command.Options.Add(PublicApiApproval);
+        command.Options.Add(Profile);
         command.Options.Add(Format);
         command.Options.Add(EnsureBuilt);
         command.Options.Add(NoRestore);
@@ -105,7 +109,8 @@ internal sealed class ArchitectureAnalysisCommandOptionSet
         result.GetValue(Framework),
         result.GetValue(Platform),
         result.GetValue(Runtime),
-        result.GetValue(PublicApiApproval));
+        result.GetValue(PublicApiApproval),
+        result.GetValue(Profile));
 
     private static Option<string> WithDefault(string name, string value)
     {

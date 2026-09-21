@@ -4,6 +4,7 @@ using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Change.Application;
@@ -14,13 +15,23 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine("arch-linter-net change snapshot --policy <path> --output <path> [--mode strict|audit] [--baseline <path>] [--condition-set <name>] [--ensure-built] [--no-restore] [--configuration <name>] [--framework <tfm>] [--platform <platform>] [--runtime <rid>]");
+            console.Out.WriteLine("arch-linter-net change snapshot --policy <path> --output <path> [--mode strict|audit] [--baseline <path>] [--condition-set <name>] [--ensure-built] [--no-restore] [--configuration <name>] [--framework <tfm>] [--platform <platform>] [--runtime <rid>] [--profile <path>]");
             return CliExitCodes.Success;
         }
 
         if (options.Mode is not ("strict" or "audit") || string.IsNullOrWhiteSpace(options.OutputPath))
         {
             console.Error.WriteLine("Change snapshot requires --output and a strict or audit --mode.");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        if (!AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination,
+                console,
+                ("--policy", options.PolicyPath),
+                ("--baseline", options.BaselinePath),
+                ("--output", options.OutputPath)))
+        {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -33,7 +44,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
-            ValidationOutcome validation = runtime.Validate(new ValidationRequest
+            (ValidationOutcome validation, ArchitectureAnalysisSnapshotCounters counters) = runtime.ValidateWithCounters(new ValidationRequest
             {
                 PolicyPath = options.PolicyPath,
                 Mode = options.Mode,
@@ -48,6 +59,15 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
             }, null);
             if (validation.PreflightBlocked)
             {
+                AnalysisProfilePublisher.Write(
+                    options.ProfileDestination,
+                    console,
+                    fileSystem,
+                    counters,
+                    AnalysisProfileCompletionStatus.PreparationFailure,
+                    ("--policy", options.PolicyPath),
+                    ("--baseline", options.BaselinePath),
+                    ("--output", options.OutputPath));
                 return FailIncompleteSnapshot("validation", validation.PreflightDiagnostics);
             }
 
@@ -90,9 +110,39 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            if (!AnalysisProfilePublisher.TryValidateDestination(
+                    options.ProfileDestination,
+                    console,
+                    ("--policy", options.PolicyPath),
+                    ("--baseline", options.BaselinePath),
+                    ("--output", options.OutputPath)) ||
+                !AnalysisProfilePublisher.TryValidateDestination(
+                    options.ProfileDestination,
+                    console,
+                    validation.PolicyImportPaths.Select(path => ("imported policy", (string?)path))
+                        .Concat(validation.ResolvedAssemblyPaths.SelectMany(path => new[]
+                        {
+                            ("a build artifact", (string?)path),
+                            ("a build receipt", (string?)BuildReceiptStore.ReceiptPathFor(path)),
+                        }))
+                        .Concat(validation.DiscoveredProjectPaths.Select(path => ("a project file", (string?)path)))
+                        .ToArray()))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
                 options.Mode, validation, namespaces, assemblies, baselineDebt, options.ConditionSetName);
             fileSystem.WriteAllText(options.OutputPath, ArchitectureChangeReports.SerializeSnapshot(snapshot));
+            AnalysisProfilePublisher.Write(
+                options.ProfileDestination,
+                console,
+                fileSystem,
+                counters,
+                AnalysisProfileCompletionStatus.Success,
+                ("--policy", options.PolicyPath),
+                ("--baseline", options.BaselinePath),
+                ("--output", options.OutputPath));
             return CliExitCodes.Success;
         }
         catch (Exception exception)

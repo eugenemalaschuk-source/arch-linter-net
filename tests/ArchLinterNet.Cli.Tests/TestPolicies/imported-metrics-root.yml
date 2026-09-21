@@ -1,0 +1,6 @@
+version: 1
+name: Imported metric CLI complete
+imports:
+  - imported-metrics-fragment.yml
+layers: {}
+contracts: {}

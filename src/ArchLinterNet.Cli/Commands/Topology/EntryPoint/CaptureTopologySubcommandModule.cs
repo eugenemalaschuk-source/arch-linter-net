@@ -32,6 +32,7 @@ internal sealed class CaptureTopologySubcommandModule : ITopologySubcommandModul
         Option<string> platform = new("--platform");
         Option<string> runtimeOption = new("--runtime");
         Option<int?> maxParallelism = new("--max-parallelism");
+        Option<string> profile = new("--profile");
         Option<bool> help = new("--help");
         help.Aliases.Add("-h");
 
@@ -48,6 +49,7 @@ internal sealed class CaptureTopologySubcommandModule : ITopologySubcommandModul
         command.Options.Add(platform);
         command.Options.Add(runtimeOption);
         command.Options.Add(maxParallelism);
+        command.Options.Add(profile);
         command.Options.Add(help);
         command.SetAction(result => handler.Capture(new TopologyCaptureCommandOptions(
             result.GetValue(policy) ?? "architecture/dependencies.arch.yml",
@@ -62,7 +64,8 @@ internal sealed class CaptureTopologySubcommandModule : ITopologySubcommandModul
             result.GetValue(framework),
             result.GetValue(platform),
             result.GetValue(runtimeOption),
-            result.GetValue(maxParallelism))
+            result.GetValue(maxParallelism),
+            result.GetValue(profile))
         {
             HasFormatConflict = result.GetValue(json) && result.GetValue(format) is not null,
         }));

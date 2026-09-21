@@ -2,7 +2,9 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Cli.Commands.Baseline.Application;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyWeakening;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Gate.Application;
@@ -31,6 +33,7 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
               --framework <tfm>        Requested target framework
               --platform <platform>    Requested platform
               --runtime <rid>          Requested runtime identifier
+              --profile <path>         Write analysis-profile/v1 counters to a file, stdout, or stderr
           -f, --format <fmt>           human, json, or sarif (default: human)
           -h, --help                   Show this help message
 
@@ -63,9 +66,25 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        (string Name, string? Path)[] profileDeclaredInputs =
+            AnalysisProfilePublisher.CreateTrustedInputManifest(
+                ArchitectureAnalysisInputPaths.Empty,
+                ("--policy", options.PolicyPath),
+                ("--baseline", options.BaselinePath),
+                ("--base-context", options.BaseContextPath),
+                ("--current-context", options.CurrentContextPath),
+                ("--public-api-approval", options.PublicApiApprovalPath));
+        if (!AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination,
+                console,
+                profileDeclaredInputs))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
-            ArchitectureDebtGateOutcome outcome = runtime.EvaluateDebtGate(
+            (ArchitectureDebtGateOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) = runtime.EvaluateDebtGateWithCounters(
                 ArchitectureAnalysisCommandSupport.CreateDebtGateRequest(options, fileSystem, cancellationToken));
             console.Out.WriteLine(options.Format switch
             {
@@ -73,6 +92,24 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
                 "sarif" => runtime.FormatDebtGateAsSarif(outcome),
                 _ => runtime.FormatDebtGateAsHuman(outcome),
             });
+            (string Name, string? Path)[] profileTrustedInputs =
+                AnalysisProfilePublisher.CreateTrustedInputManifest(outcome.AnalysisInputs, profileDeclaredInputs);
+            if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileTrustedInputs))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
+            AnalysisProfilePublisher.Write(
+                options.ProfileDestination,
+                console,
+                fileSystem,
+                counters,
+                !outcome.Succeeded
+                    ? AnalysisProfileCompletionStatus.PreparationFailure
+                    : outcome.Passed
+                        ? AnalysisProfileCompletionStatus.Success
+                        : AnalysisProfileCompletionStatus.ValidationFailure,
+                profileTrustedInputs);
             if (!outcome.Succeeded)
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;

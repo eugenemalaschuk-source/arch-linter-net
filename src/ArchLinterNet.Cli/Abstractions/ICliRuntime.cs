@@ -29,6 +29,11 @@ internal interface ICliRuntime
         ValidationTiming? timing) =>
         throw new NotSupportedException("Architecture metric measurement is not configured for this CLI runtime.");
 
+    (ArchitectureMetricMeasurementOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) MeasureWithCounters(
+        ArchitectureMetricMeasurementRequest request,
+        ValidationTiming? timing) =>
+        (Measure(request, timing), new ArchitectureAnalysisSnapshotCounters());
+
     /// <summary>
     /// Same behavior as <see cref="Validate"/>, plus the snapshot's typed counters — needed by the
     /// <c>--profile</c> option (issue #374). Default interface implementation delegates to
@@ -243,6 +248,10 @@ internal interface ICliRuntime
     ArchitectureDebtGateOutcome EvaluateDebtGate(ArchitectureDebtGateRequest request) =>
         throw new NotSupportedException("Architecture debt gate is not configured for this CLI runtime.");
 
+    (ArchitectureDebtGateOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) EvaluateDebtGateWithCounters(
+        ArchitectureDebtGateRequest request) =>
+        (EvaluateDebtGate(request), new ArchitectureAnalysisSnapshotCounters());
+
     string FormatDebtGateAsHuman(ArchitectureDebtGateOutcome outcome) =>
         ArchitectureDebtGateFormatter.FormatAsHuman(outcome);
 
@@ -298,6 +307,10 @@ internal interface ICliRuntime
     /// </summary>
     ArchitectureTopologyCaptureOutcome CaptureTopology(ArchitectureTopologyCaptureRequest request) =>
         throw new NotSupportedException("Topology capture is not configured for this CLI runtime.");
+
+    (ArchitectureTopologyCaptureOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) CaptureTopologyWithCounters(
+        ArchitectureTopologyCaptureRequest request) =>
+        (CaptureTopology(request), new ArchitectureAnalysisSnapshotCounters());
 
     string FormatGraphAsJson(ArchitectureDependencyGraph graph);
 

@@ -16,7 +16,8 @@ internal sealed record TopologyCaptureCommandOptions(
     string? TargetFramework = null,
     string? Platform = null,
     string? RuntimeIdentifier = null,
-    int? MaxParallelism = null)
+    int? MaxParallelism = null,
+    string? ProfileDestination = null)
 {
     public bool HasFormatConflict { get; init; }
 }

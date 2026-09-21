@@ -13,5 +13,5 @@ internal sealed class MeasureCommandModule : ITopLevelCliSubcommandModule
         IFileSystem fileSystem,
         CancellationToken cancellationToken = default) =>
         new MeasureCommandDefinition(
-            new MeasureCommandHandler(runtime, console, cancellationToken)).Create();
+            new MeasureCommandHandler(runtime, console, fileSystem, cancellationToken)).Create();
 }

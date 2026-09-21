@@ -13,4 +13,5 @@ internal sealed record MeasureCommandOptions(
     string? Configuration = null,
     string? TargetFramework = null,
     string? Platform = null,
-    string? RuntimeIdentifier = null);
+    string? RuntimeIdentifier = null,
+    string? ProfileDestination = null);

@@ -12,7 +12,8 @@ internal sealed record ChangeSnapshotCommandOptions(
     string? Configuration = null,
     string? TargetFramework = null,
     string? Platform = null,
-    string? RuntimeIdentifier = null);
+    string? RuntimeIdentifier = null,
+    string? ProfileDestination = null);
 
 internal sealed record ChangeReportCommandOptions(
     string BasePath,

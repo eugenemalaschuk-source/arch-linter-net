@@ -4,6 +4,7 @@ using ArchLinterNet.Cli.Commands.Baseline.Application;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyWeakening;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Health.Application;
@@ -45,6 +46,7 @@ internal sealed class HealthCommandHandler(
               --framework <tfm>        Requested target framework
               --platform <platform>    Requested platform
               --runtime <rid>          Requested runtime identifier
+              --profile <path>         Write analysis-profile/v1 counters to a file, stdout, or stderr
           -f, --format <fmt>           human or json (default: human)
           -h, --help                   Show this help message
 
@@ -82,6 +84,23 @@ internal sealed class HealthCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        (string Name, string? Path)[] profileDeclaredInputs =
+            AnalysisProfilePublisher.CreateTrustedInputManifest(
+                ArchitectureAnalysisInputPaths.Empty,
+                [
+                    ("--policy", (string?)options.PolicyPath),
+                    ("--baseline", options.BaselinePath),
+                    ("--base-context", options.BaseContextPath),
+                    ("--current-context", options.CurrentContextPath),
+                    ("--public-api-approval", options.PublicApiApprovalPath),
+                    .. (externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
+                        .Select(artifact => ("--external-evidence", (string?)artifact.Path)),
+                ]);
+        if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileDeclaredInputs))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         try
         {
             ArchitectureHealthOutcome outcome = runtime.EvaluateHealth(new ArchitectureHealthRequest
@@ -95,6 +114,26 @@ internal sealed class HealthCommandHandler(
             console.Out.WriteLine(options.Format == "json"
                 ? runtime.FormatHealthAsJson(outcome)
                 : runtime.FormatHealthAsHuman(outcome));
+
+            (string Name, string? Path)[] profileTrustedInputs =
+                AnalysisProfilePublisher.CreateTrustedInputManifest(outcome.AnalysisInputs, profileDeclaredInputs);
+            if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileTrustedInputs))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
+            AnalysisProfilePublisher.Write(
+                options.ProfileDestination,
+                console,
+                fileSystem,
+                outcome.AnalysisCounters,
+                outcome.Gate switch
+                {
+                    ArchitectureHealthGate.Pass => AnalysisProfileCompletionStatus.Success,
+                    ArchitectureHealthGate.Fail => AnalysisProfileCompletionStatus.ValidationFailure,
+                    _ => AnalysisProfileCompletionStatus.PreparationFailure,
+                },
+                profileTrustedInputs);
 
             return outcome.Gate switch
             {
