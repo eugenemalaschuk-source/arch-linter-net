@@ -453,6 +453,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             ColdPrepareCost = coldPrepareCost,
             ColdPrepareMilliseconds = coldPrepareCost,
             ExpectedLocalSpeedup = expectedLocalSpeedup,
+            TimingEvidenceComplete = true,
+            MissingTimingEvidenceFamilies = [],
             MeasurementBasis = "Synthetic Stopwatch duration measurements in milliseconds; counters are attribution only.",
         };
     }

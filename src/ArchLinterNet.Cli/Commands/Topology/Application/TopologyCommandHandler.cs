@@ -57,6 +57,24 @@ internal sealed class TopologyCommandHandler(
                 CancellationToken = cancellationToken,
             });
 
+            (string Name, string? Path)[] profileProtectedPaths = TopologyCommandGuards
+                .CreateTrustedInputManifest(
+                    options.PolicyPath,
+                    outcome.PolicyImportPaths,
+                    outcome.ResolvedAssemblyPaths,
+                    outcome.DiscoveredProjectPaths,
+                    outcome.ConsumedInputPaths,
+                    baselinePath: null)
+                .Append(("--output", options.OutputPath))
+                .ToArray();
+            if (!AnalysisProfilePublisher.TryValidateDestination(
+                    options.ProfileDestination,
+                    console,
+                    profileProtectedPaths))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             string? collision = TopologyCommandGuards.FindCaptureOutputCollision(
                 options.OutputPath, options.PolicyPath, outcome, fileSystem);
             if (collision is not null)
@@ -83,8 +101,7 @@ internal sealed class TopologyCommandHandler(
                 outcome.PreflightBlocked
                     ? AnalysisProfileCompletionStatus.PreparationFailure
                     : AnalysisProfileCompletionStatus.Success,
-                ("--policy", options.PolicyPath),
-                ("--output", options.OutputPath));
+                profileProtectedPaths);
 
             return outcome.PreflightBlocked ? CliExitCodes.InvalidArgumentsOrRuntimeError : CliExitCodes.Success;
         }

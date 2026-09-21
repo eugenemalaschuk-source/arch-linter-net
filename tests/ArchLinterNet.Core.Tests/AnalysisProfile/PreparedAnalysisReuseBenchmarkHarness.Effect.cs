@@ -17,7 +17,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         decimal IndependentPreparationMilliseconds,
         decimal IndependentProjectionMilliseconds,
         decimal PerConsumerLoadAuthorizationCost,
-        decimal PerConsumerLoadAuthorizationMilliseconds);
+        decimal PerConsumerLoadAuthorizationMilliseconds,
+        IReadOnlyList<string> MissingTimingEvidenceFamilies);
 
     private static PreparedEffectContract CreateEffect(
         BenchmarkWorkloadDefinition workload,
@@ -150,7 +151,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             representativeProcessCount);
         string workMeasurementBasis = decisionCapableEvidence
             ? $"Stopwatch wall-clock durations in milliseconds are the only decision-cost units. One disabled-cache independent process per required command family ({string.Join(", ", _measuredCommandFamilies)}) is paired with its measured one-process projection: cold preparation is the non-negative independent-minus-projection duration, and the projection/command duration is included in the common U component exactly once. Summed deterministic counters remain attribution evidence only and are not added as costs. Cache miss/hit samples remain supplemental and are excluded from the comparable workload."
-            : $"Decision-capable timing/attribution evidence is incomplete. Missing counter families: {string.Join(", ", missingOneProcessWorkEvidenceFamilies)}; missing duration families: {string.Join(", ", missingTimingEvidenceFamilies)}. Missing work is not treated as zero.";
+            : $"Decision-capable timing/attribution evidence is incomplete. Stopwatch wall-clock durations in milliseconds remain the only decision-cost units; deterministic counters remain attribution evidence only. Cache miss/hit samples remain supplemental and are excluded from the comparable workload. Missing counter families: {string.Join(", ", missingOneProcessWorkEvidenceFamilies)}; missing duration families: {string.Join(", ", missingTimingEvidenceFamilies)}. Missing work is not treated as zero.";
 
         PreparedEffectContract effect = new()
         {
@@ -184,7 +185,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             CacheModesMeasured = ["disabled", "miss", "hit"],
             Resources = CreatePreparationResourceEvidence(workload, representativeIndependentProcesses, representativeProcessCount),
             ScaleEvidenceBasis =
-                $"Measured Stopwatch durations in milliseconds for small, medium, and large {workload.CompilationMode} workloads; each point runs one cache-disabled process for every representative command family ({string.Join(", ", _measuredCommandFamilies)}), measures one-process projection duration, and repeats an in-memory serialized-state load/authorization proxy. Measured analysis-profile/v1 counters remain scale-specific attribution evidence only.",
+                $"Measured Stopwatch durations in milliseconds for small, medium, and large {workload.CompilationMode} workloads; each point runs one cache-disabled process for every representative command family ({string.Join(", ", _measuredCommandFamilies)}), independently times only available projections, and repeats an in-memory serialized-state load/authorization proxy. Process-bound families without projection-only or phase timing remain explicitly incomplete; no independent process duration is reused as projection timing. Measured analysis-profile/v1 counters remain scale-specific attribution evidence only.",
             ScaleEvidence = scaleEvidence,
             ExpectedEffect = CreateExpectedEffect(
                 repeatedWorkShare,
@@ -214,14 +215,21 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         return measuredScalePoints
             .Select(point =>
             {
-                decimal coldPrepareMilliseconds = point.IndependentPreparationMilliseconds / point.CommandCount;
-                decimal independentMilliseconds = point.IndependentPreparationMilliseconds + point.IndependentProjectionMilliseconds;
-                decimal persistedMilliseconds = coldPrepareMilliseconds +
-                    representativeProcessCount * point.PerConsumerLoadAuthorizationMilliseconds +
-                    point.IndependentProjectionMilliseconds;
-                decimal expectedLocalSpeedup = persistedMilliseconds > 0
-                    ? independentMilliseconds / persistedMilliseconds
+                bool timingEvidenceComplete = point.MissingTimingEvidenceFamilies.Count == 0;
+                decimal coldPrepareMilliseconds = timingEvidenceComplete
+                    ? point.IndependentPreparationMilliseconds / point.CommandCount
                     : 0;
+                decimal independentMilliseconds = timingEvidenceComplete
+                    ? point.IndependentPreparationMilliseconds + point.IndependentProjectionMilliseconds
+                    : 0;
+                decimal persistedMilliseconds = timingEvidenceComplete
+                    ? coldPrepareMilliseconds +
+                      representativeProcessCount * point.PerConsumerLoadAuthorizationMilliseconds +
+                      point.IndependentProjectionMilliseconds
+                    : 0;
+                decimal expectedLocalSpeedup = timingEvidenceComplete && persistedMilliseconds > 0
+                    ? independentMilliseconds / persistedMilliseconds
+                    : 1m;
                 return new PreparedEffectScalePoint
                 {
                     Label = point.Label,
@@ -238,10 +246,14 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                     IndependentPreparationMilliseconds = point.IndependentPreparationMilliseconds,
                     IndependentProjectionMilliseconds = point.IndependentProjectionMilliseconds,
                     PerConsumerLoadAuthorizationMilliseconds = point.PerConsumerLoadAuthorizationMilliseconds,
-                    ColdPrepareCost = coldPrepareMilliseconds,
-                    ColdPrepareMilliseconds = coldPrepareMilliseconds,
+                    ColdPrepareCost = timingEvidenceComplete ? coldPrepareMilliseconds : 0,
+                    ColdPrepareMilliseconds = timingEvidenceComplete ? coldPrepareMilliseconds : 0,
                     ExpectedLocalSpeedup = expectedLocalSpeedup,
-                    MeasurementBasis = "scale-specific Stopwatch duration measurements in milliseconds from one cache-disabled CLI process per command family, timed in-process projections, and a repeated serialized-state load/authorization proxy; analysis-profile counters remain attribution evidence.",
+                    TimingEvidenceComplete = timingEvidenceComplete,
+                    MissingTimingEvidenceFamilies = point.MissingTimingEvidenceFamilies,
+                    MeasurementBasis = timingEvidenceComplete
+                        ? "scale-specific Stopwatch duration measurements in milliseconds from one cache-disabled CLI process per command family, independently timed projections, and a repeated serialized-state load/authorization proxy; analysis-profile counters remain attribution evidence."
+                        : $"scale-specific Stopwatch duration measurements in milliseconds are incomplete for process-bound projection families ({string.Join(", ", point.MissingTimingEvidenceFamilies)}); no independent process duration is reused as projection timing, so no authorizing S/M/L speedup is reported. The load proxy and analysis-profile counters remain attribution evidence.",
                 };
             })
             .ToList();

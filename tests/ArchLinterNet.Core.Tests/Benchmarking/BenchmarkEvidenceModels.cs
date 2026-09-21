@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ArchLinterNet.Core.Tests;
 
@@ -131,9 +132,11 @@ internal sealed record BenchmarkProfileSample
 
     public required BenchmarkResourceMeasurement WallClock { get; init; }
 
-    // WallClock is retained as the integer resource summary used by the existing evidence
-    // contract. This higher-resolution value is the decision-model input for sub-process and
-    // in-process timings, where rounding a sub-millisecond sample to zero would erase evidence.
+    // WallClock is retained as the integer resource summary used by the versioned evidence
+    // contract. This higher-resolution value is runtime-only decision-model input for sub-process
+    // and in-process timings, where rounding a sub-millisecond sample to zero would erase evidence.
+    // Keep it out of benchmark-evidence/v1 until the versioned schema has an explicit field.
+    [JsonIgnore]
     public decimal? MeasuredWallClockMilliseconds { get; init; }
 
     public required BenchmarkResourceMeasurement ProcessorTime { get; init; }

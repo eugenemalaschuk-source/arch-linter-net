@@ -7,7 +7,7 @@ namespace ArchLinterNet.Core.Tests;
 internal sealed class CrossProcessPreparationEvidenceArtifactTests
 {
     [Test]
-    public void CheckedInArtifact_ContainsBothBoundariesAndDecisionCapableEvidence()
+    public void CheckedInArtifact_ContainsBothBoundariesAndFailsClosedWithoutProcessBoundTiming()
     {
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
         string path = Path.Combine(repositoryRoot, "docs", "internal", "prepared-analysis-reuse-evidence.json");
@@ -22,17 +22,21 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
             Assert.That(evidence.Archetypes.Select(archetype => archetype.Workflow.PreparationBoundary),
                 Is.EquivalentTo(new[] { PreparationBoundaryKind.MsBuildReceipt, PreparationBoundaryKind.StagedAssemblies }));
             Assert.That(evidence.Archetypes.All(archetype =>
-                archetype.Decision.Outcome is PreparationDecisionOutcome.A or PreparationDecisionOutcome.B), Is.True);
-            Assert.That(evidence.Archetypes.All(archetype => archetype.Decision.OneProcessAlternativeEvaluated), Is.True);
+                archetype.Decision.Outcome == PreparationDecisionOutcome.C), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => !archetype.Decision.OneProcessAlternativeEvaluated), Is.True);
             Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.OneProcessWorkEvidenceComplete), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.MissingOneProcessWorkEvidenceFamilies.Count == 0), Is.True);
-            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.TimingEvidenceComplete), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => !archetype.PreparedEffect.TimingEvidenceComplete), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
-                archetype.PreparedEffect.MissingTimingEvidenceFamilies.Count == 0), Is.True);
+                archetype.PreparedEffect.MissingTimingEvidenceFamilies.Contains("architecture_health", StringComparer.Ordinal) &&
+                archetype.PreparedEffect.MissingTimingEvidenceFamilies.Contains("change_snapshot", StringComparer.Ordinal) &&
+                archetype.PreparedEffect.MissingTimingEvidenceFamilies.Contains("measure", StringComparer.Ordinal) &&
+                archetype.PreparedEffect.MissingTimingEvidenceFamilies.Contains("no_new_debt", StringComparer.Ordinal) &&
+                archetype.PreparedEffect.MissingTimingEvidenceFamilies.Contains("topology", StringComparer.Ordinal)), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.CostModelUnit == PreparedEffectContract.CostModelUnitMilliseconds), Is.True);
-            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MeasuredOneProcessAlternativeWork.HasValue), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => !archetype.PreparedEffect.MeasuredOneProcessAlternativeWork.HasValue), Is.True);
             Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.MaterialSavingsThreshold == 0.10m), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.Decision.Outcome != PreparationDecisionOutcome.A || archetype.PreparedEffect.MateriallyCheaper), Is.True);
@@ -56,16 +60,15 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
                 .All(point => point.PerConsumerLoadAuthorizationCost > 0), Is.True);
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
                 .All(point => point.MeasurementBasis.Contains("scale-specific", StringComparison.Ordinal)), Is.True);
-            foreach (CrossProcessPreparationEvidenceDocument archetype in evidence.Archetypes)
-            {
-                decimal measuredPreparationWork = archetype.PreparedEffect.MeasuredIndependentWorkflowWork *
-                    archetype.PreparedEffect.RepeatedWorkShare;
-                decimal expectedColdPrepareCost = measuredPreparationWork /
-                    archetype.PreparedEffect.RepresentativeProcessCount;
-                Assert.That(
-                    archetype.PreparedEffect.ColdPrepareCost,
-                    Is.EqualTo(expectedColdPrepareCost).Within(0.0000000000000000000000001m));
-            }
+            Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.PreparedEffect.ScaleEvidence)
+                .All(point => !point.TimingEvidenceComplete &&
+                    point.MissingTimingEvidenceFamilies.Contains("architecture_health", StringComparer.Ordinal) &&
+                    point.MissingTimingEvidenceFamilies.Contains("change_snapshot", StringComparer.Ordinal) &&
+                    point.MissingTimingEvidenceFamilies.Contains("measure", StringComparer.Ordinal) &&
+                    point.MissingTimingEvidenceFamilies.Contains("no_new_debt", StringComparer.Ordinal) &&
+                    point.MissingTimingEvidenceFamilies.Contains("topology", StringComparer.Ordinal) &&
+                    point.ExpectedLocalSpeedup == 1m), Is.True);
+            Assert.That(evidence.Archetypes.All(archetype => archetype.PreparedEffect.ColdPrepareCost == 0), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
                 archetype.PreparedEffect.RepresentativeProcessCount == archetype.Workflow.MeasuredCommandFamilies.Count), Is.True);
             Assert.That(evidence.Archetypes.All(archetype =>
@@ -84,6 +87,9 @@ internal sealed class CrossProcessPreparationEvidenceArtifactTests
             Assert.That(json, Does.Not.Contain("eugen"));
             Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.Processes)
                 .Any(process => process.Sample.Run.PreparedStateMode == "one_process_shared"), Is.True);
+            Assert.That(evidence.Archetypes.SelectMany(archetype => archetype.Processes)
+                .Where(process => process.Sample.Run.PreparedStateMode == "one_process_process_bound")
+                .All(process => process.Sample.WallClock.Status == BenchmarkMeasurementStatus.Unavailable), Is.True);
         });
     }
 }

@@ -100,28 +100,36 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 fixture,
                 workload,
                 cancellationToken);
-            IReadOnlyDictionary<string, decimal> projectionMillisecondsByFamily =
-                _measuredCommandFamilies
-                    .Select((family, index) =>
+            IReadOnlyList<string> missingTimingEvidenceFamilies = _measuredCommandFamilies
+                .Where(family => !scaleTiming.ProjectionMillisecondsByFamily.ContainsKey(family))
+                .ToList();
+            bool timingEvidenceComplete = missingTimingEvidenceFamilies.Count == 0;
+            decimal independentPreparationMilliseconds = 0;
+            decimal independentProjectionMilliseconds = 0;
+            if (timingEvidenceComplete)
+            {
+                IReadOnlyDictionary<string, decimal> projectionMillisecondsByFamily =
+                    _measuredCommandFamilies.ToDictionary(
+                        family => family,
+                        family => scaleTiming.ProjectionMillisecondsByFamily[family],
+                        StringComparer.Ordinal);
+                independentPreparationMilliseconds = observations
+                    .Select((observation, index) =>
                     {
-                        decimal projectionDuration = scaleTiming.ProjectionMillisecondsByFamily.TryGetValue(
-                            family,
-                            out decimal measuredProjection)
-                            ? measuredProjection
-                            : DurationMilliseconds(observations[index].Elapsed);
-                        return (family, projectionDuration);
+                        decimal independentDuration = DurationMilliseconds(observation.Elapsed);
+                        decimal projectionDuration = projectionMillisecondsByFamily[_measuredCommandFamilies[index]];
+                        Assert.That(independentDuration, Is.GreaterThanOrEqualTo(projectionDuration),
+                            $"Scale point '{label}' has a projection duration greater than its independent process duration for '{_measuredCommandFamilies[index]}'.");
+                        return independentDuration - projectionDuration;
                     })
-                    .ToDictionary(item => item.family, item => item.projectionDuration, StringComparer.Ordinal);
-            decimal independentPreparationMilliseconds = observations
-                .Select((observation, index) =>
-                {
-                    decimal independentDuration = DurationMilliseconds(observation.Elapsed);
-                    decimal projectionDuration = projectionMillisecondsByFamily[_measuredCommandFamilies[index]];
-                    Assert.That(independentDuration, Is.GreaterThanOrEqualTo(projectionDuration),
-                        $"Scale point '{label}' has a projection duration greater than its independent process duration for '{_measuredCommandFamilies[index]}'.");
-                    return independentDuration - projectionDuration;
-                })
-                .Sum();
+                    .Sum();
+                independentProjectionMilliseconds = projectionMillisecondsByFamily.Values.Sum();
+            }
+            else
+            {
+                TestContext.Out.WriteLine(
+                    $"Scale point '{label}' is not decision-capable; missing independent projection timing for: {string.Join(", ", missingTimingEvidenceFamilies)}.");
+            }
 
             points.Add(new MeasuredScalePoint(
                 label,
@@ -130,9 +138,10 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 measurements.Sum(measurement => measurement.PreparationWork),
                 measurements.Sum(measurement => measurement.ProjectionWork),
                 independentPreparationMilliseconds,
-                projectionMillisecondsByFamily.Values.Sum(),
+                independentProjectionMilliseconds,
                 measurements.Sum(measurement => measurement.LoadAuthorizationWork) / measurements.Count,
-                scaleTiming.LoadAuthorizationMilliseconds));
+                scaleTiming.LoadAuthorizationMilliseconds,
+                missingTimingEvidenceFamilies));
         }
 
         return points;

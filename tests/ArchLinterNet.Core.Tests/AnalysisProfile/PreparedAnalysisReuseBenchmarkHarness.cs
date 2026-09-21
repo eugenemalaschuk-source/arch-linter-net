@@ -379,6 +379,12 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         foreach (CrossProcessProcessEvidence source in processBoundSources)
         {
             ordinal++;
+            // A process-bound command cannot be projected through the shared in-process
+            // snapshot. Do not copy the independent process wall-clock into the one-process
+            // projection: that would make independent - projection exactly zero and would
+            // manufacture a persisted-reuse comparison. Keep the profile/canonical result for
+            // attribution/equivalence, but fail closed until this family exposes projection-only
+            // or phase-level timing evidence.
             BenchmarkProfileSample sample = source.Sample with
             {
                 Run = source.Sample.Run with
@@ -386,6 +392,9 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                     SampleOrdinal = ordinal,
                     PreparedStateMode = "one_process_process_bound",
                 },
+                WallClock = BenchmarkResourceMeasurement.Unavailable(
+                    "Process-bound one-process projection timing is not independently measured."),
+                MeasuredWallClockMilliseconds = null,
             };
             PreparationProjectionIdentity projection = source.Identity.Projection with
             {
@@ -492,6 +501,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         PreparedEffectScalePoint small = scaleEvidence.Single(point => point.Label == "small");
         PreparedEffectScalePoint medium = scaleEvidence.Single(point => point.Label == "medium");
         PreparedEffectScalePoint large = scaleEvidence.Single(point => point.Label == "large");
+        bool scaleTimingComplete = scaleEvidence.All(point => point.TimingEvidenceComplete);
         return new BenchmarkExpectedEffectEvidence
         {
             IssueReference = "#493",
@@ -507,7 +517,9 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ColdPathTradeOff = "The cold preparation remains a separate cost and is never counted as a cache hit.",
             SuccessThreshold = "Only authorize implementation when persisted reuse is at least 10% cheaper than the measured representative one-process alternative, the measured small/medium/large matrix is decision-capable, and resource bounds are available.",
             KillCriterion = "Defer or route elsewhere when canonical equivalence, cache separation, or a representative crossover is not reproduced.",
-            Confidence = "Decision costs and small/medium/large scaling are derived from Stopwatch wall-clock durations in milliseconds; analysis-profile counters identify attribution only. Each scale point has a separately measured serialized-state load/authorization proxy, while projection/consume duration remains a separate component and the persisted store remains an explicit pre-implementation proxy.",
+            Confidence = scaleTimingComplete
+                ? "Decision costs and small/medium/large scaling are derived from Stopwatch wall-clock durations in milliseconds; analysis-profile counters identify attribution only. Each scale point has a separately measured serialized-state load/authorization proxy, while projection/consume duration remains a separate component and the persisted store remains an explicit pre-implementation proxy."
+                : "Decision costs remain non-authorizing because process-bound projection/consume timing is missing. Small/medium/large dimensions, attribution counters, and separately measured load proxies are retained, but no scale speedup is reported until every required projection family has independent duration evidence.",
         };
     }
 

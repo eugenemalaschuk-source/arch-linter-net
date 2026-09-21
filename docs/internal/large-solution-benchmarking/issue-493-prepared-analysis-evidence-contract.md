@@ -138,6 +138,16 @@ uncertainty/basis explicitly.
 not cost units, and projection duration must not be reused as `L` when it is
 also included in `U` or in the one-process alternative.
 
+Process-bound command families must provide an independently measured
+projection/consume-only duration or phase-level timing. Copying the independent
+process wall-clock into a process-bound one-process projection is not evidence:
+it forces the reusable preparation residual to zero. Until such timing exists,
+the affected families remain incomplete and the decision must route to outcome
+C (instrumentation gap), not outcome B. The same rule applies to each
+small/medium/large scale point: do not fall back to the independent process
+duration or publish a derived speedup when a required process-bound projection
+timing is missing; retain the point as explicitly non-authorizing instead.
+
 If `P <= L`, there is no persisted-state crossover under this model because
 `U` is non-negative. If `P > L`, report the smallest representative `R` where
 the persisted model is cheaper. Do not count a cache hit twice, and do not

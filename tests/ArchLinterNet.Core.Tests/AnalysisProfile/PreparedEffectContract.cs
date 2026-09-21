@@ -38,6 +38,10 @@ internal sealed record PreparedEffectScalePoint
 
     public required decimal ExpectedLocalSpeedup { get; init; }
 
+    public required bool TimingEvidenceComplete { get; init; }
+
+    public required IReadOnlyList<string> MissingTimingEvidenceFamilies { get; init; }
+
     public required string MeasurementBasis { get; init; }
 
     public void Validate(string fieldName, int representativeProcessCount)
@@ -58,6 +62,30 @@ internal sealed record PreparedEffectScalePoint
             WorkloadIdentity != WorkloadIdentity.ToLowerInvariant())
         {
             throw new InvalidOperationException($"Scale evidence '{fieldName}' must retain a lowercase workload SHA-256 identity.");
+        }
+
+        if (MissingTimingEvidenceFamilies.Count !=
+                MissingTimingEvidenceFamilies.Distinct(StringComparer.Ordinal).Count() ||
+            MissingTimingEvidenceFamilies.Any(family => string.IsNullOrWhiteSpace(family)))
+        {
+            throw new InvalidOperationException($"Scale evidence '{fieldName}' must contain unique named missing timing families.");
+        }
+
+        if (TimingEvidenceComplete != (MissingTimingEvidenceFamilies.Count == 0))
+        {
+            throw new InvalidOperationException($"Scale evidence '{fieldName}' timing completeness must match its missing-family list.");
+        }
+
+        if (!TimingEvidenceComplete)
+        {
+            if (IndependentPreparationMilliseconds != 0 || IndependentProjectionMilliseconds != 0 ||
+                ColdPrepareCost != 0 || ColdPrepareMilliseconds != 0 || ExpectedLocalSpeedup != 1m)
+            {
+                throw new InvalidOperationException(
+                    $"Incomplete scale evidence '{fieldName}' must not report derived preparation, projection, or speedup values.");
+            }
+
+            return;
         }
 
         decimal expectedColdPrepareMilliseconds = IndependentPreparationMilliseconds / CommandCount;
