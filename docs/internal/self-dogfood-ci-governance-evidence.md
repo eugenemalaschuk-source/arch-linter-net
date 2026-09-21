@@ -1,33 +1,34 @@
 # Self-dogfood CI governance evidence
 
-This record closes issue #992 for implementation candidate `5e4a842587019fc1fd7acfcd6431f55dd9e66aa1` and PR #997. The candidate manifest used by the hosted producer recorded the following identity:
+This record closes issue #992 for implementation candidate `a6825cc4b5b9b828e25fd6dacd56efe1589fad46` and PR #997. The final hosted producer recorded the following identity:
 
-- Source SHA: `5e4a842587019fc1fd7acfcd6431f55dd9e66aa1`
-- Tree SHA: `aa36e94260e422156bc4df5d2aa7f76346d5ad22`
+- Source SHA: `a6825cc4b5b9b828e25fd6dacd56efe1589fad46`
+- Tree SHA: `073394e9c2a20d0429b089fd7e341e933735ac78`
 - Policy: `architecture/dependencies.arch.yml`, SHA-256 `3b2b2c6664eb9e598c0bcdbd29af50d63ec89db1f263dc6f910b92843dc3a7ae`
-- CLI assembly SHA-256: `30506e794d8d581215f7498daa6a1118aab8851ece4bfb6f3960aa613e6c0bc7`
-- Testing assembly SHA-256: `df4fdd1ed6cf1b526edf719cbba24357bd6a6b6a8a1260e3de6874475ff2ab66`
+- CLI assembly SHA-256: `8ff549c9f7e9f663c53017d041f5cd5775ed71ecfd718b41adc4fc12be4e1690`
+- Testing assembly SHA-256: `8b69f9bb9dbf53e4d17dae043f778dc347a95d65f61bff8f2d90138cad81a6fa`
 - Tool identity: `ArchLinterNet.Cli/ArchLinterNet.Testing`
 
 ## Hosted samples
 
-All samples ran on the standard `ubuntu24` image in workflow `35646536730`, against the same source/tool identity. Every projection exited successfully and the projections overlapped: strict, public API, coverage, and report-input work started within the same few milliseconds.
+The three comparable samples below ran on the standard `ubuntu24` image after the receipt trust-boundary redesign. The policy, base revision, process topology, and preparation-inclusive timing boundary were held constant; the final row is the current PR head. Every projection exited successfully and the projections overlapped.
 
-| Attempt / producer job | Candidate prep | Base prep | Governance span | Projection command sum | Result |
+| Run / producer job | Candidate prep | Base prep | Governance span | Projection command sum | Result |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 1 / [Architecture Coverage](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35646536730?attempt=1) | 62.657 s | 28.845 s | 167.839 s | 222.757 s | GAP |
-| 2 / [Architecture Coverage](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35646536730?attempt=2) | 59.560 s | 32.323 s | 167.309 s | 217.582 s | GAP |
-| 3 / [Architecture Coverage](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35646536730?attempt=3) | 48.392 s | 25.792 s | 126.761 s | 152.649 s | GAP |
+| [35659656884](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35659656884) | 21.371 s | 15.242 s | 92.708 s | 159.407 s | GAP |
+| [35661691165](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35661691165) | 30.068 s | 19.854 s | 127.923 s | 227.659 s | GAP |
+| [35664256542](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35664256542) | 31.047 s | 20.210 s | 128.830 s | 224.138 s | GAP |
 
-The governance-span median is **167.309 s**, with a range of **126.761–167.839 s**. The projection-command-sum median is **217.582 s**, with a range of **152.649–222.757 s**. Against the 204 s baseline and the `<=60 s` target, the measured result is a **GAP**: the normalized fan-out reduces the comparable wall-clock governance time by 36.691 s (17.99%), a **1.219x** speedup, but does not yet reach the target. The headline span starts at the earliest candidate/base preparation boundary and includes candidate receipt publication and base preparation.
+The governance-span median is **127.923 s**, with a range of **92.708–128.830 s**. The projection-command-sum median is **224.138 s**, with a range of **159.407–227.659 s**. Against the 204 s baseline and the `<=60 s` target, the measured result is a **GAP**: the normalized fan-out reduces the comparable wall-clock governance time by 76.077 s (37.293%), a **1.595x** speedup, but does not yet reach the target. The headline span starts at the earliest candidate/base preparation boundary and includes candidate receipt publication and base preparation.
 
 ## Process accounting and attribution
 
-The candidate preparation performed exactly one restore process, one solution build process that
-emitted output-bound build proofs, one proof-verifying receipt-publication process, and one
-candidate-verification process. Base preparation performed one restore, one solution build that
-emitted the same proofs, and one proof-verifying receipt-publication process. The independent
-projections then used these process counts:
+The candidate preparation performed exactly one restore process, one authoritative graph-build
+process, and one candidate-verification process. The successful `EnsureBuilt` path wrote and
+verified receipts inside that same Core preparation call; there is no separate publisher and no
+detached proof sidecar that can promote an existing artifact. Base preparation performed one
+restore and one authoritative graph-build/receipt path. The independent projections then used
+these process counts:
 
 | Projection | Projection processes | CLI processes |
 | --- | ---: | ---: |
