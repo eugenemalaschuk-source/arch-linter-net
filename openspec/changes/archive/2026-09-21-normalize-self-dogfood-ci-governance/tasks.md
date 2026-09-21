@@ -14,4 +14,4 @@
 
 - [x] 3.1 Update OpenSpec and workflow tests for the new candidate/fan-out/render-only contract and run focused Python tests.
 - [x] 3.2 Run the required formatter/lints, focused tooling tests, relevant architecture checks, and OpenSpec validation; inspect the final diff for unrelated artifacts.
-- [ ] 3.3 After comparable hosted runs are available, record at least three successful standard-hosted samples, before/after median/range, overlap, command/process counts, and PASS/GAP attribution in the internal evidence record.
+- [x] 3.3 After comparable hosted runs are available, record at least three successful standard-hosted samples, before/after median/range, overlap, command/process counts, and PASS/GAP attribution in the internal evidence record.
