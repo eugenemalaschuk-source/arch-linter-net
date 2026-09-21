@@ -264,22 +264,47 @@ def _comment(comment_id: int, marker: str, body: str = "old report") -> dict[str
     }
 
 
-def test_ci_producer_uses_per_tree_baseline_and_separate_strict_gate() -> None:
+def test_ci_producer_freezes_one_candidate_and_fans_out_read_only_projections() -> None:
     workflow = _read("ci.yml")
     producer = _job(workflow, "architecture_pr_report_producer", "architecture_pr_report_gate")
     gate = _job(workflow, "architecture_pr_report_gate", "tooling_support_tests")
 
     assert "name: Architecture Coverage" in producer
-    assert producer.count("if [[ -f architecture/baseline.arch.yml ]]; then") == 2
+    assert "name: Build one architecture candidate" in producer
+    assert "dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1" in producer
+    assert "architecture_candidate.py create" in producer
+    assert producer.count("architecture_candidate.py verify") >= 2
+    assert "run_projection strict run_strict &" in producer
+    assert "run_projection public_api run_public_api &" in producer
+    assert "run_projection coverage run_coverage &" in producer
+    assert "run_projection report_inputs run_report_inputs &" in producer
+    assert "ARCHITECTURE_BUILD_ALREADY_PREPARED=true" in producer
+    assert "--change-snapshot \"$output_directory/current-architecture-change-snapshot.json\"" in producer
     assert "snapshot \"$output_directory/base-architecture-change-snapshot.json\"" in producer
-    assert "snapshot \"$output_directory/current-architecture-change-snapshot.json\"" in producer
+    assert '\n          snapshot "$output_directory/current-architecture-change-snapshot.json"' not in producer
     assert "arch-linter-net-empty-baseline-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.arch.yml" in producer
     assert 'document.get("schema_id") != "architecture-health/v1"' in producer
-    assert "strict_coverage_outcome: ${{ steps.architecture_coverage.outcome }}" in producer
+    assert "strict_coverage_outcome: ${{ steps.architecture_projections.outputs.coverage_outcome }}" in producer
+    lint_make = (_REPOSITORY_ROOT / "make" / "lint.mk").read_text(encoding="utf-8")
+    assert "ARCHITECTURE_CLI_RUN_BUILD_ARGS := --no-build" in lint_make
+    assert "dotnet run $(ARCHITECTURE_CLI_RUN_BUILD_ARGS) --project \"$(CLI_PROJECT)\" -- public-api diff" in lint_make
+    assert '"schema": "architecture-ci-dag/v1"' in producer
+    assert '"coverage": {"projection_processes": 1, "cli_processes": 7}' in producer
+    assert '"before_median_seconds": 204' in producer
+    assert '"target_median_seconds": 60' in producer
     assert "pull-requests: write" not in workflow
     assert "Fail if strict architecture coverage failed" not in producer
     assert "needs: architecture_pr_report_producer" in gate
     assert "outputs.strict_coverage_outcome == 'failure'" in gate
+
+
+def test_ci_rendering_steps_do_not_start_analysis() -> None:
+    workflow = _read("ci.yml")
+    report_manifest = workflow.split("      - name: Create bound architecture PR report manifest\n", maxsplit=1)[1].split(
+        "      - name: Upload strict diagnostics\n", maxsplit=1
+    )[0]
+    assert "dotnet run" not in report_manifest
+    assert "architecture_candidate.py" not in report_manifest
 
 
 def test_tooling_support_materializes_the_approved_immutable_publisher() -> None:

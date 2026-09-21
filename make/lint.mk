@@ -1,7 +1,19 @@
-.PHONY: lint _lint-dotnet lint-architecture audit-architecture policy-check explain-architecture public-api-check public-api-update-preview public-api-update lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-comment-markdown architecture-coverage-ci
+.PHONY: lint _lint-dotnet lint-architecture audit-architecture policy-check explain-architecture public-api-check public-api-update-preview public-api-update lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-release-evidence test-calculate-version test-coverage-badge-script test-architecture-candidate test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-comment-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
+# CI may set this after one verified solution build; local/default invocations retain the build.
+ARCHITECTURE_BUILD_ALREADY_PREPARED ?= false
+
+ifneq ($(filter true false,$(ARCHITECTURE_BUILD_ALREADY_PREPARED)),$(ARCHITECTURE_BUILD_ALREADY_PREPARED))
+$(error ARCHITECTURE_BUILD_ALREADY_PREPARED must be either true or false)
+endif
+
+ifeq ($(ARCHITECTURE_BUILD_ALREADY_PREPARED),true)
+ARCHITECTURE_CLI_RUN_BUILD_ARGS := --no-build
+else
+ARCHITECTURE_CLI_RUN_BUILD_ARGS :=
+endif
 
 # dotnet format, architecture self-validation, and shard-membership discovery all touch the normal
 # repository build graph. Running them as independent prerequisites under `make -j` can make two
@@ -30,7 +42,11 @@ _acceptance-test: | _lint-dotnet
 # same policy through the ArchLinterNet.Testing adapter as parity evidence inside `make test`; it is
 # not a second definition of success.
 lint-architecture:  ## Canonical read-only strict self-policy gate (builds and verifies the project graph)
-	@dotnet build "$(SLNX)" --nologo --no-restore -m:1
+	@if [ "$(ARCHITECTURE_BUILD_ALREADY_PREPARED)" = "false" ]; then \
+		dotnet build "$(SLNX)" --nologo --no-restore -m:1; \
+	else \
+		echo "lint-architecture: using the already-prepared solution build"; \
+	fi
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- \
 		--policy "$(POLICY)" --mode strict --ensure-built
 
@@ -56,7 +72,7 @@ public-api-check:  ## Read-only diff of every reviewed public API snapshot again
 	@for surface in $(PUBLIC_API_SURFACES); do \
 		contract="$${surface%%=*}"; snapshot="$${surface#*=}"; \
 		echo "public-api diff: $$contract"; \
-		dotnet run --project "$(CLI_PROJECT)" -- public-api diff \
+		dotnet run $(ARCHITECTURE_CLI_RUN_BUILD_ARGS) --project "$(CLI_PROJECT)" -- public-api diff \
 			--policy "$(POLICY)" --contract "$$contract" --snapshot "$$snapshot" --ensure-built || exit $$?; \
 	done
 
@@ -118,6 +134,10 @@ test-coverage-badge-script:  ## Run tests for the test-coverage badge Markdown g
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/scripts/tests/test_test_coverage_badge.py
 
+test-architecture-candidate:  ## Run tests for architecture candidate identity tooling
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		pytest tools/scripts/tests/test_architecture_candidate.py
+
 # Both Python suites in one run, emitting the Cobertura report SonarCloud needs. Without it the
 # release-evidence aggregator and the coverage-report generator are measured as 0%-covered new
 # code even though both are tested.
@@ -130,6 +150,7 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 		tools/scripts/tests/test_check_dogfood_reference_evidence.py \
 		tools/scripts/tests/test_check_evergreen_docs.py \
 		tools/scripts/tests/test_check_evergreen_docs_edges.py \
+		tools/scripts/tests/test_architecture_candidate.py \
 		tools/scripts/tests/test_test_coverage_badge.py \
 		tools/scripts/tests/test_verify_core_unit_shards.py \
 		tests/qodana \

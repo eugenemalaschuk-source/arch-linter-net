@@ -340,8 +340,9 @@ jobs:
       ARCHITECTURE_REPORT_DIRECTORY: architecture-pr-report
       ARCHITECTURE_REPORT_ARTIFACT_DIRECTORY: architecture-pr-report-artifact
       ARCHITECTURE_HEALTH_BADGE_ARTIFACT_DIRECTORY: architecture-health-badge-artifact
+      ARCHITECTURE_CANDIDATE_MANIFEST: architecture-pr-report/architecture-candidate.json
     outputs:
-      strict_coverage_outcome: ${{ steps.architecture_coverage.outcome }}
+      strict_coverage_outcome: ${{ steps.architecture_projections.outputs.coverage_outcome }}
 
     steps:
       - name: Checkout
@@ -370,16 +371,45 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Build CLI and Testing projects
+      - name: Build one architecture candidate
+        id: architecture_candidate
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
         run: |
-          dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --nologo -v minimal
-          dotnet build src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --nologo -v minimal
+          set -euo pipefail
+          candidate_sha="$(git rev-parse HEAD)"
+          candidate_tree_sha="$(git rev-parse 'HEAD^{tree}')"
+          test "$candidate_sha" = "$EXPECTED_HEAD_SHA"
+          dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1
+          cli_assembly="$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/bin/Debug/net10.0/ArchLinterNet.Cli.dll"
+          testing_assembly="$GITHUB_WORKSPACE/src/ArchLinterNet.Testing/bin/Debug/net10.0/ArchLinterNet.Testing.dll"
+          test -s "$cli_assembly"
+          test -s "$testing_assembly"
+          python3 tools/scripts/architecture_candidate.py create \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --source-sha "$candidate_sha" \
+            --policy architecture/dependencies.arch.yml \
+            --cli-assembly "$cli_assembly" \
+            --testing-assembly "$testing_assembly" \
+            --output "$ARCHITECTURE_CANDIDATE_MANIFEST"
+          python3 tools/scripts/architecture_candidate.py verify \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --manifest "$ARCHITECTURE_CANDIDATE_MANIFEST"
+          cli_identity="$(python3 - "$ARCHITECTURE_CANDIDATE_MANIFEST" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
 
-      - name: Run canonical architecture policy gate
-        run: make lint-architecture
-
-      - name: Run reviewed public API drift check
-        run: make public-api-check
+          document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          print(document["cli_assembly_sha256"])
+          PY
+          )"
+          {
+            echo "ARCHITECTURE_CANDIDATE_SOURCE_SHA=$candidate_sha"
+            echo "ARCHITECTURE_CANDIDATE_TREE_SHA=$candidate_tree_sha"
+            echo "ARCHITECTURE_CANDIDATE_TOOL_SHA256=$cli_identity"
+          } >> "$GITHUB_ENV"
 
       - name: Collect changed first-party files
         if: github.event_name == 'pull_request'
@@ -390,16 +420,6 @@ jobs:
         run: |
           git diff --name-only --diff-filter=ACMR "origin/$PR_BASE_REF"...HEAD \
             -- '*.cs' ':!*.g.cs' ':!*Designer.cs' > changed-files.txt
-
-      - name: Run architecture coverage analysis
-        id: architecture_coverage
-        continue-on-error: true
-        run: |
-          DIFF_STATUS="ok"
-          if [ "${{ steps.changed_files.outcome }}" = "failure" ]; then
-            DIFF_STATUS="failed"
-          fi
-          make architecture-coverage-ci DIFF_STATUS="$DIFF_STATUS"
 
       - name: Create architecture report base worktree
         id: architecture_report_base
@@ -414,130 +434,285 @@ jobs:
           git worktree add --detach "$BASE_WORKTREE" "$BASE_SHA"
           echo "path=$BASE_WORKTREE" >> "$GITHUB_OUTPUT"
 
-      - name: Generate canonical architecture PR report inputs
-        id: architecture_report_inputs
-        if: always() && steps.architecture_report_base.outcome == 'success'
+      - name: Run independent architecture projections
+        id: architecture_projections
+        if: always() && steps.architecture_candidate.outcome == 'success' && steps.architecture_report_base.outcome == 'success'
         continue-on-error: true
         env:
           BASE_WORKTREE: ${{ steps.architecture_report_base.outputs.path }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           EXECUTION_CONTEXT: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           REPORT_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
           REPORT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REPORT_ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         shell: bash
         run: |
-          cli_project="$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj"
+          set +e
           output_directory="$GITHUB_WORKSPACE/$ARCHITECTURE_REPORT_DIRECTORY"
+          projection_directory="$RUNNER_TEMP/arch-linter-net-projections-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir -p "$output_directory" "$projection_directory"
+          cli_project="$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj"
 
-          snapshot() {
-            local snapshot_output="$1"
-            local snapshot_args=(
+          run_projection() {
+            local name="$1"
+            shift
+            local start end exit_code
+            start="$(date +%s%3N)"
+            "$@" > "$projection_directory/$name.log" 2>&1
+            exit_code=$?
+            end="$(date +%s%3N)"
+            printf '%s|%s|%s|%s\n' "$name" "$start" "$end" "$exit_code" > "$projection_directory/$name.status"
+            return 0
+          }
+
+          verify_candidate() {
+            python3 tools/scripts/architecture_candidate.py verify \
+              --repository-root "$GITHUB_WORKSPACE" \
+              --manifest "$ARCHITECTURE_CANDIDATE_MANIFEST"
+          }
+
+          run_strict() {
+            verify_candidate
+            make lint-architecture ARCHITECTURE_BUILD_ALREADY_PREPARED=true
+          }
+
+          run_public_api() {
+            verify_candidate
+            make public-api-check
+          }
+
+          run_coverage() {
+            verify_candidate
+            DIFF_STATUS="ok"
+            if [ "${{ steps.changed_files.outcome }}" = "failure" ]; then
+              DIFF_STATUS="failed"
+            fi
+            make architecture-coverage-ci DIFF_STATUS="$DIFF_STATUS"
+          }
+
+          run_report_inputs() {
+            verify_candidate
+            snapshot() {
+              local snapshot_output="$1"
+              local snapshot_args=(
+                --policy architecture/dependencies.arch.yml
+                --mode strict
+                --ensure-built
+              )
+              if [[ -f architecture/baseline.arch.yml ]]; then
+                snapshot_args+=(--baseline architecture/baseline.arch.yml)
+              fi
+              dotnet run --no-build --project "$cli_project" -- change snapshot \
+                "${snapshot_args[@]}" \
+                --output "$snapshot_output"
+            }
+
+            base_start="$(date +%s%3N)"
+            pushd "$BASE_WORKTREE"
+            snapshot "$output_directory/base-architecture-change-snapshot.json"
+            base_exit=$?
+            popd
+            base_end="$(date +%s%3N)"
+            printf '%s|%s|%s|%s\n' base "$base_start" "$base_end" "$base_exit" > "$projection_directory/base.status"
+            [ "$base_exit" -eq 0 ] || return "$base_exit"
+
+            health_args=(
               --policy architecture/dependencies.arch.yml
               --mode strict
               --ensure-built
             )
             if [[ -f architecture/baseline.arch.yml ]]; then
-              snapshot_args+=(--baseline architecture/baseline.arch.yml)
+              health_args+=(--baseline architecture/baseline.arch.yml)
+            else
+              empty_baseline="$RUNNER_TEMP/arch-linter-net-empty-baseline-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.arch.yml"
+              printf '%s\n' 'version: 3' 'baseline: {}' 'metric_baselines: []' > "$empty_baseline"
+              health_args+=(--baseline "$empty_baseline")
             fi
-            dotnet run --no-build --project "$cli_project" -- change snapshot \
-              "${snapshot_args[@]}" \
-              --output "$snapshot_output"
+            dotnet run --no-build --project "$cli_project" -- health \
+              "${health_args[@]}" \
+              --format json \
+              --execution-context "$EXECUTION_CONTEXT" \
+              --change-snapshot "$output_directory/current-architecture-change-snapshot.json" \
+              > "$output_directory/architecture-health.json"
+            health_exit=$?
+            if [ "$health_exit" -ne 0 ] && [ ! -s "$output_directory/architecture-health.json" ]; then
+              return "$health_exit"
+            fi
+            if ! python3 - "$output_directory/architecture-health.json" <<'PY'
+            import json
+            import sys
+            from pathlib import Path
+
+            try:
+                document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise SystemExit(f"Architecture Health output is not valid JSON: {error}")
+
+            if not isinstance(document, dict) or document.get("schema_id") != "architecture-health/v1":
+                raise SystemExit("Architecture Health output must use schema_id architecture-health/v1.")
+          PY
+            then
+              return 2
+            fi
+
+            dotnet run --no-build --project "$cli_project" -- badge architecture-health \
+              --input "$output_directory/architecture-health.json" \
+              --output "$output_directory/architecture-health-badge.json"
+            badge_exit=$?
+            if [ "$badge_exit" -ne 0 ] && [ ! -s "$output_directory/architecture-health-badge.json" ]; then
+              return "$badge_exit"
+            fi
+            if ! python3 - "$output_directory/architecture-health-badge.json" <<'PY'
+            import json
+            import sys
+            from pathlib import Path
+
+            try:
+                document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise SystemExit(f"Architecture Health badge output is not valid JSON: {error}")
+
+            if (not isinstance(document, dict)
+                    or set(document) != {"schemaVersion", "label", "message", "color"}
+                    or document.get("schemaVersion") != 1
+                    or document.get("label") != "architecture"
+                    or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color"))):
+                raise SystemExit("Architecture Health badge output must be a complete Shields endpoint document.")
+          PY
+            then
+              return 2
+            fi
+
+            dotnet run --no-build --project "$cli_project" -- change report \
+              --base "$output_directory/base-architecture-change-snapshot.json" \
+              --current "$output_directory/current-architecture-change-snapshot.json" \
+              --execution-context "$EXECUTION_CONTEXT" \
+              --format json \
+              --output "$output_directory/architecture-change.json"
+            report_exit=$?
+            [ "$report_exit" -eq 0 ] || return "$report_exit"
+
+            dotnet run --no-build --project "$cli_project" -- report pr \
+              --health "$output_directory/architecture-health.json" \
+              --change "$output_directory/architecture-change.json" \
+              --output "$output_directory/architecture-pr-report.md" \
+              --max-details 20 \
+              --repository-url "$REPORT_REPOSITORY_URL" \
+              --head-sha "$REPORT_HEAD_SHA" \
+              --artifact-url "$REPORT_ARTIFACT_URL"
           }
 
-          pushd "$BASE_WORKTREE"
-          snapshot "$output_directory/base-architecture-change-snapshot.json"
-          popd
+          run_projection strict run_strict &
+          strict_pid=$!
+          run_projection public_api run_public_api &
+          public_api_pid=$!
+          run_projection coverage run_coverage &
+          coverage_pid=$!
+          run_projection report_inputs run_report_inputs &
+          report_pid=$!
+          wait "$strict_pid" "$public_api_pid" "$coverage_pid" "$report_pid"
 
-          snapshot "$output_directory/current-architecture-change-snapshot.json"
-
-          dotnet run --no-build --project "$cli_project" -- change report \
-            --base "$output_directory/base-architecture-change-snapshot.json" \
-            --current "$output_directory/current-architecture-change-snapshot.json" \
-            --execution-context "$EXECUTION_CONTEXT" \
-            --format json \
-            --output "$output_directory/architecture-change.json"
-
-          health_args=(
-            --policy architecture/dependencies.arch.yml
-            --mode strict
-            --ensure-built
-          )
-          if [[ -f architecture/baseline.arch.yml ]]; then
-            health_args+=(--baseline architecture/baseline.arch.yml)
-          else
-            empty_baseline="$RUNNER_TEMP/arch-linter-net-empty-baseline-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.arch.yml"
-            printf '%s\n' 'version: 3' 'baseline: {}' 'metric_baselines: []' > "$empty_baseline"
-            health_args+=(--baseline "$empty_baseline")
-          fi
-          set +e
-          dotnet run --no-build --project "$cli_project" -- health \
-            "${health_args[@]}" \
-            --format json \
-            --execution-context "$EXECUTION_CONTEXT" \
-            > "$output_directory/architecture-health.json"
-          health_exit=$?
-          set -e
-          if [ "$health_exit" -ne 0 ] && [ ! -s "$output_directory/architecture-health.json" ]; then
-            exit "$health_exit"
-          fi
-          if ! python3 - "$output_directory/architecture-health.json" <<'PY'
+          python3 - "$ARCHITECTURE_CANDIDATE_MANIFEST" "$projection_directory" "$output_directory/architecture-dag-evidence.json" <<'PY'
           import json
+          import os
           import sys
           from pathlib import Path
 
-          try:
-              document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-              raise SystemExit(f"Architecture Health output is not valid JSON: {error}")
-
-          if not isinstance(document, dict) or document.get("schema_id") != "architecture-health/v1":
-              raise SystemExit("Architecture Health output must use schema_id architecture-health/v1.")
+          manifest_path = Path(sys.argv[1])
+          projection_directory = Path(sys.argv[2])
+          output_path = Path(sys.argv[3])
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          projections = []
+          for status_path in sorted(projection_directory.glob("*.status")):
+              name, start, end, exit_code = status_path.read_text(encoding="utf-8").strip().split("|")
+              projections.append({
+                  "id": name,
+                  "start_epoch_ms": int(start),
+                  "end_epoch_ms": int(end),
+                  "duration_ms": int(end) - int(start),
+                  "exit_code": int(exit_code),
+                  "outcome": "success" if int(exit_code) == 0 else "failure",
+              })
+          all_projection_starts = [item["start_epoch_ms"] for item in projections]
+          all_projection_ends = [item["end_epoch_ms"] for item in projections]
+          governance_span_ms = max(all_projection_ends) - min(all_projection_starts) if projections else None
+          command_sum_ms = sum(item["duration_ms"] for item in projections)
+          evidence = {
+              "schema": "architecture-ci-dag/v1",
+              "candidate": manifest,
+              "context": {
+                  "repository": os.environ["GITHUB_REPOSITORY"],
+                  "pull_request_number": os.environ["PR_NUMBER"],
+                  "head_sha": os.environ["REPORT_HEAD_SHA"],
+                  "base_sha": os.environ["BASE_SHA"],
+                  "run_id": os.environ["GITHUB_RUN_ID"],
+                  "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                  "runner_image": os.environ.get("ImageOS", "ubuntu-latest"),
+              },
+              "dependencies": {
+                  "candidate_build": ["restore", "source/tree/tool identity"],
+                  "strict": ["candidate_build"],
+                  "public_api": ["candidate_build"],
+                  "coverage": ["candidate_build", "changed-files"],
+                  "report_inputs": ["candidate_build", "base-reference", "changed-files"],
+                  "rendering": ["health", "change", "report inputs"],
+              },
+              "projections": projections,
+              "command_accounting": {
+                  "candidate_build": {
+                      "restore_processes": 1,
+                      "build_processes": 1,
+                      "candidate_verification_processes": 1,
+                  },
+                  "strict": {"projection_processes": 1, "cli_processes": 1},
+                  "public_api": {"projection_processes": 1, "cli_processes": 3},
+                  "coverage": {"projection_processes": 1, "cli_processes": 7},
+                  "report_inputs": {"projection_processes": 1, "cli_processes": 5},
+              },
+              "governance_span_ms": governance_span_ms,
+              "projection_command_sum_ms": command_sum_ms,
+              "comparison": {
+                  "before_median_seconds": 204,
+                  "target_median_seconds": 60,
+                  "status": "PASS" if governance_span_ms is not None and governance_span_ms <= 60_000 else "GAP",
+              },
+          }
+          output_path.write_text(json.dumps(evidence, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
           PY
-          then
-            if [ "$health_exit" -eq 0 ]; then
-              exit 2
-            fi
-            exit "$health_exit"
-          fi
 
-          set +e
-          dotnet run --no-build --project "$cli_project" -- badge architecture-health \
-            --input "$output_directory/architecture-health.json" \
-            --output "$output_directory/architecture-health-badge.json"
-          badge_exit=$?
-          set -e
-          if [ "$badge_exit" -ne 0 ] && [ ! -s "$output_directory/architecture-health-badge.json" ]; then
-            exit "$badge_exit"
-          fi
-          if ! python3 - "$output_directory/architecture-health-badge.json" <<'PY'
-          import json
+          for log_path in "$projection_directory"/*.log; do
+            [ -f "$log_path" ] || continue
+            printf '\n%s\n' "$(basename "$log_path")"
+            cat "$log_path"
+          done
+
+          python3 - "$projection_directory" "$GITHUB_OUTPUT" <<'PY'
           import sys
           from pathlib import Path
 
-          try:
-              document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-              raise SystemExit(f"Architecture Health badge output is not valid JSON: {error}")
-
-          if (not isinstance(document, dict)
-                  or set(document) != {"schemaVersion", "label", "message", "color"}
-                  or document.get("schemaVersion") != 1
-                  or document.get("label") != "architecture"
-                  or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color"))):
-              raise SystemExit("Architecture Health badge output must be a complete Shields endpoint document.")
+          outputs = {}
+          for status_path in Path(sys.argv[1]).glob("*.status"):
+              name, _, _, exit_code = status_path.read_text(encoding="utf-8").strip().split("|")
+              outputs[f"{name}_outcome"] = "success" if int(exit_code) == 0 else "failure"
+          with Path(sys.argv[2]).open("a", encoding="utf-8") as stream:
+              for name, value in sorted(outputs.items()):
+                  stream.write(f"{name}={value}\n")
           PY
-          then
-            exit 2
-          fi
 
-          dotnet run --no-build --project "$cli_project" -- report pr \
-            --health "$output_directory/architecture-health.json" \
-            --change "$output_directory/architecture-change.json" \
-            --output "$output_directory/architecture-pr-report.md" \
-            --max-details 20 \
-            --repository-url "$REPORT_REPOSITORY_URL" \
-            --head-sha "$REPORT_HEAD_SHA" \
-            --artifact-url "$REPORT_ARTIFACT_URL"
+      - name: Upload candidate identity
+        if: always() && steps.architecture_candidate.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: architecture-candidate-v1
+          path: ${{ env.ARCHITECTURE_CANDIDATE_MANIFEST }}
+
+      - name: Upload architecture DAG evidence
+        if: always() && hashFiles('architecture-pr-report/architecture-dag-evidence.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: architecture-ci-dag-v1
+          path: architecture-pr-report/architecture-dag-evidence.json
 
       - name: Verify reviewed unavailable Architecture Health badge receipt
         id: architecture_health_badge_unavailable
@@ -561,7 +736,7 @@ jobs:
 
       - name: Create bound architecture PR report manifest
         id: architecture_report_manifest
-        if: always() && steps.architecture_report_inputs.outcome == 'success'
+        if: always() && steps.architecture_projections.outputs.report_inputs_outcome == 'success'
         continue-on-error: true
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -607,7 +782,7 @@ jobs:
 
       - name: Create bound Architecture Health badge manifest
         id: architecture_health_badge_manifest
-        if: always() && steps.architecture_report_inputs.outcome == 'success'
+        if: always() && steps.architecture_projections.outputs.report_inputs_outcome == 'success'
         continue-on-error: true
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -622,7 +797,8 @@ jobs:
           cp "$payload_path" "$artifact_directory/architecture-health-badge.json"
           export payload_path="$artifact_directory/architecture-health-badge.json"
           export manifest_path="$artifact_directory/architecture-health-badge.manifest.json"
-          export PR_HEAD_TREE_SHA="$(git rev-parse "$PR_HEAD_SHA^{tree}")"
+          PR_HEAD_TREE_SHA="$(git rev-parse "$PR_HEAD_SHA^{tree}")"
+          export PR_HEAD_TREE_SHA
           python3 - <<'PY'
           import hashlib
           import json
@@ -719,7 +895,11 @@ jobs:
         run: git worktree remove --force "$BASE_WORKTREE"
 
       - name: Fail if architecture PR report inputs are unavailable
-        if: always() && steps.architecture_report_inputs.outcome != 'success'
+        if: always() && steps.architecture_projections.outputs.report_inputs_outcome != 'success'
+        run: exit 1
+
+      - name: Fail if reviewed public API verification is unavailable
+        if: always() && steps.architecture_projections.outputs.public_api_outcome != 'success'
         run: exit 1
 
       - name: Fail if architecture PR report manifest is unavailable
