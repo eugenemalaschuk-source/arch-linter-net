@@ -20,8 +20,9 @@ non-building path.
 - **WHEN** the architecture producer reaches its projection phase
 - **THEN** the projections use the same checked-out PR head, verified build outputs, policy digest,
   and CLI tool identity
-- **AND** the one successful authoritative build emits a fresh, output-bound proof, which the
-  producer's receipt-publication step verifies before publishing and which performs no second build
+- **AND** receipt publication occurs inside the one successful authoritative `EnsureBuilt`
+  preparation, immediately after its graph build and before any fan-out process can consume the
+  resulting `Current` receipts
 - **AND** no projection performs an implicit rebuild or restore
 
 #### Scenario: Missing or stale candidate state fails closed

@@ -115,11 +115,10 @@ public sealed class ValidateCommandDefinitionTests
     }
 
     [Test]
-    public void CreateRootCommand_PreparedReceiptProofOptions_ArePropagatedToPublisher()
+    public void CreateRootCommand_PreparedReceiptPublicationOption_IsPropagatedToPublisher()
     {
         (RecordingRuntime runtime, RecordingConsole console) = Run([
             "--publish-prepared-receipts",
-            "--build-proof-nonce", "proof-token",
             "--no-restore",
             "--configuration", "Release",
             "--framework", "net10.0",

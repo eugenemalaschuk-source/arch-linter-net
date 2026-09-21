@@ -5,9 +5,9 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-// The producer owns the one authoritative solution build. That build emits an output-bound proof
-// with a fresh nonce; this service only verifies those proofs and publishes receipts in Ordinary
-// mode. It never has permission to invoke the build-capable preparation path.
+// The producer owns the one authoritative preparation. Receipt publication is performed inside
+// that build-capable path, immediately after its successful graph build, so an existing artifact
+// can never be promoted by a separate publisher without the build that authorizes it.
 internal sealed class ArchitecturePreparedBuildReceiptService(
     IArchitectureRunnerSetupService runnerSetupService)
 {
@@ -15,12 +15,6 @@ internal sealed class ArchitecturePreparedBuildReceiptService(
     {
         ArgumentNullException.ThrowIfNull(request);
         request.CancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(request.BuildProofNonce))
-        {
-            throw new InvalidOperationException(
-                "Publishing prepared receipts requires a build proof nonce from the preceding authoritative build.");
-        }
-
         ArchitectureContractDocument document = runnerSetupService.LoadDocument(
             request.PolicyPath, null, null, request.CancellationToken);
         ArchitectureRunnerPreparation preparation = runnerSetupService.PrepareRunner(
@@ -44,17 +38,16 @@ internal sealed class ArchitecturePreparedBuildReceiptService(
         string? requestedTargetFramework = request.RequestedTargetFramework
             ?? (string.IsNullOrWhiteSpace(document.Analysis.TargetFramework) ? null : document.Analysis.TargetFramework);
 
-        return BuildStateRuntimeBuildPreparation.PublishPreparedReceipts(new BuildStatePreflightRequest(
+        return BuildStateRuntimeBuildPreparation.EnsureBuilt(new BuildStatePreflightRequest(
             preparation.RepositoryRoot,
             preparation.ProjectDiscovery,
             resolution,
-            BuildPreparationMode.Ordinary,
+            BuildPreparationMode.EnsureBuilt,
             NoRestore: request.NoRestore,
             RequestedConfiguration: requestedConfiguration,
             RequestedTargetFramework: requestedTargetFramework,
             RequestedPlatform: request.RequestedPlatform,
             RequestedRuntimeIdentifier: request.RequestedRuntimeIdentifier,
-            CancellationToken: request.CancellationToken),
-            request.BuildProofNonce);
+            CancellationToken: request.CancellationToken));
     }
 }

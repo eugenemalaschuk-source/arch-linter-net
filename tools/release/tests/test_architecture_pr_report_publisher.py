@@ -276,9 +276,8 @@ def test_ci_producer_freezes_one_candidate_and_fans_out_read_only_projections() 
         "      - name: Build one architecture candidate\n", maxsplit=1
     )[1].split("      - name: Collect changed first-party files\n", maxsplit=1)[0]
     assert "--no-restore" in candidate_phase
-    assert "dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1" in candidate_phase
-    assert "ArchLinterNetBuildProofNonce" in candidate_phase
-    assert "--build-proof-nonce \"$build_proof_nonce\"" in candidate_phase
+    assert "--ensure-built" in candidate_phase
+    assert "dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1" not in candidate_phase
     assert "name: Prepare architecture report base" in producer
     assert "architecture_candidate.py create" in producer
     assert producer.count("architecture_candidate.py verify") >= 2

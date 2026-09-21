@@ -26,7 +26,7 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
     }
 
     [Test]
-    public void Publish_VerifiesPreviousBuildProof_AndOrdinaryFanoutDoesNotBuildAgain()
+    public void Publish_BuildsAndPublishesInsideAuthoritativePath_AndOrdinaryFanoutDoesNotBuildAgain()
     {
         string projectPath = CreateProjectFixture("PreparedCandidateFixture", "class C {}");
         string assemblyPath = CreateFakeAssemblyFile("PreparedCandidateFixture");
@@ -40,8 +40,6 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
                 ["PreparedCandidateFixture"] = assemblyPath,
             },
         };
-        const string BuildProofNonce = "prepared-candidate-proof";
-        WriteBuildProof(assemblyPath, projectPath, BuildProofNonce);
         ArchitectureContractDocument document = new()
         {
             Version = 1,
@@ -65,7 +63,7 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
         BuildStateRuntimeBuildProcessExecutor.GraphBuildOverride = _ =>
         {
             graphBuildCount++;
-            throw new AssertionException("prepared receipt publication must not invoke graph build");
+            return null;
         };
 
         ArchitecturePreparedBuildReceiptService service = new(new FakeRunnerSetupService(document, preparation));
@@ -73,15 +71,16 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
             Path.Combine(RepositoryRoot, "policy.arch.yml"),
             RequestedConfiguration: "Debug",
             RequestedTargetFramework: "net10.0",
-            NoRestore: true,
-            BuildProofNonce: BuildProofNonce));
+            NoRestore: true));
 
         Assert.That(published.Blocked, Is.False,
             () => string.Join(" | ", published.Diagnostics.Select(d => $"{d.State}: {d.Evidence.Detail}")));
         Assert.That(published.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
-        Assert.That(graphBuildCount, Is.EqualTo(0));
+        Assert.That(graphBuildCount, Is.EqualTo(1), "publication must be authorized by one successful graph build");
         Assert.That(File.Exists(BuildReceiptStore.ReceiptPathFor(assemblyPath)), Is.True);
 
+        BuildStateRuntimeBuildProcessExecutor.GraphBuildOverride = _ =>
+            throw new AssertionException("ordinary fan-out must not invoke graph build");
         BuildStatePreflightResult ordinary = new BuildStatePreparationService().Prepare(
             new BuildStatePreflightRequest(
                 RepositoryRoot,
@@ -94,11 +93,11 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
 
         Assert.That(ordinary.Blocked, Is.False);
         Assert.That(ordinary.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
-        Assert.That(graphBuildCount, Is.EqualTo(0), "ordinary fan-out must not re-enter graph build");
+        Assert.That(graphBuildCount, Is.EqualTo(1), "ordinary fan-out must not re-enter graph build");
     }
 
     [Test]
-    public void Publish_DoesNotIssueReceiptWithoutAuthoritativeBuildProof()
+    public void Publish_DoesNotIssueReceiptWhenAuthoritativeBuildFails()
     {
         string projectPath = CreateProjectFixture("FailedPreparedCandidateFixture", "class C {}");
         string assemblyPath = CreateFakeAssemblyFile("FailedPreparedCandidateFixture");
@@ -119,28 +118,19 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
             CapturedArtifactContentDigests: new Dictionary<string, string>(StringComparer.Ordinal),
             MissingAssemblyNames: Array.Empty<string>(),
             IsMetadataReferenceClosureComplete: true);
+        BuildStateRuntimeBuildProcessExecutor.GraphBuildOverride = _ => new BuildStatePreflightDiagnostic(
+            "build-state-preflight",
+            projectPath,
+            BuildStatePreflightState.BuildFailed,
+            new BuildStatePreflightEvidence(projectPath, "FailedPreparedCandidateFixture", Detail: "build failed"));
         ArchitecturePreparedBuildReceiptService service = new(new FakeRunnerSetupService(document, preparation));
         BuildStatePreflightResult result = service.Publish(new BuildStatePreparedCandidateRequest(
             Path.Combine(RepositoryRoot, "policy.arch.yml"),
-            NoRestore: true,
-            BuildProofNonce: "missing-proof"));
+            NoRestore: true));
 
         Assert.That(result.Blocked, Is.True);
-        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.UnverifiableArtifact));
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.BuildFailed));
         Assert.That(File.Exists(BuildReceiptStore.ReceiptPathFor(assemblyPath)), Is.False);
-    }
-
-    private static void WriteBuildProof(string assemblyPath, string projectPath, string nonce)
-    {
-        File.WriteAllLines(
-            Path.Combine(Path.GetDirectoryName(assemblyPath)!, ".arch-linter-net-build-proof"),
-            new[]
-            {
-                "schema=architecture-build-proof/v1",
-                $"nonce={nonce}",
-                $"project={Path.GetFullPath(projectPath)}",
-                $"target={Path.GetFullPath(assemblyPath)}",
-            });
     }
 
     private sealed class FakeRunnerSetupService(

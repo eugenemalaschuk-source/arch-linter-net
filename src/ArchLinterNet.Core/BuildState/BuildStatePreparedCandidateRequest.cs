@@ -1,8 +1,8 @@
 namespace ArchLinterNet.Core.BuildState;
 
-// Internal CI seam: the host has already run the authoritative candidate restore/build and asks
-// Core to publish receipt evidence for those existing outputs. This request deliberately has no
-// build-capable mode; PublishPreparedBuildReceipts must remain a receipt-publication operation.
+// Internal CI seam: the host asks Core to perform the authoritative candidate preparation once
+// and publish receipts inside that successful build path. Later projections only use Ordinary
+// mode with the resulting receipts.
 internal sealed record BuildStatePreparedCandidateRequest(
     string PolicyPath,
     string? ConditionSetName = null,
@@ -11,5 +11,4 @@ internal sealed record BuildStatePreparedCandidateRequest(
     string? RequestedPlatform = null,
     string? RequestedRuntimeIdentifier = null,
     bool NoRestore = false,
-    string? BuildProofNonce = null,
     CancellationToken CancellationToken = default);

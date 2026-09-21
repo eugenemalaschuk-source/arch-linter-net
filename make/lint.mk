@@ -42,8 +42,8 @@ _acceptance-test: | _lint-dotnet
 # The single authoritative definition of "the repository satisfies its own architecture policy".
 # It is read-only with respect to the policy and the reviewed API snapshots: --ensure-built prepares
 # and verifies the project graph, but nothing under architecture/ is ever rewritten. The CI producer
-# may pass a build proof from its one explicit solution build; `SelfArchitecturePolicyTests` runs the
-# same policy through the ArchLinterNet.Testing adapter as parity evidence inside `make test`; it is
+# may reuse the receipts produced inside its one authoritative `--ensure-built` preparation;
+# `SelfArchitecturePolicyTests` runs the same policy through the ArchLinterNet.Testing adapter as parity evidence inside `make test`; it is
 # not a second definition of success.
 lint-architecture:  ## Canonical read-only strict self-policy gate (builds and verifies the project graph)
 	@if [ "$(ARCHITECTURE_BUILD_ALREADY_PREPARED)" = "false" ]; then \
