@@ -396,7 +396,6 @@ public sealed class ValidateCommandDefinitionTests
             Array.Empty<BuildStatePreflightDiagnostic>();
         public IReadOnlyList<string> ResolvedAssemblyPathsToReturn { get; set; } =
             Array.Empty<string>();
-
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => throw new NotSupportedException();
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)
