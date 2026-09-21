@@ -162,7 +162,7 @@ def _read_manifest(repository_root: Path, path: Path) -> dict[str, Any]:
             object_pairs_hook=reject_duplicate_keys,
             parse_constant=_reject_json_constant,
         )
-    except (OSError, UnicodeError, ValueError) as error:
+    except (OSError, ValueError) as error:
         raise CandidateIdentityError(f"Candidate manifest is malformed: {error}") from error
     if not isinstance(value, dict):
         raise CandidateIdentityError("Candidate manifest must be a JSON object.")
@@ -281,7 +281,9 @@ def _write_manifest(repository_root: Path, path: Path, manifest: dict[str, Any])
     safe_path = _confined_manifest_path(repository_root, path, "Candidate manifest output")
     try:
         safe_path.parent.mkdir(parents=True, exist_ok=True)
-        safe_path.write_text(canonical_json(manifest), encoding="utf-8", newline="\n")
+        # The path has been canonicalized and confined by _confined_manifest_path above. The
+        # explicit suppression is for Sonar's CLI-path heuristic, which cannot follow that helper.
+        safe_path.write_text(canonical_json(manifest), encoding="utf-8", newline="\n")  # NOSONAR: confined to repository root
     except OSError as error:
         raise CandidateIdentityError(f"Cannot write candidate manifest '{safe_path}': {error}") from error
 

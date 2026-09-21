@@ -228,7 +228,34 @@ internal static class BuildStateRuntimeBuildPreparation
     {
         string proofPath = Path.Combine(
             Path.GetDirectoryName(Path.GetFullPath(assemblyPath))!, ".arch-linter-net-build-proof");
-        string detail = "";
+        if (!TryReadBuildProof(proofPath, out Dictionary<string, string> values, out string detail))
+        {
+            return BuildProofFailure(project, assemblyPath, detail);
+        }
+
+        string expectedProject = Path.GetFullPath(
+            BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
+        string expectedTarget = Path.GetFullPath(assemblyPath);
+        if (!string.Equals(values.GetValueOrDefault("schema"), "architecture-build-proof/v1", StringComparison.Ordinal)
+            || !string.Equals(values.GetValueOrDefault("nonce"), expectedNonce, StringComparison.Ordinal)
+            || !PathsEqual(values.GetValueOrDefault("project"), expectedProject)
+            || !PathsEqual(values.GetValueOrDefault("target"), expectedTarget)
+            || values.Count != 4)
+        {
+            return BuildProofFailure(
+                project,
+                assemblyPath,
+                "The authoritative build proof does not match the selected project, output, or nonce.");
+        }
+
+        return null;
+    }
+
+    private static bool TryReadBuildProof(
+        string proofPath, out Dictionary<string, string> values, out string detail)
+    {
+        values = new Dictionary<string, string>(StringComparer.Ordinal);
+        detail = string.Empty;
         try
         {
             if (!File.Exists(proofPath))
@@ -242,7 +269,6 @@ internal static class BuildStateRuntimeBuildPreparation
             else
             {
                 string[] lines = File.ReadAllLines(proofPath);
-                Dictionary<string, string> values = new(StringComparer.Ordinal);
                 foreach (string line in lines)
                 {
                     int separator = line.IndexOf('=');
@@ -250,21 +276,6 @@ internal static class BuildStateRuntimeBuildPreparation
                     {
                         detail = "The authoritative build proof has an invalid format.";
                         break;
-                    }
-                }
-
-                if (detail.Length == 0)
-                {
-                    string expectedProject = Path.GetFullPath(
-                        BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
-                    string expectedTarget = Path.GetFullPath(assemblyPath);
-                    if (!string.Equals(values.GetValueOrDefault("schema"), "architecture-build-proof/v1", StringComparison.Ordinal)
-                        || !string.Equals(values.GetValueOrDefault("nonce"), expectedNonce, StringComparison.Ordinal)
-                        || !PathsEqual(values.GetValueOrDefault("project"), expectedProject)
-                        || !PathsEqual(values.GetValueOrDefault("target"), expectedTarget)
-                        || values.Count != 4)
-                    {
-                        detail = "The authoritative build proof does not match the selected project, output, or nonce.";
                     }
                 }
             }
@@ -286,12 +297,11 @@ internal static class BuildStateRuntimeBuildPreparation
             detail = $"The authoritative build proof has an unsupported path: {ex.Message}";
         }
 
-        if (detail.Length == 0)
-        {
-            return null;
-        }
+        return detail.Length == 0;
+    }
 
-        return new BuildStatePreflightDiagnostic(
+    private static BuildStatePreflightDiagnostic BuildProofFailure(
+        ArchitectureDiscoveredProject project, string assemblyPath, string detail) => new(
             "build-state-preflight",
             project.Path,
             BuildStatePreflightState.UnverifiableArtifact,
@@ -301,7 +311,6 @@ internal static class BuildStateRuntimeBuildPreparation
                 ExpectedOutputPath: assemblyPath,
                 BuildCommand: $"dotnet build \"{project.Path}\"",
                 Detail: detail));
-    }
 
     private static bool PathsEqual(string? actual, string expected)
     {
