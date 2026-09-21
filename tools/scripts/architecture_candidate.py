@@ -281,9 +281,8 @@ def _write_manifest(repository_root: Path, path: Path, manifest: dict[str, Any])
     safe_path = _confined_manifest_path(repository_root, path, "Candidate manifest output")
     try:
         safe_path.parent.mkdir(parents=True, exist_ok=True)
-        # The path has been canonicalized and confined by _confined_manifest_path above. The
-        # explicit suppression is for Sonar's CLI-path heuristic, which cannot follow that helper.
-        safe_path.write_text(canonical_json(manifest), encoding="utf-8", newline="\n")  # NOSONAR: confined to repository root
+        # The path has been canonicalized and confined by _confined_manifest_path above.
+        safe_path.write_text(canonical_json(manifest), encoding="utf-8", newline="\n")  # NOSONAR
     except OSError as error:
         raise CandidateIdentityError(f"Cannot write candidate manifest '{safe_path}': {error}") from error
 

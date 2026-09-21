@@ -133,6 +133,26 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
         Assert.That(File.Exists(BuildReceiptStore.ReceiptPathFor(assemblyPath)), Is.False);
     }
 
+    [Test]
+    public void Publish_RejectsCandidateWithoutAnArchitectureProjectGraph()
+    {
+        ArchitectureContractDocument document = new() { Version = 1, Name = "Empty candidate test" };
+        ArchitectureRunnerPreparation preparation = new(
+            RepositoryRoot,
+            PreprocessorSymbols: null,
+            ProjectDiscoveryResult.Empty,
+            ResolveAssemblyOutputs: true,
+            SelectedAssemblyArtifactPaths: Array.Empty<string>(),
+            CapturedArtifactContentDigests: new Dictionary<string, string>(StringComparer.Ordinal),
+            MissingAssemblyNames: Array.Empty<string>(),
+            IsMetadataReferenceClosureComplete: true);
+        ArchitecturePreparedBuildReceiptService service = new(new FakeRunnerSetupService(document, preparation));
+
+        Assert.That(
+            () => service.Publish(new BuildStatePreparedCandidateRequest(Path.Combine(RepositoryRoot, "policy.arch.yml"))),
+            Throws.InvalidOperationException.With.Message.Contains("project graph selected"));
+    }
+
     private sealed class FakeRunnerSetupService(
         ArchitectureContractDocument document,
         ArchitectureRunnerPreparation preparation) : IArchitectureRunnerSetupService
