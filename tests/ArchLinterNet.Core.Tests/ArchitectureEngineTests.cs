@@ -1,5 +1,5 @@
-using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
