@@ -540,17 +540,17 @@ jobs:
               return "$health_exit"
             fi
             if ! python3 - "$output_directory/architecture-health.json" <<'PY'
-            import json
-            import sys
-            from pathlib import Path
+          import json
+          import sys
+          from pathlib import Path
 
-            try:
-                document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-                raise SystemExit(f"Architecture Health output is not valid JSON: {error}")
+          try:
+              document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+              raise SystemExit(f"Architecture Health output is not valid JSON: {error}")
 
-            if not isinstance(document, dict) or document.get("schema_id") != "architecture-health/v1":
-                raise SystemExit("Architecture Health output must use schema_id architecture-health/v1.")
+          if not isinstance(document, dict) or document.get("schema_id") != "architecture-health/v1":
+              raise SystemExit("Architecture Health output must use schema_id architecture-health/v1.")
           PY
             then
               return 2
@@ -564,21 +564,21 @@ jobs:
               return "$badge_exit"
             fi
             if ! python3 - "$output_directory/architecture-health-badge.json" <<'PY'
-            import json
-            import sys
-            from pathlib import Path
+          import json
+          import sys
+          from pathlib import Path
 
-            try:
-                document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-                raise SystemExit(f"Architecture Health badge output is not valid JSON: {error}")
+          try:
+              document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+              raise SystemExit(f"Architecture Health badge output is not valid JSON: {error}")
 
-            if (not isinstance(document, dict)
-                    or set(document) != {"schemaVersion", "label", "message", "color"}
-                    or document.get("schemaVersion") != 1
-                    or document.get("label") != "architecture"
-                    or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color"))):
-                raise SystemExit("Architecture Health badge output must be a complete Shields endpoint document.")
+          if (not isinstance(document, dict)
+                  or set(document) != {"schemaVersion", "label", "message", "color"}
+                  or document.get("schemaVersion") != 1
+                  or document.get("label") != "architecture"
+                  or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color"))):
+              raise SystemExit("Architecture Health badge output must be a complete Shields endpoint document.")
           PY
             then
               return 2
