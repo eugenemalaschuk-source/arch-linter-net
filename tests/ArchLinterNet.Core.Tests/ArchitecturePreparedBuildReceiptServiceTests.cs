@@ -40,8 +40,8 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
                 ["PreparedCandidateFixture"] = assemblyPath,
             },
         };
-        const string buildProofNonce = "prepared-candidate-proof";
-        WriteBuildProof(assemblyPath, projectPath, buildProofNonce);
+        const string BuildProofNonce = "prepared-candidate-proof";
+        WriteBuildProof(assemblyPath, projectPath, BuildProofNonce);
         ArchitectureContractDocument document = new()
         {
             Version = 1,
@@ -74,7 +74,7 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
             RequestedConfiguration: "Debug",
             RequestedTargetFramework: "net10.0",
             NoRestore: true,
-            BuildProofNonce: buildProofNonce));
+            BuildProofNonce: BuildProofNonce));
 
         Assert.That(published.Blocked, Is.False,
             () => string.Join(" | ", published.Diagnostics.Select(d => $"{d.State}: {d.Evidence.Detail}")));
