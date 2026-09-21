@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
@@ -263,6 +264,36 @@ internal interface ICliRuntime
 
     ArchitectureHealthOutcome EvaluateHealth(ArchitectureHealthRequest request) =>
         throw new NotSupportedException("Architecture health is not configured for this CLI runtime.");
+
+    /// <summary>
+    /// Reuses a caller-owned immutable snapshot for a composite Health/projection workflow. The
+    /// default keeps existing CLI test doubles source-compatible.
+    /// </summary>
+    ArchitectureHealthOutcome EvaluateHealth(
+        ArchitectureHealthRequest request,
+        ArchitectureAnalysisSnapshot snapshot) =>
+        throw new NotSupportedException("Shared-snapshot architecture health is not configured for this CLI runtime.");
+
+    /// <summary>
+    /// Verifies baseline candidates already retained by a caller-owned snapshot. The default keeps
+    /// existing CLI test doubles source-compatible.
+    /// </summary>
+    BaselineVerifyOutcome VerifyBaseline(
+        BaselineVerifyRequest request,
+        ArchitectureAnalysisSnapshot snapshot) =>
+        throw new NotSupportedException("Shared-snapshot baseline verification is not configured for this CLI runtime.");
+
+    /// <summary>
+    /// Projects the canonical change snapshot from one retained analysis session. The default
+    /// keeps existing CLI test doubles source-compatible.
+    /// </summary>
+    ArchitectureChangeSnapshot CreateChangeSnapshot(
+        ArchitectureAnalysisSnapshot snapshot,
+        string mode,
+        ValidationOutcome validation,
+        BaselineVerifyOutcome baseline,
+        string? conditionSetName) =>
+        throw new NotSupportedException("Shared-snapshot change projection is not configured for this CLI runtime.");
 
     string FormatHealthAsHuman(ArchitectureHealthOutcome outcome) =>
         ArchitectureHealthProjector.FormatAsHuman(outcome.Summary);
