@@ -1,4 +1,6 @@
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Validation;
 
@@ -9,6 +11,26 @@ namespace ArchLinterNet.Cli.Integration.OutputFormatting;
 // pipeline. The counters always come from the command's own Core execution.
 internal static class AnalysisProfilePublisher
 {
+    internal static (string Name, string? Path)[] CreateTrustedInputManifest(
+        ArchitectureAnalysisInputPaths analysisInputs,
+        params (string Name, string? Path)[] declaredInputs)
+    {
+        ArgumentNullException.ThrowIfNull(analysisInputs);
+
+        List<(string Name, string? Path)> inputs = [.. declaredInputs];
+        inputs.AddRange(analysisInputs.PolicyImportPaths.Select(path => ("an imported policy file", (string?)path)));
+        inputs.AddRange(analysisInputs.ResolvedAssemblyPaths.SelectMany(path => new[]
+        {
+            ("a build artifact loaded during this run", (string?)path),
+            ("a build receipt loaded during this run", (string?)BuildReceiptStore.ReceiptPathFor(path)),
+        }));
+        inputs.AddRange(analysisInputs.DiscoveredProjectPaths.Select(path =>
+            ("a project file loaded during this run", (string?)path)));
+        inputs.AddRange(analysisInputs.ConsumedInputPaths.Select(path =>
+            ("a source input consumed during this run", (string?)path)));
+        return inputs.ToArray();
+    }
+
     public static void Write(
         string? destination,
         ICliConsole console,

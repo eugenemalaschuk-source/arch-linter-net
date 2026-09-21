@@ -31,4 +31,8 @@ public sealed record ArchitectureDebtGateOutcome(
     public ArchitecturePolicyWeakeningResult? PolicyWeakening { get; init; }
 
     public bool PolicyWeakeningRequested { get; init; }
+
+    // CLI-only provenance for profile-publication collision checks. The CLI is a reviewed Core
+    // friend assembly; this is deliberately not part of the package's public result contract.
+    internal ArchitectureAnalysisInputPaths AnalysisInputs { get; init; } = ArchitectureAnalysisInputPaths.Empty;
 }

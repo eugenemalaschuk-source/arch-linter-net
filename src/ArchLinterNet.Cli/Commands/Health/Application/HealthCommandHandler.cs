@@ -84,18 +84,19 @@ internal sealed class HealthCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        (string Name, string? Path)[] profileProtectedPaths = new[]
-        {
-            ("--policy", (string?)options.PolicyPath),
-            ("--baseline", options.BaselinePath),
-            ("--base-context", options.BaseContextPath),
-            ("--current-context", options.CurrentContextPath),
-            ("--public-api-approval", options.PublicApiApprovalPath),
-        }
-        .Concat((externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
-            .Select(artifact => ("--external-evidence", (string?)artifact.Path)))
-        .ToArray();
-        if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileProtectedPaths))
+        (string Name, string? Path)[] profileDeclaredInputs =
+            AnalysisProfilePublisher.CreateTrustedInputManifest(
+                ArchitectureAnalysisInputPaths.Empty,
+                [
+                    ("--policy", (string?)options.PolicyPath),
+                    ("--baseline", options.BaselinePath),
+                    ("--base-context", options.BaseContextPath),
+                    ("--current-context", options.CurrentContextPath),
+                    ("--public-api-approval", options.PublicApiApprovalPath),
+                    .. (externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
+                        .Select(artifact => ("--external-evidence", (string?)artifact.Path)),
+                ]);
+        if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileDeclaredInputs))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
@@ -114,6 +115,13 @@ internal sealed class HealthCommandHandler(
                 ? runtime.FormatHealthAsJson(outcome)
                 : runtime.FormatHealthAsHuman(outcome));
 
+            (string Name, string? Path)[] profileTrustedInputs =
+                AnalysisProfilePublisher.CreateTrustedInputManifest(outcome.AnalysisInputs, profileDeclaredInputs);
+            if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileTrustedInputs))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             AnalysisProfilePublisher.Write(
                 options.ProfileDestination,
                 console,
@@ -125,7 +133,7 @@ internal sealed class HealthCommandHandler(
                     ArchitectureHealthGate.Fail => AnalysisProfileCompletionStatus.ValidationFailure,
                     _ => AnalysisProfileCompletionStatus.PreparationFailure,
                 },
-                profileProtectedPaths);
+                profileTrustedInputs);
 
             return outcome.Gate switch
             {

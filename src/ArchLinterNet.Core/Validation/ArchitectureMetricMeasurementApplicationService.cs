@@ -27,7 +27,14 @@ public sealed class ArchitectureMetricMeasurementApplicationService(
         ArgumentNullException.ThrowIfNull(request);
         using ArchitectureAnalysisSnapshot snapshot = validationApplicationService.CreateSnapshot(
             request.ToSnapshotRequest(), timing);
-        ArchitectureMetricMeasurementOutcome outcome = snapshot.Measure(request.MetricIds);
+        ArchitectureMetricMeasurementOutcome outcome = snapshot.Measure(request.MetricIds) with
+        {
+            AnalysisInputs = ArchitectureAnalysisInputPaths.Create(
+                snapshot.GetCapturePolicyImportPaths(),
+                snapshot.GetCaptureResolvedAssemblyPaths(),
+                snapshot.GetCaptureDiscoveredProjectPaths(),
+                snapshot.GetCaptureConsumedInputPaths()),
+        };
         return (outcome, snapshot.Counters);
     }
 }

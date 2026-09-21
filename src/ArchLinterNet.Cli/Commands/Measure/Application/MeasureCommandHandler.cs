@@ -52,7 +52,7 @@ internal sealed class MeasureCommandHandler
         if (!AnalysisProfilePublisher.TryValidateDestination(
                 options.ProfileDestination,
                 _console,
-                ("--policy", options.PolicyPath)))
+                ProfileDeclaredInputs(options)))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
@@ -121,13 +121,20 @@ internal sealed class MeasureCommandHandler
             : MeasureReportFormatter.FormatHuman(outcome, maxContributors, options.AllContributors));
 
         bool complete = outcome.Measurements.All(static measurement => measurement.IsEvaluable);
+        (string Name, string? Path)[] profileTrustedInputs =
+            AnalysisProfilePublisher.CreateTrustedInputManifest(outcome.AnalysisInputs, ProfileDeclaredInputs(options));
+        if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, _console, profileTrustedInputs))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         AnalysisProfilePublisher.Write(
             options.ProfileDestination,
             _console,
             _fileSystem,
             counters,
             complete ? AnalysisProfileCompletionStatus.Success : AnalysisProfileCompletionStatus.ValidationFailure,
-            ("--policy", options.PolicyPath));
+            profileTrustedInputs);
         return complete
             ? CliExitCodes.Success
             : CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -138,6 +145,11 @@ internal sealed class MeasureCommandHandler
         CliErrorOutputWriter.Write(_console, options.Format, InvalidArgumentsReason, exception.Message);
         return CliExitCodes.InvalidArgumentsOrRuntimeError;
     }
+
+    private static (string Name, string? Path)[] ProfileDeclaredInputs(MeasureCommandOptions options) =>
+        AnalysisProfilePublisher.CreateTrustedInputManifest(
+            ArchitectureAnalysisInputPaths.Empty,
+            ("--policy", options.PolicyPath));
 
     private int WriteUnexpectedError(MeasureCommandOptions options, Exception exception)
     {

@@ -64,7 +64,7 @@ public sealed class ArchitectureDebtGateApplicationService : IArchitectureDebtGa
             snapshot.Evaluate(mode);
         }
 
-        ArchitectureDebtGateOutcome outcome = EvaluateCore(request, snapshot);
+        ArchitectureDebtGateOutcome outcome = Evaluate(request, snapshot);
         return (outcome, snapshot.Counters);
     }
 
@@ -85,7 +85,14 @@ public sealed class ArchitectureDebtGateApplicationService : IArchitectureDebtGa
     public ArchitectureDebtGateOutcome Evaluate(ArchitectureDebtGateRequest request, ArchitectureAnalysisSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        return EvaluateCore(request, snapshot);
+        return EvaluateCore(request, snapshot) with
+        {
+            AnalysisInputs = ArchitectureAnalysisInputPaths.Create(
+                snapshot.GetCapturePolicyImportPaths(),
+                snapshot.GetCaptureResolvedAssemblyPaths(),
+                snapshot.GetCaptureDiscoveredProjectPaths(),
+                snapshot.GetCaptureConsumedInputPaths()),
+        };
     }
 
     private ArchitectureDebtGateOutcome EvaluateCore(

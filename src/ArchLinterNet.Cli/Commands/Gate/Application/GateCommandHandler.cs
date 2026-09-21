@@ -2,6 +2,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Cli.Commands.Baseline.Application;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyWeakening;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Validation;
@@ -65,14 +66,18 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (!AnalysisProfilePublisher.TryValidateDestination(
-                options.ProfileDestination,
-                console,
+        (string Name, string? Path)[] profileDeclaredInputs =
+            AnalysisProfilePublisher.CreateTrustedInputManifest(
+                ArchitectureAnalysisInputPaths.Empty,
                 ("--policy", options.PolicyPath),
                 ("--baseline", options.BaselinePath),
                 ("--base-context", options.BaseContextPath),
                 ("--current-context", options.CurrentContextPath),
-                ("--public-api-approval", options.PublicApiApprovalPath)))
+                ("--public-api-approval", options.PublicApiApprovalPath));
+        if (!AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination,
+                console,
+                profileDeclaredInputs))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
@@ -87,6 +92,13 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
                 "sarif" => runtime.FormatDebtGateAsSarif(outcome),
                 _ => runtime.FormatDebtGateAsHuman(outcome),
             });
+            (string Name, string? Path)[] profileTrustedInputs =
+                AnalysisProfilePublisher.CreateTrustedInputManifest(outcome.AnalysisInputs, profileDeclaredInputs);
+            if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileTrustedInputs))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             AnalysisProfilePublisher.Write(
                 options.ProfileDestination,
                 console,
@@ -97,11 +109,7 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
                     : outcome.Passed
                         ? AnalysisProfileCompletionStatus.Success
                         : AnalysisProfileCompletionStatus.ValidationFailure,
-                ("--policy", options.PolicyPath),
-                ("--baseline", options.BaselinePath),
-                ("--base-context", options.BaseContextPath),
-                ("--current-context", options.CurrentContextPath),
-                ("--public-api-approval", options.PublicApiApprovalPath));
+                profileTrustedInputs);
             if (!outcome.Succeeded)
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
