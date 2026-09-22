@@ -31,6 +31,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(estimate.Complete, Is.False);
         Assert.That(estimate.Points, Has.All.Matches<RealMsBuildCacheEffectPoint>(point =>
             !point.VerifiedWarmHitObserved &&
+            point.ColdMissOverheadPercent is null &&
             point.ExpectedWarmHitReductionPercent is null &&
             point.ExpectedAmortizedReductionPercent is null &&
             point.WarmHitAvoidedWork is null));
@@ -61,6 +62,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(markdown, Does.Contain("eligible-control"));
         Assert.That(markdown, Does.Contain("The targeted boundary includes assembly/artifact loading and analysis phases"));
         Assert.That(markdown, Does.Contain("Without a verified warm-hit control, warm-hit and amortized reductions remain unavailable/model-only"));
+        Assert.That(markdown, Does.Contain("Cold/miss overhead is computed only from the eligible-control disabled-versus-population path"));
     }
 
     [Test]
@@ -89,6 +91,34 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
 
         Assert.That(exception.Message, Does.Contain("material amortized effect"));
+    }
+
+    [Test]
+    public void Document_RejectsOutcomeAWhenEligibleControlCanonicalResultsDiffer()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control" && measurement.CacheMode == "repeat"
+                ? measurement with { CanonicalResultSha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+                : measurement)
+            .ToArray();
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("A", phase2Authorized: true, measurements: measurements);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("Eligible-control evidence"));
+    }
+
+    [Test]
+    public void Document_RejectsEligibleControlWithoutExactCacheModes()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Where(measurement => !(measurement.FixtureKind == "eligible-control" && measurement.CacheMode == "population"))
+            .ToArray();
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("C", phase2Authorized: false, measurements: measurements);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("exactly disabled, population, and repeat"));
     }
 
     [Test]
@@ -177,7 +207,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
             foreach ((string mode, long hits, long writes, double duration) in new[]
             {
                 ("disabled", 0, 0, total),
-                ("population", 0, 0, total * 1.2),
+                ("population", 0, 0, total * 1.8),
                 ("repeat", 0, 0, total * 1.1),
             })
             {
@@ -187,6 +217,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
             if (includeEligibleControl)
             {
                 measurements.Add(CreateMeasurement("eligible-control", "disabled", workloadId, size, projects, 0, 0, total, total * .25, "VerifiedCacheEligible"));
+                measurements.Add(CreateMeasurement("eligible-control", "population", workloadId, size, projects, 0, 1, total * 1.2, total * .25, "VerifiedCacheEligible"));
                 measurements.Add(CreateMeasurement("eligible-control", "repeat", workloadId, size, projects, 1, 0, total * .5, total * .25, "VerifiedCacheEligible", avoidedWork: 4));
             }
         }

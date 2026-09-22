@@ -53,13 +53,15 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
         EffectEstimate.Validate();
 
         string[] sizes = ["small", "medium", "large"];
+        string[] requiredCacheModes = ["disabled", "population", "repeat"];
         foreach (string size in sizes)
         {
             IReadOnlyList<RealMsBuildCacheMeasurement> realMeasurements = Measurements
                 .Where(measurement => measurement.FixtureKind == "real-msbuild" && measurement.Size == size)
                 .ToList();
-            Require(realMeasurements.Select(measurement => measurement.CacheMode).Distinct(StringComparer.Ordinal).Count() == 3,
-                $"Real-MSBuild evidence for {size} must contain disabled, population, and repeat modes.");
+            Require(realMeasurements.Select(measurement => measurement.CacheMode).OrderBy(mode => mode, StringComparer.Ordinal)
+                    .SequenceEqual(requiredCacheModes, StringComparer.Ordinal),
+                $"Real-MSBuild evidence for {size} must contain exactly disabled, population, and repeat modes.");
             Require(realMeasurements.All(measurement => measurement.Eligibility == "CacheIneligible"),
                 $"Real-MSBuild evidence for {size} must retain the current fail-closed eligibility result.");
             Require(realMeasurements.All(measurement => measurement.IneligibilityReasons.Count > 0),
@@ -68,6 +70,19 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
                 $"Real-MSBuild evidence for {size} must preserve canonical result identity across cache modes.");
             Require(realMeasurements.All(measurement => measurement.Hits == 0),
                 $"Ineligible real-MSBuild evidence for {size} cannot claim a cache hit.");
+
+            IReadOnlyList<RealMsBuildCacheMeasurement> controlMeasurements = Measurements
+                .Where(measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == size)
+                .ToList();
+            if (controlMeasurements.Count > 0)
+            {
+                Require(controlMeasurements.Select(measurement => measurement.CacheMode).OrderBy(mode => mode, StringComparer.Ordinal)
+                        .SequenceEqual(requiredCacheModes, StringComparer.Ordinal),
+                    $"Eligible-control evidence for {size} must contain exactly disabled, population, and repeat modes.");
+                Require(controlMeasurements.Select(measurement => measurement.CanonicalResultSha256)
+                        .Distinct(StringComparer.Ordinal).Count() == 1,
+                    $"Eligible-control evidence for {size} must preserve canonical result identity across cache modes.");
+            }
         }
 
         string[] requiredStaleInputKinds = ["project", "source", "package", "configuration", "artifact"];
@@ -205,7 +220,7 @@ internal sealed record RealMsBuildCacheEffectPoint
 
     public required decimal AmdahlMaximumSpeedup { get; init; }
 
-    public required decimal ColdMissOverheadPercent { get; init; }
+    public required decimal? ColdMissOverheadPercent { get; init; }
 
     public required decimal? ExpectedWarmHitReductionPercent { get; init; }
 
@@ -219,7 +234,8 @@ internal sealed record RealMsBuildCacheEffectPoint
     {
         if (Size is not ("small" or "medium" or "large") ||
             TargetedPhaseSharePercent < 0 || TargetedPhaseSharePercent > 100 ||
-            AmdahlMaximumSpeedup < 1 || ColdMissOverheadPercent < 0 ||
+            AmdahlMaximumSpeedup < 1 ||
+            (ColdMissOverheadPercent is < 0 or > 100) ||
             (ExpectedWarmHitReductionPercent is < 0 or > 100) ||
             (ExpectedAmortizedReductionPercent is < 0 or > 100) || WarmHitAvoidedWork < 0 ||
             (!VerifiedWarmHitObserved &&
@@ -321,28 +337,39 @@ internal static class RealMsBuildCacheEffectModel
         {
             RealMsBuildCacheMeasurement baseline = measurements.Single(
                 measurement => measurement.FixtureKind == "real-msbuild" && measurement.Size == size && measurement.CacheMode == "disabled");
-            RealMsBuildCacheMeasurement population = measurements.Single(
-                measurement => measurement.FixtureKind == "real-msbuild" && measurement.Size == size && measurement.CacheMode == "population");
-            RealMsBuildCacheMeasurement repeat = measurements.Single(
-                measurement => measurement.FixtureKind == "real-msbuild" && measurement.Size == size && measurement.CacheMode == "repeat");
             double total = baseline.TotalElapsedMilliseconds.GetValueOrDefault();
             double targeted = baseline.TargetedPhaseMilliseconds.GetValueOrDefault();
             decimal share = total > 0 ? (decimal)(targeted / total * 100) : 0;
-            decimal coldOverhead = total > 0 && population.TotalElapsedMilliseconds.HasValue
-                ? Math.Max(0, (decimal)((population.TotalElapsedMilliseconds.Value - total) / total * 100))
-                : 0;
             RealMsBuildCacheMeasurement? controlBaseline = measurements.SingleOrDefault(
                 measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == size && measurement.CacheMode == "disabled");
+            RealMsBuildCacheMeasurement? controlPopulation = measurements.SingleOrDefault(
+                measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == size && measurement.CacheMode == "population");
             RealMsBuildCacheMeasurement? controlHit = measurements.SingleOrDefault(
                 measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == size && measurement.CacheMode == "repeat" && measurement.Hits > 0);
-            bool verifiedWarmHitObserved = controlBaseline?.TotalElapsedMilliseconds is > 0 &&
-                controlHit?.TotalElapsedMilliseconds is >= 0;
+            bool controlPopulationVerified = controlPopulation is
+            {
+                Eligibility: "VerifiedCacheEligible",
+                Misses: > 0,
+                Writes: > 0,
+                Rejects: 0,
+            };
+            decimal? coldOverhead = controlPopulationVerified && controlBaseline?.TotalElapsedMilliseconds is > 0 &&
+                controlPopulation!.TotalElapsedMilliseconds.HasValue
+                ? Math.Max(0, (decimal)((controlPopulation.TotalElapsedMilliseconds.Value - controlBaseline.TotalElapsedMilliseconds!.Value) /
+                    controlBaseline.TotalElapsedMilliseconds.Value * 100))
+                : null;
+            bool controlCanonicalResultEquivalent = controlBaseline != null && controlPopulation != null && controlHit != null &&
+                controlBaseline.CanonicalResultSha256 == controlPopulation.CanonicalResultSha256 &&
+                controlBaseline.CanonicalResultSha256 == controlHit.CanonicalResultSha256;
+            bool verifiedWarmHitObserved = controlPopulationVerified && controlCanonicalResultEquivalent &&
+                controlBaseline?.Eligibility == "VerifiedCacheEligible" && controlBaseline.TotalElapsedMilliseconds is > 0 &&
+                controlHit?.Eligibility == "VerifiedCacheEligible" && controlHit.TotalElapsedMilliseconds is >= 0;
             decimal? warmReduction = verifiedWarmHitObserved
                 ? Math.Clamp((decimal)((controlBaseline!.TotalElapsedMilliseconds!.Value - controlHit!.TotalElapsedMilliseconds!.Value) /
                     controlBaseline.TotalElapsedMilliseconds.Value * 100), 0, 100)
                 : null;
-            decimal? amortized = warmReduction.HasValue
-                ? Math.Clamp(((expectedReuseCount - 1) * warmReduction.Value - coldOverhead) / expectedReuseCount, 0, 100)
+            decimal? amortized = warmReduction.HasValue && coldOverhead.HasValue
+                ? Math.Clamp(((expectedReuseCount - 1) * warmReduction.Value - coldOverhead.Value) / expectedReuseCount, 0, 100)
                 : null;
             points.Add(new RealMsBuildCacheEffectPoint
             {
@@ -365,7 +392,7 @@ internal static class RealMsBuildCacheEffectModel
             KillCriterionPercent = 5,
             ExpectedReuseCount = expectedReuseCount,
             ReuseAssumptions = "Three equivalent requests in one workflow or across immutable reference/base revisions; cache misses remain correct fallbacks.",
-            Complete = points.All(point => point.TargetedPhaseSharePercent > 0 && point.VerifiedWarmHitObserved),
+            Complete = points.All(point => point.TargetedPhaseSharePercent > 0 && point.VerifiedWarmHitObserved && point.ColdMissOverheadPercent.HasValue),
             Points = points,
         };
     }
