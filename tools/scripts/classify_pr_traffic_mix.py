@@ -78,10 +78,13 @@ def classify(path: str) -> str:
 
 
 def load_commits(end_ref: str, commit_count: int, cwd: Path) -> dict[str, list[str]]:
-    # Re-validate immediately before the subprocess call, not only at argparse parse time: static
-    # analysis does not know argparse's `type=` callback already sanitized this value, and this
-    # function may also be called directly (as the tests do) without going through argparse at all.
+    # Re-validate both arguments immediately before the subprocess call, not only at argparse parse
+    # time: static analysis does not know argparse's `type=` callbacks already sanitized these
+    # values, and this function may also be called directly (as the tests do) without going through
+    # argparse at all.
     safe_end_ref = validate_git_ref(end_ref)
+    if not isinstance(commit_count, int) or isinstance(commit_count, bool) or not (0 < commit_count <= 100_000):
+        raise ValueError(f"commit_count must be a positive integer up to 100000, got {commit_count!r}")
     output = subprocess.run(
         ["git", "log", safe_end_ref, "-n", str(commit_count), "--pretty=format:__COMMIT__%H", "--name-only"],
         capture_output=True,

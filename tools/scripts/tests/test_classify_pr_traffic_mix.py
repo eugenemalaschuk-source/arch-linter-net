@@ -98,6 +98,17 @@ def test_load_commits_parses_git_log_output_into_a_commit_map(monkeypatch: pytes
     assert commits["ccc333"] == []
 
 
+@pytest.mark.parametrize("bad_count", [0, -1, 100_001, True, "3", 3.5, None])
+def test_load_commits_rejects_unsafe_commit_count_before_invoking_git(bad_count: object) -> None:
+    def fake_run(*_args, **_kwargs):
+        raise AssertionError("git must not be invoked for a rejected commit_count")
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(extractor.subprocess, "run", fake_run)
+        with pytest.raises(ValueError, match="commit_count must be a positive integer"):
+            extractor.load_commits("deadbeef", bad_count, Path("."))  # type: ignore[arg-type]
+
+
 def test_commit_range_returns_newest_then_oldest_by_insertion_order() -> None:
     commits = {"newest": ["a"], "middle": ["b"], "oldest": ["c"]}
 
