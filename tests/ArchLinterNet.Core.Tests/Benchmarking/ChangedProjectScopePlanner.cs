@@ -267,7 +267,7 @@ internal static class ChangedProjectScopePlanner
         return dependentsOf;
     }
 
-    private static IReadOnlyList<string> ClosureOfDependents(
+    private static List<string> ClosureOfDependents(
         IReadOnlyList<string> seeds,
         Dictionary<string, List<string>> dependentsOf)
     {
