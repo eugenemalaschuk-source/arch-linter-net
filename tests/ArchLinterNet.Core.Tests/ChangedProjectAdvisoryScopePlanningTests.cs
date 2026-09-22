@@ -26,38 +26,50 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
     [TestCaseSource(nameof(_executableShapes))]
     public void LeafProjectChange_AffectsOnlyItself(BenchmarkTopologyShape shape)
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(shape, projectCount: 12);
-        string leafProjectId = workload.Projects[0].Id;
-
-        ScopePlan plan = ChangedProjectScopePlanner.Plan(
-            workload.Projects,
-            workload.Edges,
-            [OwnedSourceFile("leaf-change", leafProjectId)]);
-
-        Assert.Multiple(() =>
+        // Measured at all four §3a sizes (8/16/32/64), not just one, so the doc's "K=1 at every
+        // scale" row is an actual measurement per size rather than a single P=12 sample generalized
+        // by hand.
+        foreach (int projectCount in new[] { 8, 16, 32, 64 })
         {
-            Assert.That(plan.AffectedProjectIds, Is.EqualTo(new[] { leafProjectId }), shape.ToString());
-            Assert.That(plan.AffectedProjectCount, Is.EqualTo(1), shape.ToString());
-            Assert.That(plan.IsFullFallback, Is.False, shape.ToString());
-        });
+            BenchmarkWorkloadDefinition workload = CreateWorkload(shape, projectCount);
+            string leafProjectId = workload.Projects[0].Id;
+
+            ScopePlan plan = ChangedProjectScopePlanner.Plan(
+                workload.Projects,
+                workload.Edges,
+                [OwnedSourceFile("leaf-change", leafProjectId)]);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(plan.AffectedProjectIds, Is.EqualTo(new[] { leafProjectId }), $"{shape} P={projectCount}");
+                Assert.That(plan.AffectedProjectCount, Is.EqualTo(1), $"{shape} P={projectCount}");
+                Assert.That(plan.IsFullFallback, Is.False, $"{shape} P={projectCount}");
+            });
+        }
     }
 
     [TestCaseSource(nameof(_executableShapes))]
     public void SharedFoundationProjectChange_AffectsEveryProject(BenchmarkTopologyShape shape)
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(shape, projectCount: 12);
-        string sharedProjectId = workload.Projects[^1].Id;
-
-        ScopePlan plan = ChangedProjectScopePlanner.Plan(
-            workload.Projects,
-            workload.Edges,
-            [OwnedSourceFile("shared-change", sharedProjectId)]);
-
-        Assert.Multiple(() =>
+        // Measured at all four §3a sizes (8/16/32/64), not just one, so the doc's "K=P at every
+        // scale" row is an actual measurement per size rather than a single P=12 sample generalized
+        // by hand.
+        foreach (int projectCount in new[] { 8, 16, 32, 64 })
         {
-            Assert.That(plan.AffectedProjectCount, Is.EqualTo(12), shape.ToString());
-            Assert.That(plan.AffectedScopeRatio, Is.EqualTo(1.0m), shape.ToString());
-        });
+            BenchmarkWorkloadDefinition workload = CreateWorkload(shape, projectCount);
+            string sharedProjectId = workload.Projects[^1].Id;
+
+            ScopePlan plan = ChangedProjectScopePlanner.Plan(
+                workload.Projects,
+                workload.Edges,
+                [OwnedSourceFile("shared-change", sharedProjectId)]);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(plan.AffectedProjectCount, Is.EqualTo(projectCount), $"{shape} P={projectCount}");
+                Assert.That(plan.AffectedScopeRatio, Is.EqualTo(1.0m), $"{shape} P={projectCount}");
+            });
+        }
     }
 
     [Test]

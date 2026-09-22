@@ -14,8 +14,11 @@ deterministic graph computations**, not timed samples: every row is reproduced b
 which runs in every normal `make test` pass (no `[Explicit]` exclusion — there is no hardware
 sensitivity to isolate).
 
-**Outcome: interim.** The deterministic change-to-project mapping (Question 2) is complete and exact.
-Dependency closure (Question 3) is complete for the reference-graph dimension **and** now includes
+**Outcome: interim.** The change-to-project *disposition* mapping (Question 2) — given a changed
+input's kind and its already-resolved owning project(s), which scope-widening rule applies — is
+complete and exact. The *ownership-resolution* half of Question 2 — given a changed file path, which
+project(s) actually own it — is **not** addressed; see the correction in Question 2. Dependency
+closure (Question 3) is complete for the reference-graph dimension **and** now includes
 real, code-grounded evidence for a representative evaluator/fact-family subset — #503 explicitly
 forbids assuming one graph direction serves every contract family, and an earlier revision of this
 document did exactly that (see the correction in Question 3). The scope-plan/coverage/advisory-
@@ -121,8 +124,13 @@ faster" claim.
 
 ## Question 2 — Change-to-project mapping
 
+### 2a. Disposition given known ownership
+
 `ChangedProjectScopePlanner` gives every changed-input kind from #503's own list one explicit,
-tested disposition. No kind is silently dropped:
+tested disposition. No kind is silently dropped. **This table answers "given that a changed input is
+already known to be owned by project(s) X, what scope-widening rule applies" — it does not answer
+"given a raw changed file path, which project(s) actually own it." That second, prior step is a
+separate, unaddressed problem; see the correction in §2b.**
 
 | Changed input kind | Disposition | Reason |
 |---|---|---|
@@ -163,6 +171,39 @@ Every measured decision carries a human-readable reason string (asserted by
 `EveryChangedInput_ReceivesExactlyOneDeterministicDecision`); none of the ten kinds above returns an
 implicit "no-op" or silently excludes an input.
 
+### 2b. Correction — ownership resolution itself is not measured
+
+`ChangedInput.OwningProjectIds` is a field every test in this evidence task supplies directly — for
+the synthetic corpus, the test author already knows which project a generated path belongs to,
+because `BenchmarkWorkloadGenerator` produced that path deterministically in the first place. Nothing
+in this task computes "given this changed file path, which project(s) own it" from the path itself;
+§2a's table and tests exercise only the disposition step that runs *after* ownership is already
+known. Presenting §2a as answering the whole of #503's "change-to-project mapping" question would
+overstate what is proven — this correction narrows that claim explicitly.
+
+The real authoritative basis for that resolution step is not directory containment or path-pattern
+matching. A real MSBuild project's compiled surface is its *evaluated* project items —
+`@(Compile)` after glob expansion, including any `<Compile Include="…" Link="…" />` entries that pull
+in a file from an arbitrary location outside the project's own directory (the mechanism a real
+linked/shared source file uses), plus whatever `Directory.Build.props`/explicit `<Import>` chain
+contributed to that evaluation. A file's location on disk is not proof of which project(s) compile
+it, and a naive path-prefix classifier — such as this task's own
+[`classify_pr_traffic_mix.py`](../../tools/scripts/classify_pr_traffic_mix.py), already labeled
+informal/approximate for a different reason in Question 1 — is not a substitute for that evaluation.
+This makes the limitation more fundamental than "approximate": path-prefix matching is not the
+authoritative model MSBuild itself uses, for any repository where compiled items are not implicitly
+"everything under the project's own directory" (globs with explicit exclusions, generated files,
+linked files from a shared location, and similar are all common in practice, if not in this
+repository today).
+
+A production implementation's ownership resolver would need to evaluate the actual project files
+(via MSBuild, the same way build-state preflight and project discovery already do elsewhere in this
+codebase) to produce a real `path → owning project(s)` mapping, including the multi-owner case a
+linked/shared file requires. `ChangedInput.OwningProjectIds` already accepts a list, so §2a's
+disposition rules are compatible with whatever that resolver eventually produces — but this evidence
+task does not build or test the resolver itself, and no claim in this document should be read as
+having done so.
+
 ## Question 3 — Dependency closure
 
 ### 3a. Reference-graph dependents closure by shape and position
@@ -180,6 +221,12 @@ projects), `E` (edges):
 | Diamond | tail middle position (`P/2`) | 5 | 9 | 17 | 33 | Same linear-tail growth once past the fixed 4-node head. |
 | Any of the four | shared foundation (index P−1) | 8 | 16 | 32 | 64 | `K = P` at every scale — full fallback in all four topologies. |
 
+Every cell above is measured at its stated `P`, not extrapolated from a single sample size:
+`LeafProjectChange_AffectsOnlyItself` and `SharedFoundationProjectChange_AffectsEveryProject` run at
+all four sizes (an earlier revision ran them only at `P=12` and generalized the "at every scale"
+claim by hand — that gap is now closed), and the middle-position/spoke rows already looped over all
+four sizes from the start.
+
 The headline finding: **`K` does not stay small as a rule.** Whether it does depends entirely on
 which project changed, not on solution size. A scope planner cannot assume "changed project ⇒ small
 `K`"; it must compute the actual closure per change and report the resulting ratio.
@@ -190,20 +237,22 @@ An earlier revision of this document claimed the reference-graph dependents clos
 safe superset for cross-project correctness contracts (layering, cyclic checks, public-API
 compatibility)." Reading the actual checker implementations under
 `src/ArchLinterNet.Core/Execution/` shows that claim was wrong, and #503's acceptance criteria
-explicitly forbid this kind of one-direction assumption. This section was itself revised once more
-after a second review pass found the first correction still understated two families'
-requirements — `ReferenceGraphLocal` was claimed narrower than it actually is, and `coverage` was
-treated as one family when its six schema-defined scopes split into two different shapes. The table
-below is the corrected state, with the `K=9` §3a baseline (Linear, `P=16`, position index 8) as a
-fixed comparison point:
+explicitly forbid this kind of one-direction assumption. This section has been revised twice more
+since: a second review pass found the first correction still understated two families'
+requirements (`ReferenceGraphLocal` was claimed narrower than it actually is, and `coverage` was
+treated as one family when its six schema-defined scopes split into two shapes); a third review pass
+found that second correction had still misclassified `coverage`'s `namespace` scope as project-local
+alongside `project`/`assembly`, when a C# namespace is not tied to one assembly the way a project or
+assembly output is. The table below is the corrected state, with the `K=9` §3a baseline (Linear,
+`P=16`, position index 8) as a fixed comparison point:
 
 | Evaluator family | What the checker actually iterates over | Required scope if only the changed project changes | vs. the §3a dependents closure (`K=9`) |
 |---|---|---|---|
 | `EvaluatorFamily.ReferenceGraphLocal` (`layers`, `external`/`external_allow_only`, `allow_only`) | Only the changed project's own layer's own outgoing references (`context.FindTypesInLayer(sourceLayer)`, then that layer's own reference/IL scan in `LayerChecker`/`ExternalDependencyChecker`/`AllowOnlyChecker`). But the violation verdict for each reference is decided by `ArchitectureNamespaceViolationFinder.MatchReference`, which classifies the *target* type (namespace/role/expression facts via `ArchitectureLayerTypeMatcher.Matches`), not the source. | The changed project's transitive dependents (`K=9`) — **not** the changed project alone. If unchanged project A references a type in changed project B, and B's change alters that type's own classification, A's already-passing check can flip even though A itself did not change. | **Equal, not narrower.** The first correction claimed `K=1` here; that was itself wrong — this family needs the same bound as the generic default absent a per-type target-fact invalidation model, which this task does not build. |
 | `EvaluatorFamily.CyclesGlobal` (`cycles`) | `CycleChecker` builds one shared inter-layer edge graph across every layer named by the contract (`CollectCycleEdgesForLayer` populates one `state.Graph`) and runs global cycle detection once over it (`ArchitectureCycleDetector.FindCycles(state.Graph)`). | Every project whose layer participates in the same cycle contract; this task has no modeled layer-membership graph, so it conservatively falls back to the full population (`K=16`). | **Not a subset relationship at all** — even the dependents closure is *unsafe* here: cycle detection runs over one shared multi-layer graph, not the changed project's own reachability tree. |
 | `EvaluatorFamily.ContractCoListing` (`public_api_surface`) | `PublicApiSurfaceChecker` scopes to only the assemblies explicitly named in one contract's `assemblies` list (`ScanContractAssemblies` loops `contract.Assemblies`); a downstream consumer not co-listed in that same contract is unaffected even though it depends on the changed project through the ordinary project-reference graph. | The assemblies co-listed with the changed project in the same contract — a contract-*membership* relationship this task does not model, so it falls back to the full population (`K=16`) rather than assuming the reference graph applies at all. | **Different relationship entirely**, not narrower or wider along the same axis — this is why `ChangedInputKind.ApiSnapshotOrBaselineChange` is `UnmappableFallback` in Question 2, not a dependents-closure expansion. |
-| `EvaluatorFamily.AggregatedGlobalScan` (coverage scopes `project`, `assembly`, `namespace`) | `CheckProjectCoverageContract`/`CheckAssemblyCoverageContract`, and the `namespace` branch of `CheckCoverageContract`, classify each item independently from only that item's own namespaces against policy-declared layers (`IsCoveredByDeclaredLayers`) — never another project's code. | The changed project alone is *correctness-relevant* (`K=1`); today's execution re-scans the whole solution regardless, which is a separate execution-model limitation, not a scope-planning one. | **Strictly narrower** — the one family in this table genuinely bounded below the generic dependents closure. |
-| `EvaluatorFamily.CoverageGraphOrCatalogWide` (coverage scopes `dependency_edge`, `semantic_role`, `rule_input`) | `dependency_edge` (`ArchitectureDependencyEdgeCoverageService.Check`) evaluates declared layer-name pairs against edges observed across the whole coverage inventory; `semantic_role` (`ArchitectureSemanticCoverageService.BuildSummary`) iterates every type from `TypeIndex.AllTypes()` via the shared role catalog — the same unproven cross-project classification risk as `ReferenceGraphLocal`; `rule_input` operates over policy-level contract ids, not project code. | This task has no graph/catalog model precise enough to bound any of the three below the full population (`K=16`). | **Not a subset relationship** — these three coverage scopes do not share `AggregatedGlobalScan`'s per-item-local shape, so lumping all of `coverage` into one family (as the first correction did) was itself an unverified one-direction assumption. |
+| `EvaluatorFamily.AggregatedGlobalScan` (coverage scopes `project`, `assembly`) | `CheckProjectCoverageContract`/`CheckAssemblyCoverageContract` classify each item independently from only that item's own namespaces against policy-declared layers (`IsCoveredByDeclaredLayers`) — never another project's code, and each item is by construction exactly one project or one assembly. | The changed project alone is *correctness-relevant* (`K=1`); today's execution re-scans the whole solution regardless, which is a separate execution-model limitation, not a scope-planning one. | **Strictly narrower** — the one family in this table genuinely bounded below the generic dependents closure. |
+| `EvaluatorFamily.CoverageGraphOrCatalogWide` (coverage scopes `namespace`, `dependency_edge`, `semantic_role`, `rule_input`) | `namespace` (`ArchitectureCoverageInventory.Build`) groups `session.TypeIndex.AllTypes()` — the *whole solution's* types — by namespace string and picks one representative type; a namespace is not tied to one assembly, so a shared namespace entry can span types owned by several projects. `dependency_edge` (`ArchitectureDependencyEdgeCoverageService.Check`) evaluates declared layer-name pairs against edges observed across the whole coverage inventory; `semantic_role` (`ArchitectureSemanticCoverageService.BuildSummary`) iterates every type from `TypeIndex.AllTypes()` via the shared role catalog — the same unproven cross-project classification risk as `ReferenceGraphLocal`; `rule_input` operates over policy-level contract ids, not project code. | This task has no graph/catalog model precise enough to bound any of the four below the full population (`K=16`). | **Not a subset relationship** — these four coverage scopes do not share `AggregatedGlobalScan`'s per-item-local shape. The second correction grouped `namespace` with `project`/`assembly` at `K=1`; that was itself wrong, since only `project` and `assembly` are inherently single-project/assembly by construction. |
 
 This is implemented and tested, not asserted: `EvaluatorFamilyScopePlanner`
 (`tests/ArchLinterNet.Core.Tests/Benchmarking/EvaluatorFamilyScopePlanner.cs`) computes each family's
@@ -350,12 +399,13 @@ coverage.**
 #503 requires baseline full-validation duration and phase shares, secondary timing evidence, an
 expected PR-feedback latency reduction for S/M/L solutions, and — per the acceptance criterion
 forbidding one generic graph-direction assumption — an evaluator/fact-class-specific closure model,
-before a final outcome can be recorded. This task supplies the deterministic mapping (Question 2) and
-a code-grounded evaluator-family closure model for five representative families out of roughly 34
-(§3b), but explicitly does **not** supply the timing half — see
-[Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate) — and does
+before a final outcome can be recorded. This task supplies the disposition-given-ownership mapping
+(Question 2a) and a code-grounded evaluator-family closure model for five representative families out
+of roughly 34 (§3b), but explicitly does **not** supply the timing half — see
+[Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate) — does
+**not** supply the ownership-*resolution* half of Question 2 (§2b), and does
 **not** claim the remaining ~29 contract families are safely bounded by any model in this document. So
-declaring a final B here would still close the gate on incomplete evidence. Three independent reasons
+declaring a final B here would still close the gate on incomplete evidence. Four independent reasons
 converge on the same action:
 
 - the #991 P0 gate disqualifies the pre-normalization dogfood latency as sole justification for any
@@ -365,37 +415,46 @@ converge on the same action:
   fixed/per-project work split this task would need to state a defensible S/M/L reduction number;
 - independent of both, §3b shows the generic reference-graph dependents closure is unsafe or the wrong
   relationship for three of the five analyzed families (`cycles`, `public_api_surface`,
-  `dependency_edge`/`semantic_role`/`rule_input` coverage), and a second review pass found the first
-  correction itself had understated `layers`/`external`/`allow_only`'s requirement — any implementation
-  must plan per evaluator family actually present in the target policy, and this task has not analyzed
-  most of them, nor is this task's own analysis to date free of revision.
+  `CoverageGraphOrCatalogWide`), and two further review passes each found the prior correction itself
+  had misclassified something (`layers`/`external`/`allow_only`'s requirement first, then coverage's
+  `namespace` scope second) — any implementation must plan per evaluator family actually present in
+  the target policy, and this task has not analyzed most of them, nor is this task's own analysis to
+  date free of revision;
+- independent of all three, §2b shows the change-to-project *ownership resolution* step (given a raw
+  changed path, which project(s) own it) is not addressed at all — every test in this task supplies
+  ownership directly rather than deriving it, and the correct authoritative basis (MSBuild's evaluated
+  `@(Compile)` items, including `Link`-based shared/linked files) is a different, harder problem than
+  the disposition rules in §2a.
 
 **Working hypothesis, not a locked decision**: only the `AggregatedGlobalScan`-shaped family
-(coverage's `project`/`assembly`/`namespace` scopes) is analyzed as narrower than the generic
-dependents closure in §3b. `ReferenceGraphLocal` (`layers`/`external`/`allow_only`) turned out, after
-correction, to need the *same* dependents-closure bound as the generic default — no better, no worse.
-`CyclesGlobal`, `ContractCoListing`, and `CoverageGraphOrCatalogWide` all fall back to the full
-population. So the B-shaped hypothesis is real but narrow on both axes: it holds only for changed
-inputs that map (Question 2) to a bounded, non-foundational subset of projects, evaluated only against
-`AggregatedGlobalScan`-shaped contract families (Question 3b) — every other analyzed family, and every
+(coverage's `project`/`assembly` scopes) is analyzed as narrower than the generic dependents closure
+in §3b. `ReferenceGraphLocal` (`layers`/`external`/`allow_only`) turned out, after correction, to need
+the *same* dependents-closure bound as the generic default — no better, no worse. `CyclesGlobal`,
+`ContractCoListing`, and `CoverageGraphOrCatalogWide` (now including coverage's `namespace` scope) all
+fall back to the full population. So the B-shaped hypothesis is real but narrow on three axes, not
+two: it holds only for changed inputs whose ownership is somehow already known (§2b) and which map
+(§2a) to a bounded, non-foundational subset of projects, evaluated only against
+`AggregatedGlobalScan`-shaped contract families (§3b) — every other analyzed family, and every
 unanalyzed one, means full-validation fallback under the safe-widening principle. Central build/package
 props, analyzer/generator/additional files, policy/import files, API-snapshot/baseline changes (per the
-Question 2 revision above), and unmappable build-context inputs remain full-validation fallback with no
-exception. The Question 4 scope-plan contract and Question 5 coverage model apply to the narrow case
-exactly as to the general case: one Core scope authority per dimension (changed-input *and* evaluator
-family), explicit per-input disposition, and complete coverage accounting — narrow support is not
-permission to ignore inputs or evaluator families outside the analyzed set.
+Question 2a revision above), and unmappable build-context inputs remain full-validation fallback with
+no exception. The Question 4 scope-plan contract and Question 5 coverage model apply to the narrow
+case exactly as to the general case: one Core scope authority per dimension (changed-input *and*
+evaluator family), explicit per-input disposition, and complete coverage accounting — narrow support
+is not permission to ignore inputs or evaluator families outside the analyzed set.
 
 This task does **not** create a focused implementation issue under #19. The required next actions are
-recorded here: (1) extend §3b's evaluator-family analysis from the current five representative
-families to the remaining contract families the target policy actually uses (each one grounded in its
-own checker code, the same way as §3b, not assumed — including a real per-type target-fact
-invalidation model for `ReferenceGraphLocal`/`CoverageGraphOrCatalogWide`'s `semantic_role` scope,
-which this task only bounded conservatively rather than solved); (2) after #991 reaches its decision gate,
-complete the outstanding timing/effect evidence (fixed vs. per-project work split, measured phase
-shares, S/M/L latency reduction) against normalized consumer CI spans; then record a final A/B/C
-outcome and open the implementation issue only if a supported change class still shows material
-residual benefit across both dimensions.
+recorded here: (1) build and test a real change-to-project ownership resolver grounded in MSBuild's
+evaluated `@(Compile)` items (§2b), since every result in this document assumes ownership is already
+known; (2) extend §3b's evaluator-family analysis from the current five representative families to
+the remaining contract families the target policy actually uses (each one grounded in its own checker
+code, the same way as §3b, not assumed — including a real per-type target-fact invalidation model for
+`ReferenceGraphLocal`/`CoverageGraphOrCatalogWide`'s `semantic_role` scope, which this task only
+bounded conservatively rather than solved); (3) after #991 reaches its decision gate, complete the
+outstanding timing/effect evidence (fixed vs. per-project work split, measured phase shares, S/M/L
+latency reduction) against normalized consumer CI spans; then record a final A/B/C outcome and open
+the implementation issue only if a supported change class still shows material residual benefit
+across all three dimensions.
 
 ## Routing and non-goals
 
@@ -408,8 +467,11 @@ residual benefit across both dimensions.
   Implementation-child creation is deferred pending #991; see
   [P0 consumer-normalization gate](#p0-consumer-normalization-gate-991).
 - No single reference-graph direction is presented as sufficient for every contract family; §3b's
-  four-family analysis is representative, not exhaustive, and unanalyzed families default to full
+  five-family analysis is representative, not exhaustive, and unanalyzed families default to full
   fallback rather than an assumed bound.
+- No path-based ownership heuristic is presented as the authoritative change-to-project mapping; §2b
+  is explicit that this task supplies only the disposition step given already-known ownership, not a
+  tested `path → owning project(s)` resolver.
 - `analysis-cache/v1` and `prepared-analysis/v1` (#492) reuse relationships are evidence-based, not
   assumed prerequisites — see Question 7.
 - No private adopter identity, repository URL, or proprietary topology is committed; all closure

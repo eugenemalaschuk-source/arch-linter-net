@@ -33,25 +33,32 @@ namespace ArchLinterNet.Core.Tests;
 /// <see cref="ChangedInputKind.ApiSnapshotOrBaselineChange"/> as <see cref="ScopeDisposition.UnmappableFallback"/>
 /// rather than a reference-graph closure: the real relationship is contract membership, not
 /// reachability, and this task does not model contract-to-assemblies membership.</item>
-/// <item><see cref="AggregatedGlobalScan"/> — architecture-coverage's `project`, `assembly`, and
-/// `namespace` scopes (<c>schema/dependencies.arch.schema.json</c> coverage `scope` enum) classify
-/// each item independently from only that item's own namespaces against policy-declared layers
-/// (<c>CheckProjectCoverageContract</c>/<c>CheckAssemblyCoverageContract</c>, and the `namespace`
-/// branch of <c>CheckCoverageContract</c>), never another project's code — so the correctness-relevant
-/// scope is the changed project alone. Today's execution re-scans the whole solution and returns one
-/// combined findings list regardless, which is a separate execution-model limitation this evidence
-/// task records but does not resolve.</item>
-/// <item><see cref="CoverageGraphOrCatalogWide"/> — the coverage scope enum's remaining three values
-/// do not share <see cref="AggregatedGlobalScan"/>'s per-item-local shape: `dependency_edge`
-/// (<c>ArchitectureDependencyEdgeCoverageService.Check</c>) evaluates declared layer-name pairs
-/// against edges observed across the *whole* coverage inventory, so any project touching either
-/// layer's namespace membership can change the result; `semantic_role`
+/// <item><see cref="AggregatedGlobalScan"/> — architecture-coverage's `project` and `assembly` scopes
+/// (<c>schema/dependencies.arch.schema.json</c> coverage `scope` enum) classify each item
+/// independently from only that item's own namespaces against policy-declared layers
+/// (<c>CheckProjectCoverageContract</c>/<c>CheckAssemblyCoverageContract</c>), and each item is by
+/// construction exactly one project or one assembly — so the correctness-relevant scope is the changed
+/// project alone. Today's execution re-scans the whole solution and returns one combined findings list
+/// regardless, which is a separate execution-model limitation this evidence task records but does not
+/// resolve. `namespace` does **not** belong in this family — see
+/// <see cref="CoverageGraphOrCatalogWide"/>.</item>
+/// <item><see cref="CoverageGraphOrCatalogWide"/> — the coverage scope enum's remaining four values do
+/// not share <see cref="AggregatedGlobalScan"/>'s per-item-local shape. `namespace`
+/// (<c>ArchitectureCoverageInventory.Build</c>) groups <c>session.TypeIndex.AllTypes()</c> — the
+/// *whole solution's* types — by namespace string and picks one representative type; a C# namespace is
+/// not tied to one assembly, so a shared namespace entry can legitimately span types owned by several
+/// projects, and changing any one of them can change that entry's coverage classification. This
+/// evidence task originally grouped `namespace` with `project`/`assembly` as project-local; that was
+/// wrong, since only `project` and `assembly` are inherently single-project/assembly by construction.
+/// `dependency_edge` (<c>ArchitectureDependencyEdgeCoverageService.Check</c>) evaluates declared
+/// layer-name pairs against edges observed across the *whole* coverage inventory, so any project
+/// touching either layer's namespace membership can change the result; `semantic_role`
 /// (<c>ArchitectureSemanticCoverageService.BuildSummary</c>) iterates every type from
 /// <c>TypeIndex.AllTypes()</c> and classifies each via the shared role catalog, which — like the
 /// <see cref="ReferenceGraphLocal"/> case — is not proven free of cross-project classification
 /// dependencies; `rule_input` operates over contract ids from policy, not project code, so it is
 /// policy-level rather than project-scoped. This evidence task does not have a graph/catalog model
-/// precise enough to bound any of the three below the full project population.</item>
+/// precise enough to bound any of the four below the full project population.</item>
 /// </list>
 /// This taxonomy intentionally covers a representative subset, not all ~34 contract families in
 /// <c>schema/dependencies.arch.schema.json</c>; families outside this subset are not claimed to be
@@ -128,22 +135,26 @@ internal static class EvaluatorFamilyScopePlanner
             {
                 Family = family,
                 RequiredProjectIds = changedProjectIds,
-                Reason = "Coverage scopes 'project'/'assembly'/'namespace' classify each item independently from " +
-                    "only that item's own namespaces against policy-declared layers, never another project's " +
-                    "code, so the correctness-relevant scope is the changed project alone; today's execution " +
-                    "re-scans the whole solution regardless, which is a separate execution-model limitation this " +
-                    "evidence task records but does not resolve.",
+                Reason = "Coverage scopes 'project'/'assembly' classify each item independently from only that " +
+                    "item's own namespaces against policy-declared layers, and each item is by construction " +
+                    "exactly one project or one assembly, so the correctness-relevant scope is the changed " +
+                    "project alone; today's execution re-scans the whole solution regardless, which is a " +
+                    "separate execution-model limitation this evidence task records but does not resolve. " +
+                    "'namespace' is intentionally excluded from this family (see CoverageGraphOrCatalogWide).",
             },
             EvaluatorFamily.CoverageGraphOrCatalogWide => new EvaluatorScope
             {
                 Family = family,
                 RequiredProjectIds = allProjectIds,
-                Reason = "Coverage scopes 'dependency_edge' (evaluated over the whole coverage inventory's " +
-                    "observed edges), 'semantic_role' (iterates every type via the shared role catalog, with the " +
-                    "same unproven cross-project classification risk as ReferenceGraphLocal), and 'rule_input' " +
-                    "(policy-level, not project-scoped) do not share AggregatedGlobalScan's per-item-local shape; " +
-                    "this evidence task has no graph/catalog model precise enough to bound any of them below the " +
-                    "full project population.",
+                Reason = "Coverage scopes 'namespace' (ArchitectureCoverageInventory.Build groups the whole " +
+                    "solution's types by namespace string and picks one representative type; a namespace is not " +
+                    "tied to one assembly, so a shared namespace entry can span multiple projects), " +
+                    "'dependency_edge' (evaluated over the whole coverage inventory's observed edges), " +
+                    "'semantic_role' (iterates every type via the shared role catalog, with the same unproven " +
+                    "cross-project classification risk as ReferenceGraphLocal), and 'rule_input' (policy-level, " +
+                    "not project-scoped) do not share AggregatedGlobalScan's per-item-local shape; this evidence " +
+                    "task has no graph/catalog model precise enough to bound any of them below the full project " +
+                    "population.",
             },
             _ => throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown evaluator family."),
         };
