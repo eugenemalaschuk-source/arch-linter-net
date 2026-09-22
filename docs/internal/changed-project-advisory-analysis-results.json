@@ -1,0 +1,65 @@
+{
+  "schema_id": "changed-project-scope-plan-evidence/v1",
+  "issue": "#503",
+  "disposition": "evidence-only",
+  "source_identity": "synthetic-current-tree",
+  "generator": {
+    "workload_catalog": "large-solution-benchmark/v1 (#502)",
+    "planner": "ChangedProjectScopePlanner (tests/ArchLinterNet.Core.Tests/Benchmarking/ChangedProjectScopePlanner.cs)",
+    "verified_by_tests": "tests/ArchLinterNet.Core.Tests/ChangedProjectAdvisoryScopePlanningTests.cs",
+    "measurement_kind": "deterministic-graph-closure",
+    "note": "K/P values below are exact deterministic graph computations, not wall-clock samples; every row is reproduced by an assertion in the referenced test file."
+  },
+  "closure_ratio_by_change_class": [
+    { "shape": "Linear", "change_class": "leaf-project-source-change", "project_count": 12, "k": 1, "p": 12, "k_over_p": 0.083 },
+    { "shape": "WideFanOutFanIn", "change_class": "leaf-project-source-change", "project_count": 12, "k": 1, "p": 12, "k_over_p": 0.083 },
+    { "shape": "Diamond", "change_class": "leaf-project-source-change", "project_count": 12, "k": 1, "p": 12, "k_over_p": 0.083 },
+    { "shape": "Dense", "change_class": "leaf-project-source-change", "project_count": 12, "k": 1, "p": 12, "k_over_p": 0.083 },
+
+    { "shape": "Linear", "change_class": "shared-foundation-project-source-change", "project_count": 12, "k": 12, "p": 12, "k_over_p": 1.0 },
+    { "shape": "WideFanOutFanIn", "change_class": "shared-foundation-project-source-change", "project_count": 12, "k": 12, "p": 12, "k_over_p": 1.0 },
+    { "shape": "Diamond", "change_class": "shared-foundation-project-source-change", "project_count": 12, "k": 12, "p": 12, "k_over_p": 1.0 },
+    { "shape": "Dense", "change_class": "shared-foundation-project-source-change", "project_count": 12, "k": 12, "p": 12, "k_over_p": 1.0 },
+
+    { "shape": "Linear", "change_class": "middle-position-source-change", "project_count": 8, "k": 5, "p": 8, "k_over_p": 0.625 },
+    { "shape": "Linear", "change_class": "middle-position-source-change", "project_count": 16, "k": 9, "p": 16, "k_over_p": 0.5625 },
+    { "shape": "Linear", "change_class": "middle-position-source-change", "project_count": 32, "k": 17, "p": 32, "k_over_p": 0.531 },
+    { "shape": "Linear", "change_class": "middle-position-source-change", "project_count": 64, "k": 33, "p": 64, "k_over_p": 0.516 },
+
+    { "shape": "Dense", "change_class": "middle-position-source-change", "project_count": 8, "k": 5, "p": 8, "k_over_p": 0.625 },
+    { "shape": "Dense", "change_class": "middle-position-source-change", "project_count": 16, "k": 9, "p": 16, "k_over_p": 0.5625 },
+    { "shape": "Dense", "change_class": "middle-position-source-change", "project_count": 32, "k": 17, "p": 32, "k_over_p": 0.531 },
+    { "shape": "Dense", "change_class": "middle-position-source-change", "project_count": 64, "k": 33, "p": 64, "k_over_p": 0.516 },
+
+    { "shape": "Diamond", "change_class": "tail-middle-position-source-change", "project_count": 8, "k": 5, "p": 8, "k_over_p": 0.625 },
+    { "shape": "Diamond", "change_class": "tail-middle-position-source-change", "project_count": 16, "k": 9, "p": 16, "k_over_p": 0.5625 },
+    { "shape": "Diamond", "change_class": "tail-middle-position-source-change", "project_count": 32, "k": 17, "p": 32, "k_over_p": 0.531 },
+    { "shape": "Diamond", "change_class": "tail-middle-position-source-change", "project_count": 64, "k": 33, "p": 64, "k_over_p": 0.516 },
+
+    { "shape": "WideFanOutFanIn", "change_class": "single-spoke-source-change", "project_count": 8, "k": 2, "p": 8, "k_over_p": 0.25 },
+    { "shape": "WideFanOutFanIn", "change_class": "single-spoke-source-change", "project_count": 16, "k": 2, "p": 16, "k_over_p": 0.125 },
+    { "shape": "WideFanOutFanIn", "change_class": "single-spoke-source-change", "project_count": 32, "k": 2, "p": 32, "k_over_p": 0.0625 },
+    { "shape": "WideFanOutFanIn", "change_class": "single-spoke-source-change", "project_count": 64, "k": 2, "p": 64, "k_over_p": 0.03125 },
+
+    { "shape": "Linear", "change_class": "project-reference-edge-change", "project_count": 8, "k": 5, "p": 8, "k_over_p": 0.625, "note": "edge project-004->project-005; union of both endpoint dependent closures collapses to the deeper endpoint's own closure" },
+
+    { "shape": "Dense", "change_class": "central-build-props-or-packages-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "GlobalExpansion" },
+    { "shape": "Dense", "change_class": "analyzer-generator-additional-file-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "GlobalExpansion" },
+    { "shape": "Dense", "change_class": "policy-or-import-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "GlobalExpansion" },
+    { "shape": "Dense", "change_class": "generated-output-or-build-context-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "UnmappableFallback" }
+  ],
+  "repository_pr_traffic_mix": {
+    "method": "path-pattern classification of file lists from the last N commits on this repository's own main history; approximate, not a literal application of ChangedProjectScopePlanner (which requires structured project/edge graph input the raw commit history does not provide)",
+    "sample_size_commits": 300,
+    "commits_touching_central_props_or_policy_paths": 31,
+    "commits_touching_central_props_or_policy_paths_ratio": 0.103,
+    "commits_touching_only_project_source_or_csproj_paths": 15,
+    "commits_touching_only_project_source_or_csproj_paths_ratio": 0.05,
+    "caveat": "The remaining ~85% mix project-source with docs/openspec/other paths not classified here; whether those other paths are architecture-lint-relevant at all is a separate, unanswered mapping question this task surfaces but does not resolve."
+  },
+  "p0_gate": {
+    "authority": "#991",
+    "constraint": "No incremental-analysis implementation child issue may be created from this evidence based solely on the current (pre-normalization) dogfood latency table in #991. Re-evaluation against normalized consumer CI is required first.",
+    "action_taken_in_this_task": "No implementation child issue created. Decision recorded as narrow-case-material (Outcome B in spirit) but deferred pending #991."
+  }
+}

@@ -120,3 +120,12 @@ The explicit harness writes the current synthetic/anonymized result to
 [`prepared-analysis-reuse-evidence.json`](../prepared-analysis-reuse-evidence.json).
 It is evidence for the pre-implementation decision only; it does not describe a
 persisted prepared-state product or authorize one.
+
+The issue-specific changed-project advisory analysis and dependency-closure contract for #503 is
+documented in
+[`changed-project-advisory-analysis-evidence.md`](../changed-project-advisory-analysis-evidence.md),
+with its exact-computed closure matrix in
+[`changed-project-advisory-analysis-results.json`](../changed-project-advisory-analysis-results.json).
+Unlike the other issue-specific contracts in this directory, #503's evidence is deterministic graph
+closure computation rather than timed samples, so it runs as ordinary (non-`[Explicit]`) tests under
+`tests/ArchLinterNet.Core.Tests/ChangedProjectAdvisoryScopePlanningTests.cs`.
