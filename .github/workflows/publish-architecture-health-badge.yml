@@ -20,7 +20,7 @@ jobs:
       id-token: write
       packages: read
       pull-requests: read
-    uses: ./.github/workflows/architecture-health-badge-promotion.yml
+    uses: $/.github/workflows/architecture-health-badge-promotion.yml
     with:
       configuration-id: reference-public-raw
       adapter: github-raw
@@ -30,4 +30,4 @@ jobs:
     needs: publish
     permissions:
       contents: write
-    uses: ./.github/workflows/publish-repository-metrics-badge.yml
+    uses: $/.github/workflows/publish-repository-metrics-badge.yml
