@@ -16,9 +16,11 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(small.TargetedPhaseSharePercent, Is.EqualTo(25m));
         Assert.That(small.AmdahlMaximumSpeedup, Is.EqualTo(1.3333333333333333333333333333m).Within(0.0000000000000000000000001m));
         Assert.That(small.ColdMissOverheadPercent, Is.EqualTo(20m));
-        Assert.That(small.ExpectedWarmHitReductionPercent, Is.EqualTo(50m));
-        Assert.That(small.ExpectedAmortizedReductionPercent, Is.EqualTo(26.6666666666666666666666666667m).Within(0.0000000000000000000000001m));
+        Assert.That(small.ExpectedWarmHitReductionPercent, Is.EqualTo(25m));
+        Assert.That(small.ExpectedAmortizedReductionPercent, Is.EqualTo(10m));
         Assert.That(small.VerifiedWarmHitObserved, Is.True);
+        Assert.That(small.ResourceEvidenceComplete, Is.True);
+        Assert.That(estimate.Complete, Is.True);
         estimate.Validate();
     }
 
@@ -31,6 +33,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(estimate.Complete, Is.False);
         Assert.That(estimate.Points, Has.All.Matches<RealMsBuildCacheEffectPoint>(point =>
             !point.VerifiedWarmHitObserved &&
+            !point.ResourceEvidenceComplete &&
             point.ColdMissOverheadPercent is null &&
             point.ExpectedWarmHitReductionPercent is null &&
             point.ExpectedAmortizedReductionPercent is null &&
@@ -63,6 +66,9 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(markdown, Does.Contain("The targeted boundary includes assembly/artifact loading and analysis phases"));
         Assert.That(markdown, Does.Contain("Without a verified warm-hit control, warm-hit and amortized reductions remain unavailable/model-only"));
         Assert.That(markdown, Does.Contain("Cold/miss overhead is computed only from the eligible-control disabled-versus-population path"));
+        Assert.That(markdown, Does.Contain("Expected warm-hit reduction is normalized to the real-MSBuild denominator"));
+        Assert.That(markdown, Does.Contain("Allocated bytes"));
+        Assert.That(markdown, Does.Contain("Peak working set"));
     }
 
     [Test]
@@ -106,6 +112,21 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
 
         Assert.That(exception.Message, Does.Contain("Eligible-control evidence"));
+    }
+
+    [Test]
+    public void EffectModel_LeavesEstimateIncompleteWithoutControlResourceObservations()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control" && measurement.CacheMode == "repeat"
+                ? measurement with { AllocatedBytes = null }
+                : measurement)
+            .ToArray();
+
+        RealMsBuildCacheEffectEstimate estimate = RealMsBuildCacheEffectModel.Calculate(measurements);
+
+        Assert.That(estimate.Complete, Is.False);
+        Assert.That(estimate.Points, Has.All.Matches<RealMsBuildCacheEffectPoint>(point => !point.ResourceEvidenceComplete));
     }
 
     [Test]

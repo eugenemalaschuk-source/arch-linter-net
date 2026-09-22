@@ -112,6 +112,9 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
                 "Outcome A requires a material amortized effect at or above the success threshold for every representative size.");
             Require(Measurements.Any(measurement => measurement.FixtureKind == "eligible-control" && measurement.Hits > 0),
                 "Outcome A requires an observed verified warm-hit control.");
+            Require(Measurements.Where(measurement => measurement.FixtureKind == "eligible-control")
+                    .All(HasResourceObservations),
+                "Outcome A requires allocation, peak-working-set, bytes-read, and bytes-written observations for every eligible-control path.");
             Require(ReferenceBaseDisposition.CountedInEffectEstimate == false,
                 "Reference/base work cannot be counted as candidate exact-cache savings.");
         }
@@ -127,6 +130,10 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
         value.Contains("firstice", StringComparison.OrdinalIgnoreCase) ||
         value.Contains("github.com/", StringComparison.OrdinalIgnoreCase) ||
         value.Contains("namespace", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasResourceObservations(RealMsBuildCacheMeasurement measurement) =>
+        measurement.AllocatedBytes is >= 0 && measurement.PeakWorkingSetBytes is >= 0 &&
+        measurement.BytesRead is >= 0 && measurement.BytesWritten is >= 0;
 
     private static void Require(bool condition, string message)
     {
@@ -230,6 +237,8 @@ internal sealed record RealMsBuildCacheEffectPoint
 
     public required bool VerifiedWarmHitObserved { get; init; }
 
+    public required bool ResourceEvidenceComplete { get; init; }
+
     public void Validate()
     {
         if (Size is not ("small" or "medium" or "large") ||
@@ -238,6 +247,7 @@ internal sealed record RealMsBuildCacheEffectPoint
             (ColdMissOverheadPercent is < 0 or > 100) ||
             (ExpectedWarmHitReductionPercent is < 0 or > 100) ||
             (ExpectedAmortizedReductionPercent is < 0 or > 100) || WarmHitAvoidedWork < 0 ||
+            (ExpectedWarmHitReductionPercent.HasValue && ExpectedWarmHitReductionPercent.Value > TargetedPhaseSharePercent) ||
             (!VerifiedWarmHitObserved &&
                 (ExpectedWarmHitReductionPercent.HasValue || ExpectedAmortizedReductionPercent.HasValue ||
                     WarmHitAvoidedWork.HasValue)) ||
@@ -364,9 +374,21 @@ internal static class RealMsBuildCacheEffectModel
             bool verifiedWarmHitObserved = controlPopulationVerified && controlCanonicalResultEquivalent &&
                 controlBaseline?.Eligibility == "VerifiedCacheEligible" && controlBaseline.TotalElapsedMilliseconds is > 0 &&
                 controlHit?.Eligibility == "VerifiedCacheEligible" && controlHit.TotalElapsedMilliseconds is >= 0;
-            decimal? warmReduction = verifiedWarmHitObserved
+            bool resourceEvidenceComplete = HasResourceObservations(controlBaseline) &&
+                HasResourceObservations(controlPopulation) && HasResourceObservations(controlHit);
+            decimal? controlTargetedSharePercent = controlBaseline?.TotalElapsedMilliseconds is > 0 &&
+                controlBaseline.TargetedPhaseMilliseconds is > 0
+                ? (decimal)(controlBaseline.TargetedPhaseMilliseconds.Value / controlBaseline.TotalElapsedMilliseconds.Value * 100)
+                : null;
+            decimal? controlWarmReduction = verifiedWarmHitObserved
                 ? Math.Clamp((decimal)((controlBaseline!.TotalElapsedMilliseconds!.Value - controlHit!.TotalElapsedMilliseconds!.Value) /
                     controlBaseline.TotalElapsedMilliseconds.Value * 100), 0, 100)
+                : null;
+            decimal? targetedWorkAvoidanceFraction = controlWarmReduction.HasValue && controlTargetedSharePercent is > 0
+                ? Math.Clamp(controlWarmReduction.Value / controlTargetedSharePercent.Value, 0, 1)
+                : null;
+            decimal? warmReduction = targetedWorkAvoidanceFraction.HasValue
+                ? Math.Clamp(share * targetedWorkAvoidanceFraction.Value, 0, share)
                 : null;
             decimal? amortized = warmReduction.HasValue && coldOverhead.HasValue
                 ? Math.Clamp(((expectedReuseCount - 1) * warmReduction.Value - coldOverhead.Value) / expectedReuseCount, 0, 100)
@@ -381,6 +403,7 @@ internal static class RealMsBuildCacheEffectModel
                 ExpectedAmortizedReductionPercent = amortized,
                 WarmHitAvoidedWork = verifiedWarmHitObserved ? controlHit!.AvoidedWork : null,
                 VerifiedWarmHitObserved = verifiedWarmHitObserved,
+                ResourceEvidenceComplete = resourceEvidenceComplete,
             });
         }
 
@@ -392,8 +415,13 @@ internal static class RealMsBuildCacheEffectModel
             KillCriterionPercent = 5,
             ExpectedReuseCount = expectedReuseCount,
             ReuseAssumptions = "Three equivalent requests in one workflow or across immutable reference/base revisions; cache misses remain correct fallbacks.",
-            Complete = points.All(point => point.TargetedPhaseSharePercent > 0 && point.VerifiedWarmHitObserved && point.ColdMissOverheadPercent.HasValue),
+            Complete = points.All(point => point.TargetedPhaseSharePercent > 0 && point.VerifiedWarmHitObserved &&
+                point.ColdMissOverheadPercent.HasValue && point.ResourceEvidenceComplete),
             Points = points,
         };
     }
+
+    private static bool HasResourceObservations(RealMsBuildCacheMeasurement? measurement) =>
+        measurement?.AllocatedBytes is >= 0 && measurement.PeakWorkingSetBytes is >= 0 &&
+        measurement.BytesRead is >= 0 && measurement.BytesWritten is >= 0;
 }

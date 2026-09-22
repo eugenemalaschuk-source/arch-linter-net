@@ -42,6 +42,8 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
             .AppendLine("- The targeted boundary includes assembly/artifact loading and analysis phases that a verified exact-request hit skips; cache lookup, build-state authorization and output routing remain outside it. Deterministic counters establish avoided-work scope; Stopwatch values are environment-labelled supporting evidence.")
             .AppendLine("- Without a verified warm-hit control, warm-hit and amortized reductions remain unavailable/model-only and cannot be used to declare a final outcome C.")
             .AppendLine("- Cold/miss overhead is computed only from the eligible-control disabled-versus-population path when eligibility, miss, and cache write are all verified; ineligible or rejected real-MSBuild rows are never used as amortization cost.")
+            .AppendLine("- Expected warm-hit reduction is normalized to the real-MSBuild denominator by applying the observed control targeted-work avoidance fraction to the real targeted-phase share; it cannot exceed the real Amdahl bound.")
+            .AppendLine("- Outcome-complete resource evidence requires allocation, peak working set, bytes read, and bytes written observations for eligible-control disabled, population, and repeat paths.")
             .AppendLine("- Cache-disabled, population/miss, and repeat results retain canonical-result identity; stale-input checks retain fail-closed dispositions.")
             .AppendLine("- The exact-request cache estimate excludes prepared-analysis persistence and separately records reference/base-side work.")
             .AppendLine()
@@ -60,8 +62,8 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
             .AppendLine($"Expected equivalent reuse count: **{document.EffectEstimate.ExpectedReuseCount}**. Assumptions: {document.EffectEstimate.ReuseAssumptions}")
             .AppendLine($"Success threshold: **{document.EffectEstimate.SuccessThresholdPercent.ToString("F1", CultureInfo.InvariantCulture)}%** amortized reduction; kill criterion: **{document.EffectEstimate.KillCriterionPercent.ToString("F1", CultureInfo.InvariantCulture)}%**.")
             .AppendLine()
-            .AppendLine("| Size | Targeted phase share | Amdahl max speedup | Cold/miss overhead | Expected warm-hit reduction | Expected amortized reduction | Avoided work | Verified hit observed |")
-            .AppendLine("|---|---:|---:|---:|---:|---:|---:|---|");
+            .AppendLine("| Size | Targeted phase share | Amdahl max speedup | Cold/miss overhead | Expected warm-hit reduction | Expected amortized reduction | Avoided work | Verified hit observed | Resource evidence |")
+            .AppendLine("|---|---:|---:|---:|---:|---:|---:|---|---|");
         foreach (RealMsBuildCacheEffectPoint point in document.EffectEstimate.Points.OrderBy(point => SizeOrder(point.Size)))
         {
             builder.Append("| ").Append(point.Size)
@@ -72,14 +74,15 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
                 .Append(" | ").Append(Format(point.ExpectedAmortizedReductionPercent)).Append(point.ExpectedAmortizedReductionPercent.HasValue ? "%" : "")
                 .Append(" | ").Append(point.WarmHitAvoidedWork?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
                 .Append(" | ").Append(point.VerifiedWarmHitObserved ? "yes" : "no")
+                .Append(" | ").Append(point.ResourceEvidenceComplete ? "complete" : "unavailable")
                 .AppendLine(" |");
         }
 
         builder.AppendLine()
             .AppendLine("## Cache measurements")
             .AppendLine()
-            .AppendLine("| Fixture | Size | Mode | Projects | Eligibility | Reasons | Lookups | Hits | Misses | Rejects | Writes | Ineligible units | Bytes read | Bytes written | Avoided work | Total ms | Targeted phase ms | Targeted share | Canonical result |")
-            .AppendLine("|---|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|");
+            .AppendLine("| Fixture | Size | Mode | Projects | Eligibility | Reasons | Lookups | Hits | Misses | Rejects | Writes | Ineligible units | Bytes read | Bytes written | Allocated bytes | Peak working set | Avoided work | Total ms | Targeted phase ms | Targeted share | Canonical result |")
+            .AppendLine("|---|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|");
         foreach (RealMsBuildCacheMeasurement measurement in document.Measurements.OrderBy(measurement => SizeOrder(measurement.Size)).ThenBy(measurement => measurement.FixtureKind, StringComparer.Ordinal).ThenBy(measurement => measurement.CacheMode, StringComparer.Ordinal))
         {
             builder.Append("| ").Append(measurement.FixtureKind)
@@ -96,6 +99,8 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
                 .Append(" | ").Append(measurement.IneligibleUnitCount.ToString(CultureInfo.InvariantCulture))
                 .Append(" | ").Append(measurement.BytesRead?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
                 .Append(" | ").Append(measurement.BytesWritten?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
+                .Append(" | ").Append(measurement.AllocatedBytes?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
+                .Append(" | ").Append(measurement.PeakWorkingSetBytes?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
                 .Append(" | ").Append(measurement.AvoidedWork?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
                 .Append(" | ").Append(Format(measurement.TotalElapsedMilliseconds))
                 .Append(" | ").Append(Format(measurement.TargetedPhaseMilliseconds))
