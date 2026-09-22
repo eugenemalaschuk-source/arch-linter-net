@@ -119,6 +119,20 @@ internal static class ChangedProjectScopePlanner
         };
     }
 
+    /// <summary>
+    /// Public entry point for the same transitive-dependents closure <see cref="Plan"/> uses
+    /// internally, so callers that need the raw closure (for example, to compare it against a
+    /// narrower or wider evaluator-family-specific bound in
+    /// <see cref="EvaluatorFamilyScopePlanner"/>) do not have to re-derive it.
+    /// </summary>
+    public static List<string> DependentsClosure(
+        IReadOnlyList<BenchmarkProjectNode> projects,
+        IReadOnlyList<BenchmarkProjectEdge> edges,
+        IReadOnlyList<string> seeds)
+    {
+        return ClosureOfDependents(seeds, BuildDependentsIndex(projects, edges));
+    }
+
     private static ChangedInputDecision Decide(
         ChangedInput input,
         IReadOnlyList<string> allProjectIds,

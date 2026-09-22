@@ -245,39 +245,55 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 16);
         string changedProjectId = workload.Projects[8].Id;
         IReadOnlyList<string> allProjectIds = workload.Projects.Select(project => project.Id).ToList();
+        IReadOnlyList<string> changedProjectIds = [changedProjectId];
+        List<string> dependentsClosureIds = ChangedProjectScopePlanner.DependentsClosure(
+            workload.Projects, workload.Edges, changedProjectIds);
 
         ScopePlan genericPlan = ChangedProjectScopePlanner.Plan(
             workload.Projects,
             workload.Edges,
             [OwnedSourceFile("middle-change", changedProjectId)]);
         Assert.That(genericPlan.AffectedProjectCount, Is.EqualTo(9), "generic dependents-closure baseline");
+        Assert.That(dependentsClosureIds, Has.Count.EqualTo(9), "DependentsClosure must agree with Plan's own closure");
 
         EvaluatorScope referenceGraphLocal = EvaluatorFamilyScopePlanner.Plan(
-            EvaluatorFamily.ReferenceGraphLocal, [changedProjectId], allProjectIds);
+            EvaluatorFamily.ReferenceGraphLocal, changedProjectIds, dependentsClosureIds, allProjectIds);
         EvaluatorScope cyclesGlobal = EvaluatorFamilyScopePlanner.Plan(
-            EvaluatorFamily.CyclesGlobal, [changedProjectId], allProjectIds);
+            EvaluatorFamily.CyclesGlobal, changedProjectIds, dependentsClosureIds, allProjectIds);
         EvaluatorScope contractCoListing = EvaluatorFamilyScopePlanner.Plan(
-            EvaluatorFamily.ContractCoListing, [changedProjectId], allProjectIds);
+            EvaluatorFamily.ContractCoListing, changedProjectIds, dependentsClosureIds, allProjectIds);
         EvaluatorScope aggregatedGlobalScan = EvaluatorFamilyScopePlanner.Plan(
-            EvaluatorFamily.AggregatedGlobalScan, [changedProjectId], allProjectIds);
+            EvaluatorFamily.AggregatedGlobalScan, changedProjectIds, dependentsClosureIds, allProjectIds);
+        EvaluatorScope coverageGraphOrCatalogWide = EvaluatorFamilyScopePlanner.Plan(
+            EvaluatorFamily.CoverageGraphOrCatalogWide, changedProjectIds, dependentsClosureIds, allProjectIds);
 
         Assert.Multiple(() =>
         {
             // Layers/external/allow_only checkers scan only the changed project's own outgoing
-            // references: strictly narrower than the generic dependents closure (1 < 9).
-            Assert.That(referenceGraphLocal.RequiredProjectIds, Is.EqualTo(new[] { changedProjectId }));
+            // references, but the verdict depends on each referenced TARGET type's own
+            // classification (namespace/role/expression facts) — a change to the target project can
+            // flip an unchanged dependent's result. The safe bound is therefore the full dependents
+            // closure (9), the same as the generic default, not the changed project alone.
+            Assert.That(referenceGraphLocal.RequiredProjectIds, Is.EqualTo(dependentsClosureIds));
 
-            // Cycle detection shares one graph across every layer in the contract: the dependents
-            // closure is not a safe bound, so this evidence task falls back to the full population
-            // (16), which is wider than the generic closure (9), not narrower.
+            // Cycle detection shares one graph across every layer in the contract: even the
+            // dependents closure is not a safe bound, so this evidence task falls back to the full
+            // population (16), which is wider than the generic closure (9), not narrower.
             Assert.That(cyclesGlobal.RequiredProjectIds, Has.Count.EqualTo(16));
 
             // Public-API surface scoping is contract co-listing, not the reference graph at all —
             // also falls back to the full population rather than reusing the dependents closure.
             Assert.That(contractCoListing.RequiredProjectIds, Has.Count.EqualTo(16));
 
-            // Coverage classification is per-item and project-local, same as ReferenceGraphLocal.
+            // Coverage scopes 'project'/'assembly'/'namespace' classify each item independently
+            // from only that item's own namespaces against policy-declared layers, so this stays
+            // project-local (K=1) — the one family genuinely narrower than the generic closure.
             Assert.That(aggregatedGlobalScan.RequiredProjectIds, Is.EqualTo(new[] { changedProjectId }));
+
+            // Coverage scopes 'dependency_edge'/'semantic_role'/'rule_input' are graph/catalog/
+            // policy-wide, not project-local; this evidence task has no model precise enough to
+            // narrow them, so they fall back to the full population like CyclesGlobal.
+            Assert.That(coverageGraphOrCatalogWide.RequiredProjectIds, Has.Count.EqualTo(16));
         });
     }
 

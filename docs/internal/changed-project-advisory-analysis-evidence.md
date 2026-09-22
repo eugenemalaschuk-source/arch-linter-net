@@ -189,30 +189,37 @@ which project changed, not on solution size. A scope planner cannot assume "chan
 An earlier revision of this document claimed the reference-graph dependents closure from §3a was "the
 safe superset for cross-project correctness contracts (layering, cyclic checks, public-API
 compatibility)." Reading the actual checker implementations under
-`src/ArchLinterNet.Core/Execution/Checkers/` shows that claim was wrong for two of those three named
-families, and #503's acceptance criteria explicitly forbid this kind of one-direction assumption. The
-correction, with the `K=9` §3a baseline (Linear, `P=16`, position index 8) as a fixed comparison
-point:
+`src/ArchLinterNet.Core/Execution/` shows that claim was wrong, and #503's acceptance criteria
+explicitly forbid this kind of one-direction assumption. This section was itself revised once more
+after a second review pass found the first correction still understated two families'
+requirements — `ReferenceGraphLocal` was claimed narrower than it actually is, and `coverage` was
+treated as one family when its six schema-defined scopes split into two different shapes. The table
+below is the corrected state, with the `K=9` §3a baseline (Linear, `P=16`, position index 8) as a
+fixed comparison point:
 
 | Evaluator family | What the checker actually iterates over | Required scope if only the changed project changes | vs. the §3a dependents closure (`K=9`) |
 |---|---|---|---|
-| `EvaluatorFamily.ReferenceGraphLocal` (`layers`, `external`/`external_allow_only`, `allow_only`) | Only the changed project's own layer's own outgoing references (`context.FindTypesInLayer(sourceLayer)`, then that layer's own reference/IL scan in `LayerChecker`/`ExternalDependencyChecker`/`AllowOnlyChecker`) — no other project's types are ever enumerated. | The changed project alone (`K=1`). | **Strictly narrower** — the dependents closure is a safe but wasteful superset here. |
-| `EvaluatorFamily.CyclesGlobal` (`cycles`) | `CycleChecker` builds one shared inter-layer edge graph across every layer named by the contract (`CollectCycleEdgesForLayer` populates one `state.Graph`) and runs global cycle detection once over it (`ArchitectureCycleDetector.FindCycles(state.Graph)`). | Every project whose layer participates in the same cycle contract; this task has no modeled layer-membership graph, so it conservatively falls back to the full population (`K=16`). | **Not a subset relationship at all** — the dependents closure is *unsafe* here: a cycle can flip through an edge that never passes back through the changed project in the reverse-reachability sense, because cycle detection runs over one shared multi-layer graph, not the changed project's own reachability tree. |
+| `EvaluatorFamily.ReferenceGraphLocal` (`layers`, `external`/`external_allow_only`, `allow_only`) | Only the changed project's own layer's own outgoing references (`context.FindTypesInLayer(sourceLayer)`, then that layer's own reference/IL scan in `LayerChecker`/`ExternalDependencyChecker`/`AllowOnlyChecker`). But the violation verdict for each reference is decided by `ArchitectureNamespaceViolationFinder.MatchReference`, which classifies the *target* type (namespace/role/expression facts via `ArchitectureLayerTypeMatcher.Matches`), not the source. | The changed project's transitive dependents (`K=9`) — **not** the changed project alone. If unchanged project A references a type in changed project B, and B's change alters that type's own classification, A's already-passing check can flip even though A itself did not change. | **Equal, not narrower.** The first correction claimed `K=1` here; that was itself wrong — this family needs the same bound as the generic default absent a per-type target-fact invalidation model, which this task does not build. |
+| `EvaluatorFamily.CyclesGlobal` (`cycles`) | `CycleChecker` builds one shared inter-layer edge graph across every layer named by the contract (`CollectCycleEdgesForLayer` populates one `state.Graph`) and runs global cycle detection once over it (`ArchitectureCycleDetector.FindCycles(state.Graph)`). | Every project whose layer participates in the same cycle contract; this task has no modeled layer-membership graph, so it conservatively falls back to the full population (`K=16`). | **Not a subset relationship at all** — even the dependents closure is *unsafe* here: cycle detection runs over one shared multi-layer graph, not the changed project's own reachability tree. |
 | `EvaluatorFamily.ContractCoListing` (`public_api_surface`) | `PublicApiSurfaceChecker` scopes to only the assemblies explicitly named in one contract's `assemblies` list (`ScanContractAssemblies` loops `contract.Assemblies`); a downstream consumer not co-listed in that same contract is unaffected even though it depends on the changed project through the ordinary project-reference graph. | The assemblies co-listed with the changed project in the same contract — a contract-*membership* relationship this task does not model, so it falls back to the full population (`K=16`) rather than assuming the reference graph applies at all. | **Different relationship entirely**, not narrower or wider along the same axis — this is why `ChangedInputKind.ApiSnapshotOrBaselineChange` is `UnmappableFallback` in Question 2, not a dependents-closure expansion. |
-| `EvaluatorFamily.AggregatedGlobalScan` (`coverage`) | Architecture-coverage checks classify each project/namespace independently from only that item's own namespaces (`GetAssemblyNamespaces(resolvedAssembly)`), then aggregate every item's result into one findings list per run. | The changed project alone is *correctness-relevant* (`K=1`); today's execution re-scans the whole solution regardless, which is a separate execution-model limitation, not a scope-planning one. | **Strictly narrower** in principle, same as `ReferenceGraphLocal`, but not exploitable without re-architecting the coverage check's execution unit. |
+| `EvaluatorFamily.AggregatedGlobalScan` (coverage scopes `project`, `assembly`, `namespace`) | `CheckProjectCoverageContract`/`CheckAssemblyCoverageContract`, and the `namespace` branch of `CheckCoverageContract`, classify each item independently from only that item's own namespaces against policy-declared layers (`IsCoveredByDeclaredLayers`) — never another project's code. | The changed project alone is *correctness-relevant* (`K=1`); today's execution re-scans the whole solution regardless, which is a separate execution-model limitation, not a scope-planning one. | **Strictly narrower** — the one family in this table genuinely bounded below the generic dependents closure. |
+| `EvaluatorFamily.CoverageGraphOrCatalogWide` (coverage scopes `dependency_edge`, `semantic_role`, `rule_input`) | `dependency_edge` (`ArchitectureDependencyEdgeCoverageService.Check`) evaluates declared layer-name pairs against edges observed across the whole coverage inventory; `semantic_role` (`ArchitectureSemanticCoverageService.BuildSummary`) iterates every type from `TypeIndex.AllTypes()` via the shared role catalog — the same unproven cross-project classification risk as `ReferenceGraphLocal`; `rule_input` operates over policy-level contract ids, not project code. | This task has no graph/catalog model precise enough to bound any of the three below the full population (`K=16`). | **Not a subset relationship** — these three coverage scopes do not share `AggregatedGlobalScan`'s per-item-local shape, so lumping all of `coverage` into one family (as the first correction did) was itself an unverified one-direction assumption. |
 
 This is implemented and tested, not asserted: `EvaluatorFamilyScopePlanner`
 (`tests/ArchLinterNet.Core.Tests/Benchmarking/EvaluatorFamilyScopePlanner.cs`) computes each family's
-required scope, and
+required scope from the changed project(s), the reference-graph dependents closure
+(`ChangedProjectScopePlanner.DependentsClosure`, exposed publicly for this purpose), and the full
+project population, and
 `EvaluatorFamilies_RequireDifferentScopesThanTheGenericDependentsClosure` in
-`ChangedProjectAdvisoryScopePlanningTests.cs` asserts all four rows above against the same fixed
+`ChangedProjectAdvisoryScopePlanningTests.cs` asserts all five rows above against the same fixed
 workload used for the §3a `K=9` baseline.
 
 **Scope of this correction**: `schema/dependencies.arch.schema.json` defines roughly 34 contract
 families (`layers`, `cycles`, `allow_only`, `external`, `assembly_dependency`, `package_dependency`,
-`coverage`, `public_api_surface`, `type_placement`, `metric_budgets`, …); this task analyzes four
-representative families grounded in their actual checker code, not all of them. Families outside this
-representative set are **not** claimed to be safely bounded by any model above — per the safe-widening
+`coverage` (itself six sub-scopes), `public_api_surface`, `type_placement`, `metric_budgets`, …); this
+task analyzes five representative families (four contract-family groups, with `coverage` split in
+two) grounded in their actual checker code, not all of them. Families outside this representative set
+are **not** claimed to be safely bounded by any model above — per the safe-widening
 principle, an unanalyzed family must be treated as requiring the conservative full-population fallback
 until it is analyzed the same way, exactly like `CyclesGlobal` and `ContractCoListing` are today.
 
@@ -234,9 +241,10 @@ A later implementation's minimum scope-plan contract, informed by this evidence:
   present in the policy, that family's own required scope (§3b), not reuse the changed-input closure
   as if it were universal.
 - **Directly affected + expanded scope**: the union of all decisions' expanded project ids
-  (`ScopePlan.AffectedProjectIds` in this task's planner) — this remains a useful *maximal* bound
-  across `ReferenceGraphLocal`-shaped families, but §3b shows it is unsafe as the bound for
-  `CyclesGlobal` and undefined (wrong relationship) for `ContractCoListing`.
+  (`ScopePlan.AffectedProjectIds` in this task's planner) — this is the exact required scope for
+  `ReferenceGraphLocal` and a safe (wasteful) upper bound for `AggregatedGlobalScan`, but §3b shows it
+  is unsafe as the bound for `CyclesGlobal`/`CoverageGraphOrCatalogWide` and undefined (wrong
+  relationship) for `ContractCoListing`.
 - **Global/unmappable record**: which inputs forced `GlobalExpansion`/`UnmappableFallback` and why,
   so a full-fallback plan is never indistinguishable from a narrow one that happened to compute a
   large closure.
@@ -343,10 +351,10 @@ coverage.**
 expected PR-feedback latency reduction for S/M/L solutions, and — per the acceptance criterion
 forbidding one generic graph-direction assumption — an evaluator/fact-class-specific closure model,
 before a final outcome can be recorded. This task supplies the deterministic mapping (Question 2) and
-a code-grounded evaluator-family closure model for four representative families out of roughly 34
+a code-grounded evaluator-family closure model for five representative families out of roughly 34
 (§3b), but explicitly does **not** supply the timing half — see
 [Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate) — and does
-**not** claim the remaining ~30 contract families are safely bounded by any model in this document. So
+**not** claim the remaining ~29 contract families are safely bounded by any model in this document. So
 declaring a final B here would still close the gate on incomplete evidence. Three independent reasons
 converge on the same action:
 
@@ -355,29 +363,35 @@ converge on the same action:
 - independent of #991, the `K/P × full_validation_work` shorthand does not net out fixed,
   repository-wide analysis phases, so even a normalized timing baseline is not yet paired with the
   fixed/per-project work split this task would need to state a defensible S/M/L reduction number;
-- independent of both, §3b shows the generic reference-graph dependents closure is unsafe for at least
-  one analyzed family (`cycles`) and describes the wrong relationship for another (`public_api_surface`)
-  — any implementation must plan per evaluator family actually present in the target policy, and this
-  task has not analyzed most of them.
+- independent of both, §3b shows the generic reference-graph dependents closure is unsafe or the wrong
+  relationship for three of the five analyzed families (`cycles`, `public_api_surface`,
+  `dependency_edge`/`semantic_role`/`rule_input` coverage), and a second review pass found the first
+  correction itself had understated `layers`/`external`/`allow_only`'s requirement — any implementation
+  must plan per evaluator family actually present in the target policy, and this task has not analyzed
+  most of them, nor is this task's own analysis to date free of revision.
 
-**Working hypothesis, not a locked decision**: for the `ReferenceGraphLocal`- and
-`AggregatedGlobalScan`-shaped families analyzed in §3b, the closure evidence supports narrow-case-
-favorable (B-shaped) treatment for changed inputs that map to a bounded, non-foundational subset of
-projects. For `CyclesGlobal`- and `ContractCoListing`-shaped families, and for every unanalyzed family,
-the safe-widening principle currently means full-validation fallback, not a narrow scope — so the
-B-shaped hypothesis is real but bounded to a subset of both change classes (Question 2) *and*
-evaluator families (§3b), not a general claim. Central build/package props, analyzer/generator/
-additional files, policy/import files, API-snapshot/baseline changes (per the Question 2 revision
-above), and unmappable build-context inputs remain full-validation fallback with no exception. The
-Question 4 scope-plan contract and Question 5 coverage model apply to the narrow case exactly as to
-the general case: one Core scope authority per dimension (changed-input *and* evaluator family),
-explicit per-input disposition, and complete coverage accounting — narrow support is not permission to
-ignore inputs or evaluator families outside the analyzed set.
+**Working hypothesis, not a locked decision**: only the `AggregatedGlobalScan`-shaped family
+(coverage's `project`/`assembly`/`namespace` scopes) is analyzed as narrower than the generic
+dependents closure in §3b. `ReferenceGraphLocal` (`layers`/`external`/`allow_only`) turned out, after
+correction, to need the *same* dependents-closure bound as the generic default — no better, no worse.
+`CyclesGlobal`, `ContractCoListing`, and `CoverageGraphOrCatalogWide` all fall back to the full
+population. So the B-shaped hypothesis is real but narrow on both axes: it holds only for changed
+inputs that map (Question 2) to a bounded, non-foundational subset of projects, evaluated only against
+`AggregatedGlobalScan`-shaped contract families (Question 3b) — every other analyzed family, and every
+unanalyzed one, means full-validation fallback under the safe-widening principle. Central build/package
+props, analyzer/generator/additional files, policy/import files, API-snapshot/baseline changes (per the
+Question 2 revision above), and unmappable build-context inputs remain full-validation fallback with no
+exception. The Question 4 scope-plan contract and Question 5 coverage model apply to the narrow case
+exactly as to the general case: one Core scope authority per dimension (changed-input *and* evaluator
+family), explicit per-input disposition, and complete coverage accounting — narrow support is not
+permission to ignore inputs or evaluator families outside the analyzed set.
 
 This task does **not** create a focused implementation issue under #19. The required next actions are
-recorded here: (1) extend §3b's evaluator-family analysis from the current four representative
+recorded here: (1) extend §3b's evaluator-family analysis from the current five representative
 families to the remaining contract families the target policy actually uses (each one grounded in its
-own checker code, the same way as §3b, not assumed); (2) after #991 reaches its decision gate,
+own checker code, the same way as §3b, not assumed — including a real per-type target-fact
+invalidation model for `ReferenceGraphLocal`/`CoverageGraphOrCatalogWide`'s `semantic_role` scope,
+which this task only bounded conservatively rather than solved); (2) after #991 reaches its decision gate,
 complete the outstanding timing/effect evidence (fixed vs. per-project work split, measured phase
 shares, S/M/L latency reduction) against normalized consumer CI spans; then record a final A/B/C
 outcome and open the implementation issue only if a supported change class still shows material
