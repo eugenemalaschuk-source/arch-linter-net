@@ -189,13 +189,13 @@ Do not commit generated release notes. The release workflow generates them and t
 
 Create `tools/release/scopes/<RELEASE_TARGET>.json` only after the release story and factual scope are coherent.
 
-Follow the current schema and neighboring declarations rather than copying stale field assumptions. At the time this workflow was authored, stable declarations use:
+Follow the current schema and neighboring declarations rather than copying stale field assumptions. Publication declarations may target an exact stable `X.Y.Z` version or an exact preview `X.Y.Z-preview.N` version. They use:
 
 ```json
 {
   "schema": "checkpoint-b-release-scope-declaration/v2",
   "declaration_id": "...",
-  "release_target": "X.Y.Z",
+  "release_target": "X.Y.Z or X.Y.Z-preview.N",
   "story": 123,
   "_comment": ["..."],
   "required_items": [],
@@ -206,7 +206,8 @@ Follow the current schema and neighboring declarations rather than copying stale
 
 Rules:
 
-- `release_target` must exactly match the immutable candidate version the declaration is meant to authorize;
+- `release_target` must exactly match the immutable candidate version the declaration is meant to authorize; stable and preview targets are separate authorities;
+- a preview declaration authorizes only its exact `X.Y.Z-preview.N` target and never authorizes stable `X.Y.Z`;
 - `story` must point to the reviewed release story;
 - `declaration_id` must be stable and meaningful for the release intent;
 - comments explain intent and authority, not mutable implementation guesses;
@@ -245,7 +246,8 @@ At minimum for a normal declaration-only release preparation:
 4. verify intended public-note labels against `.github/release.yml`;
 5. verify no generated changelog/release-note page was added;
 6. verify no package/version property was changed merely to force the release version;
-7. verify that the chosen release scenario is consistent with `docs/reference/versioning-and-releases.md` and the NuGet-visible README summary.
+7. verify that the chosen release scenario is consistent with `docs/reference/versioning-and-releases.md` and the NuGet-visible README summary;
+8. for a publishing preview, verify that the exact preview target has its own reviewed declaration and that the corresponding stable target remains independently unauthorized unless its own declaration/gates are complete.
 
 If release scripts, workflow logic, schemas, packaging, or publication authority are modified beyond adding a declaration/test entry, escalate validation to the repository's release/publication risk tier and run the broader release-specific gates required by those files.
 

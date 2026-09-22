@@ -158,8 +158,8 @@ def test_build_evidence_rejects_a_manifest_from_another_commit(tmp_path: Path, m
         build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
 
 
-@pytest.mark.parametrize("version", ["0.7.0-preview.1", "0.6.5", "0.7.1"])
-def test_unsupported_preview_or_unmapped_candidate_target_fails_closed(
+@pytest.mark.parametrize("version", ["0.6.5", "0.7.1", "0.9.0-preview.2"])
+def test_unmapped_candidate_target_fails_closed(
     tmp_path: Path, monkeypatch, version: str
 ) -> None:
     monkeypatch.chdir(tmp_path)
@@ -168,8 +168,54 @@ def test_unsupported_preview_or_unmapped_candidate_target_fails_closed(
     _stub_gh(monkeypatch, {})
 
     manifest = _manifest(tmp_path, version)
-    with pytest.raises(ValueError, match="exact stable release target|No reviewed release-scope declaration"):
+    with pytest.raises(ValueError, match="No reviewed release-scope declaration"):
         build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
+
+
+def test_exact_preview_target_selects_reviewed_authority_without_authorizing_stable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    scopes = tmp_path / "scopes"
+    preview = _declaration(
+        scopes,
+        "0.9.0-preview.1",
+        declaration_id="v0.9.0-preview.1-performance-dogfood",
+        story=1000,
+        required=[
+            {"issue": 493, "finding": "prepared-analysis-evidence", "summary": "Measure repeated preparation"},
+            {"issue": 502, "finding": "large-solution-benchmark", "summary": "Establish benchmark foundation"},
+        ],
+        excluded=[{"issue": 787, "reason": "Stable v0.9.0 release authority remains open."}],
+        delivered=[],
+    )
+    _stub_gh(monkeypatch, {493: "CLOSED", 502: "CLOSED"})
+
+    evidence = build_evidence(
+        scopes,
+        _manifest(tmp_path, "0.9.0-preview.1"),
+        _COMMIT,
+        _REPOSITORY,
+    )
+
+    assert evidence["candidate_version"] == "0.9.0-preview.1"
+    assert evidence["release_target"] == "0.9.0-preview.1"
+    assert evidence["story"] == 1000
+    assert evidence["declaration_sha256"] == hashlib.sha256(preview.read_bytes()).hexdigest()
+    assert [item["state"] for item in evidence["required_items"]] == ["closed", "closed"]
+
+    with pytest.raises(ValueError, match="No reviewed release-scope declaration matches candidate target 0.9.0"):
+        build_evidence(scopes, _manifest(tmp_path, "0.9.0"), _COMMIT, _REPOSITORY)
+
+
+def test_unsupported_prerelease_shape_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    scopes = tmp_path / "scopes"
+    _declaration(scopes)
+    _stub_gh(monkeypatch, {})
+
+    with pytest.raises(ValueError, match="exact stable or preview release target"):
+        build_evidence(scopes, _manifest(tmp_path, "0.9.0-rc.1"), _COMMIT, _REPOSITORY)
 
 
 def test_prepublication_candidate_is_bound_without_selecting_stable_release_authority(
@@ -429,8 +475,11 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 9
-    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4", "0.8.0", "0.8.1", "0.8.2"}
+    assert len(declarations) == len(by_target) == 10
+    assert set(by_target) == {
+        "0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4",
+        "0.8.0", "0.8.1", "0.8.2", "0.9.0-preview.1",
+    }
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
     assert by_target["0.7.0"]["story"] == 613
@@ -510,6 +559,17 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     assert hotfix["delivered_items"] == []
     assert all("Owner: @eugenemalaschuk-source." in item["reason"] for item in hotfix["excluded_items"])
     assert "Private Relay remains experimental / opt-in" in " ".join(hotfix["_comment"])
+
+    preview = by_target["0.9.0-preview.1"]
+    assert preview["declaration_id"] == "v0.9.0-preview.1-performance-dogfood"
+    assert preview["story"] == 1000
+    assert {item["issue"] for item in preview["required_items"]} == {493, 502, 655, 992}
+    assert {item["issue"] for item in preview["excluded_items"]} == {
+        19, 461, 492, 503, 650, 675, 787, 991, 998, 999,
+    }
+    assert preview["delivered_items"] == []
+    assert "early-validation preview" in " ".join(preview["_comment"])
+    assert "589.875" in " ".join(preview["_comment"])
 
 
 def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoption(
