@@ -34,8 +34,8 @@ _REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _COMMIT_PATTERN = re.compile(r"^[0-9a-fA-F]{7,64}$")
 _DECLARATION_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _RELEASE_TARGET_PATTERN = re.compile(
-    r"^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)"
-    r"(?:-preview\\.(0|[1-9]\\d*))?$"
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+    r"(?:-preview\.(0|[1-9]\d*))?$"
 )
 _AUTHORIZATION_MODES = {"publication", "prepublication"}
 
