@@ -39,6 +39,15 @@ an instruction to guess the next patch number. The outer manifest and checksum
 evidence are not recursively hashed into their own subject inventory. A file
 being present beside the manifests does not authorize its release attachment.
 
+The v2 transport manifest is release-line neutral. It records
+`support_status: experimental-opt-in`, a historical `review_origin` for the
+reviewed Relay distribution/pins, and
+`publication_authority: external-checkpoint-b-release-scope`. Those fields do
+not authorize the package release themselves. The current candidate's
+publication authority is the separately verified exact release-scope evidence
+in Checkpoint B. A later release therefore does not inherit the historical
+v0.8 release authority merely because it reuses unchanged reviewed Relay bytes.
+
 ### Runtime and configuration contents
 
 The archive must contain the compatible Worker entrypoint, public payload
@@ -67,7 +76,7 @@ fixture identity.
 | Promotion | `architecture-health-badge-promotion/v1` |
 | Publication | `architecture-health-badge-publication/v2` |
 | Storage migration | `v1` |
-| Distribution manifest | `architecture-health-badge-release-distribution/v1` |
+| Distribution manifest | `architecture-health-badge-release-distribution/v2` |
 | Compatibility metadata | `architecture-health-badge-relay-compatibility/v1` |
 
 These identifiers are not interchangeable with package SemVer. Setup and doctor
