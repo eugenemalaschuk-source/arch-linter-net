@@ -14,15 +14,21 @@ deterministic graph computations**, not timed samples: every row is reproduced b
 which runs in every normal `make test` pass (no `[Explicit]` exclusion — there is no hardware
 sensitivity to isolate).
 
-**Outcome: interim.** The deterministic change-to-project mapping (Question 2), dependency-closure
-(Question 3), and scope-plan/coverage/advisory-semantics design (Questions 4–6) are complete and
-exact. The required PR-feedback timing/latency evidence (baseline full-validation duration and phase
-shares, secondary timing evidence, expected S/M/L latency reduction) is **not** complete — see
+**Outcome: interim.** The deterministic change-to-project mapping (Question 2) is complete and exact.
+Dependency closure (Question 3) is complete for the reference-graph dimension **and** now includes
+real, code-grounded evidence for a representative evaluator/fact-family subset — #503 explicitly
+forbids assuming one graph direction serves every contract family, and an earlier revision of this
+document did exactly that (see the correction in Question 3). The scope-plan/coverage/advisory-
+semantics design (Questions 4–6) is complete as a design sketch but, like Question 3, is proven only
+for that representative subset, not all ~34 contract families in
+`schema/dependencies.arch.schema.json`. The required PR-feedback timing/latency evidence (baseline
+full-validation duration and phase shares, secondary timing evidence, expected S/M/L latency
+reduction) is **not** complete — see
 [Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate) — so this
 task does not lock in a final A/B/C outcome. The closure evidence *supports* narrow-case-favorable
-(**B**-shaped) as a working hypothesis, but #503's own acceptance criteria require the timing/effect
-evidence before that hypothesis becomes a decision. See
-[Required decision outcome](#required-decision-outcome).
+(**B**-shaped) as a working hypothesis, but #503's own acceptance criteria require both the
+evaluator-family evidence and the timing/effect evidence before that hypothesis becomes a decision.
+See [Required decision outcome](#required-decision-outcome).
 
 ## P0 consumer-normalization gate (#991)
 
@@ -159,15 +165,12 @@ implicit "no-op" or silently excludes an input.
 
 ## Question 3 — Dependency closure
 
-Closure direction is not uniform across shapes or positions — this evidence measures the *dependents*
-direction (reverse reachability: who could break if this project changes), which is the safe
-superset for cross-project correctness contracts (layering, cyclic checks, public-API compatibility).
-A project-local contract (e.g. an external-dependency allow-list scoped to one project) would only
-need the changed project itself — a strict subset of the dependents closure — which confirms the
-issue's own instruction that "a single graph direction is [not] sufficient for all contracts": the
-dependents closure is a safe default, not a universal minimum.
+### 3a. Reference-graph dependents closure by shape and position
 
-`K` growth by scale variable `ΔP` (changed position) and `P` (total projects), `E` (edges):
+Closure direction is not uniform across shapes or positions. This first pass measures the
+*reference-graph dependents* direction (reverse reachability: who could break if this project
+changes) as one candidate scope. `K` growth by scale variable `ΔP` (changed position) and `P` (total
+projects), `E` (edges):
 
 | Shape | Change position | K at P=8 | K at P=16 | K at P=32 | K at P=64 | Growth |
 |---|---|---:|---:|---:|---:|---|
@@ -179,8 +182,39 @@ dependents closure is a safe default, not a universal minimum.
 
 The headline finding: **`K` does not stay small as a rule.** Whether it does depends entirely on
 which project changed, not on solution size. A scope planner cannot assume "changed project ⇒ small
-`K`"; it must compute the actual closure per change and report the resulting ratio, which is exactly
-what the scope-plan contract in Question 4 requires.
+`K`"; it must compute the actual closure per change and report the resulting ratio.
+
+### 3b. Correction — the dependents closure is not one safe superset for every evaluator family
+
+An earlier revision of this document claimed the reference-graph dependents closure from §3a was "the
+safe superset for cross-project correctness contracts (layering, cyclic checks, public-API
+compatibility)." Reading the actual checker implementations under
+`src/ArchLinterNet.Core/Execution/Checkers/` shows that claim was wrong for two of those three named
+families, and #503's acceptance criteria explicitly forbid this kind of one-direction assumption. The
+correction, with the `K=9` §3a baseline (Linear, `P=16`, position index 8) as a fixed comparison
+point:
+
+| Evaluator family | What the checker actually iterates over | Required scope if only the changed project changes | vs. the §3a dependents closure (`K=9`) |
+|---|---|---|---|
+| `EvaluatorFamily.ReferenceGraphLocal` (`layers`, `external`/`external_allow_only`, `allow_only`) | Only the changed project's own layer's own outgoing references (`context.FindTypesInLayer(sourceLayer)`, then that layer's own reference/IL scan in `LayerChecker`/`ExternalDependencyChecker`/`AllowOnlyChecker`) — no other project's types are ever enumerated. | The changed project alone (`K=1`). | **Strictly narrower** — the dependents closure is a safe but wasteful superset here. |
+| `EvaluatorFamily.CyclesGlobal` (`cycles`) | `CycleChecker` builds one shared inter-layer edge graph across every layer named by the contract (`CollectCycleEdgesForLayer` populates one `state.Graph`) and runs global cycle detection once over it (`ArchitectureCycleDetector.FindCycles(state.Graph)`). | Every project whose layer participates in the same cycle contract; this task has no modeled layer-membership graph, so it conservatively falls back to the full population (`K=16`). | **Not a subset relationship at all** — the dependents closure is *unsafe* here: a cycle can flip through an edge that never passes back through the changed project in the reverse-reachability sense, because cycle detection runs over one shared multi-layer graph, not the changed project's own reachability tree. |
+| `EvaluatorFamily.ContractCoListing` (`public_api_surface`) | `PublicApiSurfaceChecker` scopes to only the assemblies explicitly named in one contract's `assemblies` list (`ScanContractAssemblies` loops `contract.Assemblies`); a downstream consumer not co-listed in that same contract is unaffected even though it depends on the changed project through the ordinary project-reference graph. | The assemblies co-listed with the changed project in the same contract — a contract-*membership* relationship this task does not model, so it falls back to the full population (`K=16`) rather than assuming the reference graph applies at all. | **Different relationship entirely**, not narrower or wider along the same axis — this is why `ChangedInputKind.ApiSnapshotOrBaselineChange` is `UnmappableFallback` in Question 2, not a dependents-closure expansion. |
+| `EvaluatorFamily.AggregatedGlobalScan` (`coverage`) | Architecture-coverage checks classify each project/namespace independently from only that item's own namespaces (`GetAssemblyNamespaces(resolvedAssembly)`), then aggregate every item's result into one findings list per run. | The changed project alone is *correctness-relevant* (`K=1`); today's execution re-scans the whole solution regardless, which is a separate execution-model limitation, not a scope-planning one. | **Strictly narrower** in principle, same as `ReferenceGraphLocal`, but not exploitable without re-architecting the coverage check's execution unit. |
+
+This is implemented and tested, not asserted: `EvaluatorFamilyScopePlanner`
+(`tests/ArchLinterNet.Core.Tests/Benchmarking/EvaluatorFamilyScopePlanner.cs`) computes each family's
+required scope, and
+`EvaluatorFamilies_RequireDifferentScopesThanTheGenericDependentsClosure` in
+`ChangedProjectAdvisoryScopePlanningTests.cs` asserts all four rows above against the same fixed
+workload used for the §3a `K=9` baseline.
+
+**Scope of this correction**: `schema/dependencies.arch.schema.json` defines roughly 34 contract
+families (`layers`, `cycles`, `allow_only`, `external`, `assembly_dependency`, `package_dependency`,
+`coverage`, `public_api_surface`, `type_placement`, `metric_budgets`, …); this task analyzes four
+representative families grounded in their actual checker code, not all of them. Families outside this
+representative set are **not** claimed to be safely bounded by any model above — per the safe-widening
+principle, an unanalyzed family must be treated as requiring the conservative full-population fallback
+until it is analyzed the same way, exactly like `CyclesGlobal` and `ContractCoListing` are today.
 
 ## Question 4 — Canonical scope plan and preview/execution parity
 
@@ -193,8 +227,16 @@ A later implementation's minimum scope-plan contract, informed by this evidence:
 - **Per-input decisions**: the ten-row table in Question 2, each carrying kind, disposition, reason,
   direct project ids, and expanded project ids — this task's `ChangedInputDecision` record is a
   direct, working sketch of that shape.
+- **Per-evaluator-family scope, not one shared scope**: Question 2's changed-input mapping and §3b's
+  evaluator-family requirement are two independent dimensions that must both be represented — a plan
+  cannot collapse to one project list. `EvaluatorScope` in this task's evidence code is a working
+  sketch of that second dimension: the production contract must record, per evaluator family actually
+  present in the policy, that family's own required scope (§3b), not reuse the changed-input closure
+  as if it were universal.
 - **Directly affected + expanded scope**: the union of all decisions' expanded project ids
-  (`ScopePlan.AffectedProjectIds` in this task's planner).
+  (`ScopePlan.AffectedProjectIds` in this task's planner) — this remains a useful *maximal* bound
+  across `ReferenceGraphLocal`-shaped families, but §3b shows it is unsafe as the bound for
+  `CyclesGlobal` and undefined (wrong relationship) for `ContractCoListing`.
 - **Global/unmappable record**: which inputs forced `GlobalExpansion`/`UnmappableFallback` and why,
   so a full-fallback plan is never indistinguishable from a narrow one that happened to compute a
   large closure.
@@ -205,7 +247,8 @@ A later implementation's minimum scope-plan contract, informed by this evidence:
   recomputing it, which is an execution-plumbing concern outside this evidence task's scope.
 
 This task does not ship that contract as a production type; `ChangedInput`/`ChangedInputDecision`/
-`ScopePlan` in `ChangedProjectScopePlanner.cs` are test-only evidence, not the reviewed API.
+`ScopePlan` in `ChangedProjectScopePlanner.cs`, and `EvaluatorFamily`/`EvaluatorScope` in
+`EvaluatorFamilyScopePlanner.cs`, are test-only evidence, not the reviewed API.
 
 ## Question 5 — Coverage accounting
 
@@ -292,49 +335,67 @@ Neither reuse candidate is made a prerequisite by this evidence.
 
 ## Required decision outcome
 
-**Interim — deterministic mapping/closure evidence complete; final A/B/C outcome deferred pending the
-required timing/effect gate.**
+**Interim — deterministic mapping/closure evidence complete for a representative evaluator-family
+subset; final A/B/C outcome deferred pending the required timing/effect gate and full-family
+coverage.**
 
-#503 requires baseline full-validation duration and phase shares, secondary timing evidence, and an
-expected PR-feedback latency reduction for S/M/L solutions before a final outcome can be recorded.
-This task supplies the deterministic half of that evidence (change-to-project mapping, dependency
-closure, scope-plan/coverage/advisory-semantics design) but explicitly does **not** supply the timing
-half — see [Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate)
-— so declaring a final B here would close the gate on incomplete evidence. Two independent reasons
+#503 requires baseline full-validation duration and phase shares, secondary timing evidence, an
+expected PR-feedback latency reduction for S/M/L solutions, and — per the acceptance criterion
+forbidding one generic graph-direction assumption — an evaluator/fact-class-specific closure model,
+before a final outcome can be recorded. This task supplies the deterministic mapping (Question 2) and
+a code-grounded evaluator-family closure model for four representative families out of roughly 34
+(§3b), but explicitly does **not** supply the timing half — see
+[Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate) — and does
+**not** claim the remaining ~30 contract families are safely bounded by any model in this document. So
+declaring a final B here would still close the gate on incomplete evidence. Three independent reasons
 converge on the same action:
 
 - the #991 P0 gate disqualifies the pre-normalization dogfood latency as sole justification for any
   implementation-child issue;
 - independent of #991, the `K/P × full_validation_work` shorthand does not net out fixed,
   repository-wide analysis phases, so even a normalized timing baseline is not yet paired with the
-  fixed/per-project work split this task would need to state a defensible S/M/L reduction number.
+  fixed/per-project work split this task would need to state a defensible S/M/L reduction number;
+- independent of both, §3b shows the generic reference-graph dependents closure is unsafe for at least
+  one analyzed family (`cycles`) and describes the wrong relationship for another (`public_api_surface`)
+  — any implementation must plan per evaluator family actually present in the target policy, and this
+  task has not analyzed most of them.
 
-**Working hypothesis, not a locked decision**: the closure evidence supports narrow-case-favorable
-(B-shaped) treatment for changed inputs that map (directly or via dependency expansion) to a bounded,
-non-foundational subset of projects — concretely, source/property/package changes to projects whose
-dependents closure does not degenerate to the full population. Central build/package props,
-analyzer/generator/additional files, policy/import files, API-snapshot/baseline changes (per the
-Question 2 revision above), and unmappable build-context inputs remain full-validation fallback with
-no exception. The Question 4 scope-plan contract and Question 5 coverage model apply to the narrow
-case exactly as to the general case: one Core scope authority, explicit per-input disposition, and
-complete coverage accounting — narrow support is not permission to ignore inputs outside the
-supported class.
+**Working hypothesis, not a locked decision**: for the `ReferenceGraphLocal`- and
+`AggregatedGlobalScan`-shaped families analyzed in §3b, the closure evidence supports narrow-case-
+favorable (B-shaped) treatment for changed inputs that map to a bounded, non-foundational subset of
+projects. For `CyclesGlobal`- and `ContractCoListing`-shaped families, and for every unanalyzed family,
+the safe-widening principle currently means full-validation fallback, not a narrow scope — so the
+B-shaped hypothesis is real but bounded to a subset of both change classes (Question 2) *and*
+evaluator families (§3b), not a general claim. Central build/package props, analyzer/generator/
+additional files, policy/import files, API-snapshot/baseline changes (per the Question 2 revision
+above), and unmappable build-context inputs remain full-validation fallback with no exception. The
+Question 4 scope-plan contract and Question 5 coverage model apply to the narrow case exactly as to
+the general case: one Core scope authority per dimension (changed-input *and* evaluator family),
+explicit per-input disposition, and complete coverage accounting — narrow support is not permission to
+ignore inputs or evaluator families outside the analyzed set.
 
-This task does **not** create a focused implementation issue under #19. The required next action is
-recorded here: after #991 reaches its decision gate, complete the outstanding timing/effect
-evidence (fixed vs. per-project work split, measured phase shares, S/M/L latency reduction) against
-normalized consumer CI spans, then record a final A/B/C outcome and open the implementation issue
-only if a supported change class still shows material residual benefit.
+This task does **not** create a focused implementation issue under #19. The required next actions are
+recorded here: (1) extend §3b's evaluator-family analysis from the current four representative
+families to the remaining contract families the target policy actually uses (each one grounded in its
+own checker code, the same way as §3b, not assumed); (2) after #991 reaches its decision gate,
+complete the outstanding timing/effect evidence (fixed vs. per-project work split, measured phase
+shares, S/M/L latency reduction) against normalized consumer CI spans; then record a final A/B/C
+outcome and open the implementation issue only if a supported change class still shows material
+residual benefit across both dimensions.
 
 ## Routing and non-goals
 
 - No changed-file-only path is presented as a replacement for full strict validation.
 - No incremental validation, cache, or invalidation logic is implemented by this task; the
-  `ChangedProjectScopePlanner` in `tests/ArchLinterNet.Core.Tests/Benchmarking/` is test-only
-  evidence infrastructure, not a product capability, and is excluded from the reviewed public API the
-  same way the rest of the #502 Benchmarking folder is.
+  `ChangedProjectScopePlanner` and `EvaluatorFamilyScopePlanner` in
+  `tests/ArchLinterNet.Core.Tests/Benchmarking/` are test-only evidence infrastructure, not a product
+  capability, and are excluded from the reviewed public API the same way the rest of the #502
+  Benchmarking folder is.
   Implementation-child creation is deferred pending #991; see
   [P0 consumer-normalization gate](#p0-consumer-normalization-gate-991).
+- No single reference-graph direction is presented as sufficient for every contract family; §3b's
+  four-family analysis is representative, not exhaustive, and unanalyzed families default to full
+  fallback rather than an assumed bound.
 - `analysis-cache/v1` and `prepared-analysis/v1` (#492) reuse relationships are evidence-based, not
   assumed prerequisites — see Question 7.
 - No private adopter identity, repository URL, or proprietary topology is committed; all closure

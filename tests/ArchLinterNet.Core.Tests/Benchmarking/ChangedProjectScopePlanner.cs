@@ -175,8 +175,12 @@ internal static class ChangedProjectScopePlanner
                     return Decision(
                         input,
                         ScopeDisposition.GlobalExpansion,
-                        "Directory.Build.*/Directory.Packages.props apply to every project in the solution; no static " +
-                        "mapping can bound the affected set below the full project population.",
+                        "MSBuild/NuGet resolve Directory.Build.*/Directory.Packages.props by directory-ancestry " +
+                        "('nearest file wins' walking up from each project), not by an inherent solution-wide rule; " +
+                        "in this repository these files live at the repository root with no nested overrides, so " +
+                        "every project currently inherits them and GlobalExpansion is repository-specific, not a " +
+                        "general MSBuild/NuGet guarantee. A production implementation must resolve the actual " +
+                        "nearest-file ancestry per project rather than assume repository-root universality.",
                         allProjectIds);
                 }
 

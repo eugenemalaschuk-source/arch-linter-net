@@ -2,11 +2,12 @@
   "schema_id": "changed-project-scope-plan-evidence/v1",
   "issue": "#503",
   "disposition": "interim-evidence-only",
-  "disposition_note": "Deterministic mapping/closure evidence (this file) is complete; the timing/effect evidence #503 also requires (baseline duration, phase shares, S/M/L latency reduction) is not yet measured, so no final A/B/C outcome is recorded from this file alone. See docs/internal/changed-project-advisory-analysis-evidence.md 'Required decision outcome'.",
+  "disposition_note": "Deterministic mapping/closure evidence (this file) is complete for the changed-input dimension and for a representative four-family evaluator-family subset (see evaluator_family_scope_by_family); the timing/effect evidence #503 also requires (baseline duration, phase shares, S/M/L latency reduction), and evaluator-family evidence for the remaining ~30 contract families, are not yet measured, so no final A/B/C outcome is recorded from this file alone. See docs/internal/changed-project-advisory-analysis-evidence.md 'Required decision outcome'.",
   "source_identity": "synthetic-current-tree",
   "generator": {
     "workload_catalog": "large-solution-benchmark/v1 (#502)",
     "planner": "ChangedProjectScopePlanner (tests/ArchLinterNet.Core.Tests/Benchmarking/ChangedProjectScopePlanner.cs)",
+    "evaluator_family_planner": "EvaluatorFamilyScopePlanner (tests/ArchLinterNet.Core.Tests/Benchmarking/EvaluatorFamilyScopePlanner.cs)",
     "verified_by_tests": "tests/ArchLinterNet.Core.Tests/ChangedProjectAdvisoryScopePlanningTests.cs",
     "measurement_kind": "deterministic-graph-closure",
     "note": "K/P values below are exact deterministic graph computations, not wall-clock samples; every row is reproduced by an assertion in the referenced test file."
@@ -50,6 +51,18 @@
     { "shape": "Dense", "change_class": "api-snapshot-or-baseline-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "UnmappableFallback", "note": "Revised after review: a strict_public_api_surface contract's assemblies list is schema-unbounded, so one api_snapshot is not provably owned by exactly one project; falls back to full scope until a deterministic contract-to-assemblies-to-projects mapping exists." },
     { "shape": "Dense", "change_class": "generated-output-or-build-context-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "UnmappableFallback" }
   ],
+  "evaluator_family_scope_by_family": {
+    "note": "Added after review: the reference-graph dependents closure above is not one safe superset for every contract family. These rows are grounded in the actual checkers under src/ArchLinterNet.Core/Execution/Checkers/, not assumed, and are asserted by EvaluatorFamilies_RequireDifferentScopesThanTheGenericDependentsClosure. This is a representative four-family subset of the ~34 contract families in schema/dependencies.arch.schema.json, not exhaustive coverage.",
+    "fixed_comparison_workload": { "shape": "Linear", "project_count": 16, "changed_position_index": 8, "dependents_closure_k": 9 },
+    "families": [
+      { "family": "ReferenceGraphLocal", "contract_families": ["layers", "external", "external_allow_only", "allow_only"], "required_k": 1, "relationship_to_dependents_closure": "strictly-narrower", "checker_evidence": "LayerChecker/ExternalDependencyChecker/AllowOnlyChecker scan only the changed project's own layer's own outgoing references; no other project's types are enumerated." },
+      { "family": "CyclesGlobal", "contract_families": ["cycles"], "required_k": 16, "relationship_to_dependents_closure": "unsafe-not-a-subset", "checker_evidence": "CycleChecker builds one shared inter-layer edge graph across every layer named by the contract and runs global cycle detection once over it; the dependents closure is not a safe bound." },
+      { "family": "ContractCoListing", "contract_families": ["public_api_surface"], "required_k": 16, "relationship_to_dependents_closure": "different-relationship-not-reference-graph", "checker_evidence": "PublicApiSurfaceChecker scopes to assemblies explicitly co-listed in one contract's assemblies field, a membership relationship not modeled by the project-reference graph." },
+      { "family": "AggregatedGlobalScan", "contract_families": ["coverage"], "required_k": 1, "relationship_to_dependents_closure": "strictly-narrower-but-not-yet-exploitable", "checker_evidence": "Coverage checks classify each project/namespace independently from only that item's own namespaces, but current execution re-scans the whole solution and aggregates into one findings list per run." }
+    ],
+    "unanalyzed_contract_families_count_approx": 30,
+    "unanalyzed_families_default": "full-population-fallback (safe widening; not claimed safe by any model here)"
+  },
   "repository_pr_traffic_mix": {
     "method": "path-pattern classification of file lists from the last N commits on this repository's own main history; approximate, not a literal application of ChangedProjectScopePlanner (which requires structured project/edge graph input the raw commit history does not provide)",
     "extractor": "tools/scripts/classify_pr_traffic_mix.py",
@@ -66,6 +79,6 @@
   "p0_gate": {
     "authority": "#991",
     "constraint": "No incremental-analysis implementation child issue may be created from this evidence based solely on the current (pre-normalization) dogfood latency table in #991. Re-evaluation against normalized consumer CI is required first.",
-    "action_taken_in_this_task": "No implementation child issue created. No final A/B/C outcome recorded either: the required timing/effect evidence (baseline duration, phase shares, S/M/L latency reduction) is not yet measured, independent of the #991 gate. Working hypothesis: narrow-case-material (B-shaped) for low-dependent-count change classes, pending both the timing gate and #991 normalization."
+    "action_taken_in_this_task": "No implementation child issue created. No final A/B/C outcome recorded either: the required timing/effect evidence (baseline duration, phase shares, S/M/L latency reduction) and full evaluator-family coverage (only 4 of ~34 contract families analyzed) are not yet complete, independent of the #991 gate. Working hypothesis: narrow-case-material (B-shaped) for low-dependent-count change classes AND for ReferenceGraphLocal/AggregatedGlobalScan-shaped evaluator families, pending the timing gate, remaining evaluator-family analysis, and #991 normalization."
   }
 }

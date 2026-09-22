@@ -235,6 +235,52 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         Assert.That(first.AffectedProjectIds, Is.EqualTo(second.AffectedProjectIds));
     }
 
+    [Test]
+    public void EvaluatorFamilies_RequireDifferentScopesThanTheGenericDependentsClosure()
+    {
+        // Middle-position change in a 16-project Linear chain: the generic reference-graph
+        // dependents closure (ChangedProjectScopePlanner's default) is K=9 (see
+        // LinearAndDenseMiddleProjectChange_GrowsLinearlyWithPosition). No single number is
+        // correct for every evaluator family — this is #503's own requirement, not an assumption.
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 16);
+        string changedProjectId = workload.Projects[8].Id;
+        IReadOnlyList<string> allProjectIds = workload.Projects.Select(project => project.Id).ToList();
+
+        ScopePlan genericPlan = ChangedProjectScopePlanner.Plan(
+            workload.Projects,
+            workload.Edges,
+            [OwnedSourceFile("middle-change", changedProjectId)]);
+        Assert.That(genericPlan.AffectedProjectCount, Is.EqualTo(9), "generic dependents-closure baseline");
+
+        EvaluatorScope referenceGraphLocal = EvaluatorFamilyScopePlanner.Plan(
+            EvaluatorFamily.ReferenceGraphLocal, [changedProjectId], allProjectIds);
+        EvaluatorScope cyclesGlobal = EvaluatorFamilyScopePlanner.Plan(
+            EvaluatorFamily.CyclesGlobal, [changedProjectId], allProjectIds);
+        EvaluatorScope contractCoListing = EvaluatorFamilyScopePlanner.Plan(
+            EvaluatorFamily.ContractCoListing, [changedProjectId], allProjectIds);
+        EvaluatorScope aggregatedGlobalScan = EvaluatorFamilyScopePlanner.Plan(
+            EvaluatorFamily.AggregatedGlobalScan, [changedProjectId], allProjectIds);
+
+        Assert.Multiple(() =>
+        {
+            // Layers/external/allow_only checkers scan only the changed project's own outgoing
+            // references: strictly narrower than the generic dependents closure (1 < 9).
+            Assert.That(referenceGraphLocal.RequiredProjectIds, Is.EqualTo(new[] { changedProjectId }));
+
+            // Cycle detection shares one graph across every layer in the contract: the dependents
+            // closure is not a safe bound, so this evidence task falls back to the full population
+            // (16), which is wider than the generic closure (9), not narrower.
+            Assert.That(cyclesGlobal.RequiredProjectIds, Has.Count.EqualTo(16));
+
+            // Public-API surface scoping is contract co-listing, not the reference graph at all —
+            // also falls back to the full population rather than reusing the dependents closure.
+            Assert.That(contractCoListing.RequiredProjectIds, Has.Count.EqualTo(16));
+
+            // Coverage classification is per-item and project-local, same as ReferenceGraphLocal.
+            Assert.That(aggregatedGlobalScan.RequiredProjectIds, Is.EqualTo(new[] { changedProjectId }));
+        });
+    }
+
     private static BenchmarkWorkloadDefinition CreateWorkload(BenchmarkTopologyShape shape, int projectCount) =>
         BenchmarkWorkloadGenerator.Create(
             $"synthetic-scope-plan-{shape.ToString().ToLowerInvariant()}-{projectCount}",
