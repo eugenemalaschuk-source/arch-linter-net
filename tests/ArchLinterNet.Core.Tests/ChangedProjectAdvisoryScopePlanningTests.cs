@@ -150,6 +150,7 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
     [TestCase(ChangedInputKind.CentralBuildPropsOrPackagesChange, ScopeDisposition.GlobalExpansion)]
     [TestCase(ChangedInputKind.AnalyzerGeneratorAdditionalFileChange, ScopeDisposition.GlobalExpansion)]
     [TestCase(ChangedInputKind.PolicyOrImportChange, ScopeDisposition.GlobalExpansion)]
+    [TestCase(ChangedInputKind.ApiSnapshotOrBaselineChange, ScopeDisposition.UnmappableFallback)]
     [TestCase(ChangedInputKind.GeneratedOutputOrBuildContextChange, ScopeDisposition.UnmappableFallback)]
     public void GlobalOrUnmappableInputs_WidenToTheFullProjectPopulation(
         ChangedInputKind kind,
@@ -168,6 +169,31 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
             Assert.That(plan.AffectedProjectCount, Is.EqualTo(16));
             Assert.That(plan.Decisions.Single().Disposition, Is.EqualTo(expectedDisposition));
             Assert.That(plan.Decisions.Single().Reason, Is.Not.Empty);
+        });
+    }
+
+    [Test]
+    public void ApiSnapshotChange_DoesNotAssumeExactlyOneOwningProject()
+    {
+        // A reviewed public-API-surface contract's `assemblies` list can name more than one
+        // project (schema/dependencies.arch.schema.json publicApiSurfaceContract), so this kind
+        // must accept any owning-project count, including zero or several, without throwing.
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Dense, projectCount: 10);
+
+        ScopePlan plan = ChangedProjectScopePlanner.Plan(
+            workload.Projects,
+            workload.Edges,
+            [new ChangedInput
+            {
+                InputId = "api-snapshot-change",
+                Kind = ChangedInputKind.ApiSnapshotOrBaselineChange,
+                OwningProjectIds = [workload.Projects[2].Id, workload.Projects[5].Id],
+            }]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(plan.Decisions.Single().Disposition, Is.EqualTo(ScopeDisposition.UnmappableFallback));
+            Assert.That(plan.AffectedProjectCount, Is.EqualTo(10));
         });
     }
 

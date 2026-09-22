@@ -14,8 +14,15 @@ deterministic graph computations**, not timed samples: every row is reproduced b
 which runs in every normal `make test` pass (no `[Explicit]` exclusion — there is no hardware
 sensitivity to isolate).
 
-**Outcome: B, narrow and material for specific change classes, with implementation-child creation
-deferred by the #991 P0 gate.** See [Required decision outcome](#required-decision-outcome).
+**Outcome: interim.** The deterministic change-to-project mapping (Question 2), dependency-closure
+(Question 3), and scope-plan/coverage/advisory-semantics design (Questions 4–6) are complete and
+exact. The required PR-feedback timing/latency evidence (baseline full-validation duration and phase
+shares, secondary timing evidence, expected S/M/L latency reduction) is **not** complete — see
+[Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate) — so this
+task does not lock in a final A/B/C outcome. The closure evidence *supports* narrow-case-favorable
+(**B**-shaped) as a working hypothesis, but #503's own acceptance criteria require the timing/effect
+evidence before that hypothesis becomes a decision. See
+[Required decision outcome](#required-decision-outcome).
 
 ## P0 consumer-normalization gate (#991)
 
@@ -26,13 +33,11 @@ Unity 41s, `firstice-map-editor` 249s). This task therefore:
 
 - records the deterministic closure evidence and scope-plan contract now, since that evidence is
   independent of consumer CI topology;
-- does **not** create a focused implementation issue under #19 in this task, even though the
-  evidence below shows narrow cases are materially favorable, because the required
-  pre-implementation effect estimate cannot yet isolate residual product-internal latency from
-  consumer-orchestration overhead;
-- records the exact re-evaluation trigger: after #991 reaches its decision gate, recompute the
-  expected end-to-end effect against normalized dogfood spans before deciding whether to open the
-  child issue.
+- does **not** create a focused implementation issue under #19 in this task — both because the
+  required timing/effect evidence is not yet complete (see the outcome note above) and, independent of
+  that, because #991 disqualifies the pre-normalization dogfood latency as sole justification;
+- records the exact re-evaluation trigger: after #991 reaches its decision gate, complete the
+  timing/effect gate against normalized dogfood spans before deciding whether to open the child issue.
 
 ## Methodology
 
@@ -53,17 +58,24 @@ Unity 41s, `firstice-map-editor` 249s). This task therefore:
 - Vary project count independently at four sizes (8/16/32/64) to observe how the closure size `K`
   grows relative to `P`, per representative changed-input position, rather than assuming affected
   scope stays small.
-- Separately, classify the last 300 commits on this repository's own `main` history by file path to
-  get a real (if approximate) PR-traffic-mix prior, complementing the synthetic closure math with
-  evidence about how often this repository's own changes touch globally-scoped inputs.
+- Separately, classify the last 300 commits on this repository's own `main` history by file path,
+  using the checked-in, reproducible
+  [`tools/scripts/classify_pr_traffic_mix.py`](../../tools/scripts/classify_pr_traffic_mix.py), to get
+  a real (if approximate) PR-traffic-mix prior complementing the synthetic closure math with evidence
+  about how often this repository's own changes touch globally-scoped inputs. Reproduce with:
+  `uv run --project tools/pyproject.toml python tools/scripts/classify_pr_traffic_mix.py --end-ref bb533f0f2fc0d2e30addc7a4110adda26e825e68 --commit-count 300`.
 
 ## Environment
 
 Closure measurements are exact graph computations with no environment sensitivity: the same input
 graph always produces the same closure on any machine, .NET version, or OS. No wall-clock,
 processor-time, or allocation sampling applies to this evidence, unlike the #493/#655/#461 harnesses.
-The repository-history classification was run against this repository's `main` branch at commit
-`bb533f0f` (2026-09-22).
+The repository-history classification is reproducible and pinned to an exact range: the 300 commits
+ending at `bb533f0f2fc0d2e30addc7a4110adda26e825e68` (2026-09-22) and starting at
+`3cb0cf5bc996101c41ac9b85a9a0434b5c7b5f52` (2026-07-20), extracted by
+`tools/scripts/classify_pr_traffic_mix.py` (see [Methodology](#methodology) for the exact
+invocation); raw output is in
+[`changed-project-advisory-analysis-results.json`](changed-project-advisory-analysis-results.json).
 
 ## Question 1 — User outcome
 
@@ -83,15 +95,19 @@ smaller unit of work **only for specific change shapes**, not universally:
   unmappable (central build/package props, analyzer/generator/additional files, policy/import
   changes, generated output/build context), reaches `K=P` — full fallback, zero advisory benefit.
 
-Repository-history evidence (last 300 commits, path-pattern classification, see
+Repository-history evidence (300 commits ending at `bb533f0f`, path-pattern classification,
+reproducible via `tools/scripts/classify_pr_traffic_mix.py`, raw output in
 [`changed-project-advisory-analysis-results.json`](changed-project-advisory-analysis-results.json)):
-only 10.3% of commits touch a central-build-props or policy path that would force global fallback
-under these rules; 5.0% touch only project source/`.csproj` paths (a clean scoped case). The
-remaining ~85% mix project source with docs/OpenSpec/other paths whose architecture-lint relevance
-this task does not resolve — a correct implementation would need to classify those as excluded
-(no re-analysis needed) or direct-mapped, not silently folded into "global." That mapping question
-is exactly what a focused implementation issue would need to answer with real path-ownership rules,
-not path-pattern heuristics.
+31/300 (10.3%) of commits touch a central-build-props or policy path that would force global
+fallback under these rules; 18/300 (6.0%) touch only project source/`.csproj` paths (a clean scoped
+case). The remaining ~84% mix project source with docs/OpenSpec/other paths whose architecture-lint
+relevance this task does not resolve — a correct implementation would need to classify those as
+excluded (no re-analysis needed) or direct-mapped, not silently folded into "global." That mapping
+question is exactly what a focused implementation issue would need to answer with real
+path-ownership rules, not path-pattern heuristics. This traffic-mix reading is informal,
+approximate context: it classifies raw commit file lists by path pattern, not a literal run of
+`ChangedProjectScopePlanner` (which needs a structured project/edge graph the commit history does
+not provide).
 
 **Conclusion**: material user-outcome benefit exists, but only for a bounded subclass of PR-shaped
 changes (leaf/spoke-shaped, low-dependent-count changes); it is not a general "PR feedback gets
@@ -109,17 +125,32 @@ tested disposition. No kind is silently dropped:
 | Project-reference edge change (`.csproj` reference add/remove) | `DependencyDrivenExpansion` | Both endpoints are seeded; an edge's presence/absence can change graph-shaped contract results for either side. |
 | `.csproj` property edit (non-reference) | `DependencyDrivenExpansion` | Same rule as an owned source file. |
 | Package/framework reference change (one project) | `DependencyDrivenExpansion` | Same rule as an owned source file. |
-| `Directory.Build.*` / `Directory.Packages.props` / `.editorconfig` / `NuGet.config` / `global.json` | `GlobalExpansion` | Applies to every project; no static mapping can bound the set below the full population. |
+| `Directory.Build.*` / `Directory.Packages.props` / `.editorconfig` / `NuGet.config` / `global.json` | `GlobalExpansion` | In this repository these files live at the repository root, so MSBuild/NuGet's directory-ancestry resolution currently makes every project inherit them — see the repository-specific caveat below. |
 | Analyzer/generator/additional file | `GlobalExpansion` | Can change compiled output for any consuming project in ways static reference analysis cannot verify. |
 | Policy/import file (`architecture/*.yml`) | `GlobalExpansion` | Can change selector membership, layer boundaries, or contract scope for any project. |
-| Baseline / reviewed public-API snapshot (`architecture/api/*.public-api.txt`) | `DependencyDrivenExpansion` | Documents exactly one package's public surface; scoped to that project's dependents, not global — see caveat below. |
+| Baseline / reviewed public-API snapshot (`architecture/api/*.public-api.txt`) | `UnmappableFallback` | A `strict_public_api_surface` contract binds one `api_snapshot` to an `assemblies` list that is schema-unbounded (`schema/dependencies.arch.schema.json` `publicApiSurfaceContract`), so one snapshot can govern more than one project's output. Without a deterministic contract-to-assemblies-to-projects mapping, a single owning project cannot be assumed — see caveat below. |
 | Generated output / build-context change | `UnmappableFallback` | No reviewed static ownership mapping exists; the input is unmappable and falls back to full scope rather than being excluded. |
 
-Caveat on the API-snapshot row: this evidence task treats it as project-scoped because each
-`*.public-api.txt` file documents one package's surface (Core, Testing, or CEL). A future
-implementation must confirm that no contract family treats the reviewed snapshot as a cross-project
-or repository-wide input before relying on this narrower disposition; if any does, that snapshot kind
-must move to `GlobalExpansion` like policy/import changes.
+Caveat on the `Directory.Build.*`/central-props row: MSBuild and NuGet resolve these files by
+directory-ancestry/nearest-file search, not by an inherent "applies everywhere" rule — a future
+multi-root or nested-`Directory.Build.props` layout could scope one of these files to a subtree
+rather than the whole solution. Today, in this repository, `Directory.Build.props`,
+`Directory.Build.targets`, and `Directory.Packages.props` all live at the repository root with no
+nested overrides, so `GlobalExpansion` is currently correct as well as conservatively safe. A
+production implementation must resolve the actual nearest-file ancestry per project rather than
+assume repository-root universality as a general architectural guarantee.
+
+Caveat on the API-snapshot row (revised after review): this evidence task originally treated the row
+as project-scoped, assuming one snapshot always names exactly one project. Checking the actual
+`publicApiSurfaceContract` schema shows `assemblies` is an unbounded list — today's three concrete
+policy entries in `architecture/policy/public-api-and-coverage.arch.yml` each happen to name exactly
+one assembly, but the schema does not guarantee that, so treating the row as narrower than
+`GlobalExpansion`/`UnmappableFallback` would make the evidence boundary narrower than the product
+proves. `ChangedProjectScopePlanner` now classifies this kind as `UnmappableFallback` until a
+deterministic contract-to-assemblies-to-projects mapping exists (see
+`ApiSnapshotChange_DoesNotAssumeExactlyOneOwningProject` in
+`ChangedProjectAdvisoryScopePlanningTests.cs`), and it is **not** included among the narrow supported
+change classes in [Required decision outcome](#required-decision-outcome).
 
 Every measured decision carries a human-readable reason string (asserted by
 `GlobalOrUnmappableInputs_WidenToTheFullProjectPopulation` and
@@ -217,15 +248,28 @@ Neither reuse candidate is made a prerequisite by this evidence.
 - **Affected-scope ratio `K/P` by representative change shape** (from Question 3): leaf ≈ `1/P` → 0
   as `P` grows; single spoke ≈ `2/P` → 0 as `P` grows; middle-position/tail ≈ `0.5` constant; shared
   foundation and all global/unmappable classes = `1.0`.
-- **Proposed changed-scope work model**: `advisory_work ≈ (K/P) × full_validation_work + scope_planning_overhead`. Scope-planning overhead is `O(P + E)` graph traversal — negligible next
-  to project-level compilation/analysis work at every measured size (closure computation for the
-  largest measured graph, `P=64`/`Dense`/full density, completes in low single-digit milliseconds;
-  see the test run timings in `ChangedProjectAdvisoryScopePlanningTests`).
+- **Proposed changed-scope work model**: `advisory_work ≈ fixed_repository_wide_work + (K/P) × per_project_work + scope_planning_overhead`. The `K/P × full_validation_work` shorthand used
+  elsewhere in this document is a **simplification that likely overstates the reduction**: it assumes
+  work scales uniformly with project count and ignores fixed, repository-wide phases that do not
+  shrink with `K` — project/policy discovery, dependency-graph construction, and any
+  whole-solution-scoped contract or report phase all run once per invocation regardless of how many
+  projects are in scope. Neither this evidence task nor the existing #502/#655 phase-share evidence
+  separates `fixed_repository_wide_work` from `per_project_work` for this repository's own current
+  analysis pipeline, so the refined model's two terms are not yet independently measured — that
+  measurement is part of the required, still-outstanding timing gate, not something this task can
+  derive from graph closure alone. Scope-planning overhead itself is `O(P + E)` graph traversal and is
+  negligible by comparison at every measured size (closure computation for the largest measured graph,
+  `P=64`/`Dense`/full density, completes in low single-digit milliseconds; see the test run timings in
+  `ChangedProjectAdvisoryScopePlanningTests`).
 - **Expected deterministic work reduction, S/M/L**: for the *favorable* subclass (leaf/spoke
-  changes), reduction grows with scale — at `P=8` a spoke change already avoids `6/8 = 75%` of
-  project-level work; at `P=64` it avoids `62/64 ≈ 97%`. For the *unfavorable but common* subclass
-  (shared-foundation, and the ~10% of this repository's own PR history touching central-props/policy
-  paths per the traffic-mix evidence), reduction is `0%` at every scale — full fallback.
+  changes), the simplified `K/P` model gives an **upper bound** on reduction that grows with scale —
+  at `P=8` a spoke change avoids at most `6/8 = 75%` of project-level work; at `P=64`, at most
+  `62/64 ≈ 97%`. These are upper bounds, not measured reductions: they apply only to `per_project_work`
+  and do not net out `fixed_repository_wide_work`, which does not shrink with `K` and therefore lowers
+  the realizable end-to-end percentage by an amount this task has not measured. For the *unfavorable
+  but common* subclass (shared-foundation, and the ~10% of this repository's own PR history touching
+  central-props/policy paths per the traffic-mix evidence), reduction is `0%` at every scale under
+  either model — full fallback.
 - **Mapping/scope-plan/closure overhead**: bounded and cheap (pure graph traversal), evidenced above;
   the dominant cost driver is not the planner, it is how often real PRs land in the unfavorable
   subclass.
@@ -248,24 +292,39 @@ Neither reuse candidate is made a prerequisite by this evidence.
 
 ## Required decision outcome
 
-**B — material only for narrower cases, implementation-child creation deferred by the #991 P0 gate.**
+**Interim — deterministic mapping/closure evidence complete; final A/B/C outcome deferred pending the
+required timing/effect gate.**
 
-Narrow supported change classes: a changed input that maps (directly or via dependency expansion) to
-a bounded, non-foundational subset of projects — concretely, source/property/package/API-snapshot
-changes to projects whose dependents closure does not degenerate to the full population. Central
-build/package props, analyzer/generator/additional files, policy/import files, and unmappable
-build-context inputs remain full-validation fallback with no exception. The Question 4 scope-plan
-contract and Question 5 coverage model apply to the narrow case exactly as to the general case: one
-Core scope authority, explicit per-input disposition, and complete coverage accounting — narrow
-support is not permission to ignore inputs outside the supported class.
+#503 requires baseline full-validation duration and phase shares, secondary timing evidence, and an
+expected PR-feedback latency reduction for S/M/L solutions before a final outcome can be recorded.
+This task supplies the deterministic half of that evidence (change-to-project mapping, dependency
+closure, scope-plan/coverage/advisory-semantics design) but explicitly does **not** supply the timing
+half — see [Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate)
+— so declaring a final B here would close the gate on incomplete evidence. Two independent reasons
+converge on the same action:
 
-This task does **not** create a focused implementation issue under #19. Per the #503 P0 gate, doing
-so now would rely on the same pre-normalization dogfood latency #991 explicitly disqualifies as sole
-justification, and this evidence's own effect model cannot yet separate residual product-internal
-latency from consumer-orchestration overhead. The required next action is recorded here: after #991
-reaches its decision gate, re-run the Question 1/effect-estimate reasoning above against normalized
-consumer CI spans, and open the implementation issue only if a supported change class still shows
-material residual benefit.
+- the #991 P0 gate disqualifies the pre-normalization dogfood latency as sole justification for any
+  implementation-child issue;
+- independent of #991, the `K/P × full_validation_work` shorthand does not net out fixed,
+  repository-wide analysis phases, so even a normalized timing baseline is not yet paired with the
+  fixed/per-project work split this task would need to state a defensible S/M/L reduction number.
+
+**Working hypothesis, not a locked decision**: the closure evidence supports narrow-case-favorable
+(B-shaped) treatment for changed inputs that map (directly or via dependency expansion) to a bounded,
+non-foundational subset of projects — concretely, source/property/package changes to projects whose
+dependents closure does not degenerate to the full population. Central build/package props,
+analyzer/generator/additional files, policy/import files, API-snapshot/baseline changes (per the
+Question 2 revision above), and unmappable build-context inputs remain full-validation fallback with
+no exception. The Question 4 scope-plan contract and Question 5 coverage model apply to the narrow
+case exactly as to the general case: one Core scope authority, explicit per-input disposition, and
+complete coverage accounting — narrow support is not permission to ignore inputs outside the
+supported class.
+
+This task does **not** create a focused implementation issue under #19. The required next action is
+recorded here: after #991 reaches its decision gate, complete the outstanding timing/effect
+evidence (fixed vs. per-project work split, measured phase shares, S/M/L latency reduction) against
+normalized consumer CI spans, then record a final A/B/C outcome and open the implementation issue
+only if a supported change class still shows material residual benefit.
 
 ## Routing and non-goals
 

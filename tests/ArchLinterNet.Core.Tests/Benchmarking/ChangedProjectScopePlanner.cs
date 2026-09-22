@@ -129,7 +129,6 @@ internal static class ChangedProjectScopePlanner
             case ChangedInputKind.ProjectOwnedSourceFile:
             case ChangedInputKind.ProjectFilePropertyChange:
             case ChangedInputKind.PackageOrFrameworkReferenceChange:
-            case ChangedInputKind.ApiSnapshotOrBaselineChange:
                 {
                     RequireOwningProjects(input, expectedCount: 1);
                     IReadOnlyList<string> expanded = ClosureOfDependents(input.OwningProjectIds, dependentsOf);
@@ -198,6 +197,18 @@ internal static class ChangedProjectScopePlanner
                         ScopeDisposition.GlobalExpansion,
                         "Policy/import files can change selector membership, layer boundaries, or contract scope for any " +
                         "project; the change is not attributable to one project's dependency subtree.",
+                        allProjectIds);
+                }
+
+            case ChangedInputKind.ApiSnapshotOrBaselineChange:
+                {
+                    return Decision(
+                        input,
+                        ScopeDisposition.UnmappableFallback,
+                        "A reviewed public-API-surface contract binds one api_snapshot to an 'assemblies' list that may " +
+                        "name more than one project (schema/dependencies.arch.schema.json publicApiSurfaceContract); " +
+                        "without a deterministic contract-to-assemblies-to-projects mapping, a single owning project " +
+                        "cannot be assumed, so the input is unmappable and falls back to full scope.",
                         allProjectIds);
                 }
 

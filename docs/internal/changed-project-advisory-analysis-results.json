@@ -1,7 +1,8 @@
 {
   "schema_id": "changed-project-scope-plan-evidence/v1",
   "issue": "#503",
-  "disposition": "evidence-only",
+  "disposition": "interim-evidence-only",
+  "disposition_note": "Deterministic mapping/closure evidence (this file) is complete; the timing/effect evidence #503 also requires (baseline duration, phase shares, S/M/L latency reduction) is not yet measured, so no final A/B/C outcome is recorded from this file alone. See docs/internal/changed-project-advisory-analysis-evidence.md 'Required decision outcome'.",
   "source_identity": "synthetic-current-tree",
   "generator": {
     "workload_catalog": "large-solution-benchmark/v1 (#502)",
@@ -46,20 +47,25 @@
     { "shape": "Dense", "change_class": "central-build-props-or-packages-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "GlobalExpansion" },
     { "shape": "Dense", "change_class": "analyzer-generator-additional-file-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "GlobalExpansion" },
     { "shape": "Dense", "change_class": "policy-or-import-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "GlobalExpansion" },
+    { "shape": "Dense", "change_class": "api-snapshot-or-baseline-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "UnmappableFallback", "note": "Revised after review: a strict_public_api_surface contract's assemblies list is schema-unbounded, so one api_snapshot is not provably owned by exactly one project; falls back to full scope until a deterministic contract-to-assemblies-to-projects mapping exists." },
     { "shape": "Dense", "change_class": "generated-output-or-build-context-change", "project_count": 16, "k": 16, "p": 16, "k_over_p": 1.0, "disposition": "UnmappableFallback" }
   ],
   "repository_pr_traffic_mix": {
     "method": "path-pattern classification of file lists from the last N commits on this repository's own main history; approximate, not a literal application of ChangedProjectScopePlanner (which requires structured project/edge graph input the raw commit history does not provide)",
+    "extractor": "tools/scripts/classify_pr_traffic_mix.py",
+    "reproduce_command": "uv run --project tools/pyproject.toml python tools/scripts/classify_pr_traffic_mix.py --end-ref bb533f0f2fc0d2e30addc7a4110adda26e825e68 --commit-count 300",
+    "end_ref": "bb533f0f2fc0d2e30addc7a4110adda26e825e68",
+    "oldest_commit_in_range": "3cb0cf5bc996101c41ac9b85a9a0434b5c7b5f52",
     "sample_size_commits": 300,
     "commits_touching_central_props_or_policy_paths": 31,
-    "commits_touching_central_props_or_policy_paths_ratio": 0.103,
-    "commits_touching_only_project_source_or_csproj_paths": 15,
-    "commits_touching_only_project_source_or_csproj_paths_ratio": 0.05,
-    "caveat": "The remaining ~85% mix project-source with docs/openspec/other paths not classified here; whether those other paths are architecture-lint-relevant at all is a separate, unanswered mapping question this task surfaces but does not resolve."
+    "commits_touching_central_props_or_policy_paths_ratio": 0.1033,
+    "commits_touching_only_project_source_or_csproj_paths": 18,
+    "commits_touching_only_project_source_or_csproj_paths_ratio": 0.06,
+    "caveat": "The remaining ~84% mix project-source with docs/openspec/other paths not classified here; whether those other paths are architecture-lint-relevant at all is a separate, unanswered mapping question this task surfaces but does not resolve."
   },
   "p0_gate": {
     "authority": "#991",
     "constraint": "No incremental-analysis implementation child issue may be created from this evidence based solely on the current (pre-normalization) dogfood latency table in #991. Re-evaluation against normalized consumer CI is required first.",
-    "action_taken_in_this_task": "No implementation child issue created. Decision recorded as narrow-case-material (Outcome B in spirit) but deferred pending #991."
+    "action_taken_in_this_task": "No implementation child issue created. No final A/B/C outcome recorded either: the required timing/effect evidence (baseline duration, phase shares, S/M/L latency reduction) is not yet measured, independent of the #991 gate. Working hypothesis: narrow-case-material (B-shaped) for low-dependent-count change classes, pending both the timing gate and #991 normalization."
   }
 }
