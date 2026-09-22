@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
@@ -137,6 +138,17 @@ public sealed class ArchitectureEngineTests
 
         Assert.That(provider.GetService<IArchitectureValidationApplicationService>(), Is.Not.Null);
         Assert.That(provider.GetService<IArchitectureBaselineApplicationService>(), Is.Not.Null);
+    }
+
+    [Test]
+    public void PublishPreparedBuildReceipts_DelegatesToRegisteredPreparedReceiptService()
+    {
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
+
+        Assert.That(
+            () => engine.PublishPreparedBuildReceipts(new BuildStatePreparedCandidateRequest(
+                Path.Combine(_tempDir, "missing-policy.yml"))),
+            Throws.Exception);
     }
 
     [Test]

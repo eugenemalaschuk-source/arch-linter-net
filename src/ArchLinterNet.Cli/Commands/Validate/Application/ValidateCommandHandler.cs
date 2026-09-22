@@ -35,6 +35,11 @@ internal sealed class ValidateCommandHandler
             return immediateResult.Value;
         }
 
+        if (options.PublishPreparedReceipts)
+        {
+            return PublishPreparedReceipts(options);
+        }
+
         string errorFormat = ValidateCommandPreflight.ResolveEffectiveFormat(options);
         ValidateProfileExecutionState profileState = new();
 
@@ -65,6 +70,27 @@ internal sealed class ValidateCommandHandler
         catch (Exception ex)
         {
             _errors.WriteExecutionError(options, errorFormat, ex);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+    }
+
+    private int PublishPreparedReceipts(ValidateCommandOptions options)
+    {
+        try
+        {
+            BuildStatePreflightResult result = _execution.PublishPreparedBuildReceipts(options);
+            if (result.Blocked)
+            {
+                _execution.WritePreparedReceiptDiagnostics(options, result.Diagnostics);
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
+            _execution.WritePreparedReceiptSuccess(result.Diagnostics.Count);
+            return CliExitCodes.Success;
+        }
+        catch (Exception ex)
+        {
+            _errors.WriteExecutionError(options, ValidateCommandPreflight.ResolveEffectiveFormat(options), ex);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }

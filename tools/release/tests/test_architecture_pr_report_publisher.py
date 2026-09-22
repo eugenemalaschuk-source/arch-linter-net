@@ -264,22 +264,77 @@ def _comment(comment_id: int, marker: str, body: str = "old report") -> dict[str
     }
 
 
-def test_ci_producer_uses_per_tree_baseline_and_separate_strict_gate() -> None:
+def test_ci_producer_freezes_one_candidate_and_fans_out_read_only_projections() -> None:
     workflow = _read("ci.yml")
     producer = _job(workflow, "architecture_pr_report_producer", "architecture_pr_report_gate")
     gate = _job(workflow, "architecture_pr_report_gate", "tooling_support_tests")
 
     assert "name: Architecture Coverage" in producer
-    assert producer.count("if [[ -f architecture/baseline.arch.yml ]]; then") == 2
+    assert "name: Build one architecture candidate" in producer
+    assert "--publish-prepared-receipts" in producer
+    candidate_phase = producer.split(
+        "      - name: Build one architecture candidate\n", maxsplit=1
+    )[1].split("      - name: Collect changed first-party files\n", maxsplit=1)[0]
+    assert "--no-restore" in candidate_phase
+    assert "--ensure-built" not in candidate_phase
+    host_build = "dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --nologo --no-restore -m:1"
+    solution_build = "dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1"
+    cli_exec = 'dotnet exec "$cli_assembly"'
+    assert host_build not in candidate_phase
+    assert solution_build in candidate_phase
+    assert cli_exec in candidate_phase
+    assert candidate_phase.index(solution_build) < candidate_phase.index(cli_exec)
+    assert "dotnet run --no-restore --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" not in candidate_phase
+    assert "dotnet run --no-build --no-restore --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" not in candidate_phase
+    assert "ArchLinterNetPreparedBuildProofDirectory" in candidate_phase
+    assert "ArchLinterNetPreparedBuildProofNonce" in candidate_phase
+    assert "--prepared-build-proof-directory" in candidate_phase
+    assert "--prepared-build-proof-nonce" in candidate_phase
+    assert "name: Prepare architecture report base" in producer
+    assert "architecture_candidate.py create" in producer
+    assert producer.count("architecture_candidate.py verify") >= 2
+    assert "run_projection strict run_strict &" in producer
+    assert "run_projection public_api run_public_api &" in producer
+    assert "run_projection coverage run_coverage &" in producer
+    assert "run_projection report_inputs run_report_inputs &" in producer
+    assert "ARCHITECTURE_BUILD_ALREADY_PREPARED=true" in producer
+    assert "make public-api-check ARCHITECTURE_BUILD_ALREADY_PREPARED=true" in producer
+    projection_phase = producer.split(
+        "      - name: Run independent architecture projections\n", maxsplit=1
+    )[1].split("      - name: Upload candidate identity\n", maxsplit=1)[0]
+    assert "--ensure-built" not in projection_phase
+    assert "--use-prepared-receipts" in projection_phase
+    assert "candidate_preparation" in projection_phase
+    assert "base_preparation" in projection_phase
+    assert "--change-snapshot \"$output_directory/current-architecture-change-snapshot.json\"" in producer
     assert "snapshot \"$output_directory/base-architecture-change-snapshot.json\"" in producer
-    assert "snapshot \"$output_directory/current-architecture-change-snapshot.json\"" in producer
+    assert '\n          snapshot "$output_directory/current-architecture-change-snapshot.json"' not in producer
     assert "arch-linter-net-empty-baseline-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.arch.yml" in producer
     assert 'document.get("schema_id") != "architecture-health/v1"' in producer
-    assert "strict_coverage_outcome: ${{ steps.architecture_coverage.outcome }}" in producer
+    assert "strict_coverage_outcome: ${{ steps.architecture_projections.outputs.coverage_outcome }}" in producer
+    lint_make = (_REPOSITORY_ROOT / "make" / "lint.mk").read_text(encoding="utf-8")
+    assert "ARCHITECTURE_CLI_RUN_BUILD_ARGS := --no-build" in lint_make
+    assert "dotnet run $(ARCHITECTURE_CLI_RUN_BUILD_ARGS) --project \"$(CLI_PROJECT)\" -- public-api diff" in lint_make
+    assert '"schema": "architecture-ci-dag/v1"' in producer
+    assert '"authoritative_solution_build_processes": 1' in producer
+    assert '"cli_host_bootstrap_build_processes": 1' not in producer
+    assert '"authoritative_graph_build_processes": 1' in producer
+    assert '"coverage": {"projection_processes": 1, "cli_processes": 7}' in producer
+    assert '"before_median_seconds": 204' in producer
+    assert '"target_median_seconds": 60' in producer
     assert "pull-requests: write" not in workflow
     assert "Fail if strict architecture coverage failed" not in producer
     assert "needs: architecture_pr_report_producer" in gate
     assert "outputs.strict_coverage_outcome == 'failure'" in gate
+
+
+def test_ci_rendering_steps_do_not_start_analysis() -> None:
+    workflow = _read("ci.yml")
+    report_manifest = workflow.split("      - name: Create bound architecture PR report manifest\n", maxsplit=1)[1].split(
+        "      - name: Upload strict diagnostics\n", maxsplit=1
+    )[0]
+    assert "dotnet run" not in report_manifest
+    assert "architecture_candidate.py" not in report_manifest
 
 
 def test_tooling_support_materializes_the_approved_immutable_publisher() -> None:

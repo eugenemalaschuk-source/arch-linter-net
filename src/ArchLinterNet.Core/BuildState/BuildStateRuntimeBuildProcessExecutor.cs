@@ -13,7 +13,21 @@ internal static class BuildStateRuntimeBuildProcessExecutor
     private const int ProcessExitAfterKillTimeoutMs = 5_000;
     private const int OutputDrainTimeoutMs = 1_000;
 
+    // Test-only instrumentation for the producer/fan-out trust-boundary regression. Production
+    // callers leave this null, so the authoritative process path remains unchanged.
+    internal static Func<BuildStatePreflightRequest, BuildStatePreflightDiagnostic?>? GraphBuildOverride { get; set; }
+
     internal static BuildStatePreflightDiagnostic? InvokeGraphBuild(BuildStatePreflightRequest request)
+    {
+        if (GraphBuildOverride is { } graphBuildOverride)
+        {
+            return graphBuildOverride(request);
+        }
+
+        return InvokeGraphBuildCore(request);
+    }
+
+    private static BuildStatePreflightDiagnostic? InvokeGraphBuildCore(BuildStatePreflightRequest request)
     {
         bool buildsRuntimeSpecificOutput = request.RequestedRuntimeIdentifier != null;
         string buildTargetPath = buildsRuntimeSpecificOutput

@@ -1,6 +1,8 @@
 using ArchLinterNet.Core.Asmdef;
 using ArchLinterNet.Core.Asmdef.Abstractions;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Change;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Graph.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -28,6 +30,15 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
     {
         return _serviceProvider.GetRequiredService<IArchitectureValidationApplicationService>()
             .Validate(request, timing);
+    }
+
+    // Internal host seam used by the self-governance producer. With the nonce-bound proof hand-off
+    // it publishes and verifies receipts without entering the build-capable preparation path;
+    // without that proof it retains the explicit EnsureBuilt behavior for direct callers.
+    internal BuildStatePreflightResult PublishPreparedBuildReceipts(BuildStatePreparedCandidateRequest request)
+    {
+        return _serviceProvider.GetRequiredService<ArchitecturePreparedBuildReceiptService>()
+            .Publish(request);
     }
 
     public (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(

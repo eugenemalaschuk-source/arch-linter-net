@@ -1,0 +1,17 @@
+<Project>
+  <!--
+    The self-governance producer can ask MSBuild to leave a nonce-bound marker after each
+    successful project Build target. The marker is deliberately opt-in and lives outside the
+    repository; it is the hand-off proof that lets the already-built CLI publish receipts without
+    entering Core's build-capable preparation path.
+  -->
+  <Target Name="WriteArchLinterNetPreparedBuildProof"
+          AfterTargets="Build"
+          Condition="'$(ArchLinterNetPreparedBuildProofDirectory)' != '' and '$(ArchLinterNetPreparedBuildProofNonce)' != ''">
+    <MakeDir Directories="$(ArchLinterNetPreparedBuildProofDirectory)" />
+    <WriteLinesToFile
+      File="$(ArchLinterNetPreparedBuildProofDirectory)/$(MSBuildProjectName).$(TargetFramework).prepared-build-proof"
+      Lines="$(MSBuildProjectFullPath)|$(TargetPath)|$(Configuration)|$(TargetFramework)|$(Platform)|$(RuntimeIdentifier)|$(ArchLinterNetPreparedBuildProofNonce)"
+      Overwrite="true" />
+  </Target>
+</Project>
