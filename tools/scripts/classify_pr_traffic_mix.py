@@ -72,8 +72,13 @@ def classify(path: str) -> str:
         return "api-snapshot"
     if lower.endswith(".csproj"):
         return "csproj"
-    if lower.startswith(("src/", "tests/")):
+    if lower.startswith(("src/", "tests/")) and lower.endswith(".cs"):
         return "project-source"
+    if lower.startswith(("src/", "tests/")):
+        # A JSON fixture, README, or other non-.cs file living under src/ or tests/ is not compiled
+        # source; classifying it as "project-source" would overstate the "clean scoped change" bucket
+        # (a change to only these files doesn't touch ArchLinterNet's own analyzed compilation units).
+        return "non-source-file-under-src-or-tests"
     return "other-non-architecture-relevant"
 
 

@@ -156,19 +156,26 @@ internal static class ChangedProjectScopePlanner
 
             case ChangedInputKind.SharedOrLinkedSourceFile:
                 {
-                    if (input.OwningProjectIds.Count < 2)
+                    if (input.OwningProjectIds.Count < 1)
                     {
                         throw new ArgumentException(
-                            "A shared/linked source file must declare at least two owning projects.",
+                            "A shared/linked source file must declare at least one owning project.",
                             nameof(input));
                     }
 
+                    // MSBuild's <Compile Include="…" Link="…" /> mechanism (a file compiled from a
+                    // location outside the owning project's own directory tree) is orthogonal to how
+                    // many projects reference that file: exactly one project can link it, or several
+                    // can. "Linked" describes how ownership was resolved (evaluated @(Compile) items,
+                    // not directory containment), not a minimum owner count — so this kind must accept
+                    // the same single-owner shape ProjectOwnedSourceFile does, in addition to the
+                    // multi-owner case.
                     IReadOnlyList<string> expanded = ClosureOfDependents(input.OwningProjectIds, dependentsOf);
                     return Decision(
                         input,
                         ScopeDisposition.DependencyDrivenExpansion,
-                        "Linked into more than one project; scope starts from every owning project and widens to their " +
-                        "combined transitive dependents.",
+                        "Owned (directly or via an MSBuild Link) by one or more projects; scope starts from every " +
+                        "owning project and widens to their combined transitive dependents.",
                         expanded);
                 }
 

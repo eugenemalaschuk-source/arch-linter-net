@@ -108,15 +108,17 @@ Repository-history evidence (300 commits ending at `bb533f0f`, path-pattern clas
 reproducible via `tools/scripts/classify_pr_traffic_mix.py`, raw output in
 [`changed-project-advisory-analysis-results.json`](changed-project-advisory-analysis-results.json)):
 31/300 (10.3%) of commits touch a central-build-props or policy path that would force global
-fallback under these rules; 18/300 (6.0%) touch only project source/`.csproj` paths (a clean scoped
-case). The remaining ~84% mix project source with docs/OpenSpec/other paths whose architecture-lint
-relevance this task does not resolve — a correct implementation would need to classify those as
-excluded (no re-analysis needed) or direct-mapped, not silently folded into "global." That mapping
-question is exactly what a focused implementation issue would need to answer with real
-path-ownership rules, not path-pattern heuristics. This traffic-mix reading is informal,
-approximate context: it classifies raw commit file lists by path pattern, not a literal run of
-`ChangedProjectScopePlanner` (which needs a structured project/edge graph the commit history does
-not provide).
+fallback under these rules; 15/300 (5.0%) touch only compiled project source (`.cs`) and/or
+`.csproj` paths (a clean scoped case — corrected after review: the classifier originally counted any
+file under `src/`/`tests/` regardless of extension, which folded non-compiled files like JSON test
+fixtures into this bucket and overstated it at 18/300). The remaining ~85% mix project source with
+docs/OpenSpec/non-`.cs`-under-`src`-or-`tests`/other paths whose architecture-lint relevance this
+task does not resolve — a correct implementation would need to classify those as excluded (no
+re-analysis needed) or direct-mapped, not silently folded into "global." That mapping question is
+exactly what a focused implementation issue would need to answer with real path-ownership rules
+(§2b), not path-pattern heuristics. This traffic-mix reading is informal, approximate context: it
+classifies raw commit file lists by path pattern, not a literal run of `ChangedProjectScopePlanner`
+(which needs a structured project/edge graph the commit history does not provide).
 
 **Conclusion**: material user-outcome benefit exists, but only for a bounded subclass of PR-shaped
 changes (leaf/spoke-shaped, low-dependent-count changes); it is not a general "PR feedback gets
@@ -135,7 +137,7 @@ separate, unaddressed problem; see the correction in §2b.**
 | Changed input kind | Disposition | Reason |
 |---|---|---|
 | Project-owned source file | `DependencyDrivenExpansion` | Owned by exactly one project; scope widens to that project's transitive dependents. |
-| Shared/linked source file (2+ owning projects) | `DependencyDrivenExpansion` | Scope starts from every owning project and widens to their combined dependents. |
+| Shared/linked source file (1+ owning projects, via MSBuild `Link`) | `DependencyDrivenExpansion` | Being "linked" describes how ownership was resolved (evaluated `@(Compile)` items, not directory containment), not a minimum owner count — a single project can link a file from outside its own directory. Scope starts from every owning project and widens to their combined dependents. |
 | Project-reference edge change (`.csproj` reference add/remove) | `DependencyDrivenExpansion` | Both endpoints are seeded; an edge's presence/absence can change graph-shaped contract results for either side. |
 | `.csproj` property edit (non-reference) | `DependencyDrivenExpansion` | Same rule as an owned source file. |
 | Package/framework reference change (one project) | `DependencyDrivenExpansion` | Same rule as an owned source file. |
@@ -144,6 +146,18 @@ separate, unaddressed problem; see the correction in §2b.**
 | Policy/import file (`architecture/*.yml`) | `GlobalExpansion` | Can change selector membership, layer boundaries, or contract scope for any project. |
 | Baseline / reviewed public-API snapshot (`architecture/api/*.public-api.txt`) | `UnmappableFallback` | A `strict_public_api_surface` contract binds one `api_snapshot` to an `assemblies` list that is schema-unbounded (`schema/dependencies.arch.schema.json` `publicApiSurfaceContract`), so one snapshot can govern more than one project's output. Without a deterministic contract-to-assemblies-to-projects mapping, a single owning project cannot be assumed — see caveat below. |
 | Generated output / build-context change | `UnmappableFallback` | No reviewed static ownership mapping exists; the input is unmappable and falls back to full scope rather than being excluded. |
+
+Caveat on the shared/linked-source-file row (revised after review): this evidence task originally
+required at least two owning projects for this kind, rejecting a single-owner linked file. Per
+Context7's MSBuild documentation, `<Compile Include="…" Link="…" />` can be used by exactly one
+project to compile a file that physically lives outside that project's own directory — "linked"
+describes *how* ownership was resolved (evaluated `@(Compile)` items), not a minimum owner count. A
+future ownership resolver built on evaluated project items (§2b) will legitimately produce
+single-owner linked inputs, which the original `Count < 2` constraint would have rejected or forced
+into `ProjectOwnedSourceFile` misclassification. `ChangedProjectScopePlanner` now accepts one or more
+owning projects for this kind (see `LinkedSourceFileChange_AcceptsASingleOwningProject` and
+`SharedSourceFileChange_UnionsMultipleOwningProjectsDependents` in
+`ChangedProjectAdvisoryScopePlanningTests.cs`).
 
 Caveat on the `Directory.Build.*`/central-props row: MSBuild and NuGet resolve these files by
 directory-ancestry/nearest-file search, not by an inherent "applies everywhere" rule — a future

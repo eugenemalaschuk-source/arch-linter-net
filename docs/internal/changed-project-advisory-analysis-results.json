@@ -79,9 +79,10 @@
     "sample_size_commits": 300,
     "commits_touching_central_props_or_policy_paths": 31,
     "commits_touching_central_props_or_policy_paths_ratio": 0.1033,
-    "commits_touching_only_project_source_or_csproj_paths": 18,
-    "commits_touching_only_project_source_or_csproj_paths_ratio": 0.06,
-    "caveat": "The remaining ~84% mix project-source with docs/openspec/other paths not classified here; whether those other paths are architecture-lint-relevant at all is a separate, unanswered mapping question this task surfaces but does not resolve."
+    "commits_touching_only_project_source_or_csproj_paths": 15,
+    "commits_touching_only_project_source_or_csproj_paths_ratio": 0.05,
+    "predicate_correction_note": "Corrected after review: the classifier originally counted ANY file under src/ or tests/ as project-source regardless of extension, folding non-compiled files (JSON fixtures, README, .resx, etc.) into this bucket and overstating it at 18/300 (0.06). project-source now requires a .cs extension specifically; non-.cs files under src/tests classify separately as non-source-file-under-src-or-tests.",
+    "caveat": "The remaining ~85% mix project-source with docs/openspec/non-source-file-under-src-or-tests/other paths not classified here; whether those other paths are architecture-lint-relevant at all is a separate, unanswered mapping question this task surfaces but does not resolve."
   },
   "p0_gate": {
     "authority": "#991",

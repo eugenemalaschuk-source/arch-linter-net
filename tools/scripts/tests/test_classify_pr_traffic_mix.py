@@ -27,6 +27,9 @@ import classify_pr_traffic_mix as extractor  # noqa: E402
         ("src/ArchLinterNet.Core/Foo.csproj", "csproj"),
         ("src/ArchLinterNet.Core/Foo.cs", "project-source"),
         ("tests/ArchLinterNet.Core.Tests/Foo.cs", "project-source"),
+        ("tests/ArchLinterNet.Core.Tests/Fixtures/sample.json", "non-source-file-under-src-or-tests"),
+        ("tests/ArchLinterNet.Core.Tests/README.md", "non-source-file-under-src-or-tests"),
+        ("src/ArchLinterNet.Core/Resources/icon.resx", "non-source-file-under-src-or-tests"),
         ("docs/internal/notes.md", "other-non-architecture-relevant"),
         ("openspec/changes/x/proposal.md", "other-non-architecture-relevant"),
         ("README.md", "other-non-architecture-relevant"),
@@ -132,6 +135,19 @@ def test_summarize_counts_global_shaped_and_project_source_only_commits() -> Non
     assert result["commits_touching_central_props_or_policy_paths_ratio"] == pytest.approx(0.4)
     assert result["commits_touching_only_project_source_or_csproj_paths"] == 2
     assert result["commits_touching_only_project_source_or_csproj_paths_ratio"] == pytest.approx(0.4)
+
+
+def test_summarize_excludes_non_cs_files_under_src_or_tests_from_source_only_bucket() -> None:
+    # A commit touching only a JSON fixture under tests/ is not a "clean scoped source change" — it
+    # doesn't touch a compiled unit ArchLinterNet's own architecture-lint analysis observes.
+    commits = {
+        "fixture-only": ["tests/ArchLinterNet.Core.Tests/Fixtures/sample.json"],
+        "source-only": ["src/Foo.cs"],
+    }
+
+    result = extractor.summarize(commits)
+
+    assert result["commits_touching_only_project_source_or_csproj_paths"] == 1
 
 
 def test_summarize_handles_zero_commits_without_division_by_zero() -> None:

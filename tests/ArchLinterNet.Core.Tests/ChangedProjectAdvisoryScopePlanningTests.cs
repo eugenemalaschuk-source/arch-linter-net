@@ -210,6 +210,67 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
     }
 
     [Test]
+    public void LinkedSourceFileChange_AcceptsASingleOwningProject()
+    {
+        // MSBuild's <Compile Include="…" Link="…" /> can be used by exactly one project; being
+        // "linked" describes how ownership was resolved (evaluated @(Compile) items), not a minimum
+        // owner count, so this must behave like ProjectOwnedSourceFile's dependents-closure rule for
+        // a single owner rather than rejecting it.
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        string ownerId = workload.Projects[3].Id;
+
+        ScopePlan plan = ChangedProjectScopePlanner.Plan(
+            workload.Projects,
+            workload.Edges,
+            [new ChangedInput
+            {
+                InputId = "linked-single-owner",
+                Kind = ChangedInputKind.SharedOrLinkedSourceFile,
+                OwningProjectIds = [ownerId],
+            }]);
+
+        Assert.That(plan.AffectedProjectCount, Is.EqualTo(4), "index-3 owner in an 8-project Linear chain closes to indices 0..3");
+    }
+
+    [Test]
+    public void SharedSourceFileChange_UnionsMultipleOwningProjectsDependents()
+    {
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        string firstOwnerId = workload.Projects[1].Id;
+        string secondOwnerId = workload.Projects[5].Id;
+
+        ScopePlan plan = ChangedProjectScopePlanner.Plan(
+            workload.Projects,
+            workload.Edges,
+            [new ChangedInput
+            {
+                InputId = "linked-multi-owner",
+                Kind = ChangedInputKind.SharedOrLinkedSourceFile,
+                OwningProjectIds = [firstOwnerId, secondOwnerId],
+            }]);
+
+        // Union of dependents closures for index 1 (K=2: indices 0..1) and index 5 (K=6: indices
+        // 0..5) collapses to the deeper owner's own closure, index 5's (K=6).
+        Assert.That(plan.AffectedProjectCount, Is.EqualTo(6));
+    }
+
+    [Test]
+    public void SharedOrLinkedSourceFileChange_RejectsZeroOwningProjects()
+    {
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+
+        Assert.Throws<ArgumentException>(() => ChangedProjectScopePlanner.Plan(
+            workload.Projects,
+            workload.Edges,
+            [new ChangedInput
+            {
+                InputId = "linked-zero-owner",
+                Kind = ChangedInputKind.SharedOrLinkedSourceFile,
+                OwningProjectIds = [],
+            }]));
+    }
+
+    [Test]
     public void EveryChangedInput_ReceivesExactlyOneDeterministicDecision()
     {
         BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Diamond, projectCount: 10);
@@ -297,14 +358,17 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
             // also falls back to the full population rather than reusing the dependents closure.
             Assert.That(contractCoListing.RequiredProjectIds, Has.Count.EqualTo(16));
 
-            // Coverage scopes 'project'/'assembly'/'namespace' classify each item independently
-            // from only that item's own namespaces against policy-declared layers, so this stays
-            // project-local (K=1) — the one family genuinely narrower than the generic closure.
+            // Coverage scopes 'project'/'assembly' classify each item independently from only that
+            // item's own namespaces against policy-declared layers, and each item is by
+            // construction exactly one project or one assembly, so this stays project-local (K=1) —
+            // the one family genuinely narrower than the generic closure.
             Assert.That(aggregatedGlobalScan.RequiredProjectIds, Is.EqualTo(new[] { changedProjectId }));
 
-            // Coverage scopes 'dependency_edge'/'semantic_role'/'rule_input' are graph/catalog/
-            // policy-wide, not project-local; this evidence task has no model precise enough to
-            // narrow them, so they fall back to the full population like CyclesGlobal.
+            // Coverage scopes 'namespace'/'dependency_edge'/'semantic_role'/'rule_input' are
+            // graph/catalog/policy-wide, not project-local ('namespace' spans multiple projects
+            // because a C# namespace isn't tied to one assembly); this evidence task has no model
+            // precise enough to narrow them, so they fall back to the full population like
+            // CyclesGlobal.
             Assert.That(coverageGraphOrCatalogWide.RequiredProjectIds, Has.Count.EqualTo(16));
         });
     }
