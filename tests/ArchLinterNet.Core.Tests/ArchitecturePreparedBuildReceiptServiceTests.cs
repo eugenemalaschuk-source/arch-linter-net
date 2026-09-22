@@ -198,6 +198,94 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
     }
 
     [Test]
+    public void PreparedBuildProof_RejectsEveryIdentityMismatch()
+    {
+        string projectPath = CreateProjectFixture("ProofIdentityFixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("ProofIdentityFixture");
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "ProofIdentityFixture");
+        ArchitectureDiscoveredProject project = discovery.DiscoveredProjects.Single();
+        BuildStatePreflightRequest request = new(
+            RepositoryRoot,
+            discovery,
+            SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary,
+            RequestedConfiguration: "Debug",
+            RequestedTargetFramework: "net10.0",
+            RequestedPlatform: "AnyCPU",
+            RequestedRuntimeIdentifier: "linux-x64");
+        string proofDirectory = Path.Combine(RepositoryRoot, "proof-identity");
+        Directory.CreateDirectory(proofDirectory);
+        string proofPath = Path.Combine(proofDirectory, "identity.prepared-build-proof");
+
+        bool IsAccepted(string contents)
+        {
+            File.WriteAllText(proofPath, contents);
+            return BuildStatePreparedBuildProof.Exists(
+                request, project, assemblyPath, proofDirectory, "nonce");
+        }
+
+        Assert.That(
+            BuildStatePreparedBuildProof.Exists(request, project, assemblyPath, "", "nonce"), Is.False);
+        Assert.That(IsAccepted("malformed"), Is.False);
+        Assert.That(IsAccepted(string.Join('|', "/wrong/project.csproj", assemblyPath, "Debug", "net10.0", "AnyCPU", "linux-x64", "nonce")), Is.False);
+        Assert.That(IsAccepted(string.Join('|', projectPath, "/wrong/assembly.dll", "Debug", "net10.0", "AnyCPU", "linux-x64", "nonce")), Is.False);
+        Assert.That(IsAccepted(string.Join('|', projectPath, assemblyPath, "Debug", "net10.0", "AnyCPU", "linux-x64", "wrong-nonce")), Is.False);
+        Assert.That(IsAccepted(string.Join('|', projectPath, assemblyPath, "Release", "net10.0", "AnyCPU", "linux-x64", "nonce")), Is.False);
+        Assert.That(IsAccepted(string.Join('|', projectPath, assemblyPath, "Debug", "net8.0", "AnyCPU", "linux-x64", "nonce")), Is.False);
+        Assert.That(IsAccepted(string.Join('|', projectPath, assemblyPath, "Debug", "net10.0", "x64", "linux-x64", "nonce")), Is.False);
+        Assert.That(IsAccepted(string.Join('|', projectPath, assemblyPath, "Debug", "net10.0", "AnyCPU", "win-x64", "nonce")), Is.False);
+        Assert.That(IsAccepted(string.Join('|', projectPath, assemblyPath, "Debug", "net10.0", "AnyCPU", "linux-x64", "nonce")), Is.True);
+    }
+
+    [Test]
+    public void PublishPreparedBuildReceipts_ReturnsEvaluationFailureWithoutPublishingOrBuilding()
+    {
+        string projectPath = CreateProjectFixture("InvalidReceiptFixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("InvalidReceiptFixture");
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "InvalidReceiptFixture") with
+        {
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["InvalidReceiptFixture"] = assemblyPath,
+            },
+        };
+        BuildStateResolvedAssemblies resolution = new(Array.Empty<Assembly>(), Array.Empty<string>())
+        {
+            ResolvedAssemblyPaths = discovery.ResolvedAssemblyPaths,
+        };
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath,
+            "DifferentAssemblyName",
+            "Debug",
+            "net10.0",
+            "irrelevant",
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath)));
+        string proofDirectory = Path.Combine(RepositoryRoot, "invalid-receipt-proof");
+        Directory.CreateDirectory(proofDirectory);
+        File.WriteAllText(
+            Path.Combine(proofDirectory, "InvalidReceiptFixture.net10.0.prepared-build-proof"),
+            string.Join('|', Path.GetFullPath(projectPath), Path.GetFullPath(assemblyPath), "Debug", "net10.0", "", "", "nonce"));
+        BuildStateRuntimeBuildProcessExecutor.GraphBuildOverride = _ =>
+            throw new AssertionException("completed-build verification must not invoke graph build");
+
+        BuildStatePreflightResult result = BuildStateRuntimeBuildPreparation.PublishReceiptsForPreparedBuild(
+            new BuildStatePreflightRequest(
+                RepositoryRoot,
+                discovery,
+                resolution,
+                BuildPreparationMode.EnsureBuilt,
+                NoRestore: true,
+                RequestedConfiguration: "Debug",
+                RequestedTargetFramework: "net10.0"),
+            proofDirectory,
+            "nonce");
+
+        Assert.That(result.Blocked, Is.True);
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.WrongProjectOutput));
+        Assert.That(File.Exists(BuildReceiptStore.ReceiptPathFor(assemblyPath)), Is.True);
+    }
+
+    [Test]
     public void Publish_DoesNotIssueReceiptWhenAuthoritativeBuildFails()
     {
         string projectPath = CreateProjectFixture("FailedPreparedCandidateFixture", "class C {}");
