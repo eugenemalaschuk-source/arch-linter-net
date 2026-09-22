@@ -26,8 +26,8 @@ from _release_workspace import _safe_path
 from verify_relay_dependencies import verify_relay_dependencies
 
 
-_INVENTORY_SCHEMA = "architecture-health-badge-release-inventory/v2"
-_DISTRIBUTION_SCHEMA = "architecture-health-badge-release-distribution/v1"
+_INVENTORY_SCHEMA = "architecture-health-badge-release-inventory/v3"
+_DISTRIBUTION_SCHEMA = "architecture-health-badge-release-distribution/v2"
 _COMPATIBILITY_SCHEMA = "architecture-health-badge-relay-compatibility/v1"
 _APPROVED_PUBLISHER_COMMIT = "e35b0c6f41810f3460efd7e1d1ff4d7fd4571b24"
 _APPROVED_PUBLISHER_ACTION_COMMIT = "ac678db689a1faf2eb098d0027fc7d176a362d00"
@@ -36,9 +36,19 @@ _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 _GIT_BLOB_PATTERN = re.compile(r"[0-9a-f]{40}")
 _VERSION_PATTERN = re.compile(
-    r"^0\.8\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-](?:\.?[0-9A-Za-z-])*)?(?:\+[0-9A-Za-z-](?:\.?[0-9A-Za-z-])*)?$",
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+    r"(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?"
+    r"(?:\+[0-9A-Za-z][0-9A-Za-z.-]*)?$",
     re.ASCII,
 )
+_SUPPORT_STATUS = "experimental-opt-in"
+_PUBLICATION_AUTHORITY = "external-checkpoint-b-release-scope"
+_REVIEW_ORIGIN = {
+    "story": "#825",
+    "distribution_task": "#835",
+    "first_release_authority": "#806",
+    "lifecycle": "milestone-6/v0.8.x-completeness",
+}
 
 _ARCHIVE_FILE_TEMPLATE = "architecture-health-badge-relay-{version}.tar.gz"
 _COMPATIBILITY_FILE_TEMPLATE = "architecture-health-badge-relay-{version}.json"
@@ -138,7 +148,7 @@ def _safe_source_path(root: Path, relative: str, description: str) -> Path:
 
 def _validate_version(value: Any) -> str:
     if not isinstance(value, str) or not _VERSION_PATTERN.fullmatch(value):
-        raise ValueError("The candidate version must be a valid 0.8.x version.")
+        raise ValueError("The candidate version must be a valid SemVer-style NuGet version.")
     return value
 
 
@@ -151,12 +161,9 @@ def _validate_source_commit(value: Any) -> str:
 def _validate_inventory_header(value: dict[str, Any]) -> None:
     expected_fields = {
         "schema",
-        "lifecycle",
-        "release_authority",
-        "publication",
-        "included",
-        "excluded",
-        "handoff",
+        "support_status",
+        "publication_authority",
+        "review_origin",
         "components",
         "bundle_members",
         "compatibility",
@@ -165,16 +172,12 @@ def _validate_inventory_header(value: dict[str, Any]) -> None:
     }
     if set(value) != expected_fields or value.get("schema") != _INVENTORY_SCHEMA:
         raise ValueError("The release inventory has invalid fields or schema.")
-    if value.get("lifecycle") != "milestone-6/v0.8.x-completeness":
-        raise ValueError("The release inventory is not for the reviewed v0.8.x line.")
-    if value.get("release_authority") != "#806" or value.get("publication") != "not-authorized":
-        raise ValueError("The release inventory has an invalid release authority.")
-    if value.get("included") != ["#806", "#825"]:
-        raise ValueError("The release inventory must include exactly the #806/#825 handoff.")
-    if value.get("excluded") != ["v0.9-performance", "#650", "#787"]:
-        raise ValueError("The release inventory exclusions are invalid.")
-    if value.get("handoff") != "#825 -> #806 reviewed candidate scope and released-artifact verification":
-        raise ValueError("The release inventory handoff is invalid.")
+    if value.get("support_status") != _SUPPORT_STATUS:
+        raise ValueError("The release inventory support status is invalid.")
+    if value.get("publication_authority") != _PUBLICATION_AUTHORITY:
+        raise ValueError("The release inventory publication authority boundary is invalid.")
+    if value.get("review_origin") != _REVIEW_ORIGIN:
+        raise ValueError("The release inventory review origin is invalid.")
     if value.get("package_ids") != _PACKAGE_IDS:
         raise ValueError("The release inventory package identity set is invalid.")
 
@@ -569,9 +572,9 @@ def _build_outputs(
         "schema": _DISTRIBUTION_SCHEMA,
         "version": candidate["version"],
         "source_commit": candidate["source_commit"],
-        "release_authority": inventory["release_authority"],
-        "handoff": inventory["handoff"],
-        "lifecycle": inventory["lifecycle"],
+        "support_status": inventory["support_status"],
+        "publication_authority": inventory["publication_authority"],
+        "review_origin": inventory["review_origin"],
         "candidate_manifest": {"file": candidate_manifest_name, "sha256": candidate_manifest_sha},
         "compatibility": compatibility["compatibility"],
         "subjects": [archive_subject, workflow_subject, action_subject, compatibility_subject],
@@ -649,9 +652,9 @@ def _validate_distribution_header(distribution: dict[str, Any]) -> None:
         "schema",
         "version",
         "source_commit",
-        "release_authority",
-        "handoff",
-        "lifecycle",
+        "support_status",
+        "publication_authority",
+        "review_origin",
         "candidate_manifest",
         "compatibility",
         "subjects",
@@ -662,6 +665,12 @@ def _validate_distribution_header(distribution: dict[str, Any]) -> None:
         raise ValueError("The transport manifest fields or schema are invalid.")
     _validate_version(distribution.get("version"))
     _validate_source_commit(distribution.get("source_commit"))
+    if distribution.get("support_status") != _SUPPORT_STATUS:
+        raise ValueError("The transport manifest support status is invalid.")
+    if distribution.get("publication_authority") != _PUBLICATION_AUTHORITY:
+        raise ValueError("The transport manifest publication authority boundary is invalid.")
+    if distribution.get("review_origin") != _REVIEW_ORIGIN:
+        raise ValueError("The transport manifest review origin is invalid.")
     candidate_manifest = distribution.get("candidate_manifest")
     if not isinstance(candidate_manifest, dict) or set(candidate_manifest) != {"file", "sha256"}:
         raise ValueError("The transport manifest candidate binding is invalid.")
