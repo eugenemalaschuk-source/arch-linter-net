@@ -1,10 +1,7 @@
 name: Publish Repository Metrics Badge
 
 on:
-  workflow_run:
-    workflows: ["Publish Architecture Health Badge"]
-    types: [completed]
-    branches: [main]
+  workflow_call:
 
 concurrency:
   group: repository-metrics-badge-publication
@@ -15,7 +12,6 @@ permissions:
 
 jobs:
   publish:
-    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -26,6 +22,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -36,8 +33,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 \
-            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/architecture-health-badge/architecture-health.json?run=${{ github.event.workflow_run.id }}" \
+          curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 \
+            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/architecture-health-badge/architecture-health.json" \
             --output "$RUNNER_TEMP/architecture-health.json"
 
       - name: Project the Source lines badge
