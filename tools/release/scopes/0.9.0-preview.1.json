@@ -1,0 +1,82 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.9.0-preview.1-performance-dogfood",
+  "release_target": "0.9.0-preview.1",
+  "story": 1000,
+  "_comment": [
+    "Early-validation preview of the v0.9 performance/scale foundation after public v0.8.2.",
+    "The inspected pre-preparation range is v0.8.2 source 40d4e72de9ab18b1c15d8c92266af2a80cabc20c through current main 0adebeabee367801b2749978b89cd0cd0fa8a78c; the actual release source is the reviewed preparation merge SHA.",
+    "Required items are completed measurement/benchmark/self-dogfood foundations already present in the candidate: #493, #502, #655 and #992.",
+    "PR #996 under open #991/#19 adds the one-process health --change-snapshot projection used for consumer dogfood; this preview ships that already-integrated seam without claiming the #991 umbrella complete.",
+    "First Ice Server exact-base acceptance proved the trust path but measured a 589.875 s median governance span (495.216-593.964 s), leaving an explicit +529.875 s GAP to the <=60 s target.",
+    "That GAP is intentional preview context: it routes further optimization to #19/#991 and residual owners rather than authorizing server-local cache or stable v0.9.0.",
+    "#19/#461/#991/#998/#999/#492/#675/#503/#650/#787 remain open and are explicitly non-blocking only for this early-validation preview.",
+    "This declaration authorizes exactly 0.9.0-preview.1. It does not authorize 0.9.0 or any other prerelease number.",
+    "Because v0.8.2 is the latest stable tag, the maintainer release handoff intentionally uses release_type=preview with version_override=0.9.0-preview.1; the exact reviewed declaration, not the override alone, is publication authority."
+  ],
+  "required_items": [
+    {
+      "issue": 493,
+      "finding": "cross-process-preparation-evidence",
+      "summary": "Measure repeated candidate preparation and compare one-process versus persisted reuse before implementation"
+    },
+    {
+      "issue": 502,
+      "finding": "large-solution-benchmark-foundation",
+      "summary": "Establish reusable large-solution benchmark, complexity, memory and expected-effect evidence"
+    },
+    {
+      "issue": 655,
+      "finding": "deferred-hot-path-disposition",
+      "summary": "Measure and disposition deferred selector, graph and repeated-work hypotheses without speculative implementation"
+    },
+    {
+      "issue": 992,
+      "finding": "self-dogfood-ci-normalization",
+      "summary": "Normalize ArchLinterNet self-dogfood CI to build-once and evidence-reuse topology before Core optimization"
+    }
+  ],
+  "excluded_items": [
+    {
+      "issue": 19,
+      "reason": "Stable v0.9 performance/scale scope remains open; this preview is for immutable dogfood of the current measured foundation."
+    },
+    {
+      "issue": 461,
+      "reason": "Consumer-shaped attribution closure remains open; merged instrumentation may ship in preview without claiming final attribution complete."
+    },
+    {
+      "issue": 991,
+      "reason": "Four-repository CI normalization remains open; the preview may carry already-integrated one-process projection seams but does not claim the umbrella complete."
+    },
+    {
+      "issue": 998,
+      "reason": "Conditional same-session Public API optimization remains evidence-gated follow-up after normalized consumer measurements."
+    },
+    {
+      "issue": 999,
+      "reason": "Conditional staged/prebuilt candidate-input optimization remains evidence-gated follow-up after normalized consumer measurements."
+    },
+    {
+      "issue": 492,
+      "reason": "Persisted prepared-analysis lifecycle remains conditional and is not required for this preview."
+    },
+    {
+      "issue": 675,
+      "reason": "Real-MSBuild analysis-cache eligibility decision remains open and is not required for this preview."
+    },
+    {
+      "issue": 503,
+      "reason": "Changed-project advisory/invalidation decision remains open and is not required for this preview."
+    },
+    {
+      "issue": 650,
+      "reason": "Final stable v0.9 executable documentation gate remains open; preview release notes must not claim stable performance completion."
+    },
+    {
+      "issue": 787,
+      "reason": "Sole stable v0.9.0 release authority remains open and cannot be satisfied or bypassed by publishing this preview."
+    }
+  ],
+  "delivered_items": []
+}
