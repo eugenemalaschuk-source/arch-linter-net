@@ -7,8 +7,8 @@ exact stable-or-preview release target to the candidate manifest version; declar
 paths carry no release semantics. It resolves only required items' live issue-tracker states and
 binds that inventory, declaration identity/bytes, manifest digest, candidate version, and source
 commit into evidence. A non-publishing candidate instead emits a distinct, explicitly
-non-authorizing record bound to the same immutable candidate identity; it never selects a stable
-release declaration.
+non-authorizing record bound to the same immutable candidate identity; it never selects a
+publication declaration.
 
 This candidate-authorization command takes no declaration, manifest, or output path arguments.
 Those locations are fixed in the release workspace. ``build_evidence`` retains explicit paths only
