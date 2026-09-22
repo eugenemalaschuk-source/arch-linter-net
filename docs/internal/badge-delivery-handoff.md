@@ -74,10 +74,19 @@ because this documentation PR merges.
 
 The machine-readable owner is
 `.github/badge-promotion/release-inventory.json`
-(`architecture-health-badge-release-inventory/v2`), consumed by
+(`architecture-health-badge-release-inventory/v3`), consumed by
 `tools/release/release_distribution.py`. The bundle member/digest authority is
 `relay/bundle-manifest.json`. Keep these authorities; do not create a parallel
 packager or silently repair a released archive in a documentation command.
+
+The v3 inventory is intentionally release-line neutral. Its exact support
+status is `experimental-opt-in`; its current publication boundary is
+`external-checkpoint-b-release-scope`. The immutable Relay review origin
+remains story `#825`, distribution task `#835`, first release authority
+`#806`, lifecycle `milestone-6/v0.8.x-completeness`. These are historical
+review origins, not current-release authorization. The generated v2 transport
+manifest carries that distinction forward while the exact candidate release
+scope remains authoritative for publication.
 
 | Delivery component | Exact identity or path to bind in candidate evidence |
 | --- | --- |
@@ -87,7 +96,7 @@ packager or silently repair a released archive in a documentation command.
 | Compatibility description | `architecture-health-badge-relay-{version}.json` |
 | Reusable workflow asset | `architecture-health-badge-publisher-workflow.yml` |
 | Composite action asset | `architecture-health-badge-publisher-action.yml` |
-| Distribution manifest | `architecture-health-badge-release-distribution.json` (`architecture-health-badge-release-distribution/v1`) |
+| Distribution manifest | `architecture-health-badge-release-distribution.json` (`architecture-health-badge-release-distribution/v2`) |
 | Distribution checksums | `architecture-health-badge-release-checksums.txt` |
 | Workflow source | `.github/workflows/architecture-health-badge-promotion.yml` |
 | Action source | `.github/actions/architecture-health-badge-promotion/action.yml` |

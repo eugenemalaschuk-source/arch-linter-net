@@ -146,13 +146,20 @@ def test_registry_is_closed_and_public_raw_is_not_available_for_private_reposito
         assert "callback" not in config["destination"]
 
 
-def test_release_inventory_is_candidate_only_and_excludes_unrelated_work() -> None:
+def test_release_inventory_is_candidate_only_and_release_line_neutral() -> None:
     inventory = json.loads((ROOT / ".github" / "badge-promotion" / "release-inventory.json").read_text(encoding="utf-8"))
-    assert inventory["release_authority"] == "#806"
-    assert inventory["publication"] == "not-authorized"
-    assert inventory["lifecycle"] == "milestone-6/v0.8.x-completeness"
-    assert "#650" in inventory["excluded"]
-    assert "#787" in inventory["excluded"]
+    assert inventory["schema"] == "architecture-health-badge-release-inventory/v3"
+    assert inventory["support_status"] == "experimental-opt-in"
+    assert inventory["publication_authority"] == "external-checkpoint-b-release-scope"
+    assert inventory["review_origin"] == {
+        "story": "#825",
+        "distribution_task": "#835",
+        "first_release_authority": "#806",
+        "lifecycle": "milestone-6/v0.8.x-completeness",
+    }
+    assert "release_authority" not in inventory
+    assert "included" not in inventory
+    assert "excluded" not in inventory
     for component in inventory["components"]:
         assert len(component["approved_source_sha"]) == 40
 

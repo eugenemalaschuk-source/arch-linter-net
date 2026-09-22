@@ -20,6 +20,15 @@
 
 ## 4. Validation
 
-- [ ] 4.1 Run the complete release-tool test suite.
-- [ ] 4.2 Run strict OpenSpec validation.
-- [ ] 4.3 Run repository/release CI and review the final preparation diff.
+- [x] 4.1 Run the complete release-tool test suite.
+- [x] 4.2 Run strict OpenSpec validation.
+- [x] 4.3 Run repository/release CI and review the final preparation diff.
+
+## Completion evidence
+
+- Implementation/preparation PR: #1001.
+- Exact preparation head CI: 35716205657 SUCCESS.
+- Package Validation: 35716205659 SUCCESS.
+- CodeQL: 35716205699 SUCCESS.
+- Qodana Community: 35716205675 SUCCESS.
+- Canonical spec synchronized before archival on 2026-09-22.
