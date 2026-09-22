@@ -118,17 +118,17 @@ def test_summarize_counts_global_shaped_and_project_source_only_commits() -> Non
 
     assert result["total_commits_with_files"] == 5
     assert result["commits_touching_central_props_or_policy_paths"] == 2
-    assert result["commits_touching_central_props_or_policy_paths_ratio"] == 0.4
+    assert result["commits_touching_central_props_or_policy_paths_ratio"] == pytest.approx(0.4)
     assert result["commits_touching_only_project_source_or_csproj_paths"] == 2
-    assert result["commits_touching_only_project_source_or_csproj_paths_ratio"] == 0.4
+    assert result["commits_touching_only_project_source_or_csproj_paths_ratio"] == pytest.approx(0.4)
 
 
 def test_summarize_handles_zero_commits_without_division_by_zero() -> None:
     result = extractor.summarize({})
 
     assert result["total_commits_with_files"] == 0
-    assert result["commits_touching_central_props_or_policy_paths_ratio"] == 0.0
-    assert result["commits_touching_only_project_source_or_csproj_paths_ratio"] == 0.0
+    assert result["commits_touching_central_props_or_policy_paths_ratio"] == pytest.approx(0.0)
+    assert result["commits_touching_only_project_source_or_csproj_paths_ratio"] == pytest.approx(0.0)
 
 
 def test_main_prints_json_summary_and_returns_zero(

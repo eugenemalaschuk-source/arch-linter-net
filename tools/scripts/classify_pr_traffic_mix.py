@@ -78,8 +78,12 @@ def classify(path: str) -> str:
 
 
 def load_commits(end_ref: str, commit_count: int, cwd: Path) -> dict[str, list[str]]:
+    # Re-validate immediately before the subprocess call, not only at argparse parse time: static
+    # analysis does not know argparse's `type=` callback already sanitized this value, and this
+    # function may also be called directly (as the tests do) without going through argparse at all.
+    safe_end_ref = validate_git_ref(end_ref)
     output = subprocess.run(
-        ["git", "log", end_ref, "-n", str(commit_count), "--pretty=format:__COMMIT__%H", "--name-only"],
+        ["git", "log", safe_end_ref, "-n", str(commit_count), "--pretty=format:__COMMIT__%H", "--name-only"],
         capture_output=True,
         text=True,
         cwd=cwd,
