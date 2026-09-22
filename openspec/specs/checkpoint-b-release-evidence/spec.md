@@ -151,7 +151,7 @@ change the recorded scenario result, the platform result, or the authorization o
 ### Requirement: Publication authorization proves the release scope is closed
 The aggregation job SHALL consume an authoritative release-scope inventory
 selected from a fixed tracked declaration collection by the immutable candidate
-manifest's exact stable release version. Declaration filenames SHALL NOT be
+manifest's exact reviewed stable or `X.Y.Z-preview.N` release version. Declaration filenames SHALL NOT be
 semantic authority. Every declaration SHALL expose a versioned schema, explicit
 declaration identity, release target, release-authority story, required items,
 explicitly excluded items with reasons, and delivered-context items with
@@ -169,8 +169,7 @@ before evaluating required-item states. Evidence-supplied identity, hash, or
 inventory fields SHALL NOT act as release authority. Authorization
 SHALL be refused while any required item is not closed.
 
-Missing, malformed, duplicate, incompatible, prerelease, emergency-override,
-or otherwise unmapped target declarations SHALL fail closed. The current tracked
+Missing, malformed, duplicate, incompatible, unsupported-prerelease, or otherwise unmapped target declarations SHALL fail closed. An explicit version override SHALL NOT create publication authority; it SHALL still require one exact reviewed declaration for the immutable candidate version. The current tracked
 authorities SHALL preserve v0.6.4/#527 and define v0.7.0/#613 with required
 #234, #116, #269, #267, and #614; #287 SHALL remain explicitly non-blocking and
 #222 SHALL remain delivered context for v0.7.0. The tracked authorities SHALL
@@ -186,10 +185,14 @@ a required item of its own declaration.
 - **AND** no declaration can authorize a candidate targeting a different release
 
 #### Scenario: Candidate target has no unique supported declaration
-- **WHEN** a candidate uses a prerelease, unknown patch/minor, malformed,
-  inconsistent, or duplicate-mapped release target
-- **THEN** declaration selection fails before issue resolution or evidence
-  output
+- **WHEN** a candidate uses an unsupported prerelease shape, an unmapped preview number, an unknown stable patch/minor, a malformed or inconsistent version, or a duplicate-mapped release target
+- **THEN** declaration selection fails before issue resolution or evidence output
+
+#### Scenario: Exact preview target has its own authority
+- **WHEN** a candidate version is `0.9.0-preview.1`
+- **AND** exactly one reviewed declaration targets `0.9.0-preview.1`
+- **THEN** that declaration may authorize only that preview candidate
+- **AND** it does not authorize `0.9.0` or another preview number
 
 #### Scenario: A required release-scope item is open
 - **WHEN** any required item of the selected release scope is open at

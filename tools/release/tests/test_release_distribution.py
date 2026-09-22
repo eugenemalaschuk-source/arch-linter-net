@@ -206,6 +206,20 @@ def test_metadata_binds_candidate_packages_and_exact_publisher_bytes(tmp_path: P
     )
 
 
+def test_v09_preview_manifest_records_review_origin_not_legacy_current_authority(tmp_path: Path) -> None:
+    arguments, transport = _arguments(tmp_path, "0.9.0-preview.1")
+    manifest = json.loads((transport / distribution._MANIFEST_FILE).read_text(encoding="utf-8"))
+
+    assert manifest["schema"] == "architecture-health-badge-release-distribution/v2"
+    assert manifest["version"] == "0.9.0-preview.1"
+    assert manifest["support_status"] == "experimental-opt-in"
+    assert manifest["publication_authority"] == "external-checkpoint-b-release-scope"
+    assert manifest["review_origin"] == distribution._REVIEW_ORIGIN
+    assert "release_authority" not in manifest
+    assert "lifecycle" not in manifest
+    assert "handoff" not in manifest
+
+
 def test_inventory_action_ref_matches_badge_setup_contract() -> None:
     inventory = json.loads(INVENTORY.read_text(encoding="utf-8"))
     contract_path = (
@@ -356,17 +370,21 @@ def test_publisher_source_fallback_without_git_index_requires_exact_workspace_by
         distribution._approved_source_bytes(fixture, relative, inventory)
 
 
-def test_validate_version_rejects_non_ascii_unicode_digits() -> None:
+def test_validate_version_accepts_release_line_neutral_semver_and_rejects_unicode_digits() -> None:
     assert distribution._validate_version("0.8.19") == "0.8.19"
+    assert distribution._validate_version("0.9.0-preview.1") == "0.9.0-preview.1"
 
     validate_version = distribution._validate_version
     with pytest.raises(ValueError) as error:
-        validate_version("0.8.1١")
-    assert "valid 0.8.x version" in str(error.value)
+        validate_version("0.9.0-preview.١")
+    assert "valid SemVer-style NuGet version" in str(error.value)
 
 
-def test_verify_accepts_any_0_8_x_candidate_and_rejects_wrong_binding(tmp_path: Path) -> None:
-    arguments, transport = _arguments(tmp_path, "0.8.19")
+@pytest.mark.parametrize("version", ["0.8.19", "0.9.0-preview.1"])
+def test_verify_accepts_release_line_neutral_candidates_and_rejects_wrong_binding(
+    tmp_path: Path, version: str
+) -> None:
+    arguments, transport = _arguments(tmp_path, version)
     distribution._verify(_verify_arguments(arguments, transport))
 
     wrong_source = _verify_arguments(arguments, transport)
@@ -375,7 +393,7 @@ def test_verify_accepts_any_0_8_x_candidate_and_rejects_wrong_binding(tmp_path: 
         distribution._verify(wrong_source)
 
     wrong_version = _verify_arguments(arguments, transport)
-    wrong_version.version = "0.8.20"
+    wrong_version.version = "0.9.0-preview.2" if version != "0.9.0-preview.2" else "0.9.0-preview.3"
     with pytest.raises(ValueError, match="version"):
         distribution._verify(wrong_version)
 
@@ -471,12 +489,52 @@ def test_attestation_and_path_commands_exclude_recursive_outer_evidence(tmp_path
     assert capsys.readouterr().out.splitlines()[-2:] == [distribution._MANIFEST_FILE, distribution._CHECKSUMS_FILE]
 
 
-def test_inventory_is_closed_to_pin_drift_and_unrelated_scope(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("support_status", "stable", "support status"),
+        ("publication_authority", "#806", "publication authority boundary"),
+        ("review_origin", {"story": "#999"}, "review origin"),
+    ],
+)
+def test_distribution_manifest_rejects_header_authority_drift(
+    tmp_path: Path, field: str, value: object, message: str
+) -> None:
+    arguments, transport = _arguments(tmp_path, "0.9.0-preview.1")
+    manifest_path = transport / distribution._MANIFEST_FILE
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest[field] = value
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        distribution._verify(_verify_arguments(arguments, transport))
+
+
+@pytest.mark.parametrize(
+    ("field", "mutate", "message"),
+    [
+        ("support_status", lambda value: value.__setitem__("support_status", "stable"), "support status"),
+        (
+            "publication_authority",
+            lambda value: value.__setitem__("publication_authority", "#806"),
+            "publication authority boundary",
+        ),
+        (
+            "review_origin",
+            lambda value: value["review_origin"].__setitem__("first_release_authority", "#787"),
+            "review origin",
+        ),
+    ],
+)
+def test_inventory_is_closed_to_support_authority_and_review_origin_drift(
+    tmp_path: Path, field: str, mutate, message: str
+) -> None:
     value = json.loads(INVENTORY.read_text(encoding="utf-8"))
-    value["excluded"].remove("#787")
-    path = tmp_path / "inventory.json"
+    mutate(value)
+    path = tmp_path / f"{field}.json"
     path.write_text(json.dumps(value), encoding="utf-8")
-    with pytest.raises(ValueError, match="exclusions"):
+
+    with pytest.raises(ValueError, match=message):
         distribution._load_inventory(path)
 
 

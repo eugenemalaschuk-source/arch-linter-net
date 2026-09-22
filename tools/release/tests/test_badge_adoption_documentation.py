@@ -90,9 +90,10 @@ def test_handoff_inventory_tracks_machine_readable_authority() -> None:
     compatibility = inventory["compatibility"]
     values = [
         inventory["schema"],
-        inventory["release_authority"],
+        inventory["support_status"],
+        inventory["publication_authority"],
+        *inventory["review_origin"].values(),
         *inventory["package_ids"],
-        *inventory["excluded"],
         *inventory["relay"].values(),
         *(
             compatibility[key]

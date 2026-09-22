@@ -1,11 +1,13 @@
 {
-  "schema": "architecture-health-badge-release-inventory/v2",
-  "lifecycle": "milestone-6/v0.8.x-completeness",
-  "release_authority": "#806",
-  "publication": "not-authorized",
-  "included": ["#806", "#825"],
-  "excluded": ["v0.9-performance", "#650", "#787"],
-  "handoff": "#825 -> #806 reviewed candidate scope and released-artifact verification",
+  "schema": "architecture-health-badge-release-inventory/v3",
+  "support_status": "experimental-opt-in",
+  "publication_authority": "external-checkpoint-b-release-scope",
+  "review_origin": {
+    "story": "#825",
+    "distribution_task": "#835",
+    "first_release_authority": "#806",
+    "lifecycle": "milestone-6/v0.8.x-completeness"
+  },
   "package_ids": [
     "ArchLinterNet.CEL",
     "ArchLinterNet.Cli",
