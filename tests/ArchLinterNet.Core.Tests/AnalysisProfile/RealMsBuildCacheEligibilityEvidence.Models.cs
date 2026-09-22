@@ -70,9 +70,19 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
                 $"Ineligible real-MSBuild evidence for {size} cannot claim a cache hit.");
         }
 
-        Require(StaleInputChecks.Count >= 4, "Evidence must cover project, source, package/configuration, and artifact change dispositions.");
+        string[] requiredStaleInputKinds = ["project", "source", "package", "configuration", "artifact"];
+        foreach (RealMsBuildStaleInputCheck check in StaleInputChecks)
+        {
+            check.Validate();
+        }
+
+        Require(StaleInputChecks.Count == requiredStaleInputKinds.Length &&
+            requiredStaleInputKinds.All(kind => StaleInputChecks.Any(check => check.ChangeKind == kind)),
+            "Evidence must cover exactly project, source, package, configuration, and artifact changes.");
         Require(StaleInputChecks.Select(check => check.ChangeKind).Distinct(StringComparer.Ordinal).Count() == StaleInputChecks.Count,
             "Stale-input checks must have unique change kinds.");
+        Require(StaleInputChecks.All(check => check.Disposition == "reject"),
+            "Every stale-input check must demonstrate a fail-closed reject disposition.");
         Require(Phase2Routing.Contains("#991", StringComparison.Ordinal),
             "Phase 2 routing must name the #991 normalization gate.");
 
@@ -81,6 +91,10 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
             Require(NormalizationGate.Phase2Authorized && NormalizationGate.Status == "complete",
                 "Outcome A requires completed #991 normalization authority.");
             Require(EffectEstimate.Complete, "Outcome A requires a complete effect estimate.");
+            Require(EffectEstimate.Points.All(point =>
+                    point.ExpectedAmortizedReductionPercent.HasValue &&
+                    point.ExpectedAmortizedReductionPercent.Value >= EffectEstimate.SuccessThresholdPercent),
+                "Outcome A requires a material amortized effect at or above the success threshold for every representative size.");
             Require(Measurements.Any(measurement => measurement.FixtureKind == "eligible-control" && measurement.Hits > 0),
                 "Outcome A requires an observed verified warm-hit control.");
             Require(ReferenceBaseDisposition.CountedInEffectEstimate == false,
@@ -285,6 +299,15 @@ internal sealed record RealMsBuildStaleInputCheck
     public required string Disposition { get; init; }
 
     public required string Evidence { get; init; }
+
+    public void Validate()
+    {
+        if (ChangeKind is not ("project" or "source" or "package" or "configuration" or "artifact") ||
+            Disposition != "reject" || string.IsNullOrWhiteSpace(Evidence))
+        {
+            throw new InvalidOperationException($"Stale-input evidence for {ChangeKind} must be an explicit fail-closed reject.");
+        }
+    }
 }
 
 internal static class RealMsBuildCacheEffectModel

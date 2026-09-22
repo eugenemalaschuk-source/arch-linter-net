@@ -349,8 +349,9 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
     private static IReadOnlyList<RealMsBuildStaleInputCheck> StaleInputChecks() =>
     [
         new() { ChangeKind = "project", Disposition = "reject", Evidence = "Existing evaluated-manifest digest comparison rejects changed project/import inputs." },
-        new() { ChangeKind = "source", Disposition = "reject-or-ineligible", Evidence = "Source inputs outside the exact manifest remain fail-closed; no timestamp-only authorization is used." },
-        new() { ChangeKind = "package-or-configuration", Disposition = "reject", Evidence = "Package/framework/reference/configuration/build identity changes alter authorization or cache key." },
+        new() { ChangeKind = "source", Disposition = "reject", Evidence = "Source inputs outside the exact manifest reject reuse; no timestamp-only authorization is used." },
+        new() { ChangeKind = "package", Disposition = "reject", Evidence = "Package/framework/reference identity changes reject reuse or alter the cache key." },
+        new() { ChangeKind = "configuration", Disposition = "reject", Evidence = "Configuration/TFM/platform/RID and build identity changes reject reuse or alter the cache key." },
         new() { ChangeKind = "artifact", Disposition = "reject", Evidence = "Selected PE/PDB/build-receipt byte changes are covered by existing artifact-manifest rejection tests." },
     ];
 

@@ -59,6 +59,8 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(markdown, Does.Contain("#991"));
         Assert.That(markdown, Does.Contain("OpenSpec: not applicable"));
         Assert.That(markdown, Does.Contain("eligible-control"));
+        Assert.That(markdown, Does.Contain("The targeted boundary includes assembly/artifact loading and analysis phases"));
+        Assert.That(markdown, Does.Contain("Without a verified warm-hit control, warm-hit and amortized reductions remain unavailable/model-only"));
     }
 
     [Test]
@@ -72,6 +74,48 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
 
         Assert.That(exception.Message, Does.Contain("verified warm-hit effect estimate"));
+    }
+
+    [Test]
+    public void Document_RejectsOutcomeAWhenAmortizedBenefitMissesSuccessThreshold()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control" && measurement.CacheMode == "repeat"
+                ? measurement with { TotalElapsedMilliseconds = measurement.TotalElapsedMilliseconds!.Value * 1.98 }
+                : measurement)
+            .ToArray();
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("A", phase2Authorized: true, measurements: measurements);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("material amortized effect"));
+    }
+
+    [Test]
+    public void Document_AllowsOutcomeAWhenAmortizedBenefitMeetsSuccessThreshold()
+    {
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("A", phase2Authorized: true);
+
+        Assert.DoesNotThrow(document.Validate);
+    }
+
+    [Test]
+    public void Document_RejectsStaleInputEvidenceWithoutRequiredFailClosedCategories()
+    {
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("C", phase2Authorized: false) with
+        {
+            StaleInputChecks =
+            [
+                new() { ChangeKind = "project", Disposition = "reject", Evidence = "Project change rejects reuse." },
+                new() { ChangeKind = "source", Disposition = "reject", Evidence = "Source change rejects reuse." },
+                new() { ChangeKind = "package", Disposition = "reject", Evidence = "Package change rejects reuse." },
+                new() { ChangeKind = "artifact", Disposition = "accept", Evidence = "Artifact change was accepted." },
+            ],
+        };
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("Stale-input evidence"));
     }
 
     private static RealMsBuildCacheEligibilityEvidenceDocument CreateDocument(
@@ -111,7 +155,8 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
             [
                 new() { ChangeKind = "project", Disposition = "reject", Evidence = "Project manifest digest mismatch rejects reuse." },
                 new() { ChangeKind = "source", Disposition = "reject", Evidence = "Source inputs remain fail-closed when outside the exact manifest." },
-                new() { ChangeKind = "package-or-configuration", Disposition = "reject", Evidence = "Build identity/key changes reject reuse." },
+                new() { ChangeKind = "package", Disposition = "reject", Evidence = "Package/framework/reference identity changes reject reuse." },
+                new() { ChangeKind = "configuration", Disposition = "reject", Evidence = "Configuration/TFM/platform/RID changes reject reuse." },
                 new() { ChangeKind = "artifact", Disposition = "reject", Evidence = "PE/PDB/receipt byte changes reject reuse." },
             ],
             Phase2Routing = "Do not begin Phase 2 eligibility implementation until #991 completes and normalized workflows are remeasured.",
