@@ -606,6 +606,7 @@ public sealed class LargeSolutionBenchmarkingTests
     }
 
     [Test]
+    [CancelAfter(60_000)]
     public void ExplicitRealMsBuildMaterializer_IsAcceptedByExistingCliBoundary()
     {
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
