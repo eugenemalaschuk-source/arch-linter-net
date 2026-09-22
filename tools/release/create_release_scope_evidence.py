@@ -3,7 +3,7 @@
 
 Release authorities are reviewed declarations in the fixed ``tools/release/scopes`` directory.
 For a publication candidate, the generator selects exactly one declaration by matching its explicit
-stable release target to the candidate manifest version; declaration filenames and caller-provided
+exact stable-or-preview release target to the candidate manifest version; declaration filenames and caller-provided
 paths carry no release semantics. It resolves only required items' live issue-tracker states and
 binds that inventory, declaration identity/bytes, manifest digest, candidate version, and source
 commit into evidence. A non-publishing candidate instead emits a distinct, explicitly
@@ -33,7 +33,10 @@ _PREPUBLICATION_EVIDENCE_SCHEMA = "checkpoint-b-prepublication-authorization/v1"
 _REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _COMMIT_PATTERN = re.compile(r"^[0-9a-fA-F]{7,64}$")
 _DECLARATION_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
-_RELEASE_TARGET_PATTERN = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+_RELEASE_TARGET_PATTERN = re.compile(
+    r"^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)"
+    r"(?:-preview\\.(0|[1-9]\\d*))?$"
+)
 _AUTHORIZATION_MODES = {"publication", "prepublication"}
 
 
@@ -72,7 +75,7 @@ def _issue_number(value: Any) -> int:
 
 def _release_target(value: Any, description: str) -> str:
     if not isinstance(value, str) or not _RELEASE_TARGET_PATTERN.fullmatch(value):
-        raise ValueError(f"{description} must be an exact stable release target.")
+        raise ValueError(f"{description} must be an exact stable or preview release target.")
     return value
 
 
