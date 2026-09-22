@@ -1,38 +1,34 @@
 # Self-dogfood CI governance evidence
 
-This record is the canonical post-fix acceptance evidence for issue #992 and PR #997. The measured
-implementation candidate and documentation-only reconciliation tip are recorded separately from
-the fixed three-sample performance comparison:
+This record is the canonical post-fix acceptance evidence for issue #992 and PR #997. The three
+comparable samples below are all from the final build-once producer implementation and the same
+candidate identity.
 
-- Measured implementation candidate: `a5c947e5d67b32e4098aed350711bcb1ae8343f3`
-- Producer verification run for that candidate: [35670638922](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35670638922)
-- Subsequent PR-tip changes are documentation-only reconciliation commits; the PR's required checks
-  remain the authority for the final tip.
-
-- Source SHA: `a5c947e5d67b32e4098aed350711bcb1ae8343f3`
-- Tree SHA: `3c388a562c1846882a1d7a31d8dcd228a7f08e46`
+- Current implementation candidate: `f17e8ff1514549b6adfd5eb4c2fa7c303204499e`
+- Validation workflow: [35706015057](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35706015057), attempts 1, 2, and 3
+- Source SHA: `f17e8ff1514549b6adfd5eb4c2fa7c303204499e`
+- Tree SHA: `cea37b59f9d1ed11320b0bdbe11c0998f6ff1d19`
 - Policy: `architecture/dependencies.arch.yml`, SHA-256 `3b2b2c6664eb9e598c0bcdbd29af50d63ec89db1f263dc6f910b92843dc3a7ae`
-- CLI assembly SHA-256: `9920e68cf79f9fdea1cc2b4bd292fe54d83b1f2df4f158b3edfa508fa5ee3a8d`
-- Testing assembly SHA-256: `ce585e50fad7a2406499e0775798abf1501d89492f8a9d7db4801b5d894eecd3`
+- CLI assembly SHA-256: `0902b9e134aa250bdf39764698fb6d074156c8edf36da2cc2eeb90459866e0b5`
+- Testing assembly SHA-256: `e5fc02758cfea6abd10201a5353ba63670cc3e0e855c6b5f65f2061f11445eb9`
 - Tool identity: `ArchLinterNet.Cli/ArchLinterNet.Testing`
 
 ## Canonical performance comparison
 
-The canonical post-fix acceptance set is the three same-candidate `ubuntu24` samples recorded
-in the performance authority updates on [#991](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/991)
-and [#19](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/19). All three use the
-same preparation-inclusive boundary as the pinned 204 s baseline. Earlier timing rows and the
-earlier median are superseded and are not part of this acceptance comparison.
+The canonical post-fix acceptance set is the three same-candidate `ubuntu24` samples from workflow
+35706015057 attempts 1–3. All three use the same preparation-inclusive boundary as the pinned 204 s
+baseline. Earlier timing rows and the earlier median are superseded and are not part of this
+acceptance comparison.
 
-| Comparable post-fix sample | Governance span | Result |
-| --- | ---: | --- |
-| Sample 1 | 167.839 s | GAP |
-| Sample 2 | 167.309 s | GAP |
-| Sample 3 | 126.761 s | GAP |
+| Comparable post-fix sample | Workflow attempt | Governance span | Result |
+| --- | ---: | ---: | --- |
+| Sample 1 | 1 | 144.831 s | GAP |
+| Sample 2 | 2 | 90.085 s | GAP |
+| Sample 3 | 3 | 158.152 s | GAP |
 
-The governance-span median is **167.309 s**, with a range of **126.761–167.839 s**. Against the
+The governance-span median is **144.831 s**, with a range of **90.085–158.152 s**. Against the
 204 s baseline and the `<=60 s` target, the measured result is a **GAP**: the normalized fan-out
-reduces the comparable wall-clock governance time by **36.691 s (17.99%)**, a **1.219x** speedup,
+reduces the comparable wall-clock governance time by **59.169 s (29.004%)**, a **1.409x** speedup,
 but does not yet reach the target. The headline span starts at the earliest candidate/base
 preparation boundary and includes candidate solution build/receipt publication and base
 preparation.
@@ -54,6 +50,6 @@ candidate CLI host. The independent projections then used these process counts:
 | Architecture coverage | 1 | 7 |
 | Health/current/change/report inputs | 1 | 5 |
 
-The report-input projection is the dominant wall-clock projection at 51.383–74.875 s; the strict, public-API, and coverage projections complete in parallel. Rendering and manifest steps consume the projection outputs and do not perform additional analysis.
+The report-input projection is the dominant wall-clock projection at 41.967–74.374 s; the strict, public-API, and coverage projections complete in parallel. Rendering and manifest steps consume the projection outputs and do not perform additional analysis.
 
 This evidence authorizes no ArchLinterNet Core optimization. The next step belongs to the linked performance/adoption authority issues (#991 and #19), where this GAP and the bounded attribution should remain visible before any Core algorithm change is proposed.
