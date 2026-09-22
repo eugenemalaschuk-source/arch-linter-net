@@ -1,0 +1,162 @@
+using NUnit.Framework;
+
+namespace ArchLinterNet.Core.Tests;
+
+[TestFixture]
+public sealed class RealMsBuildCacheEligibilityEvidenceTests
+{
+    [Test]
+    public void EffectModel_DerivesPhaseShareAmdahlAndAmortizedValues()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true);
+
+        RealMsBuildCacheEffectEstimate estimate = RealMsBuildCacheEffectModel.Calculate(measurements);
+
+        RealMsBuildCacheEffectPoint small = estimate.Points.Single(point => point.Size == "small");
+        Assert.That(small.TargetedPhaseSharePercent, Is.EqualTo(25m));
+        Assert.That(small.AmdahlMaximumSpeedup, Is.EqualTo(1.3333333333333333333333333333m).Within(0.0000000000000000000000001m));
+        Assert.That(small.ColdMissOverheadPercent, Is.EqualTo(20m));
+        Assert.That(small.ExpectedWarmHitReductionPercent, Is.EqualTo(50m));
+        Assert.That(small.ExpectedAmortizedReductionPercent, Is.EqualTo(26.6666666666666666666666666667m).Within(0.0000000000000000000000001m));
+        Assert.That(small.VerifiedWarmHitObserved, Is.True);
+        estimate.Validate();
+    }
+
+    [Test]
+    public void Document_RejectsOutcomeAWhileNormalizationGateIsOpen()
+    {
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("A", phase2Authorized: false);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("completed #991 normalization authority"));
+    }
+
+    [Test]
+    public void Document_AllowsConservativeOutcomeCAndPreservesFailClosedRows()
+    {
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("C", phase2Authorized: false);
+
+        Assert.DoesNotThrow(document.Validate);
+        Assert.DoesNotThrow(() => RealMsBuildCacheEligibilityEvidenceSerialization.Serialize(document));
+        string markdown = RealMsBuildCacheEligibilityEvidenceMarkdown.Render(document);
+        Assert.That(markdown, Does.Contain("Phase 1 outcome: **C**"));
+        Assert.That(markdown, Does.Contain("#991"));
+        Assert.That(markdown, Does.Contain("OpenSpec: not applicable"));
+        Assert.That(markdown, Does.Contain("eligible-control"));
+    }
+
+    private static RealMsBuildCacheEligibilityEvidenceDocument CreateDocument(string decision, bool phase2Authorized)
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true);
+        return new RealMsBuildCacheEligibilityEvidenceDocument
+        {
+            EvidenceSchemaId = RealMsBuildCacheEligibilityEvidenceDocument.SchemaId,
+            IssueReference = "#675",
+            SourceIdentity = "synthetic-current-tree",
+            Runtime = ".NET 10",
+            OperatingSystem = "test",
+            Architecture = "x64",
+            Configuration = "Debug",
+            ToolIdentity = "ArchLinterNet.Cli analysis-profile/v1",
+            NormalizationGate = new RealMsBuildNormalizationGate
+            {
+                IssueReference = "#991",
+                Status = phase2Authorized ? "complete" : "open",
+                Phase2Authorized = phase2Authorized,
+                Evidence = "The adopter normalization issue remains the Phase 2 authority.",
+            },
+            Decision = decision,
+            DecisionRationale = "Current evidence does not prove distinct material value before the normalized gate.",
+            ReferenceBaseDisposition = new RealMsBuildReferenceBaseDisposition
+            {
+                Disposition = "routed-to-owning-lane",
+                CountedInEffectEstimate = false,
+                Evidence = "The current exact-request cache boundary is separate from prepared-analysis reference work; route that work to the owning lane.",
+            },
+            EffectEstimate = RealMsBuildCacheEffectModel.Calculate(measurements),
+            Measurements = measurements,
+            StaleInputChecks =
+            [
+                new() { ChangeKind = "project", Disposition = "reject", Evidence = "Project manifest digest mismatch rejects reuse." },
+                new() { ChangeKind = "source", Disposition = "reject", Evidence = "Source inputs remain fail-closed when outside the exact manifest." },
+                new() { ChangeKind = "package-or-configuration", Disposition = "reject", Evidence = "Build identity/key changes reject reuse." },
+                new() { ChangeKind = "artifact", Disposition = "reject", Evidence = "PE/PDB/receipt byte changes reject reuse." },
+            ],
+            Phase2Routing = "Do not begin Phase 2 eligibility implementation until #991 completes and normalized workflows are remeasured.",
+        };
+    }
+
+    private static IReadOnlyList<RealMsBuildCacheMeasurement> CreateMeasurements(bool includeEligibleControl)
+    {
+        List<RealMsBuildCacheMeasurement> measurements = [];
+        foreach ((string size, int projects, double total) in new[]
+        {
+            ("small", 2, 100d),
+            ("medium", 4, 200d),
+            ("large", 6, 400d),
+        })
+        {
+            string workloadId = $"synthetic-{size}";
+            foreach ((string mode, long hits, long writes, double duration) in new[]
+            {
+                ("disabled", 0, 0, total),
+                ("population", 0, 0, total * 1.2),
+                ("repeat", 0, 0, total * 1.1),
+            })
+            {
+                measurements.Add(CreateMeasurement("real-msbuild", mode, workloadId, size, projects, hits, writes, duration, total * .25));
+            }
+
+            if (includeEligibleControl)
+            {
+                measurements.Add(CreateMeasurement("eligible-control", "disabled", workloadId, size, projects, 0, 0, total, total * .25, "VerifiedCacheEligible"));
+                measurements.Add(CreateMeasurement("eligible-control", "repeat", workloadId, size, projects, 1, 0, total * .5, total * .25, "VerifiedCacheEligible", avoidedWork: 4));
+            }
+        }
+
+        return measurements;
+    }
+
+    private static RealMsBuildCacheMeasurement CreateMeasurement(
+        string fixtureKind,
+        string cacheMode,
+        string workloadId,
+        string size,
+        int projectCount,
+        long hits,
+        long writes,
+        double duration,
+        double targetedPhase,
+        string eligibility = "CacheIneligible",
+        long avoidedWork = 0) =>
+        new()
+        {
+            FixtureKind = fixtureKind,
+            CacheMode = cacheMode,
+            WorkloadId = workloadId,
+            WorkloadIdentity = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(workloadId))),
+            Size = size,
+            ProjectCount = projectCount,
+            Eligibility = eligibility,
+            IneligibilityReasons = eligibility == "CacheIneligible" ? ["package-reference-identity-unverified"] : [],
+            Lookups = cacheMode == "disabled" ? 0 : 1,
+            Hits = hits,
+            Misses = cacheMode == "population" ? 1 : 0,
+            Rejects = 0,
+            Writes = writes,
+            IneligibleUnitCount = eligibility == "CacheIneligible" ? projectCount : 0,
+            BytesRead = cacheMode == "disabled" ? 0 : 100,
+            BytesWritten = writes == 0 ? 0 : 100,
+            AvoidedWork = avoidedWork,
+            DeterministicWork = 8,
+            TotalElapsedMilliseconds = duration,
+            TargetedPhaseMilliseconds = targetedPhase,
+            TargetedPhaseSharePercent = targetedPhase / duration * 100,
+            AllocatedBytes = 10,
+            PeakWorkingSetBytes = 20,
+            CanonicalResultSha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            CompletionStatus = "Completed",
+            ExitCode = 0,
+        };
+}
