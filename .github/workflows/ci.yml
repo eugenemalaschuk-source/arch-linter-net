@@ -382,19 +382,24 @@ jobs:
           candidate_tree_sha="$(git rev-parse 'HEAD^{tree}')"
           test "$candidate_sha" = "$EXPECTED_HEAD_SHA"
           candidate_start_ms="$(date +%s%3N)"
-          # Bootstrap the CLI host explicitly so the producer invocation itself cannot
-          # trigger an implicit host build. The authoritative graph build happens inside
-          # the receipt-backed --ensure-built preparation below.
-          dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --nologo --no-restore -m:1
-          dotnet run --no-build --no-restore --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- \
+          # Build the candidate solution once. The opt-in MSBuild target emits a nonce-bound
+          # proof only after each project's Build target succeeds; the already-built CLI then
+          # publishes receipts through Core's verification-only path, which cannot build again.
+          proof_directory="$RUNNER_TEMP/archlinternet-prepared-build-proof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          build_nonce="$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
+          dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1 \
+            -p:ArchLinterNetPreparedBuildProofDirectory="$proof_directory" \
+            -p:ArchLinterNetPreparedBuildProofNonce="$build_nonce"
+          cli_assembly="$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/bin/Debug/net10.0/ArchLinterNet.Cli.dll"
+          dotnet exec "$cli_assembly" \
             --policy architecture/dependencies.arch.yml \
             --no-restore \
-            --ensure-built \
-            --publish-prepared-receipts
+            --publish-prepared-receipts \
+            --prepared-build-proof-directory "$proof_directory" \
+            --prepared-build-proof-nonce "$build_nonce"
           candidate_end_ms="$(date +%s%3N)"
           echo "candidate_start_ms=$candidate_start_ms" >> "$GITHUB_OUTPUT"
           echo "candidate_end_ms=$candidate_end_ms" >> "$GITHUB_OUTPUT"
-          cli_assembly="$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/bin/Debug/net10.0/ArchLinterNet.Cli.dll"
           testing_assembly="$GITHUB_WORKSPACE/src/ArchLinterNet.Testing/bin/Debug/net10.0/ArchLinterNet.Testing.dll"
           test -s "$cli_assembly"
           test -s "$testing_assembly"
@@ -715,8 +720,7 @@ jobs:
               "command_accounting": {
                   "candidate_preparation": {
                       "restore_processes": 1,
-                      "cli_host_bootstrap_build_processes": 1,
-                      "authoritative_graph_build_processes": 1,
+                      "authoritative_solution_build_processes": 1,
                       "receipt_publication_processes": 1,
                       "candidate_verification_processes": 1,
                   },

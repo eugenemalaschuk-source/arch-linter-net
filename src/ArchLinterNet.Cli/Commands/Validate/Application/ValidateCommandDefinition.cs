@@ -79,8 +79,12 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
               --platform <platform> Requested platform for build-state preflight
               --runtime <rid>     Requested runtime identifier for build-state preflight
               --publish-prepared-receipts
-                                Perform the one authoritative graph preparation and publish receipts
-                                inside that successful build path; no second build is performed
+                                Publish receipts for the authoritative preparation (builds when no
+                                completed-build proof hand-off is supplied)
+              --prepared-build-proof-directory <path>
+                                Internal producer hand-off directory emitted by the authoritative build
+              --prepared-build-proof-nonce <value>
+                                Internal nonce binding the proof hand-off to that build invocation
               --use-prepared-receipts
                                 Verify and use producer-published receipts without building
                                 or restoring; intended for CI projections
@@ -144,6 +148,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> runtimeIdentifierOption = new("--runtime");
         Option<bool> publishPreparedReceiptsOption = new("--publish-prepared-receipts");
         Option<bool> usePreparedArtifactsOption = new("--use-prepared-receipts");
+        Option<string> preparedBuildProofDirectoryOption = new("--prepared-build-proof-directory");
+        Option<string> preparedBuildProofNonceOption = new("--prepared-build-proof-nonce");
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
         Option<bool> versionOption = new("--version");
@@ -176,6 +182,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(runtimeIdentifierOption);
         command.Options.Add(publishPreparedReceiptsOption);
         command.Options.Add(usePreparedArtifactsOption);
+        command.Options.Add(preparedBuildProofDirectoryOption);
+        command.Options.Add(preparedBuildProofNonceOption);
         command.Options.Add(helpOption);
         command.Options.Add(versionOption);
 
@@ -203,6 +211,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             runtimeIdentifierOption,
             publishPreparedReceiptsOption,
             usePreparedArtifactsOption,
+            preparedBuildProofDirectoryOption,
+            preparedBuildProofNonceOption,
             helpOption,
             versionOption)));
 
@@ -248,6 +258,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> runtimeIdentifierOption,
         Option<bool> publishPreparedReceiptsOption,
         Option<bool> usePreparedArtifactsOption,
+        Option<string> preparedBuildProofDirectoryOption,
+        Option<string> preparedBuildProofNonceOption,
         Option<bool> helpOption,
         Option<bool> versionOption)
     {
@@ -300,7 +312,9 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             parseResult.GetValue(platformOption),
             parseResult.GetValue(runtimeIdentifierOption),
             parseResult.GetValue(publishPreparedReceiptsOption),
-            parseResult.GetValue(usePreparedArtifactsOption))
+            parseResult.GetValue(usePreparedArtifactsOption),
+            parseResult.GetValue(preparedBuildProofDirectoryOption),
+            parseResult.GetValue(preparedBuildProofNonceOption))
         {
             IsFormatExplicit = isFormatExplicit,
             AdditionalSinks = additionalSinks,

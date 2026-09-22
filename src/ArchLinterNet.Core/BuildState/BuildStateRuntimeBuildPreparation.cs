@@ -38,6 +38,46 @@ internal static class BuildStateRuntimeBuildPreparation
         return BuildStatePreflightEvaluator.Evaluate(postBuildRequest);
     }
 
+    // Used only after an external authoritative solution build has completed. The nonce-bound
+    // MSBuild markers prove that the build target succeeded for every selected project; this path
+    // verifies those markers and the normal source/output identities, then publishes receipts
+    // without ever calling InvokeGraphBuild().
+    internal static BuildStatePreflightResult PublishReceiptsForPreparedBuild(
+        BuildStatePreflightRequest request,
+        string? proofDirectory,
+        string? proofNonce)
+    {
+        request.CancellationToken.ThrowIfCancellationRequested();
+
+        BuildStatePreflightRequest preparedRequest = request with
+        {
+            Resolution = ResolveBuiltAssemblies(request),
+            PreparationMode = BuildPreparationMode.Ordinary,
+        };
+        BuildStatePreflightResult evaluation = BuildStatePreflightEvaluator.Evaluate(preparedRequest);
+        request.CancellationToken.ThrowIfCancellationRequested();
+
+        IReadOnlyList<BuildStatePreflightDiagnostic> proofFailures = FindMissingBuildProofs(
+            preparedRequest, proofDirectory, proofNonce);
+        if (proofFailures.Count > 0)
+        {
+            return new BuildStatePreflightResult(proofFailures);
+        }
+
+        if (evaluation.Diagnostics.Any(d => d.State is not BuildStatePreflightState.Current
+            and not BuildStatePreflightState.UnverifiableArtifact
+            and not BuildStatePreflightState.StaleArtifact
+            and not BuildStatePreflightState.WrongConfiguration
+            and not BuildStatePreflightState.WrongTargetFramework))
+        {
+            return evaluation;
+        }
+
+        WriteReceiptsForCurrentArtifacts(preparedRequest, evaluation);
+        request.CancellationToken.ThrowIfCancellationRequested();
+        return BuildStatePreflightEvaluator.Evaluate(preparedRequest);
+    }
+
     // Building the whole selected graph once — not once per project, and not once per independent
     // root — means generating a single temporary .slnx solution file listing every discovered
     // project and invoking `dotnet build` on it exactly once. A solution build shares one MSBuild
@@ -276,5 +316,44 @@ internal static class BuildStateRuntimeBuildPreparation
                 request.RequestedPlatform,
                 request.RequestedRuntimeIdentifier));
         }
+    }
+
+    private static IReadOnlyList<BuildStatePreflightDiagnostic> FindMissingBuildProofs(
+        BuildStatePreflightRequest request,
+        string? proofDirectory,
+        string? proofNonce)
+    {
+        List<BuildStatePreflightDiagnostic> failures = new();
+
+        foreach (ArchitectureDiscoveredProject project in SelectRelevantProjectsWithTransitiveReferences(request))
+        {
+            string? assemblyPath = request.Resolution.ResolvedAssemblyPaths.TryGetValue(
+                project.AssemblyName, out string? resolvedPath)
+                ? resolvedPath
+                : null;
+            if (assemblyPath is not null
+                && File.Exists(assemblyPath)
+                && BuildStatePreparedBuildProof.Exists(request, project, assemblyPath, proofDirectory, proofNonce))
+            {
+                continue;
+            }
+
+            string? expectedOutputPath = assemblyPath is not null && File.Exists(assemblyPath) ? assemblyPath : null;
+            failures.Add(new BuildStatePreflightDiagnostic(
+                "build-state-preflight",
+                project.Path,
+                BuildStatePreflightState.UnverifiableArtifact,
+                new BuildStatePreflightEvidence(
+                    project.Path,
+                    project.AssemblyName,
+                    RequestedConfiguration: request.RequestedConfiguration,
+                    RequestedTargetFramework: request.RequestedTargetFramework,
+                    ExpectedOutputPath: expectedOutputPath,
+                    Detail: "The authoritative solution build proof is missing or does not match this "
+                        + "project output. Receipt publication is fail-closed; run the producer build "
+                        + "with its nonce-bound proof hand-off before publishing receipts.")));
+        }
+
+        return failures;
     }
 }

@@ -60,7 +60,11 @@ internal sealed class ValidateCommandExecution
             options.Platform,
             options.RuntimeIdentifier,
             options.NoRestore,
-            _cancellationToken));
+            _cancellationToken,
+            options.PreparedBuildProofDirectory,
+            options.PreparedBuildProofNonce,
+            BuildAlreadyCompleted: options.PreparedBuildProofDirectory is not null
+                || options.PreparedBuildProofNonce is not null));
     }
 
     internal void WritePreparedReceiptDiagnostics(

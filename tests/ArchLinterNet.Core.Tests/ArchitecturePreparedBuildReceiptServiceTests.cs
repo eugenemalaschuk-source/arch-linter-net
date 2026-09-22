@@ -97,6 +97,107 @@ public sealed class ArchitecturePreparedBuildReceiptServiceTests : BuildStatePre
     }
 
     [Test]
+    public void Publish_WithCompletedSolutionBuildProof_PublishesWithoutEnteringGraphBuild()
+    {
+        string projectPath = CreateProjectFixture("ExternallyPreparedCandidateFixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("ExternallyPreparedCandidateFixture");
+        string objDirectory = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj");
+        Directory.CreateDirectory(objDirectory);
+        File.WriteAllText(Path.Combine(objDirectory, "project.assets.json"), "{\"targets\":{\"net10.0\":{}}}");
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "ExternallyPreparedCandidateFixture") with
+        {
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["ExternallyPreparedCandidateFixture"] = assemblyPath,
+            },
+        };
+        ArchitectureContractDocument document = new()
+        {
+            Version = 1,
+            Name = "Externally prepared candidate test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Configuration = "Debug",
+                TargetFramework = "net10.0",
+            },
+        };
+        ArchitectureRunnerPreparation preparation = new(
+            RepositoryRoot,
+            PreprocessorSymbols: null,
+            discovery,
+            ResolveAssemblyOutputs: true,
+            SelectedAssemblyArtifactPaths: new[] { assemblyPath },
+            CapturedArtifactContentDigests: new Dictionary<string, string>(StringComparer.Ordinal),
+            MissingAssemblyNames: Array.Empty<string>(),
+            IsMetadataReferenceClosureComplete: true);
+        string proofDirectory = Path.Combine(RepositoryRoot, "prepared-build-proof");
+        Directory.CreateDirectory(proofDirectory);
+        string nonce = "test-build-nonce";
+        File.WriteAllText(
+            Path.Combine(proofDirectory, "ExternallyPreparedCandidateFixture.net10.0.prepared-build-proof"),
+            string.Join('|', Path.GetFullPath(projectPath), Path.GetFullPath(assemblyPath), "Debug", "net10.0", "", "", nonce));
+        int graphBuildCount = 0;
+        BuildStateRuntimeBuildProcessExecutor.GraphBuildOverride = _ =>
+        {
+            graphBuildCount++;
+            throw new AssertionException("completed-build publication must not invoke graph build");
+        };
+
+        ArchitecturePreparedBuildReceiptService service = new(new FakeRunnerSetupService(document, preparation));
+        BuildStatePreflightResult published = service.Publish(new BuildStatePreparedCandidateRequest(
+            Path.Combine(RepositoryRoot, "policy.arch.yml"),
+            RequestedConfiguration: "Debug",
+            RequestedTargetFramework: "net10.0",
+            NoRestore: true,
+            PreparedBuildProofDirectory: proofDirectory,
+            PreparedBuildProofNonce: nonce,
+            BuildAlreadyCompleted: true));
+
+        Assert.That(published.Blocked, Is.False,
+            () => string.Join(" | ", published.Diagnostics.Select(d => $"{d.State}: {d.Evidence.Detail}")));
+        Assert.That(published.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
+        Assert.That(graphBuildCount, Is.Zero);
+        Assert.That(File.Exists(BuildReceiptStore.ReceiptPathFor(assemblyPath)), Is.True);
+    }
+
+    [Test]
+    public void Publish_WithCompletedBuildClaimButWithoutProof_FailsClosedWithoutReceipt()
+    {
+        string projectPath = CreateProjectFixture("UnprovenPreparedCandidateFixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("UnprovenPreparedCandidateFixture");
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "UnprovenPreparedCandidateFixture") with
+        {
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["UnprovenPreparedCandidateFixture"] = assemblyPath,
+            },
+        };
+        ArchitectureContractDocument document = new() { Version = 1, Name = "Unproven candidate test" };
+        ArchitectureRunnerPreparation preparation = new(
+            RepositoryRoot,
+            PreprocessorSymbols: null,
+            discovery,
+            ResolveAssemblyOutputs: true,
+            SelectedAssemblyArtifactPaths: new[] { assemblyPath },
+            CapturedArtifactContentDigests: new Dictionary<string, string>(StringComparer.Ordinal),
+            MissingAssemblyNames: Array.Empty<string>(),
+            IsMetadataReferenceClosureComplete: true);
+        BuildStateRuntimeBuildProcessExecutor.GraphBuildOverride = _ =>
+            throw new AssertionException("verification-only publication must not fall back to graph build");
+
+        ArchitecturePreparedBuildReceiptService service = new(new FakeRunnerSetupService(document, preparation));
+        BuildStatePreflightResult result = service.Publish(new BuildStatePreparedCandidateRequest(
+            Path.Combine(RepositoryRoot, "policy.arch.yml"),
+            PreparedBuildProofDirectory: Path.Combine(RepositoryRoot, "missing-proof"),
+            PreparedBuildProofNonce: "missing-proof-nonce",
+            BuildAlreadyCompleted: true));
+
+        Assert.That(result.Blocked, Is.True);
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.UnverifiableArtifact));
+        Assert.That(File.Exists(BuildReceiptStore.ReceiptPathFor(assemblyPath)), Is.False);
+    }
+
+    [Test]
     public void Publish_DoesNotIssueReceiptWhenAuthoritativeBuildFails()
     {
         string projectPath = CreateProjectFixture("FailedPreparedCandidateFixture", "class C {}");

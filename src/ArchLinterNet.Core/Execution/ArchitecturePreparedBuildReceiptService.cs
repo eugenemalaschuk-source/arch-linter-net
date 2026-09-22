@@ -5,9 +5,9 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-// The producer owns the one authoritative preparation. Receipt publication is performed inside
-// that build-capable path, immediately after its successful graph build, so an existing artifact
-// can never be promoted by a separate publisher without the build that authorizes it.
+// The producer owns one authoritative preparation. It can either build through the existing
+// EnsureBuilt path or hand Core the nonce-bound proof emitted by an already-completed solution
+// build; the latter path verifies and publishes without entering another build-capable path.
 internal sealed class ArchitecturePreparedBuildReceiptService(
     IArchitectureRunnerSetupService runnerSetupService)
 {
@@ -38,7 +38,7 @@ internal sealed class ArchitecturePreparedBuildReceiptService(
         string? requestedTargetFramework = request.RequestedTargetFramework
             ?? (string.IsNullOrWhiteSpace(document.Analysis.TargetFramework) ? null : document.Analysis.TargetFramework);
 
-        return BuildStateRuntimeBuildPreparation.EnsureBuilt(new BuildStatePreflightRequest(
+        BuildStatePreflightRequest preflightRequest = new(
             preparation.RepositoryRoot,
             preparation.ProjectDiscovery,
             resolution,
@@ -48,6 +48,11 @@ internal sealed class ArchitecturePreparedBuildReceiptService(
             RequestedTargetFramework: requestedTargetFramework,
             RequestedPlatform: request.RequestedPlatform,
             RequestedRuntimeIdentifier: request.RequestedRuntimeIdentifier,
-            CancellationToken: request.CancellationToken));
+            CancellationToken: request.CancellationToken);
+
+        return request.BuildAlreadyCompleted
+            ? BuildStateRuntimeBuildPreparation.PublishReceiptsForPreparedBuild(
+                preflightRequest, request.PreparedBuildProofDirectory, request.PreparedBuildProofNonce)
+            : BuildStateRuntimeBuildPreparation.EnsureBuilt(preflightRequest);
     }
 }

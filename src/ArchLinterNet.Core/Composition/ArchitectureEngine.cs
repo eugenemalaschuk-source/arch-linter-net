@@ -32,9 +32,9 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Validate(request, timing);
     }
 
-    // Internal host seam used by the self-governance producer after its explicit candidate build.
-    // The service publishes and verifies receipts without entering the build-capable preparation
-    // path; ordinary projections then consume those receipts in fresh CLI processes.
+    // Internal host seam used by the self-governance producer. With the nonce-bound proof hand-off
+    // it publishes and verifies receipts without entering the build-capable preparation path;
+    // without that proof it retains the explicit EnsureBuilt behavior for direct callers.
     internal BuildStatePreflightResult PublishPreparedBuildReceipts(BuildStatePreparedCandidateRequest request)
     {
         return _serviceProvider.GetRequiredService<ArchitecturePreparedBuildReceiptService>()

@@ -276,14 +276,20 @@ def test_ci_producer_freezes_one_candidate_and_fans_out_read_only_projections() 
         "      - name: Build one architecture candidate\n", maxsplit=1
     )[1].split("      - name: Collect changed first-party files\n", maxsplit=1)[0]
     assert "--no-restore" in candidate_phase
-    assert "--ensure-built" in candidate_phase
+    assert "--ensure-built" not in candidate_phase
     host_build = "dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --nologo --no-restore -m:1"
-    host_run = "dotnet run --no-build --no-restore --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj"
-    assert host_build in candidate_phase
-    assert host_run in candidate_phase
-    assert candidate_phase.index(host_build) < candidate_phase.index(host_run)
+    solution_build = "dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1"
+    cli_exec = 'dotnet exec "$cli_assembly"'
+    assert host_build not in candidate_phase
+    assert solution_build in candidate_phase
+    assert cli_exec in candidate_phase
+    assert candidate_phase.index(solution_build) < candidate_phase.index(cli_exec)
     assert "dotnet run --no-restore --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" not in candidate_phase
-    assert "dotnet build ArchLinterNet.slnx --nologo --no-restore -m:1" not in candidate_phase
+    assert "dotnet run --no-build --no-restore --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" not in candidate_phase
+    assert "ArchLinterNetPreparedBuildProofDirectory" in candidate_phase
+    assert "ArchLinterNetPreparedBuildProofNonce" in candidate_phase
+    assert "--prepared-build-proof-directory" in candidate_phase
+    assert "--prepared-build-proof-nonce" in candidate_phase
     assert "name: Prepare architecture report base" in producer
     assert "architecture_candidate.py create" in producer
     assert producer.count("architecture_candidate.py verify") >= 2
@@ -310,7 +316,8 @@ def test_ci_producer_freezes_one_candidate_and_fans_out_read_only_projections() 
     assert "ARCHITECTURE_CLI_RUN_BUILD_ARGS := --no-build" in lint_make
     assert "dotnet run $(ARCHITECTURE_CLI_RUN_BUILD_ARGS) --project \"$(CLI_PROJECT)\" -- public-api diff" in lint_make
     assert '"schema": "architecture-ci-dag/v1"' in producer
-    assert '"cli_host_bootstrap_build_processes": 1' in producer
+    assert '"authoritative_solution_build_processes": 1' in producer
+    assert '"cli_host_bootstrap_build_processes": 1' not in producer
     assert '"authoritative_graph_build_processes": 1' in producer
     assert '"coverage": {"projection_processes": 1, "cli_processes": 7}' in producer
     assert '"before_median_seconds": 204' in producer

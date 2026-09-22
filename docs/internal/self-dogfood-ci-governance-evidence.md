@@ -34,19 +34,18 @@ The governance-span median is **167.309 s**, with a range of **126.761–167.839
 204 s baseline and the `<=60 s` target, the measured result is a **GAP**: the normalized fan-out
 reduces the comparable wall-clock governance time by **36.691 s (17.99%)**, a **1.219x** speedup,
 but does not yet reach the target. The headline span starts at the earliest candidate/base
-preparation boundary and includes the explicit CLI-host bootstrap, candidate receipt publication,
-and base preparation.
+preparation boundary and includes candidate solution build/receipt publication and base
+preparation.
 
 ## Process accounting and attribution
 
-The candidate preparation performed exactly one restore process and one explicit CLI-host
-bootstrap build. The producer then invokes the CLI with `dotnet run --no-build`, so that bootstrap
-cannot turn into an implicit second host build. The receipt-backed preparation performs exactly
-one authoritative graph-build process and one candidate-verification process. The successful
-`EnsureBuilt` path wrote and verified receipts inside that same Core preparation call; there is no
-separate publisher and no detached proof sidecar that can promote an existing artifact. Base
-preparation performed one restore and one authoritative graph-build/receipt path, reusing the
-already-built candidate CLI host. The independent projections then used these process counts:
+The corrected producer path performs exactly one restore process and one authoritative solution
+build process, including the CLI launcher. That build emits nonce-bound per-project completion
+markers; the already-built CLI then verifies those markers and publishes receipts without entering
+Core's build-capable `EnsureBuilt` path. A missing, stale, or mismatched marker fails closed, so an
+existing or fake artifact cannot be promoted by the verification-only hand-off. Base preparation
+performed one restore and one authoritative graph-build/receipt path, reusing the already-built
+candidate CLI host. The independent projections then used these process counts:
 
 | Projection | Projection processes | CLI processes |
 | --- | ---: | ---: |

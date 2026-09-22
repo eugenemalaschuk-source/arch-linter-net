@@ -15,20 +15,21 @@ identity cannot be verified. Every strict, public-API, coverage, Health, change,
 report-producing projection SHALL verify and consume that same candidate identity through a
 non-building path.
 
-The producer MAY perform an explicit CLI-host bootstrap build solely to obtain the executable that
-starts the authoritative preparation. That bootstrap SHALL be separate from the candidate graph
-build in process accounting, and the producer SHALL invoke the CLI with `dotnet run --no-build` so
-the launch step cannot perform an implicit host rebuild.
+The authoritative candidate build SHALL include the CLI launcher itself. The producer SHALL invoke
+that already-built launcher without a build-capable command. If receipt publication is performed
+in a separate launcher process, the build SHALL emit a nonce-bound completion proof for the
+selected project outputs and Core SHALL verify that proof before publishing receipts.
 
 #### Scenario: A complete candidate is shared by all projections
 
 - **WHEN** the architecture producer reaches its projection phase
 - **THEN** the projections use the same checked-out PR head, verified build outputs, policy digest,
   and CLI tool identity
-- **AND** receipt publication occurs inside the one successful authoritative `EnsureBuilt`
-  preparation, immediately after its graph build and before any fan-out process can consume the
-  resulting `Current` receipts
-- **AND** the producer's CLI launch uses `--no-build` after any explicit host bootstrap
+- **AND** receipt publication occurs only after the one successful authoritative candidate build,
+  either inside that build-capable preparation or through a proof-verified non-building hand-off
+  from that exact build
+- **AND** the producer's CLI launch uses the already-built launcher without an implicit or explicit
+  second build
 - **AND** no projection performs an implicit rebuild or restore
 
 #### Scenario: Missing or stale candidate state fails closed
