@@ -203,4 +203,13 @@ public sealed class AnalysisCacheKeyTests
 
         Assert.That(a.Digest, Is.Not.EqualTo(b.Digest));
     }
+
+    [Test]
+    public void Digest_ChangesWhenRepositoryMetricsProjectionChanges()
+    {
+        AnalysisCacheKey a = CreateKey() with { IncludeRepositoryMetrics = false };
+        AnalysisCacheKey b = CreateKey() with { IncludeRepositoryMetrics = true };
+
+        Assert.That(a.Digest, Is.Not.EqualTo(b.Digest));
+    }
 }

@@ -773,6 +773,7 @@ const ArchLinterNet.Core.Model.RepositoryMetricsReasonCodes.IncompatibleSchema: 
 const ArchLinterNet.Core.Model.RepositoryMetricsReasonCodes.IncompleteTypeUniverse: System.String [value:"incomplete_type_universe"]
 const ArchLinterNet.Core.Model.RepositoryMetricsReasonCodes.MissingAnalysis: System.String [value:"missing_analysis"]
 const ArchLinterNet.Core.Model.RepositoryMetricsReasonCodes.MissingProjectDiscovery: System.String [value:"missing_project_discovery"]
+const ArchLinterNet.Core.Model.RepositoryMetricsReasonCodes.SourceInventoryNotMaterialized: System.String [value:"source_inventory_not_materialized"]
 const ArchLinterNet.Core.Model.RepositoryMetricsReasonCodes.UnreadableSource: System.String [value:"unreadable_source"]
 const ArchLinterNet.Core.Model.RepositoryMetricsSnapshot.CurrentKind: System.String [value:"repository-metrics/v1"]
 const ArchLinterNet.Core.Model.RepositoryMetricsSnapshot.CurrentSchemaVersion: System.Int32 [value:1]
@@ -863,6 +864,7 @@ ctor ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary(System.String, System.
 ctor ArchLinterNet.Core.Caching.AnalysisCacheEntryV1()
 ctor ArchLinterNet.Core.Caching.AnalysisCacheKey(System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.Boolean, System.Boolean)
 ctor ArchLinterNet.Core.Caching.AnalysisCacheKey(System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.Boolean, System.Boolean, System.String)
+ctor ArchLinterNet.Core.Caching.AnalysisCacheKey(System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.Boolean, System.Boolean, System.String, System.Boolean)
 ctor ArchLinterNet.Core.Caching.AnalysisCacheLocation(System.String, ArchLinterNet.Core.Caching.AnalysisCacheMode)
 ctor ArchLinterNet.Core.Caching.AnalysisCacheLocationRejectedException(System.String)
 ctor ArchLinterNet.Core.Caching.AnalysisCacheLookupResult(ArchLinterNet.Core.Caching.AnalysisCacheLookupOutcome, System.Nullable`1[ArchLinterNet.Core.Caching.AnalysisCacheRejectReason], ArchLinterNet.Core.Caching.AnalysisCacheEntryV1, System.Int64)
@@ -2069,6 +2071,7 @@ property ArchLinterNet.Core.Caching.AnalysisCacheKey.ContractIdsDigest: System.S
 property ArchLinterNet.Core.Caching.AnalysisCacheKey.Digest: System.String [get]
 property ArchLinterNet.Core.Caching.AnalysisCacheKey.EnforceUnmatchedIgnoredViolationsPolicy: System.Boolean [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheKey.IncludeAsmdefContracts: System.Boolean [get, init]
+property ArchLinterNet.Core.Caching.AnalysisCacheKey.IncludeRepositoryMetrics: System.Boolean [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheKey.Mode: System.String [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheKey.Platform: System.String [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheKey.PolicyDigest: System.String [get, init]
@@ -4565,6 +4568,7 @@ property ArchLinterNet.Core.Validation.AnalysisSnapshotRequest.ConditionSetName:
 property ArchLinterNet.Core.Validation.AnalysisSnapshotRequest.ContractIds: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
 property ArchLinterNet.Core.Validation.AnalysisSnapshotRequest.EnforceUnmatchedIgnoredViolationsPolicy: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.AnalysisSnapshotRequest.IncludeAsmdefContracts: System.Boolean [get, init]
+property ArchLinterNet.Core.Validation.AnalysisSnapshotRequest.IncludeRepositoryMetrics: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.AnalysisSnapshotRequest.MaxParallelism: System.Nullable`1[System.Int32] [get, init]
 property ArchLinterNet.Core.Validation.AnalysisSnapshotRequest.NoRestore: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.AnalysisSnapshotRequest.PolicyPath: System.String [get, init]
@@ -4908,6 +4912,7 @@ property ArchLinterNet.Core.Validation.ValidationRequest.ConditionSetName: Syste
 property ArchLinterNet.Core.Validation.ValidationRequest.ContractIds: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
 property ArchLinterNet.Core.Validation.ValidationRequest.EnforceUnmatchedIgnoredViolationsPolicy: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.ValidationRequest.IncludeAsmdefContracts: System.Boolean [get, init]
+property ArchLinterNet.Core.Validation.ValidationRequest.IncludeRepositoryMetrics: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.ValidationRequest.MaxParallelism: System.Nullable`1[System.Int32] [get, init]
 property ArchLinterNet.Core.Validation.ValidationRequest.Mode: System.String [get, init]
 property ArchLinterNet.Core.Validation.ValidationRequest.NoRestore: System.Boolean [get, init]

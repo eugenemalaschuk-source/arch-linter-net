@@ -97,6 +97,10 @@ public sealed class ArchitectureSourceFileFactIndex
 
     public IReadOnlyList<ArchitectureDeclaredTypeFact> AllFacts => _data.Value.AllFacts;
 
+    internal bool IsMaterialized => _data.IsValueCreated;
+
+    internal bool HasConfiguredSourceRoots => _sourceRoots.Count > 0;
+
     public IReadOnlyList<ArchitectureDeclaredTypeSourceAmbiguity> Ambiguities => _data.Value.Ambiguities;
 
     // Unlike AllFacts, this preserves every source declaration of a type, including every part

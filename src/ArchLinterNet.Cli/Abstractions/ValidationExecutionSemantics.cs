@@ -63,6 +63,7 @@ internal abstract class ValidationExecutionSemantics
             ConditionSetName = options.ConditionSetName,
             ContractIds = options.ContractIds.ToList(),
             BaselinePath = options.BaselinePath,
+            IncludeRepositoryMetrics = true,
             EnforceUnmatchedIgnoredViolationsPolicy = true,
             PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
             UsePreparedArtifacts = options.UsePreparedArtifacts,

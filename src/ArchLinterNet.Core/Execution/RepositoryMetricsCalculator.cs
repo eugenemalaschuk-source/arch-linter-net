@@ -8,7 +8,9 @@ namespace ArchLinterNet.Core.Execution;
 // policy evaluator: none of these values participate in findings, health, or exit-code decisions.
 internal static class RepositoryMetricsCalculator
 {
-    internal static RepositoryMetricsSnapshot Calculate(ArchitectureAnalysisSession session)
+    internal static RepositoryMetricsSnapshot Calculate(
+        ArchitectureAnalysisSession session,
+        bool includeSourceInventory)
     {
         ArgumentNullException.ThrowIfNull(session);
 
@@ -19,10 +21,22 @@ internal static class RepositoryMetricsCalculator
             reasons.Add(RepositoryMetricsReasonCodes.IncompleteTypeUniverse);
         }
 
-        // The source inventory is lazy because most policies do not need it. Metrics do: force
-        // the existing fact index once so an otherwise source-unrelated policy still gets the
-        // same readable-file and physical-line evidence without a second traversal.
-        _ = session.SourceFileFactIndex.AllFacts;
+        // The source inventory is lazy because most policies do not need it. Do not force it for
+        // an ordinary validation projection; report and Health callers explicitly opt in when
+        // they need absolute source-size evidence. A source inventory materialized by another
+        // contract is always reused.
+        if (includeSourceInventory)
+        {
+            _ = session.SourceFileFactIndex.AllFacts;
+        }
+
+        bool sourceInventoryAvailable = !session.SourceFileFactIndex.HasConfiguredSourceRoots
+            || session.SourceFileFactIndex.IsMaterialized;
+        if (!sourceInventoryAvailable)
+        {
+            reasons.Add(RepositoryMetricsReasonCodes.SourceInventoryNotMaterialized);
+        }
+
         IReadOnlyDictionary<string, int> sourceFiles = session.SourceFileFactIndex.SourceFileLineCounts;
         if (session.SourceFileFactIndex.UnreadableSourceInputPaths.Count > 0)
         {
@@ -43,8 +57,8 @@ internal static class RepositoryMetricsCalculator
             availability,
             reasons,
             new RepositorySizeMetrics(
-                sourceFiles.Values.Sum(),
-                sourceFiles.Count,
+                sourceInventoryAvailable ? sourceFiles.Values.Sum() : null,
+                sourceInventoryAvailable ? sourceFiles.Count : null,
                 graph.Projects.Count,
                 types.Length,
                 types.Count(IsPublicType)),
@@ -157,12 +171,17 @@ internal static class RepositoryMetricsCalculator
         int[] fanIn = new int[projectCount];
         int[] fanOut = graph.Adjacency.Select(edges => edges.Count).ToArray();
         int dependencyCount = 0;
+        int densityEdgeCount = 0;
         for (int source = 0; source < projectCount; source++)
         {
             dependencyCount += graph.Adjacency[source].Count;
             foreach (int target in graph.Adjacency[source])
             {
                 fanIn[target]++;
+                if (source != target)
+                {
+                    densityEdgeCount++;
+                }
             }
         }
 
@@ -180,7 +199,7 @@ internal static class RepositoryMetricsCalculator
             .ToArray();
         double density = projectCount <= 1
             ? 0d
-            : (double)dependencyCount / (projectCount * (projectCount - 1));
+            : (double)densityEdgeCount / (projectCount * (projectCount - 1));
         return new RepositoryCouplingMetrics(
             dependencyCount,
             projectCount == 0 ? 0d : (double)dependencyCount / projectCount,

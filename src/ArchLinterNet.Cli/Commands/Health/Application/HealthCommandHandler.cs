@@ -225,6 +225,7 @@ internal sealed class HealthCommandHandler(
                 RequestedTargetFramework = debtGateRequest.RequestedTargetFramework,
                 RequestedPlatform = debtGateRequest.RequestedPlatform,
                 RequestedRuntimeIdentifier = debtGateRequest.RequestedRuntimeIdentifier,
+                IncludeRepositoryMetrics = true,
                 CancellationToken = debtGateRequest.CancellationToken,
             },
             null);

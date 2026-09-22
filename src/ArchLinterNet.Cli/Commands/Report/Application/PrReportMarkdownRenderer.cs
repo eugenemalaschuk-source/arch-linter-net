@@ -313,11 +313,29 @@ internal static class PrReportMarkdownRenderer
             builder.AppendLine($"- Reasons: {string.Join(", ", delta.ReasonCodes)}");
         }
 
-        IReadOnlyList<string> metrics = delta.Metrics
+        IReadOnlyList<RepositoryMetricDelta> changedMetricValues = delta.Metrics
+            .Where(metric => metric.Delta != 0d)
             .OrderBy(metric => metric.Name, StringComparer.Ordinal)
+            .ToArray();
+        IReadOnlyList<string> metrics = changedMetricValues
             .Select(FormatRepositoryMetricDelta)
             .ToArray();
-        AppendBounded(builder, "Base → head metrics", metrics.Count, metrics, maxDetails, static item => $"- {item}");
+        if (metrics.Count == 0)
+        {
+            builder.AppendLine("- Changed metrics: none.");
+        }
+        else
+        {
+            AppendBounded(builder, "Changed base → head metrics", metrics.Count, metrics, maxDetails,
+                static item => $"- {item}");
+        }
+
+        int unchangedCount = delta.Metrics.Count - changedMetricValues.Count;
+        if (unchangedCount > 0)
+        {
+            builder.AppendLine($"- Unchanged metrics: {unchangedCount} omitted by default.");
+        }
+
         return true;
     }
 

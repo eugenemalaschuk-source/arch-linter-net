@@ -15,6 +15,7 @@ public static class RepositoryMetricsReasonCodes
     public const string MissingAnalysis = "missing_analysis";
     public const string MissingProjectDiscovery = "missing_project_discovery";
     public const string IncompleteTypeUniverse = "incomplete_type_universe";
+    public const string SourceInventoryNotMaterialized = "source_inventory_not_materialized";
     public const string UnreadableSource = "unreadable_source";
     public const string DiscoveryDiagnostics = "project_discovery_diagnostics";
     public const string IncompatibleSchema = "incompatible_schema";

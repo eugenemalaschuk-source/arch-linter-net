@@ -174,7 +174,7 @@ internal static class ArchitectureAnalysisSnapshotEvaluationProjector
         RepositoryMetricsSnapshot repositoryMetrics;
         using (input.Timing?.Measure("repository_metrics"))
         {
-            repositoryMetrics = runner.Session.GetRepositoryMetrics();
+            repositoryMetrics = runner.Session.GetRepositoryMetrics(input.IncludeRepositoryMetrics);
         }
 
         ValidationOutcome outcome = new(
@@ -272,7 +272,8 @@ internal sealed record ArchitectureAnalysisSnapshotEvaluationInput(
     IReadOnlyList<BuildStatePreflightDiagnostic> PreflightDiagnostics,
     IReadOnlyList<string> PolicyImportPaths,
     IReadOnlyList<string> ResolvedAssemblyPaths,
-    IReadOnlyList<string> DiscoveredProjectPaths);
+    IReadOnlyList<string> DiscoveredProjectPaths,
+    bool IncludeRepositoryMetrics);
 
 internal sealed record ArchitectureAnalysisSnapshotBlockedEvaluationInput(
     ArchitectureContractDocument Document,

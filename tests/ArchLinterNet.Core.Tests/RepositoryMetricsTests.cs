@@ -90,6 +90,7 @@ public sealed class RepositoryMetricsTests
         Assert.Multiple(() =>
         {
             Assert.That(metrics.Coupling.DependencyCount, Is.EqualTo(1));
+            Assert.That(metrics.Coupling.DependencyDensity, Is.EqualTo(0d));
             Assert.That(metrics.Structure.CyclicComponentCount, Is.EqualTo(1));
             Assert.That(metrics.Structure.CyclicProjectCount, Is.EqualTo(1));
             Assert.That(metrics.Structure.CyclicProjectRatio, Is.EqualTo(0.5d));
@@ -111,6 +112,41 @@ public sealed class RepositoryMetricsTests
             Assert.That(metrics.Structure.LargestSccSize, Is.EqualTo(0));
             Assert.That(metrics.Structure.LargestSccRatio, Is.EqualTo(0d));
         });
+    }
+
+    [Test]
+    public void Calculator_DoesNotMaterializeConfiguredSourceFactsWithoutExplicitRequest()
+    {
+        using ArchitectureAnalysisContext context = new(
+            "/repo",
+            [typeof(RepositoryMetricsTests).Assembly],
+            [],
+            []);
+        ArchitectureAnalysisSession session = new(
+            context,
+            new ArchitectureContractDocument
+            {
+                Name = "repository-metrics",
+                Analysis = new ArchitectureAnalysisConfiguration { SourceRoots = ["src"] },
+            },
+            null,
+            false,
+            null);
+
+        Assert.That(session.SourceFileFactIndex.IsMaterialized, Is.False);
+
+        RepositoryMetricsSnapshot cheap = session.GetRepositoryMetrics();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.SourceFileFactIndex.IsMaterialized, Is.False);
+            Assert.That(cheap.Size.SourceLines, Is.Null);
+            Assert.That(cheap.ReasonCodes, Does.Contain(RepositoryMetricsReasonCodes.SourceInventoryNotMaterialized));
+        });
+
+        session.GetRepositoryMetrics(includeSourceInventory: true);
+
+        Assert.That(session.SourceFileFactIndex.IsMaterialized, Is.True);
     }
 
     [Test]

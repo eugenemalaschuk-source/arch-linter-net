@@ -25,9 +25,3 @@ jobs:
       configuration-id: reference-public-raw
       adapter: github-raw
       operation: publish
-
-  repository_metrics:
-    needs: publish
-    permissions:
-      contents: write
-    uses: $/.github/workflows/publish-repository-metrics-badge.yml

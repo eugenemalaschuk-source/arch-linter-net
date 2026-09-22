@@ -79,6 +79,7 @@ public sealed class ArchitectureHealthApplicationService(
         RequestedTargetFramework = request.RequestedTargetFramework,
         RequestedPlatform = request.RequestedPlatform,
         RequestedRuntimeIdentifier = request.RequestedRuntimeIdentifier,
+        IncludeRepositoryMetrics = true,
         CancellationToken = request.CancellationToken,
     };
 

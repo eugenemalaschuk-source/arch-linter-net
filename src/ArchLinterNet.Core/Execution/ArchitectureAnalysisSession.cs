@@ -163,8 +163,22 @@ public sealed class ArchitectureAnalysisSession
     // Repository observability is a session projection. Caching it here keeps strict/audit
     // evaluation and the Health composite on the same already-materialized facts without adding a
     // second source, reflection, or project-graph traversal.
-    internal RepositoryMetricsSnapshot GetRepositoryMetrics() =>
-        _repositoryMetrics ??= RepositoryMetricsCalculator.Calculate(this);
+    internal RepositoryMetricsSnapshot GetRepositoryMetrics(bool includeSourceInventory = false)
+    {
+        // Ordinary validation must not turn an informational projection into an implicit source
+        // scan. A report/Health caller opts into source inventory explicitly; if a preceding
+        // contract already materialized it, the cheap path reuses those facts.
+        bool needsExplicitMaterialization = includeSourceInventory
+            && SourceFileFactIndex.HasConfiguredSourceRoots
+            && !SourceFileFactIndex.IsMaterialized
+            && (_repositoryMetrics is null || !_repositoryMetrics.IsComplete);
+        if (_repositoryMetrics is null || needsExplicitMaterialization)
+        {
+            _repositoryMetrics = RepositoryMetricsCalculator.Calculate(this, includeSourceInventory);
+        }
+
+        return _repositoryMetrics;
+    }
 
     internal ArchitectureExpressionFactService ExpressionFacts { get; }
 

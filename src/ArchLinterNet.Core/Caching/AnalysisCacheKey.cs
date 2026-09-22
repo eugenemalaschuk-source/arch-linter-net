@@ -52,8 +52,33 @@ public sealed record AnalysisCacheKey(
     bool EnforceUnmatchedIgnoredViolationsPolicy = false,
     // Waiver lifecycle states are date-sensitive. A dated key prevents a result evaluated today
     // from being reused after a waiver expires tomorrow.
-    string WaiverEvaluationDate = "")
+    string WaiverEvaluationDate = "",
+    // Repository metrics are an opt-in projection. A cache entry produced without the projection
+    // must never satisfy a report/health request that requires its evidence.
+    bool IncludeRepositoryMetrics = false)
 {
+    public AnalysisCacheKey(
+        string policyDigest,
+        string mode,
+        string? conditionSetName,
+        string contractIdsDigest,
+        string workspaceDigest,
+        string? configuration,
+        string? targetFramework,
+        string? platform,
+        string? runtimeIdentifier,
+        string preprocessorSymbolsDigest,
+        string baselineDigest,
+        bool includeAsmdefContracts,
+        bool enforceUnmatchedIgnoredViolationsPolicy,
+        string waiverEvaluationDate)
+        : this(
+            policyDigest, mode, conditionSetName, contractIdsDigest, workspaceDigest, configuration, targetFramework,
+            platform, runtimeIdentifier, preprocessorSymbolsDigest, baselineDigest, includeAsmdefContracts,
+            enforceUnmatchedIgnoredViolationsPolicy, waiverEvaluationDate, false)
+    {
+    }
+
     // Keep the previously published primary-constructor shape binary-compatible while adding the
     // date-sensitive lifecycle dimension above.
     public AnalysisCacheKey(
@@ -73,7 +98,7 @@ public sealed record AnalysisCacheKey(
         : this(
             policyDigest, mode, conditionSetName, contractIdsDigest, workspaceDigest, configuration, targetFramework,
             platform, runtimeIdentifier, preprocessorSymbolsDigest, baselineDigest, includeAsmdefContracts,
-            enforceUnmatchedIgnoredViolationsPolicy, "")
+            enforceUnmatchedIgnoredViolationsPolicy, "", false)
     {
     }
 
@@ -99,7 +124,8 @@ public sealed record AnalysisCacheKey(
                 $"baseline:{BaselineDigest}",
                 $"asmdef:{IncludeAsmdefContracts}",
                 $"enforceunmatched:{EnforceUnmatchedIgnoredViolationsPolicy}",
-                $"waiverevaluationdate:{WaiverEvaluationDate}");
+                $"waiverevaluationdate:{WaiverEvaluationDate}",
+                $"includerepositorymetrics:{IncludeRepositoryMetrics}");
             return HashHex(canonical);
         }
     }
