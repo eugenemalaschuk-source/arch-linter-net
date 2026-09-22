@@ -160,6 +160,10 @@ The exact values and badge color are CLI-owned. CI may validate transport metada
 
 The Architecture Health badge is distinct from the legacy `badge architecture-policy` projection and from GitHub Actions, SonarCloud or Codecov status badges.
 
+The default-branch Source lines badge is a separate informational projection of the same
+repository_metrics evidence. It is published beside the canonical Health payload and never
+contains pull-request deltas or affects Health, findings, budgets, or exit status.
+
 ## PR report projection
 
 `report pr` consumes canonical Health and architecture-change JSON and renders reviewer Markdown without re-running analysis:

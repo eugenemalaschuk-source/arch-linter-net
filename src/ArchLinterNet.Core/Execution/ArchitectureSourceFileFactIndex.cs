@@ -110,6 +110,14 @@ public sealed class ArchitectureSourceFileFactIndex
         ? _data.Value.ConsumedSourceInputPaths
         : Array.Empty<string>();
 
+    internal IReadOnlyDictionary<string, int> SourceFileLineCounts => _data.IsValueCreated
+        ? _data.Value.SourceFileLineCounts
+        : new Dictionary<string, int>(StringComparer.Ordinal);
+
+    internal IReadOnlyList<string> UnreadableSourceInputPaths => _data.IsValueCreated
+        ? _data.Value.UnreadableSourceInputPaths
+        : Array.Empty<string>();
+
     public bool TryGetFact(string fullTypeName, out ArchitectureDeclaredTypeFact fact)
     {
         ArgumentNullException.ThrowIfNull(fullTypeName);
@@ -178,7 +186,9 @@ public sealed class ArchitectureSourceFileFactIndex
             allFacts,
             ambiguities,
             BuildSourceDeclarations(sourceMap),
-            sourceScan.ConsumedSourceInputPaths);
+            sourceScan.ConsumedSourceInputPaths,
+            sourceScan.SourceFileLineCounts,
+            sourceScan.UnreadableSourceInputPaths);
     }
 
     private static void SortFactsAndAmbiguities(
@@ -201,7 +211,9 @@ public sealed class ArchitectureSourceFileFactIndex
         List<ArchitectureDeclaredTypeFact> allFacts,
         List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities,
         IReadOnlyList<ArchitectureTypeSourceDeclaration> sourceDeclarations,
-        IReadOnlyList<string> consumedSourceInputPaths)
+        IReadOnlyList<string> consumedSourceInputPaths,
+        IReadOnlyDictionary<string, int> sourceFileLineCounts,
+        IReadOnlyList<string> unreadableSourceInputPaths)
     {
         Dictionary<string, ArchitectureDeclaredTypeFact> uniqueFactsByName = new(_ordinal);
         Dictionary<ArchitectureSourceFileFactTraversal.SourceFactKey,
@@ -235,6 +247,8 @@ public sealed class ArchitectureSourceFileFactIndex
             ambiguities,
             sourceDeclarations,
             consumedSourceInputPaths,
+            sourceFileLineCounts,
+            unreadableSourceInputPaths,
             byFile,
             byNamespace);
     }
@@ -467,6 +481,8 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyList<ArchitectureDeclaredTypeSourceAmbiguity> Ambiguities,
         IReadOnlyList<ArchitectureTypeSourceDeclaration> SourceDeclarations,
         IReadOnlyList<string> ConsumedSourceInputPaths,
+        IReadOnlyDictionary<string, int> SourceFileLineCounts,
+        IReadOnlyList<string> UnreadableSourceInputPaths,
         Dictionary<string, IReadOnlyList<ArchitectureDeclaredTypeFact>> ByFile,
         Dictionary<string, IReadOnlyList<ArchitectureDeclaredTypeFact>> ByNamespace);
 

@@ -65,6 +65,8 @@ public sealed class ArchitectureAnalysisSession
 
     internal ArchitectureAnalysisFactService Facts { get; }
 
+    private RepositoryMetricsSnapshot? _repositoryMetrics;
+
     private ArchitectureCheckerContext? _checkerContext;
 
     public ArchitectureAnalysisSession(
@@ -157,6 +159,12 @@ public sealed class ArchitectureAnalysisSession
     public ArchitectureRoleIndex RoleIndex { get; }
 
     public ArchitectureSourceFileFactIndex SourceFileFactIndex { get; }
+
+    // Repository observability is a session projection. Caching it here keeps strict/audit
+    // evaluation and the Health composite on the same already-materialized facts without adding a
+    // second source, reflection, or project-graph traversal.
+    internal RepositoryMetricsSnapshot GetRepositoryMetrics() =>
+        _repositoryMetrics ??= RepositoryMetricsCalculator.Calculate(this);
 
     internal ArchitectureExpressionFactService ExpressionFacts { get; }
 

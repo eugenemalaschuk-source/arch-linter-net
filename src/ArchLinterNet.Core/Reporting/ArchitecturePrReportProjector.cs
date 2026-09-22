@@ -110,7 +110,9 @@ public static class ArchitecturePrReportProjector
             "topology",
             "waiver_lifecycle",
         ];
-        if (availability.Count != expectedKeys.Length || !expectedKeys.All(availability.ContainsKey))
+        if (!expectedKeys.All(availability.ContainsKey)
+            || availability.Keys.Any(key => key != "repository_metrics"
+                && !expectedKeys.Contains(key, StringComparer.Ordinal)))
         {
             return false;
         }
@@ -121,12 +123,15 @@ public static class ArchitecturePrReportProjector
         }
 
         bool topology = receipt.Applicability?.Controls.Any(control => control.Record?.Topology is not null) == true;
+        bool repositoryMetrics = receipt.RepositoryMetrics is not null;
         return Matches(availability, "policy_inventory", receipt.PolicyInventory is not null, Unavailable)
             && Matches(availability, "waiver_lifecycle", receipt.WaiverLifecycle is not null, Unavailable)
             && Matches(availability, "applicability", receipt.Applicability is not null, Unavailable)
             && Matches(availability, "topology", topology, "not_configured")
             && Matches(availability, ExternalEvidence, receipt.ExternalEvidence is not null, "not_configured")
-            && Matches(availability, "findings", receipt.Findings is not null, Unavailable);
+            && Matches(availability, "findings", receipt.Findings is not null, Unavailable)
+            && (!availability.ContainsKey("repository_metrics")
+                || Matches(availability, "repository_metrics", repositoryMetrics, Unavailable));
     }
 
     private static bool Matches(

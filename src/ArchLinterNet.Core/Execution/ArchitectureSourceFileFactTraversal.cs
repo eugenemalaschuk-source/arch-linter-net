@@ -104,6 +104,8 @@ internal sealed class ArchitectureSourceFileFactTraversal
 
         Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap = [];
         List<string> consumedSourceInputPaths = [];
+        Dictionary<string, int> sourceFileLineCounts = new(StringComparer.Ordinal);
+        List<string> unreadableSourceInputPaths = [];
         foreach (SourceScanResult rootResult in perRootResults)
         {
             _cancellationToken.ThrowIfCancellationRequested();
@@ -119,11 +121,22 @@ internal sealed class ArchitectureSourceFileFactTraversal
             }
 
             consumedSourceInputPaths.AddRange(rootResult.ConsumedSourceInputPaths);
+            foreach ((string path, int lineCount) in rootResult.SourceFileLineCounts)
+            {
+                sourceFileLineCounts.TryAdd(path, lineCount);
+            }
+
+            unreadableSourceInputPaths.AddRange(rootResult.UnreadableSourceInputPaths);
         }
 
         return new SourceScanResult(
             sourceMap,
             consumedSourceInputPaths
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, _ordinal)
+                .ToArray(),
+            sourceFileLineCounts,
+            unreadableSourceInputPaths
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(path => path, _ordinal)
                 .ToArray());
@@ -165,12 +178,18 @@ internal sealed class ArchitectureSourceFileFactTraversal
     {
         Dictionary<SourceFactKey, List<SourceDeclaration>> localMap = [];
         List<string> consumedSourceInputPaths = [];
+        Dictionary<string, int> sourceFileLineCounts = new(StringComparer.Ordinal);
+        List<string> unreadableSourceInputPaths = [];
         _cancellationToken.ThrowIfCancellationRequested();
         string normalizedSourceRoot = NormalizeRelativePath(sourceRoot);
         string absoluteRoot = Path.Combine(_repositoryRoot, normalizedSourceRoot);
         if (!_fileSystem.DirectoryExists(absoluteRoot))
         {
-            return new SourceScanResult(localMap, consumedSourceInputPaths);
+            return new SourceScanResult(
+                localMap,
+                consumedSourceInputPaths,
+                sourceFileLineCounts,
+                unreadableSourceInputPaths);
         }
 
         foreach (string absoluteFile in _fileSystem.EnumerateFiles(
@@ -198,20 +217,32 @@ internal sealed class ArchitectureSourceFileFactTraversal
                 continue;
             }
 
-            if (ProcessSourceFile(localMap, assemblyName, absoluteRoot, absoluteFile))
+            if (ProcessSourceFile(
+                    localMap,
+                    assemblyName,
+                    absoluteRoot,
+                    absoluteFile,
+                    sourceFileLineCounts,
+                    unreadableSourceInputPaths))
             {
                 consumedSourceInputPaths.Add(Path.GetFullPath(absoluteFile));
             }
         }
 
-        return new SourceScanResult(localMap, consumedSourceInputPaths);
+        return new SourceScanResult(
+            localMap,
+            consumedSourceInputPaths,
+            sourceFileLineCounts,
+            unreadableSourceInputPaths);
     }
 
     private bool ProcessSourceFile(
         Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap,
         string assemblyName,
         string absoluteRoot,
-        string absoluteFile)
+        string absoluteFile,
+        Dictionary<string, int> sourceFileLineCounts,
+        List<string> unreadableSourceInputPaths)
     {
         // Relative to the scanned root so ancestor directory names outside the repo
         // can never be mistaken for excluded segments.
@@ -224,13 +255,18 @@ internal sealed class ArchitectureSourceFileFactTraversal
             return false;
         }
 
-        if (!TryReadSourceText(absoluteFile, out string sourceText)) return false;
+        if (!TryReadSourceText(absoluteFile, out string sourceText))
+        {
+            unreadableSourceInputPaths.Add(NormalizePath(_repositoryRoot, absoluteFile));
+            return false;
+        }
 
         // Count only files that passed generated-file exclusion and were successfully read,
         // i.e. the files the parser actually receives.
         _profilingCounters?.RecordSourceFileScanned();
 
         string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
+        sourceFileLineCounts.TryAdd(normalizedFilePath, CountPhysicalLines(sourceText));
         AddParsedTypes(sourceMap, assemblyName, normalizedFilePath, sourceText);
         return true;
     }
@@ -247,6 +283,30 @@ internal sealed class ArchitectureSourceFileFactTraversal
             sourceText = string.Empty;
             return false;
         }
+        catch (UnauthorizedAccessException)
+        {
+            sourceText = string.Empty;
+            return false;
+        }
+    }
+
+    private static int CountPhysicalLines(string sourceText)
+    {
+        if (sourceText.Length == 0)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        foreach (char character in sourceText)
+        {
+            if (character == '\n')
+            {
+                count++;
+            }
+        }
+
+        return sourceText[^1] == '\n' ? count : count + 1;
     }
 
     private void AddParsedTypes(
@@ -492,8 +552,14 @@ internal sealed class ArchitectureSourceFileFactTraversal
 
     internal sealed record SourceScanResult(
         Dictionary<SourceFactKey, List<SourceDeclaration>> SourceMap,
-        IReadOnlyList<string> ConsumedSourceInputPaths)
+        IReadOnlyList<string> ConsumedSourceInputPaths,
+        IReadOnlyDictionary<string, int> SourceFileLineCounts,
+        IReadOnlyList<string> UnreadableSourceInputPaths)
     {
-        internal static SourceScanResult Empty { get; } = new([], Array.Empty<string>());
+        internal static SourceScanResult Empty { get; } = new(
+            [],
+            Array.Empty<string>(),
+            new Dictionary<string, int>(StringComparer.Ordinal),
+            Array.Empty<string>());
     }
 }
