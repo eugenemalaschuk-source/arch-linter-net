@@ -1,12 +1,13 @@
 # Self-dogfood CI governance evidence
 
-This record is the canonical post-fix acceptance evidence for issue #992 and PR #997. The current
-PR head and latest green producer verification are recorded separately from the fixed
-three-sample performance comparison:
+This record is the canonical post-fix acceptance evidence for issue #992 and PR #997. The measured
+implementation candidate and documentation-only reconciliation tip are recorded separately from
+the fixed three-sample performance comparison:
 
-- Current PR head: `a5c947e5d67b32e4098aed350711bcb1ae8343f3`
-- Latest green producer run: [35670638922](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35670638922)
-- Latest green run status: 44/44 jobs successful
+- Measured implementation candidate: `a5c947e5d67b32e4098aed350711bcb1ae8343f3`
+- Producer verification run for that candidate: [35670638922](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35670638922)
+- Subsequent PR-tip changes are documentation-only reconciliation commits; the PR's required checks
+  remain the authority for the final tip.
 
 - Source SHA: `a5c947e5d67b32e4098aed350711bcb1ae8343f3`
 - Tree SHA: `3c388a562c1846882a1d7a31d8dcd228a7f08e46`
