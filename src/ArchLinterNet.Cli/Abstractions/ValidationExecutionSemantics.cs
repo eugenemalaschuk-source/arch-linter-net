@@ -21,6 +21,8 @@ internal interface IValidationExecutionOptions
 
     bool EnsureBuilt { get; }
 
+    bool UsePreparedArtifacts => false;
+
     bool NoRestore { get; }
 
     string? Configuration { get; }
@@ -63,6 +65,7 @@ internal abstract class ValidationExecutionSemantics
             BaselinePath = options.BaselinePath,
             EnforceUnmatchedIgnoredViolationsPolicy = true,
             PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+            UsePreparedArtifacts = options.UsePreparedArtifacts,
             NoRestore = options.NoRestore,
             RequestedConfiguration = options.Configuration,
             RequestedTargetFramework = options.TargetFramework,

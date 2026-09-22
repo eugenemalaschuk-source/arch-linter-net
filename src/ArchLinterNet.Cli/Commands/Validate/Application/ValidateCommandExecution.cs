@@ -50,6 +50,42 @@ internal sealed class ValidateCommandExecution
             : ExecuteCombinedModes(options, modes, errorFormat, profileState);
     }
 
+    internal BuildStatePreflightResult PublishPreparedBuildReceipts(ValidateCommandOptions options)
+    {
+        return _runtime.PublishPreparedBuildReceipts(new BuildStatePreparedCandidateRequest(
+            options.PolicyPath,
+            options.ConditionSetName,
+            options.Configuration,
+            options.TargetFramework,
+            options.Platform,
+            options.RuntimeIdentifier,
+            options.NoRestore,
+            _cancellationToken,
+            options.PreparedBuildProofDirectory,
+            options.PreparedBuildProofNonce,
+            BuildAlreadyCompleted: options.PreparedBuildProofDirectory is not null
+                || options.PreparedBuildProofNonce is not null));
+    }
+
+    internal void WritePreparedReceiptDiagnostics(
+        ValidateCommandOptions options, IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics)
+    {
+        string detail = _runtime.FormatBuildStatePreflightForHumans(diagnostics);
+        if (options.Format == ValidateCommandPreflight.FormatJson)
+        {
+            _console.Out.WriteLine(detail);
+        }
+        else
+        {
+            _console.Error.WriteLine(detail);
+        }
+    }
+
+    internal void WritePreparedReceiptSuccess(int receiptCount)
+    {
+        _console.Out.WriteLine($"Published and verified {receiptCount} prepared build receipt(s).");
+    }
+
     private int ExecuteSingleMode(
         ValidateCommandOptions options,
         string mode,
@@ -130,6 +166,7 @@ internal sealed class ValidateCommandExecution
             BaselinePath = options.BaselinePath,
             EnforceUnmatchedIgnoredViolationsPolicy = true,
             PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+            UsePreparedArtifacts = options.UsePreparedArtifacts,
             NoRestore = options.NoRestore,
             RequestedConfiguration = options.Configuration,
             RequestedTargetFramework = options.TargetFramework,

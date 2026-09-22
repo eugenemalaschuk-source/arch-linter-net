@@ -25,6 +25,10 @@ public sealed class ArchitectureRunnerSetupService(
     // project output paths even when analysis.target_assemblies is authored explicitly.
     internal const string PublicApiResolutionMode = "public-api";
 
+    // Internal CI fan-out mode: select and load the exact project outputs whose receipts were
+    // published by the producer, without changing contract-mode selection or building anything.
+    internal const string PreparedCandidateResolutionMode = "prepared-candidate";
+
     public ArchitectureContractDocument LoadDocument(
         string policyPath,
         string? baselinePath = null,
@@ -218,6 +222,7 @@ public sealed class ArchitectureRunnerSetupService(
         using (timing?.Measure("assembly_resolution", indent: 1))
         {
             bool resolveAssemblyOutputs = string.Equals(mode, PublicApiResolutionMode, StringComparison.Ordinal)
+                || string.Equals(mode, PreparedCandidateResolutionMode, StringComparison.Ordinal)
                 || ShouldResolveAssemblyOutputs(document, mode, selectedContractIds);
             if (loadPostBuildArtifacts)
             {

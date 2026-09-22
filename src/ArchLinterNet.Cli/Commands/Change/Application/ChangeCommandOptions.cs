@@ -13,7 +13,8 @@ internal sealed record ChangeSnapshotCommandOptions(
     string? TargetFramework = null,
     string? Platform = null,
     string? RuntimeIdentifier = null,
-    string? ProfileDestination = null);
+    string? ProfileDestination = null,
+    bool UsePreparedArtifacts = false);
 
 internal sealed record ChangeReportCommandOptions(
     string BasePath,

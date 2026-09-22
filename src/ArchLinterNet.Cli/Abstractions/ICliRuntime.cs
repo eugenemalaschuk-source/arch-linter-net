@@ -18,6 +18,9 @@ internal interface ICliRuntime
 
     ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing);
 
+    BuildStatePreflightResult PublishPreparedBuildReceipts(BuildStatePreparedCandidateRequest request) =>
+        throw new NotSupportedException("Prepared build receipt publication is not configured for this CLI runtime.");
+
     ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing);
 
     /// <summary>

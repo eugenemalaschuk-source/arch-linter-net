@@ -140,9 +140,11 @@ public sealed class ArchitectureValidationApplicationService(
         // EnsureBuilt must use the metadata-only preparation path even without a cache. The
         // temporary graph build can replace selected outputs, so loading them during the initial
         // setup would lock those files on Windows before the build gets a chance to run. A cache
-        // request still takes this path for lazy materialization; ordinary uncached validation
-        // stays on the existing load-and-setup path below.
-        if (request.CacheLocation is not null || request.PreparationMode == BuildPreparationMode.EnsureBuilt)
+        // request still takes this path for lazy materialization, and the prepared-receipt mode
+        // uses it to bind the fan-out to the producer's exact output paths without building.
+        if (request.CacheLocation is not null
+            || request.PreparationMode == BuildPreparationMode.EnsureBuilt
+            || request.UsePreparedArtifacts)
         {
             ArchitectureRunnerPreparation preparation;
             using (timing?.Measure("metadata_preparation"))
@@ -198,7 +200,10 @@ public sealed class ArchitectureValidationApplicationService(
                 preparedArtifactContentDigests: preparation.CapturedArtifactContentDigests,
                 preparedProjectPaths: preparation.PreparedProjectPaths,
                 preparedArtifactClosureComplete: preparation.HasCompleteArtifactSelection,
-                preparedPostBuildRunner: request.PreparationMode == BuildPreparationMode.EnsureBuilt ? preparation : null,
+                preparedPostBuildRunner: request.PreparationMode == BuildPreparationMode.EnsureBuilt
+                    || request.UsePreparedArtifacts
+                    ? preparation
+                    : null,
                 materializeSetup: () => preparation.HasCompleteRootSelection
                     ? runnerSetupService.MaterializePreparedRunner(
                         state.Policy.Document, preparation, state.Policy.SelectedContractIds,
@@ -404,12 +409,11 @@ public sealed class ArchitectureValidationApplicationService(
             runner.Session.Context.ProjectDiscovery,
             runner.Session.Context.TargetAssemblies,
             runner.Session.Context.MissingAssemblyNames,
-            // Project metrics load the discovered output in an isolated scope so a host's
-            // already-loaded same-name assembly cannot become its owner. Stream-loaded
-            // assemblies have no Assembly.Location, therefore preflight must consume the same
-            // discovery evidence rather than misclassifying that selected artifact as missing.
-            includeResolvedAssemblyPathsFromDiscovery:
-                ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding(runner.Session.Document),
+            // Discovery owns the selected project output for every project-backed validation.
+            // Use that same path for ordinary receipt verification; Assembly.Location can point
+            // at a copied dependency under the CLI host's bin directory instead of the artifact
+            // the producer built and published.
+            includeResolvedAssemblyPathsFromDiscovery: true,
             () => buildStatePreparationService,
             request.PreparationMode,
             request.NoRestore,
@@ -509,14 +513,17 @@ public sealed class ArchitectureValidationApplicationService(
         ValidationTiming? timing,
         bool loadPostBuildArtifacts = false)
     {
+        string? runnerMode = request.UsePreparedArtifacts
+            ? ArchitectureRunnerSetupService.PreparedCandidateResolutionMode
+            : modeHint;
         return loadPostBuildArtifacts
             ? runnerSetupService.BuildRunnerForPostBuild(
                 policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
-                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
+                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, runnerMode,
                 request.CancellationToken, request.MaxParallelism)
             : runnerSetupService.BuildRunner(
                 policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
-                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
+                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, runnerMode,
                 request.CancellationToken, request.MaxParallelism);
     }
 

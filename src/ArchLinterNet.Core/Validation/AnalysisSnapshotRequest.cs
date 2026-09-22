@@ -27,6 +27,9 @@ public sealed record AnalysisSnapshotRequest
 
     public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
 
+    // Internal CI fan-out seam; see ValidationRequest.UsePreparedArtifacts.
+    internal bool UsePreparedArtifacts { get; init; }
+
     public bool NoRestore { get; init; }
 
     public string? RequestedConfiguration { get; init; }
@@ -69,6 +72,7 @@ public sealed record AnalysisSnapshotRequest
             EnforceUnmatchedIgnoredViolationsPolicy = EnforceUnmatchedIgnoredViolationsPolicy,
             WaiverEvaluationDate = WaiverEvaluationDate,
             PreparationMode = PreparationMode,
+            UsePreparedArtifacts = UsePreparedArtifacts,
             NoRestore = NoRestore,
             RequestedConfiguration = RequestedConfiguration,
             RequestedTargetFramework = RequestedTargetFramework,
@@ -93,6 +97,7 @@ public sealed record AnalysisSnapshotRequest
             EnforceUnmatchedIgnoredViolationsPolicy = request.EnforceUnmatchedIgnoredViolationsPolicy,
             WaiverEvaluationDate = request.WaiverEvaluationDate,
             PreparationMode = request.PreparationMode,
+            UsePreparedArtifacts = request.UsePreparedArtifacts,
             NoRestore = request.NoRestore,
             RequestedConfiguration = request.RequestedConfiguration,
             RequestedTargetFramework = request.RequestedTargetFramework,

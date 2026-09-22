@@ -17,6 +17,7 @@ internal sealed record ArchitectureAnalysisCommandOptions(
     string? CurrentContextPath,
     bool ShowHelp,
     bool EnsureBuilt,
+    bool UsePreparedArtifacts,
     bool NoRestore,
     string? Configuration,
     string? TargetFramework,
@@ -52,6 +53,8 @@ internal sealed class ArchitectureAnalysisCommandOptionSet
 
     public Option<bool> EnsureBuilt { get; } = new("--ensure-built");
 
+    public Option<bool> UsePreparedArtifacts { get; } = new("--use-prepared-receipts");
+
     public Option<bool> NoRestore { get; } = new("--no-restore");
 
     public Option<string> Configuration { get; } = new("--configuration");
@@ -85,6 +88,7 @@ internal sealed class ArchitectureAnalysisCommandOptionSet
         command.Options.Add(Profile);
         command.Options.Add(Format);
         command.Options.Add(EnsureBuilt);
+        command.Options.Add(UsePreparedArtifacts);
         command.Options.Add(NoRestore);
         command.Options.Add(Configuration);
         command.Options.Add(Framework);
@@ -104,6 +108,7 @@ internal sealed class ArchitectureAnalysisCommandOptionSet
         result.GetValue(CurrentContext),
         result.GetValue(Help),
         result.GetValue(EnsureBuilt),
+        result.GetValue(UsePreparedArtifacts),
         result.GetValue(NoRestore),
         result.GetValue(Configuration),
         result.GetValue(Framework),
@@ -174,6 +179,7 @@ internal static class ArchitectureAnalysisCommandSupport
                 ? null
                 : ArchitecturePolicyWeakeningFormatter.DeserializePublicApiApprovals(fileSystem.ReadAllText(options.PublicApiApprovalPath)),
             PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+            UsePreparedArtifacts = options.UsePreparedArtifacts,
             NoRestore = options.NoRestore,
             RequestedConfiguration = options.Configuration,
             RequestedTargetFramework = options.TargetFramework,

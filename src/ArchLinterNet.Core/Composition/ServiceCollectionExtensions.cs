@@ -61,6 +61,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IArchitectureExternalDependencyIlScanner, ArchitectureExternalDependencyIlScanner>();
         services.AddSingleton<IArchitectureIlMethodBodyScanner, ArchitectureIlMethodBodyScanner>();
         services.AddSingleton<IArchitectureRunnerSetupService, ArchitectureRunnerSetupService>();
+        services.AddSingleton<ArchitecturePreparedBuildReceiptService>();
         services.AddSingleton<ArchitectureContractHandlerRegistry>();
         services.AddSingleton<IArchitectureContractHandlerRegistry>(ResolveHandlerRegistry);
         services.AddSingleton<IArchitectureContractExecutor, ArchitectureContractExecutor>();

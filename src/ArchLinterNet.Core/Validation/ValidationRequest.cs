@@ -29,6 +29,10 @@ public sealed record ValidationRequest
     // graph once and verifies it via a build receipt. See BuildPreparationMode.
     public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
 
+    // Internal CI fan-out seam: verify producer-published receipts and materialize the exact
+    // discovered project outputs without entering the build-capable EnsureBuilt path.
+    internal bool UsePreparedArtifacts { get; init; }
+
     // Fails closed offline with a `restore-required` diagnostic instead of allowing restore.
     // Composes with PreparationMode: valid with Ordinary (checked, never built) and with
     // EnsureBuilt (checked, then passed through to the build invocation).

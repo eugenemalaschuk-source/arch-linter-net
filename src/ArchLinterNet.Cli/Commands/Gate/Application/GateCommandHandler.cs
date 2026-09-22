@@ -28,6 +28,7 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
               --current-context <path> Current effective-policy context JSON (requires --base-context)
               --public-api-approval <path> Exact reviewed public API addition approval artifact
               --ensure-built           Build and receipt-verify before complete candidate collection
+              --use-prepared-receipts  Verify producer-published receipts without building or restoring
               --no-restore             Do not restore while ensuring build state
               --configuration <name>   Requested build configuration
               --framework <tfm>        Requested target framework

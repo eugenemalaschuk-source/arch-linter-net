@@ -28,6 +28,9 @@ public sealed record ArchitectureDebtGateRequest
 
     public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
 
+    // Internal CI fan-out seam; see ValidationRequest.UsePreparedArtifacts.
+    internal bool UsePreparedArtifacts { get; init; }
+
     public bool NoRestore { get; init; }
 
     public string? RequestedConfiguration { get; init; }

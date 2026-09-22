@@ -39,7 +39,8 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         HashSet<string>? selectedContractIds,
         CancellationToken cancellationToken = default)
     {
-        bool requiresExactMetricArtifact = ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding(document);
+        bool requiresExactMetricArtifact = ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding(document)
+            || string.Equals(mode, ArchitectureRunnerSetupService.PreparedCandidateResolutionMode, StringComparison.Ordinal);
         return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
             forceIsolatedLoading: requiresExactMetricArtifact,
             exactAssemblyPaths: requiresExactMetricArtifact ? discovery.ResolvedAssemblyPaths : null,

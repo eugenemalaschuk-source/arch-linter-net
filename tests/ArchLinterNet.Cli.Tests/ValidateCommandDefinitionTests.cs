@@ -115,6 +115,20 @@ public sealed class ValidateCommandDefinitionTests
     }
 
     [Test]
+    public void CreateRootCommand_PreparedReceiptPublicationOption_IsPropagatedToPublisher()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--publish-prepared-receipts",
+            "--no-restore",
+            "--configuration", "Release",
+            "--framework", "net10.0",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Prepared build receipt publication is not configured"));
+    }
+
+    [Test]
     public void CreateRootCommand_WithoutEnsureBuiltOrNoRestore_DefaultsToOrdinary()
     {
         (RecordingRuntime runtime, _) = Run([]);
@@ -382,7 +396,6 @@ public sealed class ValidateCommandDefinitionTests
             Array.Empty<BuildStatePreflightDiagnostic>();
         public IReadOnlyList<string> ResolvedAssemblyPathsToReturn { get; set; } =
             Array.Empty<string>();
-
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => throw new NotSupportedException();
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)

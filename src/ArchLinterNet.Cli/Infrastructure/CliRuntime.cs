@@ -43,6 +43,11 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.Validate(request, timing);
     }
 
+    public BuildStatePreflightResult PublishPreparedBuildReceipts(BuildStatePreparedCandidateRequest request)
+    {
+        return _engine.PublishPreparedBuildReceipts(request);
+    }
+
     public (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(
         ValidationRequest request, ValidationTiming? timing)
     {
