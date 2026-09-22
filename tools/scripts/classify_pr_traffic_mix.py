@@ -23,9 +23,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
+
+# A git revision must not be treated as a command option: reject anything starting with "-" and
+# anything outside git's own safe ref/SHA character set, so a crafted --end-ref value cannot be
+# interpreted as a git flag instead of a revision (SonarCloud python:S8705 hardening).
+_SAFE_GIT_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$")
+
+
+def validate_git_ref(value: str) -> str:
+    if not _SAFE_GIT_REF_PATTERN.match(value):
+        raise argparse.ArgumentTypeError(
+            f"{value!r} is not a safe git revision: it must start with an alphanumeric character "
+            "and contain only letters, digits, '.', '_', '/', or '-'."
+        )
+    return value
+
 
 CENTRAL_BUILD_PROPS_NAMES = {
     "nuget.config",
@@ -81,7 +97,7 @@ def load_commits(end_ref: str, commit_count: int, cwd: Path) -> dict[str, list[s
     return commits
 
 
-def commit_range(commits: dict[str, list[str]], cwd: Path) -> tuple[str, str]:
+def commit_range(commits: dict[str, list[str]]) -> tuple[str, str]:
     shas = list(commits.keys())
     newest = shas[0]
     oldest = shas[-1]
@@ -115,7 +131,12 @@ def summarize(commits: dict[str, list[str]]) -> dict[str, object]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--end-ref", required=True, help="Newest commit (inclusive) to start counting back from.")
+    parser.add_argument(
+        "--end-ref",
+        required=True,
+        type=validate_git_ref,
+        help="Newest commit (inclusive) to start counting back from.",
+    )
     parser.add_argument("--commit-count", type=int, default=300, help="Number of commits to sample (default: 300).")
     args = parser.parse_args()
 
@@ -125,7 +146,7 @@ def main() -> int:
         print("No commits found for the given range.", file=sys.stderr)
         return 1
 
-    newest, oldest = commit_range(commits, root)
+    newest, oldest = commit_range(commits)
     result = {
         "end_ref": args.end_ref,
         "commit_count_requested": args.commit_count,
