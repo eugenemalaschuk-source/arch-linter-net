@@ -489,18 +489,52 @@ def test_attestation_and_path_commands_exclude_recursive_outer_evidence(tmp_path
     assert capsys.readouterr().out.splitlines()[-2:] == [distribution._MANIFEST_FILE, distribution._CHECKSUMS_FILE]
 
 
-def test_inventory_is_closed_to_review_origin_and_publication_boundary_drift(tmp_path: Path) -> None:
-    value = json.loads(INVENTORY.read_text(encoding="utf-8"))
-    value["publication_authority"] = "#806"
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(value), encoding="utf-8")
-    with pytest.raises(ValueError, match="publication authority boundary"):
-        distribution._load_inventory(path)
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("support_status", "stable", "support status"),
+        ("publication_authority", "#806", "publication authority boundary"),
+        ("review_origin", {"story": "#999"}, "review origin"),
+    ],
+)
+def test_distribution_manifest_rejects_header_authority_drift(
+    tmp_path: Path, field: str, value: object, message: str
+) -> None:
+    arguments, transport = _arguments(tmp_path, "0.9.0-preview.1")
+    manifest_path = transport / distribution._MANIFEST_FILE
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest[field] = value
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
+    with pytest.raises(ValueError, match=message):
+        distribution._verify(_verify_arguments(arguments, transport))
+
+
+@pytest.mark.parametrize(
+    ("field", "mutate", "message"),
+    [
+        ("support_status", lambda value: value.__setitem__("support_status", "stable"), "support status"),
+        (
+            "publication_authority",
+            lambda value: value.__setitem__("publication_authority", "#806"),
+            "publication authority boundary",
+        ),
+        (
+            "review_origin",
+            lambda value: value["review_origin"].__setitem__("first_release_authority", "#787"),
+            "review origin",
+        ),
+    ],
+)
+def test_inventory_is_closed_to_support_authority_and_review_origin_drift(
+    tmp_path: Path, field: str, mutate, message: str
+) -> None:
     value = json.loads(INVENTORY.read_text(encoding="utf-8"))
-    value["review_origin"]["first_release_authority"] = "#787"
+    mutate(value)
+    path = tmp_path / f"{field}.json"
     path.write_text(json.dumps(value), encoding="utf-8")
-    with pytest.raises(ValueError, match="review origin"):
+
+    with pytest.raises(ValueError, match=message):
         distribution._load_inventory(path)
 
 
