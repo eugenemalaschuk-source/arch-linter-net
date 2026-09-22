@@ -13,6 +13,8 @@ The project is still in the `0.x` initial-development range. Under SemVer, a `0.
 | `*-preview.N` | **Preview release** | Early validation of a future public release. Behavior and compatibility may still change before the stable release. |
 | `X.Y.Z-main.N` | **Development/dogfood build** | An installable build from `main` used for repository-authorized dogfooding. It is not a public release candidate and is not a stable NuGet.org release. |
 
+Published preview releases use the same immutable candidate, provenance, and reviewed release-scope publication path as stable releases, but preview authority is version-specific. A declaration for `0.9.0-preview.1` cannot authorize `0.9.0`; stable publication retains its own release gate and acceptance.
+
 For a released minor line, consumers should normally prefer the latest available patch version unless a specific repository has reviewed and pinned an older version for a documented reason.
 
 This same summary is embedded in the repository `README.md`, which is packaged as the NuGet README. A user evaluating an ArchLinterNet package on NuGet.org therefore does not need access to internal maintainer documentation to understand what the version number means.
