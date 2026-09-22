@@ -1,26 +1,40 @@
 # Self-dogfood CI governance evidence
 
-This record closes issue #992 for implementation candidate `d4e38da578aa96e25a3201a059a41f9c4730d142` and PR #997. The final hosted producer recorded the following identity:
+This record is the canonical post-fix acceptance evidence for issue #992 and PR #997. The current
+PR head and latest green producer verification are recorded separately from the fixed
+three-sample performance comparison:
 
-- Source SHA: `d4e38da578aa96e25a3201a059a41f9c4730d142`
-- Tree SHA: `366828df1eaea01ea04f971f3c6916f618a4b6be`
+- Current PR head: `a5c947e5d67b32e4098aed350711bcb1ae8343f3`
+- Latest green producer run: [35670638922](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35670638922)
+- Latest green run status: 44/44 jobs successful
+
+- Source SHA: `a5c947e5d67b32e4098aed350711bcb1ae8343f3`
+- Tree SHA: `3c388a562c1846882a1d7a31d8dcd228a7f08e46`
 - Policy: `architecture/dependencies.arch.yml`, SHA-256 `3b2b2c6664eb9e598c0bcdbd29af50d63ec89db1f263dc6f910b92843dc3a7ae`
-- CLI assembly SHA-256: `caaa6b49e2e7b09d151d9d69cef3cce0e92ffd83538e4dbab89f986af47db1a1`
-- Testing assembly SHA-256: `1f73b42e8db2233a0caff364d9b48b7bb08be83703ac938046cb5f6e76b87e2b`
+- CLI assembly SHA-256: `9920e68cf79f9fdea1cc2b4bd292fe54d83b1f2df4f158b3edfa508fa5ee3a8d`
+- Testing assembly SHA-256: `ce585e50fad7a2406499e0775798abf1501d89492f8a9d7db4801b5d894eecd3`
 - Tool identity: `ArchLinterNet.Cli/ArchLinterNet.Testing`
 
-## Hosted samples
+## Canonical performance comparison
 
-The four comparable samples below ran on the standard `ubuntu24` image after the receipt trust-boundary redesign. The policy, base revision, process topology, and preparation-inclusive timing boundary were held constant; the final row is the current PR head. Every projection exited successfully and the projections overlapped.
+The canonical post-fix acceptance set is the three same-candidate `ubuntu24` samples recorded
+in the performance authority updates on [#991](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/991)
+and [#19](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/19). All three use the
+same preparation-inclusive boundary as the pinned 204 s baseline. Earlier timing rows and the
+earlier median are superseded and are not part of this acceptance comparison.
 
-| Run / producer job | Candidate prep | Base prep | Governance span | Projection command sum | Result |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| [35659656884](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35659656884) | 21.371 s | 15.242 s | 92.708 s | 159.407 s | GAP |
-| [35661691165](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35661691165) | 30.068 s | 19.854 s | 127.923 s | 227.659 s | GAP |
-| [35665388766](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35665388766) | 29.526 s | 20.739 s | 127.708 s | 225.879 s | GAP |
-| [35669501579](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35669501579) | 28.815 s | 16.370 s | 120.941 s | 220.162 s | GAP |
+| Comparable post-fix sample | Governance span | Result |
+| --- | ---: | --- |
+| Sample 1 | 167.839 s | GAP |
+| Sample 2 | 167.309 s | GAP |
+| Sample 3 | 126.761 s | GAP |
 
-The governance-span median is **124.325 s**, with a range of **92.708–127.923 s**. The projection-command-sum median is **223.021 s**, with a range of **159.407–227.659 s**. Against the 204 s baseline and the `<=60 s` target, the measured result is a **GAP**: the normalized fan-out reduces the comparable wall-clock governance time by 79.675 s (39.057%), a **1.641x** speedup, but does not yet reach the target. The headline span starts at the earliest candidate/base preparation boundary and includes the explicit CLI-host bootstrap, candidate receipt publication, and base preparation.
+The governance-span median is **167.309 s**, with a range of **126.761–167.839 s**. Against the
+204 s baseline and the `<=60 s` target, the measured result is a **GAP**: the normalized fan-out
+reduces the comparable wall-clock governance time by **36.691 s (17.99%)**, a **1.219x** speedup,
+but does not yet reach the target. The headline span starts at the earliest candidate/base
+preparation boundary and includes the explicit CLI-host bootstrap, candidate receipt publication,
+and base preparation.
 
 ## Process accounting and attribution
 
