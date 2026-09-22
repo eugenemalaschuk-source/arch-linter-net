@@ -2,9 +2,9 @@
 
 ## Decision
 
-Phase 1 outcome: **C**
+Phase 1 outcome: **B**
 
-The current ordinary real-MSBuild matrix remains CacheIneligible with zero verified exact-request hits. The separately labelled eligibility-control attempt does not produce a verified hit, so the measured targeted-phase share is only a conservative upper bound; the normalized #991 consumer gate is still open, and available evidence does not justify an eligibility expansion or a Phase 2 implementation.
+The expanded cache-avoidable boundary includes assembly/artifact loading and analysis work, but the separately labelled eligibility-control attempt does not produce a verified hit. The warm-hit and amortized effect therefore remain model-only and cannot support a final no-value outcome C; route the incomplete evidence through the #991 normalization and owning prepared-analysis lanes before making a final eligibility decision.
 
 Phase 2 remains gated by #991: status **open**, authorized: **False**.
 Do not begin Phase 2 until #991 completes and the normalized dogfood workflows are remeasured; any future outcome A must be recorded only after that gate.
@@ -28,38 +28,38 @@ Do not begin Phase 2 until #991 completes and the normalized dogfood workflows a
 
 ## Pre-implementation effect estimate
 
-Targeted phase: **contract-evaluation** — Contract execution and mode-specific fact/evaluation work that a verified exact-request hit can reconstruct without re-running.
+Targeted phase: **cache-avoidable-analysis** — Assembly/artifact loading and analysis phases skipped by a verified exact-request hit; cache lookup, build-state authorization, and output routing remain outside the boundary.
 Expected equivalent reuse count: **3**. Assumptions: Three equivalent requests in one workflow or across immutable reference/base revisions; cache misses remain correct fallbacks.
 Success threshold: **10.0%** amortized reduction; kill criterion: **5.0%**.
 
 | Size | Targeted phase share | Amdahl max speedup | Cold/miss overhead | Expected warm-hit reduction | Expected amortized reduction | Avoided work | Verified hit observed |
 |---|---:|---:|---:|---:|---:|---:|---|
-| small | 1.01% | 1.01x | 0.00% | 1.01% | 0.68% | 4 | no |
-| medium | 0.87% | 1.01x | 0.00% | 0.87% | 0.58% | 6 | no |
-| large | 0.75% | 1.01x | 0.00% | 0.75% | 0.50% | 8 | no |
+| small | 7.06% | 1.08x | 0.00% | unavailable | unavailable | unavailable | no |
+| medium | 9.21% | 1.10x | 0.00% | unavailable | unavailable | unavailable | no |
+| large | 7.94% | 1.09x | 0.00% | unavailable | unavailable | unavailable | no |
 
 ## Cache measurements
 
 | Fixture | Size | Mode | Projects | Eligibility | Reasons | Lookups | Hits | Misses | Rejects | Writes | Ineligible units | Bytes read | Bytes written | Avoided work | Total ms | Targeted phase ms | Targeted share | Canonical result |
 |---|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| eligible-control | small | disabled | 2 | ControlUnavailable | | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 526.531 | 21.000 | 3.988% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
-| eligible-control | small | population | 2 | ControlUnavailable | | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 528.117 | 25.000 | 4.734% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
-| eligible-control | small | repeat | 2 | ControlUnavailable | | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 551.889 | 19.000 | 3.443% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
-| real-msbuild | small | disabled | 2 | CacheIneligible | framework-reference-identity-unverified | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1677.483 | 17.000 | 1.013% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
-| real-msbuild | small | population | 2 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 2 | 0 | 0 | 0 | 1600.836 | 18.000 | 1.124% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
-| real-msbuild | small | repeat | 2 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 2 | 0 | 0 | 0 | 1593.227 | 17.000 | 1.067% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
-| eligible-control | medium | disabled | 4 | ControlUnavailable | | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 497.145 | 18.000 | 3.621% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
-| eligible-control | medium | population | 4 | ControlUnavailable | | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 579.000 | 18.000 | 3.109% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
-| eligible-control | medium | repeat | 4 | ControlUnavailable | | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 532.023 | 19.000 | 3.571% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
-| real-msbuild | medium | disabled | 4 | CacheIneligible | framework-reference-identity-unverified | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2070.563 | 18.000 | 0.869% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
-| real-msbuild | medium | population | 4 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 4 | 0 | 0 | 0 | 1854.311 | 17.000 | 0.917% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
-| real-msbuild | medium | repeat | 4 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 4 | 0 | 0 | 0 | 1903.732 | 19.000 | 0.998% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
-| eligible-control | large | disabled | 6 | ControlUnavailable | | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 497.680 | 18.000 | 3.617% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
-| eligible-control | large | population | 6 | ControlUnavailable | | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 533.351 | 19.000 | 3.562% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
-| eligible-control | large | repeat | 6 | ControlUnavailable | | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 536.891 | 19.000 | 3.539% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
-| real-msbuild | large | disabled | 6 | CacheIneligible | framework-reference-identity-unverified | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2385.563 | 18.000 | 0.755% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
-| real-msbuild | large | population | 6 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 6 | 0 | 0 | 0 | 2050.805 | 18.000 | 0.878% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
-| real-msbuild | large | repeat | 6 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 6 | 0 | 0 | 0 | 2102.495 | 30.000 | 1.427% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
+| eligible-control | small | disabled | 2 | ControlUnavailable |  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 552.776 | 88.000 | 15.920% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
+| eligible-control | small | population | 2 | ControlUnavailable |  | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 509.829 | 81.000 | 15.888% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
+| eligible-control | small | repeat | 2 | ControlUnavailable |  | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 557.714 | 80.000 | 14.344% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
+| real-msbuild | small | disabled | 2 | CacheIneligible | framework-reference-identity-unverified | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2011.031 | 142.000 | 7.061% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
+| real-msbuild | small | population | 2 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 2 | 0 | 0 | 0 | 1710.547 | 104.000 | 6.080% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
+| real-msbuild | small | repeat | 2 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 2 | 0 | 0 | 0 | 1658.984 | 117.000 | 7.053% | 59bf176490f26ed54d7936686b1c4893886e2dc85a7c11679cf7f920f738f77f |
+| eligible-control | medium | disabled | 4 | ControlUnavailable |  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 514.035 | 100.000 | 19.454% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
+| eligible-control | medium | population | 4 | ControlUnavailable |  | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 512.253 | 84.000 | 16.398% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
+| eligible-control | medium | repeat | 4 | ControlUnavailable |  | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 508.562 | 86.000 | 16.910% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
+| real-msbuild | medium | disabled | 4 | CacheIneligible | framework-reference-identity-unverified | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2107.099 | 194.000 | 9.207% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
+| real-msbuild | medium | population | 4 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 4 | 0 | 0 | 0 | 1916.262 | 122.000 | 6.367% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
+| real-msbuild | medium | repeat | 4 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 4 | 0 | 0 | 0 | 1861.847 | 112.000 | 6.016% | 3f4d30020a731053f972f028eb5e465645c7ebd3f71b5cbbb6efc85769fac906 |
+| eligible-control | large | disabled | 6 | ControlUnavailable |  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 536.874 | 94.000 | 17.509% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
+| eligible-control | large | population | 6 | ControlUnavailable |  | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 535.545 | 89.000 | 16.619% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
+| eligible-control | large | repeat | 6 | ControlUnavailable |  | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 520.793 | 84.000 | 16.129% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
+| real-msbuild | large | disabled | 6 | CacheIneligible | framework-reference-identity-unverified | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2343.554 | 186.000 | 7.937% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
+| real-msbuild | large | population | 6 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 6 | 0 | 0 | 0 | 2070.698 | 117.000 | 5.650% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
+| real-msbuild | large | repeat | 6 | CacheIneligible | framework-reference-identity-unverified | 1 | 0 | 0 | 1 | 0 | 6 | 0 | 0 | 0 | 2018.111 | 117.000 | 5.798% | 9900043f60a2e5ed85ff329000971763cc6e1c3d8ffaaf26ac7a5966e20bd5ed |
 
 ## Reference/base-side exact-request disposition
 

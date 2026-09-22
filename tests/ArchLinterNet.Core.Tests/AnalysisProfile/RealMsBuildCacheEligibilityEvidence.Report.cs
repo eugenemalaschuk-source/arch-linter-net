@@ -39,7 +39,8 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
             .AppendLine()
             .AppendLine("- Reuse #502's synthetic workload generator/materializer; no second benchmark corpus is created.")
             .AppendLine("- Real-MSBuild rows retain the observed fail-closed eligibility and typed reasons. The separately labelled staged control is reported as unavailable when its artifact authorization cannot produce a verified hit; it is never counted as a real-MSBuild success.")
-            .AppendLine("- Deterministic counters establish avoided-work scope; Stopwatch values are environment-labelled supporting evidence.")
+            .AppendLine("- The targeted boundary includes assembly/artifact loading and analysis phases that a verified exact-request hit skips; cache lookup, build-state authorization and output routing remain outside it. Deterministic counters establish avoided-work scope; Stopwatch values are environment-labelled supporting evidence.")
+            .AppendLine("- Without a verified warm-hit control, warm-hit and amortized reductions remain unavailable/model-only and cannot be used to declare a final outcome C.")
             .AppendLine("- Cache-disabled, population/miss, and repeat results retain canonical-result identity; stale-input checks retain fail-closed dispositions.")
             .AppendLine("- The exact-request cache estimate excludes prepared-analysis persistence and separately records reference/base-side work.")
             .AppendLine()
@@ -66,9 +67,9 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
                 .Append(" | ").Append(point.TargetedPhaseSharePercent.ToString("F2", CultureInfo.InvariantCulture)).Append('%')
                 .Append(" | ").Append(point.AmdahlMaximumSpeedup.ToString("F2", CultureInfo.InvariantCulture)).Append('x')
                 .Append(" | ").Append(point.ColdMissOverheadPercent.ToString("F2", CultureInfo.InvariantCulture)).Append('%')
-                .Append(" | ").Append(point.ExpectedWarmHitReductionPercent.ToString("F2", CultureInfo.InvariantCulture)).Append('%')
-                .Append(" | ").Append(point.ExpectedAmortizedReductionPercent.ToString("F2", CultureInfo.InvariantCulture)).Append('%')
-                .Append(" | ").Append(point.WarmHitAvoidedWork.ToString(CultureInfo.InvariantCulture))
+                .Append(" | ").Append(Format(point.ExpectedWarmHitReductionPercent)).Append(point.ExpectedWarmHitReductionPercent.HasValue ? "%" : "")
+                .Append(" | ").Append(Format(point.ExpectedAmortizedReductionPercent)).Append(point.ExpectedAmortizedReductionPercent.HasValue ? "%" : "")
+                .Append(" | ").Append(point.WarmHitAvoidedWork?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
                 .Append(" | ").Append(point.VerifiedWarmHitObserved ? "yes" : "no")
                 .AppendLine(" |");
         }
@@ -134,4 +135,6 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
     };
 
     private static string Format(double? value) => value?.ToString("F3", CultureInfo.InvariantCulture) ?? "unavailable";
+
+    private static string Format(decimal? value) => value?.ToString("F2", CultureInfo.InvariantCulture) ?? "unavailable";
 }

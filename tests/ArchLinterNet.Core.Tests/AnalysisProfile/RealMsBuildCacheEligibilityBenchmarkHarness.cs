@@ -106,8 +106,8 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                 Phase2Authorized = false,
                 Evidence = "#991 remains open; normalized consumer workflows must be remeasured before any Phase 2 eligibility implementation.",
             },
-            Decision = "C",
-            DecisionRationale = "The current ordinary real-MSBuild matrix remains CacheIneligible with zero verified exact-request hits. The separately labelled eligibility-control attempt does not produce a verified hit, so the measured targeted-phase share is only a conservative upper bound; the normalized #991 consumer gate is still open, and available evidence does not justify an eligibility expansion or a Phase 2 implementation.",
+            Decision = "B",
+            DecisionRationale = "The expanded cache-avoidable boundary includes assembly/artifact loading and analysis work, but the separately labelled eligibility-control attempt does not produce a verified hit. The warm-hit and amortized effect therefore remain model-only and cannot support a final no-value outcome C; route the incomplete evidence through the #991 normalization and owning prepared-analysis lanes before making a final eligibility decision.",
             ReferenceBaseDisposition = new RealMsBuildReferenceBaseDisposition
             {
                 Disposition = "routed-to-owning-lane",
@@ -177,51 +177,60 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
             Task<string> stderrTask = process.StandardError.ReadToEndAsync();
             using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(180));
             using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
-            await process.WaitForExitAsync(linked.Token);
-            string stdout = await stdoutTask.WaitAsync(linked.Token);
-            string stderr = await stderrTask.WaitAsync(linked.Token);
-            stopwatch.Stop();
-            Assert.That(process.ExitCode, Is.EqualTo(0), $"Benchmark command failed for {workload.WorkloadId}/{cacheMode}. stdout={stdout} stderr={stderr}");
-            Assert.That(File.Exists(profilePath), Is.True, $"No profile written for {workload.WorkloadId}/{cacheMode}.");
-            using JsonDocument profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
-            using JsonDocument resultDocument = JsonDocument.Parse(stdout);
-            JsonElement profile = profileDocument.RootElement.Clone();
-            JsonElement result = resultDocument.RootElement.Clone();
-            bool isReal = workload.CompilationMode == BenchmarkCompilationMode.RealMsBuild;
-            long hits = ReadCounter(profile, "Counters.Cache.Hits");
-            return new RealMsBuildCacheMeasurement
+            try
             {
-                FixtureKind = isReal ? "real-msbuild" : "eligible-control",
-                CacheMode = cacheMode,
-                WorkloadId = workload.WorkloadId,
-                WorkloadIdentity = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(workload.WorkloadId))),
-                Size = size,
-                ProjectCount = workload.Dimensions.ProjectCount,
-                Eligibility = isReal ? "CacheIneligible" : (hits > 0 ? "VerifiedCacheEligible" : "ControlUnavailable"),
-                IneligibilityReasons = ineligibilityReasons.OrderBy(reason => reason, StringComparer.Ordinal).ToArray(),
-                Lookups = ReadCounter(profile, "Counters.Cache.Lookups"),
-                Hits = hits,
-                Misses = ReadCounter(profile, "Counters.Cache.Misses"),
-                Rejects = ReadCounter(profile, "Counters.Cache.Rejects"),
-                Writes = ReadCounter(profile, "Counters.Cache.Writes"),
-                IneligibleUnitCount = ReadCounter(profile, "Counters.Cache.IneligibleUnitCount"),
-                BytesRead = ReadOptionalCounter(profile, "Counters.Cache.BytesRead"),
-                BytesWritten = ReadOptionalCounter(profile, "Counters.Cache.BytesWritten"),
-                AvoidedWork = ReadOptionalCounter(profile, "Counters.Cache.AvoidedFactIndexMaterializations") +
-                    ReadOptionalCounter(profile, "Counters.Cache.AvoidedContractExecutions"),
-                DeterministicWork = ReadCounter(profile, "Counters.ProjectGraphEvaluations") +
-                    ReadCounter(profile, "Counters.AssemblyLoads") +
-                    ReadCounter(profile, "Counters.FactIndexMaterializations") +
-                    ReadCounter(profile, "Counters.ContractExecutions"),
-                TotalElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds,
-                TargetedPhaseMilliseconds = ReadTargetedPhaseMilliseconds(profile),
-                TargetedPhaseSharePercent = TargetedPhaseShare(profile, stopwatch.Elapsed.TotalMilliseconds),
-                AllocatedBytes = ReadOptionalCounter(profile, "Measurements.AllocatedBytesTotal"),
-                PeakWorkingSetBytes = ReadOptionalCounter(profile, "Measurements.PeakWorkingSetBytes"),
-                CanonicalResultSha256 = CanonicalResultSha256(result, ReadString(profile, "CompletionStatus") ?? "unknown", process.ExitCode),
-                CompletionStatus = ReadString(profile, "CompletionStatus") ?? "unknown",
-                ExitCode = process.ExitCode,
-            };
+                await process.WaitForExitAsync(linked.Token);
+                string stdout = await stdoutTask.WaitAsync(linked.Token);
+                string stderr = await stderrTask.WaitAsync(linked.Token);
+                stopwatch.Stop();
+                Assert.That(process.ExitCode, Is.EqualTo(0), $"Benchmark command failed for {workload.WorkloadId}/{cacheMode}. stdout={stdout} stderr={stderr}");
+                Assert.That(File.Exists(profilePath), Is.True, $"No profile written for {workload.WorkloadId}/{cacheMode}.");
+                using JsonDocument profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
+                using JsonDocument resultDocument = JsonDocument.Parse(stdout);
+                JsonElement profile = profileDocument.RootElement.Clone();
+                JsonElement result = resultDocument.RootElement.Clone();
+                bool isReal = workload.CompilationMode == BenchmarkCompilationMode.RealMsBuild;
+                long hits = ReadCounter(profile, "Counters.Cache.Hits");
+                return new RealMsBuildCacheMeasurement
+                {
+                    FixtureKind = isReal ? "real-msbuild" : "eligible-control",
+                    CacheMode = cacheMode,
+                    WorkloadId = workload.WorkloadId,
+                    WorkloadIdentity = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(workload.WorkloadId))),
+                    Size = size,
+                    ProjectCount = workload.Dimensions.ProjectCount,
+                    Eligibility = isReal ? "CacheIneligible" : (hits > 0 ? "VerifiedCacheEligible" : "ControlUnavailable"),
+                    IneligibilityReasons = ineligibilityReasons.OrderBy(reason => reason, StringComparer.Ordinal).ToArray(),
+                    Lookups = ReadCounter(profile, "Counters.Cache.Lookups"),
+                    Hits = hits,
+                    Misses = ReadCounter(profile, "Counters.Cache.Misses"),
+                    Rejects = ReadCounter(profile, "Counters.Cache.Rejects"),
+                    Writes = ReadCounter(profile, "Counters.Cache.Writes"),
+                    IneligibleUnitCount = ReadCounter(profile, "Counters.Cache.IneligibleUnitCount"),
+                    BytesRead = ReadOptionalCounter(profile, "Counters.Cache.BytesRead"),
+                    BytesWritten = ReadOptionalCounter(profile, "Counters.Cache.BytesWritten"),
+                    AvoidedWork = ReadOptionalCounter(profile, "Counters.Cache.AvoidedFactIndexMaterializations") +
+                        ReadOptionalCounter(profile, "Counters.Cache.AvoidedContractExecutions"),
+                    DeterministicWork = ReadCounter(profile, "Counters.ProjectGraphEvaluations") +
+                        ReadCounter(profile, "Counters.AssemblyLoads") +
+                        ReadCounter(profile, "Counters.FactIndexMaterializations") +
+                        ReadCounter(profile, "Counters.ContractExecutions"),
+                    TotalElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds,
+                    TargetedPhaseMilliseconds = ReadTargetedPhaseMilliseconds(profile),
+                    TargetedPhaseSharePercent = TargetedPhaseShare(profile, stopwatch.Elapsed.TotalMilliseconds),
+                    AllocatedBytes = ReadOptionalCounter(profile, "Measurements.AllocatedBytesTotal"),
+                    PeakWorkingSetBytes = ReadOptionalCounter(profile, "Measurements.PeakWorkingSetBytes"),
+                    CanonicalResultSha256 = CanonicalResultSha256(result, ReadString(profile, "CompletionStatus") ?? "unknown", process.ExitCode),
+                    CompletionStatus = ReadString(profile, "CompletionStatus") ?? "unknown",
+                    ExitCode = process.ExitCode,
+                };
+            }
+            catch
+            {
+                TryKillProcessTree(process);
+                await AwaitProcessCleanupAsync(process, stdoutTask, stderrTask);
+                throw;
+            }
         }
         catch
         {
@@ -234,6 +243,34 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
             {
                 File.Delete(profilePath);
             }
+        }
+    }
+
+    private static async Task AwaitProcessCleanupAsync(Process process, params Task<string>[] outputTasks)
+    {
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.WhenAll(outputTasks).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch
+        {
+            // Preserve the original timeout, cancellation, or process failure.
+        }
+    }
+
+    private static void TryKillProcessTree(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // The process exited between the check and Kill; cleanup is already complete.
         }
     }
 
@@ -324,14 +361,20 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
             return null;
         }
 
-        JsonElement phase = phases.EnumerateArray()
+        List<JsonElement> entries = phases.EnumerateArray().ToList();
+        bool hasLoadAndSetup = entries.Any(candidate =>
+            candidate.TryGetProperty("Name", out JsonElement name) && name.GetString() == "load_and_setup");
+        string[] avoidableNames =
+        [
+            "configuration_check", "policy_consistency_check", "contract_checks", "post_processing",
+        ];
+        double total = entries
             .Where(candidate => candidate.TryGetProperty("Name", out JsonElement name) &&
-                name.GetString()?.Contains("contract", StringComparison.OrdinalIgnoreCase) == true)
-            .OrderByDescending(candidate => candidate.TryGetProperty("ElapsedMs", out JsonElement elapsed) ? elapsed.GetDouble() : 0)
-            .FirstOrDefault();
-        return phase.ValueKind != JsonValueKind.Undefined && phase.TryGetProperty("ElapsedMs", out JsonElement value)
-            ? value.GetDouble()
-            : null;
+                (avoidableNames.Contains(name.GetString(), StringComparer.Ordinal) ||
+                    (!hasLoadAndSetup && name.GetString() == "assembly_resolution") ||
+                    (hasLoadAndSetup && name.GetString() == "load_and_setup")))
+            .Sum(candidate => candidate.TryGetProperty("ElapsedMs", out JsonElement elapsed) ? elapsed.GetDouble() : 0);
+        return total > 0 ? total : null;
     }
 
     private static double? TargetedPhaseShare(JsonElement profile, double totalMilliseconds)

@@ -23,6 +23,21 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
     }
 
     [Test]
+    public void EffectModel_LeavesWarmHitAndAmortizedEffectModelOnlyWithoutVerifiedHit()
+    {
+        RealMsBuildCacheEffectEstimate estimate = RealMsBuildCacheEffectModel.Calculate(
+            CreateMeasurements(includeEligibleControl: false));
+
+        Assert.That(estimate.Complete, Is.False);
+        Assert.That(estimate.Points, Has.All.Matches<RealMsBuildCacheEffectPoint>(point =>
+            !point.VerifiedWarmHitObserved &&
+            point.ExpectedWarmHitReductionPercent is null &&
+            point.ExpectedAmortizedReductionPercent is null &&
+            point.WarmHitAvoidedWork is null));
+        estimate.Validate();
+    }
+
+    [Test]
     public void Document_RejectsOutcomeAWhileNormalizationGateIsOpen()
     {
         RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("A", phase2Authorized: false);
@@ -46,9 +61,25 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(markdown, Does.Contain("eligible-control"));
     }
 
-    private static RealMsBuildCacheEligibilityEvidenceDocument CreateDocument(string decision, bool phase2Authorized)
+    [Test]
+    public void Document_RejectsOutcomeCWithoutVerifiedWarmHit()
     {
-        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true);
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
+            "C",
+            phase2Authorized: false,
+            measurements: CreateMeasurements(includeEligibleControl: false));
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("verified warm-hit effect estimate"));
+    }
+
+    private static RealMsBuildCacheEligibilityEvidenceDocument CreateDocument(
+        string decision,
+        bool phase2Authorized,
+        IReadOnlyList<RealMsBuildCacheMeasurement>? measurements = null)
+    {
+        measurements ??= CreateMeasurements(includeEligibleControl: true);
         return new RealMsBuildCacheEligibilityEvidenceDocument
         {
             EvidenceSchemaId = RealMsBuildCacheEligibilityEvidenceDocument.SchemaId,

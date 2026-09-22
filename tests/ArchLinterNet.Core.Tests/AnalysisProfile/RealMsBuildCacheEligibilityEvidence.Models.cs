@@ -86,6 +86,12 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
             Require(ReferenceBaseDisposition.CountedInEffectEstimate == false,
                 "Reference/base work cannot be counted as candidate exact-cache savings.");
         }
+
+        if (Decision == "C")
+        {
+            Require(EffectEstimate.Complete,
+                "Outcome C cannot be final while the verified warm-hit effect estimate is incomplete or model-only.");
+        }
     }
 
     private static bool ContainsPrivateIdentity(string value) =>
@@ -187,11 +193,11 @@ internal sealed record RealMsBuildCacheEffectPoint
 
     public required decimal ColdMissOverheadPercent { get; init; }
 
-    public required decimal ExpectedWarmHitReductionPercent { get; init; }
+    public required decimal? ExpectedWarmHitReductionPercent { get; init; }
 
-    public required decimal ExpectedAmortizedReductionPercent { get; init; }
+    public required decimal? ExpectedAmortizedReductionPercent { get; init; }
 
-    public required long WarmHitAvoidedWork { get; init; }
+    public required long? WarmHitAvoidedWork { get; init; }
 
     public required bool VerifiedWarmHitObserved { get; init; }
 
@@ -200,8 +206,14 @@ internal sealed record RealMsBuildCacheEffectPoint
         if (Size is not ("small" or "medium" or "large") ||
             TargetedPhaseSharePercent < 0 || TargetedPhaseSharePercent > 100 ||
             AmdahlMaximumSpeedup < 1 || ColdMissOverheadPercent < 0 ||
-            ExpectedWarmHitReductionPercent < 0 || ExpectedWarmHitReductionPercent > 100 ||
-            ExpectedAmortizedReductionPercent < 0 || ExpectedAmortizedReductionPercent > 100 || WarmHitAvoidedWork < 0)
+            (ExpectedWarmHitReductionPercent is < 0 or > 100) ||
+            (ExpectedAmortizedReductionPercent is < 0 or > 100) || WarmHitAvoidedWork < 0 ||
+            (!VerifiedWarmHitObserved &&
+                (ExpectedWarmHitReductionPercent.HasValue || ExpectedAmortizedReductionPercent.HasValue ||
+                    WarmHitAvoidedWork.HasValue)) ||
+            (VerifiedWarmHitObserved &&
+                (!ExpectedWarmHitReductionPercent.HasValue || !ExpectedAmortizedReductionPercent.HasValue ||
+                    !WarmHitAvoidedWork.HasValue)))
         {
             throw new InvalidOperationException($"Invalid cache effect point for {Size}.");
         }
@@ -300,11 +312,15 @@ internal static class RealMsBuildCacheEffectModel
                 measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == size && measurement.CacheMode == "disabled");
             RealMsBuildCacheMeasurement? controlHit = measurements.SingleOrDefault(
                 measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == size && measurement.CacheMode == "repeat" && measurement.Hits > 0);
-            decimal warmReduction = controlBaseline?.TotalElapsedMilliseconds is > 0 && controlHit?.TotalElapsedMilliseconds is >= 0
-                ? Math.Clamp((decimal)((controlBaseline.TotalElapsedMilliseconds.Value - controlHit.TotalElapsedMilliseconds!.Value) /
+            bool verifiedWarmHitObserved = controlBaseline?.TotalElapsedMilliseconds is > 0 &&
+                controlHit?.TotalElapsedMilliseconds is >= 0;
+            decimal? warmReduction = verifiedWarmHitObserved
+                ? Math.Clamp((decimal)((controlBaseline!.TotalElapsedMilliseconds!.Value - controlHit!.TotalElapsedMilliseconds!.Value) /
                     controlBaseline.TotalElapsedMilliseconds.Value * 100), 0, 100)
-                : share;
-            decimal amortized = Math.Clamp(((expectedReuseCount - 1) * warmReduction - coldOverhead) / expectedReuseCount, 0, 100);
+                : null;
+            decimal? amortized = warmReduction.HasValue
+                ? Math.Clamp(((expectedReuseCount - 1) * warmReduction.Value - coldOverhead) / expectedReuseCount, 0, 100)
+                : null;
             points.Add(new RealMsBuildCacheEffectPoint
             {
                 Size = size,
@@ -313,20 +329,20 @@ internal static class RealMsBuildCacheEffectModel
                 ColdMissOverheadPercent = coldOverhead,
                 ExpectedWarmHitReductionPercent = warmReduction,
                 ExpectedAmortizedReductionPercent = amortized,
-                WarmHitAvoidedWork = controlHit?.AvoidedWork ?? baseline.DeterministicWork,
-                VerifiedWarmHitObserved = controlHit != null,
+                WarmHitAvoidedWork = verifiedWarmHitObserved ? controlHit!.AvoidedWork : null,
+                VerifiedWarmHitObserved = verifiedWarmHitObserved,
             });
         }
 
         return new RealMsBuildCacheEffectEstimate
         {
-            TargetedPhase = "contract-evaluation",
-            TargetedWork = "Contract execution and mode-specific fact/evaluation work that a verified exact-request hit can reconstruct without re-running.",
+            TargetedPhase = "cache-avoidable-analysis",
+            TargetedWork = "Assembly/artifact loading and analysis phases skipped by a verified exact-request hit; cache lookup, build-state authorization, and output routing remain outside the boundary.",
             SuccessThresholdPercent = 10,
             KillCriterionPercent = 5,
             ExpectedReuseCount = expectedReuseCount,
             ReuseAssumptions = "Three equivalent requests in one workflow or across immutable reference/base revisions; cache misses remain correct fallbacks.",
-            Complete = points.All(point => point.TargetedPhaseSharePercent > 0),
+            Complete = points.All(point => point.TargetedPhaseSharePercent > 0 && point.VerifiedWarmHitObserved),
             Points = points,
         };
     }
