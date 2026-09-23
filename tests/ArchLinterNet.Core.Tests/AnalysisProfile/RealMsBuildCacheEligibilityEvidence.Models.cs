@@ -363,10 +363,10 @@ internal static class RealMsBuildCacheEffectModel
                 Writes: > 0,
                 Rejects: 0,
             };
-            decimal? coldOverhead = controlPopulationVerified && controlBaseline?.TotalElapsedMilliseconds is > 0 &&
+            decimal? coldOverhead = controlPopulationVerified && total > 0 && controlBaseline?.TotalElapsedMilliseconds is > 0 &&
                 controlPopulation!.TotalElapsedMilliseconds.HasValue
                 ? Math.Max(0, (decimal)((controlPopulation.TotalElapsedMilliseconds.Value - controlBaseline.TotalElapsedMilliseconds!.Value) /
-                    controlBaseline.TotalElapsedMilliseconds.Value * 100))
+                    total * 100))
                 : null;
             bool controlCanonicalResultEquivalent = controlBaseline != null && controlPopulation != null && controlHit != null &&
                 controlBaseline.CanonicalResultSha256 == controlPopulation.CanonicalResultSha256 &&

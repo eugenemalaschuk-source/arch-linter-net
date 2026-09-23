@@ -10,14 +10,17 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
     {
         IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true);
 
+        Assert.That(measurements.Single(measurement => measurement.FixtureKind == "real-msbuild" && measurement.Size == "small" && measurement.CacheMode == "disabled").TotalElapsedMilliseconds, Is.EqualTo(100d));
+        Assert.That(measurements.Single(measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == "small" && measurement.CacheMode == "disabled").TotalElapsedMilliseconds, Is.EqualTo(50d));
+
         RealMsBuildCacheEffectEstimate estimate = RealMsBuildCacheEffectModel.Calculate(measurements);
 
         RealMsBuildCacheEffectPoint small = estimate.Points.Single(point => point.Size == "small");
         Assert.That(small.TargetedPhaseSharePercent, Is.EqualTo(25m));
         Assert.That(small.AmdahlMaximumSpeedup, Is.EqualTo(1.3333333333333333333333333333m).Within(0.0000000000000000000000001m));
-        Assert.That(small.ColdMissOverheadPercent, Is.EqualTo(20m));
+        Assert.That(small.ColdMissOverheadPercent, Is.EqualTo(10m));
         Assert.That(small.ExpectedWarmHitReductionPercent, Is.EqualTo(25m));
-        Assert.That(small.ExpectedAmortizedReductionPercent, Is.EqualTo(10m));
+        Assert.That(small.ExpectedAmortizedReductionPercent, Is.EqualTo(13.3333333333333333333333333333m).Within(0.0000000000000000000000001m));
         Assert.That(small.VerifiedWarmHitObserved, Is.True);
         Assert.That(small.ResourceEvidenceComplete, Is.True);
         Assert.That(estimate.Complete, Is.True);
@@ -66,6 +69,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(markdown, Does.Contain("The targeted boundary includes assembly/artifact loading and analysis phases"));
         Assert.That(markdown, Does.Contain("Without a verified warm-hit control, warm-hit and amortized reductions remain unavailable/model-only"));
         Assert.That(markdown, Does.Contain("Cold/miss overhead is computed only from the eligible-control disabled-versus-population path"));
+        Assert.That(markdown, Does.Contain("its absolute cost is normalized against the real-MSBuild disabled baseline"));
         Assert.That(markdown, Does.Contain("Expected warm-hit reduction is normalized to the real-MSBuild denominator"));
         Assert.That(markdown, Does.Contain("Allocated bytes"));
         Assert.That(markdown, Does.Contain("Peak working set"));
@@ -237,9 +241,9 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
 
             if (includeEligibleControl)
             {
-                measurements.Add(CreateMeasurement("eligible-control", "disabled", workloadId, size, projects, 0, 0, total, total * .25, "VerifiedCacheEligible"));
-                measurements.Add(CreateMeasurement("eligible-control", "population", workloadId, size, projects, 0, 1, total * 1.2, total * .25, "VerifiedCacheEligible"));
-                measurements.Add(CreateMeasurement("eligible-control", "repeat", workloadId, size, projects, 1, 0, total * .5, total * .25, "VerifiedCacheEligible", avoidedWork: 4));
+                measurements.Add(CreateMeasurement("eligible-control", "disabled", workloadId, size, projects, 0, 0, total * .5, total * .125, "VerifiedCacheEligible"));
+                measurements.Add(CreateMeasurement("eligible-control", "population", workloadId, size, projects, 0, 1, total * .6, total * .125, "VerifiedCacheEligible"));
+                measurements.Add(CreateMeasurement("eligible-control", "repeat", workloadId, size, projects, 1, 0, total * .25, total * .125, "VerifiedCacheEligible", avoidedWork: 4));
             }
         }
 
