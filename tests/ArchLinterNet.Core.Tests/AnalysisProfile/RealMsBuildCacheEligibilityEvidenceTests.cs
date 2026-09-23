@@ -57,7 +57,15 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
     [Test]
     public void Document_AllowsConservativeOutcomeCAndPreservesFailClosedRows()
     {
-        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("C", phase2Authorized: true);
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control" && measurement.CacheMode == "repeat"
+                ? measurement with { TotalElapsedMilliseconds = measurement.TotalElapsedMilliseconds!.Value * 1.75 }
+                : measurement)
+            .ToArray();
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
+            "C",
+            phase2Authorized: true,
+            measurements: measurements);
 
         Assert.DoesNotThrow(document.Validate);
         Assert.DoesNotThrow(() => RealMsBuildCacheEligibilityEvidenceSerialization.Serialize(document));
@@ -73,6 +81,16 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(markdown, Does.Contain("Expected warm-hit reduction is normalized to the real-MSBuild denominator"));
         Assert.That(markdown, Does.Contain("Allocated bytes"));
         Assert.That(markdown, Does.Contain("Peak working set"));
+    }
+
+    [Test]
+    public void Document_RejectsOutcomeCWhenAmortizedBenefitExceedsKillCriterion()
+    {
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("C", phase2Authorized: true);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("kill criterion"));
     }
 
     [Test]

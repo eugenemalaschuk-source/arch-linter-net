@@ -165,6 +165,10 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
         {
             Require(EffectEstimate.Complete,
                 "Outcome C cannot be final while the verified warm-hit effect estimate is incomplete or model-only.");
+            Require(EffectEstimate.Points.All(point =>
+                    point.ExpectedAmortizedReductionPercent.HasValue &&
+                    point.ExpectedAmortizedReductionPercent.Value <= EffectEstimate.KillCriterionPercent),
+                "Outcome C requires amortized effect at or below the kill criterion for every representative size.");
         }
     }
 
