@@ -634,20 +634,20 @@ jobs:
               return "$metrics_badge_exit"
             fi
             if ! python3 - "$output_directory" <<'PY'
-            import json
-            import sys
-            from pathlib import Path
+          import json
+          import sys
+          from pathlib import Path
 
-            expected = {
-                "repository-metrics-badge.json": "source lines",
-                "repository.json": "repository",
-                "structure.json": "structure",
-            }
-            for name, label in expected.items():
+          expected = {
+              "repository-metrics-badge.json": "source lines",
+              "repository.json": "repository",
+              "structure.json": "structure",
+          }
+          for name, label in expected.items():
               try:
-                document = json.loads((Path(sys.argv[1]) / name).read_text(encoding="utf-8"))
+                  document = json.loads((Path(sys.argv[1]) / name).read_text(encoding="utf-8"))
               except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-                raise SystemExit(f"Repository metrics badge output is not valid JSON: {error}")
+                  raise SystemExit(f"Repository metrics badge output is not valid JSON: {error}")
 
               if (not isinstance(document, dict)
                       or set(document) != {"schemaVersion", "label", "message", "color", "logoSvg"}
@@ -656,7 +656,7 @@ jobs:
                       or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color", "logoSvg"))
                       or not document["logoSvg"].lstrip().startswith("<svg ")):
                   raise SystemExit(f"{name} must be a complete Shields endpoint document with the reviewed ArchLinterNet SVG logo.")
-            PY
+          PY
             then
               return 2
             fi
