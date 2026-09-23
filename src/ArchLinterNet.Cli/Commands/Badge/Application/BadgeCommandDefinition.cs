@@ -42,15 +42,18 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
         Command repositoryMetrics = new("repository-metrics", "Write Shields endpoint JSON from repository metrics.");
         Option<string> repositoryMetricsInput = new(InputOptionName);
         Option<string> repositoryMetricsOutput = new("--output");
+        Option<string> repositoryMetricsOutputDirectory = new("--output-directory");
         Option<bool> repositoryMetricsHelp = new(HelpOptionName);
         repositoryMetricsHelp.Aliases.Add("-h");
         repositoryMetrics.Options.Add(repositoryMetricsInput);
         repositoryMetrics.Options.Add(repositoryMetricsOutput);
+        repositoryMetrics.Options.Add(repositoryMetricsOutputDirectory);
         repositoryMetrics.Options.Add(repositoryMetricsHelp);
         repositoryMetrics.SetAction(result => handler.ExecuteRepositoryMetrics(new RepositoryMetricsBadgeCommandOptions(
             result.GetValue(repositoryMetricsInput) ?? string.Empty,
             result.GetValue(repositoryMetricsOutput),
-            result.GetValue(repositoryMetricsHelp))));
+            result.GetValue(repositoryMetricsHelp),
+            result.GetValue(repositoryMetricsOutputDirectory))));
         Command setup = new("setup", "Preview or generate a versioned consumer badge setup.");
         Option<string> setupInput = new(InputOptionName);
         Option<string> setupOutput = new("--output");

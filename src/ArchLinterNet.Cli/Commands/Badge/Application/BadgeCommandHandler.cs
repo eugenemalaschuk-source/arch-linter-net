@@ -13,7 +13,8 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
         + "[--disclosure-profile <headline-only/v1|headline-plus-freshness/v1>] [--verified-at <UTC>] "
         + "[--verify-disclosure-profile]";
     private const string RepositoryMetricsHelp =
-        "arch-linter-net badge repository-metrics --input <validation.json|architecture-health.json> [--output <badge.json>]";
+        "arch-linter-net badge repository-metrics --input <validation.json|architecture-health.json> "
+        + "[--output <badge.json>] [--output-directory <directory>]";
 
     internal int ExecuteSetup(BadgeSetupCommandOptions options) => new BadgeSetupCommandHandler(console, fileSystem).ExecuteSetup(options);
 
@@ -113,35 +114,39 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
             return CliExitCodes.Success;
         }
 
-        RepositoryMetricsBadgeProjection projection;
         try
         {
-            projection = RepositoryMetricsBadgeProjector.Project(fileSystem.ReadAllText(options.InputPath));
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            console.Error.WriteLine($"Could not read repository metrics input: {exception.Message}");
-            projection = new("unavailable", "lightgrey", CliExitCodes.InvalidArgumentsOrRuntimeError);
-        }
+            string input = fileSystem.ReadAllText(options.InputPath);
+            if (options.OutputDirectory is not null)
+            {
+                RepositoryMetricsBadgeProjection[] projections =
+                [
+                    RepositoryMetricsBadgeProjector.Project(input, RepositoryMetricsBadgeKind.SourceLines),
+                    RepositoryMetricsBadgeProjector.Project(input, RepositoryMetricsBadgeKind.Repository),
+                    RepositoryMetricsBadgeProjector.Project(input, RepositoryMetricsBadgeKind.Structure),
+                ];
+                string[] fileNames = ["repository-metrics-badge.json", "repository.json", "structure.json"];
+                for (int index = 0; index < projections.Length; index++)
+                {
+                    WriteRepositoryMetricsBadge(projections[index], Path.Combine(options.OutputDirectory, fileNames[index]));
+                }
 
-        string json = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            label = "source lines",
-            message = projection.Message,
-            color = projection.Color,
-        });
-        try
-        {
+                return projections.Any(static projection => projection.ExitCode != CliExitCodes.Success)
+                    ? CliExitCodes.InvalidArgumentsOrRuntimeError
+                    : CliExitCodes.Success;
+            }
+
+            RepositoryMetricsBadgeProjection projection = RepositoryMetricsBadgeProjector.Project(input);
             if (options.OutputPath is null)
             {
-                console.Out.WriteLine(json);
+                console.Out.WriteLine(SerializeRepositoryMetricsBadge(projection));
             }
             else
             {
-                string temporaryPath = fileSystem.WriteAllTextToTemp(options.OutputPath, json + Environment.NewLine);
-                fileSystem.RenameTempToTarget(temporaryPath, options.OutputPath);
+                WriteRepositoryMetricsBadge(projection, options.OutputPath);
             }
+
+            return projection.ExitCode;
         }
         catch (Exception exception) when (exception is IOException
             or UnauthorizedAccessException
@@ -151,9 +156,22 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
             console.Error.WriteLine($"Could not write repository metrics badge: {exception.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
-
-        return projection.ExitCode;
     }
+
+    private void WriteRepositoryMetricsBadge(RepositoryMetricsBadgeProjection projection, string outputPath)
+    {
+        string temporaryPath = fileSystem.WriteAllTextToTemp(outputPath, SerializeRepositoryMetricsBadge(projection) + Environment.NewLine);
+        fileSystem.RenameTempToTarget(temporaryPath, outputPath);
+    }
+
+    private static string SerializeRepositoryMetricsBadge(RepositoryMetricsBadgeProjection projection) => JsonSerializer.Serialize(new
+    {
+        schemaVersion = 1,
+        label = projection.Label,
+        message = projection.Message,
+        color = projection.Color,
+        logoSvg = projection.LogoSvg,
+    });
 
     private int VerifyDisclosureProfile(ArchitectureHealthBadgeCommandOptions options)
     {

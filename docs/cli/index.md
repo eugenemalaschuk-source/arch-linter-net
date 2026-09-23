@@ -27,7 +27,7 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 <!-- cli-command: badge repository-metrics -->
 
-| `arch-linter-net badge repository-metrics --input <validation.json> [--output <badge.json>]` | Project absolute Source lines repository metrics into a Shields endpoint payload; does not rerun analysis. |
+| `arch-linter-net badge repository-metrics --input <validation.json> [--output <badge.json>] [--output-directory <directory>]` | Project absolute Source lines plus optional grouped Repository and Structure metrics into Shields endpoint payloads; does not rerun analysis. |
 
 <!-- cli-command: badge setup -->
 

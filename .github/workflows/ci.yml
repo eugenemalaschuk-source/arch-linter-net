@@ -628,28 +628,35 @@ jobs:
 
             dotnet run --no-build --project "$cli_project" -- badge repository-metrics \
               --input "$output_directory/architecture-health.json" \
-              --output "$output_directory/repository-metrics-badge.json"
+              --output-directory "$output_directory"
             metrics_badge_exit=$?
             if [ "$metrics_badge_exit" -ne 0 ] && [ ! -s "$output_directory/repository-metrics-badge.json" ]; then
               return "$metrics_badge_exit"
             fi
-            if ! python3 - "$output_directory/repository-metrics-badge.json" <<'PY'
-          import json
-          import sys
-          from pathlib import Path
+            if ! python3 - "$output_directory" <<'PY'
+            import json
+            import sys
+            from pathlib import Path
 
-          try:
-              document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-              raise SystemExit(f"Repository metrics badge output is not valid JSON: {error}")
+            expected = {
+                "repository-metrics-badge.json": "source lines",
+                "repository.json": "repository",
+                "structure.json": "structure",
+            }
+            for name, label in expected.items():
+              try:
+                document = json.loads((Path(sys.argv[1]) / name).read_text(encoding="utf-8"))
+              except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise SystemExit(f"Repository metrics badge output is not valid JSON: {error}")
 
-          if (not isinstance(document, dict)
-                  or set(document) != {"schemaVersion", "label", "message", "color"}
-                  or document.get("schemaVersion") != 1
-                  or document.get("label") != "source lines"
-                  or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color"))):
-              raise SystemExit("Repository metrics badge output must be a complete Shields endpoint document.")
-          PY
+              if (not isinstance(document, dict)
+                      or set(document) != {"schemaVersion", "label", "message", "color", "logoSvg"}
+                      or document.get("schemaVersion") != 1
+                      or document.get("label") != label
+                      or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color", "logoSvg"))
+                      or not document["logoSvg"].lstrip().startswith("<svg ")):
+                  raise SystemExit(f"{name} must be a complete Shields endpoint document with the reviewed ArchLinterNet SVG logo.")
+            PY
             then
               return 2
             fi
@@ -948,13 +955,15 @@ jobs:
           path: architecture-coverage.md
 
       - name: Upload architecture Health artifact
-        if: always() && hashFiles('architecture-pr-report/architecture-health.json') != '' && hashFiles('architecture-pr-report/repository-metrics-badge.json') != ''
+        if: always() && hashFiles('architecture-pr-report/architecture-health.json') != '' && hashFiles('architecture-pr-report/repository-metrics-badge.json') != '' && hashFiles('architecture-pr-report/repository.json') != '' && hashFiles('architecture-pr-report/structure.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: architecture-health
           path: |
             architecture-pr-report/architecture-health.json
             architecture-pr-report/repository-metrics-badge.json
+            architecture-pr-report/repository.json
+            architecture-pr-report/structure.json
 
       - name: Upload architecture change artifact
         if: always() && hashFiles('architecture-pr-report/architecture-change.json') != ''

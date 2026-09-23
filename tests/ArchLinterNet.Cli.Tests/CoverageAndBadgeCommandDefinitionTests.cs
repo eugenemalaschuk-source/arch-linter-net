@@ -134,6 +134,22 @@ public sealed class CoverageAndBadgeCommandDefinitionTests
     }
 
     [Test]
+    public void BadgeDefinition_RepositoryMetricsSubcommand_ExposesGroupedOutputDirectory()
+    {
+        FakeConsole console = new();
+        RootCommand root = new();
+        root.Subcommands.Add(new BadgeCommandDefinition(new BadgeCommandHandler(console, new FakeFileSystem())).Create());
+
+        int exitCode = root.Parse(["badge", "repository-metrics", "--help"]).Invoke();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(console.Output, Does.Contain("--output-directory"));
+        });
+    }
+
+    [Test]
     public void BadgeDefinition_ArchitectureHealthLifecycleSubcommand_ExposesHelp()
     {
         FakeConsole console = new();

@@ -6,13 +6,24 @@ using ArchLinterNet.Core.Model;
 namespace ArchLinterNet.Cli.Commands.Badge.Application;
 
 internal sealed record RepositoryMetricsBadgeProjection(
+    string Label,
     string Message,
     string Color,
+    string LogoSvg,
     int ExitCode);
+
+internal enum RepositoryMetricsBadgeKind
+{
+    SourceLines,
+    Repository,
+    Structure,
+}
 
 internal static class RepositoryMetricsBadgeProjector
 {
-    internal static RepositoryMetricsBadgeProjection Project(string input)
+    internal static RepositoryMetricsBadgeProjection Project(
+        string input,
+        RepositoryMetricsBadgeKind kind = RepositoryMetricsBadgeKind.SourceLines)
     {
         try
         {
@@ -21,25 +32,53 @@ internal static class RepositoryMetricsBadgeProjector
                 ? nested
                 : document.RootElement;
             RepositoryMetricsSnapshot metrics = RepositoryMetricsJson.Deserialize(metricsElement.GetRawText());
-            if (!metrics.IsComplete || metrics.Size.SourceLines is null)
+            if (!metrics.IsComplete)
             {
-                return new("unavailable", "lightgrey", CliExitCodes.InvalidArgumentsOrRuntimeError);
+                return Unavailable(kind);
             }
 
-            return new(
-                FormatSourceLines(metrics.Size.SourceLines.Value),
-                "blue",
-                CliExitCodes.Success);
+            return kind switch
+            {
+                RepositoryMetricsBadgeKind.SourceLines when metrics.Size.SourceLines is int sourceLines =>
+                    Complete("source lines", FormatSourceLines(sourceLines)),
+                RepositoryMetricsBadgeKind.Repository when metrics.Size.Projects is int projects && metrics.Size.Types is int types =>
+                    Complete("repository", $"{FormatCount(projects)} projects · {FormatCount(types)} types"),
+                RepositoryMetricsBadgeKind.Structure when metrics.Coupling.DependencyCount is int dependencies
+                    && metrics.Structure.LargestSccSize is int largestScc =>
+                    Complete("structure", $"{FormatCount(dependencies)} deps · SCC {FormatCount(largestScc)}"),
+                _ => Unavailable(kind),
+            };
         }
         catch (JsonException)
         {
-            return new("unavailable", "lightgrey", CliExitCodes.InvalidArgumentsOrRuntimeError);
+            return Unavailable(kind);
         }
         catch (ArgumentException)
         {
-            return new("unavailable", "lightgrey", CliExitCodes.InvalidArgumentsOrRuntimeError);
+            return Unavailable(kind);
         }
     }
+
+    private static RepositoryMetricsBadgeProjection Complete(string label, string message) => new(
+        label,
+        message,
+        "blue",
+        ArchLinterNetBadgeLogo.Svg,
+        CliExitCodes.Success);
+
+    private static RepositoryMetricsBadgeProjection Unavailable(RepositoryMetricsBadgeKind kind) => new(
+        kind switch
+        {
+            RepositoryMetricsBadgeKind.Repository => "repository",
+            RepositoryMetricsBadgeKind.Structure => "structure",
+            _ => "source lines",
+        },
+        "unavailable",
+        "lightgrey",
+        ArchLinterNetBadgeLogo.Svg,
+        CliExitCodes.InvalidArgumentsOrRuntimeError);
+
+    private static string FormatCount(int value) => value.ToString("N0", CultureInfo.InvariantCulture);
 
     private static string FormatSourceLines(int sourceLines)
     {
