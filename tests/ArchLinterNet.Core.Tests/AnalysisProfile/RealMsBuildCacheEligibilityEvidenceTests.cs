@@ -79,6 +79,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.That(markdown, Does.Contain("Cold/miss overhead is computed only from the eligible-control disabled-versus-population path"));
         Assert.That(markdown, Does.Contain("its absolute cost is normalized against the real-MSBuild disabled baseline"));
         Assert.That(markdown, Does.Contain("Expected warm-hit reduction is normalized to the real-MSBuild denominator"));
+        Assert.That(markdown, Does.Contain("Decision classification is total after #991"));
         Assert.That(markdown, Does.Contain("Allocated bytes"));
         Assert.That(markdown, Does.Contain("Peak working set"));
     }
@@ -241,6 +242,36 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
             DecisionRationale = "The measured useful effect is dominated by the prepared-analysis lane and remains below the materiality threshold.",
         };
 
+        Assert.DoesNotThrow(document.Validate);
+    }
+
+    [Test]
+    public void Document_AllowsOutcomeBForMixedScaleEffects()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control" && measurement.CacheMode == "repeat"
+                ? measurement with
+                {
+                    TotalElapsedMilliseconds = measurement.TotalElapsedMilliseconds!.Value * (measurement.Size switch
+                    {
+                        "small" => 1.78,
+                        "medium" => 1.69,
+                        "large" => 1.54,
+                        _ => throw new ArgumentOutOfRangeException(),
+                    }),
+                }
+                : measurement)
+            .ToArray();
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
+            "B",
+            phase2Authorized: true,
+            measurements: measurements) with
+        {
+            DecisionRationale = "The mixed small/medium/large effect is useful but dominated by the prepared-analysis lane at this stage.",
+        };
+
+        Assert.That(document.EffectEstimate.Points.Select(point => point.ExpectedAmortizedReductionPercent),
+            Is.EqualTo(new decimal?[] { 4m, 7m, 12m }));
         Assert.DoesNotThrow(document.Validate);
     }
 

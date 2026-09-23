@@ -46,6 +46,7 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
             .AppendLine("- Outcome-complete resource evidence requires allocation, peak working set, bytes read, and bytes written observations for eligible-control disabled, population, and repeat paths.")
             .AppendLine("- Eligible-control calibration is paired to the corresponding real-MSBuild workload by project count and an explicit calibration-pair identity; mismatches leave the estimate incomplete.")
             .AppendLine("- Cache-disabled, population/miss, and repeat results retain canonical-result identity within each fixture and across eligible-control versus real-MSBuild workloads; stale-input checks retain fail-closed dispositions.")
+            .AppendLine("- Decision classification is total after #991: A requires every S/M/L point at or above the success threshold, C requires every point at or below the kill criterion, and B covers complete useful or mixed-scale evidence between those uniform outcomes.")
             .AppendLine("- The exact-request cache estimate excludes prepared-analysis persistence and separately records reference/base-side work.")
             .AppendLine()
             .AppendLine("## Environment")

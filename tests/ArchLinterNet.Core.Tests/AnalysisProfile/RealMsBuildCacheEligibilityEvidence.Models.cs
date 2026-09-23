@@ -142,11 +142,13 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
         {
             Require(EffectEstimate.Complete,
                 "Outcome B requires a complete effect estimate; incomplete evidence must remain Pending.");
-            Require(EffectEstimate.Points.All(point =>
+            Require(EffectEstimate.Points.Any(point =>
                     point.ExpectedAmortizedReductionPercent.HasValue &&
-                    point.ExpectedAmortizedReductionPercent.Value > EffectEstimate.KillCriterionPercent &&
+                    point.ExpectedAmortizedReductionPercent.Value > EffectEstimate.KillCriterionPercent) &&
+                EffectEstimate.Points.Any(point =>
+                    point.ExpectedAmortizedReductionPercent.HasValue &&
                     point.ExpectedAmortizedReductionPercent.Value < EffectEstimate.SuccessThresholdPercent),
-                "Outcome B requires useful amortized benefit above the kill criterion but below the materiality threshold.");
+                "Outcome B requires a useful or mixed-scale effect: at least one size above the kill criterion and at least one below the materiality threshold.");
             Require(DecisionRationale.Contains("dominat", StringComparison.OrdinalIgnoreCase) &&
                     DecisionRationale.Contains("lane", StringComparison.OrdinalIgnoreCase),
                 "Outcome B requires rationale that identifies the dominating lane.");
