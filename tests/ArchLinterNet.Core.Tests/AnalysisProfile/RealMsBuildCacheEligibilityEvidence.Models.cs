@@ -82,6 +82,9 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
                 Require(controlMeasurements.Select(measurement => measurement.CanonicalResultSha256)
                         .Distinct(StringComparer.Ordinal).Count() == 1,
                     $"Eligible-control evidence for {size} must preserve canonical result identity across cache modes.");
+                Require(controlMeasurements.All(measurement =>
+                        measurement.CanonicalResultSha256 == realMeasurements[0].CanonicalResultSha256),
+                    $"Eligible-control evidence for {size} must preserve canonical result identity with real-MSBuild evidence.");
             }
         }
 
@@ -370,7 +373,8 @@ internal static class RealMsBuildCacheEffectModel
                 : null;
             bool controlCanonicalResultEquivalent = controlBaseline != null && controlPopulation != null && controlHit != null &&
                 controlBaseline.CanonicalResultSha256 == controlPopulation.CanonicalResultSha256 &&
-                controlBaseline.CanonicalResultSha256 == controlHit.CanonicalResultSha256;
+                controlBaseline.CanonicalResultSha256 == controlHit.CanonicalResultSha256 &&
+                baseline.CanonicalResultSha256 == controlBaseline.CanonicalResultSha256;
             bool verifiedWarmHitObserved = controlPopulationVerified && controlCanonicalResultEquivalent &&
                 controlBaseline?.Eligibility == "VerifiedCacheEligible" && controlBaseline.TotalElapsedMilliseconds is > 0 &&
                 controlHit?.Eligibility == "VerifiedCacheEligible" && controlHit.TotalElapsedMilliseconds is >= 0;

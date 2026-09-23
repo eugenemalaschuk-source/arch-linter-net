@@ -119,6 +119,40 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
     }
 
     [Test]
+    public void EffectModel_RejectsControlCanonicalResultThatDiffersFromRealMsBuild()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control"
+                ? measurement with { CanonicalResultSha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+                : measurement)
+            .ToArray();
+
+        RealMsBuildCacheEffectEstimate estimate = RealMsBuildCacheEffectModel.Calculate(measurements);
+
+        Assert.That(estimate.Complete, Is.False);
+        Assert.That(estimate.Points, Has.All.Matches<RealMsBuildCacheEffectPoint>(point =>
+            !point.VerifiedWarmHitObserved &&
+            point.ExpectedWarmHitReductionPercent is null &&
+            point.ExpectedAmortizedReductionPercent is null));
+        estimate.Validate();
+    }
+
+    [Test]
+    public void Document_RejectsOutcomeAWhenEligibleControlDiffersFromRealMsBuild()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control"
+                ? measurement with { CanonicalResultSha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+                : measurement)
+            .ToArray();
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("A", phase2Authorized: true, measurements: measurements);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("canonical result identity with real-MSBuild"));
+    }
+
+    [Test]
     public void EffectModel_LeavesEstimateIncompleteWithoutControlResourceObservations()
     {
         IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)

@@ -44,7 +44,7 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
             .AppendLine("- Cold/miss overhead is computed only from the eligible-control disabled-versus-population path when eligibility, miss, and cache write are all verified; its absolute cost is normalized against the real-MSBuild disabled baseline, and ineligible or rejected real-MSBuild rows are never used as amortization cost.")
             .AppendLine("- Expected warm-hit reduction is normalized to the real-MSBuild denominator by applying the observed control targeted-work avoidance fraction to the real targeted-phase share; it cannot exceed the real Amdahl bound.")
             .AppendLine("- Outcome-complete resource evidence requires allocation, peak working set, bytes read, and bytes written observations for eligible-control disabled, population, and repeat paths.")
-            .AppendLine("- Cache-disabled, population/miss, and repeat results retain canonical-result identity; stale-input checks retain fail-closed dispositions.")
+            .AppendLine("- Cache-disabled, population/miss, and repeat results retain canonical-result identity within each fixture and across eligible-control versus real-MSBuild workloads; stale-input checks retain fail-closed dispositions.")
             .AppendLine("- The exact-request cache estimate excludes prepared-analysis persistence and separately records reference/base-side work.")
             .AppendLine()
             .AppendLine("## Environment")
