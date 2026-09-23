@@ -40,11 +40,15 @@ evidence and bounded presentation. It does not create a second comment or publis
 ## Badge provenance
 
 The Source lines Shields payload is an absolute default-branch projection of the same Health
-artifact. The trusted post-merge badge-promotion pipeline reads the reviewed
-`repository-metrics-badge.json` member from the canonical `architecture-health` evidence artifact
-and publishes it beside the Architecture Health payload on the existing raw badge branch. It does
-not read the already-rendered `architecture-health.json` Shields payload as metrics evidence, and
-it never contains pull-request deltas or a quality score.
+artifact. The optional `Repository` and `Structure` payloads are compact grouped projections of
+the same absolute snapshot; they are not one-badge-per-metric and never contain PR deltas.
+The trusted post-merge badge-promotion pipeline reads the reviewed
+`repository-metrics-badge.json`, `repository.json`, and `structure.json` members from the canonical
+`architecture-health` evidence artifact and publishes them beside the Architecture Health payload
+on the existing raw badge branch. Each payload carries the small ArchLinterNet graph/check SVG as
+the Shields `logoSvg` field, so the producer remains recognizable inside the badge itself. The
+pipeline does not read the already-rendered `architecture-health.json` Shields payload as metrics
+evidence, and it never contains a quality score.
 
 ## Performance boundary
 
