@@ -46,7 +46,7 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
         Require(SourceIdentity == "synthetic-current-tree", "Evidence source must be synthetic/anonymized.");
         Require(!ContainsPrivateIdentity(SourceIdentity) && !ContainsPrivateIdentity(DecisionRationale),
             "Evidence must not contain private adopter identity or topology.");
-        Require(Decision is "A" or "B" or "C", "Decision must be exactly A, B, or C.");
+        Require(Decision is "A" or "B" or "C" or "Pending", "Decision must be A, B, C, or Pending.");
         Require(Measurements.Count > 0, "Evidence must contain measurements.");
         NormalizationGate.Validate();
         ReferenceBaseDisposition.Validate();
@@ -68,6 +68,12 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
                 $"Real-MSBuild evidence for {size} must retain typed ineligibility reasons.");
             Require(realMeasurements.Select(measurement => measurement.CanonicalResultSha256).Distinct(StringComparer.Ordinal).Count() == 1,
                 $"Real-MSBuild evidence for {size} must preserve canonical result identity across cache modes.");
+            Require(realMeasurements.Select(measurement => measurement.ProjectCount).Distinct().Count() == 1,
+                $"Real-MSBuild evidence for {size} must preserve project count across cache modes.");
+            Require(realMeasurements.Select(measurement => measurement.CalibrationPairIdentity)
+                        .Distinct(StringComparer.Ordinal).Count() == 1 &&
+                    !string.IsNullOrWhiteSpace(realMeasurements[0].CalibrationPairIdentity),
+                $"Real-MSBuild evidence for {size} must preserve a non-empty calibration pair identity across cache modes.");
             Require(realMeasurements.All(measurement => measurement.Hits == 0),
                 $"Ineligible real-MSBuild evidence for {size} cannot claim a cache hit.");
 
@@ -85,6 +91,10 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
                 Require(controlMeasurements.All(measurement =>
                         measurement.CanonicalResultSha256 == realMeasurements[0].CanonicalResultSha256),
                     $"Eligible-control evidence for {size} must preserve canonical result identity with real-MSBuild evidence.");
+                Require(controlMeasurements.All(measurement =>
+                        measurement.ProjectCount == realMeasurements[0].ProjectCount &&
+                        measurement.CalibrationPairIdentity == realMeasurements[0].CalibrationPairIdentity),
+                    $"Eligible-control evidence for {size} must match the real-MSBuild project count and calibration pair identity.");
             }
         }
 
@@ -120,6 +130,29 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
                 "Outcome A requires allocation, peak-working-set, bytes-read, and bytes-written observations for every eligible-control path.");
             Require(ReferenceBaseDisposition.CountedInEffectEstimate == false,
                 "Reference/base work cannot be counted as candidate exact-cache savings.");
+        }
+
+        if (Decision == "B")
+        {
+            Require(EffectEstimate.Complete,
+                "Outcome B requires a complete effect estimate; incomplete evidence must remain Pending.");
+            Require(EffectEstimate.Points.All(point =>
+                    point.ExpectedAmortizedReductionPercent.HasValue &&
+                    point.ExpectedAmortizedReductionPercent.Value > EffectEstimate.KillCriterionPercent &&
+                    point.ExpectedAmortizedReductionPercent.Value < EffectEstimate.SuccessThresholdPercent),
+                "Outcome B requires useful amortized benefit above the kill criterion but below the materiality threshold.");
+            Require(DecisionRationale.Contains("dominat", StringComparison.OrdinalIgnoreCase) &&
+                    DecisionRationale.Contains("lane", StringComparison.OrdinalIgnoreCase),
+                "Outcome B requires rationale that identifies the dominating lane.");
+        }
+
+        if (Decision == "Pending")
+        {
+            Require(!EffectEstimate.Complete,
+                "Pending evidence cannot claim a complete effect estimate.");
+            Require(DecisionRationale.Contains("incomplete", StringComparison.OrdinalIgnoreCase) ||
+                    DecisionRationale.Contains("pending", StringComparison.OrdinalIgnoreCase),
+                "Pending evidence requires an explicit incomplete or pending rationale.");
         }
 
         if (Decision == "C")
@@ -273,6 +306,8 @@ internal sealed record RealMsBuildCacheMeasurement
 
     public required string WorkloadIdentity { get; init; }
 
+    public required string CalibrationPairIdentity { get; init; }
+
     public required string Size { get; init; }
 
     public required int ProjectCount { get; init; }
@@ -359,6 +394,15 @@ internal static class RealMsBuildCacheEffectModel
                 measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == size && measurement.CacheMode == "population");
             RealMsBuildCacheMeasurement? controlHit = measurements.SingleOrDefault(
                 measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == size && measurement.CacheMode == "repeat" && measurement.Hits > 0);
+            IReadOnlyList<RealMsBuildCacheMeasurement> controlMeasurements = measurements
+                .Where(measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == size)
+                .ToList();
+            bool controlWorkloadCorrelationEquivalent = controlMeasurements.Count == 3 &&
+                controlMeasurements.All(measurement =>
+                    measurement.ProjectCount == baseline.ProjectCount &&
+                    measurement.CalibrationPairIdentity == baseline.CalibrationPairIdentity) &&
+                controlMeasurements.Select(measurement => measurement.WorkloadId).Distinct(StringComparer.Ordinal).Count() == 1 &&
+                controlMeasurements.Select(measurement => measurement.WorkloadIdentity).Distinct(StringComparer.Ordinal).Count() == 1;
             bool controlPopulationVerified = controlPopulation is
             {
                 Eligibility: "VerifiedCacheEligible",
@@ -374,7 +418,8 @@ internal static class RealMsBuildCacheEffectModel
             bool controlCanonicalResultEquivalent = controlBaseline != null && controlPopulation != null && controlHit != null &&
                 controlBaseline.CanonicalResultSha256 == controlPopulation.CanonicalResultSha256 &&
                 controlBaseline.CanonicalResultSha256 == controlHit.CanonicalResultSha256 &&
-                baseline.CanonicalResultSha256 == controlBaseline.CanonicalResultSha256;
+                baseline.CanonicalResultSha256 == controlBaseline.CanonicalResultSha256 &&
+                controlWorkloadCorrelationEquivalent;
             bool verifiedWarmHitObserved = controlPopulationVerified && controlCanonicalResultEquivalent &&
                 controlBaseline?.Eligibility == "VerifiedCacheEligible" && controlBaseline.TotalElapsedMilliseconds is > 0 &&
                 controlHit?.Eligibility == "VerifiedCacheEligible" && controlHit.TotalElapsedMilliseconds is >= 0;

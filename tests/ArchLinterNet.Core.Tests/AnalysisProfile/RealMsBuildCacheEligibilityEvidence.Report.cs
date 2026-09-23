@@ -28,7 +28,7 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
             .AppendLine()
             .AppendLine("## Decision")
             .AppendLine()
-            .Append("Phase 1 outcome: **").Append(document.Decision).AppendLine("**")
+            .Append("Phase 1 decision state: **").Append(document.Decision).AppendLine("**")
             .AppendLine()
             .AppendLine(document.DecisionRationale)
             .AppendLine()
@@ -44,6 +44,7 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
             .AppendLine("- Cold/miss overhead is computed only from the eligible-control disabled-versus-population path when eligibility, miss, and cache write are all verified; its absolute cost is normalized against the real-MSBuild disabled baseline, and ineligible or rejected real-MSBuild rows are never used as amortization cost.")
             .AppendLine("- Expected warm-hit reduction is normalized to the real-MSBuild denominator by applying the observed control targeted-work avoidance fraction to the real targeted-phase share; it cannot exceed the real Amdahl bound.")
             .AppendLine("- Outcome-complete resource evidence requires allocation, peak working set, bytes read, and bytes written observations for eligible-control disabled, population, and repeat paths.")
+            .AppendLine("- Eligible-control calibration is paired to the corresponding real-MSBuild workload by project count and an explicit calibration-pair identity; mismatches leave the estimate incomplete.")
             .AppendLine("- Cache-disabled, population/miss, and repeat results retain canonical-result identity within each fixture and across eligible-control versus real-MSBuild workloads; stale-input checks retain fail-closed dispositions.")
             .AppendLine("- The exact-request cache estimate excludes prepared-analysis persistence and separately records reference/base-side work.")
             .AppendLine()
@@ -81,7 +82,7 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
         builder.AppendLine()
             .AppendLine("## Cache measurements")
             .AppendLine()
-            .AppendLine("| Fixture | Size | Mode | Projects | Eligibility | Reasons | Lookups | Hits | Misses | Rejects | Writes | Ineligible units | Bytes read | Bytes written | Allocated bytes | Peak working set | Avoided work | Total ms | Targeted phase ms | Targeted share | Canonical result |")
+            .AppendLine("| Fixture | Size | Mode | Projects / calibration pair | Eligibility | Reasons | Lookups | Hits | Misses | Rejects | Writes | Ineligible units | Bytes read | Bytes written | Allocated bytes | Peak working set | Avoided work | Total ms | Targeted phase ms | Targeted share | Canonical result |")
             .AppendLine("|---|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|");
         foreach (RealMsBuildCacheMeasurement measurement in document.Measurements.OrderBy(measurement => SizeOrder(measurement.Size)).ThenBy(measurement => measurement.FixtureKind, StringComparer.Ordinal).ThenBy(measurement => measurement.CacheMode, StringComparer.Ordinal))
         {
@@ -89,6 +90,7 @@ internal static class RealMsBuildCacheEligibilityEvidenceMarkdown
                 .Append(" | ").Append(measurement.Size)
                 .Append(" | ").Append(measurement.CacheMode)
                 .Append(" | ").Append(measurement.ProjectCount.ToString(CultureInfo.InvariantCulture))
+                .Append(" / ").Append(measurement.CalibrationPairIdentity)
                 .Append(" | ").Append(measurement.Eligibility)
                 .Append(" | ").Append(string.Join(", ", measurement.IneligibilityReasons))
                 .Append(" | ").Append(measurement.Lookups.ToString(CultureInfo.InvariantCulture))

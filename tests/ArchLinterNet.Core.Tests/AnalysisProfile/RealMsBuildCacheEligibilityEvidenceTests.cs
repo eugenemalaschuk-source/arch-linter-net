@@ -62,7 +62,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
         Assert.DoesNotThrow(document.Validate);
         Assert.DoesNotThrow(() => RealMsBuildCacheEligibilityEvidenceSerialization.Serialize(document));
         string markdown = RealMsBuildCacheEligibilityEvidenceMarkdown.Render(document);
-        Assert.That(markdown, Does.Contain("Phase 1 outcome: **C**"));
+        Assert.That(markdown, Does.Contain("Phase 1 decision state: **C**"));
         Assert.That(markdown, Does.Contain("#991"));
         Assert.That(markdown, Does.Contain("OpenSpec: not applicable"));
         Assert.That(markdown, Does.Contain("eligible-control"));
@@ -153,6 +153,80 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
     }
 
     [Test]
+    public void EffectModel_RejectsControlFromDifferentCalibrationPair()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control"
+                ? measurement with { CalibrationPairIdentity = "synthetic-foreign-calibration-pair" }
+                : measurement)
+            .ToArray();
+
+        RealMsBuildCacheEffectEstimate estimate = RealMsBuildCacheEffectModel.Calculate(measurements);
+
+        Assert.That(estimate.Complete, Is.False);
+        Assert.That(estimate.Points, Has.All.Matches<RealMsBuildCacheEffectPoint>(point => !point.VerifiedWarmHitObserved));
+        estimate.Validate();
+    }
+
+    [Test]
+    public void Document_RejectsControlWithMismatchedProjectCount()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control" && measurement.Size == "medium"
+                ? measurement with { ProjectCount = measurement.ProjectCount + 1 }
+                : measurement)
+            .ToArray();
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("Pending", phase2Authorized: false, measurements: measurements);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("project count and calibration pair identity"));
+    }
+
+    [Test]
+    public void Document_RejectsOutcomeBWhenEffectEvidenceIsIncomplete()
+    {
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
+            "B",
+            phase2Authorized: false,
+            measurements: CreateMeasurements(includeEligibleControl: false));
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("incomplete evidence must remain Pending"));
+    }
+
+    [Test]
+    public void Document_AllowsPendingStateForIncompleteEffectEvidence()
+    {
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
+            "Pending",
+            phase2Authorized: false,
+            measurements: CreateMeasurements(includeEligibleControl: false));
+
+        Assert.DoesNotThrow(document.Validate);
+    }
+
+    [Test]
+    public void Document_AllowsOutcomeBWhenCompleteEffectIsUsefulButBelowMaterialityThreshold()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control" && measurement.CacheMode == "repeat"
+                ? measurement with { TotalElapsedMilliseconds = measurement.TotalElapsedMilliseconds!.Value * 1.66 }
+                : measurement)
+            .ToArray();
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
+            "B",
+            phase2Authorized: false,
+            measurements: measurements) with
+        {
+            DecisionRationale = "The measured useful effect is dominated by the prepared-analysis lane and remains below the materiality threshold.",
+        };
+
+        Assert.DoesNotThrow(document.Validate);
+    }
+
+    [Test]
     public void EffectModel_LeavesEstimateIncompleteWithoutControlResourceObservations()
     {
         IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
@@ -231,7 +305,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
                 Evidence = "The adopter normalization issue remains the Phase 2 authority.",
             },
             Decision = decision,
-            DecisionRationale = "Current evidence does not prove distinct material value before the normalized gate.",
+            DecisionRationale = "Current evidence is incomplete and does not prove distinct material value before the normalized gate.",
             ReferenceBaseDisposition = new RealMsBuildReferenceBaseDisposition
             {
                 Disposition = "routed-to-owning-lane",
@@ -302,6 +376,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
             CacheMode = cacheMode,
             WorkloadId = workloadId,
             WorkloadIdentity = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(workloadId))),
+            CalibrationPairIdentity = $"synthetic-cache-eligibility-{size}-p{projectCount}",
             Size = size,
             ProjectCount = projectCount,
             Eligibility = eligibility,

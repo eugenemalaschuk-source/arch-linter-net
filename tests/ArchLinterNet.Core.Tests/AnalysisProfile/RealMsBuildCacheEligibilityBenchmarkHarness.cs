@@ -106,8 +106,8 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                 Phase2Authorized = false,
                 Evidence = "#991 remains open; normalized consumer workflows must be remeasured before any Phase 2 eligibility implementation.",
             },
-            Decision = "B",
-            DecisionRationale = "The expanded cache-avoidable boundary includes assembly/artifact loading and analysis work, but the separately labelled eligibility-control attempt does not produce a verified hit. The warm-hit and amortized effect therefore remain model-only and cannot support a final no-value outcome C; route the incomplete evidence through the #991 normalization and owning prepared-analysis lanes before making a final eligibility decision.",
+            Decision = "Pending",
+            DecisionRationale = "The expanded cache-avoidable boundary includes assembly/artifact loading and analysis work, but the separately labelled eligibility-control attempt does not produce a verified hit. The effect estimate is incomplete, so the Phase 1 decision remains pending and cannot support a final A, B, or C outcome; route the incomplete evidence through the #991 normalization and owning prepared-analysis lanes before making a final eligibility decision.",
             ReferenceBaseDisposition = new RealMsBuildReferenceBaseDisposition
             {
                 Disposition = "routed-to-owning-lane",
@@ -197,6 +197,7 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                     CacheMode = cacheMode,
                     WorkloadId = workload.WorkloadId,
                     WorkloadIdentity = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(workload.WorkloadId))),
+                    CalibrationPairIdentity = $"synthetic-cache-eligibility-{size}-p{workload.Dimensions.ProjectCount}",
                     Size = size,
                     ProjectCount = workload.Dimensions.ProjectCount,
                     Eligibility = isReal ? "CacheIneligible" : (hits > 0 ? "VerifiedCacheEligible" : "ControlUnavailable"),
