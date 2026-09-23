@@ -26,7 +26,7 @@
       "validity": { "max_lease_seconds": 3600 },
       "limits": {
         "max_archive_bytes": 65536,
-        "max_member_bytes": 16384,
+        "max_member_bytes": 32768,
         "max_payload_bytes": 16384,
         "max_members": 2
       }
@@ -57,7 +57,7 @@
       "validity": { "max_lease_seconds": 3600 },
       "limits": {
         "max_archive_bytes": 65536,
-        "max_member_bytes": 16384,
+        "max_member_bytes": 32768,
         "max_payload_bytes": 16384,
         "max_members": 2
       }
