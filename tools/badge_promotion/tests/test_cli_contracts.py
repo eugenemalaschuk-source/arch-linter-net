@@ -329,10 +329,18 @@ def test_raw_publication_retries_ref_update_race_and_fails_closed(
 def test_semantic_evidence_member_is_bounded_before_decompression() -> None:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("architecture-health.json", b"0" * 32_768)
+        archive.writestr("architecture-health.json", b"0" * 32_769)
     with zipfile.ZipFile(io.BytesIO(stream.getvalue())) as opened:
         with pytest.raises(ProviderFailure, match="semantic_evidence_oversized"):
-            _read_bounded_zip_member(opened, "architecture-health.json", 16_384)
+            _read_bounded_zip_member(opened, "architecture-health.json", 32_768)
+
+
+def test_semantic_evidence_member_accepts_repository_metrics_evidence_size() -> None:
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("architecture-health.json", b"0" * 18_000)
+    with zipfile.ZipFile(io.BytesIO(stream.getvalue())) as opened:
+        assert len(_read_bounded_zip_member(opened, "architecture-health.json", 32_768)) == 18_000
 
 
 def test_workflow_sha_is_resolved_from_the_versioned_content_endpoint() -> None:
