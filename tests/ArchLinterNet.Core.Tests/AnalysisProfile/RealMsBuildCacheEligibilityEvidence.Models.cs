@@ -113,6 +113,12 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
             "Every stale-input check must demonstrate a fail-closed reject disposition.");
         Require(Phase2Routing.Contains("#991", StringComparison.Ordinal),
             "Phase 2 routing must name the #991 normalization gate.");
+        bool phase2Complete = NormalizationGate.Phase2Authorized && NormalizationGate.Status == "complete";
+        if (!phase2Complete)
+        {
+            Require(Decision == "Pending",
+                "Final A/B/C outcomes require completed #991 normalization authority; keep evidence Pending while the gate is open.");
+        }
 
         if (Decision == "A")
         {
@@ -148,8 +154,8 @@ internal sealed record RealMsBuildCacheEligibilityEvidenceDocument
 
         if (Decision == "Pending")
         {
-            Require(!EffectEstimate.Complete,
-                "Pending evidence cannot claim a complete effect estimate.");
+            Require(!EffectEstimate.Complete || !phase2Complete,
+                "Pending evidence requires incomplete effect evidence or an open #991 normalization gate.");
             Require(DecisionRationale.Contains("incomplete", StringComparison.OrdinalIgnoreCase) ||
                     DecisionRationale.Contains("pending", StringComparison.OrdinalIgnoreCase),
                 "Pending evidence requires an explicit incomplete or pending rationale.");

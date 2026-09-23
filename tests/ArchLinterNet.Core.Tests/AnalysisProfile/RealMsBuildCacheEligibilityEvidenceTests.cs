@@ -57,7 +57,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
     [Test]
     public void Document_AllowsConservativeOutcomeCAndPreservesFailClosedRows()
     {
-        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("C", phase2Authorized: false);
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("C", phase2Authorized: true);
 
         Assert.DoesNotThrow(document.Validate);
         Assert.DoesNotThrow(() => RealMsBuildCacheEligibilityEvidenceSerialization.Serialize(document));
@@ -80,7 +80,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
     {
         RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
             "C",
-            phase2Authorized: false,
+            phase2Authorized: true,
             measurements: CreateMeasurements(includeEligibleControl: false));
 
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
@@ -188,7 +188,7 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
     {
         RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
             "B",
-            phase2Authorized: false,
+            phase2Authorized: true,
             measurements: CreateMeasurements(includeEligibleControl: false));
 
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
@@ -217,13 +217,44 @@ public sealed class RealMsBuildCacheEligibilityEvidenceTests
             .ToArray();
         RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
             "B",
-            phase2Authorized: false,
+            phase2Authorized: true,
             measurements: measurements) with
         {
             DecisionRationale = "The measured useful effect is dominated by the prepared-analysis lane and remains below the materiality threshold.",
         };
 
         Assert.DoesNotThrow(document.Validate);
+    }
+
+    [Test]
+    public void Document_RejectsOutcomeBWhileNormalizationGateIsOpen()
+    {
+        IReadOnlyList<RealMsBuildCacheMeasurement> measurements = CreateMeasurements(includeEligibleControl: true)
+            .Select(measurement => measurement.FixtureKind == "eligible-control" && measurement.CacheMode == "repeat"
+                ? measurement with { TotalElapsedMilliseconds = measurement.TotalElapsedMilliseconds!.Value * 1.66 }
+                : measurement)
+            .ToArray();
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument(
+            "B",
+            phase2Authorized: false,
+            measurements: measurements) with
+        {
+            DecisionRationale = "The measured useful effect is dominated by the prepared-analysis lane and remains below the materiality threshold.",
+        };
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("keep evidence Pending"));
+    }
+
+    [Test]
+    public void Document_RejectsOutcomeCWhileNormalizationGateIsOpen()
+    {
+        RealMsBuildCacheEligibilityEvidenceDocument document = CreateDocument("C", phase2Authorized: false);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(document.Validate)!;
+
+        Assert.That(exception.Message, Does.Contain("keep evidence Pending"));
     }
 
     [Test]
