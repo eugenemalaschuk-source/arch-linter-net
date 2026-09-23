@@ -1454,6 +1454,7 @@ method ArchLinterNet.Core.Caching.AnalysisCacheKey.ComputeContractIdsDigest(Syst
 method ArchLinterNet.Core.Caching.AnalysisCacheKey.ComputePolicyDigest(System.Collections.Generic.IEnumerable`1[System.String], System.String, System.Threading.CancellationToken): System.String [static]
 method ArchLinterNet.Core.Caching.AnalysisCacheKey.ComputePreprocessorSymbolsDigest(System.Collections.Generic.IEnumerable`1[System.String]): System.String [static]
 method ArchLinterNet.Core.Caching.AnalysisCacheKey.ComputeWorkspaceDigest(System.Collections.Generic.IEnumerable`1[System.String], System.String): System.String [static]
+method ArchLinterNet.Core.Caching.AnalysisCacheKey.Deconstruct(System.String&, System.String&, System.String&, System.String&, System.String&, System.String&, System.String&, System.String&, System.String&, System.String&, System.String&, System.Boolean&, System.Boolean&, System.String&): System.Void [param0:out, param1:out, param2:out, param3:out, param4:out, param5:out, param6:out, param7:out, param8:out, param9:out, param10:out, param11:out, param12:out, param13:out]
 method ArchLinterNet.Core.Caching.AnalysisCacheKey.NormalizeMode(System.String): System.String [static]
 method ArchLinterNet.Core.Caching.AnalysisCacheLocationResolver.Resolve(ArchLinterNet.Core.Caching.AnalysisCacheOptions): ArchLinterNet.Core.Caching.AnalysisCacheLocation [static]
 method ArchLinterNet.Core.Caching.AnalysisCacheLookupResult.Hit(ArchLinterNet.Core.Caching.AnalysisCacheEntryV1, System.Int64): ArchLinterNet.Core.Caching.AnalysisCacheLookupResult [static]

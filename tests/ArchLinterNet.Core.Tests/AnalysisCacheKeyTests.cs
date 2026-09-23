@@ -114,6 +114,48 @@ public sealed class AnalysisCacheKeyTests
         Assert.That(AnalysisCacheKey.NormalizeMode("STRICT"), Is.EqualTo("strict"));
     }
 
+    [Test]
+    public void Deconstruct_PreservesPublishedFourteenParameterShape()
+    {
+        AnalysisCacheKey key = new(
+            "policy", "strict", "conditions", "contracts", "workspace", "Debug", "net10.0", "AnyCPU", "linux-x64",
+            "symbols", "baseline", false, true, "2026-09-23");
+
+        key.Deconstruct(
+            out string policy,
+            out string mode,
+            out string? conditionSet,
+            out string contracts,
+            out string workspace,
+            out string? configuration,
+            out string? targetFramework,
+            out string? platform,
+            out string? runtimeIdentifier,
+            out string symbols,
+            out string baseline,
+            out bool includeAsmdefContracts,
+            out bool enforceUnmatchedIgnoredViolationsPolicy,
+            out string waiverEvaluationDate);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(policy, Is.EqualTo("policy"));
+            Assert.That(mode, Is.EqualTo("strict"));
+            Assert.That(conditionSet, Is.EqualTo("conditions"));
+            Assert.That(contracts, Is.EqualTo("contracts"));
+            Assert.That(workspace, Is.EqualTo("workspace"));
+            Assert.That(configuration, Is.EqualTo("Debug"));
+            Assert.That(targetFramework, Is.EqualTo("net10.0"));
+            Assert.That(platform, Is.EqualTo("AnyCPU"));
+            Assert.That(runtimeIdentifier, Is.EqualTo("linux-x64"));
+            Assert.That(symbols, Is.EqualTo("symbols"));
+            Assert.That(baseline, Is.EqualTo("baseline"));
+            Assert.That(includeAsmdefContracts, Is.False);
+            Assert.That(enforceUnmatchedIgnoredViolationsPolicy, Is.True);
+            Assert.That(waiverEvaluationDate, Is.EqualTo("2026-09-23"));
+        });
+    }
+
     // Finding #2: every remaining result-affecting AnalysisSnapshotRequest/ValidationRequest
     // dimension must be folded into AnalysisCacheKey — one invalidation regression per dimension,
     // same everything else, only that one field differs.

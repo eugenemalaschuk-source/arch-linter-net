@@ -102,6 +102,42 @@ public sealed record AnalysisCacheKey(
     {
     }
 
+    // Positional records expose Deconstruct as part of the public API. Keep the previously
+    // published 14-value shape alongside the generated 15-value overload introduced by the
+    // repository-metrics projection so existing deconstruction source and binary consumers remain
+    // compatible.
+    public void Deconstruct(
+        out string PolicyDigest,
+        out string Mode,
+        out string? ConditionSetName,
+        out string ContractIdsDigest,
+        out string WorkspaceDigest,
+        out string? Configuration,
+        out string? TargetFramework,
+        out string? Platform,
+        out string? RuntimeIdentifier,
+        out string PreprocessorSymbolsDigest,
+        out string BaselineDigest,
+        out bool IncludeAsmdefContracts,
+        out bool EnforceUnmatchedIgnoredViolationsPolicy,
+        out string WaiverEvaluationDate)
+    {
+        PolicyDigest = this.PolicyDigest;
+        Mode = this.Mode;
+        ConditionSetName = this.ConditionSetName;
+        ContractIdsDigest = this.ContractIdsDigest;
+        WorkspaceDigest = this.WorkspaceDigest;
+        Configuration = this.Configuration;
+        TargetFramework = this.TargetFramework;
+        Platform = this.Platform;
+        RuntimeIdentifier = this.RuntimeIdentifier;
+        PreprocessorSymbolsDigest = this.PreprocessorSymbolsDigest;
+        BaselineDigest = this.BaselineDigest;
+        IncludeAsmdefContracts = this.IncludeAsmdefContracts;
+        EnforceUnmatchedIgnoredViolationsPolicy = this.EnforceUnmatchedIgnoredViolationsPolicy;
+        WaiverEvaluationDate = this.WaiverEvaluationDate;
+    }
+
     public string Digest
     {
         get

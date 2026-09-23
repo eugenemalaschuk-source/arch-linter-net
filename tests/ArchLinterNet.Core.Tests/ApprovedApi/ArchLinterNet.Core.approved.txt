@@ -206,6 +206,7 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheKey : System.IEquatable<Arc
   method static string ComputeWorkspaceDigest(System.Collections.Generic.IEnumerable<string> discoveredProjectPaths, string repositoryRoot)
   method static string NormalizeMode(string mode)
   method string ToString()
+  method void Deconstruct(out string PolicyDigest, out string Mode, out string? ConditionSetName, out string ContractIdsDigest, out string WorkspaceDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier, out string PreprocessorSymbolsDigest, out string BaselineDigest, out bool IncludeAsmdefContracts, out bool EnforceUnmatchedIgnoredViolationsPolicy, out string WaiverEvaluationDate)
   method void Deconstruct(out string PolicyDigest, out string Mode, out string? ConditionSetName, out string ContractIdsDigest, out string WorkspaceDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier, out string PreprocessorSymbolsDigest, out string BaselineDigest, out bool IncludeAsmdefContracts, out bool EnforceUnmatchedIgnoredViolationsPolicy, out string WaiverEvaluationDate, out bool IncludeRepositoryMetrics)
   operator !=(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
