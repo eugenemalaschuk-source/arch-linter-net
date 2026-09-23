@@ -19,6 +19,10 @@ public sealed record ValidationRequest
 
     public bool IncludeAsmdefContracts { get; init; } = true;
 
+    // Source inventory is expensive relative to ordinary policy-only validation. Report-producing
+    // callers opt in so informational metrics never make an unrelated analysis scan the tree.
+    public bool IncludeRepositoryMetrics { get; init; }
+
     public bool EnforceUnmatchedIgnoredViolationsPolicy { get; init; }
 
     // An explicit date makes waiver expiry evaluation deterministic across local and CI runs.

@@ -47,7 +47,10 @@ internal static class ArchitectureChangeSnapshotProjector
             conditionSetName ?? string.Empty,
             entries,
             findings,
-            baselineDebt.Select(BaselineIdentity).OrderBy(static value => value, StringComparer.Ordinal).ToArray());
+            baselineDebt.Select(BaselineIdentity).OrderBy(static value => value, StringComparer.Ordinal).ToArray())
+        {
+            RepositoryMetrics = validation.RepositoryMetrics,
+        };
     }
 
     private static ArchitectureChangeEntry Edge(string level, ArchitectureGraphEdge edge) => new(

@@ -50,6 +50,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
                 BaselinePath = options.BaselinePath,
+                IncludeRepositoryMetrics = true,
                 PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
                 UsePreparedArtifacts = options.UsePreparedArtifacts,
                 NoRestore = options.NoRestore,

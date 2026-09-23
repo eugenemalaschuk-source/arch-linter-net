@@ -37,6 +37,7 @@ internal static class ArchitectureAnalysisSnapshotEvaluationProjector
             ConsumedInputPaths = input.ConsumedInputPaths,
             SourceExpansion = input.Document.SourceExpansion,
             ExternalEvidenceRequirements = input.Document.ExternalEvidence,
+            RepositoryMetrics = RepositoryMetricsSnapshot.Unavailable(RepositoryMetricsReasonCodes.MissingAnalysis),
         };
 
     internal static (ValidationOutcome Outcome, IReadOnlyDictionary<string, int> ContractFamilyResultCounts) Evaluate(
@@ -170,6 +171,12 @@ internal static class ArchitectureAnalysisSnapshotEvaluationProjector
         // there must win over constructing and returning an apparently complete outcome.
         cancellationToken.ThrowIfCancellationRequested();
 
+        RepositoryMetricsSnapshot repositoryMetrics;
+        using (input.Timing?.Measure("repository_metrics"))
+        {
+            repositoryMetrics = runner.Session.GetRepositoryMetrics(input.IncludeRepositoryMetrics);
+        }
+
         ValidationOutcome outcome = new(
             passed,
             allViolations,
@@ -204,6 +211,7 @@ internal static class ArchitectureAnalysisSnapshotEvaluationProjector
                 .Skip(subtractiveMatcherStartIndex)
                 .ToList(),
             ExternalEvidenceRequirements = input.Document.ExternalEvidence,
+            RepositoryMetrics = repositoryMetrics,
         };
 
         return (outcome, execution.ContractFamilyResultCounts);
@@ -264,7 +272,8 @@ internal sealed record ArchitectureAnalysisSnapshotEvaluationInput(
     IReadOnlyList<BuildStatePreflightDiagnostic> PreflightDiagnostics,
     IReadOnlyList<string> PolicyImportPaths,
     IReadOnlyList<string> ResolvedAssemblyPaths,
-    IReadOnlyList<string> DiscoveredProjectPaths);
+    IReadOnlyList<string> DiscoveredProjectPaths,
+    bool IncludeRepositoryMetrics);
 
 internal sealed record ArchitectureAnalysisSnapshotBlockedEvaluationInput(
     ArchitectureContractDocument Document,

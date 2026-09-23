@@ -58,6 +58,11 @@ internal static class PrReportMarkdownRenderer
             builder.AppendLine();
         }
 
+        if (AppendRepositoryMetricsDelta(builder, projection.Change, maxDetails))
+        {
+            builder.AppendLine();
+        }
+
         if (AppendRemediation(builder, projection, maxDetails))
         {
             builder.AppendLine();
@@ -288,6 +293,59 @@ internal static class PrReportMarkdownRenderer
         AppendBounded(builder, "Baseline debt identities", change.BaselineDebt.Count, change.BaselineDebt,
             maxDetails, static item => $"- `{Inline(Bounded(item))}`");
         return true;
+    }
+
+    private static bool AppendRepositoryMetricsDelta(
+        StringBuilder builder,
+        ArchitecturePrReportChange change,
+        int maxDetails)
+    {
+        RepositoryMetricsDelta? delta = change.RepositoryMetricsDelta;
+        if (delta is null)
+        {
+            return false;
+        }
+
+        builder.AppendLine("## Repository metrics delta");
+        builder.AppendLine($"- Availability: {delta.Availability.ToString().ToLowerInvariant()}");
+        if (delta.ReasonCodes.Count > 0)
+        {
+            builder.AppendLine($"- Reasons: {string.Join(", ", delta.ReasonCodes)}");
+        }
+
+        IReadOnlyList<RepositoryMetricDelta> changedMetricValues = delta.Metrics
+            .Where(metric => metric.Delta != 0d)
+            .OrderBy(metric => metric.Name, StringComparer.Ordinal)
+            .ToArray();
+        IReadOnlyList<string> metrics = changedMetricValues
+            .Select(FormatRepositoryMetricDelta)
+            .ToArray();
+        if (metrics.Count == 0)
+        {
+            builder.AppendLine("- Changed metrics: none.");
+        }
+        else
+        {
+            AppendBounded(builder, "Changed base → head metrics", metrics.Count, metrics, maxDetails,
+                static item => $"- {item}");
+        }
+
+        int unchangedCount = delta.Metrics.Count - changedMetricValues.Count;
+        if (unchangedCount > 0)
+        {
+            builder.AppendLine($"- Unchanged metrics: {unchangedCount} omitted by default.");
+        }
+
+        return true;
+    }
+
+    private static string FormatRepositoryMetricDelta(RepositoryMetricDelta metric)
+    {
+        string format = metric.Unit == "ratio" ? "0.000" : "N0";
+        string baseline = metric.Base.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
+        string head = metric.Head.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
+        string delta = metric.Delta.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
+        return $"{metric.Name}: {baseline} → {head} (delta {delta})";
     }
 
     private static bool AppendRemediation(

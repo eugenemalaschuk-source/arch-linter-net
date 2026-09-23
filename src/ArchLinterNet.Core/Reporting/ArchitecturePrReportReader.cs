@@ -170,6 +170,9 @@ public static class ArchitecturePrReportReader
         ArchitecturePrReportExternalEvidence? external = element.TryGetProperty("external_evidence", out JsonElement externalElement)
             ? ReadExternalEvidence(externalElement)
             : null;
+        RepositoryMetricsSnapshot? repositoryMetrics = element.TryGetProperty("repository_metrics", out JsonElement metricsElement)
+            ? RepositoryMetricsJson.Deserialize(metricsElement.GetRawText())
+            : null;
         JsonElement findings = Required(element, "findings", JsonValueKind.Array);
         ArchitecturePrReportFinding[] parsedFindings = findings.EnumerateArray()
             .Select(ReadFinding)
@@ -185,6 +188,7 @@ public static class ArchitecturePrReportReader
             lifecycle,
             applicability,
             external,
+            repositoryMetrics,
             findings);
         return new ArchitecturePrReportValidationReceipt(
             mode,
@@ -194,7 +198,10 @@ public static class ArchitecturePrReportReader
             applicability,
             external,
             parsedFindings,
-            provenance);
+            provenance)
+        {
+            RepositoryMetrics = repositoryMetrics,
+        };
     }
 
     private static ArchitecturePrReportExecutionContext ReadExecutionContext(JsonElement element)
@@ -210,6 +217,7 @@ public static class ArchitecturePrReportReader
         ArchitectureWaiverLifecycleAssessment? lifecycle,
         ArchitecturePrReportApplicability? applicability,
         ArchitecturePrReportExternalEvidence? external,
+        RepositoryMetricsSnapshot? repositoryMetrics,
         JsonElement findings)
     {
         string[] expectedKeys =
@@ -233,7 +241,8 @@ public static class ArchitecturePrReportReader
                 return map;
             });
 
-        if (values.Count != expectedKeys.Length || !expectedKeys.All(values.ContainsKey))
+        if (!expectedKeys.All(values.ContainsKey)
+            || values.Keys.Any(key => key != "repository_metrics" && !expectedKeys.Contains(key, StringComparer.Ordinal)))
         {
             throw InvalidArtifact("The availability map must contain exactly the supported authority keys.");
         }
@@ -245,6 +254,10 @@ public static class ArchitecturePrReportReader
         ValidateAvailabilityValue(values, "topology", hasTopology, Available, "not_configured");
         ValidateAvailabilityValue(values, "external_evidence", external is not null, Available, "not_configured");
         ValidateAvailabilityValue(values, "findings", findings.ValueKind == JsonValueKind.Array, Available, Unavailable);
+        if (values.ContainsKey("repository_metrics"))
+        {
+            ValidateAvailabilityValue(values, "repository_metrics", repositoryMetrics is not null, Available, Unavailable);
+        }
         return values;
     }
 
@@ -280,7 +293,10 @@ public static class ArchitecturePrReportReader
             change.NewFindings,
             change.ExistingFindings,
             change.ResolvedFindings,
-            change.BaselineDebt);
+            change.BaselineDebt)
+        {
+            RepositoryMetricsDelta = change.RepositoryMetricsDelta,
+        };
     }
 
     private static void ValidateCompatibleContext(

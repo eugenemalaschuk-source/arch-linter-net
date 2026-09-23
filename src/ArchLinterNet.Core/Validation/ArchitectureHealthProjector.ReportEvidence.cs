@@ -43,6 +43,14 @@ internal static class ArchitectureHealthReportEvidenceWriter
             throw new InvalidOperationException("Architecture Health summary must be a JSON object.");
         }
 
+        RepositoryMetricsSnapshot? repositoryMetrics = outcome.ValidationOutcomes
+            .Select(receipt => receipt.Outcome.RepositoryMetrics)
+            .FirstOrDefault(metrics => metrics is not null);
+        if (repositoryMetrics is not null)
+        {
+            summary["repository_metrics"] = JsonNode.Parse(RepositoryMetricsJson.Serialize(repositoryMetrics));
+        }
+
         if (string.IsNullOrWhiteSpace(outcome.ExecutionContext))
         {
             return summary.ToJsonString();
@@ -142,6 +150,11 @@ internal static class ArchitectureHealthReportEvidenceWriter
             result["applicability"] = BuildApplicability(outcome.AssessmentCompletionEvidence);
         }
 
+        if (outcome.RepositoryMetrics is not null)
+        {
+            result["repository_metrics"] = JsonNode.Parse(RepositoryMetricsJson.Serialize(outcome.RepositoryMetrics));
+        }
+
         if (HasExternalEvidence(outcome))
         {
             result["external_evidence"] = BuildExternalEvidence(outcome, receipt.Mode);
@@ -163,6 +176,7 @@ internal static class ArchitectureHealthReportEvidenceWriter
             ["topology"] = hasTopology ? Available : "not_configured",
             ["external_evidence"] = hasExternal ? Available : "not_configured",
             ["findings"] = Available,
+            ["repository_metrics"] = outcome.RepositoryMetrics is null ? "unavailable" : Available,
         };
     }
 }

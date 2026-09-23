@@ -155,9 +155,11 @@ jobs:
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" clone --depth 1 --branch "$BOOTSTRAP_BASE_REF" "https://github.com/${GITHUB_REPOSITORY}.git" "$root"
           base_sha="$(git -C "$root" rev-parse HEAD)"
           base_tree_sha="$(git -C "$root" rev-parse "HEAD^{tree}")"
-          echo "BOOTSTRAP_ROOT=$root" >> "$GITHUB_ENV"
-          echo "BOOTSTRAP_BASE_SHA=$base_sha" >> "$GITHUB_ENV"
-          echo "BOOTSTRAP_BASE_TREE_SHA=$base_tree_sha" >> "$GITHUB_ENV"
+          {
+            echo "BOOTSTRAP_ROOT=$root"
+            echo "BOOTSTRAP_BASE_SHA=$base_sha"
+            echo "BOOTSTRAP_BASE_TREE_SHA=$base_tree_sha"
+          } >> "$GITHUB_ENV"
       - name: Setup .NET for trusted bootstrap setup
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
@@ -346,11 +348,121 @@ jobs:
           dotnet-version: 10.0.x
       - name: Run pinned trusted promotion contract
         id: promotion
-        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@ac678db689a1faf2eb098d0027fc7d176a362d00
+        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@68c69f51ea4ea6a5ae2cca2a09479be99ae3501d
         with:
           configuration_id: ${{ inputs['configuration-id'] }}
           adapter: ${{ inputs.adapter }}
           operation: ${{ inputs.operation }}
+      - name: Publish Source lines payload from canonical evidence
+        if: steps.promotion.outputs.status == 'ready' && inputs.adapter == 'github-raw'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PRODUCER_RUN_ID: ${{ steps.promotion.outputs.run-id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/architecture-health-evidence.zip"
+          payload="$RUNNER_TEMP/repository-metrics.json"
+          artifact_id="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$PRODUCER_RUN_ID/artifacts?per_page=100" \
+            --jq '[.artifacts[] | select(.name == "architecture-health" and .expired != true)] | if length == 1 then .[0].id else error("expected exactly one canonical Architecture Health evidence artifact") end')"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$archive"
+          python3 - "$archive" "$payload" <<'PY'
+          import json
+          import sys
+          import zipfile
+          from pathlib import Path
+
+          archive_path = Path(sys.argv[1])
+          payload_path = Path(sys.argv[2])
+          with zipfile.ZipFile(archive_path) as opened:
+              try:
+                  member = opened.getinfo("repository-metrics-badge.json")
+              except KeyError as error:
+                  raise SystemExit("canonical evidence is missing repository-metrics-badge.json") from error
+              if member.file_size > 16_384 or member.compress_size > 16_384:
+                  raise SystemExit("repository-metrics-badge.json exceeds the reviewed member limit")
+              raw = opened.read(member)
+
+          try:
+              document = json.loads(raw.decode("utf-8"))
+          except (UnicodeDecodeError, json.JSONDecodeError) as error:
+              raise SystemExit(f"repository metrics badge is not valid JSON: {error}") from error
+          if (
+              not isinstance(document, dict)
+              or set(document) != {"schemaVersion", "label", "message", "color"}
+              or document.get("schemaVersion") != 1
+              or document.get("label") != "source lines"
+              or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color"))
+          ):
+              raise SystemExit("repository metrics badge is not a complete Shields endpoint document")
+          payload_path.write_bytes(raw)
+          PY
+
+          blob_input="$RUNNER_TEMP/repository-metrics-blob.json"
+          tree_input="$RUNNER_TEMP/repository-metrics-tree.json"
+          commit_input="$RUNNER_TEMP/repository-metrics-commit.json"
+          ref_input="$RUNNER_TEMP/repository-metrics-ref.json"
+          for attempt in 1 2 3; do
+            parent_sha="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/architecture-health-badge" --jq '.object.sha')"
+            base_tree="$(gh api "/repos/$GITHUB_REPOSITORY/git/commits/$parent_sha" --jq '.tree.sha')"
+            python3 - "$payload" "$blob_input" <<'PY'
+          import base64
+          import json
+          import sys
+          from pathlib import Path
+
+          Path(sys.argv[2]).write_text(
+              json.dumps({"content": base64.b64encode(Path(sys.argv[1]).read_bytes()).decode("ascii"), "encoding": "base64"}),
+              encoding="utf-8",
+          )
+          PY
+            blob_sha="$(gh api --method POST "/repos/$GITHUB_REPOSITORY/git/blobs" --input "$blob_input" --jq '.sha')"
+            python3 - "$base_tree" "$blob_sha" "$tree_input" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          Path(sys.argv[3]).write_text(
+              json.dumps({
+                  "base_tree": sys.argv[1],
+                  "tree": [{"path": "repository-metrics.json", "mode": "100644", "type": "blob", "sha": sys.argv[2]}],
+              }),
+              encoding="utf-8",
+          )
+          PY
+            tree_sha="$(gh api --method POST "/repos/$GITHUB_REPOSITORY/git/trees" --input "$tree_input" --jq '.sha')"
+            python3 - "$tree_sha" "$parent_sha" "$commit_input" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          Path(sys.argv[3]).write_text(
+              json.dumps({
+                  "message": "chore: publish repository metrics badge",
+                  "tree": sys.argv[1],
+                  "parents": [sys.argv[2]],
+              }),
+              encoding="utf-8",
+          )
+          PY
+            commit_sha="$(gh api --method POST "/repos/$GITHUB_REPOSITORY/git/commits" --input "$commit_input" --jq '.sha')"
+            python3 - "$commit_sha" "$ref_input" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          Path(sys.argv[2]).write_text(
+              json.dumps({"sha": sys.argv[1], "force": False}),
+              encoding="utf-8",
+          )
+          PY
+            if gh api --method PATCH "/repos/$GITHUB_REPOSITORY/git/refs/heads/architecture-health-badge" --input "$ref_input" >/dev/null; then
+              exit 0
+            fi
+            sleep "$attempt"
+          done
+          echo "Could not publish repository-metrics.json without losing the raw-branch CAS race." >&2
+          exit 1
       - name: Confirm actionable promotion result
         if: always()
         env:

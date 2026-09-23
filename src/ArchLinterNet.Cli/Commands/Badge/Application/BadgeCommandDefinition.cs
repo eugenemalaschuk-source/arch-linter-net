@@ -39,6 +39,18 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
             result.GetValue(disclosureProfile),
             result.GetValue(verifiedAt),
             result.GetValue(verifyDisclosureProfile))));
+        Command repositoryMetrics = new("repository-metrics", "Write Shields endpoint JSON from repository metrics.");
+        Option<string> repositoryMetricsInput = new(InputOptionName);
+        Option<string> repositoryMetricsOutput = new("--output");
+        Option<bool> repositoryMetricsHelp = new(HelpOptionName);
+        repositoryMetricsHelp.Aliases.Add("-h");
+        repositoryMetrics.Options.Add(repositoryMetricsInput);
+        repositoryMetrics.Options.Add(repositoryMetricsOutput);
+        repositoryMetrics.Options.Add(repositoryMetricsHelp);
+        repositoryMetrics.SetAction(result => handler.ExecuteRepositoryMetrics(new RepositoryMetricsBadgeCommandOptions(
+            result.GetValue(repositoryMetricsInput) ?? string.Empty,
+            result.GetValue(repositoryMetricsOutput),
+            result.GetValue(repositoryMetricsHelp))));
         Command setup = new("setup", "Preview or generate a versioned consumer badge setup.");
         Option<string> setupInput = new(InputOptionName);
         Option<string> setupOutput = new("--output");
@@ -193,6 +205,7 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
         health.Subcommands.Add(lifecycle);
         badge.Subcommands.Add(policy);
         badge.Subcommands.Add(health);
+        badge.Subcommands.Add(repositoryMetrics);
         return badge;
     }
 }

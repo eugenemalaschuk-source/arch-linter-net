@@ -21,6 +21,10 @@ public sealed record AnalysisSnapshotRequest
 
     public bool IncludeAsmdefContracts { get; init; } = true;
 
+    // See ValidationRequest.IncludeRepositoryMetrics. The snapshot keeps this choice stable for
+    // every mode evaluated from the same immutable fact set.
+    public bool IncludeRepositoryMetrics { get; init; }
+
     public bool EnforceUnmatchedIgnoredViolationsPolicy { get; init; }
 
     public DateOnly? WaiverEvaluationDate { get; init; }
@@ -69,6 +73,7 @@ public sealed record AnalysisSnapshotRequest
             ContractIds = ContractIds,
             BaselinePath = BaselinePath,
             IncludeAsmdefContracts = IncludeAsmdefContracts,
+            IncludeRepositoryMetrics = IncludeRepositoryMetrics,
             EnforceUnmatchedIgnoredViolationsPolicy = EnforceUnmatchedIgnoredViolationsPolicy,
             WaiverEvaluationDate = WaiverEvaluationDate,
             PreparationMode = PreparationMode,
@@ -94,6 +99,7 @@ public sealed record AnalysisSnapshotRequest
             ContractIds = request.ContractIds,
             BaselinePath = request.BaselinePath,
             IncludeAsmdefContracts = request.IncludeAsmdefContracts,
+            IncludeRepositoryMetrics = request.IncludeRepositoryMetrics,
             EnforceUnmatchedIgnoredViolationsPolicy = request.EnforceUnmatchedIgnoredViolationsPolicy,
             WaiverEvaluationDate = request.WaiverEvaluationDate,
             PreparationMode = request.PreparationMode,

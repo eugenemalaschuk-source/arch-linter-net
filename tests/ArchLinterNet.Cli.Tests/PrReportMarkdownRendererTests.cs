@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class PrReportMarkdownRendererTests
+public sealed partial class PrReportMarkdownRendererTests
 {
     [Test]
     public void CleanProjection_RendersIndependentAcceptanceDimensions()

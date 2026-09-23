@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Change;
 
@@ -14,6 +16,8 @@ public sealed record ArchitectureChangeSnapshot(
 {
     public const int CurrentSchemaVersion = 2;
     public const string Kind = "architecture-change-snapshot";
+
+    public RepositoryMetricsSnapshot? RepositoryMetrics { get; init; }
 }
 
 /// <summary>A stable architecture surface observed by a complete analysis.</summary>
@@ -50,6 +54,9 @@ public sealed record ArchitectureChangeReport(
     // canonical report document for downstream consumers.
     public IReadOnlyList<ArchitectureChangeFinding> ResolvedFindings { get; init; } =
         Array.Empty<ArchitectureChangeFinding>();
+
+    /// <summary>Bounded repository-observability delta when compatible base and head evidence exists.</summary>
+    public RepositoryMetricsDelta? RepositoryMetricsDelta { get; init; }
 }
 
 /// <summary>Mode, condition set, and workflow identity proven by one change report.</summary>
@@ -67,6 +74,11 @@ public static class ArchitectureChangeReports
         WriteIndented = true,
     };
 
+    static ArchitectureChangeReports()
+    {
+        _jsonOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
+    }
+
     public static string SerializeSnapshot(ArchitectureChangeSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -78,7 +90,8 @@ public static class ArchitectureChangeReports
             snapshot.ConditionSetName,
             Order(snapshot.Entries),
             Order(snapshot.Findings),
-            snapshot.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray()), _jsonOptions);
+            snapshot.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray(),
+            snapshot.RepositoryMetrics), _jsonOptions);
     }
 
     public static ArchitectureChangeSnapshot DeserializeSnapshot(string json)
@@ -106,13 +119,17 @@ public static class ArchitectureChangeReports
             document.ConditionSetName,
             document.Entries,
             document.Findings,
-            document.BaselineDebt);
+            document.BaselineDebt)
+        {
+            RepositoryMetrics = document.RepositoryMetrics,
+        };
         Validate(snapshot);
         return snapshot with
         {
             Entries = Order(snapshot.Entries),
             Findings = Order(snapshot.Findings),
             BaselineDebt = snapshot.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray(),
+            RepositoryMetrics = document.RepositoryMetrics,
         };
     }
 
@@ -179,7 +196,12 @@ public static class ArchitectureChangeReports
             current.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray())
         {
             ResolvedFindings = Order(baseline.Findings.Where(finding =>
-                !currentFindingIdentities.Contains(finding.Identity)))
+                !currentFindingIdentities.Contains(finding.Identity))),
+            RepositoryMetricsDelta = executionId is null
+                ? null
+                : RepositoryMetricsDeltaFactory.Create(
+                    baseline.RepositoryMetrics,
+                    current.RepositoryMetrics)
         };
         return executionId is null
             ? report
@@ -197,7 +219,7 @@ public static class ArchitectureChangeReports
         ArgumentNullException.ThrowIfNull(report);
         Validate(report);
         report = OrderReport(report);
-        return report.ExecutionContext is null
+        return report.ExecutionContext is null && report.RepositoryMetricsDelta is null
             ? JsonSerializer.Serialize(new LegacyReportDocument(
                 report.Added,
                 report.Removed,
@@ -226,6 +248,11 @@ public static class ArchitectureChangeReports
         foreach (string identity in report.BaselineDebt)
         {
             builder.AppendLine($"- {identity}");
+        }
+
+        if (report.RepositoryMetricsDelta is not null)
+        {
+            AppendRepositoryMetricsDelta(builder, report.RepositoryMetricsDelta);
         }
 
         return builder.ToString();
@@ -280,6 +307,7 @@ public static class ArchitectureChangeReports
                     document.ExecutionContext.Mode ?? string.Empty,
                     document.ExecutionContext.ConditionSet ?? string.Empty),
             ResolvedFindings = document.ResolvedFindings,
+            RepositoryMetricsDelta = document.RepositoryMetricsDelta,
         };
         Validate(report);
         return OrderReport(report);
@@ -318,6 +346,10 @@ public static class ArchitectureChangeReports
 
         ValidateEntries(report.Added.Concat(report.Removed), nameof(report));
         ValidateBaselineDebt(report.BaselineDebt, nameof(report));
+        if (report.RepositoryMetricsDelta is not null && !report.RepositoryMetricsDelta.IsCompatible)
+        {
+            throw new ArgumentException("The architecture change report contains an unsupported repository metrics delta.", nameof(report));
+        }
     }
 
     private static void Validate(ArchitectureChangeSnapshot snapshot)
@@ -340,6 +372,10 @@ public static class ArchitectureChangeReports
         ValidateEntries(snapshot.Entries, nameof(snapshot), requireUnique: true);
         ValidateFindings(snapshot.Findings, nameof(snapshot), requireUnique: true);
         ValidateBaselineDebt(snapshot.BaselineDebt, nameof(snapshot));
+        if (snapshot.RepositoryMetrics is not null && !snapshot.RepositoryMetrics.IsCompatible)
+        {
+            throw new ArgumentException("The architecture change snapshot contains unsupported repository metrics.", nameof(snapshot));
+        }
     }
 
     private static void ValidateEntries(
@@ -425,6 +461,22 @@ public static class ArchitectureChangeReports
         }
     }
 
+    private static void AppendRepositoryMetricsDelta(StringBuilder builder, RepositoryMetricsDelta delta)
+    {
+        builder.AppendLine("Repository metrics delta:");
+        builder.AppendLine($"- availability: {delta.Availability.ToString().ToLowerInvariant()}");
+        foreach (RepositoryMetricDelta metric in delta.Metrics)
+        {
+            string format = metric.Unit == "ratio" ? "0.000" : "N0";
+            builder.AppendLine($"- {metric.Name}: {metric.Base.ToString(format, System.Globalization.CultureInfo.InvariantCulture)} -> {metric.Head.ToString(format, System.Globalization.CultureInfo.InvariantCulture)} ({metric.Delta.ToString(format, System.Globalization.CultureInfo.InvariantCulture)})");
+        }
+
+        foreach (string reason in delta.ReasonCodes)
+        {
+            builder.AppendLine($"- unavailable reason: {reason}");
+        }
+    }
+
     private sealed record SnapshotDocument(
         string SnapshotKind,
         int SchemaVersion,
@@ -432,7 +484,8 @@ public static class ArchitectureChangeReports
         string? ConditionSetName,
         IReadOnlyList<ArchitectureChangeEntry>? Entries,
         IReadOnlyList<ArchitectureChangeFinding>? Findings,
-        IReadOnlyList<string>? BaselineDebt);
+        IReadOnlyList<string>? BaselineDebt,
+        RepositoryMetricsSnapshot? RepositoryMetrics);
 
     private sealed record ReportDocument(
         string? Kind,
@@ -443,7 +496,8 @@ public static class ArchitectureChangeReports
         IReadOnlyList<ArchitectureChangeFinding>? NewFindings,
         IReadOnlyList<ArchitectureChangeFinding>? ExistingFindings,
         IReadOnlyList<ArchitectureChangeFinding>? ResolvedFindings,
-        IReadOnlyList<string>? BaselineDebt);
+        IReadOnlyList<string>? BaselineDebt,
+        RepositoryMetricsDelta? RepositoryMetricsDelta);
 
     private sealed record LegacyReportDocument(
         IReadOnlyList<ArchitectureChangeEntry> Added,

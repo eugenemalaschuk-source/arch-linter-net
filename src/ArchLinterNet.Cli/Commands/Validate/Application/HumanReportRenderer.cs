@@ -79,6 +79,9 @@ internal sealed class HumanReportRenderer
             return;
         }
 
+        AppendSection(sb, outcome.RepositoryMetrics is not null,
+            () => FormatRepositoryMetrics(outcome.RepositoryMetrics!));
+
         if (outcome.Passed)
         {
             sb.AppendLine("Architecture validation passed.");
@@ -162,5 +165,44 @@ internal sealed class HumanReportRenderer
             sb.AppendLine();
             sb.AppendLine(content);
         }
+    }
+
+    private static string FormatRepositoryMetrics(RepositoryMetricsSnapshot metrics)
+    {
+        static string Value(int? value) => value?.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) ?? "unavailable";
+        static string Ratio(double? value) => value?.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) ?? "unavailable";
+
+        StringBuilder sb = new();
+        sb.AppendLine("Repository metrics:");
+        sb.AppendLine($"  availability: {metrics.Availability.ToString().ToLowerInvariant()}");
+        sb.AppendLine();
+        sb.AppendLine("  Size:");
+        sb.AppendLine($"    source lines: {Value(metrics.Size.SourceLines)}");
+        sb.AppendLine($"    source files: {Value(metrics.Size.SourceFiles)}");
+        sb.AppendLine($"    projects: {Value(metrics.Size.Projects)}");
+        sb.AppendLine($"    types: {Value(metrics.Size.Types)}");
+        sb.AppendLine($"    public types: {Value(metrics.Size.PublicTypes)}");
+        sb.AppendLine();
+        sb.AppendLine("  Coupling:");
+        sb.AppendLine($"    dependencies: {Value(metrics.Coupling.DependencyCount)}");
+        sb.AppendLine($"    dependencies per project: {Ratio(metrics.Coupling.DependenciesPerProject)}");
+        sb.AppendLine($"    dependency density: {Ratio(metrics.Coupling.DependencyDensity)}");
+        sb.AppendLine($"    maximum fan-in: {Value(metrics.Coupling.MaxFanIn)}");
+        sb.AppendLine($"    maximum fan-out: {Value(metrics.Coupling.MaxFanOut)}");
+        sb.AppendLine();
+        sb.AppendLine("  Structure:");
+        sb.AppendLine($"    maximum dependency depth: {Value(metrics.Structure.MaxDependencyDepth)}");
+        sb.AppendLine($"    cyclic components: {Value(metrics.Structure.CyclicComponentCount)}");
+        sb.AppendLine($"    cyclic projects: {Value(metrics.Structure.CyclicProjectCount)}");
+        sb.AppendLine($"    cyclic project ratio: {Ratio(metrics.Structure.CyclicProjectRatio)}");
+        sb.AppendLine($"    largest strongly connected component: {Value(metrics.Structure.LargestSccSize)}");
+        sb.Append($"    largest SCC ratio: {Ratio(metrics.Structure.LargestSccRatio)}");
+        if (metrics.ReasonCodes.Count > 0)
+        {
+            sb.AppendLine();
+            sb.Append($"  reasons: {string.Join(", ", metrics.ReasonCodes)}");
+        }
+
+        return sb.ToString();
     }
 }

@@ -51,7 +51,10 @@ public sealed record ArchitecturePrReportValidationReceipt(
     ArchitecturePrReportApplicability? Applicability,
     ArchitecturePrReportExternalEvidence? ExternalEvidence,
     IReadOnlyList<ArchitecturePrReportFinding> Findings,
-    ArchitecturePrReportProvenance Provenance);
+    ArchitecturePrReportProvenance Provenance)
+{
+    public RepositoryMetricsSnapshot? RepositoryMetrics { get; init; }
+}
 
 /// <summary>Applicability completion and control-level evidence retained for reporting.</summary>
 public sealed record ArchitecturePrReportApplicability(
@@ -493,7 +496,10 @@ public sealed record ArchitecturePrReportChange(
     IReadOnlyList<ArchitectureChangeFinding> NewFindings,
     IReadOnlyList<ArchitectureChangeFinding> ExistingFindings,
     IReadOnlyList<ArchitectureChangeFinding> ResolvedFindings,
-    IReadOnlyList<string> BaselineDebt);
+    IReadOnlyList<string> BaselineDebt)
+{
+    public RepositoryMetricsDelta? RepositoryMetricsDelta { get; init; }
+}
 
 public sealed record ArchitecturePrReportHeadline(
     ArchitectureHealthGate Gate,

@@ -202,6 +202,13 @@ public sealed record ValidationOutcome
     public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; init; }
 
     /// <summary>
+    /// Informational repository size, coupling, and structure observability projected from the
+    /// immutable analysis session. This never participates in policy, findings, health, or exit
+    /// status decisions.
+    /// </summary>
+    public RepositoryMetricsSnapshot? RepositoryMetrics { get; init; }
+
+    /// <summary>
     /// The single Core-owned applicability projection consumed by output and adapter layers. It is
     /// null for policies without applicability opt-in, just like completion evidence.
     /// </summary>

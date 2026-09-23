@@ -28,6 +28,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly DateOnly _waiverEvaluationDate;
     private readonly bool _enforceUnmatchedIgnoredViolationsPolicy;
     private readonly bool _includeAsmdefContracts;
+    private readonly bool _includeRepositoryMetrics;
     private readonly IArchitectureContractExecutor _contractExecutor;
     private readonly IArchitectureContractHandlerRegistry _handlerRegistry;
     private readonly IReadOnlyCollection<string>? _requestedContractIds;
@@ -75,7 +76,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         // Keep CancellationToken before the optional waiver date to preserve the reviewed
         // public constructor signature; CA1068 is intentionally retained for compatibility.
         CancellationToken cancellationToken = default,
-        DateOnly? waiverEvaluationDate = null)
+        DateOnly? waiverEvaluationDate = null,
+        bool includeRepositoryMetrics = false)
     {
         _document = document;
         _setup = setup;
@@ -88,6 +90,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         _waiverEvaluationDate = waiverEvaluationDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
         _enforceUnmatchedIgnoredViolationsPolicy = enforceUnmatchedIgnoredViolationsPolicy;
         _includeAsmdefContracts = includeAsmdefContracts;
+        _includeRepositoryMetrics = includeRepositoryMetrics;
         _contractExecutor = contractExecutor;
         _handlerRegistry = handlerRegistry;
         _requestedContractIds = requestedContractIds;
@@ -120,12 +123,10 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     }
 
     public string RepositoryRoot => _repositoryRoot;
-
     public BuildStatePreflightResult Preflight => _preflight;
 
     // A blocked preflight is a failed session: no mode may execute contracts against it.
     public bool Failed => _preflight.Blocked;
-
     public ArchitectureAnalysisSnapshotCounters Counters
     {
         get
@@ -157,7 +158,6 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             }
         }
     }
-
     public bool IsDisposed
     {
         get
@@ -168,7 +168,6 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             }
         }
     }
-
     // Real analysis-cache/v1 lookup instrumentation for whatever this snapshot's Evaluate calls
     // actually did — see AnalysisProfileCacheCounters, which ValidateCommandHandler.Profile.cs and
     // ArchitectureValidationBuilder now source Lookups/Hits/Misses/BytesRead from instead of leaving
@@ -197,7 +196,6 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             }
         }
     }
-
     public ValidationOutcome Evaluate(string mode, ValidationTiming? timing = null)
     {
         if (mode is not ("strict" or "audit"))
@@ -469,7 +467,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                     _preflight.Diagnostics,
                     GetPolicyImportPaths(),
                     GetResolvedAssemblyPaths(),
-                    GetDiscoveredProjectPaths()));
+                    GetDiscoveredProjectPaths(),
+                    _includeRepositoryMetrics));
         RecordContractFamilyResultCounts(resultCounts);
         _profilingCounters?.ResetContractFamilyResultCounts();
         return outcome;
@@ -527,7 +526,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             keyInputs.BaselineInput?.ContentDigest ?? string.Empty,
             _includeAsmdefContracts,
             _enforceUnmatchedIgnoredViolationsPolicy,
-            _waiverEvaluationDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+            _waiverEvaluationDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            _includeRepositoryMetrics);
 
         AnalysisCachePopulation.LookupPreparation preparation;
         using (timing?.Measure("cache_lookup"))

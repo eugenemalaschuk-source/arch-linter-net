@@ -12,6 +12,8 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
         "arch-linter-net badge architecture-health --input <architecture-health.json> [--output <badge.json>] "
         + "[--disclosure-profile <headline-only/v1|headline-plus-freshness/v1>] [--verified-at <UTC>] "
         + "[--verify-disclosure-profile]";
+    private const string RepositoryMetricsHelp =
+        "arch-linter-net badge repository-metrics --input <validation.json|architecture-health.json> [--output <badge.json>]";
 
     internal int ExecuteSetup(BadgeSetupCommandOptions options) => new BadgeSetupCommandHandler(console, fileSystem).ExecuteSetup(options);
 
@@ -96,6 +98,57 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
             or NotSupportedException)
         {
             console.Error.WriteLine($"Could not write Architecture Health badge: {exception.Message}");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        return projection.ExitCode;
+    }
+
+    public int ExecuteRepositoryMetrics(RepositoryMetricsBadgeCommandOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.ShowHelp)
+        {
+            console.Out.WriteLine(RepositoryMetricsHelp);
+            return CliExitCodes.Success;
+        }
+
+        RepositoryMetricsBadgeProjection projection;
+        try
+        {
+            projection = RepositoryMetricsBadgeProjector.Project(fileSystem.ReadAllText(options.InputPath));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            console.Error.WriteLine($"Could not read repository metrics input: {exception.Message}");
+            projection = new("unavailable", "lightgrey", CliExitCodes.InvalidArgumentsOrRuntimeError);
+        }
+
+        string json = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            label = "source lines",
+            message = projection.Message,
+            color = projection.Color,
+        });
+        try
+        {
+            if (options.OutputPath is null)
+            {
+                console.Out.WriteLine(json);
+            }
+            else
+            {
+                string temporaryPath = fileSystem.WriteAllTextToTemp(options.OutputPath, json + Environment.NewLine);
+                fileSystem.RenameTempToTarget(temporaryPath, options.OutputPath);
+            }
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            console.Error.WriteLine($"Could not write repository metrics badge: {exception.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 

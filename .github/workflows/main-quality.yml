@@ -374,9 +374,11 @@ jobs:
           REPORT_COUNT: ${{ steps.coverage_evidence.outputs.cobertura_count }}
         shell: bash
         run: |
-          echo "upload_status=uploaded" >> "$GITHUB_OUTPUT"
-          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-          echo "report_count=$REPORT_COUNT" >> "$GITHUB_OUTPUT"
+          {
+            echo "upload_status=uploaded"
+            echo "commit=$GITHUB_SHA"
+            echo "report_count=$REPORT_COUNT"
+          } >> "$GITHUB_OUTPUT"
           echo "Codecov accepted explicit canonical coverage input: commit=$GITHUB_SHA reports=$REPORT_COUNT disable_search=true"
 
   summary:
