@@ -25,6 +25,10 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | `arch-linter-net badge architecture-health --input <architecture-health.json> [--output <badge.json>]` | Project canonical Architecture Health plus policy inventory into a Shields endpoint payload; does not rerun analysis. |
 
+<!-- cli-command: badge repository-metrics -->
+
+| `arch-linter-net badge repository-metrics --input <validation.json> [--output <badge.json>]` | Project absolute Source lines repository metrics into a Shields endpoint payload; does not rerun analysis. |
+
 <!-- cli-command: badge setup -->
 
 | `arch-linter-net badge architecture-health setup --repository <owner/name> --visibility <public|private> [--mode <none|github-raw|relay>]` | Preview or generate a deterministic, versioned consumer badge setup. |

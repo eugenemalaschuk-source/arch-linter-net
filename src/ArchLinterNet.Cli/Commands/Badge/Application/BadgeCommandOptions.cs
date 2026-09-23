@@ -9,3 +9,8 @@ internal sealed record ArchitectureHealthBadgeCommandOptions(
     string? DisclosureProfile = null,
     string? VerifiedAt = null,
     bool VerifyDisclosureProfile = false);
+
+internal sealed record RepositoryMetricsBadgeCommandOptions(
+    string InputPath,
+    string? OutputPath,
+    bool ShowHelp);

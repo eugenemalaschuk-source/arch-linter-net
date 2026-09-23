@@ -52,8 +52,33 @@ public sealed record AnalysisCacheKey(
     bool EnforceUnmatchedIgnoredViolationsPolicy = false,
     // Waiver lifecycle states are date-sensitive. A dated key prevents a result evaluated today
     // from being reused after a waiver expires tomorrow.
-    string WaiverEvaluationDate = "")
+    string WaiverEvaluationDate = "",
+    // Repository metrics are an opt-in projection. A cache entry produced without the projection
+    // must never satisfy a report/health request that requires its evidence.
+    bool IncludeRepositoryMetrics = false)
 {
+    public AnalysisCacheKey(
+        string policyDigest,
+        string mode,
+        string? conditionSetName,
+        string contractIdsDigest,
+        string workspaceDigest,
+        string? configuration,
+        string? targetFramework,
+        string? platform,
+        string? runtimeIdentifier,
+        string preprocessorSymbolsDigest,
+        string baselineDigest,
+        bool includeAsmdefContracts,
+        bool enforceUnmatchedIgnoredViolationsPolicy,
+        string waiverEvaluationDate)
+        : this(
+            policyDigest, mode, conditionSetName, contractIdsDigest, workspaceDigest, configuration, targetFramework,
+            platform, runtimeIdentifier, preprocessorSymbolsDigest, baselineDigest, includeAsmdefContracts,
+            enforceUnmatchedIgnoredViolationsPolicy, waiverEvaluationDate, false)
+    {
+    }
+
     // Keep the previously published primary-constructor shape binary-compatible while adding the
     // date-sensitive lifecycle dimension above.
     public AnalysisCacheKey(
@@ -73,8 +98,44 @@ public sealed record AnalysisCacheKey(
         : this(
             policyDigest, mode, conditionSetName, contractIdsDigest, workspaceDigest, configuration, targetFramework,
             platform, runtimeIdentifier, preprocessorSymbolsDigest, baselineDigest, includeAsmdefContracts,
-            enforceUnmatchedIgnoredViolationsPolicy, "")
+            enforceUnmatchedIgnoredViolationsPolicy, "", false)
     {
+    }
+
+    // Positional records expose Deconstruct as part of the public API. Keep the previously
+    // published 14-value shape alongside the generated 15-value overload introduced by the
+    // repository-metrics projection so existing deconstruction source and binary consumers remain
+    // compatible.
+    public void Deconstruct(
+        out string PolicyDigest,
+        out string Mode,
+        out string? ConditionSetName,
+        out string ContractIdsDigest,
+        out string WorkspaceDigest,
+        out string? Configuration,
+        out string? TargetFramework,
+        out string? Platform,
+        out string? RuntimeIdentifier,
+        out string PreprocessorSymbolsDigest,
+        out string BaselineDigest,
+        out bool IncludeAsmdefContracts,
+        out bool EnforceUnmatchedIgnoredViolationsPolicy,
+        out string WaiverEvaluationDate)
+    {
+        PolicyDigest = this.PolicyDigest;
+        Mode = this.Mode;
+        ConditionSetName = this.ConditionSetName;
+        ContractIdsDigest = this.ContractIdsDigest;
+        WorkspaceDigest = this.WorkspaceDigest;
+        Configuration = this.Configuration;
+        TargetFramework = this.TargetFramework;
+        Platform = this.Platform;
+        RuntimeIdentifier = this.RuntimeIdentifier;
+        PreprocessorSymbolsDigest = this.PreprocessorSymbolsDigest;
+        BaselineDigest = this.BaselineDigest;
+        IncludeAsmdefContracts = this.IncludeAsmdefContracts;
+        EnforceUnmatchedIgnoredViolationsPolicy = this.EnforceUnmatchedIgnoredViolationsPolicy;
+        WaiverEvaluationDate = this.WaiverEvaluationDate;
     }
 
     public string Digest
@@ -99,7 +160,8 @@ public sealed record AnalysisCacheKey(
                 $"baseline:{BaselineDigest}",
                 $"asmdef:{IncludeAsmdefContracts}",
                 $"enforceunmatched:{EnforceUnmatchedIgnoredViolationsPolicy}",
-                $"waiverevaluationdate:{WaiverEvaluationDate}");
+                $"waiverevaluationdate:{WaiverEvaluationDate}",
+                $"includerepositorymetrics:{IncludeRepositoryMetrics}");
             return HashHex(canonical);
         }
     }

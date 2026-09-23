@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".github" / "workflows"
 STAGE_B_ACTION_REF = (
     "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion"
-    "@ac678db689a1faf2eb098d0027fc7d176a362d00"
+    "@68c69f51ea4ea6a5ae2cca2a09479be99ae3501d"
 )
 
 
@@ -33,6 +33,22 @@ def test_reference_publisher_delegates_to_one_reusable_workflow() -> None:
     assert "adapter: github-raw" in workflow
     assert "actions/github-script" not in workflow
     assert "actions/checkout" not in workflow
+
+
+def test_source_lines_badge_uses_canonical_evidence_in_the_trusted_pipeline() -> None:
+    workflow = read_workflow("architecture-health-badge-promotion.yml")
+    caller = read_workflow("publish-architecture-health-badge.yml")
+    ci = read_workflow("ci.yml")
+
+    assert "Publish Source lines payload from canonical evidence" in workflow
+    assert 'name == "architecture-health"' in workflow
+    assert 'repository-metrics-badge.json' in workflow
+    assert 'actions/runs/$PRODUCER_RUN_ID/artifacts' in workflow
+    assert 'architecture-health-badge/architecture-health.json' not in workflow
+    assert "repository_metrics:" not in caller
+    assert not (WORKFLOWS / "publish-repository-metrics-badge.yml").exists()
+    assert "badge repository-metrics" in ci
+    assert "architecture-pr-report/repository-metrics-badge.json" in ci
 
 
 def test_reusable_workflow_resolves_its_action_from_the_workflow_repository() -> None:

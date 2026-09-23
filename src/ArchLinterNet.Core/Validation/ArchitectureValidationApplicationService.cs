@@ -211,7 +211,8 @@ public sealed class ArchitectureValidationApplicationService(
                         request.CancellationToken, request.MaxParallelism)
                     : BuildRunnerFor(state.Policy, request, modeHint, timing),
                 cancellationToken: request.CancellationToken,
-                waiverEvaluationDate: request.WaiverEvaluationDate);
+                waiverEvaluationDate: request.WaiverEvaluationDate,
+                includeRepositoryMetrics: request.IncludeRepositoryMetrics);
         }
 
         using (timing?.Measure("load_and_setup"))
@@ -257,7 +258,8 @@ public sealed class ArchitectureValidationApplicationService(
             requestedContractIds: request.ContractIds,
             cacheContext: BuildCacheContext(request),
             cancellationToken: request.CancellationToken,
-            waiverEvaluationDate: request.WaiverEvaluationDate);
+            waiverEvaluationDate: request.WaiverEvaluationDate,
+            includeRepositoryMetrics: request.IncludeRepositoryMetrics);
     }
 
     // Null whenever the caller did not configure a cache location (ValidationRequest.CacheLocation /

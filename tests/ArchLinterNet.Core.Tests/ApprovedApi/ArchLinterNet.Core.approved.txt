@@ -192,8 +192,9 @@ static class ArchLinterNet.Core.Caching.AnalysisCacheEnvelope
   field const string SchemaId = "analysis-cache/v1"
   property static string ToolVersion {get;}
 sealed class ArchLinterNet.Core.Caching.AnalysisCacheKey : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheKey>
-  ctor(string PolicyDigest, string Mode, string? ConditionSetName, string ContractIdsDigest, string WorkspaceDigest, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier, string PreprocessorSymbolsDigest = "", string BaselineDigest = "", bool IncludeAsmdefContracts = true, bool EnforceUnmatchedIgnoredViolationsPolicy = false, string WaiverEvaluationDate = "")
+  ctor(string PolicyDigest, string Mode, string? ConditionSetName, string ContractIdsDigest, string WorkspaceDigest, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier, string PreprocessorSymbolsDigest = "", string BaselineDigest = "", bool IncludeAsmdefContracts = true, bool EnforceUnmatchedIgnoredViolationsPolicy = false, string WaiverEvaluationDate = "", bool IncludeRepositoryMetrics = false)
   ctor(string policyDigest, string mode, string? conditionSetName, string contractIdsDigest, string workspaceDigest, string? configuration, string? targetFramework, string? platform, string? runtimeIdentifier, string preprocessorSymbolsDigest, string baselineDigest, bool includeAsmdefContracts, bool enforceUnmatchedIgnoredViolationsPolicy)
+  ctor(string policyDigest, string mode, string? conditionSetName, string contractIdsDigest, string workspaceDigest, string? configuration, string? targetFramework, string? platform, string? runtimeIdentifier, string preprocessorSymbolsDigest, string baselineDigest, bool includeAsmdefContracts, bool enforceUnmatchedIgnoredViolationsPolicy, string waiverEvaluationDate)
   method ArchLinterNet.Core.Caching.AnalysisCacheKey <Clone>$()
   method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheKey? other)
   method bool Equals(object? obj)
@@ -206,10 +207,12 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheKey : System.IEquatable<Arc
   method static string NormalizeMode(string mode)
   method string ToString()
   method void Deconstruct(out string PolicyDigest, out string Mode, out string? ConditionSetName, out string ContractIdsDigest, out string WorkspaceDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier, out string PreprocessorSymbolsDigest, out string BaselineDigest, out bool IncludeAsmdefContracts, out bool EnforceUnmatchedIgnoredViolationsPolicy, out string WaiverEvaluationDate)
+  method void Deconstruct(out string PolicyDigest, out string Mode, out string? ConditionSetName, out string ContractIdsDigest, out string WorkspaceDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier, out string PreprocessorSymbolsDigest, out string BaselineDigest, out bool IncludeAsmdefContracts, out bool EnforceUnmatchedIgnoredViolationsPolicy, out string WaiverEvaluationDate, out bool IncludeRepositoryMetrics)
   operator !=(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
   property bool EnforceUnmatchedIgnoredViolationsPolicy {get;init;}
   property bool IncludeAsmdefContracts {get;init;}
+  property bool IncludeRepositoryMetrics {get;init;}
   property string BaselineDigest {get;init;}
   property string ContractIdsDigest {get;init;}
   property string Digest {get;}
@@ -311,6 +314,7 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 : System.IEquatab
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? left, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? right)
   property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;init;}
   property ArchLinterNet.Core.Model.ArchitecturePolicyInventory? PolicyInventory {get;init;}
+  property ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? RepositoryMetrics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord> ApplicabilityRecords {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}
@@ -454,6 +458,7 @@ sealed class ArchLinterNet.Core.Change.ArchitectureChangeReport : System.IEquata
   operator !=(ArchLinterNet.Core.Change.ArchitectureChangeReport? left, ArchLinterNet.Core.Change.ArchitectureChangeReport? right)
   operator ==(ArchLinterNet.Core.Change.ArchitectureChangeReport? left, ArchLinterNet.Core.Change.ArchitectureChangeReport? right)
   property ArchLinterNet.Core.Change.ArchitectureChangeReportContext? ExecutionContext {get;init;}
+  property ArchLinterNet.Core.Model.RepositoryMetricsDelta? RepositoryMetricsDelta {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings {get;init;}
@@ -495,6 +500,7 @@ sealed class ArchLinterNet.Core.Change.ArchitectureChangeSnapshot : System.IEqua
   method void Deconstruct(out int SchemaVersion, out string Mode, out string ConditionSetName, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings, out System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
   operator !=(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? left, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? right)
   operator ==(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? left, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? right)
+  property ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? RepositoryMetrics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> BaselineDebt {get;init;}
@@ -4329,6 +4335,152 @@ sealed class ArchLinterNet.Core.Model.PublicApiSurfacePayload : ArchLinterNet.Co
   property string? PreviousApiSignature {get;init;}
   property string? UndeclaredApiSignature {get;init;}
   property string? UnselectedFirstPartyDependency {get;init;}
+sealed class ArchLinterNet.Core.Model.RepositoryCouplingMetrics : System.IEquatable<ArchLinterNet.Core.Model.RepositoryCouplingMetrics>
+  ctor(int? DependencyCount, double? DependenciesPerProject, double? DependencyDensity, int? MaxFanIn, int? MaxFanOut, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.RepositoryProjectCoupling> Projects)
+  method ArchLinterNet.Core.Model.RepositoryCouplingMetrics <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.RepositoryCouplingMetrics? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int? DependencyCount, out double? DependenciesPerProject, out double? DependencyDensity, out int? MaxFanIn, out int? MaxFanOut, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.RepositoryProjectCoupling> Projects)
+  operator !=(ArchLinterNet.Core.Model.RepositoryCouplingMetrics? left, ArchLinterNet.Core.Model.RepositoryCouplingMetrics? right)
+  operator ==(ArchLinterNet.Core.Model.RepositoryCouplingMetrics? left, ArchLinterNet.Core.Model.RepositoryCouplingMetrics? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.RepositoryProjectCoupling> Projects {get;init;}
+  property double? DependenciesPerProject {get;init;}
+  property double? DependencyDensity {get;init;}
+  property int? DependencyCount {get;init;}
+  property int? MaxFanIn {get;init;}
+  property int? MaxFanOut {get;init;}
+  property static ArchLinterNet.Core.Model.RepositoryCouplingMetrics Empty {get;}
+sealed class ArchLinterNet.Core.Model.RepositoryMetricDelta : System.IEquatable<ArchLinterNet.Core.Model.RepositoryMetricDelta>
+  ctor(string Name, string Unit, double Base, double Head, double Delta)
+  method ArchLinterNet.Core.Model.RepositoryMetricDelta <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.RepositoryMetricDelta? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Name, out string Unit, out double Base, out double Head, out double Delta)
+  operator !=(ArchLinterNet.Core.Model.RepositoryMetricDelta? left, ArchLinterNet.Core.Model.RepositoryMetricDelta? right)
+  operator ==(ArchLinterNet.Core.Model.RepositoryMetricDelta? left, ArchLinterNet.Core.Model.RepositoryMetricDelta? right)
+  property double Base {get;init;}
+  property double Delta {get;init;}
+  property double Head {get;init;}
+  property string Name {get;init;}
+  property string Unit {get;init;}
+enum ArchLinterNet.Core.Model.RepositoryMetricsAvailability : int
+  enum-member Complete = 0
+  enum-member Partial = 1
+  enum-member Unavailable = 2
+sealed class ArchLinterNet.Core.Model.RepositoryMetricsDelta : System.IEquatable<ArchLinterNet.Core.Model.RepositoryMetricsDelta>
+  ctor(int SchemaVersion, string Kind, ArchLinterNet.Core.Model.RepositoryMetricsDeltaAvailability Availability, System.Collections.Generic.IReadOnlyList<string> ReasonCodes, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.RepositoryMetricDelta> Metrics)
+  field const int CurrentSchemaVersion = 1
+  field const string CurrentKind = "repository-metrics-delta/v1"
+  method ArchLinterNet.Core.Model.RepositoryMetricsDelta <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.RepositoryMetricsDelta? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method static ArchLinterNet.Core.Model.RepositoryMetricsDelta Unavailable(params string[] reasons)
+  method string ToString()
+  method void Deconstruct(out int SchemaVersion, out string Kind, out ArchLinterNet.Core.Model.RepositoryMetricsDeltaAvailability Availability, out System.Collections.Generic.IReadOnlyList<string> ReasonCodes, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.RepositoryMetricDelta> Metrics)
+  operator !=(ArchLinterNet.Core.Model.RepositoryMetricsDelta? left, ArchLinterNet.Core.Model.RepositoryMetricsDelta? right)
+  operator ==(ArchLinterNet.Core.Model.RepositoryMetricsDelta? left, ArchLinterNet.Core.Model.RepositoryMetricsDelta? right)
+  property ArchLinterNet.Core.Model.RepositoryMetricsDeltaAvailability Availability {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.RepositoryMetricDelta> Metrics {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> ReasonCodes {get;init;}
+  property bool IsCompatible {get;}
+  property bool IsComplete {get;}
+  property int SchemaVersion {get;init;}
+  property string Kind {get;init;}
+enum ArchLinterNet.Core.Model.RepositoryMetricsDeltaAvailability : int
+  enum-member Complete = 0
+  enum-member Unavailable = 1
+static class ArchLinterNet.Core.Model.RepositoryMetricsDeltaFactory
+  method static ArchLinterNet.Core.Model.RepositoryMetricsDelta Create(ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? baseline, ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? current)
+static class ArchLinterNet.Core.Model.RepositoryMetricsJson
+  method static ArchLinterNet.Core.Model.RepositoryMetricsDelta DeserializeDelta(string json)
+  method static ArchLinterNet.Core.Model.RepositoryMetricsSnapshot Deserialize(string json)
+  method static string Serialize(ArchLinterNet.Core.Model.RepositoryMetricsDelta delta)
+  method static string Serialize(ArchLinterNet.Core.Model.RepositoryMetricsSnapshot snapshot)
+static class ArchLinterNet.Core.Model.RepositoryMetricsReasonCodes
+  field const string DiscoveryDiagnostics = "project_discovery_diagnostics"
+  field const string IncompatibleSchema = "incompatible_schema"
+  field const string IncompleteTypeUniverse = "incomplete_type_universe"
+  field const string MissingAnalysis = "missing_analysis"
+  field const string MissingProjectDiscovery = "missing_project_discovery"
+  field const string SourceInventoryNotMaterialized = "source_inventory_not_materialized"
+  field const string UnreadableSource = "unreadable_source"
+sealed class ArchLinterNet.Core.Model.RepositoryMetricsSnapshot : System.IEquatable<ArchLinterNet.Core.Model.RepositoryMetricsSnapshot>
+  ctor(int SchemaVersion, string Kind, ArchLinterNet.Core.Model.RepositoryMetricsAvailability Availability, System.Collections.Generic.IReadOnlyList<string> ReasonCodes, ArchLinterNet.Core.Model.RepositorySizeMetrics Size, ArchLinterNet.Core.Model.RepositoryCouplingMetrics Coupling, ArchLinterNet.Core.Model.RepositoryStructureMetrics Structure)
+  field const int CurrentSchemaVersion = 1
+  field const string CurrentKind = "repository-metrics/v1"
+  method ArchLinterNet.Core.Model.RepositoryMetricsSnapshot <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method static ArchLinterNet.Core.Model.RepositoryMetricsSnapshot Unavailable(params string[] reasons)
+  method string ToString()
+  method void Deconstruct(out int SchemaVersion, out string Kind, out ArchLinterNet.Core.Model.RepositoryMetricsAvailability Availability, out System.Collections.Generic.IReadOnlyList<string> ReasonCodes, out ArchLinterNet.Core.Model.RepositorySizeMetrics Size, out ArchLinterNet.Core.Model.RepositoryCouplingMetrics Coupling, out ArchLinterNet.Core.Model.RepositoryStructureMetrics Structure)
+  operator !=(ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? left, ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? right)
+  operator ==(ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? left, ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? right)
+  property ArchLinterNet.Core.Model.RepositoryCouplingMetrics Coupling {get;init;}
+  property ArchLinterNet.Core.Model.RepositoryMetricsAvailability Availability {get;init;}
+  property ArchLinterNet.Core.Model.RepositorySizeMetrics Size {get;init;}
+  property ArchLinterNet.Core.Model.RepositoryStructureMetrics Structure {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> ReasonCodes {get;init;}
+  property bool IsCompatible {get;}
+  property bool IsComplete {get;}
+  property int SchemaVersion {get;init;}
+  property string Kind {get;init;}
+sealed class ArchLinterNet.Core.Model.RepositoryProjectCoupling : System.IEquatable<ArchLinterNet.Core.Model.RepositoryProjectCoupling>
+  ctor(string Identity, string Name, int FanIn, int FanOut, int AfferentCoupling, int EfferentCoupling, double Instability)
+  method ArchLinterNet.Core.Model.RepositoryProjectCoupling <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.RepositoryProjectCoupling? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Identity, out string Name, out int FanIn, out int FanOut, out int AfferentCoupling, out int EfferentCoupling, out double Instability)
+  operator !=(ArchLinterNet.Core.Model.RepositoryProjectCoupling? left, ArchLinterNet.Core.Model.RepositoryProjectCoupling? right)
+  operator ==(ArchLinterNet.Core.Model.RepositoryProjectCoupling? left, ArchLinterNet.Core.Model.RepositoryProjectCoupling? right)
+  property double Instability {get;init;}
+  property int AfferentCoupling {get;init;}
+  property int EfferentCoupling {get;init;}
+  property int FanIn {get;init;}
+  property int FanOut {get;init;}
+  property string Identity {get;init;}
+  property string Name {get;init;}
+sealed class ArchLinterNet.Core.Model.RepositorySizeMetrics : System.IEquatable<ArchLinterNet.Core.Model.RepositorySizeMetrics>
+  ctor(int? SourceLines, int? SourceFiles, int? Projects, int? Types, int? PublicTypes)
+  method ArchLinterNet.Core.Model.RepositorySizeMetrics <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.RepositorySizeMetrics? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int? SourceLines, out int? SourceFiles, out int? Projects, out int? Types, out int? PublicTypes)
+  operator !=(ArchLinterNet.Core.Model.RepositorySizeMetrics? left, ArchLinterNet.Core.Model.RepositorySizeMetrics? right)
+  operator ==(ArchLinterNet.Core.Model.RepositorySizeMetrics? left, ArchLinterNet.Core.Model.RepositorySizeMetrics? right)
+  property int? Projects {get;init;}
+  property int? PublicTypes {get;init;}
+  property int? SourceFiles {get;init;}
+  property int? SourceLines {get;init;}
+  property int? Types {get;init;}
+  property static ArchLinterNet.Core.Model.RepositorySizeMetrics Empty {get;}
+sealed class ArchLinterNet.Core.Model.RepositoryStructureMetrics : System.IEquatable<ArchLinterNet.Core.Model.RepositoryStructureMetrics>
+  ctor(int? MaxDependencyDepth, int? CyclicComponentCount, int? CyclicProjectCount, double? CyclicProjectRatio, int? LargestSccSize, double? LargestSccRatio)
+  method ArchLinterNet.Core.Model.RepositoryStructureMetrics <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.RepositoryStructureMetrics? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int? MaxDependencyDepth, out int? CyclicComponentCount, out int? CyclicProjectCount, out double? CyclicProjectRatio, out int? LargestSccSize, out double? LargestSccRatio)
+  operator !=(ArchLinterNet.Core.Model.RepositoryStructureMetrics? left, ArchLinterNet.Core.Model.RepositoryStructureMetrics? right)
+  operator ==(ArchLinterNet.Core.Model.RepositoryStructureMetrics? left, ArchLinterNet.Core.Model.RepositoryStructureMetrics? right)
+  property double? CyclicProjectRatio {get;init;}
+  property double? LargestSccRatio {get;init;}
+  property int? CyclicComponentCount {get;init;}
+  property int? CyclicProjectCount {get;init;}
+  property int? LargestSccSize {get;init;}
+  property int? MaxDependencyDepth {get;init;}
+  property static ArchLinterNet.Core.Model.RepositoryStructureMetrics Empty {get;}
 sealed class ArchLinterNet.Core.Model.SarifEvidenceArtifactReference : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceArtifactReference>
   ctor(string path, string logicalId, ArchLinterNet.Core.Model.SarifEvidenceProducerContext? producerContext = null)
   method ArchLinterNet.Core.Model.SarifEvidenceArtifactReference <Clone>$()
@@ -5703,6 +5855,7 @@ sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportChange : System.IE
   method void Deconstruct(out ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext ExecutionContext, out string Mode, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ResolvedFindings, out System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
   operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportChange? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportChange? right)
   operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportChange? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportChange? right)
+  property ArchLinterNet.Core.Model.RepositoryMetricsDelta? RepositoryMetricsDelta {get;init;}
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext ExecutionContext {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed {get;init;}
@@ -6228,6 +6381,7 @@ sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt 
   operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt? right)
   property ArchLinterNet.Core.Model.ArchitecturePolicyInventory? PolicyInventory {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? WaiverLifecycle {get;init;}
+  property ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? RepositoryMetrics {get;init;}
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability? Applicability {get;init;}
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? ExternalEvidence {get;init;}
   property ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance Provenance {get;init;}
@@ -6460,6 +6614,7 @@ sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest : System.IEqu
   property System.Threading.CancellationToken CancellationToken {get;init;}
   property bool EnforceUnmatchedIgnoredViolationsPolicy {get;init;}
   property bool IncludeAsmdefContracts {get;init;}
+  property bool IncludeRepositoryMetrics {get;init;}
   property bool NoRestore {get;init;}
   property int? MaxParallelism {get;init;}
   property string PolicyPath {get;init;}
@@ -7199,6 +7354,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory SourceExpansion {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? WaiverLifecycleAssessment {get;init;}
   property ArchLinterNet.Core.Model.ImportedExternalDiagnosticProjection ImportedDiagnostics {get;private init;}
+  property ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? RepositoryMetrics {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> ClassificationRoles {get;init;}
@@ -7245,6 +7401,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationRequest : System.IEquatable
   property System.Threading.CancellationToken CancellationToken {get;init;}
   property bool EnforceUnmatchedIgnoredViolationsPolicy {get;init;}
   property bool IncludeAsmdefContracts {get;init;}
+  property bool IncludeRepositoryMetrics {get;init;}
   property bool NoRestore {get;init;}
   property int? MaxParallelism {get;init;}
   property string Mode {get;init;}

@@ -114,6 +114,10 @@ public static class AnalysisCacheOutcomeMapper
                 : ArchitectureApplicabilityProjector.Project(completion, mode),
             ExternalEvidenceRequirements = externalEvidenceRequirements
                 ?? Array.Empty<ArchitectureExternalEvidenceRequirement>(),
+            // A legacy cache entry has no repository-metrics field. Preserve that absence so
+            // cache-hit reconstruction remains byte-identical for the pre-observability envelope;
+            // newly populated entries carry the complete or partial snapshot explicitly.
+            RepositoryMetrics = cached.RepositoryMetrics,
         };
     }
 
@@ -142,6 +146,7 @@ public static class AnalysisCacheOutcomeMapper
         {
             Waivers = outcome.Waivers.ToArray(),
             PolicyInventory = outcome.PolicyInventory,
+            RepositoryMetrics = outcome.RepositoryMetrics,
         };
     }
 }

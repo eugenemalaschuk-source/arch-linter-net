@@ -87,6 +87,49 @@ public sealed class BadgeCommandHandlerTests
         });
     }
 
+    [Test]
+    public void Handler_ProjectsRepositoryMetricsSourceLines()
+    {
+        RepositoryMetricsSnapshot metrics = new(
+            RepositoryMetricsSnapshot.CurrentSchemaVersion,
+            RepositoryMetricsSnapshot.CurrentKind,
+            RepositoryMetricsAvailability.Complete,
+            [],
+            new RepositorySizeMetrics(12_345, 20, 4, 100, 40),
+            RepositoryCouplingMetrics.Empty,
+            RepositoryStructureMetrics.Empty);
+        FakeConsole console = new();
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(
+            $$"""{"repository_metrics":{{RepositoryMetricsJson.Serialize(metrics)}}}"""))
+            .ExecuteRepositoryMetrics(new RepositoryMetricsBadgeCommandOptions("input.json", null, false));
+        using JsonDocument output = JsonDocument.Parse(console.Output);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(output.RootElement.GetProperty("label").GetString(), Is.EqualTo("source lines"));
+            Assert.That(output.RootElement.GetProperty("message").GetString(), Is.EqualTo("12.3k"));
+            Assert.That(output.RootElement.GetProperty("color").GetString(), Is.EqualTo("blue"));
+        });
+    }
+
+    [Test]
+    public void Handler_RepositoryMetricsBadgePublishesExplicitUnavailableValue()
+    {
+        FakeConsole console = new();
+        int exitCode = new BadgeCommandHandler(console, new FakeFileSystem(
+            """{"repository_metrics":{"schema_version":1,"kind":"repository-metrics/v1","availability":"unavailable","reason_codes":["missing_analysis"],"size":{"source_lines":null,"source_files":null,"projects":null,"types":null,"public_types":null},"coupling":{"dependency_count":null,"dependencies_per_project":null,"dependency_density":null,"max_fan_in":null,"max_fan_out":null,"projects":[]},"structure":{"max_dependency_depth":null,"cyclic_component_count":null,"cyclic_project_count":null,"cyclic_project_ratio":null,"largest_scc_size":null,"largest_scc_ratio":null}}}"""))
+            .ExecuteRepositoryMetrics(new RepositoryMetricsBadgeCommandOptions("input.json", null, false));
+        using JsonDocument output = JsonDocument.Parse(console.Output);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(output.RootElement.GetProperty("message").GetString(), Is.EqualTo("unavailable"));
+            Assert.That(output.RootElement.GetProperty("color").GetString(), Is.EqualTo("lightgrey"));
+        });
+    }
+
     [TestCase("not-json")]
     [TestCase("{\"schema_id\":\"architecture-health/v1\",\"gate\":\"pass\",\"health\":\"healthy\",\"report_evidence\":{\"validation_outcomes\":[]}}")]
     [TestCase("{\"schema_id\":\"architecture-health/v1\",\"gate\":\"unassessable\",\"health\":\"healthy\",\"report_evidence\":{\"validation_outcomes\":[]}}")]

@@ -150,6 +150,12 @@ public sealed record AnalysisCacheOutcomeV1(
     public IReadOnlyList<ArchitectureApplicabilityRecord> ApplicabilityRecords { get; init; } =
         ApplicabilityRecords ?? Array.Empty<ArchitectureApplicabilityRecord>();
 
+    // Repository observability is additive cache evidence. A null value means a legacy cache
+    // entry predates this projection; reconstruction exposes an explicit unavailable receipt
+    // rather than manufacturing zeroes or triggering a second analysis pass.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RepositoryMetricsSnapshot? RepositoryMetrics { get; init; }
+
     public IReadOnlyList<ArchitectureWaiverLifecycleRecord> Waivers { get; init; } =
         Array.Empty<ArchitectureWaiverLifecycleRecord>();
 

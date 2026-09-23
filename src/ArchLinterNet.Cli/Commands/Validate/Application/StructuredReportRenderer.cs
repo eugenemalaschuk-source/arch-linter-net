@@ -101,9 +101,28 @@ internal sealed class StructuredReportRenderer
             : ArchitectureDiagnosticFormatter.AddWaiversToCiArtifacts(result, outcome.Waivers);
         result = ArchitectureDiagnosticFormatter.AddPolicyInventoryToCiArtifacts(result, outcome.PolicyInventory);
         result = AddImportedDiagnosticsToJson(result, outcome.ImportedDiagnosticFindings);
+        result = AddRepositoryMetricsToJson(result, outcome.RepositoryMetrics);
 
         return ReportApplicabilityRenderer.AddAssessmentCompletionToJson(
             result, outcome.AssessmentCompletionEvidence, outcome.ApplicabilityProjection);
+    }
+
+    private static string AddRepositoryMetricsToJson(string json, RepositoryMetricsSnapshot? metrics)
+    {
+        if (metrics is null)
+        {
+            return json;
+        }
+
+        JsonNode document = JsonNode.Parse(json)
+            ?? throw new InvalidOperationException("The validation JSON report was empty.");
+        if (document is not JsonObject payload)
+        {
+            throw new InvalidOperationException("The validation JSON report was not an object.");
+        }
+
+        payload["repository_metrics"] = JsonNode.Parse(RepositoryMetricsJson.Serialize(metrics));
+        return payload.ToJsonString();
     }
 
     // Additive side-channel, mirroring how applicability_findings is already added to the JSON
