@@ -72,7 +72,7 @@ The snapshot SHALL carry an explicit availability state of complete, partial, or
 
 ### Requirement: Absolute reporting and badge projection are neutral
 
-The human and machine-readable reporting surfaces SHALL expose the absolute current snapshot in a bounded grouped Size, Coupling, and Structure section. A Core/CLI-owned badge projection SHALL expose at least `Source lines` as a compact absolute Shields endpoint payload. Badge output SHALL use current verified main evidence only, SHALL contain no PR delta, threshold, quality color, or pass/fail interpretation, and SHALL preserve the existing trusted badge publication/privacy boundary.
+The human and machine-readable reporting surfaces SHALL expose the absolute current snapshot in a bounded grouped Size, Coupling, and Structure section. A Core/CLI-owned badge projection SHALL expose at least `Source lines` as a compact absolute Shields endpoint payload and MAY expose bounded grouped `Repository` and `Structure` payloads. Grouped badges SHALL not become one badge per metric. Badge output SHALL use current verified main evidence only, SHALL contain no PR delta, threshold, quality color, or pass/fail interpretation, and SHALL preserve the existing trusted badge publication/privacy boundary. When a custom ArchLinterNet logo is present, it SHALL be embedded as a reviewed local SVG in the Shields payload rather than loaded from an external URL.
 
 #### Scenario: Absolute report is grouped and bounded
 - **WHEN** a current repository metrics snapshot is complete or partial
@@ -83,6 +83,12 @@ The human and machine-readable reporting surfaces SHALL expose the absolute curr
 - **WHEN** verified default-branch automation publishes a current metrics snapshot
 - **THEN** the badge payload presents an absolute Source lines value
 - **AND** it does not present a base-to-head delta or imply that magnitude is a governance result
+
+#### Scenario: Optional grouped badges remain compact and recognizable
+- **WHEN** verified default-branch automation publishes grouped repository metrics
+- **THEN** it may publish one `Repository` payload for projects/types and one `Structure` payload for dependencies/largest SCC
+- **AND** each payload contains the reviewed ArchLinterNet SVG logo inline
+- **AND** no payload contains a PR delta or a per-metric quality interpretation
 
 ### Requirement: Metrics calculation reuses existing analysis work
 

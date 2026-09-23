@@ -110,6 +110,35 @@ public sealed class BadgeCommandHandlerTests
             Assert.That(output.RootElement.GetProperty("label").GetString(), Is.EqualTo("source lines"));
             Assert.That(output.RootElement.GetProperty("message").GetString(), Is.EqualTo("12.3k"));
             Assert.That(output.RootElement.GetProperty("color").GetString(), Is.EqualTo("blue"));
+            Assert.That(output.RootElement.GetProperty("logoSvg").GetString(), Does.StartWith("<svg "));
+        });
+    }
+
+    [Test]
+    public void Handler_ProjectsGroupedRepositoryMetricsBadges()
+    {
+        RepositoryMetricsSnapshot metrics = new(
+            RepositoryMetricsSnapshot.CurrentSchemaVersion,
+            RepositoryMetricsSnapshot.CurrentKind,
+            RepositoryMetricsAvailability.Complete,
+            [],
+            new RepositorySizeMetrics(12_345, 20, 4, 100, 40),
+            new RepositoryCouplingMetrics(7, 1.75, 0.58, 3, 4, []),
+            new RepositoryStructureMetrics(3, 1, 2, 0.5, 2, 0.5));
+        FakeConsole console = new();
+        FakeFileSystem fileSystem = new($$"""{"repository_metrics":{{RepositoryMetricsJson.Serialize(metrics)}}}""");
+        int exitCode = new BadgeCommandHandler(console, fileSystem)
+            .ExecuteRepositoryMetrics(new RepositoryMetricsBadgeCommandOptions("input.json", null, false, "badges"));
+
+        using JsonDocument repository = JsonDocument.Parse(fileSystem.Written[Path.Combine("badges", "repository.json")]);
+        using JsonDocument structure = JsonDocument.Parse(fileSystem.Written[Path.Combine("badges", "structure.json")]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(repository.RootElement.GetProperty("label").GetString(), Is.EqualTo("repository"));
+            Assert.That(repository.RootElement.GetProperty("message").GetString(), Is.EqualTo("4 projects · 100 types"));
+            Assert.That(structure.RootElement.GetProperty("message").GetString(), Is.EqualTo("7 deps · SCC 2"));
+            Assert.That(structure.RootElement.GetProperty("logoSvg").GetString(), Does.StartWith("<svg "));
         });
     }
 

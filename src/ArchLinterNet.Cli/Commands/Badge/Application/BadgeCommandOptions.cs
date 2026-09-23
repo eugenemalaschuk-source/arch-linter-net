@@ -13,4 +13,5 @@ internal sealed record ArchitectureHealthBadgeCommandOptions(
 internal sealed record RepositoryMetricsBadgeCommandOptions(
     string InputPath,
     string? OutputPath,
-    bool ShowHelp);
+    bool ShowHelp,
+    string? OutputDirectory = null);
