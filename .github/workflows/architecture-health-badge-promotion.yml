@@ -348,7 +348,7 @@ jobs:
           dotnet-version: 10.0.x
       - name: Run pinned trusted promotion contract
         id: promotion
-        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@100627ff8e06e4f563a9b0e6aee19f00deae890c
+        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@6f19d55dfbaa32b7e586128c81f1e91690a70cb4
         with:
           configuration_id: ${{ inputs['configuration-id'] }}
           adapter: ${{ inputs.adapter }}
@@ -393,15 +393,19 @@ jobs:
                       document = json.loads(raw.decode("utf-8"))
                   except (UnicodeDecodeError, json.JSONDecodeError) as error:
                       raise SystemExit(f"{member_name} is not valid JSON: {error}") from error
+                  logo_svg = document.get("logoSvg", "")
+                  svg_namespace = 'xmlns="http://www.w3.org/2000/svg"'
+                  svg_without_namespace = logo_svg.replace(svg_namespace, "")
                   if (
                       not isinstance(document, dict)
                       or set(document) != {"schemaVersion", "label", "message", "color", "logoSvg"}
                       or document.get("schemaVersion") != 1
                       or document.get("label") != label
                       or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color", "logoSvg"))
-                      or not document["logoSvg"].lstrip().startswith("<svg ")
-                      or "http://" in document["logoSvg"]
-                      or "https://" in document["logoSvg"]
+                      or not logo_svg.lstrip().startswith("<svg ")
+                      or svg_namespace not in logo_svg
+                      or "http://" in svg_without_namespace
+                      or "https://" in svg_without_namespace
                   ):
                       raise SystemExit(f"{member_name} is not a complete Shields endpoint document with the reviewed local SVG logo")
                   (payload_directory / output_name).write_bytes(raw)

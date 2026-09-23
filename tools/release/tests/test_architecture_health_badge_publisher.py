@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".github" / "workflows"
 STAGE_B_ACTION_REF = (
     "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion"
-    "@100627ff8e06e4f563a9b0e6aee19f00deae890c"
+    "@6f19d55dfbaa32b7e586128c81f1e91690a70cb4"
 )
 
 
@@ -54,6 +54,8 @@ def test_repository_metrics_badges_use_canonical_evidence_in_the_trusted_pipelin
     assert "architecture-pr-report/repository-metrics-badge.json" in ci
     assert "architecture-pr-report/repository.json" in ci
     assert "architecture-pr-report/structure.json" in ci
+    assert 'svg_namespace = \'xmlns="http://www.w3.org/2000/svg"\'' in workflow
+    assert 'svg_without_namespace = logo_svg.replace(svg_namespace, "")' in workflow
 
 
 def test_reusable_workflow_resolves_its_action_from_the_workflow_repository() -> None:
