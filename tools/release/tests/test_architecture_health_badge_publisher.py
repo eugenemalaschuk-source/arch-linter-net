@@ -54,6 +54,8 @@ def test_repository_metrics_badges_use_canonical_evidence_in_the_trusted_pipelin
     assert "architecture-pr-report/repository-metrics-badge.json" in ci
     assert "architecture-pr-report/repository.json" in ci
     assert "architecture-pr-report/structure.json" in ci
+    assert 'svg_namespace = \'xmlns="http://www.w3.org/2000/svg"\'' in workflow
+    assert 'svg_without_namespace = logo_svg.replace(svg_namespace, "")' in workflow
 
 
 def test_reusable_workflow_resolves_its_action_from_the_workflow_repository() -> None:

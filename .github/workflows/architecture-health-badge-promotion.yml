@@ -393,15 +393,19 @@ jobs:
                       document = json.loads(raw.decode("utf-8"))
                   except (UnicodeDecodeError, json.JSONDecodeError) as error:
                       raise SystemExit(f"{member_name} is not valid JSON: {error}") from error
+                  logo_svg = document.get("logoSvg", "")
+                  svg_namespace = 'xmlns="http://www.w3.org/2000/svg"'
+                  svg_without_namespace = logo_svg.replace(svg_namespace, "")
                   if (
                       not isinstance(document, dict)
                       or set(document) != {"schemaVersion", "label", "message", "color", "logoSvg"}
                       or document.get("schemaVersion") != 1
                       or document.get("label") != label
                       or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color", "logoSvg"))
-                      or not document["logoSvg"].lstrip().startswith("<svg ")
-                      or "http://" in document["logoSvg"]
-                      or "https://" in document["logoSvg"]
+                      or not logo_svg.lstrip().startswith("<svg ")
+                      or svg_namespace not in logo_svg
+                      or "http://" in svg_without_namespace
+                      or "https://" in svg_without_namespace
                   ):
                       raise SystemExit(f"{member_name} is not a complete Shields endpoint document with the reviewed local SVG logo")
                   (payload_directory / output_name).write_bytes(raw)
