@@ -1,0 +1,175 @@
+{
+  "SchemaId": "history-single-analysis-packed-evidence/v1",
+  "Issue": "#1016",
+  "SourceRevision": "a328fbcf9e236ab6806a5a4457a1c93ccc425da2",
+  "ToolPath": "arch-linter-net.exe",
+  "ToolVersion": "0.0.0-history1016",
+  "ToolPackageSha256": "7375e42f15517573669858a13c9e4f1f2e89c16537727dfd0624f7809f469bd5",
+  "SdkVersion": "10.0.303",
+  "Runtime": ".NET 10.0.11",
+  "OperatingSystem": "Microsoft Windows 10.0.19045",
+  "Architecture": "X64",
+  "Configuration": "Release packed NuGet tool",
+  "Fixture": {
+    "Kind": "synthetic-git-explicit-release-range",
+    "From": "3a03e960f2d75520e384a176d497d1f040eab36a",
+    "To": "ac64a238283d14f53e110649b444cf811adfe8c5",
+    "CommitCount": 5,
+    "Policy": "default history_analysis configuration"
+  },
+  "Before": {
+    "Samples": [
+      {
+        "Shape": "before-two-processes",
+        "Format": "json\u002Bmarkdown",
+        "ExitCode": 0,
+        "StdOut": "",
+        "StdErr": "",
+        "WallClockMilliseconds": 586.3119,
+        "PeakWorkingSetBytes": 36167680,
+        "ProcessOverheadMilliseconds": 371.6899000000001,
+        "InvocationCount": 2,
+        "Timing": {
+          "ingestion": 90.33500000000001,
+          "scoring": 97.875,
+          "policy": 2.352,
+          "enrichment": 2.9779999999999998,
+          "json_render": 15.9,
+          "markdown_render": 5.182
+        }
+      },
+      {
+        "Shape": "before-two-processes",
+        "Format": "json\u002Bmarkdown",
+        "ExitCode": 0,
+        "StdOut": "",
+        "StdErr": "",
+        "WallClockMilliseconds": 565.0129999999999,
+        "PeakWorkingSetBytes": 36438016,
+        "ProcessOverheadMilliseconds": 331.61699999999996,
+        "InvocationCount": 2,
+        "Timing": {
+          "ingestion": 103.56299999999999,
+          "scoring": 102.053,
+          "policy": 2.7270000000000003,
+          "enrichment": 3.466,
+          "json_render": 16.409,
+          "markdown_render": 5.178
+        }
+      },
+      {
+        "Shape": "before-two-processes",
+        "Format": "json\u002Bmarkdown",
+        "ExitCode": 0,
+        "StdOut": "",
+        "StdErr": "",
+        "WallClockMilliseconds": 583.1551,
+        "PeakWorkingSetBytes": 36483072,
+        "ProcessOverheadMilliseconds": 328.9081,
+        "InvocationCount": 2,
+        "Timing": {
+          "ingestion": 108.362,
+          "scoring": 117.023,
+          "policy": 2.3,
+          "enrichment": 3.415,
+          "json_render": 16.155,
+          "markdown_render": 6.992
+        }
+      }
+    ],
+    "AverageWallClockMilliseconds": 578.16,
+    "AverageIngestionMilliseconds": 100.75333333333333,
+    "AverageScoringMilliseconds": 105.65033333333334,
+    "AverageJsonRenderingMilliseconds": 16.154666666666667,
+    "AverageMarkdownRenderingMilliseconds": 5.784,
+    "AverageProcessOverheadMilliseconds": 344.0716666666667,
+    "PeakWorkingSetBytes": 36483072,
+    "IngestionInvocationCounts": [
+      2,
+      2,
+      2
+    ]
+  },
+  "After": {
+    "Samples": [
+      {
+        "Shape": "after-one-process",
+        "Format": "json\u002Bmarkdown",
+        "ExitCode": 0,
+        "StdOut": "",
+        "StdErr": "History timings (ms): ingestion=46.142; scoring=50.859; policy=1.453; enrichment=1.659; json_render=15.997; markdown_render=3.169; output=19.674; ingestion_calls=1\r\n",
+        "WallClockMilliseconds": 325.8422,
+        "PeakWorkingSetBytes": 37339136,
+        "ProcessOverheadMilliseconds": 186.8892,
+        "InvocationCount": 1,
+        "Timing": {
+          "ingestion": 46.142,
+          "scoring": 50.859,
+          "policy": 1.453,
+          "enrichment": 1.659,
+          "json_render": 15.997,
+          "markdown_render": 3.169,
+          "output": 19.674
+        }
+      },
+      {
+        "Shape": "after-one-process",
+        "Format": "json\u002Bmarkdown",
+        "ExitCode": 0,
+        "StdOut": "",
+        "StdErr": "History timings (ms): ingestion=44.810; scoring=59.091; policy=1.061; enrichment=1.564; json_render=16.195; markdown_render=3.368; output=14.327; ingestion_calls=1\r\n",
+        "WallClockMilliseconds": 311.1636,
+        "PeakWorkingSetBytes": 37466112,
+        "ProcessOverheadMilliseconds": 170.74759999999998,
+        "InvocationCount": 1,
+        "Timing": {
+          "ingestion": 44.81,
+          "scoring": 59.091,
+          "policy": 1.061,
+          "enrichment": 1.564,
+          "json_render": 16.195,
+          "markdown_render": 3.368,
+          "output": 14.327
+        }
+      },
+      {
+        "Shape": "after-one-process",
+        "Format": "json\u002Bmarkdown",
+        "ExitCode": 0,
+        "StdOut": "",
+        "StdErr": "History timings (ms): ingestion=46.217; scoring=53.751; policy=1.200; enrichment=1.480; json_render=23.514; markdown_render=3.824; output=15.696; ingestion_calls=1\r\n",
+        "WallClockMilliseconds": 356.6211,
+        "PeakWorkingSetBytes": 37011456,
+        "ProcessOverheadMilliseconds": 210.93910000000002,
+        "InvocationCount": 1,
+        "Timing": {
+          "ingestion": 46.217,
+          "scoring": 53.751,
+          "policy": 1.2,
+          "enrichment": 1.48,
+          "json_render": 23.514,
+          "markdown_render": 3.824,
+          "output": 15.696
+        }
+      }
+    ],
+    "AverageWallClockMilliseconds": 331.20896666666664,
+    "AverageIngestionMilliseconds": 45.72299999999999,
+    "AverageScoringMilliseconds": 54.567,
+    "AverageJsonRenderingMilliseconds": 18.56866666666667,
+    "AverageMarkdownRenderingMilliseconds": 3.453666666666667,
+    "AverageProcessOverheadMilliseconds": 189.52530000000002,
+    "PeakWorkingSetBytes": 37466112,
+    "IngestionInvocationCounts": [
+      1,
+      1,
+      1
+    ]
+  },
+  "Notes": [
+    "Before is two independent invocations of the same freshly packed and locally installed CLI package (one JSON and one Markdown); after is one invocation with two file sinks.",
+    "The package SHA-256 identifies the exact packed tool used by every before/after sample.",
+    "Phase timings come from --timings. process_overhead_ms is wall clock minus reported policy/ingestion/scoring/render/output phases.",
+    "Measurements are runner evidence, not a promise that a complete release job is exactly twice as fast."
+  ]
+}

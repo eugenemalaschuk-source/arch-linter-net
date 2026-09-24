@@ -13,6 +13,7 @@ def write_repo(root: Path) -> None:
     (root / "src" / "ArchLinterNet.Core" / "Contracts" / "Validators").mkdir(parents=True)
     (root / "src" / "ArchLinterNet.Cli" / "Commands" / "Foo" / "EntryPoint").mkdir(parents=True)
     (root / "src" / "ArchLinterNet.Cli" / "Commands" / "Foo" / "Application").mkdir(parents=True)
+    (root / "src" / "ArchLinterNet.Cli" / "Commands" / "History" / "Application").mkdir(parents=True)
     (root / "docs" / "policy-format").mkdir(parents=True)
     (root / "docs" / "ai").mkdir(parents=True)
     (root / "docs" / "cli").mkdir(parents=True)
@@ -34,6 +35,11 @@ def write_repo(root: Path) -> None:
         'Command scaffoldTemplate = new("{{commandToken}}");\n',
         encoding="utf-8",
     )
+    (root / "src" / "ArchLinterNet.Cli" / "Commands" / "History" / "Application" / "HistoryCommandDefinition.cs").write_text(
+        'Option<string> format = new("--format");\n'
+        'Option<string[]> report = new("--report") { AllowMultipleArgumentsPerToken = true };\n',
+        encoding="utf-8",
+    )
 
     coverage_markers = (
         "<!-- coverage-scope: namespace -->\n"
@@ -45,7 +51,10 @@ def write_repo(root: Path) -> None:
     (root / "docs" / "cli" / "index.md").write_text(
         "<!-- cli-command: validate -->\n"
         "<!-- cli-command: foo -->\n"
-        "<!-- cli-command: foo bar -->\n",
+        "<!-- cli-command: foo bar -->\n"
+        "\n### History analysis options\n"
+        "| `--format` | Select a format. |\n"
+        "| `--report` | Repeatable `format=destination` sink. |\n",
         encoding="utf-8",
     )
     (root / "docs" / "contracts" / "index.md").write_text(
@@ -131,6 +140,22 @@ def test_detects_executable_cli_command_missing_from_reference(tmp_path: Path) -
     violations = docs_contract.find_violations(tmp_path)
 
     assert any("missing=['foo baz']" in item for item in violations)
+
+
+def test_detects_repeatable_history_report_option_documentation_drift(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    documentation = tmp_path / "docs" / "cli" / "index.md"
+    documentation.write_text(
+        documentation.read_text(encoding="utf-8").replace(
+            "| `--report` | Repeatable `format=destination` sink. |\n",
+            "| `--report` | `format=destination` sink. |\n",
+        ),
+        encoding="utf-8",
+    )
+
+    violations = docs_contract.find_violations(tmp_path)
+
+    assert any("history `--report` documentation must state that it is repeatable" in item for item in violations)
 
 
 def test_detects_machine_contract_family_missing_from_index(tmp_path: Path) -> None:

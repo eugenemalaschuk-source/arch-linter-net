@@ -38,6 +38,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Core unit suite shard inventory](core-unit-shard-inventory.md) - measured fixture-duration baseline and rationale for the `ArchLinterNet.Core.Tests` CI shard partition (#478).
 
+- [History single-analysis packed evidence](history-single-analysis-packed-evidence.md) — explicit #1016 before/after measurements from one freshly packed/installed CLI package, identified by SHA-256, with phase/call-count evidence.
+
 - [Self-policy capability matrix](self-policy-capability-matrix.md) — per-family adopt / already-covered / not-applicable / defer decisions for the repository's own architecture policy, recorded engine limitations, and the read-only vs writing developer commands (#464).
 
 - [Self-architecture health baseline and remediation ownership](self-architecture-health-baseline.md) — durable raw post-v0.8 Health evidence and the focused owner for every reviewed aggregate, layout finding, preflight diagnostic, and remaining OpenSpec obligation (#804/#784).

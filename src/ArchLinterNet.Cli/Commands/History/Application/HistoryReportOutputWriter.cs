@@ -13,19 +13,34 @@ internal static class HistoryReportOutputWriter
 
     public static bool TryWriteJson(ICliConsole console, Func<string> render)
     {
+        if (!TryRenderJson(console, render, out string? json))
+        {
+            return false;
+        }
+
+        console.WriteCanonicalJson(json!);
+        return true;
+    }
+
+    // Multi-sink routing needs the validated bytes before it stages any destination. Keeping this
+    // boundary shared with the single-stdout path prevents a Unicode regression in one route.
+    public static bool TryRenderJson(ICliConsole console, Func<string> render, out string? json)
+    {
+        json = null;
         try
         {
-            string json = render();
-            _ = _strictUtf8.GetByteCount(json);
-            console.WriteCanonicalJson(json);
+            json = render();
+            _ = _strictUtf8.GetBytes(json);
             return true;
         }
         catch (CanonicalJsonUnicodeException)
         {
+            json = null;
             return WriteSerializationDiagnostic(console);
         }
         catch (EncoderFallbackException)
         {
+            json = null;
             return WriteSerializationDiagnostic(console);
         }
     }

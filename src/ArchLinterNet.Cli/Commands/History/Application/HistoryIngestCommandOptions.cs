@@ -7,4 +7,7 @@ internal sealed record HistoryIngestCommandOptions(
     string Format,
     bool ShowHelp,
     string? PolicyPath = null,
-    bool RequestDotNetEnrichment = false);
+    bool RequestDotNetEnrichment = false,
+    IReadOnlyList<HistoryReportSink>? ReportSinks = null,
+    string? ReportParseError = null,
+    bool TimingsEnabled = false);

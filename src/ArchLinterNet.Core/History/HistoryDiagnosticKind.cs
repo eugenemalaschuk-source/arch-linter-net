@@ -19,4 +19,6 @@ internal enum HistoryDiagnosticKind
     ConfigurationInvalid,
     TaskKeyOverlap,
     ReportSerializationInvalid,
+    ReportPublicationFailed,
+    AnalysisCancelled,
 }

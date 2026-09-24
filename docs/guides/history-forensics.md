@@ -51,12 +51,50 @@ arch-linter-net history analyze --repository . \
   --from "$FROM_SHA" --to "$TO_SHA" --format markdown > artifacts/history.md
 ```
 
-These are **alternative analytical invocations**. Running both performs history
-analysis twice. The current command accepts one `--format`; it does not expose
-validation's repeatable `--report` routing or a standalone history JSON renderer.
-Choose the format the workflow needs rather than adding a duplicate expensive
-run without accounting for it. Keep stderr separate from the report and preserve
-a nonzero exit; an error document is not a successful empty history report.
+These two invocations each perform history analysis once with `--format`
+selecting the single document written to standard output. To get both
+documents from **one** analysis, use the repeatable `--report
+<format>=<destination>` option instead of running the command twice:
+
+```bash
+arch-linter-net history analyze --repository . \
+  --from "$FROM_SHA" --to "$TO_SHA" \
+  --report json=artifacts/history.json \
+  --report markdown=artifacts/history.md
+```
+
+`--report` accepts `json` or `markdown` for `<format>` and `stdout`, `stderr`,
+or a file path for `<destination>`; `--format` is ignored when `--report` is
+also supplied. Ingestion and scoring run exactly once regardless of how many
+sinks are configured, and every destination is validated (including
+rejecting duplicate destinations and a destination that collides with
+`--policy`) before anything is written. Staging and serialization failures
+leave every destination untouched. If a stream write or a later independent
+file rename fails, the command exits non-zero with `partial-output` or
+`output-failed` evidence naming delivered, committed, and uncommitted
+destinations; it never claims that the complete set succeeded. Keep stderr
+separate from the report and preserve a nonzero exit; an error document is not
+a successful empty history report.
+
+For a reproducible performance sample, add `--timings`. The command writes one
+timing line to stderr with policy, ingestion, scoring, JSON/Markdown rendering,
+output routing, and the ingestion invocation count. Subtract those phase values
+from the packed process wall clock to report process overhead; keep peak working
+set from the same process sample. Timing evidence is diagnostic only and does
+not affect report bytes or exit status.
+
+The repository's explicit packed before/after harness is
+`HistorySingleAnalysisPackedBenchmarkHarness`; run it after building the CLI with:
+
+```bash
+dotnet test tests/ArchLinterNet.Cli.Tests --no-restore \
+  --filter FullyQualifiedName~HistorySingleAnalysisPackedBenchmarkHarness
+```
+
+It refreshes the machine-readable and Markdown evidence under
+`docs/internal/history-single-analysis-packed-evidence.*` using a synthetic Git
+release range, keeping this history workload separate from the architecture
+validation performance baseline.
 
 ## Read the evidence
 
@@ -100,5 +138,5 @@ retry runs. ArchLinterNet does not schedule the job or publish the report.
 | Unexpected ranking | Supporting commits/tasks, mechanical edits and configuration changes, not only the headline score. |
 
 Use [performance diagnosis](../usage/timings.md) for measurement discipline;
-profiling options are command-specific and must not be assumed available on
-`history analyze` merely because validation accepts them.
+capture the history timing line with the same tool build, runner, fixture, range
+and policy for before/after comparisons.

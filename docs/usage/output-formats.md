@@ -20,6 +20,26 @@ artifact. Git-only analysis remains valid when enrichment is not requested,
 inapplicable, or unavailable. Failed canonical analysis writes a separate stable
 diagnostic and no partial report, ranking, or candidate set.
 
+Use the repeatable `--report <format>=<destination>` option to produce both the
+JSON and Markdown views from a single completed analysis instead of running the
+command twice — `<format>` is `json` or `markdown`, and `<destination>` is
+`stdout`, `stderr`, or a file path (for example, `--report json=history.json
+--report markdown=history.md`). `--format` is ignored when `--report` is also
+supplied. Ingestion and scoring run exactly once no matter how many sinks are
+configured. Every destination is validated before any write — duplicate
+destinations and a destination that collides with `--policy` are both rejected
+closed — and file destinations are written atomically. Staging or
+serialization failures leave every destination untouched. A stream-write or
+later independent rename cannot be rolled back; those failures return
+non-zero with an explicit `partial-output` or `output-failed` diagnostic
+listing delivered/committed and uncommitted destinations rather than claiming
+a complete result.
+
+Add `--timings` when collecting performance evidence. It emits one timing line
+to stderr for policy, ingestion, scoring, each renderer, output routing and the
+ingestion call count. Treat those values as diagnostic evidence only and measure
+process startup/overhead and peak working set around the packed CLI invocation.
+
 ## Policy context output
 
 `arch-linter-net policy context --format json` writes one deterministic
