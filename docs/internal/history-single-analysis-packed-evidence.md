@@ -1,9 +1,9 @@
 # History single-analysis packed evidence
 
 - Issue: `#1016`
-- Source revision: `ee3140819973bf1aa07280de80b46ab93cc6fce8+dirty`
-- Tool package SHA-256: `bcd51bbab4fcd26113ba5468712bdaf7f9445833c71246dde6bedcbcb05e489c`
-- Fixture range: `72e4c21cf1abc90f916fe01b050f65a35c3d2bea` → `eb2824f3f7716c339f57852025482ea478fba76b` (5 commits)
+- Source revision: `a328fbcf9e236ab6806a5a4457a1c93ccc425da2`
+- Tool package SHA-256: `7375e42f15517573669858a13c9e4f1f2e89c16537727dfd0624f7809f469bd5`
+- Fixture range: `3a03e960f2d75520e384a176d497d1f040eab36a` → `ac64a238283d14f53e110649b444cf811adfe8c5` (5 commits)
 - SDK/runtime: 10.0.303 / .NET 10.0.11; Microsoft Windows 10.0.19045; X64
 
 Reproduce from a restored checkout with:
@@ -14,8 +14,8 @@ dotnet test tests/ArchLinterNet.Cli.Tests --no-restore --filter FullyQualifiedNa
 
 | Shape | Wall ms | Ingestion ms | Scoring ms | JSON ms | Markdown ms | Process overhead ms | Peak working set | Ingestion calls |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Before: two processes | 582.869 | 94.969 | 108.544 | 16.494 | 5.080 | 351.958 | 36683776 | `2,2,2` |
-| After: one packed process | 316.031 | 47.018 | 53.201 | 17.113 | 3.119 | 175.968 | 37355520 | `1,1,1` |
+| Before: two processes | 578.160 | 100.753 | 105.650 | 16.155 | 5.784 | 344.072 | 36483072 | `2,2,2` |
+| After: one packed process | 331.209 | 45.723 | 54.567 | 18.569 | 3.454 | 189.525 | 37466112 | `1,1,1` |
 
 - Before is two independent invocations of the same freshly packed and locally installed CLI package (one JSON and one Markdown); after is one invocation with two file sinks.
 - The package SHA-256 identifies the exact packed tool used by every before/after sample.
