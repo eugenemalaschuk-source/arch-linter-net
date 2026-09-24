@@ -71,6 +71,7 @@ internal enum EvaluatorFamily
     ContractCoListing,
     AggregatedGlobalScan,
     CoverageGraphOrCatalogWide,
+    UnanalyzedSafeFallback,
 }
 
 internal sealed record EvaluatorScope
@@ -95,6 +96,52 @@ internal sealed record EvaluatorScope
 /// </summary>
 internal static class EvaluatorFamilyScopePlanner
 {
+    public static EvaluatorScope PlanContractFamily(
+        string contractFamily,
+        IReadOnlyList<string> changedProjectIds,
+        IReadOnlyList<string> dependentsClosureIds,
+        IReadOnlyList<string> allProjectIds)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contractFamily);
+
+        return contractFamily switch
+        {
+            "layers" or "external" or "external_allow_only" or "allow_only" => Plan(
+                EvaluatorFamily.ReferenceGraphLocal,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            "cycles" => Plan(
+                EvaluatorFamily.CyclesGlobal,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            "public_api_surface" => Plan(
+                EvaluatorFamily.ContractCoListing,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            "coverage:project" or "coverage:assembly" => Plan(
+                EvaluatorFamily.AggregatedGlobalScan,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            "coverage:namespace" or "coverage:dependency_edge" or "coverage:semantic_role" or "coverage:rule_input" => Plan(
+                EvaluatorFamily.CoverageGraphOrCatalogWide,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            _ => new EvaluatorScope
+            {
+                Family = EvaluatorFamily.UnanalyzedSafeFallback,
+                RequiredProjectIds = allProjectIds,
+                Reason = $"Contract family '{contractFamily}' is not represented by the reviewed #503 " +
+                    "checker taxonomy. Until its checker/fact dependencies are analyzed, the safe " +
+                    "disposition is full-population fallback; no reference-graph direction is assumed.",
+            },
+        };
+    }
+
     public static EvaluatorScope Plan(
         EvaluatorFamily family,
         IReadOnlyList<string> changedProjectIds,

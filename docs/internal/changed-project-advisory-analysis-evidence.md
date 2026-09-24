@@ -6,32 +6,35 @@ This is an evidence-first measurement and design gate. No changed-file-only vali
 planner, or invalidation cache is implemented by this issue, and no output from this task weakens
 full strict validation as the authoritative result.
 
-The checked-in machine-readable artifact is
-[`changed-project-advisory-analysis-results.json`](changed-project-advisory-analysis-results.json).
+The checked-in machine-readable artifacts are
+[`changed-project-advisory-analysis-results.json`](changed-project-advisory-analysis-results.json) and
+the explicit secondary timing artifact
+[`changed-project-advisory-analysis-timing-results.json`](changed-project-advisory-analysis-timing-results.json).
 Unlike the wall-clock benchmark evidence for #493/#655/#461, the closure numbers here are **exact
 deterministic graph computations**, not timed samples: every row is reproduced by an assertion in
 [`ChangedProjectAdvisoryScopePlanningTests.cs`](../../tests/ArchLinterNet.Core.Tests/ChangedProjectAdvisoryScopePlanningTests.cs),
 which runs in every normal `make test` pass (no `[Explicit]` exclusion — there is no hardware
 sensitivity to isolate).
 
-**Outcome: interim.** The change-to-project *disposition* mapping (Question 2) — given a changed
+**Outcome: C — insufficient benefit or unsafe boundary.** The change-to-project *disposition* mapping (Question 2) — given a changed
 input's kind and its already-resolved owning project(s), which scope-widening rule applies — is
-complete and exact. The *ownership-resolution* half of Question 2 — given a changed file path, which
-project(s) actually own it — is **not** addressed; see the correction in Question 2. Dependency
+complete and exact. The ownership evidence now exercises the authoritative Buildalyzer/MSBuild
+evaluated `@(Compile)` basis for ordinary, explicit include/exclude, single-owner linked, and
+multi-owner shared files, but it remains a test seam rather than a production scope resolver; see the
+correction in Question 2. Dependency
 closure (Question 3) is complete for the reference-graph dimension **and** now includes
 real, code-grounded evidence for a representative evaluator/fact-family subset — #503 explicitly
 forbids assuming one graph direction serves every contract family, and an earlier revision of this
 document did exactly that (see the correction in Question 3). The scope-plan/coverage/advisory-
 semantics design (Questions 4–6) is complete as a design sketch but, like Question 3, is proven only
-for that representative subset, not all ~34 contract families in
-`schema/dependencies.arch.schema.json`. The required PR-feedback timing/latency evidence (baseline
-full-validation duration and phase shares, secondary timing evidence, expected S/M/L latency
-reduction) is **not** complete — see
-[Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate) — so this
-task does not lock in a final A/B/C outcome. The closure evidence *supports* narrow-case-favorable
-(**B**-shaped) as a working hypothesis, but #503's own acceptance criteria require both the
-evaluator-family evidence and the timing/effect evidence before that hypothesis becomes a decision.
-See [Required decision outcome](#required-decision-outcome).
+for that representative subset; every remaining schema family now receives an explicit conservative
+full-population fallback through `PlanContractFamily`, rather than inheriting an unreviewed graph
+direction. The timing artifact records three successful full-strict profiles at each of S/M/L
+synthetic #502 staged-assembly scales and a K/P model using measured fixed versus project-dependent
+phase time. It does not execute an incremental path. The combination is enough to conclude that no
+safe, material implementation child is justified now: modeled leaf reductions are only 19–26% on
+this declared synthetic boundary, middle-position reductions are 8–13%, and global/shared changes
+fall back to full validation. See [Required decision outcome](#required-decision-outcome).
 
 ## P0 consumer-normalization gate (#991)
 
@@ -42,9 +45,10 @@ Unity 41s, `firstice-map-editor` 249s). This task therefore:
 
 - records the deterministic closure evidence and scope-plan contract now, since that evidence is
   independent of consumer CI topology;
-- does **not** create a focused implementation issue under #19 in this task — both because the
-  required timing/effect evidence is not yet complete (see the outcome note above) and, independent of
-  that, because #991 disqualifies the pre-normalization dogfood latency as sole justification;
+- records Outcome C and does **not** create a focused implementation issue under #19 — the timing
+  artifact is complete as secondary evidence but is a modeled full-strict comparison rather than
+  partial execution evidence, and #991 disqualifies the pre-normalization dogfood latency as sole
+  implementation justification;
 - records the exact re-evaluation trigger: after #991 reaches its decision gate, complete the
   timing/effect gate against normalized dogfood spans before deciding whether to open the child issue.
 
@@ -73,6 +77,12 @@ Unity 41s, `firstice-map-editor` 249s). This task therefore:
   a real (if approximate) PR-traffic-mix prior complementing the synthetic closure math with evidence
   about how often this repository's own changes touch globally-scoped inputs. Reproduce with:
   `uv run --project tools/pyproject.toml python tools/scripts/classify_pr_traffic_mix.py --end-ref bb533f0f2fc0d2e30addc7a4110adda26e825e68 --commit-count 300`.
+- Run the explicit `ChangedProjectAdvisoryEffectBenchmarkHarness` against the same #502 foundation
+  at 8, 16, and 32 staged synthetic projects, with three successful full-strict
+  `analysis-profile/v1` samples at each scale. The harness separates measured policy/configuration
+  phases from the remaining project-dependent top-level phase time, measures pure planner overhead,
+  and calculates K/P advisory estimates without executing a partial analyzer path. Reproduce with:
+  `dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~ChangedProjectAdvisoryEffectBenchmarkHarness`.
 
 ## Environment
 
@@ -85,6 +95,8 @@ ending at `bb533f0f2fc0d2e30addc7a4110adda26e825e68` (2026-09-22) and starting a
 `tools/scripts/classify_pr_traffic_mix.py` (see [Methodology](#methodology) for the exact
 invocation); raw output is in
 [`changed-project-advisory-analysis-results.json`](changed-project-advisory-analysis-results.json).
+The timing harness retains its raw profiles in
+[`changed-project-advisory-analysis-timing-results.json`](changed-project-advisory-analysis-timing-results.json).
 
 ## Question 1 — User outcome
 
@@ -185,12 +197,15 @@ Every measured decision carries a human-readable reason string (asserted by
 `EveryChangedInput_ReceivesExactlyOneDeterministicDecision`); none of the ten kinds above returns an
 implicit "no-op" or silently excludes an input.
 
-### 2b. Correction — ownership resolution itself is not measured
+### 2b. Ownership resolution is evaluated-item evidence, not a production planner
 
-`ChangedInput.OwningProjectIds` is a field every test in this evidence task supplies directly — for
-the synthetic corpus, the test author already knows which project a generated path belongs to,
-because `BenchmarkWorkloadGenerator` produced that path deterministically in the first place. Nothing
-in this task computes "given this changed file path, which project(s) own it" from the path itself;
+`ChangedInput.OwningProjectIds` is still a field the scope-planner tests supply directly — for the
+synthetic corpus, the test author already knows which project a generated path belongs to, because
+`BenchmarkWorkloadGenerator` produced that path deterministically in the first place. The focused
+`ArchitectureProjectRoslynContextResolverTests` now exercise the authoritative evaluated-item seam
+for ordinary project-owned files, explicit include/exclude, a single-owner linked file, and a shared
+multi-owner linked file. This proves the evidence basis without wiring a new production resolver into
+incremental execution; the planner tests still do not compute ownership from a path prefix;
 §2a's table and tests exercise only the disposition step that runs *after* ownership is already
 known. Presenting §2a as answering the whole of #503's "change-to-project mapping" question would
 overstate what is proven — this correction narrows that claim explicitly.
@@ -214,9 +229,9 @@ A production implementation's ownership resolver would need to evaluate the actu
 (via MSBuild, the same way build-state preflight and project discovery already do elsewhere in this
 codebase) to produce a real `path → owning project(s)` mapping, including the multi-owner case a
 linked/shared file requires. `ChangedInput.OwningProjectIds` already accepts a list, so §2a's
-disposition rules are compatible with whatever that resolver eventually produces — but this evidence
-task does not build or test the resolver itself, and no claim in this document should be read as
-having done so.
+disposition rules are compatible with whatever that resolver eventually produces. Imported/conditional
+evaluation failures and the production fallback contract remain unresolved safety boundaries behind
+Outcome C.
 
 ## Question 3 — Dependency closure
 
@@ -281,10 +296,12 @@ workload used for the §3a `K=9` baseline.
 families (`layers`, `cycles`, `allow_only`, `external`, `assembly_dependency`, `package_dependency`,
 `coverage` (itself six sub-scopes), `public_api_surface`, `type_placement`, `metric_budgets`, …); this
 task analyzes five representative families (four contract-family groups, with `coverage` split in
-two) grounded in their actual checker code, not all of them. Families outside this representative set
-are **not** claimed to be safely bounded by any model above — per the safe-widening
-principle, an unanalyzed family must be treated as requiring the conservative full-population fallback
-until it is analyzed the same way, exactly like `CyclesGlobal` and `ContractCoListing` are today.
+two) grounded in their actual checker code. The schema-driven
+`EverySchemaContractFamilyReceivesAnExplicitSafeDisposition` test now ensures every strict/audit
+family receives either one of those reviewed dispositions or `UnanalyzedSafeFallback` over the full
+population. Families outside the representative set are therefore **not** claimed to be safely
+bounded by a graph model; safe widening is explicit and tested rather than silently inheriting a
+reference-graph direction.
 
 ## Question 4 — Canonical scope plan and preview/execution parity
 
@@ -359,22 +376,24 @@ Neither reuse candidate is made a prerequisite by this evidence.
 
 - **Baseline full-validation work model**: full strict validation evaluates all `P` projects
   regardless of what changed; this is the existing, unconditional behavior.
+
 - **Affected-scope ratio `K/P` by representative change shape** (from Question 3): leaf ≈ `1/P` → 0
   as `P` grows; single spoke ≈ `2/P` → 0 as `P` grows; middle-position/tail ≈ `0.5` constant; shared
   foundation and all global/unmappable classes = `1.0`.
+
 - **Proposed changed-scope work model**: `advisory_work ≈ fixed_repository_wide_work + (K/P) × per_project_work + scope_planning_overhead`. The `K/P × full_validation_work` shorthand used
   elsewhere in this document is a **simplification that likely overstates the reduction**: it assumes
   work scales uniformly with project count and ignores fixed, repository-wide phases that do not
   shrink with `K` — project/policy discovery, dependency-graph construction, and any
   whole-solution-scoped contract or report phase all run once per invocation regardless of how many
   projects are in scope. Neither this evidence task nor the existing #502/#655 phase-share evidence
-  separates `fixed_repository_wide_work` from `per_project_work` for this repository's own current
-  analysis pipeline, so the refined model's two terms are not yet independently measured — that
-  measurement is part of the required, still-outstanding timing gate, not something this task can
-  derive from graph closure alone. Scope-planning overhead itself is `O(P + E)` graph traversal and is
-  negligible by comparison at every measured size (closure computation for the largest measured graph,
-  `P=64`/`Dense`/full density, completes in low single-digit milliseconds; see the test run timings in
+  separates `fixed_repository_wide_work` from `per_project_work` for the normalized consumer lane,
+  so the synthetic timing result below is evidence about the modeled boundary, not a universal latency
+  promise. Scope-planning overhead itself is `O(P + E)` graph traversal and is negligible by comparison
+  at every measured size (closure computation for the largest measured graph, `P=64`/`Dense`/full
+  density, completes in low single-digit milliseconds; see the test run timings in
   `ChangedProjectAdvisoryScopePlanningTests`).
+
 - **Expected deterministic work reduction, S/M/L**: for the *favorable* subclass (leaf/spoke
   changes), the simplified `K/P` model gives an **upper bound** on reduction that grows with scale —
   at `P=8` a spoke change avoids at most `6/8 = 75%` of project-level work; at `P=64`, at most
@@ -384,68 +403,73 @@ Neither reuse candidate is made a prerequisite by this evidence.
   but common* subclass (shared-foundation, and the ~10% of this repository's own PR history touching
   central-props/policy paths per the traffic-mix evidence), reduction is `0%` at every scale under
   either model — full fallback.
+
 - **Mapping/scope-plan/closure overhead**: bounded and cheap (pure graph traversal), evidenced above;
   the dominant cost driver is not the planner, it is how often real PRs land in the unfavorable
   subclass.
+
 - **Best/common/worst case**: best = constant-`K` spoke-shaped change at large `P` (near-100%
   avoidable); common = mixed PR touching a handful of leaf/mid-position projects (partial, shape- and
   position-dependent reduction); worst = any global/unmappable input, which this repository's own
   history shows in roughly 1 of every 10 commits — full fallback, `0%` reduction, by design (safe
   widening, never silently narrowed).
-- **Expected end-to-end effect**: cannot be stated as a single number without conflating
-  product-internal latency with consumer-CI orchestration overhead — this is exactly the distinction
-  the #991 P0 gate requires be resolved first. The `K/P` ratios above are consumer-independent and
-  usable immediately once #991 supplies normalized baseline spans; this task does not fabricate an
-  end-to-end percentage against the pre-normalization dogfood table.
-- **Success threshold / kill criterion (per #991 re-evaluation)**: propose, for the next
-  re-evaluation: success = a supported change class (leaf/spoke-shaped) demonstrates ≥50% reduction
-  in normalized product-internal governance span with proven preview/execution parity and zero
-  coverage gaps across the #502 fixture matrix; kill = the real PR-traffic mix (once measurable from
-  normalized consumer history rather than this repository's own commits) shows global/unmappable
-  inputs dominate enough that the weighted-average reduction falls below a low single-digit percent.
+
+- **Secondary timing/effect evidence**: the explicit harness measures full-strict phase time at S/M/L
+  scales and applies the deterministic K/P model. It is not an incremental execution benchmark:
+
+  | Scale | Full strict | Fixed phases | Project-dependent | Leaf modeled reduction | Middle modeled reduction | Global/shared |
+  |---|---:|---:|---:|---:|---:|---:|
+  | S (8 projects) | 705 ms | 582 ms | 123 ms | 15.265% | 6.541% | 0% |
+  | M (16 projects) | 487 ms | 380 ms | 107 ms | 20.584% | 9.598% | 0% |
+  | L (32 projects) | 486 ms | 355 ms | 131 ms | 26.114% | 12.636% | 0% |
+
+  The measured synthetic boundary is dominated by fixed policy/configuration work (roughly 73–83%),
+  so K/P cannot translate into a material general PR-feedback win by itself. Planner overhead is
+  0.009–0.024 ms per measured scale point and is not the limiting factor. The complete raw profiles,
+  counters, canonical result identities, and modeled rows are in
+  [`changed-project-advisory-analysis-timing-results.json`](changed-project-advisory-analysis-timing-results.json).
+
+- **Success threshold / kill criterion**: the pre-implementation success threshold would require a
+  normalized consumer/product-internal lane to show at least 50% end-to-end reduction for a supported
+  class, with evaluated-item ownership, family-specific scope, preview/execution parity, and zero
+  coverage gaps. This evidence fails the current authorization gate: the modeled result is below that
+  threshold even before accounting for unresolved production ownership/family plumbing. A future
+  re-evaluation may reopen the question only after #991 normalization and new evidence materially
+  changes that boundary.
 
 ## Required decision outcome
 
-**Interim — deterministic mapping/closure evidence complete for a representative evaluator-family
-subset; final A/B/C outcome deferred pending the required timing/effect gate and full-family
-coverage.**
+**Outcome C — insufficient benefit or unsafe boundary.** The evidence is complete enough to close
+#503 without creating an implementation child under #19. The checked-in S/M/L harness measured three
+full strict profiles per scale, separated fixed and project-dependent phases, and applied the reviewed
+K/P model; the result is only 19–26% modeled reduction for the favorable leaf class and 8–13% for the
+middle-position class, with 0% for shared-foundation/global fallback. Fixed phases account for roughly
+73–83% of the measured full profile. These are environment-specific synthetic measurements, not a
+consumer SLA, but they are below the 50% gate required to justify incremental implementation work.
 
-#503 requires baseline full-validation duration and phase shares, secondary timing evidence, an
-expected PR-feedback latency reduction for S/M/L solutions, and — per the acceptance criterion
-forbidding one generic graph-direction assumption — an evaluator/fact-class-specific closure model,
-before a final outcome can be recorded. This task supplies the disposition-given-ownership mapping
-(Question 2a) and a code-grounded evaluator-family closure model for five representative families out
-of roughly 34 (§3b), but explicitly does **not** supply the timing half — see
-[Required pre-implementation effect estimate](#required-pre-implementation-effect-estimate) — does
-**not** supply the ownership-*resolution* half of Question 2 (§2b), and does
-**not** claim the remaining ~29 contract families are safely bounded by any model in this document. So
-declaring a final B here would still close the gate on incomplete evidence. Four independent reasons
-converge on the same action:
+The boundary is also unsafe for implementation: ownership is evidenced through evaluated MSBuild
+`@(Compile)` items but is not yet a production resolver, and every strict/audit contract family now
+has an explicit reviewed disposition or conservative `UnanalyzedSafeFallback` rather than inheriting
+one generic graph direction. #991 remains the required normalization authority, so the old
+pre-normalization dogfood timing cannot reopen this decision. Full strict validation remains
+authoritative; no partial analyzer execution is introduced by this task.
 
-- the #991 P0 gate disqualifies the pre-normalization dogfood latency as sole justification for any
-  implementation-child issue;
-- independent of #991, the `K/P × full_validation_work` shorthand does not net out fixed,
-  repository-wide analysis phases, so even a normalized timing baseline is not yet paired with the
-  fixed/per-project work split this task would need to state a defensible S/M/L reduction number;
-- independent of both, §3b shows the generic reference-graph dependents closure is unsafe or the wrong
-  relationship for three of the five analyzed families (`cycles`, `public_api_surface`,
-  `CoverageGraphOrCatalogWide`), and two further review passes each found the prior correction itself
-  had misclassified something (`layers`/`external`/`allow_only`'s requirement first, then coverage's
-  `namespace` scope second) — any implementation must plan per evaluator family actually present in
-  the target policy, and this task has not analyzed most of them, nor is this task's own analysis to
-  date free of revision;
-- independent of all three, §2b shows the change-to-project *ownership resolution* step (given a raw
-  changed path, which project(s) own it) is not addressed at all — every test in this task supplies
-  ownership directly rather than deriving it, and the correct authoritative basis (MSBuild's evaluated
-  `@(Compile)` items, including `Link`-based shared/linked files) is a different, harder problem than
-  the disposition rules in §2a.
+The decision is therefore:
 
-**Working hypothesis, not a locked decision**: only the `AggregatedGlobalScan`-shaped family
+- close the evidence task as Outcome C;
+- do not create a focused implementation issue under #19 from this evidence;
+- retain the planner, ownership fixtures, family fallback coverage, and timing artifact as reusable
+  evidence for a later re-evaluation after #991;
+- reopen only if normalized consumer-shaped measurements show material residual benefit and the
+  production ownership, family-specific scope, preview/execution parity, and coverage contracts are
+  all proven together.
+
+**Residual scope-model boundary**: only the `AggregatedGlobalScan`-shaped family
 (coverage's `project`/`assembly` scopes) is analyzed as narrower than the generic dependents closure
 in §3b. `ReferenceGraphLocal` (`layers`/`external`/`allow_only`) turned out, after correction, to need
 the *same* dependents-closure bound as the generic default — no better, no worse. `CyclesGlobal`,
 `ContractCoListing`, and `CoverageGraphOrCatalogWide` (now including coverage's `namespace` scope) all
-fall back to the full population. So the B-shaped hypothesis is real but narrow on three axes, not
+fall back to the full population. So the potentially beneficial path is narrow on three axes, not
 two: it holds only for changed inputs whose ownership is somehow already known (§2b) and which map
 (§2a) to a bounded, non-foundational subset of projects, evaluated only against
 `AggregatedGlobalScan`-shaped contract families (§3b) — every other analyzed family, and every
@@ -457,18 +481,15 @@ case exactly as to the general case: one Core scope authority per dimension (cha
 evaluator family), explicit per-input disposition, and complete coverage accounting — narrow support
 is not permission to ignore inputs or evaluator families outside the analyzed set.
 
-This task does **not** create a focused implementation issue under #19. The required next actions are
-recorded here: (1) build and test a real change-to-project ownership resolver grounded in MSBuild's
-evaluated `@(Compile)` items (§2b), since every result in this document assumes ownership is already
-known; (2) extend §3b's evaluator-family analysis from the current five representative families to
-the remaining contract families the target policy actually uses (each one grounded in its own checker
-code, the same way as §3b, not assumed — including a real per-type target-fact invalidation model for
-`ReferenceGraphLocal`/`CoverageGraphOrCatalogWide`'s `semantic_role` scope, which this task only
-bounded conservatively rather than solved); (3) after #991 reaches its decision gate, complete the
-outstanding timing/effect evidence (fixed vs. per-project work split, measured phase shares, S/M/L
-latency reduction) against normalized consumer CI spans; then record a final A/B/C outcome and open
-the implementation issue only if a supported change class still shows material residual benefit
-across all three dimensions.
+This task does **not** create a focused implementation issue under #19. The evidence leaves three
+bounded follow-ups for any future re-evaluation: (1) build and test a production change-to-project
+ownership resolver grounded in MSBuild's evaluated `@(Compile)` items (§2b), since the current
+ownership tests intentionally stop at the resolver seam; (2) replace conservative fallback with
+checker-grounded family rules only where the target policy can prove a narrower scope, including a
+real per-type target-fact invalidation model for `ReferenceGraphLocal`/`CoverageGraphOrCatalogWide`'s
+`semantic_role` scope; and (3) after #991 reaches its decision gate, compare normalized consumer CI
+spans with this synthetic timing boundary. Reopen implementation work only if all three dimensions
+show material residual benefit together.
 
 ## Routing and non-goals
 
@@ -478,7 +499,8 @@ across all three dimensions.
   `tests/ArchLinterNet.Core.Tests/Benchmarking/` are test-only evidence infrastructure, not a product
   capability, and are excluded from the reviewed public API the same way the rest of the #502
   Benchmarking folder is.
-  Implementation-child creation is deferred pending #991; see
+  No implementation child is created from this evidence; #991 is the authority for any later
+  re-evaluation. See
   [P0 consumer-normalization gate](#p0-consumer-normalization-gate-991).
 - No single reference-graph direction is presented as sufficient for every contract family; §3b's
   five-family analysis is representative, not exhaustive, and unanalyzed families default to full

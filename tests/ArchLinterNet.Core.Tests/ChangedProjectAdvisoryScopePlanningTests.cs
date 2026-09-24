@@ -1,3 +1,5 @@
+using System.Text.Json;
+using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -370,6 +372,79 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
             // precise enough to narrow them, so they fall back to the full population like
             // CyclesGlobal.
             Assert.That(coverageGraphOrCatalogWide.RequiredProjectIds, Has.Count.EqualTo(16));
+        });
+    }
+
+    [Test]
+    public void EverySchemaContractFamilyReceivesAnExplicitSafeDisposition()
+    {
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        IReadOnlyList<string> allProjectIds = workload.Projects.Select(project => project.Id).ToList();
+        IReadOnlyList<string> changedProjectIds = [workload.Projects[2].Id];
+        IReadOnlyList<string> dependentsClosureIds = ChangedProjectScopePlanner.DependentsClosure(
+            workload.Projects, workload.Edges, changedProjectIds);
+        string schemaPath = Path.Combine(new ArchitectureRepositoryRootResolver().Resolve(), "schema", "dependencies.arch.schema.json");
+
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(schemaPath));
+        IReadOnlyList<string> contractFamilies = schema.RootElement
+            .GetProperty("$defs")
+            .GetProperty("contracts")
+            .GetProperty("properties")
+            .EnumerateObject()
+            .Select(property => property.Name)
+            .Where(name => name is not "strict" and not "audit")
+            .Select(name => name[(name.IndexOf('_') + 1)..])
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.That(contractFamilies, Is.Not.Empty);
+        foreach (string contractFamily in contractFamilies)
+        {
+            EvaluatorScope scope = EvaluatorFamilyScopePlanner.PlanContractFamily(
+                contractFamily, changedProjectIds, dependentsClosureIds, allProjectIds);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(scope.Reason, Is.Not.Empty, contractFamily);
+                Assert.That(scope.RequiredProjectIds, Is.Not.Empty, contractFamily);
+                IReadOnlyList<string> expectedProjectIds = contractFamily is
+                    "layers" or "external" or "external_allow_only" or "allow_only"
+                    ? dependentsClosureIds
+                    : allProjectIds;
+                Assert.That(scope.RequiredProjectIds, Is.EqualTo(expectedProjectIds),
+                    $"Schema family '{contractFamily}' must use its reviewed scope or fail closed to the full population.");
+            });
+        }
+    }
+
+    [TestCase("coverage:project", EvaluatorFamily.AggregatedGlobalScan)]
+    [TestCase("coverage:assembly", EvaluatorFamily.AggregatedGlobalScan)]
+    [TestCase("coverage:namespace", EvaluatorFamily.CoverageGraphOrCatalogWide)]
+    [TestCase("coverage:dependency_edge", EvaluatorFamily.CoverageGraphOrCatalogWide)]
+    [TestCase("coverage:semantic_role", EvaluatorFamily.CoverageGraphOrCatalogWide)]
+    [TestCase("coverage:rule_input", EvaluatorFamily.CoverageGraphOrCatalogWide)]
+    public void CoverageSubscopeFamiliesUseTheirExplicitReviewedDisposition(
+        string contractFamily,
+        EvaluatorFamily expectedFamily)
+    {
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        IReadOnlyList<string> allProjectIds = workload.Projects.Select(project => project.Id).ToList();
+        IReadOnlyList<string> changedProjectIds = [workload.Projects[2].Id];
+        IReadOnlyList<string> dependentsClosureIds = ChangedProjectScopePlanner.DependentsClosure(
+            workload.Projects, workload.Edges, changedProjectIds);
+
+        EvaluatorScope scope = EvaluatorFamilyScopePlanner.PlanContractFamily(
+            contractFamily, changedProjectIds, dependentsClosureIds, allProjectIds);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(scope.Family, Is.EqualTo(expectedFamily));
+            Assert.That(scope.RequiredProjectIds, Is.EqualTo(
+                expectedFamily == EvaluatorFamily.AggregatedGlobalScan
+                    ? changedProjectIds
+                    : allProjectIds));
+            Assert.That(scope.Reason, Is.Not.Empty);
         });
     }
 
