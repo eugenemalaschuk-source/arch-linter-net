@@ -25,7 +25,7 @@ lint-public-docs-contract:  ## Verify public docs match runtime/schema/CLI capab
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml python tools/scripts/check_public_docs_contract.py
 
 test-public-docs-contract:  ## Run focused regression tests for the public docs semantic contract
-	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml pytest -q tools/scripts/tests/test_check_public_docs_contract.py tools/scripts/tests/test_badge_ci_docs.py
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml pytest -q tools/scripts/tests/test_check_public_docs_contract.py tools/scripts/tests/test_badge_ci_docs.py tools/scripts/tests/test_governance_docs.py
 
 lint-docs: lint-evergreen-docs lint-canonical-actions-pinning lint-dogfood-reference-evidence lint-public-docs-contract test-public-docs-contract  ## Verify MkDocs documentation structure, evergreen identity, canonical Actions pinning, and semantic capability truth
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml python tools/scripts/filter_mkdocs_warnings.py -- mkdocs build --strict
