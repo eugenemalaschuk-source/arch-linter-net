@@ -1,532 +1,276 @@
 # CLI Reference
 
-The executable command tree is the authority for command availability. This page is mechanically checked against `src/ArchLinterNet.Cli/Commands`: if a command is added or removed without updating the markers below, `make lint-docs` fails.
+Use `arch-linter-net --help` or `arch-linter-net <command> --help` for the
+installed version. This reference describes current commands; a local tool
+manifest pins the package used by your repository. Package and persisted schema
+versions are separate identities.
 
-Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact options accepted by the installed tool.
+Start with [CI integration](../guides/ci-integration.md). For Health and a PR
+report, use the [base/current workflow](../guides/single-tool-workflow.md), not a
+sequence of every analytical command in this catalog.
 
 ## Command map
 
-| Command | Purpose |
-| --- | --- |
-
 <!-- cli-command: validate -->
-
-| `arch-linter-net [options]` | Normal architecture validation. |
-
 <!-- cli-command: badge -->
-
-| `arch-linter-net badge` | Badge payload workflows. |
-
 <!-- cli-command: badge architecture-policy -->
-
-| `arch-linter-net badge architecture-policy --input <strict-result.json>` | Project an existing strict JSON result to a Shields endpoint payload; does not rerun analysis. |
-
 <!-- cli-command: badge architecture-health -->
-
-| `arch-linter-net badge architecture-health --input <architecture-health.json> [--output <badge.json>]` | Project canonical Architecture Health plus policy inventory into a Shields endpoint payload; does not rerun analysis. |
-
 <!-- cli-command: badge repository-metrics -->
-
-| `arch-linter-net badge repository-metrics --input <validation.json> [--output <badge.json>] [--output-directory <directory>]` | Project absolute Source lines plus optional grouped Repository and Structure metrics into Shields endpoint payloads; does not rerun analysis. |
-
 <!-- cli-command: badge setup -->
-
-| `arch-linter-net badge architecture-health setup --repository <owner/name> --visibility <public|private> [--mode <none|github-raw|relay>]` | Preview or generate a deterministic, versioned consumer badge setup. |
-
 <!-- cli-command: badge doctor -->
-
-| `arch-linter-net badge architecture-health doctor --input <badge-relay-config.json> [--public]` | Diagnose setup compatibility, evidence availability, expiry, and disclosure-safe remediation. |
-
 <!-- cli-command: badge apply-handoff -->
-
-| `arch-linter-net badge architecture-health apply-handoff --input <bootstrap-handoff.json> --output <repository-directory> --expected-base-sha <sha> --expected-base-tree-sha <tree-sha> --repository <owner/name> --repository-id <id> --repository-owner-id <id>` | Verify a private trusted bootstrap handoff against an exact local review branch, then atomically apply only its managed setup files. |
-
 <!-- cli-command: badge lifecycle -->
-
-| `arch-linter-net badge architecture-health lifecycle --operation <status|invalidate|revoke|rename|transfer|rotate|remove|recover|upgrade|activate|rollback> --input <badge-relay-config.json>` | Inspect or perform an authenticated Relay lifecycle operation; set `ARCHLINTERNET_BADGE_ADMIN_TOKEN` and the exact-matching `ARCHLINTERNET_BADGE_ADMIN_ORIGIN` for real requests, or use `--dry-run` to plan without credentials or writes. |
-
 <!-- cli-command: baseline -->
-
-| `arch-linter-net baseline` | Migration-baseline lifecycle. |
-
 <!-- cli-command: baseline generate -->
-
-| `arch-linter-net baseline generate ...` | Capture current violations into a reviewed baseline. |
-
 <!-- cli-command: baseline migrate -->
-
-| `arch-linter-net baseline migrate ...` | Migrate supported baseline formats/identity. |
-
 <!-- cli-command: baseline update -->
-
-| `arch-linter-net baseline update ...` | Refresh a baseline from current findings under the requested policy. |
-
 <!-- cli-command: baseline prune -->
-
-| `arch-linter-net baseline prune ...` | Remove baseline entries that are no longer current. |
-
 <!-- cli-command: baseline diff -->
-
-| `arch-linter-net baseline diff ...` | Compare current findings with a baseline. |
-
 <!-- cli-command: baseline verify -->
-
-| `arch-linter-net baseline verify ...` | Verify baseline integrity/current applicability. |
-
 <!-- cli-command: cache -->
-
-| `arch-linter-net cache` | Persistent analysis-cache operations. |
-
 <!-- cli-command: cache inspect -->
-
-| `arch-linter-net cache inspect --cache <auto|path>` | Inspect the selected cache. |
-
 <!-- cli-command: cache clear -->
-
-| `arch-linter-net cache clear --cache <auto|path>` | Clear the selected cache with containment checks. |
-
 <!-- cli-command: change -->
-
-| `arch-linter-net change` | Complete architecture change snapshots/reports. |
-
 <!-- cli-command: change snapshot -->
-
-| `arch-linter-net change snapshot --policy <path> --output <path>` | Write a complete architecture change snapshot; use build-state options when a consumer requires post-build analysis. |
-
 <!-- cli-command: change report -->
-
-| `arch-linter-net change report --base <path> --current <path> --execution-context <id>` | Compare two architecture snapshots into a correlatable report artifact. |
-
 <!-- cli-command: coverage -->
-
-| `arch-linter-net coverage` | Architecture coverage artifact utilities. |
-
 <!-- cli-command: coverage report -->
-
-| `arch-linter-net coverage report --input <validation.json> ...` | Render a Markdown coverage report from strict validation JSON. |
-
 <!-- cli-command: coverage extract -->
-
-| `arch-linter-net coverage extract --input <combined.json> --mode <mode> --output <path>` | Extract one validation mode from combined JSON. |
-
 <!-- cli-command: explain -->
-
-| `arch-linter-net explain --source <id> --target <id> ...` | Explain a dependency path at namespace/type granularity. |
-
 <!-- cli-command: gate -->
-
-| `arch-linter-net gate ...` | Fail CI on new architecture debt and error-severity policy weakening. |
-
 <!-- cli-command: health -->
-
-| `arch-linter-net health ...` | Project the canonical non-compensating architecture-health/v1 summary, including bound external evidence when configured. |
-
 <!-- cli-command: health revalidate-publication -->
-
-| `arch-linter-net health revalidate-publication --input <architecture-health.json> --evaluation-date <yyyy-MM-dd> ...` | Refresh only the product-owned temporal publication receipt for unchanged serialized Health evidence; does not rerun analysis. |
-
 <!-- cli-command: graph -->
-
-| `arch-linter-net graph ...` | Export dependency graphs as JSON, DOT, or Mermaid at supported granularities. |
-
 <!-- cli-command: measure -->
-
-| `arch-linter-net measure ...` | Read-only, deterministic report of declared architecture metrics. |
-
 <!-- cli-command: history -->
-
-| `arch-linter-net history` | Architecture history forensics. |
-
 <!-- cli-command: history analyze -->
-
-| `arch-linter-net history analyze ...` | Analyze architecture evidence/history for the requested repository range. |
-
 <!-- cli-command: policy -->
-
-| `arch-linter-net policy` | Policy-only inspection/review workflows. |
-
 <!-- cli-command: policy check -->
-
-| `arch-linter-net policy check --policy <path>` | Validate policy/static configuration without claiming architecture compliance. |
-
 <!-- cli-command: policy context -->
-
-| `arch-linter-net policy context --policy <path> --format <json|markdown>` | Export effective policy facts for humans/agents. |
-
 <!-- cli-command: policy weakening -->
-
-| `arch-linter-net policy weakening --base-context <path> --current-context <path> [--public-api-approval <path>]` | Compare exported contexts for typed policy relaxations, with optional exact reviewed public-API addition approval. |
-
 <!-- cli-command: public-api -->
-
-| `arch-linter-net public-api` | Public API snapshot lifecycle. |
-
 <!-- cli-command: public-api capture -->
-
-| `arch-linter-net public-api capture ...` | Capture a reviewed public API snapshot. |
-
 <!-- cli-command: public-api diff -->
-
-| `arch-linter-net public-api diff ...` | Compare public API snapshots/current surface. |
-
 <!-- cli-command: public-api migrate -->
-
-| `arch-linter-net public-api migrate ...` | Migrate supported snapshot grammar/identity. |
-
 <!-- cli-command: public-api update -->
-
-| `arch-linter-net public-api update ...` | Update a reviewed public API snapshot. |
-
 <!-- cli-command: report -->
-
-| `arch-linter-net report` | Render reports from canonical local architecture artifacts. |
-
 <!-- cli-command: report pr -->
-
-| `arch-linter-net report pr --health <architecture-health.json> --change <architecture-change.json>` | Render a deterministic architecture-only pull-request Markdown report from canonical artifacts; does not rerun analysis or call GitHub. |
-
 <!-- cli-command: topology -->
-
-| `arch-linter-net topology` | Capture, compare, and verify declared architecture topology. |
-
 <!-- cli-command: topology capture -->
-
-| `arch-linter-net topology capture ...` | Capture canonical observed topology as a review artifact. |
-
 <!-- cli-command: topology diff -->
-
-| `arch-linter-net topology diff ...` | Compare declared topology with ordinary validation evidence. |
-
 <!-- cli-command: topology verify -->
-
-| `arch-linter-net topology verify ...` | Verify declared topology with ordinary validation semantics. |
-
 <!-- cli-command: scaffold -->
-
-| `arch-linter-net scaffold` | Repository-development scaffolding. |
-
 <!-- cli-command: scaffold cli-command -->
-
-| `arch-linter-net scaffold cli-command --module <name> --command <name> ...` | Scaffold a CLI command module in this codebase. |
-
 <!-- cli-command: schema -->
-
-| `arch-linter-net schema` | Installed schema-registry discovery. |
-
 <!-- cli-command: schema list -->
-
-| `arch-linter-net schema list` | List packaged logical schemas. |
-
 <!-- cli-command: schema print -->
 
-| `arch-linter-net schema print <logical-id>` | Print one packaged schema for offline tooling/editors. |
+| Command | Purpose |
+| --- | --- |
+| `arch-linter-net [options]` | Validate architecture; strict is the default mode. |
+| `arch-linter-net badge` | Render badge payloads and manage optional publication integrations. |
+| `arch-linter-net badge architecture-policy --input <strict.json>` | Render the legacy strict-validation badge. |
+| `arch-linter-net badge architecture-health --input <health.json>` | Render the canonical Health badge. |
+| `arch-linter-net badge repository-metrics --input <validation.json>` | Render Source lines and optional grouped Repository/Structure badges. |
+| `arch-linter-net badge architecture-health setup` | Preview/generate built-in setup; Relay remains experimental. |
+| `arch-linter-net badge architecture-health doctor` | Diagnose built-in publication configuration. |
+| `arch-linter-net badge architecture-health apply-handoff` | Verify and apply a private setup handoff on its exact base. |
+| `arch-linter-net badge architecture-health lifecycle` | Manage the experimental Relay lifecycle. |
+| `arch-linter-net baseline` | Manage reviewed finding debt and metric baselines. |
+| `arch-linter-net baseline generate` | Capture current findings and selected scalar metric baselines. |
+| `arch-linter-net baseline migrate` | Migrate supported baseline identity formats. |
+| `arch-linter-net baseline update` | Propose adding current finding debt; requires review. |
+| `arch-linter-net baseline prune` | Propose removing obsolete finding entries. |
+| `arch-linter-net baseline diff` | Compare without writing or gating. |
+| `arch-linter-net baseline verify` | Check baseline integrity and applicability without writing. |
+| `arch-linter-net cache` | Operate on the opt-in exact-request cache. |
+| `arch-linter-net cache inspect --cache <auto\|path>` | Inspect cache state. |
+| `arch-linter-net cache clear --cache <auto\|path>` | Clear the selected cache with containment checks. |
+| `arch-linter-net change` | Create/compare complete architecture snapshots. |
+| `arch-linter-net change snapshot --policy <path> --output <path>` | Analyze one revision and write its snapshot. |
+| `arch-linter-net change report --base <path> --current <path> --execution-context <id>` | Compare existing snapshots without analyzing again. |
+| `arch-linter-net coverage` | Post-process validation artifacts. |
+| `arch-linter-net coverage report --input <validation.json>` | Render coverage Markdown. |
+| `arch-linter-net coverage extract --input <combined.json> --mode <mode> --output <path>` | Extract one mode from combined validation JSON. |
+| `arch-linter-net explain --source <id> --target <id>` | Explain a namespace/type dependency path. |
+| `arch-linter-net gate` | Analyze reviewed debt and policy weakening for a gate decision. |
+| `arch-linter-net health` | Analyze and summarize current governance as Gate and Health. |
+| `arch-linter-net health revalidate-publication` | Refresh temporal publication evidence from serialized Health without a new analysis. |
+| `arch-linter-net graph` | Export JSON, DOT or Mermaid dependency graphs. |
+| `arch-linter-net measure` | Measure declared architecture metrics without budget violations. |
+| `arch-linter-net history` | Investigate architecture history. |
+| `arch-linter-net history analyze --from <ref> --to <ref>` | Analyze an explicit Git range; select JSON or Markdown. |
+| `arch-linter-net policy` | Inspect/review policy. |
+| `arch-linter-net policy check --policy <path>` | Validate static configuration, not architecture compliance. |
+| `arch-linter-net policy context --policy <path> --format <json\|markdown>` | Export effective policy facts. |
+| `arch-linter-net policy weakening --base-context <path> --current-context <path>` | Compare policy contexts for relaxation. |
+| `arch-linter-net public-api` | Manage reviewed API signatures. |
+| `arch-linter-net public-api capture` | Capture selected current API for review. |
+| `arch-linter-net public-api diff` | Compare selected API with its reviewed snapshot. |
+| `arch-linter-net public-api migrate` | Migrate supported snapshot grammar/identity. |
+| `arch-linter-net public-api update` | Explicitly update a reviewed API snapshot. |
+| `arch-linter-net report` | Render existing canonical artifacts. |
+| `arch-linter-net report pr --health <health.json> --change <change.json>` | Render local PR Markdown; does not call GitHub. |
+| `arch-linter-net topology` | Observe and review component maps. |
+| `arch-linter-net topology capture --subject-kind <kind>` | Capture observations; does not write a policy. |
+| `arch-linter-net topology diff` | Compare a declared map with observed evidence. |
+| `arch-linter-net topology verify` | Verify through ordinary validation semantics. |
+| `arch-linter-net scaffold` | Repository-development scaffolding, not consumer adoption. |
+| `arch-linter-net scaffold cli-command` | Scaffold a CLI module in this codebase. |
+| `arch-linter-net schema` | Inspect installed schemas. |
+| `arch-linter-net schema list` | List logical IDs and packaged schema identities. |
+| `arch-linter-net schema print <logical-id>` | Print the exact installed schema bytes. |
 
 ## Normal validation
 
 ```bash
-arch-linter-net \
-  --policy architecture/arch.yml \
-  --mode strict \
-  --ensure-built
+arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built \
+  --report json=artifacts/architecture.json --report sarif=artifacts/architecture.sarif
 ```
 
-The CLI compatibility default for `--policy` is `architecture/dependencies.arch.yml`. The documentation uses `architecture/arch.yml` as a concise recommended convention, so examples pass it explicitly.
+Create the artifact directory first. The default policy path is
+`architecture/dependencies.arch.yml`; examples using `architecture/arch.yml`
+pass it explicitly.
 
 ### Core validation options
 
 | Option | Meaning |
 | --- | --- |
-| `-p, --policy <path>` | Selected root policy. |
-| `-m, --mode <strict|audit>` | Validation mode; default is strict. |
-| `--strict` / `--audit` | Mode shortcuts. |
-| `--contract <id>` | Restrict execution to a contract ID; repeat where supported. |
-| `--condition-set <name>` | Select a configured preprocessor symbol set for source analysis. |
-| `--baseline <path>` | Merge reviewed baseline identities with policy ignores. |
-| `--ensure-built` | Explicitly build the selected project graph once, verify its build receipt, then validate. |
-| `--no-restore` | In ensure-built mode, fail closed if restore is required. |
-| `--configuration <name>` | Build-state configuration selector. |
-| `--framework <tfm>` | Target-framework selector. |
-| `--platform <name>` | Platform selector. |
-| `--runtime <rid>` | Runtime identifier selector. |
-| `--max-parallelism <n>` | Bound parallel assembly/fact scanning; `1` is supported sequential execution. |
-| `--waiver-evaluation-date <yyyy-MM-dd>` | Use a fixed UTC calendar date for waiver expiry evaluation. |
-| `--cache <auto|path>` | Opt into persistent analysis-cache/v1; disabled by default. |
-| `--timings` | Print phase timing information to stderr. |
-| `--profile <stdout|stderr|path>` | Emit analysis-profile/v1 JSON independently from normal reports. |
-| `-f, --format <human|json|sarif>` | Primary stdout format. |
-| `--json` | Shortcut for JSON stdout. |
-| `--report <format=destination>` | Add repeatable human/JSON/SARIF sinks to stdout, stderr, or a file. |
-| `-h, --help` | Help. |
-| `-v, --version` | Tool version. |
+| `--policy`, `-p` | Root policy path. |
+| `--mode`, `-m` | `strict`, `audit`, or supported combined `strict,audit`; default strict. |
+| `--strict` / `--audit` | Single-mode shortcuts. |
+| `--contract` | Select a contract ID; repeat for several. |
+| `--condition-set` | Named source-analysis condition set. |
+| `--baseline` | Reviewed finding baseline. |
+| `--ensure-built` | Build the selected graph and verify its receipt before analysis. |
+| `--no-restore` | With CLI-owned preparation, fail instead of restoring missing prerequisites. |
+| `--configuration`, `--framework`, `--platform`, `--runtime` | Select compatible build state. |
+| `--publish-prepared-receipts` | Producer preparation; may build unless a valid completed-build handoff exists. |
+| `--use-prepared-receipts` | Verify prepared receipts without building/restoring. |
+| `--waiver-evaluation-date` | Explicit UTC date for supported waiver-boundary evaluation. |
+| `--external-evidence` | Logical SARIF binding; see [integration](../guides/sarif-integration.md). |
+| `--evidence-repository`, `--evidence-revision`, `--evidence-scope` | Current assessment context, distinct from producer context. |
+| `--cache` | Opt-in exact-request cache; eligibility is not guaranteed. |
+| `--max-parallelism` | Positive scanning bound; `1` selects sequential execution. |
+| `--timings`, `--profile` | Human timings and machine profile; see [performance diagnosis](../usage/timings.md). |
+| `--format`, `-f`, `--json` | Primary output selection. |
+| `--report` | Repeatable `format=destination` sinks from one completed validation. |
 
-Exit codes for normal validation are `0` passed, `1` architecture/policy findings failed the run, and `2` runtime/argument/input error. See [Exit codes](../usage/exit-codes.md) for command-specific details.
+These are validation options, not flags accepted by every subcommand. For
+example, history has one `--format`, while Health has human/JSON output and no
+SARIF renderer. Command help remains version-specific.
 
 ### Build-state behavior
 
-`--ensure-built` is never implicit. It exists to make build provenance explicit and reproducible; normal validation can consume already-built outputs.
-
-The Apple Silicon self-dogfood failure tracked in #639 is fixed on current `main` by #648. Evergreen docs describe the fixed behavior. If reproducing an older release artifact, use the release-provenance workflow instead of assuming the historical defect still exists.
+Ordinary mode uses available outputs and does not silently build.
+`--ensure-built` owns preparation; prepared receipts are a separate producer/
+consumer path. Read [prepared receipts](../usage/timings.md#prepared-receipts)
+before replacing a build step. That feature and `health --change-snapshot` are
+present in `0.9.0-preview.1`, not an implied capability of `0.8.2`.
 
 ## Policy review workflow
 
-Static policy validation:
-
 ```bash
 arch-linter-net policy check --policy architecture/arch.yml
+arch-linter-net policy context --policy architecture/arch.yml --format json > current-policy.json
 ```
 
-Effective policy facts:
+For weakening, export base and current contexts from their respective revisions
+with the same CLI. The [review workflow](../guides/single-tool-workflow.md)
+shows the actual worktree sequence.
 
-```bash
-arch-linter-net policy context \
-  --policy architecture/arch.yml \
-  --format json > current-policy.json
-```
-
-Base/current weakening review:
-
-```bash
-arch-linter-net policy weakening \
-  --base-context base-policy.json \
-  --current-context current-policy.json \
-  --public-api-approval reviewed-api-additions.json
-```
-
-`policy weakening` compares exported contexts. It is a bounded change-time guardrail, not a second architecture evaluator; `impact_not_proven` means review is required.
-
-`--public-api-approval` is optional and fail-closed. Its JSON root is an array of approvals; each approval binds `schema_version: 1`, `kind: "architecture-public-api-addition-approval"`, the exact base/current context digests, a `public_api_surface` contract id, and the complete `added` snapshot entries. When approvals are supplied, `policy weakening` captures the current CLR API from `--policy` and requires it to match the current reviewed snapshot. The approval is accepted only for an unchanged `exact` or `additions_only` contract whose canonical base-snapshot-to-live-CLR delta has precisely those additions and no removals or signature changes. It cannot approve selector, inventory, or comparison-mode changes.
+`--public-api-approval` is optional. It binds the exact context digests,
+contract and complete approved additions. When supplied, the current CLR API
+must match the reviewed snapshot. It cannot approve removals, signature changes,
+selector changes or a different comparison mode. See [public API contracts](../contracts/public-api-surface.md).
 
 ## Baseline workflow
 
-Capture current debt:
-
-```bash
-arch-linter-net baseline generate \
-  --config architecture/arch.yml \
-  --output architecture/baseline.arch.yml \
-  --reason "Reviewed adoption baseline"
-```
-
-Use `update`, `prune`, `diff`, and `verify` during normal maintenance. Use `migrate` when moving supported baseline identity/format forward. See [Migration baselines](../guides/migration-baselines.md).
+Use [migration baselines](../guides/migration-baselines.md) for generation,
+review, update, prune, diff, verify and migration. Writing a baseline is a
+separate reviewed operation, never a normal CI response to a failed gate.
 
 ## No-new-debt gate
 
 ```bash
-arch-linter-net gate \
-  --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml \
-  --mode all \
-  --ensure-built
+arch-linter-net gate --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml --mode all --ensure-built
 ```
 
-`gate` can also consume exported base/current policy contexts and the same optional `--public-api-approval` artifact, so CI catches both new findings and error-severity policy weakening without bypassing reviewed public-API changes.
+`gate` requires an explicit baseline. Paired base/current contexts add the
+policy-weakening guardrail. An explicitly empty baseline is allowed for zero
+accepted finding debt; absence of a required input is not zero debt.
 
 ## Architecture health
 
-```bash
-arch-linter-net health \
-  --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml \
-  --mode all \
-  --format json \
-  --execution-context pr-123
-```
+`health` runs analysis and reports both `gate` and `health`. It does not consume
+a previous validation JSON as a shortcut. Where supported, add
+`--change-snapshot artifacts/current.json` to obtain the current snapshot from
+that same analysis session. See the [complete recipe](../guides/single-tool-workflow.md)
+and [Health reference](../reference/architecture-health.md).
 
-`health` is a read-only projection of canonical architecture-governance authorities. It reports
-the ordered `architecture-health/v1` dimensions and their reasons in human or JSON output. The
-projection is non-compensating: it has no score, percentage, letter grade, badge, pull-request
-rendering, or SARIF output. A valid but unassessable result is emitted as a health document rather
-than a command-error document.
-
-For each policy-declared `external_evidence` requirement, pass one repository-local SARIF binding:
-`--external-evidence id=<id>,path=<path>`. Add `repository=<value>`, `revision=<value>`, and
-`scope=<value>` to a binding when that artifact's producer context is supplied outside SARIF. The
-current assessment context is explicit and shared by the bindings: use `--evidence-repository`,
-`--evidence-revision`, and `--evidence-scope`. Health uses the same canonical binding authority as
-validation before it writes its reporting evidence.
-
-For topology, metric budgets, and imported external diagnostics, `evaluable` means only that the
-authority could assess the control; the health dimension still reflects that authority's resulting
-strict finding or clean receipt. Each reason retains canonical family, control, policy, and evidence
-references so automation can drill into the source receipt. A stale or otherwise blocking waiver
-lifecycle record remains a failing lifecycle result; a resolved baseline entry remains visible as
-baseline hygiene but is not classified as new architecture debt.
-
-Coverage retains its existing severity semantics in Health: `analysis.coverage: error` is failing,
-while `warn` remains non-blocking reportable evidence. For `--mode audit` and `--mode all`,
-`audit_evidence` preserves audit-only diagnostics without turning the Health gate into a strict
-failure.
+`--base-context` and `--current-context` must be supplied together. Repeat
+required external-evidence bindings on Health; a previous process does not
+transfer its inputs automatically. Exit 2 may accompany a valid unassessable
+Health document, not only a command error.
 
 ## Architecture pull-request report
 
-Render a reviewer-oriented Markdown report from a canonical Health artifact and a canonical
-architecture-change report:
-
 ```bash
-arch-linter-net report pr \
-  --health architecture-health.json \
-  --change architecture-change.json \
-  --output architecture-pr-report.md \
-  --max-details 20
+arch-linter-net report pr --health artifacts/health.json \
+  --change artifacts/change.json --output artifacts/pr.md --max-details 20
 ```
 
-`--output` is optional; without it, Markdown is written to standard output. `--max-details` is
-optional and must be a positive count. It bounds each detailed evidence section independently while
-retaining canonical totals and making omitted details explicit. The report is deterministic and
-architecture-only: it reads the supplied artifacts, does not run or recreate analysis, and does not
-inspect or call GitHub.
+Both artifacts must have compatible mode and execution-context evidence.
+`--output` is optional. `--max-details` bounds each section while retaining
+canonical totals and omitted counts. Legacy Health without the reporting envelope
+renders unavailable drill-down, not invented zeros.
 
-The Health input must be an `architecture-health/v1` document from a supported CLI. When it includes
-versioned canonical reporting evidence, its non-empty execution context must match the versioned
-canonical architecture-change JSON report's context and selected mode receipt; mismatches are
-rejected. A legacy Health artifact without the reporting-evidence envelope still renders a report,
-but all evidence drill-down is explicitly `unavailable`; it is never presented as zero or pass. The
-command does not reopen snapshots or compare them again.
-
-Create the pair from the real producers using one workflow-owned identifier:
-
-```bash
-# Base and candidate checkouts/worktrees, respectively
-arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output base-snapshot.json
-arch-linter-net change snapshot --policy architecture/arch.yml --mode strict --output current-snapshot.json
-
-arch-linter-net change report \
-  --base base-snapshot.json \
-  --current current-snapshot.json \
-  --execution-context pr-123 \
-  --format json \
-  --output architecture-change.json
-
-arch-linter-net health \
-  --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml \
-  --mode strict \
-  --format json \
-  --execution-context pr-123 \
-  > architecture-health.json
-```
-
-If that policy declares required external evidence, add the producer inputs to the same Health
-invocation, for example:
-
-```bash
-arch-linter-net health \
-  --policy architecture/arch.yml \
-  --baseline architecture/baseline.arch.yml \
-  --mode strict \
-  --format json \
-  --execution-context pr-123 \
-  --external-evidence id=security-scan,path=artifacts/security.sarif \
-  --evidence-repository example/repository \
-  --evidence-revision "$GIT_COMMIT" \
-  --evidence-scope pull-request \
-  > architecture-health.json
-```
-
-The report headline repeats direct Health/projection facts such as `gate` and `health`; it is not a
-score, percentage, grade, or compensating quality calculation. Rule/effective-control counts,
-applicability completeness, topology evidence, and external evidence remain separate sections and
-must not be combined or inferred from one another. For each configured external evidence artifact,
-the report retains its logical identity and canonical trust receipt: `current`, `stale`, or
-`wrong_context` as applicable, plus the selected run/result provenance. A valid evidence run with
-zero findings is shown as `current` with `results=0`. Missing or incomplete canonical evidence is
-rendered as unavailable or unassessable, never as zero or pass. Canonical identities and provenance
-are retained where supplied so reviewers can drill back to the source artifacts.
-
-This command only renders the local report. GitHub comment publication, workflow/event orchestration,
-security permissions, and related integration remain outside this command's boundary. The
-repository's separate completed-CI publisher consumes the rendered file after transport validation;
-the command itself never calls GitHub.
+Optional `--repository-url`, `--head-sha` and `--artifact-url` supply validated
+GitHub bundle navigation. They do not change the decision. The renderer never
+calls GitHub; a separate [publisher](../guides/ci-integration.md#secure-unified-architecture-pr-report-publication)
+checks the current head, producer/run attempt, schema, size and hash.
 
 ## Change snapshots
 
-```bash
-arch-linter-net change snapshot \
-  --policy architecture/arch.yml \
-  --mode strict \
-  --ensure-built --configuration Debug --framework net10.0 \
-  --output base-snapshot.json
-
-arch-linter-net change snapshot \
-  --policy architecture/arch.yml \
-  --mode strict \
-  --ensure-built --configuration Debug --framework net10.0 \
-  --output current-snapshot.json
-
-arch-linter-net change report \
-  --base base-snapshot.json \
-  --current current-snapshot.json \
-  --execution-context local-review \
-  --format human
-```
-
-When the policy opts into a shared framework, use `--ensure-built` for both
-snapshots and keep `--configuration`, `--framework`, `--platform`, and `--runtime`
-consistent across them. `--no-restore` preserves an offline, fail-closed build
-when the consumer has already restored its prerequisites.
-
-Snapshots are architecture evidence; reports compare two complete snapshots rather than reparsing arbitrary prose.
+A snapshot records the revision actually analyzed. Naming two outputs `base`
+and `current` while staying in one checkout does not create a comparison.
+Use the [two-revision recipe](../guides/single-tool-workflow.md#produce-a-review-from-two-exact-revisions).
+Do not rebuild a current snapshot separately when Health already produced it.
 
 ## Coverage artifacts
 
-Contract coverage runs during validation. The `coverage` command family post-processes validation JSON:
-
 ```bash
-arch-linter-net coverage report \
-  --input architecture-strict.json \
-  --changed-files changed-files.txt \
-  --repo-root . \
-  --output architecture-coverage.md
+arch-linter-net coverage report --input architecture-strict.json \
+  --changed-files changed-files.txt --repo-root . --output architecture-coverage.md
 ```
 
-Implemented policy coverage scopes are documented in [Coverage contracts](../contracts/coverage.md).
+This renders validation evidence; it does not replace [coverage contracts](../contracts/coverage.md).
+Use `coverage extract` first when a consumer requires one mode from combined JSON.
 
 ## Dependency investigation
 
-Export a graph:
-
-```bash
-arch-linter-net graph \
-  --policy architecture/arch.yml \
-  --mode all \
-  --level namespace \
-  --format mermaid
-```
-
-Explain a path:
-
-```bash
-arch-linter-net explain \
-  --policy architecture/arch.yml \
-  --source MyApp.Application \
-  --target MyApp.Infrastructure \
-  --level namespace
-```
-
-`explain` supports namespace/type granularity. For assembly-level topology, use `graph --level assembly`.
-
-Use `history analyze` when the question is how architecture evidence changed over repository history rather than how the current graph is connected.
+`graph --level namespace --format mermaid` exports dependencies;
+`explain --source MyApp.Application --target MyApp.Infrastructure --level namespace`
+explains a path. Supply the selected policy. `explain` supports namespace/type
+levels; assembly topology is available through `graph --level assembly`.
+For change over time, use [history forensics](../guides/history-forensics.md).
 
 ## Public API
 
-The `public-api` command family supports capture, diff, update, and migration of reviewed public API snapshots used by public API surface contracts. See [Public API surface contracts](../contracts/public-api-surface.md).
+[Public API surface contracts](../contracts/public-api-surface.md) own membership
+and reviewed snapshots. Capture/update are intentional review operations; diff
+is the read-only check. Do not make a CI job approve its own API changes.
 
 ## Topology review
 
-The `topology` command family captures observed facts for review, projects declared-versus-observed
-drift, and invokes ordinary validation with a focused entry point. It never writes a reviewed
-topology declaration. See [Review a topology before declaring it](../guides/topology-review-workflow.md).
+Use [capture → review → declaration → diff/verify](../guides/topology-review-workflow.md).
+Capture output is not a policy to apply automatically.
 
 ## Cache
 
-Persistent analysis cache is opt-in:
-
-```bash
-arch-linter-net cache inspect --cache auto
-arch-linter-net cache clear --cache auto
-```
-
-An explicit directory is also supported and is validated for safe containment. Validation itself enables the cache only when `--cache` is supplied.
+See [eligibility and misses](../usage/timings.md#cache-eligibility-and-misses).
+Enabling `--cache` does not prove a hit; unchanged output is not hit evidence.
 
 ## Packaged schemas
 
@@ -535,86 +279,41 @@ arch-linter-net schema list
 arch-linter-net schema print policy-root
 ```
 
-Use these commands for installed/offline schema discovery rather than deriving schema identity from package SemVer.
+Use installed schema identities, not a schema URL guessed from package SemVer.
 
 ## Architecture Health badge
 
 ```bash
-arch-linter-net badge architecture-health \
-  --input architecture-health.json \
-  --output architecture-health-badge.json
+arch-linter-net badge architecture-health --input artifacts/health.json \
+  --output artifacts/badge.json
 ```
 
-This command reads only the canonical `architecture-health/v1` document and its
-selected `architecture-policy-inventory/v1` receipt. It produces one compact
-Shields payload such as `DEBT · 7 ignores · 42 rules`: the first term is the
-canonical non-compensating Health category, `ignores` is accumulated explicit
-waiver debt, and `rules` is the effective policy-control count after policy
-composition. It does not parse policy YAML, recount findings or waivers, run
-analysis, or turn the rule count into a quality score.
-
-`healthy`, `debt`, `degrading`, and `failing` retain the canonical Health
-category and a deterministic typed color. A missing, malformed, inconsistent,
-or unassessable Health/inventory input produces `UNASSESSABLE · ? ignores · ? rules` with a non-green color and exit code 2; unknown is never fabricated as
-zero. Otherwise the command preserves the Health gate exit category: pass is
-0 and fail is 1.
+The renderer uses canonical Health and policy inventory. It does not recalculate
+counts or choose hosting. Missing/unassessable evidence remains
+`UNASSESSABLE · ? ignores · ? rules`, not zero. Otherwise its exit preserves
+Health's gate category. See [badge adoption](../guides/badge-adoption.md).
 
 ## Legacy architecture-policy badge
 
-```bash
-arch-linter-net badge architecture-policy \
-  --input architecture-strict.json
-```
-
-This compatibility projection reads an existing strict result into badge endpoint JSON. It does not rerun architecture analysis and remains deliberately narrower than Architecture Health.
+`badge architecture-policy --input architecture-strict.json` remains the
+narrower strict-validation projection, not Architecture Health.
 
 ## Measure-first metrics
 
 ```bash
-arch-linter-net measure --policy architecture/dependencies.arch.yml
-arch-linter-net measure --format json --metric application-outgoing
-arch-linter-net measure --all-contributors
+arch-linter-net measure --policy architecture/arch.yml --ensure-built --format json
 ```
 
-`measure` is read-only: it evaluates only policy-owned metric definitions and
-does not create a budget violation, rewrite a policy/baseline, or produce a
-SARIF report. Human output is the default; JSON uses
-`schema_id: "architecture-metrics-report/v1"` and `schema_version: 1`, and
-contains the native subject, effective scope, exact value when evaluable, and
-canonical contributors. By default, each contributor list is bounded to 20;
-use `--max-contributors <n>` to set another positive bound or
-`--all-contributors` to emit every contributor. JSON retains the full
-`contributor_count` and a `contributors_truncated` marker whenever it bounds a
-list.
-
-A complete measurement, including a trusted value of zero, exits 0. If a
-required metric scope is incomplete, the command still reports its typed shared
-applicability evidence but exits 2. That result is evidence completeness, not
-an architecture violation or quality score.
+Declare metrics first. Complete measurements exit 0; incomplete required scope
+exits 2 with applicability evidence. `--metric`, `--max-contributors` and
+`--all-contributors` select/bound the report. Scalar metric baselines and finding
+baselines are separate; see [budgets](../policy-format/architecture-metrics.md).
+Informational [repository metrics](../reference/repository-metrics.md) are a
+different projection and do not create budget violations.
 
 ## Output guidance
 
-- Use human output for local diagnosis.
-- Use JSON when downstream tooling needs the complete normalized finding/coverage/build-state model.
-- Use `measure --format json` for the separate, versioned read-only metric-report model.
-- Use SARIF for supported code-scanning projections, noting that not every non-SARIF finding category is representable there.
-- Use repeatable `--report` sinks when CI needs multiple formats from one validation run.
-
-When a policy provides applicability evidence, all three formats add the same deterministic completion
-projection: canonical control identity and provenance, membership/state records, and
-`required`/`evaluable`/`unassessable`/`not_applicable` counts. JSON exposes it in
-`assessment_completion` and additive `applicability_findings`; SARIF places the completion data in
-the run properties and the normalized findings in SARIF results. These counts show evidence
-completeness—not architecture quality—and do not replace the separately owned effective-rule count.
-
-When Core produces policy-inventory evidence, human and JSON validation output
-also disclose the canonical effective-control count and explicit waiver debt.
-The `policy_inventory` JSON object is the source for downstream architecture
-Health/report/badge consumers; do not recalculate either number from policy
-YAML, findings, or exclusion syntax. Its strict/audit/coverage count is
-repository-level for the selected policy even when validation evaluates only one
-finding mode. Its waiver records and debt totals use the same selected
-repository scope; mode-local waiver output still governs only that mode's
-validation result. Missing inventory evidence is not a zero-debt result.
-
-See [Output formats](../usage/output-formats.md) and [Timings](../usage/timings.md).
+Use JSON for complete structured evidence, SARIF for its supported code-scanning
+projection and human output for diagnosis. Some supplemental failures do not
+appear as ordinary SARIF results. Preserve the exit code and JSON as well;
+see [output formats](../usage/output-formats.md) and [exit codes](../usage/exit-codes.md).
