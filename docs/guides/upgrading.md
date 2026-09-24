@@ -4,6 +4,11 @@ For a new repository, use [Getting Started](../getting-started/index.md).
 For an existing policy, follow the upgrade steps below. For a Health/PR report,
 use the single [base/current recipe](single-tool-workflow.md).
 
+ArchLinterNet package releases and persisted document/schema versions have
+separate lifecycles. Pin the package version your repository has reviewed, then
+use the installed CLI to discover the exact schemas and machine contracts that
+ship with that package.
+
 ## Choose a path
 
 | Starting point | Guide |
@@ -21,9 +26,67 @@ Install a repository-local tool, commit its manifest, and author a small
 is the maintained installation/policy example. Policy `version: 1` is supported
 for compatibility; it is not the recommended new-policy default.
 
+The local tool manifest records the reviewed package version in
+`.config/dotnet-tools.json`; restore that manifest in CI rather than embedding a
+package pin in this guide:
+
+```bash
+dotnet new tool-manifest
+dotnet tool install ArchLinterNet.Cli
+dotnet tool restore
+dotnet arch-linter-net --version
+```
+
+A minimal policy keeps the repository's real solution identity explicit:
+
+```yaml
+version: 2
+name: Example Product architecture
+
+analysis:
+  solution: Example.Product.slnx
+```
+
+Use the actual solution or project paths for the adopting repository. Discover
+the policy contract from the installed tool instead of copying a release-named
+schema URL:
+
+```bash
+dotnet arch-linter-net schema list
+dotnet arch-linter-net schema print policy-root > policy-root.schema.json
+```
+
 The minimal gate needs no baseline, public badge, cache, API snapshot or external
 service. Add those only when their purpose exists. A package version and a policy
 schema version are different decisions.
+
+Check the policy without loading assemblies, then restore and build before the
+first strict gate:
+
+```bash
+dotnet arch-linter-net policy check --policy architecture/arch.yml
+dotnet restore
+dotnet build Example.Product.slnx --no-restore
+dotnet arch-linter-net --policy architecture/arch.yml --mode strict
+```
+
+For a clean, already-restored checkout where the CLI owns preparation, use
+`--ensure-built --no-restore` explicitly. Missing restore input fails closed;
+it is not silently repaired by CI.
+
+When strict and audit are one required decision, use one immutable analysis
+snapshot and route both reports:
+
+```bash
+dotnet arch-linter-net --policy architecture/arch.yml \
+  --mode strict,audit --ensure-built --no-restore \
+  --report json=artifacts/architecture-results.json \
+  --report sarif=artifacts/architecture-results.sarif
+```
+
+The command fails if either requested mode fails. Separate strict-blocking and
+advisory-audit commands remain appropriate when audit is intentionally
+non-blocking; independent processes do not share prepared state.
 
 ## Upgrade an existing policy
 
@@ -67,8 +130,10 @@ absence, with a reason. See [policy format](../policy-format/index.md).
 
 Use [baseline diff and migration](migration-baselines.md) before rewriting an
 existing baseline. Review `changed`, `stale` and `ambiguous` identities; none is
-permission to broaden a match. CI reads and verifies accepted debt rather than
-regenerating it. Scalar metric baseline values are separate from finding debt.
+permission to broaden a match. If `diff` or `verify` reports `changed`, `stale`,
+or `ambiguous`, recapture the affected identity explicitly. CI uses read-only
+`baseline verify`; it must never regenerate, update, or commit accepted debt.
+Scalar metric baseline values are separate from finding debt.
 
 ### 5. Move API contracts to reviewed snapshots when appropriate
 
@@ -92,7 +157,8 @@ plain `dotnet build` produces every required receipt.
 
 ## Reports, artifacts, and completion status
 
-Request multiple validation formats through `--report` rather than several
+`--report <format>=<destination>` is repeatable; request multiple validation
+formats through it rather than several
 analytical runs. For a PR review, use [Health plus a compatible change report](single-tool-workflow.md).
 The supported `health --change-snapshot` path avoids a second current analysis;
 older packages require the documented fallback.
@@ -102,11 +168,22 @@ unassessable result. Health can write a valid unassessable JSON document while
 exiting 2. Rendering or uploading it must not clear that failure. See
 [exit codes](../usage/exit-codes.md).
 
+`partial-output` means that a later report destination failed after an earlier
+destination committed; the command exits `2` and reports committed and
+uncommitted destinations without claiming a cross-file transaction. Human output
+is complete without color or a TTY. Cancellation is a typed `cancelled`
+completion and exits `2`; it never creates reusable partial cache state.
+
 ## Cache, profile, and concurrency
 
 See [performance diagnosis](../usage/timings.md) before enabling caching or
 increasing parallelism. Cache eligibility and actual hits must be observed;
 prepared receipts and base-evidence reuse are different mechanisms.
+
+`analysis-cache/v1` and `analysis-profile/v1` are machine-format identities;
+their numbering is independent from the package release. Use
+`--max-parallelism 1` for deterministic sequential execution on a constrained
+runner.
 
 ## Offline schemas
 
@@ -114,6 +191,7 @@ prepared receipts and base-evidence reuse are different mechanisms.
 dotnet arch-linter-net schema list
 dotnet arch-linter-net schema print policy-root > policy-root.schema.json
 dotnet arch-linter-net schema print policy-fragment > policy-fragment.schema.json
+dotnet arch-linter-net schema print analysis-profile > profile.schema.json
 ```
 
 `schema list` supplies the remaining installed logical IDs. Select from that
