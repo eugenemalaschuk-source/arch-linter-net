@@ -12,6 +12,28 @@ internal sealed record HistoryReportSink(
     HistoryReportDestinationType DestinationType,
     string? FilePath = null);
 
+internal enum HistoryReportRouteStatus
+{
+    AllSucceeded,
+    PartialOutput,
+    OutputFailed,
+}
+
+// Stream writes and independent file renames cannot be rolled back as a set. Keep the same
+// evidence shape as Validate's ReportCoordinator so a failed history publication is honest about
+// what a consumer may already have received.
+internal readonly record struct HistoryReportRouteResult(
+    HistoryReportRouteStatus Status,
+    IReadOnlyList<string> FailedPaths,
+    IReadOnlyList<string> CommittedPaths,
+    IReadOnlyList<string> StagedPaths,
+    IReadOnlyList<string> UncommittedPaths,
+    IReadOnlyList<string> ErrorDetails,
+    IReadOnlyList<string> DeliveredStreamPaths)
+{
+    public bool Cancelled { get; init; }
+}
+
 // Mirrors the format=destination syntax already shipped on the root `validate` command's
 // --report option, restricted to the two formats history analyze supports. Kept local to
 // History rather than sharing Validate's ReportSink: the two command families have different

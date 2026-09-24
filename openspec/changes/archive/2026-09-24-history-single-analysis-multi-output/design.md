@@ -15,9 +15,9 @@ validation modes, cancellation, timing) and is `internal` to the `Validate.Appli
 - One `Ingest` call serves every requested output format in a single process invocation.
 - Syntax parity with the existing `--report format=destination` convention so CLI users learn one
   pattern.
-- Fail-closed behavior at least as strong as the existing single-format path: a collision, write
-  error, or Unicode/serialization failure must not leave any destination holding a
-  report that looks complete.
+- Explicit publication evidence: staging/serialization failures leave all destinations untouched;
+  stream delivery or a later independent rename is reported as `partial-output`/`output-failed`
+  with delivered, committed, failed and uncommitted destinations.
 - Zero behavior change to the existing `--format`-only invocation (still the default, still used
   by every caller that hasn't adopted `--report`).
 
@@ -32,8 +32,12 @@ validation modes, cancellation, timing) and is `internal` to the `Validate.Appli
   atomicity.
 - Any Git traversal/ingestion performance optimization beyond removing the duplicate `Ingest`
   call (explicitly out of scope per the issue).
-- Cancellation-token plumbing: `HistoryPolicyIngestionService.Ingest` has no cancellation support
-  today and this change does not add it.
+- Keep cancellation cooperative from the command module through policy loading, Git ingestion,
+  scoring, enrichment and publication; cancellation exits through the existing runtime-error
+  category without publishing a successful report.
+- Git traversal/scoring optimization beyond removing the duplicate `Ingest` call remains out of
+  scope; the change does add opt-in phase timing evidence so the required 2-to-1 packed
+  measurement is reproducible.
 
 ## Decisions
 
@@ -56,7 +60,7 @@ beyond what the option's own parser can express, and keeps `HistoryIngestCommand
 `System.CommandLine` concerns.
 
 **Decision: Stage-then-commit sequencing mirrors `ReportCoordinator.DistributeToSinks`, scaled
-down.**
+down, with an honest partial-output result.**
 1. Render only the content formats actually requested by at least one sink (never render a
    format nothing asked for).
 2. For JSON content, run the existing strict-UTF-8 validity check
@@ -67,12 +71,21 @@ down.**
    file (size bound, and JSON re-parse for `json` sinks) — reusing the same validation shape as
    `ReportCoordinator.StageFileSink`/`ValidateWrittenTempFile` and `ReportCommandHandler`'s
    existing temp-then-rename usage.
-4. Only if every file sink staged cleanly, write stream sinks (`stdout` before `stderr`, matching
+4. After every sink's content is produced and every file sink is staged and validated, commit the
+   staged file renames before publishing streams. If any rename fails, stop the commit sequence,
+   clean remaining temps, report committed/failed/uncommitted destinations, and leave stdout/stderr
+   untouched.
+5. Once file commits succeed, write stream sinks (`stdout` before `stderr`, matching
    `ReportCoordinator`'s ordering rationale: a failed stdout must not leave a misleading
-   successful stderr).
-5. Commit staged renames last. Any staging or stream-write failure deletes already-staged temp
-   files and writes one diagnostic naming every failed destination; the process exits non-zero
-   and no destination receives a report.
+   successful stderr). A stream-write failure cannot roll back prior file commits or a prior stream;
+   emit stable partial-publication evidence and exit non-zero rather than claiming set-level
+   atomicity.
+
+**Decision: Opt-in `--timings` is the history performance evidence seam.**
+The command records policy, ingestion, scoring, enrichment, renderer and output phases plus the
+ingestion invocation count to one stable stderr line. The packed benchmark harness combines that
+line with process wall clock and peak working set, keeping the before/after evidence separate from
+normal correctness and release-governance baselines.
 
 **Decision: JSON stdout keeps the raw-byte `ICliConsole.WriteCanonicalJson` boundary; JSON to
 file/stderr uses ordinary text writes.**

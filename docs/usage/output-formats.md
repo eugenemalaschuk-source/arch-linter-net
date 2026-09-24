@@ -28,10 +28,17 @@ command twice — `<format>` is `json` or `markdown`, and `<destination>` is
 supplied. Ingestion and scoring run exactly once no matter how many sinks are
 configured. Every destination is validated before any write — duplicate
 destinations and a destination that collides with `--policy` are both rejected
-closed — and file destinations are written atomically. A failure on any sink
-(a collision, a write error, or the existing Unicode/serialization diagnostic)
-leaves no destination holding a report that could be mistaken for a complete
-result, and the process exits non-zero.
+closed — and file destinations are written atomically. Staging or
+serialization failures leave every destination untouched. A stream-write or
+later independent rename cannot be rolled back; those failures return
+non-zero with an explicit `partial-output` or `output-failed` diagnostic
+listing delivered/committed and uncommitted destinations rather than claiming
+a complete result.
+
+Add `--timings` when collecting performance evidence. It emits one timing line
+to stderr for policy, ingestion, scoring, each renderer, output routing and the
+ingestion call count. Treat those values as diagnostic evidence only and measure
+process startup/overhead and peak working set around the packed CLI invocation.
 
 ## Policy context output
 

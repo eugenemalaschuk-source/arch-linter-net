@@ -136,6 +136,34 @@ def cli_command_paths(root: Path) -> set[str]:
     return result
 
 
+def history_cli_documentation_violations(root: Path) -> list[str]:
+    source_path = root / "src/ArchLinterNet.Cli/Commands/History/Application/HistoryCommandDefinition.cs"
+    if not source_path.is_file():
+        return []
+
+    source = source_path.read_text(encoding="utf-8")
+    documentation = read_text(root, CLI_DOC)
+    section_match = re.search(
+        r"(?ms)^### History analysis options\s*\n(?P<body>.*?)(?=^## |\Z)",
+        documentation,
+    )
+    section = section_match.group("body") if section_match is not None else ""
+    violations: list[str] = []
+
+    for option in ("--format", "--report"):
+        if f'new("{option}")' in source and f"`{option}`" not in section:
+            violations.append(f"{CLI_DOC}: history analysis options omit executable {option}")
+
+    report_is_repeatable = (
+        'new("--report")' in source
+        and "AllowMultipleArgumentsPerToken = true" in source
+    )
+    if report_is_repeatable and not re.search(r"`--report`[^\n]*\brepeatable\b", section, re.I):
+        violations.append(f"{CLI_DOC}: history `--report` documentation must state that it is repeatable")
+
+    return violations
+
+
 def _layer_definition_candidates(schema: object) -> list[dict[str, object]]:
     candidates: list[dict[str, object]] = []
 
@@ -272,6 +300,8 @@ def find_violations(root: Path) -> list[str]:
                 f"missing={sorted(expected_cli - documented_cli)} "
                 f"extra={sorted(documented_cli - expected_cli)}"
             )
+
+        violations.extend(history_cli_documentation_violations(root))
 
         assert_schema_allows_selector_only_layer(root)
         if "<!-- layer-selector-only-supported -->" not in read_text(root, YAML_REFERENCE):

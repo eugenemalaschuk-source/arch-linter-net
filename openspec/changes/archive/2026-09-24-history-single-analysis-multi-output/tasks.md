@@ -29,8 +29,10 @@
 - [x] 3.6 Stage file sinks via `IFileSystem.WriteAllTextToTemp`, re-validate each staged temp
       file (size bound; re-parse for `json`), and only then write stream sinks (`stdout` before
       `stderr`), and only then commit renames.
-- [x] 3.7 On any staging/write failure, delete already-staged temp files, write one diagnostic
-      naming the failed destination(s) to stderr, write nothing to any sink, and exit non-zero.
+- [x] 3.7 On staging/serialization failure, delete already-staged temp files, write one
+      diagnostic naming the failed destination(s) to stderr, write nothing to any sink, and exit
+      non-zero. On stream-write or later-rename failure, preserve the same non-zero exit while
+      reporting the typed partial-output evidence for destinations already delivered/committed.
 
 ## 4. Tests
 
@@ -47,6 +49,12 @@
 - [x] 4.6 Add/extend a CLI definition test verifying `--report` is parsed into the option surface
       (mirroring existing `ValidateCommandDefinitionTests` coverage style) if such coverage
       exists for `history`.
+- [x] 4.7 Add regression coverage for physical-file collision, Unicode multi-output rendering,
+      stream/rename partial output, cancellation propagation, staged-temp cleanup and an
+      ingestion counter incremented inside Core's actual `HistoryIngestionService.Ingest`.
+- [x] 4.8 Add opt-in timing evidence, a freshly packed/installed CLI acceptance test and an explicit
+      packed-package benchmark harness recording the 2-process/1-process call counts, phase
+      timings, process overhead, peak working set and exact tool-package SHA-256.
 
 ## 5. Docs and spec sync
 

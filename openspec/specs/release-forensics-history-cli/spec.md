@@ -125,8 +125,12 @@ invalid selected author UTF-8, invalid commit-message UTF-8, invalid Git path UT
 and TaskKey span-overlap ambiguity.
 
 Diagnostics SHALL be written to the error stream and SHALL NOT be emitted as
-records inside a successful report. A run that produces a diagnostic SHALL write
-no report to the output stream and SHALL exit with a non-zero exit code.
+records inside a successful report. A diagnostic raised before publication SHALL
+leave every report destination untouched and exit with a non-zero exit code. If a
+stream write or independent file rename fails after another destination has
+already received a report, the run SHALL instead use the typed `partial-output`
+or `output-failed` publication evidence defined below; it SHALL still exit
+non-zero and SHALL never claim that the complete report set was published.
 
 #### Scenario: No partial result on failure
 - **WHEN** a commit message in the analyzed range is not valid UTF-8
@@ -236,22 +240,34 @@ A rejected `--report` configuration SHALL leave standard output empty and
 exit non-zero without calling `Ingest`.
 
 File destinations SHALL be written using an atomic temporary-file-then-rename
-sequence. Every file sink SHALL be staged and validated before any stream
-sink (`stdout` or `stderr`) is written, and `stdout` SHALL be written before
-`stderr` when both are configured. Staged file renames SHALL be committed
-only after every sink's content has been produced without error. When any
-sink fails — a destination collision, a file write error, or the JSON
-Unicode/serialization failure already defined for the report-serialization
-diagnostic — the run SHALL fail closed: no sink SHALL receive a report, a
-diagnostic naming the failed destination(s) SHALL be written to standard
-error, and the process SHALL exit non-zero. The CLI SHALL NOT claim to
-replace multiple independent file destinations atomically as a set, but SHALL
-NOT leave a destination that a consumer could mistake for a complete
-successful multi-format result either.
+sequence. Every file sink SHALL be staged and validated before publication.
+After every sink's content has been produced without error, staged file renames
+SHALL be committed before any stream sink (`stdout` or `stderr`) is written;
+`stdout` SHALL be written before `stderr` when both are configured. A file
+rename failure SHALL leave stream sinks untouched. A collision, file
+write/validation error during staging, or the JSON Unicode/serialization
+failure already defined for the report-serialization diagnostic SHALL fail
+before publication and leave all destinations untouched. A stream-write or
+file-rename failure can occur after publication has begun and cannot undo a
+stream delivery or an earlier independent rename; in that case the run SHALL
+return non-zero and expose a canonical History diagnostic with stable kind
+`report_publication_failed`, `publicationStatus` (`partial-output` or
+`output-failed`), and destination arrays `failed`, `committed`, `delivered`,
+and `uncommitted`. It SHALL also include a boolean `cancelled` and a `details`
+array. The CLI SHALL NOT claim to replace multiple independent file
+destinations atomically as a set, and SHALL never describe a partially
+published run as successful.
 
 JSON written to `stdout` through `--report` SHALL use the same raw UTF-8
 without-BOM boundary as the existing `--format json` stdout path. JSON
 written to `stderr` or a file destination SHALL use ordinary text writes.
+
+`analyze` SHALL accept `--timings` as an opt-in diagnostic switch. When enabled,
+the command SHALL write one stable timing line to standard error containing
+policy loading, ingestion, scoring, optional enrichment, JSON rendering,
+Markdown rendering, output routing, and the ingestion invocation count. Timing
+values SHALL be observational only and SHALL NOT affect report bytes, finding
+identity, or exit status.
 
 #### Scenario: One ingestion serves two formats
 - **WHEN** `history analyze --from <a> --to <b> --report json=report.json --report markdown=report.md` succeeds
@@ -282,3 +298,26 @@ written to `stderr` or a file destination SHALL use ordinary text writes.
   diagnostic identifies the failed destination, and the process exits
   non-zero
 
+#### Scenario: Commit failure reports partial output honestly
+- **WHEN** one file sink is renamed successfully and a later independent
+  rename fails, or a stream sink is delivered before a later stream write
+  fails
+- **THEN** the process exits non-zero with `partial-output` evidence listing
+  the delivered/committed and uncommitted destinations, and it does not claim
+  that the complete multi-format set was published
+
+#### Scenario: File rename failure precedes stream publication
+- **WHEN** one staged file rename fails while stream sinks are configured
+- **THEN** no stream sink receives a report, the process exits non-zero, and a
+  `report_publication_failed` diagnostic identifies failed, committed,
+  delivered, and uncommitted destinations
+
+#### Scenario: Timing evidence distinguishes packed work
+- **WHEN** the same explicit Git fixture and effective configuration are run
+  once as two single-format CLI processes and once as one packed CLI process
+  with `--report json=<path> --report markdown=<path> --timings`
+- **THEN** each process reports its phase timings and ingestion invocation count,
+  the two-process shape reports two ingestion calls while the packed shape
+  reports one, and the measurement harness records wall clock, process
+  overhead, renderer phases, and peak working set without claiming an exact
+  two-times end-to-end speedup

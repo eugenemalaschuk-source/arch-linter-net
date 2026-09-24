@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Text;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.History.Application;
+using ArchLinterNet.Cli.Commands.History.EntryPoint;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -78,6 +79,29 @@ public sealed class HistoryCommandDefinitionTests
             Assert.That(exitCode, Is.EqualTo(0));
             Assert.That(console.Output, Does.Contain("arch-linter-net history analyze"));
             Assert.That(console.Output, Does.Contain("--report"));
+        });
+    }
+
+    [Test]
+    public void HistoryCommandModule_ForwardsCancellationToAnalysisHandler()
+    {
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        FakeConsole console = new();
+        RootCommand root = new();
+        root.Subcommands.Add(new HistoryCommandModule().CreateCommand(
+            null!, console, new ScaffoldTestFileSystem(), cancellation.Token));
+
+        int exitCode = root.Parse([
+            "history", "analyze", "--from", "HEAD", "--to", "HEAD", "--timings",
+        ]).Invoke();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.Output, Is.Empty);
+            Assert.That(console.ErrorOutput, Does.Contain("cancelled"));
+            Assert.That(console.ErrorOutput, Does.Contain("ingestion_calls=0"));
         });
     }
 

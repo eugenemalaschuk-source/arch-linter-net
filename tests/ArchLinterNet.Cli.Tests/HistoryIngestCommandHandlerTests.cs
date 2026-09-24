@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Text;
-using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Cli.Commands.History.Application;
 using NUnit.Framework;
@@ -8,7 +6,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class HistoryIngestCommandHandlerTests
+public sealed partial class HistoryIngestCommandHandlerTests
 {
     [Test]
     public void MissingOperandsFailWithoutTouchingTheRepository()
@@ -165,6 +163,25 @@ public sealed class HistoryIngestCommandHandlerTests
     }
 
     [Test]
+    public void MultiSinkJsonRenderingRejectsInvalidUnicodeBeforePublication()
+    {
+        FakeConsole console = new();
+
+        bool succeeded = HistoryReportOutputWriter.TryRenderJson(
+            console,
+            static () => "bad\uD800",
+            out string? rendered);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(succeeded, Is.False);
+            Assert.That(rendered, Is.Null);
+            Assert.That(console.Output, Is.Empty);
+            Assert.That(console.ErrorOutput, Does.StartWith("{\n  \"kind\": \"report_serialization_invalid\""));
+        });
+    }
+
+    [Test]
     public void AnInvalidReportValueFailsBeforeRepositoryIngestion()
     {
         FakeConsole console = new();
@@ -224,6 +241,37 @@ public sealed class HistoryIngestCommandHandlerTests
                 new HistoryIngestCommandOptions(
                     directory, "HEAD", "HEAD", "json", false, policyPath,
                     ReportSinks: new[] { new HistoryReportSink("json", HistoryReportDestinationType.File, differentlyCasedDestination) }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+                Assert.That(console.Output, Is.Empty);
+                Assert.That(console.ErrorOutput, Does.Contain("matches --policy input"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void AReportDestinationThatNamesTheSamePhysicalPolicyFileCollides()
+    {
+        FakeConsole console = new();
+        string directory = Path.Combine(Path.GetTempPath(), "arch-linter-history-physical-collision-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string policyPath = Path.Combine(directory, "policy.yml");
+        string aliasPath = Path.Combine(directory, "policy-alias.yml");
+        File.WriteAllText(policyPath, "version: 1\n");
+        try
+        {
+            int exitCode = new HistoryIngestCommandHandler(
+                console,
+                new SamePhysicalFileFileSystem(new ScaffoldTestFileSystem(), aliasPath, policyPath)).Execute(
+                new HistoryIngestCommandOptions(
+                    directory, "HEAD", "HEAD", "json", false, policyPath,
+                    ReportSinks: new[] { new HistoryReportSink("json", HistoryReportDestinationType.File, aliasPath) }));
 
             Assert.Multiple(() =>
             {
@@ -328,7 +376,160 @@ public sealed class HistoryIngestCommandHandlerTests
     }
 
     [Test]
-    public void OneIngestionProducesBothFormatsMatchingSingleFormatRuns()
+    public void InvalidStagedJsonIsReportedAndItsTempFileIsDeleted()
+    {
+        string repository = CreateRepositoryWithOneCommit();
+        try
+        {
+            FakeConsole console = new();
+            ScaffoldTestFileSystem innerFileSystem = new();
+            InvalidJsonTempFileSystem fileSystem = new(innerFileSystem);
+
+            int exitCode = new HistoryIngestCommandHandler(console, fileSystem).Execute(
+                new HistoryIngestCommandOptions(
+                    repository, "HEAD", "HEAD", "json", false,
+                    ReportSinks: new[]
+                    {
+                        new HistoryReportSink("json", HistoryReportDestinationType.File, "report.json"),
+                        new HistoryReportSink("markdown", HistoryReportDestinationType.Stdout),
+                    }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.Not.EqualTo(CliExitCodes.Success));
+                Assert.That(console.Output, Is.Empty, "A staging validation failure must happen before stream publication.");
+                Assert.That(console.ErrorOutput, Does.Contain("\"kind\": \"report_publication_failed\""));
+                Assert.That(console.ErrorOutput, Does.Contain("output-failed"));
+                Assert.That(console.ErrorOutput, Does.Contain("report.json"));
+                Assert.That(fileSystem.CorruptedTempPath, Is.Not.Null);
+                Assert.That(innerFileSystem.FileExists(fileSystem.CorruptedTempPath!), Is.False);
+                Assert.That(innerFileSystem.CommittedPaths, Is.Empty);
+            });
+        }
+        finally
+        {
+            DeleteRepositoryDirectory(repository);
+        }
+    }
+
+    [Test]
+    public void CancellationAfterStagingDeletesTempFilesBeforePublishingAnySink()
+    {
+        string repository = CreateRepositoryWithOneCommit();
+        using CancellationTokenSource cancellation = new();
+        try
+        {
+            FakeConsole console = new();
+            ScaffoldTestFileSystem fileSystem = new();
+            fileSystem.OnWriteAllTextToTemp = cancellation.Cancel;
+
+            int exitCode = new HistoryIngestCommandHandler(console, fileSystem, cancellation.Token).Execute(
+                new HistoryIngestCommandOptions(
+                    repository, "HEAD", "HEAD", "json", false,
+                    ReportSinks: new[]
+                    {
+                        new HistoryReportSink("json", HistoryReportDestinationType.File, "report.json"),
+                        new HistoryReportSink("markdown", HistoryReportDestinationType.Stdout),
+                    },
+                    TimingsEnabled: true));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.Not.EqualTo(CliExitCodes.Success));
+                Assert.That(console.Output, Is.Empty);
+                Assert.That(console.ErrorOutput, Does.Contain("cancelled"));
+                Assert.That(fileSystem.FileExists("report.json.tmp"), Is.False);
+                Assert.That(fileSystem.CommittedPaths, Is.Empty);
+            });
+        }
+        finally
+        {
+            DeleteRepositoryDirectory(repository);
+        }
+    }
+
+    [Test]
+    public void OneCoreIngestionProducesBothFormatsMatchingSingleFormatRuns()
+    {
+        string repository = CreateRepositoryWithOneCommit();
+        try
+        {
+            FakeConsole jsonOnlyConsole = new();
+            new HistoryIngestCommandHandler(jsonOnlyConsole, new ScaffoldTestFileSystem()).Execute(
+                new HistoryIngestCommandOptions(repository, "HEAD", "HEAD", "json", false, TimingsEnabled: true));
+
+            FakeConsole markdownOnlyConsole = new();
+            new HistoryIngestCommandHandler(markdownOnlyConsole, new ScaffoldTestFileSystem()).Execute(
+                new HistoryIngestCommandOptions(repository, "HEAD", "HEAD", "markdown", false, TimingsEnabled: true));
+
+            FakeConsole sinkConsole = new();
+            ScaffoldTestFileSystem fileSystem = new();
+            int exitCode = new HistoryIngestCommandHandler(sinkConsole, fileSystem).Execute(
+                new HistoryIngestCommandOptions(
+                    repository, "HEAD", "HEAD", "json", false,
+                    ReportSinks: new[]
+                    {
+                        new HistoryReportSink("json", HistoryReportDestinationType.File, "report.json"),
+                        new HistoryReportSink("markdown", HistoryReportDestinationType.File, "report.md"),
+                    },
+                    TimingsEnabled: true));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+                Assert.That(jsonOnlyConsole.ErrorOutput, Does.Contain("ingestion_calls=1"));
+                Assert.That(markdownOnlyConsole.ErrorOutput, Does.Contain("ingestion_calls=1"));
+                Assert.That(sinkConsole.ErrorOutput, Does.Contain("ingestion_calls=1"));
+                Assert.That(sinkConsole.Output, Is.Empty);
+                Assert.That(fileSystem.Contents["report.json"], Is.EqualTo(jsonOnlyConsole.Output));
+                Assert.That(fileSystem.Contents["report.md"], Is.EqualTo(markdownOnlyConsole.Output));
+            });
+        }
+        finally
+        {
+            DeleteRepositoryDirectory(repository);
+        }
+    }
+
+    [Test]
+    public void TimingEvidenceReportsOneIngestionAndRequestedRenderPhases()
+    {
+        string repository = CreateRepositoryWithOneCommit();
+        try
+        {
+            FakeConsole console = new();
+            ScaffoldTestFileSystem fileSystem = new();
+            int exitCode = new HistoryIngestCommandHandler(console, fileSystem).Execute(
+                new HistoryIngestCommandOptions(
+                    repository, "HEAD", "HEAD", "json", false,
+                    ReportSinks: new[]
+                    {
+                        new HistoryReportSink("json", HistoryReportDestinationType.File, "report.json"),
+                        new HistoryReportSink("markdown", HistoryReportDestinationType.File, "report.md"),
+                    },
+                    TimingsEnabled: true));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+                Assert.That(console.Output, Is.Empty);
+                Assert.That(console.ErrorOutput, Does.Contain("History timings (ms):"));
+                Assert.That(console.ErrorOutput, Does.Contain("ingestion="));
+                Assert.That(console.ErrorOutput, Does.Contain("scoring="));
+                Assert.That(console.ErrorOutput, Does.Contain("json_render="));
+                Assert.That(console.ErrorOutput, Does.Contain("markdown_render="));
+                Assert.That(console.ErrorOutput, Does.Contain("output="));
+                Assert.That(console.ErrorOutput, Does.Contain("ingestion_calls=1"));
+            });
+        }
+        finally
+        {
+            DeleteRepositoryDirectory(repository);
+        }
+    }
+
+    [Test]
+    public void ReportSinksCanWriteJsonToStdoutAndMarkdownToStderr()
     {
         string repository = CreateRepositoryWithOneCommit();
         try
@@ -342,8 +543,109 @@ public sealed class HistoryIngestCommandHandlerTests
                 new HistoryIngestCommandOptions(repository, "HEAD", "HEAD", "markdown", false));
 
             FakeConsole sinkConsole = new();
+            int exitCode = new HistoryIngestCommandHandler(sinkConsole, new ScaffoldTestFileSystem()).Execute(
+                new HistoryIngestCommandOptions(
+                    repository, "HEAD", "HEAD", "json", false,
+                    ReportSinks: new[]
+                    {
+                        new HistoryReportSink("json", HistoryReportDestinationType.Stdout),
+                        new HistoryReportSink("markdown", HistoryReportDestinationType.Stderr),
+                    }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+                Assert.That(sinkConsole.Output, Is.EqualTo(jsonOnlyConsole.Output));
+                Assert.That(sinkConsole.ErrorOutput, Is.EqualTo(markdownOnlyConsole.Output));
+            });
+        }
+        finally
+        {
+            DeleteRepositoryDirectory(repository);
+        }
+    }
+
+    [Test]
+    public void ReportSinksCanWriteMarkdownToStdoutAndJsonToStderr()
+    {
+        string repository = CreateRepositoryWithOneCommit();
+        try
+        {
+            FakeConsole jsonOnlyConsole = new();
+            new HistoryIngestCommandHandler(jsonOnlyConsole, new ScaffoldTestFileSystem()).Execute(
+                new HistoryIngestCommandOptions(repository, "HEAD", "HEAD", "json", false));
+
+            FakeConsole markdownOnlyConsole = new();
+            new HistoryIngestCommandHandler(markdownOnlyConsole, new ScaffoldTestFileSystem()).Execute(
+                new HistoryIngestCommandOptions(repository, "HEAD", "HEAD", "markdown", false));
+
+            FakeConsole sinkConsole = new();
+            int exitCode = new HistoryIngestCommandHandler(sinkConsole, new ScaffoldTestFileSystem()).Execute(
+                new HistoryIngestCommandOptions(
+                    repository, "HEAD", "HEAD", "json", false,
+                    ReportSinks: new[]
+                    {
+                        new HistoryReportSink("markdown", HistoryReportDestinationType.Stdout),
+                        new HistoryReportSink("json", HistoryReportDestinationType.Stderr),
+                    }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+                Assert.That(sinkConsole.Output, Is.EqualTo(markdownOnlyConsole.Output));
+                Assert.That(sinkConsole.ErrorOutput, Is.EqualTo(jsonOnlyConsole.Output));
+            });
+        }
+        finally
+        {
+            DeleteRepositoryDirectory(repository);
+        }
+    }
+
+    [Test]
+    public void AStreamWriteFailureReportsCommittedFilesAndExitsNonZero()
+    {
+        string repository = CreateRepositoryWithOneCommit();
+        try
+        {
+            BrokenOutConsole console = new();
             ScaffoldTestFileSystem fileSystem = new();
-            int exitCode = new HistoryIngestCommandHandler(sinkConsole, fileSystem).Execute(
+
+            int exitCode = new HistoryIngestCommandHandler(console, fileSystem).Execute(
+                new HistoryIngestCommandOptions(
+                    repository, "HEAD", "HEAD", "json", false,
+                    ReportSinks: new[]
+                    {
+                        new HistoryReportSink("json", HistoryReportDestinationType.File, "report.json"),
+                        new HistoryReportSink("markdown", HistoryReportDestinationType.Stdout),
+                    }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.Not.EqualTo(CliExitCodes.Success));
+                Assert.That(console.ErrorOutput, Does.Contain("\"kind\": \"report_publication_failed\""));
+                Assert.That(console.ErrorOutput, Does.Contain("\"committed\": [\n    \"report.json\"\n  ]"));
+                Assert.That(fileSystem.CommittedPaths, Is.EqualTo(new[] { "report.json" }));
+                Assert.That(console.ErrorOutput, Does.Contain("<stdout>"));
+            });
+        }
+        finally
+        {
+            DeleteRepositoryDirectory(repository);
+        }
+    }
+
+    [Test]
+    public void ACommitFailureOnOneSinkReportsPartialOutputAndExitsNonZero()
+    {
+        string repository = CreateRepositoryWithOneCommit();
+        try
+        {
+            FakeConsole console = new();
+            ScaffoldTestFileSystem fileSystem = new();
+            FailOnRenameFileSystem failingFileSystem = new(fileSystem, "report.md");
+
+            int exitCode = new HistoryIngestCommandHandler(console, failingFileSystem).Execute(
                 new HistoryIngestCommandOptions(
                     repository, "HEAD", "HEAD", "json", false,
                     ReportSinks: new[]
@@ -354,17 +656,76 @@ public sealed class HistoryIngestCommandHandlerTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
-                Assert.That(sinkConsole.Output, Is.Empty);
-                Assert.That(sinkConsole.ErrorOutput, Is.Empty);
-                Assert.That(fileSystem.Contents["report.json"], Is.EqualTo(jsonOnlyConsole.Output));
-                Assert.That(fileSystem.Contents["report.md"], Is.EqualTo(markdownOnlyConsole.Output));
+                Assert.That(exitCode, Is.Not.EqualTo(CliExitCodes.Success));
+                Assert.That(console.ErrorOutput, Does.Contain("partial-output"));
+                Assert.That(console.ErrorOutput, Does.Contain("report.json"));
+                Assert.That(console.ErrorOutput, Does.Contain("report.md"));
+                Assert.That(fileSystem.CommittedPaths, Is.EqualTo(new[] { "report.json" }));
             });
         }
         finally
         {
             DeleteRepositoryDirectory(repository);
         }
+    }
+
+    [Test]
+    public void AFailedSecondStreamReportsPartialOutputAfterFilesAreCommitted()
+    {
+        string repository = CreateRepositoryWithOneCommit();
+        try
+        {
+            StreamThenBrokenErrorConsole console = new();
+            ScaffoldTestFileSystem fileSystem = new();
+
+            int exitCode = new HistoryIngestCommandHandler(console, fileSystem).Execute(
+                new HistoryIngestCommandOptions(
+                    repository, "HEAD", "HEAD", "json", false,
+                    ReportSinks: new[]
+                    {
+                        new HistoryReportSink("json", HistoryReportDestinationType.Stdout),
+                        new HistoryReportSink("markdown", HistoryReportDestinationType.Stderr),
+                        new HistoryReportSink("json", HistoryReportDestinationType.File, "report.json"),
+                    }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.Not.EqualTo(CliExitCodes.Success));
+                Assert.That(console.Output, Is.Not.Empty);
+                Assert.That(console.ErrorOutput, Does.Contain("partial-output"));
+                Assert.That(console.ErrorOutput, Does.Contain("<stderr>"));
+                Assert.That(console.ErrorOutput, Does.Contain("report.json"));
+                Assert.That(console.ErrorOutput, Does.Contain("\"committed\": [\n    \"report.json\"\n  ]"));
+                Assert.That(fileSystem.CommittedPaths, Is.EqualTo(new[] { "report.json" }));
+            });
+        }
+        finally
+        {
+            DeleteRepositoryDirectory(repository);
+        }
+    }
+
+    [Test]
+    public void CancellationTokenStopsHistoryBeforeIngestion()
+    {
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        FakeConsole console = new();
+
+        int exitCode = new HistoryIngestCommandHandler(
+            console,
+            new ScaffoldTestFileSystem(),
+            cancellation.Token).Execute(
+                new HistoryIngestCommandOptions(".", "HEAD", "HEAD", "json", false, TimingsEnabled: true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.Output, Is.Empty);
+            Assert.That(console.ErrorOutput, Does.Contain("\"kind\": \"analysis_cancelled\""));
+            Assert.That(console.ErrorOutput, Does.Contain("cancelled"));
+            Assert.That(console.ErrorOutput, Does.Contain("ingestion_calls=0"));
+        });
     }
 
     private static string CreateRepositoryWithOneCommit()
@@ -421,50 +782,4 @@ public sealed class HistoryIngestCommandHandlerTests
         }
     }
 
-    private sealed class FailOnWriteFileSystem(IFileSystem inner, string failingTargetPath) : IFileSystem
-    {
-        public bool FileExists(string path) => inner.FileExists(path);
-
-        public string ReadAllText(string path) => inner.ReadAllText(path);
-
-        public void WriteAllText(string path, string contents) => inner.WriteAllText(path, contents);
-
-        public string WriteAllTextToTemp(string targetPath, string contents)
-        {
-            if (string.Equals(targetPath, failingTargetPath, StringComparison.Ordinal))
-            {
-                throw new IOException($"Cannot write to {targetPath}");
-            }
-
-            return inner.WriteAllTextToTemp(targetPath, contents);
-        }
-
-        public void RenameTempToTarget(string tempPath, string targetPath) => inner.RenameTempToTarget(tempPath, targetPath);
-
-        public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => inner.TryRenameTempToNewTarget(tempPath, targetPath);
-
-        public void DeleteFile(string path) => inner.DeleteFile(path);
-
-        public bool TryCreateNewFile(string path) => inner.TryCreateNewFile(path);
-
-        public bool DirectoryExists(string path) => inner.DirectoryExists(path);
-
-        public void DeleteDirectoryIfEmpty(string path) => inner.DeleteDirectoryIfEmpty(path);
-
-        public bool CanWriteToDirectory(string path) => inner.CanWriteToDirectory(path);
-    }
-
-    private sealed class FakeConsole : ICliConsole
-    {
-        private readonly StringBuilder _output = new();
-        private readonly StringBuilder _error = new();
-
-        public TextWriter Out => new StringWriter(_output);
-
-        public TextWriter Error => new StringWriter(_error);
-
-        public string Output => _output.ToString();
-
-        public string ErrorOutput => _error.ToString();
-    }
 }

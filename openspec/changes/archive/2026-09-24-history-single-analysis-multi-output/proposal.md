@@ -27,14 +27,17 @@ fix to an already-shipped command, not new Git-analysis semantics.
 - File sinks are written with the CLI's existing atomic temp-file-then-rename pattern
   (`IFileSystem.WriteAllTextToTemp` / `RenameTempToTarget`). All file sinks are staged and
   validated before any stream sink (`stdout`/`stderr`) is written; renames are committed only
-  after every sink has produced valid content. A collision, write error, or JSON
-  Unicode/serialization failure fails the whole run closed: no sink receives a report, a
-  diagnostic is written to standard error, and the process exits non-zero. Independent files are
-  not claimed to be replaced atomically as a set — but the CLI never leaves output that a
-  consumer could mistake for a complete, successful multi-format result.
+  after every sink has produced valid content. A collision, file write/validation error during
+  staging, or JSON Unicode/serialization failure fails before publication: no sink receives a
+  report, a diagnostic is written to standard error, and the process exits non-zero. A stream
+  write or any file rename can fail after publication has begun and leave already-delivered/
+  committed output; the CLI reports explicit `partial-output` or `output-failed` evidence and
+  never describes the independent set as successful.
 - JSON written to stdout keeps going through the existing `ICliConsole.WriteCanonicalJson`
   raw-UTF8-without-BOM boundary; JSON written to `stderr` or a file uses ordinary text writes,
   matching the existing `--report` precedent on the root command.
+- Add opt-in `--timings` phase evidence and a packed before/after harness so #1016 records
+  ingestion/scoring, each renderer, process overhead and peak working set separately.
 
 ## Capabilities
 

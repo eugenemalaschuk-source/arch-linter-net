@@ -9,7 +9,14 @@ internal sealed class HistoryDiagnostic(
     string? objectId = null,
     string? path = null,
     int? spanStart = null,
-    int? spanEnd = null)
+    int? spanEnd = null,
+    string? publicationStatus = null,
+    bool publicationCancelled = false,
+    IReadOnlyList<string>? failedDestinations = null,
+    IReadOnlyList<string>? committedDestinations = null,
+    IReadOnlyList<string>? deliveredDestinations = null,
+    IReadOnlyList<string>? uncommittedDestinations = null,
+    IReadOnlyList<string>? publicationDetails = null)
 {
     public HistoryDiagnosticKind Kind { get; } = kind;
 
@@ -22,6 +29,20 @@ internal sealed class HistoryDiagnostic(
     public int? SpanStart { get; } = spanStart;
 
     public int? SpanEnd { get; } = spanEnd;
+
+    public string? PublicationStatus { get; } = publicationStatus;
+
+    public bool PublicationCancelled { get; } = publicationCancelled;
+
+    public IReadOnlyList<string> FailedDestinations { get; } = failedDestinations ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> CommittedDestinations { get; } = committedDestinations ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> DeliveredDestinations { get; } = deliveredDestinations ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> UncommittedDestinations { get; } = uncommittedDestinations ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> PublicationDetails { get; } = publicationDetails ?? Array.Empty<string>();
 
     public string KindText => Kind switch
     {
@@ -40,6 +61,8 @@ internal sealed class HistoryDiagnostic(
         HistoryDiagnosticKind.ConfigurationInvalid => "configuration_invalid",
         HistoryDiagnosticKind.TaskKeyOverlap => "task_key_overlap",
         HistoryDiagnosticKind.ReportSerializationInvalid => "report_serialization_invalid",
+        HistoryDiagnosticKind.ReportPublicationFailed => "report_publication_failed",
+        HistoryDiagnosticKind.AnalysisCancelled => "analysis_cancelled",
         _ => "unknown",
     };
 }

@@ -99,7 +99,7 @@ sequence of every analytical command in this catalog.
 | `arch-linter-net graph` | Export JSON, DOT or Mermaid dependency graphs. |
 | `arch-linter-net measure` | Measure declared architecture metrics without budget violations. |
 | `arch-linter-net history` | Investigate architecture history. |
-| `arch-linter-net history analyze --from <ref> --to <ref>` | Analyze an explicit Git range; select JSON or Markdown. |
+| `arch-linter-net history analyze --from <ref> --to <ref>` | Analyze an explicit Git range; select JSON or Markdown, repeat `--report` for one-analysis multi-output, and use `--timings` for phase evidence. |
 | `arch-linter-net policy` | Inspect/review policy. |
 | `arch-linter-net policy check --policy <path>` | Validate static configuration, not architecture compliance. |
 | `arch-linter-net policy context --policy <path> --format <json\|markdown>` | Export effective policy facts. |
@@ -120,6 +120,19 @@ sequence of every analytical command in this catalog.
 | `arch-linter-net schema` | Inspect installed schemas. |
 | `arch-linter-net schema list` | List logical IDs and packaged schema identities. |
 | `arch-linter-net schema print <logical-id>` | Print the exact installed schema bytes. |
+
+### History analysis options
+
+`history analyze` accepts an explicit Git range and can publish one analysis in
+multiple formats with repeatable `--report` sinks.
+
+| Option | Meaning |
+| --- | --- |
+| `--from`, `--to` | Required authored range endpoints. `--from` is exclusive and `--to` is inclusive. |
+| `--repository`, `--policy` | Repository root (defaults to the current directory) and optional analysis policy. |
+| `--format` | Select the legacy single-output format: `json` (default) or `markdown`. |
+| `--report` | Repeatable `format=destination` sink; destination is `stdout`, `stderr`, or a file path. Supplying it selects only the requested formats and ignores `--format`. |
+| `--timings` | Write phase timings and the ingestion invocation count to standard error. |
 
 ## Normal validation
 
@@ -157,8 +170,9 @@ pass it explicitly.
 | `--report` | Repeatable `format=destination` sinks from one completed validation. |
 
 These are validation options, not flags accepted by every subcommand. For
-example, history has one `--format`, while Health has human/JSON output and no
-SARIF renderer. Command help remains version-specific.
+example, history supports `--format` plus repeatable `--report` sinks, while
+Health has human/JSON output and no SARIF renderer. Command help remains
+version-specific.
 
 ### Build-state behavior
 

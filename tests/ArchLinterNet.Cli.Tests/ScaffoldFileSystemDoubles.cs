@@ -19,6 +19,8 @@ internal sealed class ScaffoldTestFileSystem(params string[] existingPaths) : IF
 
     public Action<string>? OnNoClobberMoveRejected { get; set; }
 
+    public Action? OnWriteAllTextToTemp { get; set; }
+
     public Dictionary<string, string> Contents { get; } = new(StringComparer.Ordinal);
 
     public bool FileExists(string path) => _existingPaths.Contains(path) || _temporaryContents.ContainsKey(path);
@@ -42,6 +44,7 @@ internal sealed class ScaffoldTestFileSystem(params string[] existingPaths) : IF
     {
         string temporaryPath = targetPath + ".tmp";
         _temporaryContents[temporaryPath] = contents;
+        OnWriteAllTextToTemp?.Invoke();
         return temporaryPath;
     }
 
