@@ -144,7 +144,7 @@ def history_cli_documentation_violations(root: Path) -> list[str]:
     source = source_path.read_text(encoding="utf-8")
     documentation = read_text(root, CLI_DOC)
     section_match = re.search(
-        r"(?ms)^### History analysis options\s*\n(?P<body>.*?)(?=^## |\Z)",
+        r"(?ms)^### History analysis options\s*\n(?P<body>.*?)(?=(?:^## )|\Z)",
         documentation,
     )
     section = section_match.group("body") if section_match is not None else ""

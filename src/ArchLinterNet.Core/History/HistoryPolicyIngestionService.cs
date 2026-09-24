@@ -26,7 +26,7 @@ internal static class HistoryPolicyIngestionService
             cancellationToken.ThrowIfCancellationRequested();
             configuration = string.IsNullOrWhiteSpace(policyPath)
                 ? new HistoryAnalysisConfiguration()
-                : new ArchitecturePolicyDocumentLoader().Load(policyPath).HistoryAnalysis;
+                : new ArchitecturePolicyDocumentLoader().Load(policyPath, cancellationToken).HistoryAnalysis;
             taskExtraction = TaskKeyExtraction.FromConfiguration(configuration);
         }
         catch (InvalidOperationException exception)
