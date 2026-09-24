@@ -1,158 +1,79 @@
 # Migration Baselines
 
-ArchLinterNet supports a **frozen-debt** workflow for repositories that already have
-architecture violations and want to enforce boundaries going forward without fixing
-everything at once.
+A finding baseline records **reviewed existing violations** so a repository can
+reject new debt without fixing all old debt at once. It is not a list that CI
+regenerates whenever a rule fails.
 
 ## Strict vs Audit
 
-- **Strict contracts** block the build on violation. Use for boundaries you want
-  enforced immediately.
-- **Audit contracts** report violations without blocking. Use for visibility during
-  a migration.
-
-Both contract types go in the same YAML file under separate sections:
-
-```yaml
-contracts:
-  strict:        # blocks on violation
-    - name: app-must-not-depend-on-infrastructure
-      source: app
-      forbidden: [infrastructure]
-      reason: This boundary is enforced now.
-
-  audit:         # reports only, doesn't block
-    - name: domain-must-not-depend-on-infrastructure
-      source: domain
-      forbidden: [infrastructure]
-      reason: Tracking for migration — will become strict in Q2.
-```
+Strict and audit collections select different sets of contracts. Use strict
+for an enforcing boundary and audit for discovery, but configure CI explicitly:
+a standalone audit command can return 1. An advisory step must preserve its
+report without making that result a required merge check. A combined
+`--mode strict,audit` command fails if either selected mode fails. See
+[exit codes](../usage/exit-codes.md).
 
 ## Ignored violations (frozen debt)
 
-The `ignored_violations` section allows you to acknowledge existing violations
-so they don't cause failures, while still preventing new ones:
+Choose the mechanism before writing an exception:
 
-```yaml
-contracts:
-  strict:
-    - name: app-boundaries
-      source: app
-      forbidden: [infrastructure]
-      ignored_violations:
-        - source_type: MyApp.App.Legacy.LegacyService
-          forbidden_reference: MyApp.Infrastructure.LegacyDb
-          reason: "Known debt — tracked in #1234"
-```
+| Mechanism | Meaning |
+| --- | --- |
+| Finding baseline | Specific existing findings accepted for migration. |
+| Structured waiver | An explicit policy exception with exact target, owner and expiry. |
+| Scope exclusion | A deliberate subject outside one governed universe, with a reason. |
 
-When a violation matches an ignored entry, it is suppressed. Any violation
-that does **not** match an ignored entry will still fail the build.
-
-This approach enables:
-
-- Freezing existing violations without fixing them immediately
-- Tracking debt with issue references
-- Gradually removing ignored entries as violations are resolved
-- Preventing regression (new violations are still caught)
+Manual `ignored_violations` and generated baseline entries are not the same
+authoring workflow. Matcher-only manual ignores are legacy compatibility input.
+In a new v2 policy, use [structured waivers](../policy-format/structured-waivers.md)
+for a temporary exception, not an old three-field matcher copied from a baseline.
+Policy v1 preserves compatibility defaults; migration to v2 is deliberate.
+Do not turn a generated baseline entry into a manual waiver by copying its YAML.
 
 ## Automated Baseline Generation
 
-ArchLinterNet can automatically generate a baseline file from the current state
-of violations. This is useful when adopting architecture rules for the first time
-on an existing codebase.
-
 ### Generate a baseline
 
+Prepare the selected build state, inspect the findings, then capture the intended
+debt. The command is an explicit local review operation:
+
 ```bash
-arch-linter-net baseline generate \
-  --config architecture/dependencies.arch.yml \
-  --output baseline.yml \
-  --reason "Initial baseline — migration tracked in #123"
+arch-linter-net baseline generate --config architecture/arch.yml \
+  --output architecture/baseline.arch.yml --reason "Reviewed migration debt"
 ```
 
-The generated file captures every current violation as an `ignored_violations`
-entry grouped by contract ID. When no selected contract uses a baseline-relative
-metric budget, newly generated baselines use format **version 2**, which carries
-a versioned, structured identity per entry instead of relying on the
-`source_type`/`forbidden_reference` display text alone. When one or more selected
-relative metric budgets need a reviewed value, generation uses **version 3**:
-it retains the finding-level entries and adds a separate top-level
-`metric_baselines` collection. Example version-2 finding output:
+Review the proposed entries and commit them with the policy. Validate with that
+baseline explicitly:
 
-```yaml
-version: 2
-baseline:
-  strict:
-    - id: app-boundaries
-      ignored_violations:
-        - source_type: MyApp.App.Legacy.LegacyService
-          forbidden_reference: MyApp.Infrastructure.LegacyDb
-          reason: "Initial baseline — migration tracked in #123"
-          identity_version: 2
-          contract_family: strict
-          kind: dependency
-          source_assembly: MyApp.App
-          target_assembly: MyApp.Infrastructure
-          target_member: MyApp.Infrastructure.LegacyDb
-          occurrence: 0
-        - source_type: MyApp.App.Old.OldController
-          forbidden_reference: MyApp.Infrastructure.SqlRepo
-          reason: "Initial baseline — migration tracked in #123"
-          identity_version: 2
-          contract_family: strict
-          kind: dependency
-          source_assembly: MyApp.App
-          target_assembly: MyApp.Infrastructure
-          target_member: MyApp.Infrastructure.SqlRepo
-          occurrence: 0
+```bash
+arch-linter-net --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml --mode strict --ensure-built
 ```
 
-`source_type`/`forbidden_reference` remain present as human-readable display
-fields, but for version 2 entries they are **not** the identity — the
-structured fields are. This is what makes two same-named types in different
-assemblies distinguishable (`source_assembly`/`target_assembly`), and what
-lets multiple distinct forbidden-call occurrences inside one source type each
-get their own entry instead of collapsing into one (`occurrence`). Fields that
-a particular contract family doesn't yet resolve (e.g. `source_member` for
-most families) are simply omitted.
+Generation writes version 2 finding identities when no selected relative metric
+budget requires scalar capture. With selected relative budgets, it writes
+version 3, preserving finding entries under `baseline` and scalar values under
+`metric_baselines`. These are baseline document versions, not policy or package
+versions.
 
-Baseline files written before this change use format **version 1** (the plain
-`(source_type, forbidden_reference)` pair as identity). They continue to load
-and match exactly as before — nothing about their behavior changes until you
-explicitly run `baseline migrate` (below).
+Version 1 finding entries use the legacy source/reference pair. Version 2 uses
+structured identity: family/kind, source and target assembly/type/member, and an
+occurrence discriminator where provided. Display text is not the structured
+identity. Let the command generate these fields instead of guessing them.
 
 ### Metric baseline capture
 
-Baseline-relative budgets are documented in
-[Architecture metrics](../policy-format/architecture-metrics.md#baseline-relative-budgets).
-They use the same `strict_metric_budgets` and `audit_metric_budgets` collections
-as absolute budgets, with either `baseline_mode: no_worse_than_baseline` or
-`baseline_mode: max_delta`. The former allows only delta `0`; the latter
-requires a non-negative `max_delta`. An optional `maximum` remains an absolute
-safety cap, so the effective threshold is the lower of baseline plus allowed
-delta and that cap. `minimum` is not valid in relative mode.
+Relative budgets use `baseline_mode: no_worse_than_baseline` or `max_delta`.
+The threshold is the reviewed value plus the allowed increase, limited by an
+optional absolute `maximum`. `minimum` is not supported for a relative budget.
+See [architecture metrics](../policy-format/architecture-metrics.md#baseline-relative-budgets).
 
-Run `baseline generate` deliberately to capture the current value of each
-unique, complete metric selected by a relative budget:
-
-```bash
-arch-linter-net baseline generate \
-  --config architecture/dependencies.arch.yml \
-  --output architecture/baseline.arch.yml \
-  --reason "Reviewed metric starting points"
-```
-
-The generated file is version 3 when selected relative budgets are present. It
-keeps ordinary finding debt under `baseline` and stores scalar metric values
-separately under `metric_baselines`. Each scalar entry uses the canonical
-identity fields `metric_identity_version`, `metric_id`, `metric_kind`,
-`native_subject`, `effective_scope`, and `value`; include `unit` when the metric
-definition has one:
+Use explicit reviewed generation to capture a complete measurement. A scalar
+entry identifies the metric definition and subject, not the budget rule ID:
 
 ```yaml
 version: 3
-baseline:
-  strict_metric_budgets: []
+baseline: {}
 metric_baselines:
   - metric_identity_version: 1
     metric_id: application-outgoing
@@ -160,467 +81,176 @@ metric_baselines:
     native_subject: application
     effective_scope: application
     value: 3
-  - metric_identity_version: 1
-    metric_id: application-footprint
-    metric_kind: component_footprint_count
-    native_subject: application
-    unit: project
-    effective_scope: application
-    value: 2
 ```
 
-Do not use a budget contract ID, contributor label, display text, or finding
-identity as the scalar key. `metric_baselines` entries are not
-`ignored_violations`: they do not suppress findings and do not participate in
-the #121 finding-level debt baseline. The existing finding-level `baseline`
-collection keeps its version-1/version-2 matching behavior independently.
-
-Relative validation fails closed when the selected version-3 baseline has no
-matching entry or when its `metric_identity_version`, metric kind, native
-subject, unit, or effective scope no longer matches the current metric
-definition. Such evidence is stale or unassessable; it is not a zero, a pass,
-or a finding-level baseline match. Ordinary validation does not refresh it.
-
-Only an explicit, reviewed `baseline generate` captures a new scalar value, and
-an incomplete measurement is never captured. `baseline update` and
-`baseline prune` operate on ordinary finding debt and preserve existing metric
-scalar values unchanged. They do not automatically update or prune those
-values; generate again, or make a reviewed manual edit, when the starting point
-should change.
+Copy `native_subject` and `effective_scope` from actual measurement output; the
+values above are illustrative. Include `unit` when the metric declares one.
+Missing, stale, ambiguous or incompatible scalar identity is unassessable, not
+zero. `baseline update` and `prune` preserve existing scalar values and do not
+recalculate them. A new scalar starting point needs generation or a reviewed
+manual edit.
 
 ### Baseline lifecycle
 
-1. **Generate** — create the baseline from current violations (`baseline generate`)
-1. **Merge** — run `arch-linter-net --policy ... --baseline baseline.yml --mode strict` to enforce boundaries going forward
-1. **Update** — run `baseline update` to add newly-introduced debt while preserving the `reason` text on entries that are still valid, without hand-editing YAML
-1. **Prune** — run `baseline prune` to remove entries whose violation has been fixed or whose contract ID no longer exists, and see exactly what was removed
-1. **Diff** — run `baseline diff` at any time to see `new`, `matched`, `resolved`, `stale`, `ambiguous`, and `configuration-error` entries without changing the file
-1. **Verify** — run `baseline verify` in CI to fail the build if the baseline has drifted out of sync (stale, ambiguous, or unknown-contract entries), keeping the baseline honest over time
-1. **Migrate** — run `baseline migrate` once, on demand, to deterministically upgrade an existing version 1 baseline to version 2's structured identity
+| Command | Writes | Main use |
+| --- | --- | --- |
+| `generate` | Explicit output | Capture current findings and selected complete scalar measurements. |
+| `diff` | No | Review current versus accepted debt. |
+| `verify` | No | Fail on invalid/drifted baseline evidence. |
+| `update` | Explicit output | Add newly reviewed finding debt; retain existing entries. |
+| `prune` | Explicit output | Remove obsolete finding entries; retain ambiguous entries. |
+| `migrate` | A distinct output | Upgrade supported legacy v1 finding identities to v2. |
 
-`generate`/`update`/`prune`/`diff`/`verify` share `--config`/`--policy`, `--mode`
-(`strict`/`audit`/`all`), `--condition-set`, and `--contract` (repeatable, restricts
-to specific contract IDs), consistent with `validate`. `migrate` shares
-`--config`/`--policy` and `--condition-set` but deliberately has no `--mode`/`--contract`
-— see below.
-
-Which command to reach for:
-
-| Command | Writes a file | Adds entries | Removes entries | Use it for |
-| --- | --- | --- | --- | --- |
-| `generate` | yes | yes (all current violations) | n/a (fresh file) | first adoption, or re-baselining from scratch |
-| `migrate` | yes (new path) | no | drops entries with no current match | one-time version 1 → version 2 identity upgrade |
-| `update` | yes | yes (newly introduced debt) | never | recording new debt without hand-editing YAML |
-| `prune` | yes | never | yes (resolved debt, unknown contract ids) | cleaning up after violations are fixed |
-| `verify` | no | no | no | CI gate: fail when the baseline has drifted |
-| `diff` | no | no | no | reviewing drift without gating |
+`generate`, `update`, `prune`, `diff` and `verify` share policy, mode,
+condition-set and contract selection. `migrate` examines the entire baseline:
+it does not accept `--mode` or `--contract`.
 
 ### Reviewing a change before it happens
 
-Every writing command previews:
+Without `--output`, a writing command presents its proposed document on stdout.
+`--dry-run` with an output path previews without writing. `--json` includes the
+proposal as `proposedContent` with classified entries and counts.
 
-- omit `--output` and the proposed document goes to **stdout**; nothing on disk is touched;
-- pass `--dry-run` with `--output` and the command reports the classification plus the proposed
-  content, and writes nothing;
-- add `--json` to get the same report as one machine-readable document, with the proposal in
-  `proposedContent`.
-
-`generate` and `migrate` refuse to replace an existing `--output` file: pass `--force` once you have
-reviewed the proposal. `update` and `prune` writing back to the same path they read (`--output` equal
-to `--baseline`) is the normal in-place step and needs no flag — naming the same file twice is the
-statement of intent. Writing over some *other* existing file requires `--force`. That comparison is
-case-sensitive: on a case-sensitive filesystem `baseline.yml` and `BASELINE.yml` are different files,
-so a case-variant spelling asks for `--force` rather than being assumed to be the same destination.
-
-Writes are atomic (temp file, then rename), so a failed write leaves the original baseline
-byte-for-byte intact. A `prune` with nothing to remove goes further and hands back its input
-document verbatim, so a no-op prune cannot reflow quoting, line endings, or blank lines.
+`generate` and `migrate` require `--force` to replace an existing destination.
+`update`/`prune` may write back to the same baseline path; another existing path
+requires `--force`. Path spelling/case matters. Writes are atomic. A no-op prune
+preserves the original document bytes rather than reformatting it.
 
 ### Entry lifecycle
 
-Every baseline subcommand classifies entries with one shared vocabulary — the same one the
-`adoption-stabilization-compatibility` capability fixes for the whole tool — so a single entry can be
-followed across commands, and across output formats:
-
 | Status | Meaning |
 | --- | --- |
-| `new` | a current finding has no exact baseline entry |
-| `matched` | an entry and a current finding have equal canonical identity |
-| `resolved` | a valid, evaluable entry has no current finding — the debt was fixed |
-| `stale` | the entry references a contract, family, source, schema, or identity form that is no longer valid or evaluable |
-| `changed` | a predecessor/successor relationship is derivable but canonical identity differs, so the entry does not suppress until reviewed |
-| `ambiguous` | more than one candidate could correspond to the entry, and the tool refuses to guess |
-| `configuration-error` | malformed, unsupported, or inconsistent input prevents safe classification |
+| `new` | A current finding has no exact accepted entry. |
+| `matched` | Accepted and current canonical identities agree. |
+| `resolved` | A valid, evaluable entry no longer has a live finding. |
+| `stale` | The contract, source or identity can no longer be validly evaluated. |
+| `changed` | A predecessor/successor is identifiable but needs review because identity changed. |
+| `ambiguous` | More than one correspondence is possible. |
+| `configuration-error` | Invalid input prevents a safe comparison. |
 
-**Only `matched` suppresses a finding.** `changed`, `stale`, `ambiguous`, and `configuration-error`
-never silently suppress one — each entry's JSON carries `suppresses` so this is readable without
-inferring it from the status.
+Use the structured `suppresses` field; do not infer suppression from similar
+messages. Only an accepted match suppresses a finding. `changed`, `stale`,
+`ambiguous` and invalid evidence are not automatic approval.
+
+Disposition is separate: `reported`, `added`, `retained` or `removed`. A resolved
+entry can be retained by update and removed by prune without changing its status.
+JSON carries all seven status counts, entries and canonical identities.
 
 ### Reviewing a requalified identity
 
-When a release adds a required semantic identity dimension, an older structured entry is never
-silently widened to cover it. Review `baseline diff` (or let `baseline verify` fail in CI), then
-use `baseline update` or a reviewed recapture to add the exact current entries. Run `baseline prune`
-only after those entries have been accepted. `changed` means a single successor is provable but
-still needs review; `stale` means the entry cannot be evaluated; `ambiguous` means several
-successors are possible and the tool refuses to guess. Reasons and `issue` metadata are carried
-only when that one-to-one relationship is deterministic.
-
-What a command *did* with an entry is a separate axis, reported as its **disposition**: `reported`
-(read-only), `added`, `retained`, or `removed`. This is how `update` and `prune` act differently on
-the same classification without either renaming it — a fixed violation is `resolved` in both, and only
-the disposition differs (`retained` vs `removed`).
-
-`--json` output carries a `counts` object keyed by the seven status names (values the command cannot
-produce are reported as `0`), a flat `entries` list in the shared vocabulary, and the full canonical
-structured identity of each entry.
+When a contract gains an identity dimension, inspect `diff`/`verify`. Review the
+new exact occurrence, add it deliberately, then prune obsolete entries. Do not
+broaden an old identity or call v1-to-v2 migration on an already-v2 document.
+Metadata is carried over only where correspondence is deterministic.
 
 ### SARIF and Testing API comparison results
 
-`baseline diff`, `baseline verify`, and `baseline migrate` also accept
-`--format sarif`. Each result carries `baseline_status` plus the canonical identity
-fields in SARIF `properties`; integrations do not need to parse its message.
-
-NUnit tests can use `ArchitectureAssertions.FromPolicy(path).WithBaseline(path)`
-and then call `DiffBaseline()`, `VerifyBaseline()`, or `MigrateBaseline()`. These
-return the typed Core outcomes, including comparison entries, identities, statuses,
-and the verification gate result.
-
-Display text is not identity: when an entry's canonical identity still matches but the live finding
-renders `forbidden_reference` differently, the entry stays `matched` and its display text is
-refreshed. `changed` is reserved for a genuine identity difference, which is why it does not suppress.
-
-**Ambiguous** is the one worth understanding. Under version 1, identity is the
-`(source_type, forbidden_reference)` pair, so a single entry can correspond to several distinct
-violations — two same-named types in different assemblies, or two forbidden calls in one type. Such
-an entry suppresses more than it was reviewed for. `verify` fails on it, `update` and `prune` carry it
-through untouched rather than guessing which identity to keep, and `migrate` is the command that
-resolves it.
-
-**Stale vs resolved** are easy to conflate: `resolved` means the entry is fine and the debt is gone;
-`stale` means the debt may well remain but the entry can no longer be evaluated — most often because
-it names a contract id the policy no longer has.
+`baseline diff`, `verify` and `migrate` accept `--format sarif`, carrying
+`baseline_status` and identity properties. Testing consumers can use
+`WithBaseline(path)` with `DiffBaseline()`, `VerifyBaseline()` or
+`MigrateBaseline()`; writing actions still belong in an explicit review workflow.
 
 ### Comments and issue metadata
 
-A reviewed baseline usually carries context. Two kinds survive an `update`/`prune`:
-
-```yaml
-# Baseline owned by the platform team.
-# Reviewed 2026-07; next review with the Q4 boundary work.
-version: 2
-baseline:
-  strict:
-    - id: app-boundaries
-      ignored_violations:
-        - source_type: MyApp.App.Legacy.LegacyService
-          forbidden_reference: MyApp.Infrastructure.LegacyDb
-          reason: "Known debt — scheduled for extraction"
-          issue: "PROJ-1234"
-          identity_version: 2
-          contract_family: strict
-          kind: dependency
-          occurrence: 0
-```
-
-- the **leading comment header** (the run of comment lines before the first content line) is
-  re-emitted verbatim above the regenerated document;
-- the optional per-entry **`issue`** field is carried through verbatim on every entry a command
-  retains, exactly like `reason`. It never participates in identity, matching, or deduplication.
-
-A comment sitting *next to* an entry cannot be preserved: the document is rebuilt from the model, and
-there is no stable position for that comment once entries are added, removed, or reordered — guessing
-would move your note onto the wrong entry. So `update`/`prune` refuse to write such a file, report the
-exact line numbers, and point at `--dry-run`, which still prints the proposed document so you can
-merge the comments in by hand. Moving those notes into the header block (or into each entry's `reason`
-/`issue`) makes the file updatable in place from then on.
-
-This covers a comment **trailing** a value, not just one on its own line — `reason: legacy debt # reviewed by Alice` is reviewed content the serializer would drop, so it blocks the rewrite too. A `#`
-inside a quoted scalar is not a comment and does not block anything.
+Update/prune preserve leading comments and retained entries' `reason`/`issue`.
+Inline comments cannot be safely reattached after restructuring, so rewriting
+such a file is refused; use `--dry-run` and merge the proposed change manually.
+A trailing unquoted `# comment` also counts as a comment. `#` inside a quoted
+value does not.
 
 ### Per-contract and per-family reasons
 
-`generate` and `update` accept repeatable reason mappings alongside `--reason`:
-
-```bash
-arch-linter-net baseline update \
-  --config architecture/dependencies.arch.yml \
-  --baseline baseline.yml \
-  --output baseline.yml \
-  --reason-for-family package_dependency="Package debt — tracked in #501" \
-  --reason-for-family composition="Composition debt — tracked in #502" \
-  --reason-for-contract app-boundaries="Extraction in progress — #503" \
-  --reason "Accepted during the Q3 adoption pass"
-```
-
-A newly added entry resolves its reason as: `--reason-for-contract` for its contract id, then
-`--reason-for-family` for its contract family (the group name without its `strict_`/`audit_` prefix —
-`package_dependency`, `composition`, `method_body`, …), then `--reason`, then the built-in default.
-Entries carried over from the existing baseline keep their recorded reason regardless of any mapping.
-A mapping without `=`, with an empty key, with empty text, or repeating a key is rejected up front
-rather than silently ignored.
+For a new entry, reason precedence is `--reason-for-contract id=text`, then
+`--reason-for-family family=text`, then `--reason`, then the default. Retained
+entries keep their reason. Malformed mappings and duplicate keys are rejected.
+The family key omits the strict/audit prefix, such as `package_dependency`.
 
 #### Update
 
 ```bash
-arch-linter-net baseline update \
-  --config architecture/dependencies.arch.yml \
-  --baseline baseline.yml \
-  --output baseline.yml \
-  --reason "Newly accepted debt — tracked in #456"
+arch-linter-net baseline update --config architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml --output architecture/baseline.arch.yml \
+  --reason "New debt accepted after review" --dry-run
 ```
 
-Entries whose identity still matches a current violation are kept unchanged,
-including their original `reason` and `issue`. New violations are appended using
-the resolved reason (see per-contract and per-family reasons above). Entries that
-no longer match any violation are reported as `resolved` and left in place —
-`update` never removes entries; that is `prune`'s job. Ambiguous entries are
-carried through untouched rather than rewritten into one guessed identity.
+Review before removing `--dry-run`. Update retains resolved and ambiguous entries;
+it does not perform pruning or refresh scalar metric values.
 
 #### Prune
 
 ```bash
-arch-linter-net baseline prune \
-  --config architecture/dependencies.arch.yml \
-  --baseline baseline.yml \
-  --output baseline.yml
+arch-linter-net baseline prune --config architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml --output architecture/baseline.arch.yml --dry-run
 ```
 
-Removes baseline entries that no longer match any current violation (`resolved`)
-or that reference a contract ID that no longer exists in the policy
-(`stale`), and reports exactly what was removed and why. Add `--json` to
-get the removed-entry list and lifecycle report as structured data, or
-`--dry-run` to see the removals before committing to them.
-
-Prune removes only entries whose exact identity matched nothing. An entry that
-matches *more than one* current violation is reported as `ambiguous` and
-retained — deleting it would drop accepted debt that is still real.
+Inspect each proposed removal. Obsolete finding entries can be removed; ambiguous
+live debt is retained rather than guessed away.
 
 #### Diff
 
 ```bash
-arch-linter-net baseline diff \
-  --config architecture/dependencies.arch.yml \
-  --baseline baseline.yml
+arch-linter-net baseline diff --config architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml --json
 ```
 
-Read-only comparison of the baseline against current violations, reporting every
-entry with its lifecycle value: **new**, **matched**, **resolved**, **stale**,
-**ambiguous**, and **configuration-error**. Never writes a file, and always exits 0 — it is a report,
-not a gate. `--json` adds lifecycle counts and each entry's canonical structured
-identity.
+Diff is a report, not a no-new-debt gate. A completed comparison can succeed while
+listing differences; malformed inputs/runtime failures still fail. Do not describe
+it as a command that always exits 0 regardless of errors.
 
 #### Verify
 
 ```bash
-arch-linter-net baseline verify \
-  --config architecture/dependencies.arch.yml \
-  --baseline baseline.yml
+arch-linter-net baseline verify --config architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml
 ```
 
-Runs the same comparison as `diff` but exits non-zero if any **resolved**, **stale**,
-or **ambiguous** entries are found — intended as a CI gate
-that keeps a baseline from silently accumulating stale debt or broadening what it
-suppresses. It does not fail on new, unbaselined violations (that's `validate`'s
-job). This is the only baseline command that belongs in CI; see
-[CI integration](ci-integration.md).
+Verify checks baseline integrity/current applicability. It is not a substitute
+for rejecting new unbaselined findings through validation or `gate`. Both verify
+and diff can be read-only CI steps; avoid duplicating a comparison already done
+by your selected gate.
 
 #### Migrate
 
 ```bash
-arch-linter-net baseline migrate \
-  --config architecture/dependencies.arch.yml \
-  --baseline baseline.yml \
-  --output baseline.v2.yml \
-  --dry-run
+arch-linter-net baseline migrate --config architecture/arch.yml \
+  --baseline architecture/baseline-v1.yml --output architecture/baseline-v2.yml --dry-run
 ```
 
-Deterministically upgrades a legacy **version 1** baseline to **version 2**'s
-structured identity. Every legacy entry, from every contract group in the
-file, is correlated against freshly collected current-codebase violations by
-its exact legacy `(source_type, forbidden_reference)` pair (matched only
-against candidates from the same contract ID):
-
-- **Exactly one match** — the entry is rewritten using that violation's full
-  structured identity; its `reason` is preserved verbatim.
-- **Zero matches** — the entry no longer corresponds to any current
-  violation. It is reported as `stale` and dropped from the migrated output
-  (the underlying debt is gone; there's nothing to migrate).
-- **More than one match** — the legacy pair is ambiguous: it could refer to
-  more than one distinct violation now that identity is structured. Migration
-  refuses to guess. The entry is reported as `ambiguous` and, outside of
-  `--dry-run`, the whole run fails closed — **no file is written** until you
-  resolve the ambiguity (typically by baselining the specific occurrences you
-  intend to keep with a fresh `baseline generate --contract <id>` pass, or by
-  accepting the new, disambiguated entries as new debt).
-
-Run `--dry-run`/`--check` first to see the classification report **and the proposed
-migrated document** without writing anything — useful as its own CI gate (exit
-code 1 if any entries are ambiguous, 0 otherwise). Once the report is clean,
-drop `--dry-run` and provide `--output` to write the migrated file; add
-`--force` if that file already exists. `baseline migrate` never writes to the
-same path as `--baseline` — pick a distinct `--output`, review it, then swap it
-in for the original file yourself. Like the other writing subcommands, it
-replaces the destination atomically.
-
-Unlike every other `baseline` subcommand, `migrate` does not accept
-`--mode`/`--contract` — it always classifies **every** entry in the file. A
-version-2 document cannot preserve version-1 matching semantics for only
-part of a file: an entry left unexamined could be exactly the kind of
-ambiguous legacy pair this command exists to catch, discoverable only by
-actually correlating it against current violations. So there is no way to
-migrate "just the strict entries" — the whole file is always classified
-and, if it's clean, upgraded together.
-
-Migration is opt-in and on-demand: nothing about `validate`, `generate`,
-`update`, `prune`, `diff`, or `verify` changes for a baseline you haven't
-migrated. Version 1 files keep working with their existing behavior
-indefinitely.
-
-`baseline migrate` only upgrades **version 1** files — it refuses to run
-against a file that already declares `version: 2`. This matters when a
-contract family gains new structured-identity fields it didn't previously
-populate (for example, `strict_composition`/`audit_composition` gained
-`source_assembly` qualification): a `version: 2` baseline generated *before*
-that change carries entries with those fields left `null`, and those entries
-will no longer structurally match the richer identity the same violations now
-produce. There is no dedicated "re-qualify a version-2 file" command, because
-`migrate`'s job is specifically the version-1-to-2 identity upgrade. Instead:
-
-1. Run `baseline update --baseline old.yml --output new.yml` — every
-   currently-passing violation gets a fresh, fully-qualified entry added; the
-   stale, unqualified entries are preserved untouched (`update` never removes
-   anything).
-1. Run `baseline prune --baseline new.yml --output new.yml` — the stale
-   unqualified entries no longer match any current violation (their identity
-   is missing fields the live violation now has), so `prune` removes them and
-   reports them as `resolved`.
-
-The result is a `version: 2` file where every entry is qualified with the
-current identity shape. This two-step `update` + `prune` sequence is the
-general answer for "a family's identity got more precise since I last
-generated," not just for composition.
+Migration correlates every legacy entry with current findings in its own
+contract. A unique match gets structured identity. Ambiguous matches prevent
+writing; inspect the classification before removing `--dry-run`. A no-longer-live
+entry is not carried forward as newly accepted debt. Use a distinct output path,
+review the result, then replace the old baseline deliberately.
 
 ### Merge semantics
 
-When `--baseline <path>` is provided, the baseline entries are merged into the
-policy's `ignored_violations` lists before validation. The merge:
-
-- Appends new entries to each contract's existing ignores
-- Reports an error if a baseline entry references a contract ID that doesn't
-  exist in the policy (exit code 2)
-- Deduplicates and matches using the **same identity notion baseline
-  comparison uses** — version 1 entries by the exact `(source_type, forbidden_reference)` pair, version 2 entries by the full structured
-  `ArchitectureViolationIdentity` (contract family, kind, source/target
-  assembly, source/target type and member, and an occurrence discriminator).
-  A version-2 entry's assembly/member/occurrence fields are exactly what
-  `validate --baseline` uses to decide whether a given violation is
-  suppressed — this is what makes `validate`, `diff`, `verify`, and `migrate`
-  agree on identity, not just the read-only comparison commands.
-
-One baseline entry always suppresses exactly one identity — two same-named
-types in different assemblies, or two distinct forbidden calls in the same
-source type, are never treated as the same entry under version 2, in
-`validate` just as much as in `diff`/`verify`.
+Validation merges the selected baseline using its identity format. It rejects
+unknown contract IDs instead of silently ignoring those entries. Two same-named
+types in different assemblies or distinct calls are not one structured finding.
+Legacy v1's weaker matcher identity needs special care when migrating ambiguity.
 
 ### Stale baseline entries
 
-Baseline entries that no longer match any current violation are detected by the
-runner's unmatched ignored violation tracking (same as manual ignores). When
-`analysis.unmatched_ignored_violations` is set to `error` (default), stale
-baseline entries produce a blocking failure, encouraging proactive cleanup.
+Resolved findings and invalid baseline references are different review cases.
+Unmatched-ignore/governance diagnostics can still block the selected workflow.
+Do not rename them all "new debt" or automatically accept replacements.
 
 ## Coverage baselines
 
-`strict_coverage` and `audit_coverage` contracts (see
-[architecture coverage](../contracts/coverage.md)) support the same
-`ignored_violations` and baseline mechanism as ordinary dependency contracts.
-This lets teams adopt coverage gates incrementally on a repository that
-already has uncovered namespaces or stale rule-input references, rather than
-having to resolve every coverage gap before turning the gate on.
-
-```bash
-arch-linter-net baseline generate \
-  --config architecture/dependencies.arch.yml \
-  --output baseline.yml \
-  --reason "Coverage baseline — tracked in #103"
-```
-
-For a `namespace`-scoped coverage contract, each currently uncovered namespace
-is captured as `source_type: <namespace>` /
-`forbidden_reference: "uncovered namespace"`:
-
-```yaml
-version: 2
-baseline:
-  strict_coverage:
-    - id: feature-namespace-coverage
-      ignored_violations:
-        - source_type: MyApp.Features.Legacy
-          forbidden_reference: "uncovered namespace"
-          reason: "Coverage baseline — tracked in #103"
-          identity_version: 2
-          contract_family: coverage
-          kind: coverage
-          target_member: "uncovered namespace"
-          occurrence: 0
-```
-
-For a `rule_input`-scoped coverage contract, each unresolved or empty-input
-rule reference is captured as `source_type: <referenced-contract-id>` /
-`forbidden_reference: <layer-name>`:
-
-```yaml
-version: 2
-baseline:
-  strict_coverage:
-    - id: rule-input-coverage
-      ignored_violations:
-        - source_type: video-to-ghost-rule
-          forbidden_reference: ghost
-          reason: "Coverage baseline — tracked in #103"
-          identity_version: 2
-          contract_family: coverage
-          kind: coverage
-          target_member: ghost
-          occurrence: 0
-```
-
-Coverage identity does not yet carry assembly/member qualification (it's
-categorical by nature — a namespace or a rule reference, not a symbol) — the
-`occurrence` discriminator alone is enough to keep distinct coverage findings
-from colliding.
-
-`validate --baseline` suppresses these baselined coverage findings while still
-reporting newly uncovered areas, exactly like ordinary dependency violations.
-Coverage baseline entries only affect coverage contract findings — they never
-suppress or otherwise interact with `strict`/`audit` dependency violations.
-A coverage baseline entry whose underlying gap has since been resolved (the
-namespace became covered, or the rule reference became resolved again) is
-reported as a stale baseline entry through the same
-`unmatched_ignored_violations` mechanism described above.
+Coverage findings participate in the same reviewed finding-debt workflow. Generate
+entries from actual coverage diagnostics; do not fabricate identity fields from
+a namespace label. A coverage entry does not suppress an ordinary dependency
+finding. Once a gap is fixed, review and remove its obsolete baseline entry.
+See [coverage contracts](../contracts/coverage.md).
 
 ## Gate new debt without rewriting the baseline
 
-After a baseline is reviewed, CI can compare complete current architecture
-results through the read-only gate:
-
 ```bash
-arch-linter-net gate \
-  --policy architecture/dependencies.arch.yml \
-  --baseline architecture/baseline.arch.yml \
-  --mode all \
-  --format json
+arch-linter-net gate --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml --mode all --ensure-built --format json
 ```
 
-Matched entries are reported as existing reviewed debt. New entries, a second
-canonical occurrence, an identically named type from another assembly, resolved
-entries, stale/configuration entries, and ambiguous entries remain distinct and
-fail the gate rather than being silently accepted. `gate` does not modify the
-file; use the explicit baseline lifecycle commands only after review.
-
-To include policy-change protection, provide the optional base/current
-effective-policy context artifacts. Those findings are a separate guardrail:
-an `error` can fail the combined gate while no persistent finding is new, while
-a `warn` or `impact_not_proven` result remains review evidence and is never
-stored in `baseline.yml` merely to make CI green.
+Gate rejects new debt and invalid/drifted persistent-debt evidence. Paired
+base/current policy contexts add the separate weakening guardrail. An error in
+that guardrail can block even with no new finding; warnings do not become fake
+baseline entries. See the [complete review workflow](single-tool-workflow.md).

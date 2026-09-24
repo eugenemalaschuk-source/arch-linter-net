@@ -28,7 +28,7 @@ nav:
       - Test adapter: usage/test-adapter.md
       - Output formats: usage/output-formats.md
       - Exit codes: usage/exit-codes.md
-      - Timings: usage/timings.md
+      - Timings and performance: usage/timings.md
   - Policy Authoring:
       - Policy format: policy-format/index.md
       - Policy imports: policy-format/imports.md
@@ -84,6 +84,8 @@ nav:
       - Extended governance adoption: guides/extended-governance-adoption.md
       - Topology review workflow: guides/topology-review-workflow.md
       - Adopt or upgrade: guides/upgrading.md
+      - External SARIF integration: guides/sarif-integration.md
+      - History forensics: guides/history-forensics.md
       - Reference entrypoints: guides/reference-entrypoints.md
       - Verify release provenance: guides/release-provenance-verification.md
       - Publish a badge to your hosting: guides/badge-direct-hosting.md
@@ -113,6 +115,8 @@ nav:
 
 exclude_docs: |
   internal/
+  /ai/feature-implementation-workflow.md
+  /ai/release-preparation-workflow.md
 
 markdown_extensions:
   - admonition

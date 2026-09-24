@@ -1,16 +1,14 @@
 # Installation
 
-ArchLinterNet is distributed through NuGet.org as a .NET tool and as reusable .NET packages.
+ArchLinterNet is distributed on NuGet.org as a .NET tool and reusable packages.
 
 ## Requirements
 
-- .NET 10 SDK or later.
-- Windows, macOS, or Linux.
-- For architecture validation, either current build outputs or an analysis configuration that can discover/build the selected projects.
+Use the .NET 10 SDK for the CLI, plus the SDKs/workloads required by the code you
+analyze. Windows, macOS and Linux are supported. Architecture checks need
+compatible compiled outputs or a policy from which the CLI can prepare them.
 
 ## Recommended: repository-local .NET tool
-
-A local tool manifest makes the resolved CLI version part of the repository rather than a developer-machine convention.
 
 ```bash
 dotnet new tool-manifest
@@ -19,16 +17,19 @@ dotnet tool restore
 dotnet arch-linter-net --help
 ```
 
-Commit `.config/dotnet-tools.json`. When upgrading:
+Create a manifest only when the repository does not already have one. Commit
+`.config/dotnet-tools.json`: it records the exact resolved package version.
+CI should restore this manifest, not select a fresh version on every run.
+
+For upgrades, select and review an exact version:
 
 ```bash
-dotnet tool update ArchLinterNet.Cli
+: "${ARCHLINTERNET_VERSION:?Set the reviewed package version}"
+dotnet tool update ArchLinterNet.Cli --version "$ARCHLINTERNET_VERSION"
 dotnet tool restore
 ```
 
-Review the manifest diff and run the repository acceptance gate before merging the upgrade.
-
-Documentation intentionally does not hard-code the current product package version. The local manifest is the version authority for a repository.
+Run the repository's checks before merging the new pin. See [upgrading](../guides/upgrading.md).
 
 ## Global .NET tool
 
@@ -39,50 +40,37 @@ dotnet tool install --global ArchLinterNet.Cli
 arch-linter-net --help
 ```
 
-A global install follows the package source and version resolution selected by the caller, so do not treat a developer's global tool as an implicit CI version policy.
+A developer's global installation is not the repository's CI version policy.
 
 ## Run from source
 
-Inside this repository:
+Inside an ArchLinterNet source checkout, use its actual self-policy:
 
 ```bash
 dotnet run --project src/ArchLinterNet.Cli -- --help
-
 dotnet run --project src/ArchLinterNet.Cli -- \
-  --policy architecture/arch.yml \
-  --mode strict
+  --policy architecture/dependencies.arch.yml --mode strict --ensure-built
 ```
 
-## Library packages
+`architecture/arch.yml` is a recommended consumer filename, not a file supplied
+in this source repository. Author that policy in your own repository following
+[First policy](../getting-started/first-policy.md).
 
-Use the testing adapter when architecture validation should run from a test project:
+## Library packages
 
 ```bash
 dotnet add package ArchLinterNet.Testing
 ```
 
-Use the core package when building a custom host or using the core application APIs:
-
-```bash
-dotnet add package ArchLinterNet.Core
-```
-
-Unity `.asmdef` validation is part of `ArchLinterNet.Core`; no separate Unity package is required.
+Use the [Testing adapter](../usage/test-adapter.md) for test-hosted checks.
+`ArchLinterNet.Core` is available for a custom host; Unity `.asmdef` validation
+is part of Core, with no separate Unity package. When the CLI analyzes a project
+that references these packages, keep the selected package set compatible with
+the pinned CLI rather than mixing arbitrary Core assembly versions.
 
 ## CI
 
-For a repository-local tool:
-
-```yaml
-- name: Restore local tools
-  run: dotnet tool restore
-
-- name: Validate architecture
-  run: dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
-```
-
-`--ensure-built` is opt-in. Without it, ArchLinterNet validates the available project/assembly state and fails closed on missing, stale, or ambiguous inputs instead of silently rebuilding.
-
-The Apple Silicon self-dogfood defect previously tracked in issue #639 is fixed on current `main` by #648. Current documentation describes the fixed `--ensure-built` behavior; release-qualified historical reproduction belongs in the provenance workflow, not in evergreen install commands.
-
-See [Getting Started](../getting-started/index.md), [CI integration](../guides/ci-integration.md), and [Adopt or Upgrade ArchLinterNet](../guides/upgrading.md).
+Use the [minimal required PR workflow](../guides/ci-integration.md).
+`--ensure-built` explicitly prepares the selected graph; without it, analysis
+does not silently rebuild missing inputs. A supported prepared-receipt consumer
+is a distinct [build-reuse path](../usage/timings.md#prepared-receipts).
