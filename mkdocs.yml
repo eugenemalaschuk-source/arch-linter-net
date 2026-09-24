@@ -22,9 +22,7 @@ nav:
       - First policy: getting-started/first-policy.md
       - Complete governance cycle: guides/single-tool-workflow.md
       - Run in CI: guides/ci-integration.md
-      - Badge adoption: guides/badge-adoption.md
-      - Turnkey badge setup: guides/badge-setup.md
-      - Badge lifecycle operations: guides/badge-lifecycle-operations.md
+      - Choose a badge publication path: guides/badge-adoption.md
   - Usage:
       - CLI: cli/index.md
       - Test adapter: usage/test-adapter.md
@@ -88,6 +86,10 @@ nav:
       - Adopt or upgrade: guides/upgrading.md
       - Reference entrypoints: guides/reference-entrypoints.md
       - Verify release provenance: guides/release-provenance-verification.md
+      - Publish a badge to your hosting: guides/badge-direct-hosting.md
+      - Experimental Relay:
+          - Setup and doctor: guides/badge-setup.md
+          - Lifecycle operations: guides/badge-lifecycle-operations.md
       - Clean architecture policy: guides/clean-architecture.md
       - Unity boundaries: guides/unity-boundaries.md
       - Troubleshooting: guides/troubleshooting.md
@@ -103,7 +105,8 @@ nav:
       - YAML schema: reference/yaml-schema.md
       - Architecture Health: reference/architecture-health.md
       - Repository metrics: reference/repository-metrics.md
-      - Badge distribution and compatibility: reference/badge-distribution.md
+      - Experimental Relay distribution: reference/badge-distribution.md
+      - ArchLinterNet repository CI: reference/repository-ci.md
       - NuGet package metadata: reference/nuget-metadata.md
       - Versioning and releases: reference/versioning-and-releases.md
       - Release process: reference/release-process.md
