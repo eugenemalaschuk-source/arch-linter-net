@@ -1,203 +1,160 @@
 # Adopt an Architecture Health badge
 
-> **Experimental / opt-in Private Relay.** Full hosted/lifecycle acceptance is
-> still pending. Included Relay code is not an adoption-stable or turnkey support
-> claim; verify the exact release or candidate and matching distribution.
-> Private repositories default to `none`: no automatic cloud setup or badge egress.
-> Stable core governance, private reports, and public `github-raw` snapshots do not
-> require Relay.
-
-Relay/OIDC is optional transport, not a prerequisite for core governance or
-private reporting. A consumer that already owns a trusted badge transport may
-independently verify exact producer provenance and publish only the canonical
-badge projection through its own trusted post-merge workflow and adopter-owned
-hosting/storage. That transport's credentials, fail-closed receipt checks,
-availability, and lifecycle remain consumer responsibilities. This is not a
-fourth ArchLinterNet transport mode, protocol, or hosted service.
-
-An Architecture Health badge is a deliberately limited public projection of
-PR-authoritative evidence, not a second architecture evaluator. Choose the
-transport and disclosure first, then use [setup](badge-setup.md) for
-executable commands and [lifecycle operations](badge-lifecycle-operations.md)
-for administration. Those guides own the command examples; this page explains
-which path to choose and what its result does, and does not, prove. The
-[distribution and compatibility reference](../reference/badge-distribution.md)
-identifies the components and immutable identities that must accompany the CLI.
-
-## Experimental support boundary
-
-Relay infrastructure belongs to the adopter. Included code and successful unit
-or package tests do not prove the complete hosted/lifecycle path on a particular
-provider account. Full adoption acceptance remains pending; no free hosting or
-SLA is promised. Existing core governance, required PR checks, private reports,
-and public static badges remain usable without adopting Relay.
-
-Experimental status is not a waiver for known security, privacy, integrity,
-data-corruption, or false-PASS defects. Unsafe or false-success paths must be
-blocked or fixed, not relabeled as acceptable experimental behavior.
-
-Bootstrap is read-only and produces a private, content-verified handoff. The
-owner applies it through a normal protected setup PR, without a GitHub App or
-PAT writer. Subsequent OIDC publication updates only Relay state: it does not
-commit a badge update to the consumer repository on every PR or renewal.
+Get the [required CI check](ci-integration.md) working first. A public badge is
+optional: it displays an ArchLinterNet result, not a GitHub workflow status,
+and it does not replace the private report or merge gate.
 
 ## Choose the disclosure boundary
 
-| Mode | Appropriate use | Publication and prerequisites |
+Choose a publication path, not a hosting product before you have a result:
+
+| Your situation | Path | Start here |
 | --- | --- | --- |
-| `none` | Private checks, reports, and artifacts without a public badge | No public URL, external badge egress, hosting account, or publication credential. This is the private default. |
-| `github-raw` | Existing public-repository static snapshots | Public repository only. Private raw URLs are rejected; do not put a token in a README URL to bypass that restriction. |
-| `relay` | Experimental, opt-in bounded-freshness publication from a private or public repository | Adopter-owned Cloudflare Worker and SQLite Durable Objects, approved disclosure, verified capabilities, and the shipped compatible bundle. No custom server code. |
+| You need private checks and reports, not a public badge. | No publication; `none` is the built-in private default. | Keep your CI artifacts private. No badge setup command or hosting account is needed. |
+| Your repository and badge data are public. | A static public snapshot, including `github-raw`. | [Public snapshots](#public-snapshots). |
+| You have, or will maintain, your own trusted publisher and hosting. | Consumer-owned direct publication, for private or public repositories. | [Publish to your hosting](badge-direct-hosting.md). |
+| You explicitly want to evaluate ArchLinterNet's Worker/Durable Object/OIDC integration. | Experimental, opt-in `relay`. | [Experimental support boundary](#experimental-support-boundary), then [setup](badge-setup.md). |
 
-Custom or authenticated URL transports are not turnkey private-publication
-paths without their own independent acceptance. Selecting a transport does not
-change the architecture policy, required PR check, or private reporting.
-`badge architecture-policy` is a separate existing badge and is unchanged.
+These are integration choices. The CLI's built-in transport modes remain
+`none`, `github-raw`, and `relay`; consumer-owned hosting is **not** a fourth
+mode, a new CLI flag, or a project-operated service. The built-in `github-raw`
+adapter rejects private repositories. That does not prohibit independently
+verified direct publication from a private repository.
 
-For Relay, explicitly approve the destination hostname, opaque alias, and one
-of the two profiles before setup writes anything:
+## Generate the payload
 
-| Profile | Approved public representation | Important limitation |
-| --- | --- | --- |
-| `headline-only/v1` | Minimal headline JSON for snapshot/Shields compatibility | No fresh-origin or current-main guarantee can be inferred from a cached image. |
-| `headline-plus-freshness/v1` | Headline plus bounded freshness, with direct stamped SVG as the default README path | The visible absolute expiry remains meaningful in a cached copy; it does not make caches revocable. |
+Produce `architecture-health.json` through the
+[complete governance workflow](single-tool-workflow.md), using the actual
+policy, baseline, contexts, and required evidence for your repository. Ordinary
+strict validation JSON is not a Health document. Then render the badge:
 
-The exact `headline-only/v1` JSON fields are `schemaVersion`, `label`, `message`,
-and `color`. Gate, Health, ignores and rules counts appear in the fixed message;
-unknown assessment/counts remain `UNASSESSABLE` and `?`, not zero.
-`headline-plus-freshness/v1` adds only `verified_at` and `valid_until`. These
-additional timestamps require their own disclosure approval; do not silently
-upgrade a headline-only registration or add free-form fields.
+```bash
+dotnet arch-linter-net badge architecture-health \
+  --input artifacts/architecture-health.json \
+  --output artifacts/architecture-health-badge.json
+```
 
-Only the approved canonical projection may leave the private workflow. Do not
-publish full Health JSON, findings, reports, source paths, repository identity,
-commit/tree SHAs, PR/run identifiers, private receipts, or raw provider
-responses. No secrets belong in URLs, README blocks, generated public output,
-or committed configuration. An opaque alias is not a promise that an observer
-cannot associate a hostname or README with the source repository.
+The badge command reads canonical Health and policy-inventory evidence without
+rerunning analysis. Its headline reports Gate, Health, explicit ignore debt,
+and effective policy controls. Counts are not a score or coverage percentage.
+`UNASSESSABLE` and `?` are unknown results, not zero debt.
 
-These are anonymous-reader limits, not a promise that infrastructure providers
-see nothing. GitHub handles repository and workflow metadata; the Relay host
-processes authentication claims and the private ownership registry. Keep the
-registry, configuration and full acceptance traces private. The runtime Relay
-is not given a source-reading PAT or GitHub App credential.
+The default headline projection contains only `schemaVersion`, `label`,
+`message`, and `color`. Publish the complete generated payload, not a
+handwritten substitute based on whether the workflow was green.
 
-## Verify the candidate and manual prerequisites
+## Choose the producing workflow
 
-Use the same verified CLI/package, configuration schema, Relay bundle,
-workflow/action pins, and manifests throughout setup and acceptance. Record the
-exact version, source commit, package and distribution checksums, publisher
-pins, and generated-output manifest in the private deployment record. A source
-checkout, a moving branch, or a successful local unit test is not evidence that
-the matching installable release assets exist or work. Do not invent a download
-URL, copy missing bundle files by hand, or mix independently chosen versions.
+For a normal PR-gated repository, the path is:
 
-The adopter must supply the hosting account, authorize scoped provider access,
-and review the real provider plan, permissions, rules/check visibility, quotas,
-and billing implications. The setup guide owns the live-inspection and
-credential procedure. A plan label is descriptive, not evidence that a private
-repository supports the required checks, Rules API visibility, OIDC trust, or
-hosting capabilities. Missing or unprovable capabilities leave publication
-unavailable; the installer must not weaken verification to make it green.
+```text
+required PR analysis -> canonical Health + badge + private provenance
+                    -> merge -> verify analyzed tree against accepted main
+                             -> publish the accepted projection
+```
 
-Review the read-only setup preview before applying it. It identifies the
-repository and owner by immutable numeric IDs, the selected base ref and
-required producer check, approved endpoint/profile, workflow pins, generated
-files, and optional renewal cadence. Inspect the generated workflow, Relay
-configuration, registry binding, and README block as an ordinary repository
-change. Preserve unrelated README content, workflows, rules, and secrets.
+A squash commit has a different commit SHA. Bind the actual analyzed commit
+and Git tree separately from the PR head and merged commit; require exact
+accepted-tree agreement. Do not assume GitHub's PR checkout is the head commit:
+it can be a synthetic merge candidate.
 
-The generated producer's Git-blob SHA is not the trusted reusable publisher's
-commit pin. Both identities must match the reviewed setup. Provider credentials
-are administrative inputs; the runtime publisher uses the approved OIDC trust
-boundary rather than a token embedded in a public URL. A fresh install must
-remain unavailable until real qualifying evidence exists.
+A repository may instead publish from an existing nightly/product lifecycle:
 
-## First authoritative PR to README
+```text
+select exact main revision -> existing build/analysis -> canonical projection
+                            -> isolated publisher -> public readback
+```
 
-Run the selected producer check in a PR, review its canonical architecture
-result, and squash-merge through the approved path. The publisher must prove
-that the qualifying PR evidence matches the current target tree and the
-required identity, workflow, and check constraints before the Relay can serve
-it as ready. A manually copied Health file, an untrusted workflow success, or a
-rescan of `main` does not substitute for that proof.
+That badge describes the selected nightly revision. A skipped nightly is not a
+new evaluation and must not refresh old evidence. Keep required PR checks even
+when the public badge follows nightly. In either design, publication does not
+start another build or analysis merely to update the image.
 
-A new valid receipt can refresh an unchanged headline; text equality alone is
-not proof that no new authoritative evaluation occurred. Conversely, an old
-healthy headline does not authorize publication for a changed tree. The setup
-guide's doctor procedure distinguishes missing first evidence, incompatible
-pins, inaccessible checks/rules, expired evidence, and endpoint problems.
+## Public snapshots
 
-Health, Gate, and violation counts come from the canonical CLI result. Relay
-publication availability is a different state: an unavailable badge means the
-public claim cannot currently be verified, not that the architecture passed or
-failed. Keep the private required PR check and report as the decision surface.
-The badge is not an instantaneous current-main oracle.
+For a public repository, an existing trusted static publisher can place the
+accepted JSON on an automation-owned branch or other public static hosting.
+Use a stable URL. Do not commit generated badge updates to your source branch
+on every PR. The built-in `github-raw` adapter is another option with its own
+reviewed registry/provenance prerequisites; it is not a generic workflow you
+can adopt just by copying an upstream configuration ID.
 
-## Renewal, expiry, and cost
+Shields can render the generated endpoint JSON. In the following README
+example, replace `OWNER`, `REPOSITORY`, `BADGE_BRANCH`, and the file path with
+your **public** snapshot location:
 
-Renewal is optional and metadata-only. It revalidates the approved evidence,
-identity, and current-tree relationship; it never re-analyzes `main` or creates
-a replacement architecture result. It cannot extend the canonical semantic
-horizon, revive a revoked alias, or repair unknown/missing evidence. Once proof
-has expired or no longer qualifies, obtain a new approved PR-authoritative
-proof rather than continually renewing the old headline.
+```markdown
+[![Architecture Health](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FOWNER%2FREPOSITORY%2FBADGE_BRANCH%2Farchitecture-health-badge.json)](https://raw.githubusercontent.com/OWNER/REPOSITORY/BADGE_BRANCH/architecture-health-badge.json)
+```
 
-The lease is bounded by both the publication lease and canonical semantic
-validity. At the origin, expiry is enforced on read even after all publishers
-and renewal jobs stop. The setup preview exposes the selected cadence and
-cost: the v1 ceiling is a 60-minute lease and no more than one renewal attempt
-per 30 minutes (48 per day). These are limits, not GitHub scheduling or uptime
-guarantees. Review private Actions billed-minute implications, Worker/Durable
-Object quotas, and the chosen provider plan; no universally free service is
-promised. Disabling renewal emits no scheduled renewal workflow.
+Never add an access token to a raw/Shields/README URL. A static snapshot has no
+request-time expiry: stopped publication can leave it visible indefinitely.
+Label it as a snapshot and provide publication evidence where appropriate.
+Use an expiry-enforcing origin when bounded freshness is required.
 
-## Diagnose origin and cached representations separately
+## Private repositories and public output
 
-Start with doctor and the Relay origin's JSON/direct SVG, then compare any
-Shields renderer, GitHub Camo proxy, browser, or offline copy. A ready origin
-with a stale proxy image and an expired/unavailable origin with an old healthy
-image are different incidents. Retain redacted reason codes and observed expiry
-in the private deployment record; do not paste provider responses or tokens
-into public issues.
+For consumer-owned hosting, use the [direct publication guide](badge-direct-hosting.md).
+A pre-provisioned Worker serving generated JSON/SVG does not require
+ArchLinterNet Relay, a Durable Object registry, OIDC bootstrap, or Relay renewal.
+You own the publisher, provider credentials, availability, and expiry behavior.
+There is no installed one-command direct publisher.
 
-Use the direct stamped SVG only after approving `headline-plus-freshness/v1`.
-Its absolute expiry is still visible when the image is cached. Neither that
-stamp nor a cache-control header recalls a previously served image. Revocation
-and read-time expiry control the origin; GitHub Camo, Shields, browsers, and
-offline copies cannot be universally recalled. A cached badge is not proof of
-current origin readiness.
+Approve the public fields and destination before enabling publication. Keep
+full Health, reports, findings, source paths, repository/PR/run identities,
+SHAs, and provenance manifests private. A minimal public headline is still a
+disclosure decision. A neutral hostname or opaque alias does not make its
+association with the repository undiscoverable.
+
+## Experimental support boundary
+
+**Private Relay is experimental / opt-in. Full hosted/lifecycle acceptance is
+still pending.** Included code and release assets are not proof of turnkey or
+adoption-stable operation. Core governance, private reports, public snapshots,
+and independently maintained direct hosting do not require Relay.
+
+Relay uses an adopter-owned Cloudflare Worker and SQLite Durable Objects with
+pinned publisher trust and GitHub OIDC. Evaluate it only with a matching
+[verified distribution](../reference/badge-distribution.md). Start with
+[setup and doctor](badge-setup.md); use the
+[lifecycle runbook](badge-lifecycle-operations.md) for renewal, rotation,
+revocation, migration, and removal. No project-hosted signup endpoint or free
+hosting/SLA is promised. Experimental status does not excuse security,
+privacy, integrity, or false-success defects.
+
+Relay's `headline-only/v1` is the four-field JSON projection.
+`headline-plus-freshness/v1` additionally discloses `verified_at` and
+`valid_until` and supports the direct stamped SVG. That extra disclosure needs
+explicit approval. The Relay lease/renewal limits and lifecycle guarantees
+belong to **Relay**, not to every consumer-owned Worker or raw snapshot.
+
+## Verify the result
+
+First read the origin JSON and, when used, its SVG without authentication.
+Compare them with the accepted projection and inspect the private publication
+record for the exact source, producer/run attempt, digest, and validity bound.
+An upload API success alone is insufficient. A new verified publication can
+have the same headline; text equality does not establish freshness or staleness.
+
+Then compare the origin with Shields and the image in GitHub's README proxy
+(Camo). A cached copy is not proof that the origin remains ready. Expiry and
+revocation at the origin cannot recall browser, proxy, or offline copies, and
+there is no fixed cache-refresh delay to promise. Do not change canonical
+counts or create cache-busting source commits to make a refresh visible.
+
+A valid failing Health result, unassessable architecture evidence, and an
+unavailable publication are different states. Keep the architecture decision
+in the canonical report; make transport failures visibly unavailable rather
+than presenting the previous healthy result as current.
 
 ## Operate, migrate, and remove
 
-Use the [lifecycle runbook](badge-lifecycle-operations.md) for status, rename,
-transfer, invalidate, revoke/tombstone, remove/uninstall, pin rotation,
-upgrade/activate, rollback, and recovery. Administrative credentials stay in
-the environment and are bound to the approved origin. Transfers require a
-fresh setup identity; restoration requires fresh publisher proof rather than
-replaying a backup. Only verified shipped bundle digests may be activated or
-rolled back. Do not silently substitute an unshipped digest or reuse a
-permanently tombstoned alias. Review publisher workflow-pin rotation separately
-from operator credential rotation. During a suspected compromise, contain
-publication and rotate the affected authority; do not promise erasure of copies
-that have already been published.
+For direct hosting, follow [publisher acceptance and operations](badge-direct-hosting.md#acceptance-and-operations).
+For Relay, use its [authenticated lifecycle procedures](badge-lifecycle-operations.md),
+including consent withdrawal and tombstones. Do not apply Relay commands to an
+unrelated Worker. Removing a README image or stopping a schedule alone does
+not revoke an already published origin or its cached copies.
 
-Use `invalidate` for a temporary suspension, `revoke` to permanently withdraw
-disclosure consent, and `remove` to uninstall. Invalidation is not a substitute
-for consent withdrawal: it makes the current payload unavailable without
-permanently tombstoning the alias. Follow the authenticated lifecycle procedure
-and verify that the origin is unavailable. For revoke/remove, also verify that
-delayed publishers and renewal attempts cannot restore readiness.
-
-A revoked or removed alias stays tombstoned. Publishing again requires a new
-alias, explicit consent, a fresh setup, and new qualifying publisher proof;
-recovery or replaying an old backup cannot undo the tombstone. When uninstalling,
-review removal of the managed README/workflow blocks and adopter-owned hosting
-resources. Keep private PR checks/reports and unrelated repository content
-intact. Stopping scheduled jobs or deleting a README block alone is not immediate
-revocation, and removing a deployment does not recall cached images.
-
-Public `github-raw` users may retain their existing static-snapshot workflow.
-Migration to Relay is an explicit new disclosure/setup decision, not a silent
-upgrade to stronger freshness guarantees. Private users may remain on `none`;
-there is no requirement to publish a badge to keep architecture governance.
+Existing public snapshots and the narrower `badge architecture-policy` command
+remain valid choices. Adopting another transport is an explicit decision, not a
+mandatory upgrade to keep the architecture gate working.

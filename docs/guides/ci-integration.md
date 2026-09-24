@@ -1,29 +1,22 @@
 # CI Integration
 
-A CI workflow should choose its mode boundary deliberately. When one workflow requires
-both strict and audit results from the same build state, use the combined
-`--mode strict,audit --ensure-built` invocation: it owns one immutable analysis
-snapshot and one snapshot-owned build/preflight preparation (including any
-post-build receipt verification), then evaluates both modes from that snapshot.
-The combined command fails when either requested mode fails. When audit is
-intentionally advisory, retain separate strict-blocking and non-blocking-audit
-steps instead; those independent CLI processes do not reuse one another's
-prepared state.
+Start with a required pull-request check. Add reviewer reports next, and public
+badge publication only when you need it. Neither a hosting account nor Relay,
+SonarCloud, Codecov, or GitHub Pages is required to use ArchLinterNet in CI.
 
-The [complete single-tool workflow](single-tool-workflow.md) shows how policy contexts, base/current
-change snapshots, an explicit baseline, required external evidence, Architecture Health, PR
-Markdown, and the Health badge compose. This page focuses on CI responsibility and transport.
-
-The provider-neutral 0.5.1 contract, offline schema commands, sequential mode,
-and safe POSIX/PowerShell/Make/Task/Tilt templates are in [0.5.1 reference
-entrypoints](reference-entrypoints.md). GitHub Actions below is one example
-provider, not a product dependency.
+This guide uses GitHub Actions. The CLI commands and exit codes also apply to
+other providers; see [reference entrypoints](reference-entrypoints.md) for shell,
+PowerShell, Make, Task, and Tilt examples.
 
 ## Recommended pull-request workflow
 
-Make complete architecture validation authoritative before merge. Do not add an ordinary
-`push: main` trigger to this same full matrix merely to replay an already-required candidate after
-merge.
+First complete [installation](../installation/index.md) and the
+[first policy](../getting-started/first-policy.md). Commit the local tool
+manifest with the exact CLI version you tested, your policy, and any reviewed
+baseline/API snapshots. The example uses `architecture/arch.yml`; change that
+path to your policy. Restore the SDKs and dependencies your solution requires.
+
+Save this as `.github/workflows/architecture.yml`:
 
 ```yaml
 name: Architecture validation
@@ -31,519 +24,267 @@ name: Architecture validation
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   architecture:
+    name: Architecture validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore tools
-        run: dotnet tool restore
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Validate architecture (strict + audit)
+      - name: Restore tools and dependencies
         run: |
-          dotnet arch-linter-net --mode strict,audit --ensure-built --no-restore \
-            --report json=architecture-results.json \
-            --report sarif=architecture-results.sarif
+          dotnet tool restore
+          dotnet restore
 
-      - name: Upload architecture diagnostics
+      - name: Validate architecture
+        run: |
+          dotnet arch-linter-net --policy architecture/arch.yml \
+            --mode strict --ensure-built --no-restore \
+            --report json=architecture-strict.json \
+            --report sarif=architecture-strict.sarif
+
+      - name: Keep diagnostics even when validation fails
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: architecture-results
+          name: architecture-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            architecture-results.json
-            architecture-results.sarif
+            architecture-strict.json
+            architecture-strict.sarif
+          if-no-files-found: warn
 ```
 
-Use `dotnet tool restore` with a local tool manifest when the repository should pin the ArchLinterNet version. Use `dotnet tool install --global ArchLinterNet.Cli` only when global installation is acceptable for your pipeline.
+After its first run, require the displayed `Architecture validation` check in
+the target branch's protection/ruleset. Test with a deliberate policy violation:
+the check must fail and prevent merge. A diagnostic upload cannot turn that
+failure into success. Missing diagnostic files may be expected after a build
+failure; the validation step still fails the job.
 
-A project may deliberately choose additional default-branch validation, but it is not required by
-ArchLinterNet semantics. ArchLinterNet's own repository keeps the complete lint, architecture,
-cross-platform, package, E2E, and packed-artifact matrix PR-authoritative. Its ordinary `main`
-workflows are focused: three Linux coverage shards produce one current-SHA canonical receipt for
-independent SonarCloud/Codecov refresh, while a separate lane publishes installable `main.N`
-development packages. Neither lane becomes a second architecture-governance implementation.
-
-## Exit code behavior
-
-| Code | Meaning | CI action |
-| --- | --- | --- |
-| `0` | The command completed and its requested validation/comparison gate passed. | Pass |
-| `1` | The command completed, but its requested validation/comparison gate failed. | Fail required jobs; expected only for deliberately non-blocking inspection. |
-| `2` | The command could not complete normally, or `health` produced a valid `gate: unassessable` result. | Fail closed; inspect structured output. |
-
-For a combined `strict,audit` command, code `1` is the aggregate result: either
-requested mode failing makes the command fail. The JSON and SARIF files above
-contain the completed result for each mode; report routing renders those
-outcomes and does not run analysis again.
-
-A failing or unassessable `health` invocation can still write a valid
-`architecture-health/v1` document while exiting `1` or `2`. A report-producing job may retain and
-schema-check that document so reviewers see the real state, but a separate required gate must still
-block the pull request. Do not globally coerce a Health exit to success.
-
-See [Exit codes](../usage/exit-codes.md) for details.
-
-## Architecture Health badge payload
-
-```bash
-arch-linter-net badge architecture-health \
-  --input architecture-health.json \
-  --output architecture-health-badge.json
-```
-
-This is a local projection over the canonical Health artifact and its canonical
-policy-inventory receipt. The primary message contains Health, accumulated
-explicit ignores, and effective policy controls. A rule count is transparency
-about configured controls, not a coverage percentage or quality score. Health,
-ignore debt, rule count, and colors belong to the CLI; CI only transports the
-complete generated JSON.
-
-For this repository, the required read-only PR Architecture Coverage job emits
-the exact payload with a bounded manifest binding repository, PR/base context,
-head SHA, head Git-tree identity, producer run, byte count, and SHA-256. A
-trusted `push main` publisher resolves the merged PR and promotes that payload
-only if the validated PR tree equals the merged `main` tree. This tree proof is
-required for squash merge: matching commit SHA alone is not sufficient.
-
-If the PR, required producer, artifact, manifest, hash, or tree proof is
-missing, stale, failed, expired, ambiguous, or invalid, the publisher replaces
-the fixed public endpoint with the CLI-generated `UNASSESSABLE · ? ignores · ? rules` payload and publication metadata. It does not reuse a prior healthy
-payload as current, rerun architecture analysis, mutate policy/baselines, or
-deploy MkDocs/GitHub Pages. The public endpoint is a fixed raw JSON file on an
-automation-owned static branch, suitable for Shields' `endpoint` image.
-
-### Verify Architecture Health badge freshness
-
-The README image links to the [canonical v2 publication receipt](https://raw.githubusercontent.com/eugenemalaschuk-source/arch-linter-net/architecture-health-badge/architecture-health-publication.json), not to a generic workflow-status result. For a current publication, inspect that receipt first. It records the repository, analyzed/base/head and merged-main commit/tree identities, pull request, producer and publisher run/attempt provenance, payload SHA-256, status/reason, and publication time. Compare the receipt's payload digest with the bytes returned by the [raw Architecture Health payload](https://raw.githubusercontent.com/eugenemalaschuk-source/arch-linter-net/architecture-health-badge/architecture-health.json). `status: unassessable` is an explicit current result, not permission to treat an older healthy payload as current.
-
-Diagnose apparent lag in layers:
-
-1. Compare the receipt's merged-main identities and payload digest with the
-   current `main` commit/tree and raw payload. If those agree, the canonical
-   publication is fresh. A new receipt can be fresh even when the deterministic
-   Gate, Health, ignore, and rule values have not changed.
-1. Request the Shields endpoint directly and compare its response with the raw
-   payload. Shields may cache the endpoint response, so this transport layer
-   can lag the canonical raw source.
-1. Compare the Shields response with the image rendered in the README. GitHub's
-   README image proxy (Camo) and rendered page can add another rendering delay.
-
-No fixed Shields or Camo delay is promised here. Do not treat an unchanged
-semantic message as stale evidence, and do not add cache-busting commits or
-mutate canonical payload values to make transport refreshes visible. The
-receipt and raw payload are the evidence for publication freshness; Shields
-and README/Camo are downstream rendering layers.
-
-### Reusable trusted promotion
-
-Consumers that need the same provenance contract can call the versioned
-reusable workflow at an approved immutable reference:
-
-```yaml
-jobs:
-  badge:
-    uses: eugenemalaschuk-source/arch-linter-net/.github/workflows/architecture-health-badge-promotion.yml@<reviewed-sha>
-    with:
-      configuration-id: <approved-registry-entry>
-      adapter: relay # github-raw, relay, or none
-      operation: publish # renew performs metadata-only revalidation
-```
-
-The configuration ID resolves to reviewed repository IDs, event/ref, producer
-workflow/job/check, artifact contract, disclosure profile, and adapter. It is
-not an arbitrary workflow, artifact, repository, URL, or source selector. The
-publisher never checks out or executes consumer main/PR code, generated
-artifacts, hooks, or inherited secrets. It validates the exact merged-tree
-relationship, workflow run and attempt, producer job, artifact bytes, manifest,
-digest, and canonical disclosure before publication.
-
-`github-raw` remains a public-repository snapshot adapter; private repositories
-must use an adopter-owned `relay` or select `none`. Renewal only revalidates
-fresh authorization, producer evidence, artifact retention, and the
-product-owned semantic horizon. It does not rerun architecture analysis or
-extend expired evidence. Missing gates, unsupported GitHub capability shapes,
-corruption, stale context, OIDC failure, and transport uncertainty produce an
-actionable unavailable result and never preserve an old ready result.
-
-The reusable workflow is a candidate component, not a publication authority.
-Its immutable component/configuration identity is handed to the existing #806
-release process; no package, tag, Relay deployment, or public release is
-created by this workflow alone.
-
-## Legacy architecture-policy badge payload
-
-`arch-linter-net badge architecture-policy --input architecture-strict.json`
-projects strict validation JSON into a Shields endpoint payload without rerunning analysis.
-It returns `0` with `passing`/`brightgreen`, `1` with `failing`/`red`, and `2` with
-`unavailable`/`red`. A workflow can use its exit status as the blocking gate while a
-badge service consumes the JSON endpoint.
-
-`arch-linter-net coverage report --input architecture-strict.json --output architecture-coverage.md`
-remains the standalone coverage projection. It is useful for a coverage artifact or local review,
-but it is not the repository's pull-request comment; use `--max-failure-diagnostics 3` for a
-compact coverage view and pass `--changed-files`, `--repo-root`, and `--diff-status failed` when
-applicable.
+Do not add the same full analysis on `push: main` solely to update a badge.
+A separate post-merge publisher can promote the accepted PR result after
+verifying its provenance and tree. An independently chosen nightly analysis is
+also possible; it must identify its own analyzed revision rather than claim to
+be the latest PR result. See [badge adoption](badge-adoption.md).
 
 ## Strict vs audit jobs
 
-Strict validation is the blocking current-architecture mode. The separate `gate` command adds
-reviewed baseline comparison and policy-weakening guardrails when CI needs an explicit no-new-debt
-decision.
+The starter workflow makes **strict** blocking. Audit is an explicit choice,
+not an extra required check to enable by copying a larger example.
 
-Audit validation is visibility for migration work. It can be uploaded as an artifact, posted to a dashboard, or inspected periodically, but it should not accidentally become the strict gate unless the team intentionally promotes the audit rule.
-
-If audit is intentionally advisory, keep the backward-compatible two-step
-workflow and make only the audit step non-blocking:
+For advisory audit, add this step and include its output in the artifact:
 
 ```yaml
-- name: Validate architecture (strict)
-  run: |
-    dotnet arch-linter-net --mode strict --ensure-built --no-restore \
-      --report json=architecture-strict.json
-
-- name: Architecture audit report
+- name: Advisory architecture audit
   if: always()
   continue-on-error: true
   run: |
-    dotnet arch-linter-net --mode audit --ensure-built --no-restore \
+    dotnet arch-linter-net --policy architecture/arch.yml \
+      --mode audit --ensure-built --no-restore \
       --report json=architecture-audit.json
 ```
 
-Each step is a separate CLI process with its own preparation. Choose this
-alternative when audit findings should remain visible without contributing to
-the blocking decision; choose the combined invocation when both mode results
-must be required from one build-state snapshot.
+When both modes are deliberately required, the combined
+`--mode strict,audit --ensure-built` invocation evaluates them from one
+immutable analysis snapshot and fails if either mode fails. Use a pinned CLI
+that supports that combined option. Separate invocations do not share
+in-memory preparation. Report sinks render completed outcomes; they do not run
+another analysis.
+
+## Build once where the workflow permits it
+
+`--ensure-built` gives the CLI responsibility for build preparation. Without
+it, the required outputs must already exist and pass preflight. Do not put an
+unnecessary `dotnet build` immediately before a CLI-owned build, or assume a
+second process reuses the first process's analysis snapshot.
+
+When your product job already builds the governed solution, run against those
+outputs with the matching configuration, framework, runtime, and policy inputs.
+For compiled-evidence/staging workflows, use the package's documented evidence
+contract; copying arbitrary `bin/` directories is not proof of compatibility.
+See [CLI build options](../cli/index.md) and
+[Unity boundaries](unity-boundaries.md).
+
+## Exit code behavior
+
+| Code | Meaning | Required CI action |
+| --- | --- | --- |
+| `0` | The requested gate passed. | Pass. |
+| `1` | Analysis/comparison completed and the requested gate failed. | Block merge. |
+| `2` | The command could not complete, or Health is unassessable. | Block merge; inspect diagnostics. |
+
+A `health` command can write a valid `architecture-health/v1` document while
+exiting `1` or `2`. Preserve it for reviewers, but preserve the failing gate as
+well. Do not apply `continue-on-error` to the entire required job or use
+`|| true` to make publication possible. See [exit codes](../usage/exit-codes.md).
 
 ## Baseline in CI
 
-For existing repositories with known debt:
+A reviewed baseline belongs to the repository, not to an automatically
+regenerated CI artifact. Pass it explicitly when required:
 
-```yaml
-- name: Validate architecture with baseline
-  run: dotnet arch-linter-net \
-    --policy architecture/dependencies.arch.yml \
-    --baseline architecture/baseline.arch.yml \
-    --mode strict
+```bash
+dotnet arch-linter-net --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml --mode strict --ensure-built
 ```
-
-The baseline should be reviewed like code and cleaned up as violations are fixed.
 
 ### New-debt gate with policy-weakening guardrails
 
-Use `gate` when CI needs one read-only decision over both exact reviewed
-persistent debt and the separate change-time policy-weakening guardrail. It is
-not a third validation mode: `strict` and `audit` retain their usual meanings,
-and `--mode all` merely collects complete candidates from both existing modes.
+For no-new-debt and policy-weakening decisions, use the
+[complete governance workflow](single-tool-workflow.md). It shows the explicit
+baseline, actual base/current policy contexts, compatible change snapshots,
+Health, and PR report commands. Both `gate` and `health` require an explicit
+baseline; the guide includes an explicit workflow-local empty baseline for a
+repository with no accepted debt.
+
+Bind the base to the event's exact base commit, not whichever `origin/main`
+happens to point to later. With the full-history checkout above, a preparation
+step can create the base worktree without persisting checkout credentials:
 
 ```yaml
-- name: Export base policy context
-  run: git worktree add --detach .ci-base origin/main && dotnet arch-linter-net policy context --policy .ci-base/architecture/dependencies.arch.yml --format json > base-policy-context.json
-
-- name: Export current policy context
-  run: dotnet arch-linter-net policy context --policy architecture/dependencies.arch.yml --format json > current-policy-context.json
-
-- name: Reject new architecture debt and policy weakening
-  run: dotnet arch-linter-net gate \
-    --policy architecture/dependencies.arch.yml \
-    --baseline architecture/baseline.arch.yml \
-    --base-context base-policy-context.json \
-    --current-context current-policy-context.json \
-    --format json > architecture-debt-gate.json
+- name: Prepare the exact review base
+  env:
+    BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  run: |
+    set -euo pipefail
+    git cat-file -e "${BASE_SHA}^{commit}"
+    git worktree add --detach "$RUNNER_TEMP/architecture-base" "$BASE_SHA"
 ```
 
-The base context must be exported from the base policy state, not reloaded from
-the current checkout. Both context artifacts must be produced with the same reviewed CLI version.
-The gate returns `1` for a new, resolved, stale, ambiguous, or configuration-error persistent-debt
-comparison and for an `error` policy-weakening finding. `warn` and
-`impact_not_proven` weakening records remain visible without becoming baseline debt. It returns `2`
-for missing/incomplete inputs or blocked complete analysis; CI must fail closed.
+Use that path as `BASE_WORKTREE` in the complete workflow. If the exact object
+is absent, fetch it through an authenticated read-only checkout or fail; do not
+substitute another revision. Use the same pinned CLI for base and candidate,
+including when the base has an older tool manifest.
 
-`gate` requires an explicit baseline path. A repository with no reviewed baseline can supply a
-workflow-local empty v3 baseline (`version: 3`, `baseline: {}`, `metric_baselines: []`) as explicit
-zero-debt authority. The command never creates that file or mutates repository policy.
-
-`gate` never writes a baseline. Use `baseline diff`, `update`, or `prune` in a
-separate reviewed maintenance change.
+Policy-context export is not a compiled base snapshot. Change reporting needs
+real compatible base build evidence. A trusted exact-base evidence producer
+can avoid rebuilding it for every PR, but reuse must verify the revision,
+CLI/schema, policy/build selectors, provenance, and digests. On a cache miss,
+prepare that exact base or report unavailable evidence, never a made-up empty
+comparison.
 
 ### CI reads baselines; it never writes them
 
-CI runs only the read-only baseline commands:
+`baseline verify` checks drift; `baseline diff` provides a read-only comparison.
+Run `generate`, `update`, `prune`, or `migrate` as a separate reviewed maintenance
+change, not as an automatic way to pass a failing check. Do not duplicate a
+baseline/weakening analysis already covered by your selected gate.
 
-```yaml
-- name: Verify the baseline is still in sync
-  run: dotnet arch-linter-net baseline verify \
-    --policy architecture/dependencies.arch.yml \
-    --baseline architecture/baseline.arch.yml
-```
+### Baseline debt semantics in the coverage gate
 
-`baseline verify` exits non-zero when the baseline has drifted — stale entries whose violation is
-gone, entries that now match more than one violation, or entries naming a contract the policy no
-longer has. `baseline diff` reports the same comparison without gating.
-
-Do **not** wire `baseline generate`, `baseline update`, `baseline prune`, or `baseline migrate` into
-a workflow that runs on every push, and do not commit their output automatically. A baseline is a
-record of debt somebody accepted; a job that regenerates it turns every new violation into
-pre-approved debt and removes the review step the file exists to create. Run those commands locally,
-review the diff, and commit it like any other change. `--dry-run` prints exactly what would change,
-which is the form worth pasting into a pull request description.
-
-If you want CI to *notice* that a baseline is out of date rather than fix it, add
-`baseline verify` as above, or `baseline update --dry-run --json` as a reporting step whose output is
-uploaded as an artifact — neither writes a file.
-
-## Baseline debt semantics in the coverage gate
-
-When architecture coverage is wired into CI as a quality gate (the repository's read-only
-architecture report producer runs on the protected pull-request candidate), baseline entries
-change how findings are reported, not whether they exist:
-
-- **Existing accepted debt** lives in the baseline file and does not fail the pull request. The strict run still reports it in `coverage_findings`/`coverage_summary`, but a finding matched by a baseline entry is treated as known debt rather than a regression.
-- **New coverage findings** — anything not matched by an existing baseline entry — fail the pull request. This is what keeps the gate "no new debt" instead of "no debt."
-- **Resolved baseline entries** become stale: once the underlying violation no longer exists, the baseline entry has nothing left to match. Stale baseline entries should be removed during normal maintenance so the baseline file reflects only real outstanding debt.
-- **Exclusions require a `reason`.** An exclusion is a deliberate, reviewed decision to leave a unit out of coverage scope — it is not a way to silently bypass the gate. Treat the `reason` field as required documentation, not boilerplate, and review exclusions the same way you'd review a baseline entry.
-
-To inspect the full-solution coverage report locally before pushing, run
-`make architecture-coverage-report`; it prints the standalone coverage Markdown and raw JSON
-view. The unified pull-request report is a separate Core/CLI projection over compatible Health and
-architecture-change artifacts.
+Accepted debt remains visible; it is not a new regression. New uncovered debt
+must not be silently accepted, resolved entries can become stale, and deliberate
+exclusions need reviewed reasons. No coverage contracts and zero findings from
+real coverage contracts are different states. See
+[migration baselines](migration-baselines.md) and
+[coverage contracts](../contracts/coverage.md).
 
 ## Secure unified Architecture PR report publication
 
-The repository renders the reviewer-facing architecture PR report with
-`arch-linter-net report pr` before any comment is written. The pull-request workflow has only
-read permission: it uploads the exact Markdown plus a bounded manifest that binds the report to
-the repository, PR number, head SHA, CI run and attempt, report schema/kind/marker, byte count,
-and SHA-256.
+Use the complete workflow to produce canonical Health and a compatible change
+report with the same execution context and mode. Then `report pr` renders
+Markdown from those files. **`health` performs analysis; `report pr` and badge
+projection do not.** Do not append every analytical command to an existing gate
+merely to obtain another presentation of the same result.
 
-The read-only producer passes trusted transport context to that CLI invocation. In GitHub Actions,
-the values are the repository base URL (`github.server_url/github.repository`), the pull request's
-current head (`github.event.pull_request.head.sha`), and the immutable workflow-attempt URL
-(`github.server_url/github.repository/actions/runs/github.run_id/attempts/github.run_attempt`). The
-attempt component is required because GitHub reuses `run_id` when a workflow is re-run:
+Keep the PR producer read-only. A separate trusted comment publisher needs only
+the permissions necessary to read its evidence and update the PR comment. It
+must verify the current PR head, exact producer workflow/job, run and attempt,
+artifact shape, size bounds, and digest before writing the exact Markdown.
+Treat downloaded files as data; never execute their contents or check out PR
+code in the privileged publisher. Fork and Dependabot evidence needs the same
+checks. Missing or stale evidence must not leave an older green report presented
+as the current head's result.
+
+The [CLI reference](../cli/index.md) documents `report pr` transport context and
+bundle navigation. Private reports stay private; publishing a small public
+badge does not authorize publishing the report bundle.
+
+## Architecture Health badge payload
+
+Once your selected analysis has produced canonical Health:
 
 ```bash
-dotnet run --no-build --project src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj -- report pr \
-  --health architecture-pr-report/architecture-health.json \
-  --change architecture-pr-report/architecture-change.json \
-  --max-details 20 \
-  --repository-url "$REPORT_REPOSITORY_URL" \
-  --head-sha "$REPORT_HEAD_SHA" \
-  --artifact-url "$REPORT_ARTIFACT_URL" \
-  --output architecture-pr-report/architecture-pr-report.md
+dotnet arch-linter-net badge architecture-health \
+  --input artifacts/architecture-health.json \
+  --output artifacts/architecture-health-badge.json
 ```
 
-Those values are navigation-only transport context. The CLI validates the HTTPS GitHub Actions
-run/artifact URL against the repository/run context and records the current head context, then places the immutable full-report
-bundle/run link outside the bounded detail sections. It does not calculate Gate or Health in YAML,
-and the link cannot change canonical evidence, status, or remediation semantics. The uploaded
-`architecture-pr-report-v1` bundle is the exact Markdown and manifest pair for that producer run;
-reviewers can use the link even when `--max-details` omits ordinary rows.
+This command produces the badge payload, not its hosting. Health, Gate, counts,
+and colors belong to the CLI. Choose [a publication path](badge-adoption.md)
+without adding another evaluator to your CI.
 
-The rendered report explains Gate and Health separately. Gate is the merge acceptance result;
-Health is the independent healthy/debt/degrading/failing/unassessable state. A `gate=pass` report
-can still be `health=debt` or `health=degrading`: the report's `Blockers` section is reserved for
-canonical blocking reasons, while its Health explanation and non-blocking debt sections retain
-advisory causes and complete lifecycle totals. Applicability, topology, external evidence,
-architecture change, remediation, and canonical navigation are each bounded independently with
-stable totals and omitted counts.
+### Reusable trusted promotion
 
-For local runs, legacy artifacts, or a producer that cannot provide a valid repository/head/run
-binding, full bundle navigation is explicitly `unavailable`. The report must not guess a URL or
-turn an absent required authority into a zero or pass. An invalid supplied transport context fails
-closed. This does not alter publication behavior: the completed-CI publisher still validates the
-manifest and current run/head/hash and moves only the exact inert Markdown bytes.
+The shipped reusable workflow's adapters are `github-raw`, `relay`, and `none`.
+**Within that workflow**, private repositories cannot use `github-raw`.
+They can use experimental Relay or keep publication disabled. This is not a
+restriction on a separately verified [consumer-owned publisher](badge-direct-hosting.md).
+Do not copy the upstream registry ID into another repository: it identifies a
+reviewed configuration, not a generic template. Relay users must verify the
+[matching distribution](../reference/badge-distribution.md) and follow
+[experimental setup](badge-setup.md).
 
-A separate completed-CI publisher is the only job with pull-request write permission. It performs
-no checkout and treats downloaded report bytes as inert data. Before updating the one sticky
-comment it verifies the current PR head, producer run identity, exact artifact shape, bounded
-sizes, manifest fields, and report hash. It neither reconstructs Architecture Health nor adds
-build, test, quality-service, or security-service status.
+### Verify Architecture Health badge freshness
 
-This separation also applies to fork and Dependabot pull requests: their producer can execute with
-read-only permissions, while the publisher never checks out or executes fork-controlled source or
-artifact content. If a report is missing, cancelled, stale, malformed, or exceeds the transport
-limit, publication fails closed and can show only a fixed integration-unavailable message. It never
-reuses an older green report as evidence for a new head. The raw strict/audit/coverage artifacts
-and the standalone coverage command remain available for drill-down.
+Check the origin bytes and their publication evidence before inspecting a
+cached README image. The [adoption guide](badge-adoption.md#verify-the-result)
+explains that sequence. For **ArchLinterNet's own public raw badge**, see the
+[repository publication receipt](../reference/repository-ci.md#architecture-health-publication).
+A static raw snapshot does not acquire Relay's read-time expiry guarantees.
 
-**All-zero counts can mean two different things.** If `coverage_summary` is an empty list, the policy defines no coverage contracts at all (`strict_coverage`/`audit_coverage` are absent) — the report's note line calls this out explicitly. That is different from a policy that *does* define coverage contracts and reports zero uncovered/stale/unknown items, which means real coverage contracts exist and nothing is currently failing them. This repository's own `architecture/dependencies.arch.yml` defines `assembly`-, `project`-, `namespace`-, and `rule_input`-scope `strict_coverage` contracts covering all four first-party assemblies, every discovered production project, their root namespaces, and the rule inputs of its source-sensitive strict rules, so the gate reflects real coverage rather than an empty, trivially-passing policy.
+## Legacy architecture-policy badge payload
+
+`badge architecture-policy --input architecture-strict.json` remains the
+narrower strict-validation projection. Its exits are `0` for passing, `1` for
+failing, and `2` for unavailable. `coverage report` remains a separate projection
+of coverage evidence, not the unified PR comment. Neither is a replacement for
+canonical Architecture Health.
 
 ## Repository badge policy
 
-ArchLinterNet's README deliberately distinguishes merge authority from
-post-merge telemetry:
+The following subjects describe **ArchLinterNet's own CI**, not prerequisites
+for consumers. They are now covered by the
+[repository CI reference](../reference/repository-ci.md): PR authority,
+post-merge SonarCloud/Codecov telemetry, README signals, and release-only Pages
+publication.
 
-- **Main quality** is the GitHub Actions badge for `main-quality.yml` on the
-  merged `main` branch. It means the current merged revision completed the
-  current-SHA coverage receipt plus SonarCloud/Codecov delivery and verification. A processed red
-  Sonar quality gate remains a warning/branch badge signal rather than making the telemetry
-  transport itself incomplete.
-- **Test coverage** is the Codecov badge explicitly scoped to `branch=main`.
-  It is refreshed by the same post-merge coverage reports.
-- **Sonar Quality Gate / Maintainability / Reliability / Security** are direct
-  SonarCloud project badges for `branch=main`; the main telemetry workflow sends
-  OpenCover/TRX plus Python coverage before ending the scanner. The direct Quality Gate badge can
-  be red while the Main quality workflow is green because the analysis was delivered and verified.
-- **Architecture Health** is a canonical ArchLinterNet badge, not a workflow
-  status. It contains Health, explicit ignore debt, and effective policy
-  controls from required PR evidence only after exact merged-tree proof. Its
-  unassessable state is explicit when that promotion proof is unavailable.
+<a id="test-coverage-with-codecov-and-sonarcloud"></a>
+<a id="codecov-auth-and-fork-behavior"></a>
+<a id="failure-mode-expectations"></a>
+<a id="sonarcloud-analysis"></a>
+<a id="pull-requests"></a>
+<a id="merged-main"></a>
+<a id="required-github-configuration"></a>
+<a id="fork-pull-requests"></a>
+<a id="automatic-analysis-caveat"></a>
+<a id="recommended-required-check"></a>
+<a id="post-merge-verification"></a>
 
-The repository's full self-policy and architecture-coverage validation remain
-required PR checks. They are not repeated after merge merely to refresh generic
-quality badges.
-
-## Test coverage with Codecov and SonarCloud
-
-This repository treats line test coverage and architecture coverage as two separate CI signals:
-
-- `make test-coverage` runs the NUnit unit bucket with `XPlat Code Coverage`, writes Cobertura XML for Codecov, writes OpenCover XML for SonarCloud, and emits TRX test result files under `test-results/`.
-- `make architecture-coverage-report` evaluates ArchLinterNet coverage contracts and prints architecture-specific Markdown + JSON diagnostics.
-
-The required PR workflow uses three isolated Linux coverage shards and aggregates
-them into the PR Sonar/Codecov path. After merge, `main-quality.yml` runs the
-same coverage shard targets independently of the full PR validation matrix,
-downloads the reports, collects Python tooling coverage, uploads Cobertura to
-Codecov, and ends a SonarCloud `main` analysis that imports the OpenCover/TRX and
-Python coverage data.
-
-That post-merge run is what keeps the README's `Main quality`, Codecov, and
-SonarCloud main-branch badges current for the merged revision.
-
-To inspect the same test-coverage input locally before pushing, run:
-
-```bash
-make test-coverage
-make test-coverage-badge
-```
-
-The first command regenerates the raw Cobertura XML reports, OpenCover XML reports, and TRX files in `test-results/`. The second command merges the Cobertura reports locally and prints the same overall line-coverage percentage that the README badge is expected to reflect once Codecov ingests the upload from `main`.
-
-### Codecov auth and fork behavior
-
-The upload steps use `CODECOV_TOKEN` from GitHub Actions secrets.
-
-- Trusted same-repository PRs may upload PR coverage; fork PRs still run the
-  coverage tests but skip secret-backed uploads because GitHub does not expose
-  repository secrets to untrusted forks.
-- The `main-quality.yml` push runs on the protected repository branch and has
-  access to the existing repository secret, so it uploads the authoritative
-  merged-main coverage.
-
-No additional secret is required by the `main.N` package workflow; GitHub
-Packages uses its job-scoped built-in `GITHUB_TOKEN` instead.
-
-### Failure mode expectations
-
-The two coverage contexts deliberately have different external-service failure
-semantics:
-
-- PR coverage execution remains required; the existing PR Codecov upload is
-  best-effort so a transient Codecov outage does not make an otherwise valid PR
-  flaky.
-- Post-merge `Main Quality Telemetry` is fail-closed for incomplete delivery: a missing token,
-  failed coverage shard or canonical inventory, scanner/upload/processing failure, unrecognized
-  Sonar result, wrong revision, missing coverage import, or failed Codecov upload makes the workflow
-  red. An explicitly processed Sonar quality-gate failure is instead surfaced as warning plus the
-  direct Sonar branch badge/dashboard state.
-
-## SonarCloud analysis
-
-SonarCloud has separate PR and merged-main roles.
-
-### Pull requests
-
-The `ci.yml` coverage/Sonar job runs SonarCloud analysis for trusted pull
-requests from branches in this repository:
-
-- The workflow checks out the repository with `fetch-depth: 0` so SonarCloud can compare a pull request branch against its base branch.
-- The scanner waits for the SonarCloud quality gate result, so the workflow fails when the Sonar quality gate fails.
-- The workflow publishes a job summary link to `https://sonarcloud.io/summary/new_code?id=<project-key>&pullRequest=<number>` so reviewers have a direct path to the SonarCloud PR analysis in addition to the GitHub PR decoration/check created by SonarCloud.
-- The gate is evaluated on new code introduced by the PR, as configured by SonarCloud for pull-request analysis.
-
-### Merged `main`
-
-`main-quality.yml` is the only ordinary post-merge Sonar path. It does not rerun
-repository lint, architecture validation, Windows/macOS test matrices, E2E, or
-packed-artifact acceptance. It runs the Linux coverage shards needed to produce
-fresh coverage evidence, performs the Sonar build inside the scanner context,
-imports .NET/Python coverage, and ends the scanner on the merged `main` commit.
-
-The main workflow fails closed when telemetry delivery cannot be trusted: missing configuration,
-coverage/inventory failure, scanner/upload/processing failure, unknown status, wrong analysis
-revision, or missing coverage import keeps `Main quality` red. If Sonar explicitly processes the
-current revision and reports `QUALITY GATE STATUS: FAILED`, the workflow records that as a warning
-and direct Sonar badge/dashboard signal while keeping the successful telemetry refresh green. This
-post-merge result never retroactively weakens or bypasses the PR merge gate.
-
-### Required GitHub configuration
-
-The repository workflow expects:
-
-- `SONAR_TOKEN` GitHub Actions secret for SonarCloud authentication.
-- `CODECOV_TOKEN` GitHub Actions secret for Codecov authentication.
-- Optional `SONAR_PROJECT_KEY` repository variable. If unset, the workflow uses the public project key `eugenemalaschuk-source_arch-linter-net`.
-- Optional `SONAR_ORGANIZATION` repository variable. If unset, the workflow uses the public organization key `eugenemalaschuk-source`.
-
-These are the existing quality-service credentials; the main package lane does not introduce a
-shared repository PAT for publication.
-
-If a trusted same-repository PR or `main` telemetry run is missing required
-SonarCloud configuration, the relevant workflow fails with an explicit
-diagnostic instead of silently claiming a completed scan.
-
-### Fork pull requests
-
-GitHub does not expose repository secrets to untrusted fork pull requests. For that reason, fork PRs do not run the trusted SonarCloud analysis path from this repository workflow. The job summary explains that the SonarCloud PR gate was skipped for that fork run, while same-repository PRs remain fail-closed.
-
-### Automatic analysis caveat
-
-The current public SonarCloud project metadata indicates that automatic analysis is enabled. For CI-based analysis with coverage import and PR quality-gate enforcement to be the source of truth, maintainers should confirm the project is using the intended CI-based analysis mode in SonarCloud and disable automatic analysis there if it would otherwise compete with the GitHub Actions scan.
-
-### Recommended required check
-
-After the first successful decorated pull request run, configure GitHub branch protection manually to require the Sonar-created PR status/check for this repository. For this repository's validated PR flow, GitHub currently renders that check as `SonarCloud Code Analysis`, but maintainers should still verify the exact displayed check name in GitHub before making it required.
-
-### Post-merge verification
-
-After merging a CI topology change:
-
-- confirm `Main Quality Telemetry` ran for the merged `main` SHA;
-- confirm its three Linux coverage shards and canonical inventory completed;
-- confirm the Codecov repository page and README coverage badge show `main` data from the merged revision;
-- confirm the SonarCloud `main` page and direct project badges refresh for the merged revision;
-- confirm an explicit processed red Sonar Quality Gate is visible as warning/direct badge state without being confused with delivery failure;
-- confirm the ordinary `CI` workflow, CodeQL push job, Windows/macOS matrices,
-  architecture coverage and packed-artifact acceptance did not rerun merely
-  because of the merge.
+These legacy section links are retained for existing README and guide links.
+See [quality telemetry and configuration](../reference/repository-ci.md#quality-telemetry).
 
 ## Azure Pipelines example
 
+After installing the required .NET SDK and committing a local tool manifest:
+
 ```yaml
-- task: DotNetCoreCLI@2
-  displayName: Restore local tools
-  inputs:
-    command: custom
-    custom: tool
-    arguments: restore
-
-- script: dotnet arch-linter-net --mode strict
-  displayName: Validate architecture
+steps:
+  - script: dotnet tool restore
+    displayName: Restore architecture tool
+  - script: dotnet restore
+    displayName: Restore dependencies
+  - script: >-
+      dotnet arch-linter-net --policy architecture/arch.yml
+      --mode strict --ensure-built --no-restore
+    displayName: Validate architecture
 ```
-
-## Documentation publication note
-
-PR CI and both ordinary `main` workflows may validate or reference documentation
-sources, but they never deploy MkDocs. GitHub Pages deployment remains owned by
-`release-nuget.yml` and runs only when the maintainer explicitly starts a real
-public release with `publish: true`.
