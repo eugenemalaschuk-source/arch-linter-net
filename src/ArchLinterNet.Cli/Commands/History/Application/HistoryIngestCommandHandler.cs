@@ -28,12 +28,6 @@ internal sealed class HistoryIngestCommandHandler(ICliConsole console, IFileSyst
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (options.Format is not ("json" or "markdown"))
-        {
-            console.Error.WriteLine($"Unsupported --format '{options.Format}'. Usage: {Usage}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
         if (options.ReportParseError is not null)
         {
             console.Error.WriteLine($"{options.ReportParseError} Usage: {Usage}");
@@ -41,6 +35,16 @@ internal sealed class HistoryIngestCommandHandler(ICliConsole console, IFileSyst
         }
 
         IReadOnlyList<HistoryReportSink> sinks = options.ReportSinks ?? Array.Empty<HistoryReportSink>();
+
+        // --format only selects the legacy single-destination stdout path; it is ignored once
+        // --report sinks take over publication, so an unrelated/default --format value must not
+        // block a --report run.
+        if (sinks.Count == 0 && options.Format is not ("json" or "markdown"))
+        {
+            console.Error.WriteLine($"Unsupported --format '{options.Format}'. Usage: {Usage}");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         string? collision = FindReportSinkCollision(sinks, options.PolicyPath);
         if (collision is not null)
         {
@@ -89,12 +93,12 @@ internal sealed class HistoryIngestCommandHandler(ICliConsole console, IFileSyst
 
         if (sinks.Any(sink => sink.Format == "json"))
         {
-            jsonContent = HistoryIngestionJsonWriter.Write(result);
             try
             {
+                jsonContent = HistoryIngestionJsonWriter.Write(result);
                 _ = _strictUtf8.GetByteCount(jsonContent);
             }
-            catch (EncoderFallbackException)
+            catch (Exception ex) when (ex is CanonicalJsonUnicodeException or EncoderFallbackException)
             {
                 console.Error.Write(HistoryDiagnosticJsonWriter.Write(new HistoryDiagnostic(
                     HistoryDiagnosticKind.ReportSerializationInvalid,
@@ -135,26 +139,44 @@ internal sealed class HistoryIngestCommandHandler(ICliConsole console, IFileSyst
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        foreach (HistoryReportSink sink in sinks
-            .Where(sink => sink.DestinationType != HistoryReportDestinationType.File)
-            .OrderBy(sink => sink.DestinationType == HistoryReportDestinationType.Stdout ? 0 : 1))
+        // Stream sinks are written only after every file sink is staged and validated above, but a
+        // stream write itself can still fail (e.g. a broken pipe on redirected stdout/stderr). That
+        // must not crash past the fail-closed boundary or leave staged-but-uncommitted temp files
+        // behind: catch it, discard the staged temps (nothing has been committed yet), and report
+        // the same way a staging failure would.
+        try
         {
-            string content = sink.Format == "json" ? jsonContent! : markdownContent!;
-            if (sink.DestinationType == HistoryReportDestinationType.Stdout)
+            foreach (HistoryReportSink sink in sinks
+                .Where(sink => sink.DestinationType != HistoryReportDestinationType.File)
+                .OrderBy(sink => sink.DestinationType == HistoryReportDestinationType.Stdout ? 0 : 1))
             {
-                if (sink.Format == "json")
+                string content = sink.Format == "json" ? jsonContent! : markdownContent!;
+                if (sink.DestinationType == HistoryReportDestinationType.Stdout)
                 {
-                    console.WriteCanonicalJson(content);
+                    if (sink.Format == "json")
+                    {
+                        console.WriteCanonicalJson(content);
+                    }
+                    else
+                    {
+                        console.Out.Write(content);
+                    }
                 }
                 else
                 {
-                    console.Out.Write(content);
+                    console.Error.Write(content);
                 }
             }
-            else
-            {
-                console.Error.Write(content);
-            }
+        }
+        catch (IOException ex)
+        {
+            DeletePendingTemps(pendingRenames);
+            WriteSinkFailureDiagnostic(
+                sinks.Where(sink => sink.DestinationType != HistoryReportDestinationType.File)
+                    .Select(sink => sink.DestinationType == HistoryReportDestinationType.Stdout ? "<stdout>" : "<stderr>")
+                    .ToArray(),
+                new[] { ex.Message });
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         List<string> failedCommits = new();
@@ -216,17 +238,20 @@ internal sealed class HistoryIngestCommandHandler(ICliConsole console, IFileSyst
         }
     }
 
-    private static string? FindReportSinkCollision(IReadOnlyList<HistoryReportSink> sinks, string? policyPath)
+    private string? FindReportSinkCollision(IReadOnlyList<HistoryReportSink> sinks, string? policyPath)
     {
         if (policyPath is null)
         {
             return null;
         }
 
-        string fullPolicyPath = Path.GetFullPath(policyPath);
         foreach (HistoryReportSink sink in sinks.Where(sink => sink.DestinationType == HistoryReportDestinationType.File))
         {
-            if (string.Equals(Path.GetFullPath(sink.FilePath!), fullPolicyPath, FileSystemPathComparison))
+            // AreSameExistingFile matches case-insensitively by path first (so a same-named
+            // destination collides on a case-insensitive filesystem even before either file
+            // exists) and falls back to real file-identity comparison for hardlinks/symlinks once
+            // both paths exist.
+            if (fileSystem.AreSameExistingFile(sink.FilePath!, policyPath))
             {
                 return $"--report destination '{sink.FilePath}' matches --policy input '{policyPath}'";
             }
@@ -234,8 +259,4 @@ internal sealed class HistoryIngestCommandHandler(ICliConsole console, IFileSyst
 
         return null;
     }
-
-    private static StringComparison FileSystemPathComparison => OperatingSystem.IsWindows()
-        ? StringComparison.OrdinalIgnoreCase
-        : StringComparison.Ordinal;
 }

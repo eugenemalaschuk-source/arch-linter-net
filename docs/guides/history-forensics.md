@@ -64,8 +64,8 @@ arch-linter-net history analyze --repository . \
 ```
 
 `--report` accepts `json` or `markdown` for `<format>` and `stdout`, `stderr`,
-or a file path for `<destination>`; it is ignored when `--format` is also
-supplied. Ingestion and scoring run exactly once regardless of how many
+or a file path for `<destination>`; `--format` is ignored when `--report` is
+also supplied. Ingestion and scoring run exactly once regardless of how many
 sinks are configured, and every destination is validated (including
 rejecting duplicate destinations and a destination that collides with
 `--policy`) before anything is written — a partial failure leaves no

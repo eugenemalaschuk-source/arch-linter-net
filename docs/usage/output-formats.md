@@ -24,7 +24,7 @@ Use the repeatable `--report <format>=<destination>` option to produce both the
 JSON and Markdown views from a single completed analysis instead of running the
 command twice — `<format>` is `json` or `markdown`, and `<destination>` is
 `stdout`, `stderr`, or a file path (for example, `--report json=history.json
---report markdown=history.md`). `--report` is ignored when `--format` is also
+--report markdown=history.md`). `--format` is ignored when `--report` is also
 supplied. Ingestion and scoring run exactly once no matter how many sinks are
 configured. Every destination is validated before any write — duplicate
 destinations and a destination that collides with `--policy` are both rejected

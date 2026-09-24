@@ -211,6 +211,60 @@ public sealed class HistoryIngestCommandHandlerTests
     }
 
     [Test]
+    public void ACaseDifferentReportDestinationCollidesWithThePolicyPath()
+    {
+        FakeConsole console = new();
+        string directory = Path.Combine(Path.GetTempPath(), "arch-linter-history-case-collision-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string policyPath = Path.Combine(directory, "policy.yml");
+        string differentlyCasedDestination = Path.Combine(directory, "POLICY.YML");
+        try
+        {
+            int exitCode = new HistoryIngestCommandHandler(console, new ScaffoldTestFileSystem()).Execute(
+                new HistoryIngestCommandOptions(
+                    directory, "HEAD", "HEAD", "json", false, policyPath,
+                    ReportSinks: new[] { new HistoryReportSink("json", HistoryReportDestinationType.File, differentlyCasedDestination) }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+                Assert.That(console.Output, Is.Empty);
+                Assert.That(console.ErrorOutput, Does.Contain("matches --policy input"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void AnInvalidFormatIsIgnoredWhenReportSinksArePresent()
+    {
+        FakeConsole console = new();
+        string outsideAnyRepository = Path.Combine(Path.GetTempPath(), "arch-linter-history-format-ignored-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideAnyRepository);
+        try
+        {
+            int exitCode = new HistoryIngestCommandHandler(console, new ScaffoldTestFileSystem()).Execute(
+                new HistoryIngestCommandOptions(
+                    outsideAnyRepository, "HEAD", "HEAD", "not-a-real-format", false,
+                    ReportSinks: new[] { new HistoryReportSink("json", HistoryReportDestinationType.File, "report.json") }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.Not.EqualTo(CliExitCodes.Success));
+                Assert.That(console.ErrorOutput, Does.Not.Contain("Unsupported --format"));
+                Assert.That(console.ErrorOutput, Does.Contain("\"kind\": \"repository_not_found\""));
+            });
+        }
+        finally
+        {
+            Directory.Delete(outsideAnyRepository, recursive: true);
+        }
+    }
+
+    [Test]
     public void AFailClosedRunWithReportSinksWritesADiagnosticAndNoResult()
     {
         FakeConsole console = new();
