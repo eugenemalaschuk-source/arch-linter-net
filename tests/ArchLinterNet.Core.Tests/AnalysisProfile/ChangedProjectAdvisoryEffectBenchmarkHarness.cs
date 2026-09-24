@@ -243,7 +243,10 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
     private static IReadOnlyDictionary<string, int> ReadCounters(JsonElement profile) =>
         profile.GetProperty("Counters").EnumerateObject()
             .Where(property => property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out _))
-            .ToDictionary(property => property.Name, property => property.Value.GetInt32(), StringComparer.Ordinal);
+            .ToDictionary(
+                property => JsonNamingPolicy.SnakeCaseLower.ConvertName(property.Name),
+                property => property.Value.GetInt32(),
+                StringComparer.Ordinal);
 
     private static IReadOnlyDictionary<string, decimal> ReadTopLevelPhases(JsonElement profile) =>
         profile.GetProperty("Phases").EnumerateArray()
