@@ -21,13 +21,13 @@ internal sealed class ScaffoldTestFileSystem(params string[] existingPaths) : IF
 
     public Dictionary<string, string> Contents { get; } = new(StringComparer.Ordinal);
 
-    public bool FileExists(string path) => _existingPaths.Contains(path);
+    public bool FileExists(string path) => _existingPaths.Contains(path) || _temporaryContents.ContainsKey(path);
 
     public Action? OnReadAllText { get; set; }
 
     public string ReadAllText(string path)
     {
-        string contents = Contents[path];
+        string contents = Contents.TryGetValue(path, out string? committed) ? committed : _temporaryContents[path];
         OnReadAllText?.Invoke();
         return contents;
     }

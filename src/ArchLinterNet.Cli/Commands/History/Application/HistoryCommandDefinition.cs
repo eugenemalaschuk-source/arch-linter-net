@@ -16,6 +16,7 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         Option<bool> enrichDotNet = new("--enrich-dotnet");
         Option<string> format = new("--format");
         format.DefaultValueFactory = _ => "json";
+        Option<string[]> report = new("--report") { AllowMultipleArgumentsPerToken = true };
         Option<bool> help = new("--help");
         help.Aliases.Add("-h");
         analyze.Options.Add(repository);
@@ -24,15 +25,32 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         analyze.Options.Add(policy);
         analyze.Options.Add(enrichDotNet);
         analyze.Options.Add(format);
+        analyze.Options.Add(report);
         analyze.Options.Add(help);
-        analyze.SetAction(result => handler.Execute(new HistoryIngestCommandOptions(
-            result.GetValue(repository) ?? ".",
-            result.GetValue(from) ?? string.Empty,
-            result.GetValue(to) ?? string.Empty,
-            result.GetValue(format) ?? "json",
-            result.GetValue(help),
-            result.GetValue(policy),
-            result.GetValue(enrichDotNet))));
+        analyze.SetAction(result =>
+        {
+            IReadOnlyList<HistoryReportSink> reportSinks = Array.Empty<HistoryReportSink>();
+            string? reportParseError = null;
+            try
+            {
+                reportSinks = HistoryReportSinkParser.Parse(result.GetValue(report));
+            }
+            catch (InvalidOperationException ex)
+            {
+                reportParseError = ex.Message;
+            }
+
+            return handler.Execute(new HistoryIngestCommandOptions(
+                result.GetValue(repository) ?? ".",
+                result.GetValue(from) ?? string.Empty,
+                result.GetValue(to) ?? string.Empty,
+                result.GetValue(format) ?? "json",
+                result.GetValue(help),
+                result.GetValue(policy),
+                result.GetValue(enrichDotNet),
+                reportSinks,
+                reportParseError));
+        });
         history.Subcommands.Add(analyze);
         return history;
     }

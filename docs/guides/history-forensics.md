@@ -51,12 +51,27 @@ arch-linter-net history analyze --repository . \
   --from "$FROM_SHA" --to "$TO_SHA" --format markdown > artifacts/history.md
 ```
 
-These are **alternative analytical invocations**. Running both performs history
-analysis twice. The current command accepts one `--format`; it does not expose
-validation's repeatable `--report` routing or a standalone history JSON renderer.
-Choose the format the workflow needs rather than adding a duplicate expensive
-run without accounting for it. Keep stderr separate from the report and preserve
-a nonzero exit; an error document is not a successful empty history report.
+These two invocations each perform history analysis once with `--format`
+selecting the single document written to standard output. To get both
+documents from **one** analysis, use the repeatable `--report
+<format>=<destination>` option instead of running the command twice:
+
+```bash
+arch-linter-net history analyze --repository . \
+  --from "$FROM_SHA" --to "$TO_SHA" \
+  --report json=artifacts/history.json \
+  --report markdown=artifacts/history.md
+```
+
+`--report` accepts `json` or `markdown` for `<format>` and `stdout`, `stderr`,
+or a file path for `<destination>`; it is ignored when `--format` is also
+supplied. Ingestion and scoring run exactly once regardless of how many
+sinks are configured, and every destination is validated (including
+rejecting duplicate destinations and a destination that collides with
+`--policy`) before anything is written — a partial failure leaves no
+destination holding a report that looks complete. Keep stderr separate from
+the report and preserve a nonzero exit; an error document is not a
+successful empty history report.
 
 ## Read the evidence
 
