@@ -60,9 +60,10 @@ namespace ArchLinterNet.Core.Tests;
 /// policy-level rather than project-scoped. This evidence task does not have a graph/catalog model
 /// precise enough to bound any of the four below the full project population.</item>
 /// </list>
-/// This taxonomy intentionally covers a representative subset, not all ~34 contract families in
-/// <c>schema/dependencies.arch.schema.json</c>; families outside this subset are not claimed to be
-/// safely bounded by any of the models below.
+/// The detailed checker models intentionally cover a representative subset of the contract families
+/// in <c>schema/dependencies.arch.schema.json</c>. <see cref="PlanContractFamily"/> maps schema
+/// family names to these reviewed models and assigns every other family an explicit
+/// <see cref="EvaluatorFamily.UnanalyzedSafeFallback"/> over the full project population.
 /// </summary>
 internal enum EvaluatorFamily
 {
@@ -71,6 +72,7 @@ internal enum EvaluatorFamily
     ContractCoListing,
     AggregatedGlobalScan,
     CoverageGraphOrCatalogWide,
+    UnanalyzedSafeFallback,
 }
 
 internal sealed record EvaluatorScope
@@ -95,6 +97,52 @@ internal sealed record EvaluatorScope
 /// </summary>
 internal static class EvaluatorFamilyScopePlanner
 {
+    public static EvaluatorScope PlanContractFamily(
+        string contractFamily,
+        IReadOnlyList<string> changedProjectIds,
+        IReadOnlyList<string> dependentsClosureIds,
+        IReadOnlyList<string> allProjectIds)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contractFamily);
+
+        return contractFamily switch
+        {
+            "layers" or "external" or "external_allow_only" or "allow_only" => Plan(
+                EvaluatorFamily.ReferenceGraphLocal,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            "cycles" => Plan(
+                EvaluatorFamily.CyclesGlobal,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            "public_api_surface" => Plan(
+                EvaluatorFamily.ContractCoListing,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            "coverage:project" or "coverage:assembly" => Plan(
+                EvaluatorFamily.AggregatedGlobalScan,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            "coverage:namespace" or "coverage:dependency_edge" or "coverage:semantic_role" or "coverage:rule_input" => Plan(
+                EvaluatorFamily.CoverageGraphOrCatalogWide,
+                changedProjectIds,
+                dependentsClosureIds,
+                allProjectIds),
+            _ => new EvaluatorScope
+            {
+                Family = EvaluatorFamily.UnanalyzedSafeFallback,
+                RequiredProjectIds = allProjectIds,
+                Reason = $"Contract family '{contractFamily}' is not represented by the reviewed #503 " +
+                    "checker taxonomy. Until its checker/fact dependencies are analyzed, the safe " +
+                    "disposition is full-population fallback; no reference-graph direction is assumed.",
+            },
+        };
+    }
+
     public static EvaluatorScope Plan(
         EvaluatorFamily family,
         IReadOnlyList<string> changedProjectIds,

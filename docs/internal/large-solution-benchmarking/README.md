@@ -126,6 +126,9 @@ documented in
 [`changed-project-advisory-analysis-evidence.md`](../changed-project-advisory-analysis-evidence.md),
 with its exact-computed closure matrix in
 [`changed-project-advisory-analysis-results.json`](../changed-project-advisory-analysis-results.json).
-Unlike the other issue-specific contracts in this directory, #503's evidence is deterministic graph
-closure computation rather than timed samples, so it runs as ordinary (non-`[Explicit]`) tests under
+The checked-in secondary timing artifact is
+[`changed-project-advisory-analysis-timing-results.json`](../changed-project-advisory-analysis-timing-results.json);
+its hardware-sensitive generator is the explicit
+`ChangedProjectAdvisoryEffectBenchmarkHarness` test. The deterministic graph-closure and family
+coverage evidence runs as ordinary (non-`[Explicit]`) tests under
 `tests/ArchLinterNet.Core.Tests/ChangedProjectAdvisoryScopePlanningTests.cs`.

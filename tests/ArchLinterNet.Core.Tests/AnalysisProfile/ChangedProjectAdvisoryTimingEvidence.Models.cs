@@ -1,0 +1,206 @@
+using System.Text.Json;
+
+namespace ArchLinterNet.Core.Tests;
+
+internal sealed record ChangedProjectAdvisoryTimingEvidenceDocument
+{
+    public const string SchemaId = "changed-project-advisory-timing-evidence/v2";
+
+    public required string EvidenceSchemaId { get; init; }
+
+    public required string Issue { get; init; }
+
+    public required string Outcome { get; init; }
+
+    public required string SourceIdentity { get; init; }
+
+    public required string Runtime { get; init; }
+
+    public required string OperatingSystem { get; init; }
+
+    public required string Architecture { get; init; }
+
+    public required string Configuration { get; init; }
+
+    public required string MeasurementBoundary { get; init; }
+
+    public required string DecisionNote { get; init; }
+
+    public required IReadOnlyList<ChangedProjectAdvisoryScaleEvidence> ScalePoints { get; init; }
+
+    public void Validate()
+    {
+        if (!string.Equals(EvidenceSchemaId, SchemaId, StringComparison.Ordinal) ||
+            !string.Equals(Issue, "#503", StringComparison.Ordinal) ||
+            !string.Equals(Outcome, "C", StringComparison.Ordinal) ||
+            SourceIdentity.Length != 40 || !SourceIdentity.All(char.IsAsciiHexDigit))
+        {
+            throw new InvalidOperationException(
+                "Changed-project timing evidence has an invalid issue/outcome identity or lacks a full source commit SHA.");
+        }
+
+        if (ScalePoints.Count < 3)
+        {
+            throw new InvalidOperationException("Changed-project timing evidence requires S/M/L scale points.");
+        }
+
+        foreach (ChangedProjectAdvisoryScaleEvidence scale in ScalePoints)
+        {
+            scale.Validate();
+        }
+    }
+}
+
+internal sealed record ChangedProjectAdvisoryScaleEvidence
+{
+    public const string ProjectScaledUpperBoundPhaseName = "contract_checks";
+
+    public required string Label { get; init; }
+
+    public required int ProjectCount { get; init; }
+
+    public required int FullProjectCount { get; init; }
+
+    public required int ScopePlanningSampleCount { get; init; }
+
+    public required decimal ScopePlanningMedianMilliseconds { get; init; }
+
+    public required decimal FullValidationMedianMilliseconds { get; init; }
+
+    public required decimal UnscaledPhaseResidualMilliseconds { get; init; }
+
+    public required decimal ProjectScaledUpperBoundPhaseMedianMilliseconds { get; init; }
+
+    public required IReadOnlyList<ChangedProjectAdvisoryEstimate> Estimates { get; init; }
+
+    public required IReadOnlyList<ChangedProjectAdvisoryTimingSample> Samples { get; init; }
+
+    public void Validate()
+    {
+        if (ProjectCount != FullProjectCount || ProjectCount < 1 ||
+            ScopePlanningSampleCount < 1 || ScopePlanningMedianMilliseconds < 0 ||
+            FullValidationMedianMilliseconds <= 0 || UnscaledPhaseResidualMilliseconds < 0 ||
+            ProjectScaledUpperBoundPhaseMedianMilliseconds < 0 || Samples.Count < 3)
+        {
+            throw new InvalidOperationException($"Invalid timing evidence scale point '{Label}'.");
+        }
+
+        if (Math.Abs(
+                FullValidationMedianMilliseconds -
+                (UnscaledPhaseResidualMilliseconds + ProjectScaledUpperBoundPhaseMedianMilliseconds)) > 0.01m)
+        {
+            throw new InvalidOperationException($"Scale point '{Label}' does not conserve its upper-bound phase model.");
+        }
+
+        foreach (ChangedProjectAdvisoryEstimate estimate in Estimates)
+        {
+            estimate.Validate(ProjectCount, FullValidationMedianMilliseconds, UnscaledPhaseResidualMilliseconds,
+                ProjectScaledUpperBoundPhaseMedianMilliseconds, ScopePlanningMedianMilliseconds);
+        }
+
+        foreach (ChangedProjectAdvisoryTimingSample sample in Samples)
+        {
+            sample.Validate(ProjectCount);
+        }
+    }
+}
+
+internal sealed record ChangedProjectAdvisoryEstimate
+{
+    public required string ChangeClass { get; init; }
+
+    public required string Disposition { get; init; }
+
+    public required int AffectedProjectCount { get; init; }
+
+    public required decimal AffectedScopeRatio { get; init; }
+
+    public required decimal ModeledAdvisoryMilliseconds { get; init; }
+
+    public required decimal ModeledUpperBoundReductionPercent { get; init; }
+
+    public required string Authority { get; init; }
+
+    public void Validate(
+        int projectCount,
+        decimal fullValidationMilliseconds,
+        decimal unscaledPhaseResidualMilliseconds,
+        decimal projectScaledUpperBoundPhaseMilliseconds,
+        decimal planningMilliseconds)
+    {
+        if (AffectedProjectCount is < 1 or > 10_000 || AffectedScopeRatio is < 0 or > 1 ||
+            ModeledAdvisoryMilliseconds < 0 || string.IsNullOrWhiteSpace(Authority) ||
+            !string.Equals(Disposition, "modeled-only", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"Invalid timing estimate for '{ChangeClass}'.");
+        }
+
+        decimal expectedRatio = (decimal)AffectedProjectCount / projectCount;
+        if (Math.Abs(AffectedScopeRatio - expectedRatio) > 0.0005m)
+        {
+            throw new InvalidOperationException($"Estimate '{ChangeClass}' has an invalid K/P ratio.");
+        }
+
+        decimal expectedMilliseconds = unscaledPhaseResidualMilliseconds +
+            (projectScaledUpperBoundPhaseMilliseconds * AffectedScopeRatio) + planningMilliseconds;
+        if (Math.Abs(ModeledAdvisoryMilliseconds - expectedMilliseconds) > 0.01m)
+        {
+            throw new InvalidOperationException($"Estimate '{ChangeClass}' has an invalid modeled duration.");
+        }
+
+        decimal expectedReduction = fullValidationMilliseconds > 0
+            ? Math.Clamp((1 - (ModeledAdvisoryMilliseconds / fullValidationMilliseconds)) * 100, -100, 100)
+            : 0;
+        if (Math.Abs(ModeledUpperBoundReductionPercent - expectedReduction) > 0.01m)
+        {
+            throw new InvalidOperationException($"Estimate '{ChangeClass}' has an invalid reduction percentage.");
+        }
+    }
+}
+
+internal sealed record ChangedProjectAdvisoryTimingSample
+{
+    public required int SampleOrdinal { get; init; }
+
+    public required string CompletionStatus { get; init; }
+
+    public required int ExitCode { get; init; }
+
+    public required bool OutputFailed { get; init; }
+
+    public required string CanonicalResultSha256 { get; init; }
+
+    public required IReadOnlyDictionary<string, int> Counters { get; init; }
+
+    public required IReadOnlyDictionary<string, decimal> TopLevelPhaseMilliseconds { get; init; }
+
+    public required JsonElement RawAnalysisProfile { get; init; }
+
+    public void Validate(int projectCount)
+    {
+        int discoveredProjects = Counters.GetValueOrDefault("discovered_project_count");
+        int selectedAssemblies = Counters.GetValueOrDefault("selected_assembly_count");
+        int retainedAssemblies = Counters.GetValueOrDefault("retained_assembly_count");
+        bool projectCountMatches = discoveredProjects == projectCount ||
+            selectedAssemblies == projectCount || retainedAssemblies == projectCount;
+        bool hasExpectedSchema = RawAnalysisProfile.TryGetProperty("SchemaId", out JsonElement schemaId) &&
+            schemaId.GetString() == "analysis-profile/v1";
+
+        if (SampleOrdinal < 1 || CompletionStatus != "Success" || ExitCode != 0 || OutputFailed ||
+            string.IsNullOrWhiteSpace(CanonicalResultSha256) || !projectCountMatches || !hasExpectedSchema)
+        {
+            throw new InvalidOperationException(
+                $"Invalid timing sample {SampleOrdinal}: status={CompletionStatus}, exit={ExitCode}, " +
+                $"outputFailed={OutputFailed}, projectCount={projectCount}, discovered={discoveredProjects}, " +
+                $"selected={selectedAssemblies}, retained={retainedAssemblies}, profileSchema=" +
+                $"{(hasExpectedSchema ? schemaId.GetString() : "missing-or-invalid")}.");
+        }
+
+        if (TopLevelPhaseMilliseconds.Count == 0 ||
+            !TopLevelPhaseMilliseconds.ContainsKey(ChangedProjectAdvisoryScaleEvidence.ProjectScaledUpperBoundPhaseName) ||
+            TopLevelPhaseMilliseconds.Values.Any(value => value < 0))
+        {
+            throw new InvalidOperationException($"Timing sample {SampleOrdinal} has no valid phase evidence.");
+        }
+    }
+}
