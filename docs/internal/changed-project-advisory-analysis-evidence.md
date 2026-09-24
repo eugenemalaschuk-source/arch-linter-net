@@ -32,8 +32,8 @@ full-population fallback through `PlanContractFamily`, rather than inheriting an
 direction. The timing artifact records three successful full-strict profiles at each of S/M/L
 synthetic #502 staged-assembly scales and a K/P model using measured fixed versus project-dependent
 phase time. It does not execute an incremental path. The combination is enough to conclude that no
-safe implementation boundary is established: modeled leaf reductions are 15.265–26.114% on this
-declared synthetic boundary, middle-position reductions are 6.541–12.636%, and global/shared changes
+safe implementation boundary is established: modeled leaf reductions are 15.460–28.621% on this
+declared synthetic boundary, middle-position reductions are 6.625–13.852%, and global/shared changes
 fall back to full validation. Those estimates are descriptive; see
 [Required decision outcome](#required-decision-outcome) for the safety basis.
 
@@ -422,13 +422,13 @@ Neither reuse candidate is made a prerequisite by this evidence.
 
   | Scale | Full strict | Fixed phases | Project-dependent | Leaf modeled reduction | Middle modeled reduction | Global/shared |
   |---|---:|---:|---:|---:|---:|---:|
-  | S (8 projects) | 705 ms | 582 ms | 123 ms | 15.265% | 6.541% | 0% |
-  | M (16 projects) | 487 ms | 380 ms | 107 ms | 20.584% | 9.598% | 0% |
-  | L (32 projects) | 486 ms | 355 ms | 131 ms | 26.114% | 12.636% | 0% |
+  | S (8 projects) | 1,562 ms | 1,286 ms | 276 ms | 15.460% | 6.625% | ≈0% |
+  | M (16 projects) | 1,158 ms | 870 ms | 288 ms | 23.302% | 10.867% | ≈0% |
+  | L (32 projects) | 2,363 ms | 1,665 ms | 698 ms | 28.621% | 13.852% | ≈0% |
 
-  The measured synthetic boundary is dominated by fixed policy/configuration work (roughly 73–83%),
+  The measured synthetic boundary is dominated by fixed policy/configuration work (roughly 70–82%),
   so K/P cannot translate into a material general PR-feedback win by itself. Planner overhead is
-  0.009–0.024 ms per measured scale point and is not the limiting factor. The complete raw profiles,
+  0.017–0.039 ms per measured scale point and is not the limiting factor. The complete raw profiles,
   counters, canonical result identities, and modeled rows are in
   [`changed-project-advisory-analysis-timing-results.json`](changed-project-advisory-analysis-timing-results.json).
 
