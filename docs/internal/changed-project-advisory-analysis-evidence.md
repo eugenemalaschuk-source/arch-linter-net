@@ -30,11 +30,14 @@ semantics design (Questions 4–6) is complete as a design sketch but, like Ques
 for that representative subset; every remaining schema family now receives an explicit conservative
 full-population fallback through `PlanContractFamily`, rather than inheriting an unreviewed graph
 direction. The timing artifact records three successful full-strict profiles at each of S/M/L
-synthetic #502 staged-assembly scales and a K/P model using measured fixed versus project-dependent
-phase time. It does not execute an incremental path. The combination is enough to conclude that no
-safe implementation boundary is established: modeled leaf reductions are 15.460–28.621% on this
-declared synthetic boundary, middle-position reductions are 6.625–13.852%, and global/shared changes
-fall back to full validation. Those estimates are descriptive; see
+synthetic #502 staged-assembly scales and an explicitly optimistic K/P upper-bound model. Only the
+measured `contract_checks` phase is treated as potentially project-scalable, and the model assumes
+all of that phase scales linearly; every other phase is held unscaled because its project-scope
+sensitivity is unproven. It does not execute an incremental path or measure realized savings. The
+combination is enough to conclude that no safe implementation boundary is established: modeled
+upper-bound leaf reductions are 5.377–10.985% on this declared synthetic boundary, middle-position
+upper bounds are 2.304–5.315%, and global/shared changes fall back to full validation. Those estimates
+are descriptive; see
 [Required decision outcome](#required-decision-outcome) for the safety basis.
 
 ## P0 consumer-normalization gate (#991)
@@ -80,9 +83,11 @@ Unity 41s, `firstice-map-editor` 249s). This task therefore:
   `uv run --project tools/pyproject.toml python tools/scripts/classify_pr_traffic_mix.py --end-ref bb533f0f2fc0d2e30addc7a4110adda26e825e68 --commit-count 300`.
 - Run the explicit `ChangedProjectAdvisoryEffectBenchmarkHarness` against the same #502 foundation
   at 8, 16, and 32 staged synthetic projects, with three successful full-strict
-  `analysis-profile/v1` samples at each scale. The harness separates measured policy/configuration
-  phases from the remaining project-dependent top-level phase time, measures pure planner overhead,
-  and calculates K/P advisory estimates without executing a partial analyzer path. It requires the
+  `analysis-profile/v1` samples at each scale. The harness holds every measured phase unscaled except
+  `contract_checks`, which is treated as wholly project-scalable only to produce an optimistic upper
+  bound; `load_and_setup`, `build_state_preflight`, `post_processing`, `repository_metrics`, and all
+  other phases stay unscaled. This is not a measured decomposition of incremental work. It measures
+  pure planner overhead and calculates K/P upper bounds without executing a partial analyzer path. It requires the
   full SHA of the clean checked-out source commit in `ARCH_LINTER_SOURCE_SHA`. Reproduce with:
   `ARCH_LINTER_SOURCE_SHA=$(git rev-parse HEAD) dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~ChangedProjectAdvisoryEffectBenchmarkHarness`.
 
@@ -418,17 +423,21 @@ Neither reuse candidate is made a prerequisite by this evidence.
   widening, never silently narrowed).
 
 - **Secondary timing/effect evidence**: the explicit harness measures full-strict phase time at S/M/L
-  scales and applies the deterministic K/P model. It is not an incremental execution benchmark:
+  scales and applies an explicitly optimistic K/P upper-bound model. Only `contract_checks` is allowed
+  to scale; setup, preflight, post-processing, repository metrics, policy/configuration, and any other
+  phase remain unscaled. The model assumes the entire `contract_checks` phase scales linearly, which
+  is itself an upper-bound assumption rather than measured incremental behavior. It is not an
+  incremental execution benchmark:
 
-  | Scale | Full strict | Fixed phases | Project-dependent | Leaf modeled reduction | Middle modeled reduction | Global/shared |
+  | Scale | Full strict | Unscaled phase residual | `contract_checks` upper-bound phase | Leaf modeled upper bound | Middle modeled upper bound | Global/shared |
   |---|---:|---:|---:|---:|---:|---:|
-  | S (8 projects) | 1,562 ms | 1,286 ms | 276 ms | 15.460% | 6.625% | ≈0% |
-  | M (16 projects) | 1,158 ms | 870 ms | 288 ms | 23.302% | 10.867% | ≈0% |
-  | L (32 projects) | 2,363 ms | 1,665 ms | 698 ms | 28.621% | 13.852% | ≈0% |
+  | S (8 projects) | 1,562 ms | 1,466 ms | 96 ms | 5.377% | 2.304% | ≈0% |
+  | M (16 projects) | 1,158 ms | 1,054 ms | 104 ms | 8.418% | 3.928% | ≈0% |
+  | L (32 projects) | 2,363 ms | 2,095 ms | 268 ms | 10.985% | 5.315% | ≈0% |
 
-  The measured synthetic boundary is dominated by fixed policy/configuration work (roughly 70–82%),
-  so K/P cannot translate into a material general PR-feedback win by itself. Planner overhead is
-  0.017–0.039 ms per measured scale point and is not the limiting factor. The complete raw profiles,
+  These are modeled upper bounds, not measured reductions: all phase time except `contract_checks`
+  stays unscaled, while even the eligible phase may contain work that cannot safely be narrowed.
+  Planner overhead is 0.017–0.039 ms per measured scale point and is not the limiting factor. The complete raw profiles,
   counters, canonical result identities, and modeled rows are in
   [`changed-project-advisory-analysis-timing-results.json`](changed-project-advisory-analysis-timing-results.json).
 

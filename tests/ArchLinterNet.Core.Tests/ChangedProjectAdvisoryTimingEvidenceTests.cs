@@ -7,6 +7,11 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 internal sealed class ChangedProjectAdvisoryTimingEvidenceTests
 {
+    private static readonly string[] _unscaledRepositoryWidePhaseNames =
+    [
+        "load_and_setup", "build_state_preflight", "post_processing", "repository_metrics",
+    ];
+
     [Test]
     public void CheckedInTimingEvidenceRetainsMeasuredFullStrictProfilesAndModeledFallbacks()
     {
@@ -43,6 +48,16 @@ internal sealed class ChangedProjectAdvisoryTimingEvidenceTests
                     Is.EqualTo(1m), scale.Label);
                 Assert.That(scale.Samples.Select(sample => sample.CanonicalResultSha256).Distinct().ToList(),
                     Has.Count.EqualTo(1), scale.Label);
+                decimal contractChecksMedian = Median(scale.Samples.Select(sample =>
+                    sample.TopLevelPhaseMilliseconds[ChangedProjectAdvisoryScaleEvidence.ProjectScaledUpperBoundPhaseName]));
+                Assert.That(scale.ProjectScaledUpperBoundPhaseMedianMilliseconds, Is.EqualTo(contractChecksMedian), scale.Label);
+                Assert.That(scale.UnscaledPhaseResidualMilliseconds,
+                    Is.EqualTo(scale.FullValidationMedianMilliseconds - contractChecksMedian), scale.Label);
+                Assert.That(scale.Samples.All(sample => _unscaledRepositoryWidePhaseNames.All(phaseName =>
+                    sample.TopLevelPhaseMilliseconds.ContainsKey(phaseName))), Is.True,
+                    $"Setup, preflight, post-processing, and repository-metrics phases must remain in the unscaled residual for {scale.Label}.");
+                Assert.That(scale.Estimates.All(estimate => estimate.ModeledUpperBoundReductionPercent <=
+                    (contractChecksMedian / scale.FullValidationMedianMilliseconds * 100m) + 0.01m), Is.True, scale.Label);
             });
         }
     }
@@ -66,5 +81,14 @@ internal sealed class ChangedProjectAdvisoryTimingEvidenceTests
     {
         using JsonDocument document = JsonDocument.Parse(json);
         return document.RootElement.GetProperty("source_identity").GetString()!;
+    }
+
+    private static decimal Median(IEnumerable<decimal> values)
+    {
+        decimal[] sorted = values.Order().ToArray();
+        int middle = sorted.Length / 2;
+        return sorted.Length % 2 == 0
+            ? (sorted[middle - 1] + sorted[middle]) / 2
+            : sorted[middle];
     }
 }

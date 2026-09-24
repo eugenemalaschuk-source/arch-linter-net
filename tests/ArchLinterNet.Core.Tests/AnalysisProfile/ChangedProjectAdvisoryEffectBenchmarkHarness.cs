@@ -24,10 +24,6 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
     {
         "render_human", "render_json", "render_sarif", "output_staging", "output_stream_write", "output_commit",
     };
-    private static readonly HashSet<string> _fixedPhaseNames = new(StringComparer.Ordinal)
-    {
-        "policy_composition", "configuration_check", "policy_consistency_check",
-    };
 
     [Test]
     public void RunChangedProjectAdvisoryEffectMatrix()
@@ -61,8 +57,9 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
             Configuration = "Debug; staged assemblies; strict; max-parallelism=1",
             MeasurementBoundary = "Full strict analysis-profile/v1 phases only; fixture restore/build and output rendering are excluded. " +
-                "The advisory values are modeled from measured fixed/project-dependent phase shares plus measured planner overhead; " +
-                "no partial analyzer execution is claimed.",
+                "Only the measured contract_checks phase is treated as project-scalable, and then only as an optimistic upper bound; " +
+                "all other phases (including setup, preflight, post-processing, and repository metrics) remain unscaled. " +
+                "No partial analyzer execution or realized savings are claimed.",
             DecisionNote = "Outcome C: the timing model shows where K/P could reduce project-dependent work, but ownership " +
                 "resolution from evaluated MSBuild Compile items and family-specific correctness remain unsafe for an implementation " +
                 "while #991 is open. Full strict validation remains authoritative; no implementation child is justified by this evidence.",
@@ -78,8 +75,8 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
         {
             TestContext.Out.WriteLine(
                 $"{scale.Label} P={scale.ProjectCount}: full={scale.FullValidationMedianMilliseconds:F1}ms " +
-                $"fixed={scale.FixedPhaseMedianMilliseconds:F1}ms " +
-                $"project-dependent={scale.ProjectDependentPhaseMedianMilliseconds:F1}ms " +
+                $"unscaled-residual={scale.UnscaledPhaseResidualMilliseconds:F1}ms " +
+                $"contract-checks-upper-bound={scale.ProjectScaledUpperBoundPhaseMedianMilliseconds:F1}ms " +
                 $"planner={scale.ScopePlanningMedianMilliseconds:F3}ms");
         }
     }
@@ -89,8 +86,8 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
         IReadOnlyList<ChangedProjectAdvisoryTimingSample> samples)
     {
         decimal fullMilliseconds = Median(samples.Select(FullMilliseconds));
-        decimal fixedMilliseconds = Median(samples.Select(FixedMilliseconds));
-        decimal projectDependentMilliseconds = fullMilliseconds - fixedMilliseconds;
+        decimal projectScaledUpperBoundMilliseconds = Median(samples.Select(ProjectScaledUpperBoundMilliseconds));
+        decimal unscaledPhaseResidualMilliseconds = fullMilliseconds - projectScaledUpperBoundMilliseconds;
         decimal planningMilliseconds = MeasurePlanner(workload);
         var estimates = new List<ChangedProjectAdvisoryEstimate>();
         AddEstimate("leaf-project-source-change", ChangedInputKind.ProjectOwnedSourceFile, workload.Projects[0].Id);
@@ -108,8 +105,8 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             ScopePlanningSampleCount = 1_000,
             ScopePlanningMedianMilliseconds = planningMilliseconds,
             FullValidationMedianMilliseconds = fullMilliseconds,
-            FixedPhaseMedianMilliseconds = fixedMilliseconds,
-            ProjectDependentPhaseMedianMilliseconds = projectDependentMilliseconds,
+            UnscaledPhaseResidualMilliseconds = unscaledPhaseResidualMilliseconds,
+            ProjectScaledUpperBoundPhaseMedianMilliseconds = projectScaledUpperBoundMilliseconds,
             Estimates = estimates,
             Samples = samples,
         };
@@ -123,10 +120,11 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
                 OwningProjectIds = ownerId is null ? [] : [ownerId],
             };
             ScopePlan plan = ChangedProjectScopePlanner.Plan(workload.Projects, workload.Edges, [input]);
-            decimal ratio = Round((decimal)plan.AffectedProjectCount / workload.Inventory.ProjectCount);
-            decimal modeledMilliseconds = Round(fixedMilliseconds + (projectDependentMilliseconds * ratio) + planningMilliseconds);
+            decimal ratio = (decimal)plan.AffectedProjectCount / workload.Inventory.ProjectCount;
+            decimal modeledUpperBoundMilliseconds = Round(
+                unscaledPhaseResidualMilliseconds + (projectScaledUpperBoundMilliseconds * ratio) + planningMilliseconds);
             decimal reduction = fullMilliseconds > 0
-                ? Round(Math.Clamp((1 - (modeledMilliseconds / fullMilliseconds)) * 100, -100, 100))
+                ? Round(Math.Clamp((1 - (modeledUpperBoundMilliseconds / fullMilliseconds)) * 100, -100, 100))
                 : 0;
             estimates.Add(new ChangedProjectAdvisoryEstimate
             {
@@ -134,11 +132,11 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
                 Disposition = "modeled-only",
                 AffectedProjectCount = plan.AffectedProjectCount,
                 AffectedScopeRatio = ratio,
-                ModeledAdvisoryMilliseconds = modeledMilliseconds,
-                ModeledReductionPercent = reduction,
+                ModeledAdvisoryMilliseconds = modeledUpperBoundMilliseconds,
+                ModeledUpperBoundReductionPercent = reduction,
                 Authority = kind is ChangedInputKind.PolicyOrImportChange
                     ? "GlobalExpansion/full strict fallback"
-                    : "K/P model only; no advisory execution authority",
+                    : "Optimistic K/P upper bound only; no incremental execution or savings authority",
             });
         }
     }
@@ -261,10 +259,18 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
     private static decimal FullMilliseconds(ChangedProjectAdvisoryTimingSample sample) =>
         sample.TopLevelPhaseMilliseconds.Values.Sum();
 
-    private static decimal FixedMilliseconds(ChangedProjectAdvisoryTimingSample sample) =>
-        sample.TopLevelPhaseMilliseconds
-            .Where(phase => _fixedPhaseNames.Contains(phase.Key))
-            .Sum(phase => phase.Value);
+    private static decimal ProjectScaledUpperBoundMilliseconds(ChangedProjectAdvisoryTimingSample sample)
+    {
+        if (!sample.TopLevelPhaseMilliseconds.TryGetValue(
+                ChangedProjectAdvisoryScaleEvidence.ProjectScaledUpperBoundPhaseName, out decimal milliseconds))
+        {
+            throw new InvalidOperationException(
+                $"Timing sample {sample.SampleOrdinal} has no '" +
+                $"{ChangedProjectAdvisoryScaleEvidence.ProjectScaledUpperBoundPhaseName}' phase for the upper-bound model.");
+        }
+
+        return milliseconds;
+    }
 
     private static string CanonicalResult(JsonElement result)
     {
