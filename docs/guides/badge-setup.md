@@ -1,4 +1,9 @@
-# Architecture Health badge setup
+# Experimental Relay setup and doctor
+
+This page is for the **ArchLinterNet Relay**, not for ordinary CI or an
+independently hosted badge. Start with [badge adoption](badge-adoption.md) to
+choose a path. For a consumer-owned Worker/publisher, use
+[direct hosting](badge-direct-hosting.md); the setup below does not configure it.
 
 > **Experimental / opt-in Private Relay.** Full hosted/lifecycle acceptance is
 > still pending. Included Relay code is not an adoption-stable or turnkey support
@@ -6,89 +11,75 @@
 > Private repositories default to `none`: no automatic cloud setup or badge egress.
 > Stable core governance, private reports, and public `github-raw` snapshots do not
 > require Relay.
-> Start with [badge adoption](badge-adoption.md) for disclosure and prerequisites.
 
-Relay/OIDC is optional transport, not a prerequisite for core governance or
-private reporting. A consumer that already owns a trusted badge transport may
-independently verify exact producer provenance and publish only the canonical
-badge projection through its own trusted post-merge workflow and adopter-owned
-hosting/storage. That transport's credentials, fail-closed receipt checks,
-availability, and lifecycle remain consumer responsibilities. This is not a
-fourth ArchLinterNet transport mode, protocol, or hosted service.
-
-The candidate contract requires the packed `ArchLinterNet.Cli` tool to include
-the setup contract, Relay bundle, configuration schema, and workflow templates.
-Setup is intentionally a plan-first command: it shows the disclosure and cost
-decision before writing a consumer repository, and it never runs the
-architecture evaluator a second time.
+The packed CLI, configuration schema, Relay bundle, and pinned workflow/action
+must form a [verified compatible distribution](../reference/badge-distribution.md).
+A source checkout or successful unit test is not proof that a hosted installation
+works. Setup plans disclosure and cost before writing managed files; it does
+not run the architecture evaluator.
 
 ## Choose a transport
 
-Run setup from the consumer repository (or pass its explicit repository
-identity) and choose a mode:
+The setup command supports these built-in modes:
 
 | Mode | Use | Hosting requirement |
 | --- | --- | --- |
-| `none` | Private checks and artifacts without public disclosure | None; no external call |
-| `github-raw` | Existing public static snapshot compatibility | Public repository only |
-| `relay` | Experimental, opt-in bounded-freshness private/public badge | Your Cloudflare Worker and SQLite Durable Object account |
+| `none` | Private checks and artifacts without public disclosure | None; no external badge call |
+| `github-raw` | Public static snapshot compatibility | Public repository only |
+| `relay` | Experimental bounded-freshness publication | Your Cloudflare Worker and SQLite Durable Object account |
 
-Private repositories default to `none`. Selecting `github-raw` for a private
-repository is rejected. An opaque Relay alias does not hide the Relay hostname
-or imply that the source identity is undiscoverable; setup shows the approved
-destination before registration. Custom URLs, PATs, GitHub App keys, and
-unscoped deployment credentials are not turnkey inputs.
+Private repositories default to `none`; private `github-raw` is rejected.
+These are the setup command's modes, not a ban on independent direct hosting.
+Custom URLs and broad deployment credentials are not substitutes for Relay's
+reviewed configuration and OIDC trust. An opaque alias does not hide the hosting
+hostname or guarantee that the source repository cannot be identified.
 
 ## Preview and apply
 
-The exact options and schema identifiers are owned by the installed tool. Start
-with:
+Read the installed command's options first:
 
 ```text
 arch-linter-net badge architecture-health setup --help
 arch-linter-net badge architecture-health doctor --help
 ```
 
-Use setup's dry-run/preview mode first. It must be read-only and should be
-reviewed as a normal change. A Relay setup selects either
-`headline-only/v1` (JSON/Shields snapshot compatibility) or
-`headline-plus-freshness/v1` (the default stamped SVG representation). If
-renewal is enabled, the preview reports the selected cadence, jobs per day and
-month, private GitHub billed-minute implications, and hosting quotas. The
-contract caps a lease at 60 minutes and renewal at no more than once per 30
-minutes (48 attempts per day); these are limits, not execution guarantees.
-When renewal is disabled, setup emits no scheduled renewal workflow and does
-not allow `schedule` in the Relay registry entry. For enabled cadences that do
-not align to an hour, the generated workflow uses multiple explicit POSIX cron
-entries when necessary; their UTC slots match the previewed jobs-per-day bound
-instead of rounding to a more frequent hourly schedule. The preview uses
-`floor(1440 / cadence_minutes)` slots; for a non-divisible cadence the final
-slot-to-next-day gap is longer so the cyclic interval never falls below the
-configured cadence.
+Use a reviewed dry-run first. Select the approved destination, alias, numeric
+repository/owner identities, exact base ref, producer workflow/check, publisher
+pins, and disclosure profile. `headline-only/v1` is JSON/Shields compatibility;
+`headline-plus-freshness/v1` adds approved timestamps and the stamped SVG view.
+Do not silently upgrade the disclosure profile.
 
-Relay setup is fail-closed. `--provider-plan` is optional cost metadata only;
-when supplied, it cannot prove a required check, Rules API, OIDC, provider
-quota, or account capability. A null plan label is valid when live inspection
-proves the required capabilities.
-Before a non-dry-run Relay write, the bounded live inspector must run in the
-pinned reusable publisher context. This is deliberate: a local shell cannot
-mint the publisher-bound OIDC claim. Use the trusted reusable workflow's
-`operation: bootstrap` for the first write (it checks out the consumer's
-configured base ref, obtains the short-lived OIDC token, runs the same setup
-command, and creates a private `architecture-health-bootstrap-handoff`
-artifact). It does not push a branch, create a pull request, or write any
-consumer Git reference. The caller must first configure the exact required
-check/ruleset and review the disclosure inputs. A GitHub App key and a PAT are
-not bootstrap inputs and are not supported substitutes for the OIDC inspection.
+For enabled renewal, review cadence, Actions usage, provider quotas and billing.
+Relay caps a lease at 60 minutes and renewal at no more than once per 30 minutes
+(48 attempts per day). These are limits, not scheduling or uptime guarantees.
+Disabling renewal emits no scheduled renewal workflow and excludes `schedule`
+from the registry entry. Non-hour-aligned cadences may use multiple cron entries;
+the preview uses `floor(1440 / cadence_minutes)` slots without shortening the
+configured cyclic interval. These Relay-specific limits do not govern direct
+hosting.
 
-The bootstrap workflow is pinned by the same immutable publisher SHA used for
-normal publication; it does not accept caller-authored capability evidence.
+`--provider-plan` is optional cost metadata, not evidence that required checks,
+Rules API visibility, OIDC, permissions or quota work. A null plan label is valid
+when live inspection proves the required capabilities. Missing or contradictory
+capabilities leave the plan unavailable; setup must not weaken verification.
 
-Download that private artifact only from the consumer repository's trusted
-bootstrap run. It contains `bootstrap-handoff.json` and `payload/`, and must
-remain private: it can contain consumer configuration. On a normal local review
-branch created from the handoff's recorded base commit, run the packaged
-verifier before looking at or committing its generated diff:
+### Bootstrap in the trusted publisher
+
+The first non-dry-run Relay write needs live inspection in the exact pinned
+reusable publisher context. A local shell cannot mint its publisher-bound OIDC
+claim. Configure the required check/ruleset and approve disclosure first, then
+use the compatible reusable workflow's `operation: bootstrap`.
+
+Bootstrap checks out the configured consumer base, obtains short-lived OIDC,
+runs setup, and produces a private `architecture-health-bootstrap-handoff`
+artifact. It does **not** push a branch, create a PR, or write a consumer Git
+reference. No GitHub App key or PAT writer is required. A caller-authored
+`--capability-evidence` JSON file is rejected in v1; shape and freshness do not
+authenticate its origin.
+
+Download the handoff from that trusted bootstrap run. Keep it private and retain
+all manifest-bound files, including hidden `.github` paths. On a local review
+branch at the recorded exact base, verify and apply it:
 
 ```text
 arch-linter-net badge architecture-health apply-handoff \
@@ -102,21 +93,20 @@ arch-linter-net badge architecture-health apply-handoff \
   --repository-owner-id <handoff repository.repository_owner_id>
 ```
 
-The command independently reads `HEAD` and `HEAD^{tree}` from that local
-checkout. It rejects a stale branch, a different repository identity, unknown
-or extra paths, reparse points, non-UTF-8 files, and any byte-count or digest
-mismatch before writing a managed file. Do not commit before this command: an
-exact-base branch is the handoff's replay protection. Then inspect the local
-diff, commit it, and open the repository's ordinary protected-branch PR. Only
-that normal PR may enter `main`.
+The angle-bracket fields are values from the verified handoff, not literal shell
+arguments. The command independently checks local `HEAD` and `HEAD^{tree}`,
+repository identity, permitted paths, UTF-8 contents, byte counts and digests.
+Stale branches, extra paths, reparse points, or mismatched bytes are rejected
+before writing managed files. Do not commit first: the exact base is replay
+protection. Inspect the applied diff and submit an ordinary protected setup PR.
 
-This is a one-time owner review step. After it merges, ongoing publication uses
-the generated exact pinned GitHub OIDC publisher. It requires neither a GitHub
-App key nor a direct write to the base branch.
+This is a one-time owner review. Later publication uses the pinned GitHub OIDC
+publisher to update Relay state, not to commit badge refreshes to the consumer.
 
-For an already bootstrapped destination, the equivalent local preview remains
-useful, but it cannot replace that trusted first write. With adopter-specific
-values, the command shape is:
+### Local preview and generated files
+
+A local preview remains useful but does not replace trusted bootstrap.
+Substitute your approved values in this example:
 
 ```text
 arch-linter-net badge architecture-health setup \
@@ -124,59 +114,49 @@ arch-linter-net badge architecture-health setup \
   --repository-id 123456 --repository-owner-id 654321 \
   --account 0123456789abcdef0123456789abcdef --alias a7f4k2m9 \
   --endpoint https://relay.example --audience architecture-health-badge-relay/a7f4k2m9 \
-  --provider-plan pro \
   --approve-disclosure --output . --dry-run
 ```
 
-Missing, stale, contradictory, or unproven live capability evidence leaves the
-plan unavailable and produces no managed files. A caller-authored JSON file
-passed through `--capability-evidence` is intentionally rejected in v1: shape
-and freshness do not authenticate its origin, so it cannot declare required
-checks, Rules API, OIDC, Relay capability, or quota. A future signed evidence
-protocol must define its issuer and key rotation before file-based evidence is
-re-enabled.
+The reviewed plan generates versioned configuration and a SHA-256-bound
+manifest, the compatible Worker/Durable Object source and Wrangler/migration
+configuration, producer/publisher workflows, optional renewal, and a managed
+README block. No custom server implementation is required by this Relay path.
 
-Applying the reviewed plan generates, without custom server code:
+`producer.workflow_sha` is the **Git blob SHA** of the generated producer bytes,
+not the trusted publisher's **commit SHA**. Use the installed options
+`--base-ref`, `--policy`, `--solution`, `--producer-workflow`, `--check-name`,
+and `--audience` when defaults do not match your repository. Registry and
+Wrangler configuration must contain the actual approved identities and pins,
+not fixture values.
 
-- versioned configuration and a SHA-256-bound manifest;
-- the pinned Worker/Durable Object Relay source, Wrangler configuration, and
-  SQLite migration declaration;
-- a producer workflow for the selected project/base ref/check, a trusted
-  publisher, and optional metadata-only renewal workflow;
-- a managed README badge block and final endpoint URLs.
+Review the generated diff. Setup preserves unrelated README/workflow content,
+secrets, and protection rules; it writes atomically and reuses the approved
+alias/deployment on retries. A conflict or partial failure leaves publication
+unavailable. `none` emits no public URL. No mode seeds a healthy badge before
+qualifying evidence exists.
 
-`producer.workflow_sha` is calculated from the exact generated consumer
-workflow's Git blob bytes. It is intentionally different from the SHA pin of
-the trusted reusable publisher. Use `--base-ref`, `--policy`, `--solution`,
-`--producer-workflow`, `--check-name`, and `--audience` when the consumer does
-not use the defaults. The generated Relay registry and `wrangler.jsonc` bind
-the actual repository/owner IDs, alias, audience, ref, and workflow pins; no
-fixture identity is copied into an adopter bundle.
+## First publication
 
-The generated blocks are reviewable. Existing workflow names, branch
-protection/rulesets, secrets, and README content outside those blocks are
-preserved. Setup writes atomically; repeated setup reuses the approved alias
-and deployment identity. A conflict or partial failure leaves the destination
-unavailable and can be retried deterministically.
+Run the required producer in an actual PR and merge through the approved path.
+The publisher must prove the exact merged-tree, workflow/check, run/attempt,
+artifact and disclosure relationship before the origin becomes ready. Do not
+replace that proof with a copied Health file, a green unrelated workflow, or a
+new scan of main.
 
-`none` emits no public URL and does not require a hosting account or credential.
-Required PR reports, checks, and private artifacts remain available. Setup never
-seeds a healthy value before the first qualifying merged-PR evidence exists.
+Verify the origin's JSON and selected SVG against the accepted projection;
+inspect cached Shields/Camo images separately. Health/Gate remain architecture
+facts, while readiness describes whether the public claim can be verified.
+Follow [badge verification](badge-adoption.md#verify-the-result).
 
 ## Doctor and recovery
 
-Doctor produces stable machine-readable codes plus a concise fix. It checks
-CLI/action/Relay/schema compatibility, repository and owner identity, pins,
-profile, required-check/rules API visibility, OIDC audience/ref/workflow
-claims, destination reachability, artifact and evidence availability, expiry,
-revocation, storage/quota state, and origin-versus-Shields/Camo cache delay.
+Doctor checks component compatibility, local producer pins, identities, selected
+endpoint and capabilities. Without an observation file it performs bounded
+read-only inspection. A newly generated raw/Relay configuration remains
+unavailable until it serves real first evidence.
 
-When no observation file is supplied, doctor performs a bounded read-only
-inspection of the local generated producer pin, configured capabilities, and
-the selected raw/Relay endpoint. A newly generated `github-raw` or Relay
-configuration reports `unavailable` until the endpoint serves real first
-evidence. In environments where the remote-only checks are performed by an
-approved inspector, pass its fresh identity-bound observation instead:
+Where an approved inspector performs remote-only checks, supply its fresh
+identity-bound observation:
 
 ```text
 arch-linter-net badge architecture-health doctor \
@@ -184,23 +164,19 @@ arch-linter-net badge architecture-health doctor \
   --observation ./badge-relay-doctor-observation.json
 ```
 
-The observation protocol covers identity, pins, OIDC, required checks/rules,
-artifact/evidence, expiry, revocation, quota, and cache freshness. A plan or
-provider-plan flag cannot manufacture a healthy doctor result.
+The observation covers identity/pins/OIDC, required checks/rules, evidence,
+expiry, revocation, quota, and cache freshness. A plan flag cannot manufacture
+a healthy result. Keep detailed operator observations and provider responses
+private; public diagnostics must not leak repository/source/run identities or
+authentication material.
 
-Public output is deliberately redacted: it contains no token, repository
-name/URL, commit or tree SHA, PR/run identifier, private receipt, JWT, or raw
-provider response. Detailed operator context is a separate private result.
-Unsupported plans, permissions, schemas, or claims are unavailable results;
-verification is never silently weakened.
+Relay enforces lease expiry on reads even after publishers and renewal stop.
+Renewal revalidates metadata; it does not rerun analysis or extend the canonical
+semantic horizon. Expired evidence requires new approved PR-authoritative proof.
+Revoked aliases cannot be revived by replay or backup restoration. Cached copies
+cannot be universally recalled.
 
-After all publishers and renewal jobs stop, the Relay origin expires the stored
-lease on read. A stale cached browser, Shields, GitHub Camo, or offline image
-may remain visible and cannot be universally recalled; it is not proof that the
-origin is still ready. Recovery requires a new approved PR-authoritative proof.
-It never re-analyzes `main`, revives a revoked alias, or extends an expired
-semantic horizon.
-
-The first real deployment and packed candidate proof are maintained by the
-release/acceptance workflow. This guide does not publish packages, deploy a
-project-owned Relay, or authorize a public release.
+Use the [lifecycle runbook](badge-lifecycle-operations.md) for authenticated
+status, renewal, invalidate, revoke/remove, transfers, pin/key rotation,
+upgrades, rollback and recovery. Its procedures apply to Relay only. Successful
+local commands or a docs build do not establish hosted/lifecycle acceptance.
