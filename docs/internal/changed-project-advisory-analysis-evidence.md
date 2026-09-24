@@ -35,8 +35,8 @@ measured `contract_checks` phase is treated as potentially project-scalable, and
 all of that phase scales linearly; every other phase is held unscaled because its project-scope
 sensitivity is unproven. It does not execute an incremental path or measure realized savings. The
 combination is enough to conclude that no safe implementation boundary is established: modeled
-upper-bound leaf reductions are 5.377–10.985% on this declared synthetic boundary, middle-position
-upper bounds are 2.304–5.315%, and global/shared changes fall back to full validation. Those estimates
+upper-bound leaf reductions are 6.832–10.955% on this declared synthetic boundary, middle-position
+upper bounds are 3.187–4.695%, and global/shared changes fall back to full validation. Those estimates
 are descriptive; see
 [Required decision outcome](#required-decision-outcome) for the safety basis.
 
@@ -431,9 +431,9 @@ Neither reuse candidate is made a prerequisite by this evidence.
 
   | Scale | Full strict | Unscaled phase residual | `contract_checks` upper-bound phase | Leaf modeled upper bound | Middle modeled upper bound | Global/shared |
   |---|---:|---:|---:|---:|---:|---:|
-  | S (8 projects) | 1,562 ms | 1,466 ms | 96 ms | 5.377% | 2.304% | ≈0% |
-  | M (16 projects) | 1,158 ms | 1,054 ms | 104 ms | 8.418% | 3.928% | ≈0% |
-  | L (32 projects) | 2,363 ms | 2,095 ms | 268 ms | 10.985% | 5.315% | ≈0% |
+  | S (8 projects) | 1,166 ms | 1,020 ms | 146 ms | 10.955% | 4.695% | ≈0% |
+  | M (16 projects) | 1,221 ms | 1,132 ms | 89 ms | 6.832% | 3.187% | ≈0% |
+  | L (32 projects) | 1,232 ms | 1,113 ms | 119 ms | 9.354% | 4.525% | ≈0% |
 
   These are modeled upper bounds, not measured reductions: all phase time except `contract_checks`
   stays unscaled, while even the eligible phase may contain work that cannot safely be narrowed.

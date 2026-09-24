@@ -27,7 +27,7 @@ internal sealed class ChangedProjectAdvisoryTimingEvidenceTests
             Assert.That(evidence.Outcome, Is.EqualTo("C"));
             Assert.That(evidence.SourceIdentity, Does.Match("^[0-9a-fA-F]{40}$"),
                 "Checked-in timing evidence must identify the exact clean source commit measured.");
-            Assert.That(evidence.MeasurementBoundary, Does.Contain("no partial analyzer execution"));
+            Assert.That(evidence.MeasurementBoundary, Does.Contain("No partial analyzer execution"));
             Assert.That(evidence.DecisionNote, Does.Contain("#991"));
             Assert.That(evidence.ScalePoints.Select(scale => scale.Label), Is.EqualTo(new[] { "8 projects", "16 projects", "32 projects" }));
         });

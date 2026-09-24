@@ -1,13 +1,13 @@
 {
-  "evidence_schema_id": "changed-project-advisory-timing-evidence/v1",
+  "evidence_schema_id": "changed-project-advisory-timing-evidence/v2",
   "issue": "#503",
   "outcome": "C",
-  "source_identity": "4a73afdc88a448bd6777a53591e89f762e4f84da",
+  "source_identity": "5bdc53053b1ed3388975d0d1488d353329c52536",
   "runtime": ".NET 10.0.10",
   "operating_system": "macOS 15.8.0",
   "architecture": "X64",
   "configuration": "Debug; staged assemblies; strict; max-parallelism=1",
-  "measurement_boundary": "Full strict analysis-profile/v1 phases only; fixture restore/build and output rendering are excluded. The advisory values are modeled from measured fixed/project-dependent phase shares plus measured planner overhead; no partial analyzer execution is claimed.",
+  "measurement_boundary": "Full strict analysis-profile/v1 phases only; fixture restore/build and output rendering are excluded. Only the measured contract_checks phase is treated as project-scalable, and then only as an optimistic upper bound; all other phases (including setup, preflight, post-processing, and repository metrics) remain unscaled. No partial analyzer execution or realized savings are claimed.",
   "decision_note": "Outcome C: the timing model shows where K/P could reduce project-dependent work, but ownership resolution from evaluated MSBuild Compile items and family-specific correctness remain unsafe for an implementation while #991 is open. Full strict validation remains authoritative; no implementation child is justified by this evidence.",
   "scale_points": [
     {
@@ -15,45 +15,45 @@
       "project_count": 8,
       "full_project_count": 8,
       "scope_planning_sample_count": 1000,
-      "scope_planning_median_milliseconds": 0.018,
-      "full_validation_median_milliseconds": 1562,
-      "fixed_phase_median_milliseconds": 1286,
-      "project_dependent_phase_median_milliseconds": 276,
+      "scope_planning_median_milliseconds": 0.012,
+      "full_validation_median_milliseconds": 1166,
+      "unscaled_phase_residual_milliseconds": 1020,
+      "project_scaled_upper_bound_phase_median_milliseconds": 146,
       "estimates": [
         {
           "change_class": "leaf-project-source-change",
           "disposition": "modeled-only",
           "affected_project_count": 1,
           "affected_scope_ratio": 0.125,
-          "modeled_advisory_milliseconds": 1320.518,
-          "modeled_reduction_percent": 15.460,
-          "authority": "K/P model only; no advisory execution authority"
+          "modeled_advisory_milliseconds": 1038.262,
+          "modeled_upper_bound_reduction_percent": 10.955,
+          "authority": "Optimistic K/P upper bound only; no incremental execution or savings authority"
         },
         {
           "change_class": "middle-position-source-change",
           "disposition": "modeled-only",
           "affected_project_count": 5,
           "affected_scope_ratio": 0.625,
-          "modeled_advisory_milliseconds": 1458.518,
-          "modeled_reduction_percent": 6.625,
-          "authority": "K/P model only; no advisory execution authority"
+          "modeled_advisory_milliseconds": 1111.262,
+          "modeled_upper_bound_reduction_percent": 4.695,
+          "authority": "Optimistic K/P upper bound only; no incremental execution or savings authority"
         },
         {
           "change_class": "shared-foundation-project-source-change",
           "disposition": "modeled-only",
           "affected_project_count": 8,
           "affected_scope_ratio": 1,
-          "modeled_advisory_milliseconds": 1562.018,
-          "modeled_reduction_percent": -0.001,
-          "authority": "K/P model only; no advisory execution authority"
+          "modeled_advisory_milliseconds": 1166.012,
+          "modeled_upper_bound_reduction_percent": -0.001,
+          "authority": "Optimistic K/P upper bound only; no incremental execution or savings authority"
         },
         {
           "change_class": "policy-or-import-change",
           "disposition": "modeled-only",
           "affected_project_count": 8,
           "affected_scope_ratio": 1,
-          "modeled_advisory_milliseconds": 1562.018,
-          "modeled_reduction_percent": -0.001,
+          "modeled_advisory_milliseconds": 1166.012,
+          "modeled_upper_bound_reduction_percent": -0.001,
           "authority": "GlobalExpansion/full strict fallback"
         }
       ],
@@ -80,14 +80,14 @@
             "output_sink_count": 1
           },
           "top_level_phase_milliseconds": {
-            "policy_composition": 860,
-            "load_and_setup": 60,
-            "build_state_preflight": 2,
-            "configuration_check": 167,
-            "policy_consistency_check": 48,
-            "contract_checks": 96,
+            "policy_composition": 582,
+            "load_and_setup": 68,
+            "build_state_preflight": 1,
+            "configuration_check": 179,
+            "policy_consistency_check": 90,
+            "contract_checks": 188,
             "post_processing": 0,
-            "repository_metrics": 45
+            "repository_metrics": 58
           },
           "raw_analysis_profile": {
             "SchemaId": "analysis-profile/v1",
@@ -185,32 +185,32 @@
                 "Indent": 0,
                 "Ordinal": 0,
                 "Count": null,
-                "ElapsedMs": 1355,
-                "ProcessorTimeMs": 950.487
+                "ElapsedMs": 1299,
+                "ProcessorTimeMs": 943.199
               },
               {
                 "Name": "policy_composition",
                 "Indent": 0,
                 "Ordinal": 1,
                 "Count": null,
-                "ElapsedMs": 860,
-                "ProcessorTimeMs": 513.41
+                "ElapsedMs": 582,
+                "ProcessorTimeMs": 469.319
               },
               {
                 "Name": "yaml_loading",
                 "Indent": 1,
                 "Ordinal": 2,
                 "Count": null,
-                "ElapsedMs": 857,
-                "ProcessorTimeMs": 510.357
+                "ElapsedMs": 579,
+                "ProcessorTimeMs": 466.508
               },
               {
                 "Name": "load_and_setup",
                 "Indent": 0,
                 "Ordinal": 3,
                 "Count": null,
-                "ElapsedMs": 60,
-                "ProcessorTimeMs": 57.254
+                "ElapsedMs": 68,
+                "ProcessorTimeMs": 57.265
               },
               {
                 "Name": "root_resolution",
@@ -218,7 +218,7 @@
                 "Ordinal": 4,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.125
+                "ProcessorTimeMs": 0.191
               },
               {
                 "Name": "condition_set_resolution",
@@ -226,63 +226,63 @@
                 "Ordinal": 5,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.607
+                "ProcessorTimeMs": 0.851
               },
               {
                 "Name": "assembly_resolution",
                 "Indent": 1,
                 "Ordinal": 6,
                 "Count": null,
-                "ElapsedMs": 58,
-                "ProcessorTimeMs": 55.462
+                "ElapsedMs": 66,
+                "ProcessorTimeMs": 54.987
               },
               {
                 "Name": "build_state_preflight",
                 "Indent": 0,
                 "Ordinal": 7,
                 "Count": null,
-                "ElapsedMs": 2,
-                "ProcessorTimeMs": 1.96
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.643
               },
               {
                 "Name": "configuration_check",
                 "Indent": 0,
                 "Ordinal": 8,
                 "Count": null,
-                "ElapsedMs": 167,
-                "ProcessorTimeMs": 144.265
+                "ElapsedMs": 179,
+                "ProcessorTimeMs": 141.192
               },
               {
                 "Name": "policy_consistency_check",
                 "Indent": 0,
                 "Ordinal": 9,
                 "Count": null,
-                "ElapsedMs": 48,
-                "ProcessorTimeMs": 42.027
+                "ElapsedMs": 90,
+                "ProcessorTimeMs": 60.233
               },
               {
                 "Name": "contract_checks",
                 "Indent": 0,
                 "Ordinal": 10,
                 "Count": null,
-                "ElapsedMs": 96,
-                "ProcessorTimeMs": 81.813
+                "ElapsedMs": 188,
+                "ProcessorTimeMs": 91.349
               },
               {
                 "Name": "dependency",
                 "Indent": 1,
                 "Ordinal": 11,
                 "Count": 4,
-                "ElapsedMs": 30,
-                "ProcessorTimeMs": 26.341
+                "ElapsedMs": 54,
+                "ProcessorTimeMs": 31.747
               },
               {
                 "Name": "layer",
                 "Indent": 1,
                 "Ordinal": 12,
                 "Count": 4,
-                "ElapsedMs": 19,
-                "ProcessorTimeMs": 15.653
+                "ElapsedMs": 34,
+                "ProcessorTimeMs": 14.592
               },
               {
                 "Name": "layer_template",
@@ -290,7 +290,7 @@
                 "Ordinal": 13,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.004
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "allow_only",
@@ -298,7 +298,7 @@
                 "Ordinal": 14,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "cycle",
@@ -306,7 +306,7 @@
                 "Ordinal": 15,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.007
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "method_body",
@@ -314,7 +314,7 @@
                 "Ordinal": 16,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "asmdef",
@@ -322,7 +322,7 @@
                 "Ordinal": 17,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "independence",
@@ -338,7 +338,7 @@
                 "Ordinal": 19,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "assembly_dependency",
@@ -354,7 +354,7 @@
                 "Ordinal": 21,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "package_dependency",
@@ -378,7 +378,7 @@
                 "Ordinal": 24,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "framework_allow_only",
@@ -394,7 +394,7 @@
                 "Ordinal": 26,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "protected",
@@ -418,7 +418,7 @@
                 "Ordinal": 29,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "acyclic_sibling",
@@ -426,7 +426,7 @@
                 "Ordinal": 30,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "module_container",
@@ -434,7 +434,7 @@
                 "Ordinal": 31,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "type_placement",
@@ -442,15 +442,15 @@
                 "Ordinal": 32,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.023
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "layout_conventions",
                 "Indent": 1,
                 "Ordinal": 33,
                 "Count": 1,
-                "ElapsedMs": 35,
-                "ProcessorTimeMs": 30.966
+                "ElapsedMs": 74,
+                "ProcessorTimeMs": 34.23
               },
               {
                 "Name": "layout_convention_applicability",
@@ -458,7 +458,7 @@
                 "Ordinal": 34,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "public_api_surface",
@@ -466,7 +466,7 @@
                 "Ordinal": 35,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "contract_surface_exposure",
@@ -506,7 +506,7 @@
                 "Ordinal": 40,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "composition",
@@ -522,7 +522,7 @@
                 "Ordinal": 42,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.067
+                "ProcessorTimeMs": 0.078
               },
               {
                 "Name": "metric_budgets",
@@ -530,7 +530,7 @@
                 "Ordinal": 43,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.55
+                "ProcessorTimeMs": 0.361
               },
               {
                 "Name": "context_dependency",
@@ -538,7 +538,7 @@
                 "Ordinal": 44,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.007
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "context_allow_only",
@@ -546,7 +546,7 @@
                 "Ordinal": 45,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "port_boundary",
@@ -554,7 +554,7 @@
                 "Ordinal": 46,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "post_processing",
@@ -562,38 +562,38 @@
                 "Ordinal": 47,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.704
+                "ProcessorTimeMs": 0.414
               },
               {
                 "Name": "repository_metrics",
                 "Indent": 0,
                 "Ordinal": 48,
                 "Count": null,
-                "ElapsedMs": 45,
-                "ProcessorTimeMs": 41.787
+                "ElapsedMs": 58,
+                "ProcessorTimeMs": 39.942
               },
               {
                 "Name": "render_json",
                 "Indent": 0,
                 "Ordinal": 49,
                 "Count": null,
-                "ElapsedMs": 181,
-                "ProcessorTimeMs": 158.929
+                "ElapsedMs": 338,
+                "ProcessorTimeMs": 210.025
               },
               {
                 "Name": "output_stream_write",
                 "Indent": 0,
                 "Ordinal": 50,
                 "Count": null,
-                "ElapsedMs": 1,
-                "ProcessorTimeMs": 1.205
+                "ElapsedMs": 6,
+                "ProcessorTimeMs": 3.421
               },
               {
                 "Name": "selector_predicate_evaluation",
                 "Indent": 1,
                 "Ordinal": 51,
                 "Count": 1024,
-                "ElapsedMs": 22.309956,
+                "ElapsedMs": 24.08619,
                 "ProcessorTimeMs": null
               }
             ],
@@ -606,7 +606,7 @@
             },
             "Measurements": {
               "PeakWorkingSetBytes": null,
-              "AllocatedBytesTotal": 15901360
+              "AllocatedBytesTotal": 15921608
             }
           }
         },
@@ -632,14 +632,14 @@
             "output_sink_count": 1
           },
           "top_level_phase_milliseconds": {
-            "policy_composition": 935,
-            "load_and_setup": 54,
-            "build_state_preflight": 3,
-            "configuration_check": 223,
-            "policy_consistency_check": 128,
-            "contract_checks": 96,
+            "policy_composition": 865,
+            "load_and_setup": 108,
+            "build_state_preflight": 1,
+            "configuration_check": 296,
+            "policy_consistency_check": 95,
+            "contract_checks": 140,
             "post_processing": 0,
-            "repository_metrics": 123
+            "repository_metrics": 89
           },
           "raw_analysis_profile": {
             "SchemaId": "analysis-profile/v1",
@@ -737,32 +737,32 @@
                 "Indent": 0,
                 "Ordinal": 0,
                 "Count": null,
-                "ElapsedMs": 1651,
-                "ProcessorTimeMs": 1019.074
+                "ElapsedMs": 1705,
+                "ProcessorTimeMs": 1066.67
               },
               {
                 "Name": "policy_composition",
                 "Indent": 0,
                 "Ordinal": 1,
                 "Count": null,
-                "ElapsedMs": 935,
-                "ProcessorTimeMs": 527.753
+                "ElapsedMs": 865,
+                "ProcessorTimeMs": 539.592
               },
               {
                 "Name": "yaml_loading",
                 "Indent": 1,
                 "Ordinal": 2,
                 "Count": null,
-                "ElapsedMs": 932,
-                "ProcessorTimeMs": 524.747
+                "ElapsedMs": 862,
+                "ProcessorTimeMs": 535.968
               },
               {
                 "Name": "load_and_setup",
                 "Indent": 0,
                 "Ordinal": 3,
                 "Count": null,
-                "ElapsedMs": 54,
-                "ProcessorTimeMs": 50.98
+                "ElapsedMs": 108,
+                "ProcessorTimeMs": 70.159
               },
               {
                 "Name": "root_resolution",
@@ -770,7 +770,7 @@
                 "Ordinal": 4,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.146
+                "ProcessorTimeMs": 0.16
               },
               {
                 "Name": "condition_set_resolution",
@@ -778,55 +778,55 @@
                 "Ordinal": 5,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.647
+                "ProcessorTimeMs": 0.744
               },
               {
                 "Name": "assembly_resolution",
                 "Indent": 1,
                 "Ordinal": 6,
                 "Count": null,
-                "ElapsedMs": 52,
-                "ProcessorTimeMs": 49.149
+                "ElapsedMs": 106,
+                "ProcessorTimeMs": 68.158
               },
               {
                 "Name": "build_state_preflight",
                 "Indent": 0,
                 "Ordinal": 7,
                 "Count": null,
-                "ElapsedMs": 3,
-                "ProcessorTimeMs": 3.285
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.685
               },
               {
                 "Name": "configuration_check",
                 "Indent": 0,
                 "Ordinal": 8,
                 "Count": null,
-                "ElapsedMs": 223,
-                "ProcessorTimeMs": 144.665
+                "ElapsedMs": 296,
+                "ProcessorTimeMs": 172.313
               },
               {
                 "Name": "policy_consistency_check",
                 "Indent": 0,
                 "Ordinal": 9,
                 "Count": null,
-                "ElapsedMs": 128,
-                "ProcessorTimeMs": 69.928
+                "ElapsedMs": 95,
+                "ProcessorTimeMs": 60.77
               },
               {
                 "Name": "contract_checks",
                 "Indent": 0,
                 "Ordinal": 10,
                 "Count": null,
-                "ElapsedMs": 96,
-                "ProcessorTimeMs": 87.987
+                "ElapsedMs": 140,
+                "ProcessorTimeMs": 93.963
               },
               {
                 "Name": "dependency",
                 "Indent": 1,
                 "Ordinal": 11,
                 "Count": 4,
-                "ElapsedMs": 31,
-                "ProcessorTimeMs": 29.052
+                "ElapsedMs": 33,
+                "ProcessorTimeMs": 26.264
               },
               {
                 "Name": "layer",
@@ -834,7 +834,7 @@
                 "Ordinal": 12,
                 "Count": 4,
                 "ElapsedMs": 16,
-                "ProcessorTimeMs": 15.512
+                "ProcessorTimeMs": 14.9
               },
               {
                 "Name": "layer_template",
@@ -842,7 +842,7 @@
                 "Ordinal": 13,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "allow_only",
@@ -850,7 +850,7 @@
                 "Ordinal": 14,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "cycle",
@@ -858,7 +858,7 @@
                 "Ordinal": 15,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "method_body",
@@ -866,7 +866,7 @@
                 "Ordinal": 16,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "asmdef",
@@ -874,7 +874,7 @@
                 "Ordinal": 17,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "independence",
@@ -882,7 +882,7 @@
                 "Ordinal": 18,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "assembly_independence",
@@ -890,7 +890,7 @@
                 "Ordinal": 19,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "assembly_dependency",
@@ -898,7 +898,7 @@
                 "Ordinal": 20,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "assembly_allow_only",
@@ -930,7 +930,7 @@
                 "Ordinal": 24,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "framework_allow_only",
@@ -938,7 +938,7 @@
                 "Ordinal": 25,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "project_metadata",
@@ -946,7 +946,7 @@
                 "Ordinal": 26,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "protected",
@@ -954,7 +954,7 @@
                 "Ordinal": 27,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "external",
@@ -970,7 +970,7 @@
                 "Ordinal": 29,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "acyclic_sibling",
@@ -986,7 +986,7 @@
                 "Ordinal": 31,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "type_placement",
@@ -994,15 +994,15 @@
                 "Ordinal": 32,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "layout_conventions",
                 "Indent": 1,
                 "Ordinal": 33,
                 "Count": 1,
-                "ElapsedMs": 33,
-                "ProcessorTimeMs": 30.415
+                "ElapsedMs": 65,
+                "ProcessorTimeMs": 39.306
               },
               {
                 "Name": "layout_convention_applicability",
@@ -1010,7 +1010,7 @@
                 "Ordinal": 34,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.005
               },
               {
                 "Name": "public_api_surface",
@@ -1018,7 +1018,7 @@
                 "Ordinal": 35,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "contract_surface_exposure",
@@ -1026,7 +1026,7 @@
                 "Ordinal": 36,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "versioned_contract_surface_isolation",
@@ -1034,7 +1034,7 @@
                 "Ordinal": 37,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "attribute_usage",
@@ -1050,7 +1050,7 @@
                 "Ordinal": 39,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.005
+                "ProcessorTimeMs": 0.006
               },
               {
                 "Name": "interface_implementation",
@@ -1066,7 +1066,7 @@
                 "Ordinal": 41,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "coverage",
@@ -1074,7 +1074,7 @@
                 "Ordinal": 42,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.068
+                "ProcessorTimeMs": 0.241
               },
               {
                 "Name": "metric_budgets",
@@ -1082,7 +1082,7 @@
                 "Ordinal": 43,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.575
+                "ProcessorTimeMs": 0.43
               },
               {
                 "Name": "context_dependency",
@@ -1090,7 +1090,7 @@
                 "Ordinal": 44,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.006
+                "ProcessorTimeMs": 0.005
               },
               {
                 "Name": "context_allow_only",
@@ -1098,7 +1098,7 @@
                 "Ordinal": 45,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "port_boundary",
@@ -1106,7 +1106,7 @@
                 "Ordinal": 46,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "post_processing",
@@ -1114,38 +1114,38 @@
                 "Ordinal": 47,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.635
+                "ProcessorTimeMs": 0.402
               },
               {
                 "Name": "repository_metrics",
                 "Indent": 0,
                 "Ordinal": 48,
                 "Count": null,
-                "ElapsedMs": 123,
-                "ProcessorTimeMs": 63.829
+                "ElapsedMs": 89,
+                "ProcessorTimeMs": 52.855
               },
               {
                 "Name": "render_json",
                 "Indent": 0,
                 "Ordinal": 49,
                 "Count": null,
-                "ElapsedMs": 418,
-                "ProcessorTimeMs": 239.41
+                "ElapsedMs": 218,
+                "ProcessorTimeMs": 190.348
               },
               {
                 "Name": "output_stream_write",
                 "Indent": 0,
                 "Ordinal": 50,
                 "Count": null,
-                "ElapsedMs": 7,
-                "ProcessorTimeMs": 3.93
+                "ElapsedMs": 3,
+                "ProcessorTimeMs": 3.277
               },
               {
                 "Name": "selector_predicate_evaluation",
                 "Indent": 1,
                 "Ordinal": 51,
                 "Count": 1024,
-                "ElapsedMs": 32.810765,
+                "ElapsedMs": 38.3392,
                 "ProcessorTimeMs": null
               }
             ],
@@ -1158,7 +1158,7 @@
             },
             "Measurements": {
               "PeakWorkingSetBytes": null,
-              "AllocatedBytesTotal": 15950336
+              "AllocatedBytesTotal": 15917912
             }
           }
         },
@@ -1184,14 +1184,14 @@
             "output_sink_count": 1
           },
           "top_level_phase_milliseconds": {
-            "policy_composition": 1202,
-            "load_and_setup": 153,
-            "build_state_preflight": 4,
-            "configuration_check": 354,
-            "policy_consistency_check": 71,
-            "contract_checks": 180,
-            "post_processing": 0,
-            "repository_metrics": 163
+            "policy_composition": 428,
+            "load_and_setup": 62,
+            "build_state_preflight": 1,
+            "configuration_check": 184,
+            "policy_consistency_check": 152,
+            "contract_checks": 146,
+            "post_processing": 1,
+            "repository_metrics": 59
           },
           "raw_analysis_profile": {
             "SchemaId": "analysis-profile/v1",
@@ -1289,104 +1289,104 @@
                 "Indent": 0,
                 "Ordinal": 0,
                 "Count": null,
-                "ElapsedMs": 2293,
-                "ProcessorTimeMs": 1151.349
+                "ElapsedMs": 1125,
+                "ProcessorTimeMs": 887.907
               },
               {
                 "Name": "policy_composition",
                 "Indent": 0,
                 "Ordinal": 1,
                 "Count": null,
-                "ElapsedMs": 1202,
-                "ProcessorTimeMs": 571.872
+                "ElapsedMs": 428,
+                "ProcessorTimeMs": 398.425
               },
               {
                 "Name": "yaml_loading",
                 "Indent": 1,
                 "Ordinal": 2,
                 "Count": null,
-                "ElapsedMs": 1195,
-                "ProcessorTimeMs": 566.921
+                "ElapsedMs": 424,
+                "ProcessorTimeMs": 394.731
               },
               {
                 "Name": "load_and_setup",
                 "Indent": 0,
                 "Ordinal": 3,
                 "Count": null,
-                "ElapsedMs": 153,
-                "ProcessorTimeMs": 73.972
+                "ElapsedMs": 62,
+                "ProcessorTimeMs": 57.886
               },
               {
                 "Name": "root_resolution",
                 "Indent": 1,
                 "Ordinal": 4,
                 "Count": null,
-                "ElapsedMs": 2,
-                "ProcessorTimeMs": 0.531
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.336
               },
               {
                 "Name": "condition_set_resolution",
                 "Indent": 1,
                 "Ordinal": 5,
                 "Count": null,
-                "ElapsedMs": 1,
-                "ProcessorTimeMs": 0.956
+                "ElapsedMs": 2,
+                "ProcessorTimeMs": 2.206
               },
               {
                 "Name": "assembly_resolution",
                 "Indent": 1,
                 "Ordinal": 6,
                 "Count": null,
-                "ElapsedMs": 147,
-                "ProcessorTimeMs": 70.569
+                "ElapsedMs": 58,
+                "ProcessorTimeMs": 53.431
               },
               {
                 "Name": "build_state_preflight",
                 "Indent": 0,
                 "Ordinal": 7,
                 "Count": null,
-                "ElapsedMs": 4,
-                "ProcessorTimeMs": 3.744
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.659
               },
               {
                 "Name": "configuration_check",
                 "Indent": 0,
                 "Ordinal": 8,
                 "Count": null,
-                "ElapsedMs": 354,
-                "ProcessorTimeMs": 183.29
+                "ElapsedMs": 184,
+                "ProcessorTimeMs": 142.192
               },
               {
                 "Name": "policy_consistency_check",
                 "Indent": 0,
                 "Ordinal": 9,
                 "Count": null,
-                "ElapsedMs": 71,
-                "ProcessorTimeMs": 63.058
+                "ElapsedMs": 152,
+                "ProcessorTimeMs": 69.601
               },
               {
                 "Name": "contract_checks",
                 "Indent": 0,
                 "Ordinal": 10,
                 "Count": null,
-                "ElapsedMs": 180,
-                "ProcessorTimeMs": 100.166
+                "ElapsedMs": 146,
+                "ProcessorTimeMs": 92.909
               },
               {
                 "Name": "dependency",
                 "Indent": 1,
                 "Ordinal": 11,
                 "Count": 4,
-                "ElapsedMs": 49,
-                "ProcessorTimeMs": 35.222
+                "ElapsedMs": 44,
+                "ProcessorTimeMs": 30.856
               },
               {
                 "Name": "layer",
                 "Indent": 1,
                 "Ordinal": 12,
                 "Count": 4,
-                "ElapsedMs": 48,
-                "ProcessorTimeMs": 18.942
+                "ElapsedMs": 20,
+                "ProcessorTimeMs": 14.54
               },
               {
                 "Name": "layer_template",
@@ -1394,7 +1394,7 @@
                 "Ordinal": 13,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.006
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "allow_only",
@@ -1410,7 +1410,609 @@
                 "Ordinal": 15,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.006
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "method_body",
+                "Indent": 1,
+                "Ordinal": 16,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0
+              },
+              {
+                "Name": "asmdef",
+                "Indent": 1,
+                "Ordinal": 17,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "independence",
+                "Indent": 1,
+                "Ordinal": 18,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "assembly_independence",
+                "Indent": 1,
+                "Ordinal": 19,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "assembly_dependency",
+                "Indent": 1,
+                "Ordinal": 20,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "assembly_allow_only",
+                "Indent": 1,
+                "Ordinal": 21,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0
+              },
+              {
+                "Name": "package_dependency",
+                "Indent": 1,
+                "Ordinal": 22,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "package_allow_only",
+                "Indent": 1,
+                "Ordinal": 23,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "framework_dependency",
+                "Indent": 1,
+                "Ordinal": 24,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "framework_allow_only",
+                "Indent": 1,
+                "Ordinal": 25,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "project_metadata",
+                "Indent": 1,
+                "Ordinal": 26,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "protected",
+                "Indent": 1,
+                "Ordinal": 27,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0
+              },
+              {
+                "Name": "external",
+                "Indent": 1,
+                "Ordinal": 28,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "external_allow_only",
+                "Indent": 1,
+                "Ordinal": 29,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0
+              },
+              {
+                "Name": "acyclic_sibling",
+                "Indent": 1,
+                "Ordinal": 30,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "module_container",
+                "Indent": 1,
+                "Ordinal": 31,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "type_placement",
+                "Indent": 1,
+                "Ordinal": 32,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "layout_conventions",
+                "Indent": 1,
+                "Ordinal": 33,
+                "Count": 1,
+                "ElapsedMs": 55,
+                "ProcessorTimeMs": 35.418
+              },
+              {
+                "Name": "layout_convention_applicability",
+                "Indent": 1,
+                "Ordinal": 34,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.004
+              },
+              {
+                "Name": "public_api_surface",
+                "Indent": 1,
+                "Ordinal": 35,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "contract_surface_exposure",
+                "Indent": 1,
+                "Ordinal": 36,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "versioned_contract_surface_isolation",
+                "Indent": 1,
+                "Ordinal": 37,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "attribute_usage",
+                "Indent": 1,
+                "Ordinal": 38,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0
+              },
+              {
+                "Name": "inheritance",
+                "Indent": 1,
+                "Ordinal": 39,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.004
+              },
+              {
+                "Name": "interface_implementation",
+                "Indent": 1,
+                "Ordinal": 40,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "composition",
+                "Indent": 1,
+                "Ordinal": 41,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.004
+              },
+              {
+                "Name": "coverage",
+                "Indent": 1,
+                "Ordinal": 42,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.093
+              },
+              {
+                "Name": "metric_budgets",
+                "Indent": 1,
+                "Ordinal": 43,
+                "Count": 0,
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 0.875
+              },
+              {
+                "Name": "context_dependency",
+                "Indent": 1,
+                "Ordinal": 44,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.009
+              },
+              {
+                "Name": "context_allow_only",
+                "Indent": 1,
+                "Ordinal": 45,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "port_boundary",
+                "Indent": 1,
+                "Ordinal": 46,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "post_processing",
+                "Indent": 0,
+                "Ordinal": 47,
+                "Count": null,
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.247
+              },
+              {
+                "Name": "repository_metrics",
+                "Indent": 0,
+                "Ordinal": 48,
+                "Count": null,
+                "ElapsedMs": 59,
+                "ProcessorTimeMs": 51.32
+              },
+              {
+                "Name": "render_json",
+                "Indent": 0,
+                "Ordinal": 49,
+                "Count": null,
+                "ElapsedMs": 188,
+                "ProcessorTimeMs": 173.37
+              },
+              {
+                "Name": "output_stream_write",
+                "Indent": 0,
+                "Ordinal": 50,
+                "Count": null,
+                "ElapsedMs": 2,
+                "ProcessorTimeMs": 2.003
+              },
+              {
+                "Name": "selector_predicate_evaluation",
+                "Indent": 1,
+                "Ordinal": 51,
+                "Count": 1024,
+                "ElapsedMs": 23.399242,
+                "ProcessorTimeMs": null
+              }
+            ],
+            "Output": {
+              "CommittedSinkCount": 1,
+              "FailedSinkCount": 0,
+              "StagedSinkCount": 0,
+              "UncommittedSinkCount": 0,
+              "OutputFailed": false
+            },
+            "Measurements": {
+              "PeakWorkingSetBytes": null,
+              "AllocatedBytesTotal": 15937920
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "16 projects",
+      "project_count": 16,
+      "full_project_count": 16,
+      "scope_planning_sample_count": 1000,
+      "scope_planning_median_milliseconds": 0.020,
+      "full_validation_median_milliseconds": 1221,
+      "unscaled_phase_residual_milliseconds": 1132,
+      "project_scaled_upper_bound_phase_median_milliseconds": 89,
+      "estimates": [
+        {
+          "change_class": "leaf-project-source-change",
+          "disposition": "modeled-only",
+          "affected_project_count": 1,
+          "affected_scope_ratio": 0.0625,
+          "modeled_advisory_milliseconds": 1137.583,
+          "modeled_upper_bound_reduction_percent": 6.832,
+          "authority": "Optimistic K/P upper bound only; no incremental execution or savings authority"
+        },
+        {
+          "change_class": "middle-position-source-change",
+          "disposition": "modeled-only",
+          "affected_project_count": 9,
+          "affected_scope_ratio": 0.5625,
+          "modeled_advisory_milliseconds": 1182.083,
+          "modeled_upper_bound_reduction_percent": 3.187,
+          "authority": "Optimistic K/P upper bound only; no incremental execution or savings authority"
+        },
+        {
+          "change_class": "shared-foundation-project-source-change",
+          "disposition": "modeled-only",
+          "affected_project_count": 16,
+          "affected_scope_ratio": 1,
+          "modeled_advisory_milliseconds": 1221.020,
+          "modeled_upper_bound_reduction_percent": -0.002,
+          "authority": "Optimistic K/P upper bound only; no incremental execution or savings authority"
+        },
+        {
+          "change_class": "policy-or-import-change",
+          "disposition": "modeled-only",
+          "affected_project_count": 16,
+          "affected_scope_ratio": 1,
+          "modeled_advisory_milliseconds": 1221.020,
+          "modeled_upper_bound_reduction_percent": -0.002,
+          "authority": "GlobalExpansion/full strict fallback"
+        }
+      ],
+      "samples": [
+        {
+          "sample_ordinal": 1,
+          "completion_status": "Success",
+          "exit_code": 0,
+          "output_failed": false,
+          "canonical_result_sha256": "a354b52e26561de531887e2cf5e068925b4e49bccc51d3526bbdb87cbd53e7c3",
+          "counters": {
+            "policy_compositions": 1,
+            "project_graph_evaluations": 1,
+            "assembly_loads": 16,
+            "discovered_project_count": 0,
+            "retained_assembly_count": 16,
+            "selected_assembly_count": 16,
+            "modes_evaluated": 1,
+            "snapshot_materializations": 1,
+            "fact_index_materializations": 1,
+            "source_scan_passes": 0,
+            "source_files_scanned": 0,
+            "rendered_sink_count": 1,
+            "output_sink_count": 1
+          },
+          "top_level_phase_milliseconds": {
+            "policy_composition": 668,
+            "load_and_setup": 123,
+            "build_state_preflight": 1,
+            "configuration_check": 221,
+            "policy_consistency_check": 74,
+            "contract_checks": 89,
+            "post_processing": 0,
+            "repository_metrics": 45
+          },
+          "raw_analysis_profile": {
+            "SchemaId": "analysis-profile/v1",
+            "CompletionStatus": "Success",
+            "CancellationObserved": false,
+            "Counters": {
+              "PolicyCompositions": 1,
+              "ProjectGraphEvaluations": 1,
+              "AssemblyLoads": 16,
+              "DiscoveredProjectCount": 0,
+              "RetainedAssemblyCount": 16,
+              "SelectedAssemblyCount": 16,
+              "ModesEvaluated": 1,
+              "SnapshotMaterializations": 1,
+              "FactIndexMaterializations": 1,
+              "SourceScanPasses": 0,
+              "SourceFilesScanned": 0,
+              "ContractFamilyCounts": {
+                "dependency": 4,
+                "layer": 4,
+                "layer_template": 0,
+                "allow_only": 0,
+                "cycle": 0,
+                "method_body": 0,
+                "asmdef": 0,
+                "independence": 0,
+                "assembly_independence": 0,
+                "assembly_dependency": 0,
+                "assembly_allow_only": 0,
+                "package_dependency": 0,
+                "package_allow_only": 0,
+                "framework_dependency": 0,
+                "framework_allow_only": 0,
+                "project_metadata": 0,
+                "protected": 0,
+                "external": 0,
+                "external_allow_only": 0,
+                "acyclic_sibling": 0,
+                "module_container": 0,
+                "type_placement": 0,
+                "layout_conventions": 1,
+                "layout_convention_applicability": 0,
+                "public_api_surface": 0,
+                "contract_surface_exposure": 0,
+                "versioned_contract_surface_isolation": 0,
+                "attribute_usage": 0,
+                "inheritance": 0,
+                "interface_implementation": 0,
+                "composition": 0,
+                "coverage": 0,
+                "metric_budgets": 0,
+                "context_dependency": 0,
+                "context_allow_only": 0,
+                "port_boundary": 0
+              },
+              "ContractFamilyResultCounts": {
+                "dependency": 0,
+                "layer": 0,
+                "layout_conventions": 0
+              },
+              "RenderedSinkCount": 1,
+              "OutputSinkCount": 1,
+              "Cache": {
+                "Status": "NotApplicable",
+                "Lookups": 0,
+                "Hits": 0,
+                "Misses": 0,
+                "Rejects": 0,
+                "Writes": 0,
+                "BytesRead": 0,
+                "BytesWritten": 0,
+                "IneligibleUnitCount": 0,
+                "CorruptionEvents": 0,
+                "CancelledBeforePublish": 0,
+                "AvoidedAssemblyLoads": 0,
+                "AvoidedFactIndexMaterializations": 0,
+                "AvoidedSourceScanPasses": 0,
+                "AvoidedContractExecutions": 0,
+                "AvoidedArtifactBytesLoaded": 0,
+                "Mode": "disabled",
+                "RejectReasonCounts": {}
+              },
+              "Concurrency": {
+                "Status": "NotApplicable",
+                "MaxParallelism": 0,
+                "ScheduledWorkItems": 0,
+                "CompletedWorkItems": 0,
+                "ObservedMaxConcurrency": 0,
+                "MergeOperations": 0
+              }
+            },
+            "Phases": [
+              {
+                "Name": "total",
+                "Indent": 0,
+                "Ordinal": 0,
+                "Count": null,
+                "ElapsedMs": 1308,
+                "ProcessorTimeMs": 980.584
+              },
+              {
+                "Name": "policy_composition",
+                "Indent": 0,
+                "Ordinal": 1,
+                "Count": null,
+                "ElapsedMs": 668,
+                "ProcessorTimeMs": 463.026
+              },
+              {
+                "Name": "yaml_loading",
+                "Indent": 1,
+                "Ordinal": 2,
+                "Count": null,
+                "ElapsedMs": 665,
+                "ProcessorTimeMs": 459.9
+              },
+              {
+                "Name": "load_and_setup",
+                "Indent": 0,
+                "Ordinal": 3,
+                "Count": null,
+                "ElapsedMs": 123,
+                "ProcessorTimeMs": 79.217
+              },
+              {
+                "Name": "root_resolution",
+                "Indent": 1,
+                "Ordinal": 4,
+                "Count": null,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.165
+              },
+              {
+                "Name": "condition_set_resolution",
+                "Indent": 1,
+                "Ordinal": 5,
+                "Count": null,
+                "ElapsedMs": 3,
+                "ProcessorTimeMs": 1.274
+              },
+              {
+                "Name": "assembly_resolution",
+                "Indent": 1,
+                "Ordinal": 6,
+                "Count": null,
+                "ElapsedMs": 119,
+                "ProcessorTimeMs": 76.735
+              },
+              {
+                "Name": "build_state_preflight",
+                "Indent": 0,
+                "Ordinal": 7,
+                "Count": null,
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.399
+              },
+              {
+                "Name": "configuration_check",
+                "Indent": 0,
+                "Ordinal": 8,
+                "Count": null,
+                "ElapsedMs": 221,
+                "ProcessorTimeMs": 171.251
+              },
+              {
+                "Name": "policy_consistency_check",
+                "Indent": 0,
+                "Ordinal": 9,
+                "Count": null,
+                "ElapsedMs": 74,
+                "ProcessorTimeMs": 64.684
+              },
+              {
+                "Name": "contract_checks",
+                "Indent": 0,
+                "Ordinal": 10,
+                "Count": null,
+                "ElapsedMs": 89,
+                "ProcessorTimeMs": 82.868
+              },
+              {
+                "Name": "dependency",
+                "Indent": 1,
+                "Ordinal": 11,
+                "Count": 4,
+                "ElapsedMs": 33,
+                "ProcessorTimeMs": 31.093
+              },
+              {
+                "Name": "layer",
+                "Indent": 1,
+                "Ordinal": 12,
+                "Count": 4,
+                "ElapsedMs": 19,
+                "ProcessorTimeMs": 17.744
+              },
+              {
+                "Name": "layer_template",
+                "Indent": 1,
+                "Ordinal": 13,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.007
+              },
+              {
+                "Name": "allow_only",
+                "Indent": 1,
+                "Ordinal": 14,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.003
+              },
+              {
+                "Name": "cycle",
+                "Indent": 1,
+                "Ordinal": 15,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "method_body",
@@ -1450,7 +2052,7 @@
                 "Ordinal": 20,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "assembly_allow_only",
@@ -1458,7 +2060,7 @@
                 "Ordinal": 21,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "package_dependency",
@@ -1466,7 +2068,7 @@
                 "Ordinal": 22,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "package_allow_only",
@@ -1474,7 +2076,7 @@
                 "Ordinal": 23,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "framework_dependency",
@@ -1514,7 +2116,7 @@
                 "Ordinal": 28,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "external_allow_only",
@@ -1546,15 +2148,567 @@
                 "Ordinal": 32,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "layout_conventions",
                 "Indent": 1,
                 "Ordinal": 33,
                 "Count": 1,
-                "ElapsedMs": 72,
-                "ProcessorTimeMs": 36.442
+                "ElapsedMs": 29,
+                "ProcessorTimeMs": 27.692
+              },
+              {
+                "Name": "layout_convention_applicability",
+                "Indent": 1,
+                "Ordinal": 34,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.003
+              },
+              {
+                "Name": "public_api_surface",
+                "Indent": 1,
+                "Ordinal": 35,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "contract_surface_exposure",
+                "Indent": 1,
+                "Ordinal": 36,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "versioned_contract_surface_isolation",
+                "Indent": 1,
+                "Ordinal": 37,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "attribute_usage",
+                "Indent": 1,
+                "Ordinal": 38,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "inheritance",
+                "Indent": 1,
+                "Ordinal": 39,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "interface_implementation",
+                "Indent": 1,
+                "Ordinal": 40,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "composition",
+                "Indent": 1,
+                "Ordinal": 41,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "coverage",
+                "Indent": 1,
+                "Ordinal": 42,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.054
+              },
+              {
+                "Name": "metric_budgets",
+                "Indent": 1,
+                "Ordinal": 43,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.212
+              },
+              {
+                "Name": "context_dependency",
+                "Indent": 1,
+                "Ordinal": 44,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.004
+              },
+              {
+                "Name": "context_allow_only",
+                "Indent": 1,
+                "Ordinal": 45,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "port_boundary",
+                "Indent": 1,
+                "Ordinal": 46,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "post_processing",
+                "Indent": 0,
+                "Ordinal": 47,
+                "Count": null,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.459
+              },
+              {
+                "Name": "repository_metrics",
+                "Indent": 0,
+                "Ordinal": 48,
+                "Count": null,
+                "ElapsedMs": 45,
+                "ProcessorTimeMs": 41.822
+              },
+              {
+                "Name": "render_json",
+                "Indent": 0,
+                "Ordinal": 49,
+                "Count": null,
+                "ElapsedMs": 203,
+                "ProcessorTimeMs": 179.283
+              },
+              {
+                "Name": "output_stream_write",
+                "Indent": 0,
+                "Ordinal": 50,
+                "Count": null,
+                "ElapsedMs": 2,
+                "ProcessorTimeMs": 2.243
+              },
+              {
+                "Name": "selector_predicate_evaluation",
+                "Indent": 1,
+                "Ordinal": 51,
+                "Count": 2048,
+                "ElapsedMs": 28.196554,
+                "ProcessorTimeMs": null
+              }
+            ],
+            "Output": {
+              "CommittedSinkCount": 1,
+              "FailedSinkCount": 0,
+              "StagedSinkCount": 0,
+              "UncommittedSinkCount": 0,
+              "OutputFailed": false
+            },
+            "Measurements": {
+              "PeakWorkingSetBytes": null,
+              "AllocatedBytesTotal": 28044008
+            }
+          }
+        },
+        {
+          "sample_ordinal": 2,
+          "completion_status": "Success",
+          "exit_code": 0,
+          "output_failed": false,
+          "canonical_result_sha256": "a354b52e26561de531887e2cf5e068925b4e49bccc51d3526bbdb87cbd53e7c3",
+          "counters": {
+            "policy_compositions": 1,
+            "project_graph_evaluations": 1,
+            "assembly_loads": 16,
+            "discovered_project_count": 0,
+            "retained_assembly_count": 16,
+            "selected_assembly_count": 16,
+            "modes_evaluated": 1,
+            "snapshot_materializations": 1,
+            "fact_index_materializations": 1,
+            "source_scan_passes": 0,
+            "source_files_scanned": 0,
+            "rendered_sink_count": 1,
+            "output_sink_count": 1
+          },
+          "top_level_phase_milliseconds": {
+            "policy_composition": 564,
+            "load_and_setup": 84,
+            "build_state_preflight": 1,
+            "configuration_check": 254,
+            "policy_consistency_check": 103,
+            "contract_checks": 88,
+            "post_processing": 0,
+            "repository_metrics": 40
+          },
+          "raw_analysis_profile": {
+            "SchemaId": "analysis-profile/v1",
+            "CompletionStatus": "Success",
+            "CancellationObserved": false,
+            "Counters": {
+              "PolicyCompositions": 1,
+              "ProjectGraphEvaluations": 1,
+              "AssemblyLoads": 16,
+              "DiscoveredProjectCount": 0,
+              "RetainedAssemblyCount": 16,
+              "SelectedAssemblyCount": 16,
+              "ModesEvaluated": 1,
+              "SnapshotMaterializations": 1,
+              "FactIndexMaterializations": 1,
+              "SourceScanPasses": 0,
+              "SourceFilesScanned": 0,
+              "ContractFamilyCounts": {
+                "dependency": 4,
+                "layer": 4,
+                "layer_template": 0,
+                "allow_only": 0,
+                "cycle": 0,
+                "method_body": 0,
+                "asmdef": 0,
+                "independence": 0,
+                "assembly_independence": 0,
+                "assembly_dependency": 0,
+                "assembly_allow_only": 0,
+                "package_dependency": 0,
+                "package_allow_only": 0,
+                "framework_dependency": 0,
+                "framework_allow_only": 0,
+                "project_metadata": 0,
+                "protected": 0,
+                "external": 0,
+                "external_allow_only": 0,
+                "acyclic_sibling": 0,
+                "module_container": 0,
+                "type_placement": 0,
+                "layout_conventions": 1,
+                "layout_convention_applicability": 0,
+                "public_api_surface": 0,
+                "contract_surface_exposure": 0,
+                "versioned_contract_surface_isolation": 0,
+                "attribute_usage": 0,
+                "inheritance": 0,
+                "interface_implementation": 0,
+                "composition": 0,
+                "coverage": 0,
+                "metric_budgets": 0,
+                "context_dependency": 0,
+                "context_allow_only": 0,
+                "port_boundary": 0
+              },
+              "ContractFamilyResultCounts": {
+                "dependency": 0,
+                "layer": 0,
+                "layout_conventions": 0
+              },
+              "RenderedSinkCount": 1,
+              "OutputSinkCount": 1,
+              "Cache": {
+                "Status": "NotApplicable",
+                "Lookups": 0,
+                "Hits": 0,
+                "Misses": 0,
+                "Rejects": 0,
+                "Writes": 0,
+                "BytesRead": 0,
+                "BytesWritten": 0,
+                "IneligibleUnitCount": 0,
+                "CorruptionEvents": 0,
+                "CancelledBeforePublish": 0,
+                "AvoidedAssemblyLoads": 0,
+                "AvoidedFactIndexMaterializations": 0,
+                "AvoidedSourceScanPasses": 0,
+                "AvoidedContractExecutions": 0,
+                "AvoidedArtifactBytesLoaded": 0,
+                "Mode": "disabled",
+                "RejectReasonCounts": {}
+              },
+              "Concurrency": {
+                "Status": "NotApplicable",
+                "MaxParallelism": 0,
+                "ScheduledWorkItems": 0,
+                "CompletedWorkItems": 0,
+                "ObservedMaxConcurrency": 0,
+                "MergeOperations": 0
+              }
+            },
+            "Phases": [
+              {
+                "Name": "total",
+                "Indent": 0,
+                "Ordinal": 0,
+                "Count": null,
+                "ElapsedMs": 1254,
+                "ProcessorTimeMs": 972.786
+              },
+              {
+                "Name": "policy_composition",
+                "Indent": 0,
+                "Ordinal": 1,
+                "Count": null,
+                "ElapsedMs": 564,
+                "ProcessorTimeMs": 476.349
+              },
+              {
+                "Name": "yaml_loading",
+                "Indent": 1,
+                "Ordinal": 2,
+                "Count": null,
+                "ElapsedMs": 557,
+                "ProcessorTimeMs": 470.53
+              },
+              {
+                "Name": "load_and_setup",
+                "Indent": 0,
+                "Ordinal": 3,
+                "Count": null,
+                "ElapsedMs": 84,
+                "ProcessorTimeMs": 65.395
+              },
+              {
+                "Name": "root_resolution",
+                "Indent": 1,
+                "Ordinal": 4,
+                "Count": null,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.181
+              },
+              {
+                "Name": "condition_set_resolution",
+                "Indent": 1,
+                "Ordinal": 5,
+                "Count": null,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.655
+              },
+              {
+                "Name": "assembly_resolution",
+                "Indent": 1,
+                "Ordinal": 6,
+                "Count": null,
+                "ElapsedMs": 81,
+                "ProcessorTimeMs": 63.212
+              },
+              {
+                "Name": "build_state_preflight",
+                "Indent": 0,
+                "Ordinal": 7,
+                "Count": null,
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.724
+              },
+              {
+                "Name": "configuration_check",
+                "Indent": 0,
+                "Ordinal": 8,
+                "Count": null,
+                "ElapsedMs": 254,
+                "ProcessorTimeMs": 169.69
+              },
+              {
+                "Name": "policy_consistency_check",
+                "Indent": 0,
+                "Ordinal": 9,
+                "Count": null,
+                "ElapsedMs": 103,
+                "ProcessorTimeMs": 69.903
+              },
+              {
+                "Name": "contract_checks",
+                "Indent": 0,
+                "Ordinal": 10,
+                "Count": null,
+                "ElapsedMs": 88,
+                "ProcessorTimeMs": 81.233
+              },
+              {
+                "Name": "dependency",
+                "Indent": 1,
+                "Ordinal": 11,
+                "Count": 4,
+                "ElapsedMs": 40,
+                "ProcessorTimeMs": 34.224
+              },
+              {
+                "Name": "layer",
+                "Indent": 1,
+                "Ordinal": 12,
+                "Count": 4,
+                "ElapsedMs": 18,
+                "ProcessorTimeMs": 17.963
+              },
+              {
+                "Name": "layer_template",
+                "Indent": 1,
+                "Ordinal": 13,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.004
+              },
+              {
+                "Name": "allow_only",
+                "Indent": 1,
+                "Ordinal": 14,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "cycle",
+                "Indent": 1,
+                "Ordinal": 15,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "method_body",
+                "Indent": 1,
+                "Ordinal": 16,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "asmdef",
+                "Indent": 1,
+                "Ordinal": 17,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "independence",
+                "Indent": 1,
+                "Ordinal": 18,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "assembly_independence",
+                "Indent": 1,
+                "Ordinal": 19,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "assembly_dependency",
+                "Indent": 1,
+                "Ordinal": 20,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "assembly_allow_only",
+                "Indent": 1,
+                "Ordinal": 21,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "package_dependency",
+                "Indent": 1,
+                "Ordinal": 22,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "package_allow_only",
+                "Indent": 1,
+                "Ordinal": 23,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "framework_dependency",
+                "Indent": 1,
+                "Ordinal": 24,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "framework_allow_only",
+                "Indent": 1,
+                "Ordinal": 25,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "project_metadata",
+                "Indent": 1,
+                "Ordinal": 26,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "protected",
+                "Indent": 1,
+                "Ordinal": 27,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "external",
+                "Indent": 1,
+                "Ordinal": 28,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "external_allow_only",
+                "Indent": 1,
+                "Ordinal": 29,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.001
+              },
+              {
+                "Name": "acyclic_sibling",
+                "Indent": 1,
+                "Ordinal": 30,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0
+              },
+              {
+                "Name": "module_container",
+                "Indent": 1,
+                "Ordinal": 31,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "type_placement",
+                "Indent": 1,
+                "Ordinal": 32,
+                "Count": 0,
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.002
+              },
+              {
+                "Name": "layout_conventions",
+                "Indent": 1,
+                "Ordinal": 33,
+                "Count": 1,
+                "ElapsedMs": 23,
+                "ProcessorTimeMs": 23.333
               },
               {
                 "Name": "layout_convention_applicability",
@@ -1578,7 +2732,7 @@
                 "Ordinal": 36,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "versioned_contract_surface_isolation",
@@ -1586,7 +2740,7 @@
                 "Ordinal": 37,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "attribute_usage",
@@ -1610,7 +2764,7 @@
                 "Ordinal": 40,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "composition",
@@ -1618,7 +2772,7 @@
                 "Ordinal": 41,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "coverage",
@@ -1626,7 +2780,7 @@
                 "Ordinal": 42,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.07
+                "ProcessorTimeMs": 0.063
               },
               {
                 "Name": "metric_budgets",
@@ -1634,7 +2788,7 @@
                 "Ordinal": 43,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.475
+                "ProcessorTimeMs": 0.233
               },
               {
                 "Name": "context_dependency",
@@ -1642,7 +2796,7 @@
                 "Ordinal": 44,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.006
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "context_allow_only",
@@ -1650,7 +2804,7 @@
                 "Ordinal": 45,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "port_boundary",
@@ -1658,7 +2812,7 @@
                 "Ordinal": 46,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "post_processing",
@@ -1666,38 +2820,38 @@
                 "Ordinal": 47,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.665
+                "ProcessorTimeMs": 0.633
               },
               {
                 "Name": "repository_metrics",
                 "Indent": 0,
                 "Ordinal": 48,
                 "Count": null,
-                "ElapsedMs": 163,
-                "ProcessorTimeMs": 63.813
+                "ElapsedMs": 40,
+                "ProcessorTimeMs": 39.298
               },
               {
                 "Name": "render_json",
                 "Indent": 0,
                 "Ordinal": 49,
                 "Count": null,
-                "ElapsedMs": 494,
-                "ProcessorTimeMs": 237.224
+                "ElapsedMs": 177,
+                "ProcessorTimeMs": 162.936
               },
               {
                 "Name": "output_stream_write",
                 "Indent": 0,
                 "Ordinal": 50,
                 "Count": null,
-                "ElapsedMs": 3,
-                "ProcessorTimeMs": 1.88
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.831
               },
               {
                 "Name": "selector_predicate_evaluation",
                 "Indent": 1,
                 "Ordinal": 51,
-                "Count": 1024,
-                "ElapsedMs": 43.391103,
+                "Count": 2048,
+                "ElapsedMs": 28.091096,
                 "ProcessorTimeMs": null
               }
             ],
@@ -1710,62 +2864,12 @@
             },
             "Measurements": {
               "PeakWorkingSetBytes": null,
-              "AllocatedBytesTotal": 15921584
+              "AllocatedBytesTotal": 28095640
             }
           }
-        }
-      ]
-    },
-    {
-      "label": "16 projects",
-      "project_count": 16,
-      "full_project_count": 16,
-      "scope_planning_sample_count": 1000,
-      "scope_planning_median_milliseconds": 0.017,
-      "full_validation_median_milliseconds": 1158,
-      "fixed_phase_median_milliseconds": 870,
-      "project_dependent_phase_median_milliseconds": 288,
-      "estimates": [
-        {
-          "change_class": "leaf-project-source-change",
-          "disposition": "modeled-only",
-          "affected_project_count": 1,
-          "affected_scope_ratio": 0.063,
-          "modeled_advisory_milliseconds": 888.161,
-          "modeled_reduction_percent": 23.302,
-          "authority": "K/P model only; no advisory execution authority"
         },
         {
-          "change_class": "middle-position-source-change",
-          "disposition": "modeled-only",
-          "affected_project_count": 9,
-          "affected_scope_ratio": 0.563,
-          "modeled_advisory_milliseconds": 1032.161,
-          "modeled_reduction_percent": 10.867,
-          "authority": "K/P model only; no advisory execution authority"
-        },
-        {
-          "change_class": "shared-foundation-project-source-change",
-          "disposition": "modeled-only",
-          "affected_project_count": 16,
-          "affected_scope_ratio": 1,
-          "modeled_advisory_milliseconds": 1158.017,
-          "modeled_reduction_percent": -0.001,
-          "authority": "K/P model only; no advisory execution authority"
-        },
-        {
-          "change_class": "policy-or-import-change",
-          "disposition": "modeled-only",
-          "affected_project_count": 16,
-          "affected_scope_ratio": 1,
-          "modeled_advisory_milliseconds": 1158.017,
-          "modeled_reduction_percent": -0.001,
-          "authority": "GlobalExpansion/full strict fallback"
-        }
-      ],
-      "samples": [
-        {
-          "sample_ordinal": 1,
+          "sample_ordinal": 3,
           "completion_status": "Success",
           "exit_code": 0,
           "output_failed": false,
@@ -1787,13 +2891,13 @@
           },
           "top_level_phase_milliseconds": {
             "policy_composition": 783,
-            "load_and_setup": 140,
-            "build_state_preflight": 4,
-            "configuration_check": 278,
-            "policy_consistency_check": 187,
-            "contract_checks": 167,
+            "load_and_setup": 118,
+            "build_state_preflight": 7,
+            "configuration_check": 287,
+            "policy_consistency_check": 79,
+            "contract_checks": 166,
             "post_processing": 0,
-            "repository_metrics": 104
+            "repository_metrics": 35
           },
           "raw_analysis_profile": {
             "SchemaId": "analysis-profile/v1",
@@ -1891,8 +2995,8 @@
                 "Indent": 0,
                 "Ordinal": 0,
                 "Count": null,
-                "ElapsedMs": 1801,
-                "ProcessorTimeMs": 1139.315
+                "ElapsedMs": 1577,
+                "ProcessorTimeMs": 1065.964
               },
               {
                 "Name": "policy_composition",
@@ -1900,23 +3004,23 @@
                 "Ordinal": 1,
                 "Count": null,
                 "ElapsedMs": 783,
-                "ProcessorTimeMs": 529.354
+                "ProcessorTimeMs": 519.941
               },
               {
                 "Name": "yaml_loading",
                 "Indent": 1,
                 "Ordinal": 2,
                 "Count": null,
-                "ElapsedMs": 777,
-                "ProcessorTimeMs": 526.202
+                "ElapsedMs": 778,
+                "ProcessorTimeMs": 516.02
               },
               {
                 "Name": "load_and_setup",
                 "Indent": 0,
                 "Ordinal": 3,
                 "Count": null,
-                "ElapsedMs": 140,
-                "ProcessorTimeMs": 85.761
+                "ElapsedMs": 118,
+                "ProcessorTimeMs": 76.106
               },
               {
                 "Name": "root_resolution",
@@ -1924,71 +3028,71 @@
                 "Ordinal": 4,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.138
+                "ProcessorTimeMs": 0.293
               },
               {
                 "Name": "condition_set_resolution",
                 "Indent": 1,
                 "Ordinal": 5,
                 "Count": null,
-                "ElapsedMs": 1,
-                "ProcessorTimeMs": 1.151
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.776
               },
               {
                 "Name": "assembly_resolution",
                 "Indent": 1,
                 "Ordinal": 6,
                 "Count": null,
-                "ElapsedMs": 137,
-                "ProcessorTimeMs": 83.461
+                "ElapsedMs": 112,
+                "ProcessorTimeMs": 71.724
               },
               {
                 "Name": "build_state_preflight",
                 "Indent": 0,
                 "Ordinal": 7,
                 "Count": null,
-                "ElapsedMs": 4,
-                "ProcessorTimeMs": 3.392
+                "ElapsedMs": 7,
+                "ProcessorTimeMs": 3.845
               },
               {
                 "Name": "configuration_check",
                 "Indent": 0,
                 "Ordinal": 8,
                 "Count": null,
-                "ElapsedMs": 278,
-                "ProcessorTimeMs": 184.539
+                "ElapsedMs": 287,
+                "ProcessorTimeMs": 177.723
               },
               {
                 "Name": "policy_consistency_check",
                 "Indent": 0,
                 "Ordinal": 9,
                 "Count": null,
-                "ElapsedMs": 187,
-                "ProcessorTimeMs": 82.527
+                "ElapsedMs": 79,
+                "ProcessorTimeMs": 64.392
               },
               {
                 "Name": "contract_checks",
                 "Indent": 0,
                 "Ordinal": 10,
                 "Count": null,
-                "ElapsedMs": 167,
-                "ProcessorTimeMs": 110.055
+                "ElapsedMs": 166,
+                "ProcessorTimeMs": 107.591
               },
               {
                 "Name": "dependency",
                 "Indent": 1,
                 "Ordinal": 11,
                 "Count": 4,
-                "ElapsedMs": 59,
-                "ProcessorTimeMs": 38.622
+                "ElapsedMs": 75,
+                "ProcessorTimeMs": 37.145
               },
               {
                 "Name": "layer",
                 "Indent": 1,
                 "Ordinal": 12,
                 "Count": 4,
-                "ElapsedMs": 28,
-                "ProcessorTimeMs": 20.833
+                "ElapsedMs": 38,
+                "ProcessorTimeMs": 25.56
               },
               {
                 "Name": "layer_template",
@@ -1996,7 +3100,7 @@
                 "Ordinal": 13,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.013
               },
               {
                 "Name": "allow_only",
@@ -2004,7 +3108,7 @@
                 "Ordinal": 14,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "cycle",
@@ -2012,7 +3116,7 @@
                 "Ordinal": 15,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "method_body",
@@ -2020,7 +3124,7 @@
                 "Ordinal": 16,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "asmdef",
@@ -2028,7 +3132,7 @@
                 "Ordinal": 17,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.005
               },
               {
                 "Name": "independence",
@@ -2036,7 +3140,7 @@
                 "Ordinal": 18,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "assembly_independence",
@@ -2044,7 +3148,7 @@
                 "Ordinal": 19,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "assembly_dependency",
@@ -2052,7 +3156,7 @@
                 "Ordinal": 20,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "assembly_allow_only",
@@ -2060,7 +3164,7 @@
                 "Ordinal": 21,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "package_dependency",
@@ -2076,7 +3180,7 @@
                 "Ordinal": 23,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.005
               },
               {
                 "Name": "framework_dependency",
@@ -2084,7 +3188,7 @@
                 "Ordinal": 24,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "framework_allow_only",
@@ -2116,7 +3220,7 @@
                 "Ordinal": 28,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "external_allow_only",
@@ -2124,7 +3228,7 @@
                 "Ordinal": 29,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.005
               },
               {
                 "Name": "acyclic_sibling",
@@ -2132,7 +3236,7 @@
                 "Ordinal": 30,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.005
               },
               {
                 "Name": "module_container",
@@ -2140,7 +3244,7 @@
                 "Ordinal": 31,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "type_placement",
@@ -2148,15 +3252,15 @@
                 "Ordinal": 32,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "layout_conventions",
                 "Indent": 1,
                 "Ordinal": 33,
                 "Count": 1,
-                "ElapsedMs": 56,
-                "ProcessorTimeMs": 37.748
+                "ElapsedMs": 37,
+                "ProcessorTimeMs": 33.439
               },
               {
                 "Name": "layout_convention_applicability",
@@ -2180,7 +3284,7 @@
                 "Ordinal": 36,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "versioned_contract_surface_isolation",
@@ -2188,7 +3292,7 @@
                 "Ordinal": 37,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "attribute_usage",
@@ -2196,7 +3300,7 @@
                 "Ordinal": 38,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "inheritance",
@@ -2220,7 +3324,7 @@
                 "Ordinal": 41,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "coverage",
@@ -2228,7 +3332,7 @@
                 "Ordinal": 42,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.166
+                "ProcessorTimeMs": 0.092
               },
               {
                 "Name": "metric_budgets",
@@ -2236,559 +3340,7 @@
                 "Ordinal": 43,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.253
-              },
-              {
-                "Name": "context_dependency",
-                "Indent": 1,
-                "Ordinal": 44,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
-              },
-              {
-                "Name": "context_allow_only",
-                "Indent": 1,
-                "Ordinal": 45,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "port_boundary",
-                "Indent": 1,
-                "Ordinal": 46,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "post_processing",
-                "Indent": 0,
-                "Ordinal": 47,
-                "Count": null,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.651
-              },
-              {
-                "Name": "repository_metrics",
-                "Indent": 0,
-                "Ordinal": 48,
-                "Count": null,
-                "ElapsedMs": 104,
-                "ProcessorTimeMs": 54.899
-              },
-              {
-                "Name": "render_json",
-                "Indent": 0,
-                "Ordinal": 49,
-                "Count": null,
-                "ElapsedMs": 273,
-                "ProcessorTimeMs": 200.751
-              },
-              {
-                "Name": "output_stream_write",
-                "Indent": 0,
-                "Ordinal": 50,
-                "Count": null,
-                "ElapsedMs": 9,
-                "ProcessorTimeMs": 3.796
-              },
-              {
-                "Name": "selector_predicate_evaluation",
-                "Indent": 1,
-                "Ordinal": 51,
-                "Count": 2048,
-                "ElapsedMs": 47.449357,
-                "ProcessorTimeMs": null
-              }
-            ],
-            "Output": {
-              "CommittedSinkCount": 1,
-              "FailedSinkCount": 0,
-              "StagedSinkCount": 0,
-              "UncommittedSinkCount": 0,
-              "OutputFailed": false
-            },
-            "Measurements": {
-              "PeakWorkingSetBytes": null,
-              "AllocatedBytesTotal": 28078728
-            }
-          }
-        },
-        {
-          "sample_ordinal": 2,
-          "completion_status": "Success",
-          "exit_code": 0,
-          "output_failed": false,
-          "canonical_result_sha256": "a354b52e26561de531887e2cf5e068925b4e49bccc51d3526bbdb87cbd53e7c3",
-          "counters": {
-            "policy_compositions": 1,
-            "project_graph_evaluations": 1,
-            "assembly_loads": 16,
-            "discovered_project_count": 0,
-            "retained_assembly_count": 16,
-            "selected_assembly_count": 16,
-            "modes_evaluated": 1,
-            "snapshot_materializations": 1,
-            "fact_index_materializations": 1,
-            "source_scan_passes": 0,
-            "source_files_scanned": 0,
-            "rendered_sink_count": 1,
-            "output_sink_count": 1
-          },
-          "top_level_phase_milliseconds": {
-            "policy_composition": 669,
-            "load_and_setup": 66,
-            "build_state_preflight": 4,
-            "configuration_check": 131,
-            "policy_consistency_check": 59,
-            "contract_checks": 95,
-            "post_processing": 0,
-            "repository_metrics": 51
-          },
-          "raw_analysis_profile": {
-            "SchemaId": "analysis-profile/v1",
-            "CompletionStatus": "Success",
-            "CancellationObserved": false,
-            "Counters": {
-              "PolicyCompositions": 1,
-              "ProjectGraphEvaluations": 1,
-              "AssemblyLoads": 16,
-              "DiscoveredProjectCount": 0,
-              "RetainedAssemblyCount": 16,
-              "SelectedAssemblyCount": 16,
-              "ModesEvaluated": 1,
-              "SnapshotMaterializations": 1,
-              "FactIndexMaterializations": 1,
-              "SourceScanPasses": 0,
-              "SourceFilesScanned": 0,
-              "ContractFamilyCounts": {
-                "dependency": 4,
-                "layer": 4,
-                "layer_template": 0,
-                "allow_only": 0,
-                "cycle": 0,
-                "method_body": 0,
-                "asmdef": 0,
-                "independence": 0,
-                "assembly_independence": 0,
-                "assembly_dependency": 0,
-                "assembly_allow_only": 0,
-                "package_dependency": 0,
-                "package_allow_only": 0,
-                "framework_dependency": 0,
-                "framework_allow_only": 0,
-                "project_metadata": 0,
-                "protected": 0,
-                "external": 0,
-                "external_allow_only": 0,
-                "acyclic_sibling": 0,
-                "module_container": 0,
-                "type_placement": 0,
-                "layout_conventions": 1,
-                "layout_convention_applicability": 0,
-                "public_api_surface": 0,
-                "contract_surface_exposure": 0,
-                "versioned_contract_surface_isolation": 0,
-                "attribute_usage": 0,
-                "inheritance": 0,
-                "interface_implementation": 0,
-                "composition": 0,
-                "coverage": 0,
-                "metric_budgets": 0,
-                "context_dependency": 0,
-                "context_allow_only": 0,
-                "port_boundary": 0
-              },
-              "ContractFamilyResultCounts": {
-                "dependency": 0,
-                "layer": 0,
-                "layout_conventions": 0
-              },
-              "RenderedSinkCount": 1,
-              "OutputSinkCount": 1,
-              "Cache": {
-                "Status": "NotApplicable",
-                "Lookups": 0,
-                "Hits": 0,
-                "Misses": 0,
-                "Rejects": 0,
-                "Writes": 0,
-                "BytesRead": 0,
-                "BytesWritten": 0,
-                "IneligibleUnitCount": 0,
-                "CorruptionEvents": 0,
-                "CancelledBeforePublish": 0,
-                "AvoidedAssemblyLoads": 0,
-                "AvoidedFactIndexMaterializations": 0,
-                "AvoidedSourceScanPasses": 0,
-                "AvoidedContractExecutions": 0,
-                "AvoidedArtifactBytesLoaded": 0,
-                "Mode": "disabled",
-                "RejectReasonCounts": {}
-              },
-              "Concurrency": {
-                "Status": "NotApplicable",
-                "MaxParallelism": 0,
-                "ScheduledWorkItems": 0,
-                "CompletedWorkItems": 0,
-                "ObservedMaxConcurrency": 0,
-                "MergeOperations": 0
-              }
-            },
-            "Phases": [
-              {
-                "Name": "total",
-                "Indent": 0,
-                "Ordinal": 0,
-                "Count": null,
-                "ElapsedMs": 1147,
-                "ProcessorTimeMs": 947.572
-              },
-              {
-                "Name": "policy_composition",
-                "Indent": 0,
-                "Ordinal": 1,
-                "Count": null,
-                "ElapsedMs": 669,
-                "ProcessorTimeMs": 498.257
-              },
-              {
-                "Name": "yaml_loading",
-                "Indent": 1,
-                "Ordinal": 2,
-                "Count": null,
-                "ElapsedMs": 665,
-                "ProcessorTimeMs": 494.426
-              },
-              {
-                "Name": "load_and_setup",
-                "Indent": 0,
-                "Ordinal": 3,
-                "Count": null,
-                "ElapsedMs": 66,
-                "ProcessorTimeMs": 62.946
-              },
-              {
-                "Name": "root_resolution",
-                "Indent": 1,
-                "Ordinal": 4,
-                "Count": null,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.229
-              },
-              {
-                "Name": "condition_set_resolution",
-                "Indent": 1,
-                "Ordinal": 5,
-                "Count": null,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.818
-              },
-              {
-                "Name": "assembly_resolution",
-                "Indent": 1,
-                "Ordinal": 6,
-                "Count": null,
-                "ElapsedMs": 64,
-                "ProcessorTimeMs": 60.504
-              },
-              {
-                "Name": "build_state_preflight",
-                "Indent": 0,
-                "Ordinal": 7,
-                "Count": null,
-                "ElapsedMs": 4,
-                "ProcessorTimeMs": 4.326
-              },
-              {
-                "Name": "configuration_check",
-                "Indent": 0,
-                "Ordinal": 8,
-                "Count": null,
-                "ElapsedMs": 131,
-                "ProcessorTimeMs": 127.34
-              },
-              {
-                "Name": "policy_consistency_check",
-                "Indent": 0,
-                "Ordinal": 9,
-                "Count": null,
-                "ElapsedMs": 59,
-                "ProcessorTimeMs": 56.39
-              },
-              {
-                "Name": "contract_checks",
-                "Indent": 0,
-                "Ordinal": 10,
-                "Count": null,
-                "ElapsedMs": 95,
-                "ProcessorTimeMs": 88.391
-              },
-              {
-                "Name": "dependency",
-                "Indent": 1,
-                "Ordinal": 11,
-                "Count": 4,
-                "ElapsedMs": 29,
-                "ProcessorTimeMs": 28.579
-              },
-              {
-                "Name": "layer",
-                "Indent": 1,
-                "Ordinal": 12,
-                "Count": 4,
-                "ElapsedMs": 20,
-                "ProcessorTimeMs": 19.604
-              },
-              {
-                "Name": "layer_template",
-                "Indent": 1,
-                "Ordinal": 13,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "allow_only",
-                "Indent": 1,
-                "Ordinal": 14,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "cycle",
-                "Indent": 1,
-                "Ordinal": 15,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
-              },
-              {
-                "Name": "method_body",
-                "Indent": 1,
-                "Ordinal": 16,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "asmdef",
-                "Indent": 1,
-                "Ordinal": 17,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "independence",
-                "Indent": 1,
-                "Ordinal": 18,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "assembly_independence",
-                "Indent": 1,
-                "Ordinal": 19,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
-              },
-              {
-                "Name": "assembly_dependency",
-                "Indent": 1,
-                "Ordinal": 20,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "assembly_allow_only",
-                "Indent": 1,
-                "Ordinal": 21,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "package_dependency",
-                "Indent": 1,
-                "Ordinal": 22,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "package_allow_only",
-                "Indent": 1,
-                "Ordinal": 23,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "framework_dependency",
-                "Indent": 1,
-                "Ordinal": 24,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "framework_allow_only",
-                "Indent": 1,
-                "Ordinal": 25,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "project_metadata",
-                "Indent": 1,
-                "Ordinal": 26,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "protected",
-                "Indent": 1,
-                "Ordinal": 27,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "external",
-                "Indent": 1,
-                "Ordinal": 28,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "external_allow_only",
-                "Indent": 1,
-                "Ordinal": 29,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "acyclic_sibling",
-                "Indent": 1,
-                "Ordinal": 30,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "module_container",
-                "Indent": 1,
-                "Ordinal": 31,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "type_placement",
-                "Indent": 1,
-                "Ordinal": 32,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "layout_conventions",
-                "Indent": 1,
-                "Ordinal": 33,
-                "Count": 1,
-                "ElapsedMs": 34,
-                "ProcessorTimeMs": 31.65
-              },
-              {
-                "Name": "layout_convention_applicability",
-                "Indent": 1,
-                "Ordinal": 34,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
-              },
-              {
-                "Name": "public_api_surface",
-                "Indent": 1,
-                "Ordinal": 35,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "contract_surface_exposure",
-                "Indent": 1,
-                "Ordinal": 36,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "versioned_contract_surface_isolation",
-                "Indent": 1,
-                "Ordinal": 37,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "attribute_usage",
-                "Indent": 1,
-                "Ordinal": 38,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "inheritance",
-                "Indent": 1,
-                "Ordinal": 39,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "interface_implementation",
-                "Indent": 1,
-                "Ordinal": 40,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "composition",
-                "Indent": 1,
-                "Ordinal": 41,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "coverage",
-                "Indent": 1,
-                "Ordinal": 42,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.055
-              },
-              {
-                "Name": "metric_budgets",
-                "Indent": 1,
-                "Ordinal": 43,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.314
+                "ProcessorTimeMs": 0.258
               },
               {
                 "Name": "context_dependency",
@@ -2820,23 +3372,23 @@
                 "Ordinal": 47,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.755
+                "ProcessorTimeMs": 0.613
               },
               {
                 "Name": "repository_metrics",
                 "Indent": 0,
                 "Ordinal": 48,
                 "Count": null,
-                "ElapsedMs": 51,
-                "ProcessorTimeMs": 45.656
+                "ElapsedMs": 35,
+                "ProcessorTimeMs": 34.936
               },
               {
                 "Name": "render_json",
                 "Indent": 0,
                 "Ordinal": 49,
                 "Count": null,
-                "ElapsedMs": 429,
-                "ProcessorTimeMs": 210.187
+                "ElapsedMs": 193,
+                "ProcessorTimeMs": 179.84
               },
               {
                 "Name": "output_stream_write",
@@ -2844,14 +3396,14 @@
                 "Ordinal": 50,
                 "Count": null,
                 "ElapsedMs": 3,
-                "ProcessorTimeMs": 3.257
+                "ProcessorTimeMs": 3.374
               },
               {
                 "Name": "selector_predicate_evaluation",
                 "Indent": 1,
                 "Ordinal": 51,
                 "Count": 2048,
-                "ElapsedMs": 24.620765,
+                "ElapsedMs": 58.230357,
                 "ProcessorTimeMs": null
               }
             ],
@@ -2864,559 +3416,7 @@
             },
             "Measurements": {
               "PeakWorkingSetBytes": null,
-              "AllocatedBytesTotal": 28095192
-            }
-          }
-        },
-        {
-          "sample_ordinal": 3,
-          "completion_status": "Success",
-          "exit_code": 0,
-          "output_failed": false,
-          "canonical_result_sha256": "a354b52e26561de531887e2cf5e068925b4e49bccc51d3526bbdb87cbd53e7c3",
-          "counters": {
-            "policy_compositions": 1,
-            "project_graph_evaluations": 1,
-            "assembly_loads": 16,
-            "discovered_project_count": 0,
-            "retained_assembly_count": 16,
-            "selected_assembly_count": 16,
-            "modes_evaluated": 1,
-            "snapshot_materializations": 1,
-            "fact_index_materializations": 1,
-            "source_scan_passes": 0,
-            "source_files_scanned": 0,
-            "rendered_sink_count": 1,
-            "output_sink_count": 1
-          },
-          "top_level_phase_milliseconds": {
-            "policy_composition": 594,
-            "load_and_setup": 137,
-            "build_state_preflight": 1,
-            "configuration_check": 220,
-            "policy_consistency_check": 56,
-            "contract_checks": 104,
-            "post_processing": 0,
-            "repository_metrics": 46
-          },
-          "raw_analysis_profile": {
-            "SchemaId": "analysis-profile/v1",
-            "CompletionStatus": "Success",
-            "CancellationObserved": false,
-            "Counters": {
-              "PolicyCompositions": 1,
-              "ProjectGraphEvaluations": 1,
-              "AssemblyLoads": 16,
-              "DiscoveredProjectCount": 0,
-              "RetainedAssemblyCount": 16,
-              "SelectedAssemblyCount": 16,
-              "ModesEvaluated": 1,
-              "SnapshotMaterializations": 1,
-              "FactIndexMaterializations": 1,
-              "SourceScanPasses": 0,
-              "SourceFilesScanned": 0,
-              "ContractFamilyCounts": {
-                "dependency": 4,
-                "layer": 4,
-                "layer_template": 0,
-                "allow_only": 0,
-                "cycle": 0,
-                "method_body": 0,
-                "asmdef": 0,
-                "independence": 0,
-                "assembly_independence": 0,
-                "assembly_dependency": 0,
-                "assembly_allow_only": 0,
-                "package_dependency": 0,
-                "package_allow_only": 0,
-                "framework_dependency": 0,
-                "framework_allow_only": 0,
-                "project_metadata": 0,
-                "protected": 0,
-                "external": 0,
-                "external_allow_only": 0,
-                "acyclic_sibling": 0,
-                "module_container": 0,
-                "type_placement": 0,
-                "layout_conventions": 1,
-                "layout_convention_applicability": 0,
-                "public_api_surface": 0,
-                "contract_surface_exposure": 0,
-                "versioned_contract_surface_isolation": 0,
-                "attribute_usage": 0,
-                "inheritance": 0,
-                "interface_implementation": 0,
-                "composition": 0,
-                "coverage": 0,
-                "metric_budgets": 0,
-                "context_dependency": 0,
-                "context_allow_only": 0,
-                "port_boundary": 0
-              },
-              "ContractFamilyResultCounts": {
-                "dependency": 0,
-                "layer": 0,
-                "layout_conventions": 0
-              },
-              "RenderedSinkCount": 1,
-              "OutputSinkCount": 1,
-              "Cache": {
-                "Status": "NotApplicable",
-                "Lookups": 0,
-                "Hits": 0,
-                "Misses": 0,
-                "Rejects": 0,
-                "Writes": 0,
-                "BytesRead": 0,
-                "BytesWritten": 0,
-                "IneligibleUnitCount": 0,
-                "CorruptionEvents": 0,
-                "CancelledBeforePublish": 0,
-                "AvoidedAssemblyLoads": 0,
-                "AvoidedFactIndexMaterializations": 0,
-                "AvoidedSourceScanPasses": 0,
-                "AvoidedContractExecutions": 0,
-                "AvoidedArtifactBytesLoaded": 0,
-                "Mode": "disabled",
-                "RejectReasonCounts": {}
-              },
-              "Concurrency": {
-                "Status": "NotApplicable",
-                "MaxParallelism": 0,
-                "ScheduledWorkItems": 0,
-                "CompletedWorkItems": 0,
-                "ObservedMaxConcurrency": 0,
-                "MergeOperations": 0
-              }
-            },
-            "Phases": [
-              {
-                "Name": "total",
-                "Indent": 0,
-                "Ordinal": 0,
-                "Count": null,
-                "ElapsedMs": 1240,
-                "ProcessorTimeMs": 996.372
-              },
-              {
-                "Name": "policy_composition",
-                "Indent": 0,
-                "Ordinal": 1,
-                "Count": null,
-                "ElapsedMs": 594,
-                "ProcessorTimeMs": 473.323
-              },
-              {
-                "Name": "yaml_loading",
-                "Indent": 1,
-                "Ordinal": 2,
-                "Count": null,
-                "ElapsedMs": 584,
-                "ProcessorTimeMs": 467.059
-              },
-              {
-                "Name": "load_and_setup",
-                "Indent": 0,
-                "Ordinal": 3,
-                "Count": null,
-                "ElapsedMs": 137,
-                "ProcessorTimeMs": 89.408
-              },
-              {
-                "Name": "root_resolution",
-                "Indent": 1,
-                "Ordinal": 4,
-                "Count": null,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.205
-              },
-              {
-                "Name": "condition_set_resolution",
-                "Indent": 1,
-                "Ordinal": 5,
-                "Count": null,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.829
-              },
-              {
-                "Name": "assembly_resolution",
-                "Indent": 1,
-                "Ordinal": 6,
-                "Count": null,
-                "ElapsedMs": 134,
-                "ProcessorTimeMs": 87.082
-              },
-              {
-                "Name": "build_state_preflight",
-                "Indent": 0,
-                "Ordinal": 7,
-                "Count": null,
-                "ElapsedMs": 1,
-                "ProcessorTimeMs": 1.247
-              },
-              {
-                "Name": "configuration_check",
-                "Indent": 0,
-                "Ordinal": 8,
-                "Count": null,
-                "ElapsedMs": 220,
-                "ProcessorTimeMs": 167.642
-              },
-              {
-                "Name": "policy_consistency_check",
-                "Indent": 0,
-                "Ordinal": 9,
-                "Count": null,
-                "ElapsedMs": 56,
-                "ProcessorTimeMs": 53.337
-              },
-              {
-                "Name": "contract_checks",
-                "Indent": 0,
-                "Ordinal": 10,
-                "Count": null,
-                "ElapsedMs": 104,
-                "ProcessorTimeMs": 97.046
-              },
-              {
-                "Name": "dependency",
-                "Indent": 1,
-                "Ordinal": 11,
-                "Count": 4,
-                "ElapsedMs": 31,
-                "ProcessorTimeMs": 29.441
-              },
-              {
-                "Name": "layer",
-                "Indent": 1,
-                "Ordinal": 12,
-                "Count": 4,
-                "ElapsedMs": 25,
-                "ProcessorTimeMs": 23.861
-              },
-              {
-                "Name": "layer_template",
-                "Indent": 1,
-                "Ordinal": 13,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.006
-              },
-              {
-                "Name": "allow_only",
-                "Indent": 1,
-                "Ordinal": 14,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "cycle",
-                "Indent": 1,
-                "Ordinal": 15,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "method_body",
-                "Indent": 1,
-                "Ordinal": 16,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "asmdef",
-                "Indent": 1,
-                "Ordinal": 17,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "independence",
-                "Indent": 1,
-                "Ordinal": 18,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "assembly_independence",
-                "Indent": 1,
-                "Ordinal": 19,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "assembly_dependency",
-                "Indent": 1,
-                "Ordinal": 20,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
-              },
-              {
-                "Name": "assembly_allow_only",
-                "Indent": 1,
-                "Ordinal": 21,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "package_dependency",
-                "Indent": 1,
-                "Ordinal": 22,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
-              },
-              {
-                "Name": "package_allow_only",
-                "Indent": 1,
-                "Ordinal": 23,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "framework_dependency",
-                "Indent": 1,
-                "Ordinal": 24,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "framework_allow_only",
-                "Indent": 1,
-                "Ordinal": 25,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.005
-              },
-              {
-                "Name": "project_metadata",
-                "Indent": 1,
-                "Ordinal": 26,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "protected",
-                "Indent": 1,
-                "Ordinal": 27,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "external",
-                "Indent": 1,
-                "Ordinal": 28,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "external_allow_only",
-                "Indent": 1,
-                "Ordinal": 29,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "acyclic_sibling",
-                "Indent": 1,
-                "Ordinal": 30,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "module_container",
-                "Indent": 1,
-                "Ordinal": 31,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "type_placement",
-                "Indent": 1,
-                "Ordinal": 32,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.005
-              },
-              {
-                "Name": "layout_conventions",
-                "Indent": 1,
-                "Ordinal": 33,
-                "Count": 1,
-                "ElapsedMs": 36,
-                "ProcessorTimeMs": 33.636
-              },
-              {
-                "Name": "layout_convention_applicability",
-                "Indent": 1,
-                "Ordinal": 34,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.006
-              },
-              {
-                "Name": "public_api_surface",
-                "Indent": 1,
-                "Ordinal": 35,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
-              },
-              {
-                "Name": "contract_surface_exposure",
-                "Indent": 1,
-                "Ordinal": 36,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
-              },
-              {
-                "Name": "versioned_contract_surface_isolation",
-                "Indent": 1,
-                "Ordinal": 37,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "attribute_usage",
-                "Indent": 1,
-                "Ordinal": 38,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
-              },
-              {
-                "Name": "inheritance",
-                "Indent": 1,
-                "Ordinal": 39,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "interface_implementation",
-                "Indent": 1,
-                "Ordinal": 40,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.01
-              },
-              {
-                "Name": "composition",
-                "Indent": 1,
-                "Ordinal": 41,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "coverage",
-                "Indent": 1,
-                "Ordinal": 42,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.425
-              },
-              {
-                "Name": "metric_budgets",
-                "Indent": 1,
-                "Ordinal": 43,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.259
-              },
-              {
-                "Name": "context_dependency",
-                "Indent": 1,
-                "Ordinal": 44,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
-              },
-              {
-                "Name": "context_allow_only",
-                "Indent": 1,
-                "Ordinal": 45,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "port_boundary",
-                "Indent": 1,
-                "Ordinal": 46,
-                "Count": 0,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
-              },
-              {
-                "Name": "post_processing",
-                "Indent": 0,
-                "Ordinal": 47,
-                "Count": null,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.73
-              },
-              {
-                "Name": "repository_metrics",
-                "Indent": 0,
-                "Ordinal": 48,
-                "Count": null,
-                "ElapsedMs": 46,
-                "ProcessorTimeMs": 44.114
-              },
-              {
-                "Name": "render_json",
-                "Indent": 0,
-                "Ordinal": 49,
-                "Count": null,
-                "ElapsedMs": 181,
-                "ProcessorTimeMs": 169.794
-              },
-              {
-                "Name": "output_stream_write",
-                "Indent": 0,
-                "Ordinal": 50,
-                "Count": null,
-                "ElapsedMs": 4,
-                "ProcessorTimeMs": 2.968
-              },
-              {
-                "Name": "selector_predicate_evaluation",
-                "Indent": 1,
-                "Ordinal": 51,
-                "Count": 2048,
-                "ElapsedMs": 28.259326,
-                "ProcessorTimeMs": null
-              }
-            ],
-            "Output": {
-              "CommittedSinkCount": 1,
-              "FailedSinkCount": 0,
-              "StagedSinkCount": 0,
-              "UncommittedSinkCount": 0,
-              "OutputFailed": false
-            },
-            "Measurements": {
-              "PeakWorkingSetBytes": null,
-              "AllocatedBytesTotal": 28094680
+              "AllocatedBytesTotal": 28073760
             }
           }
         }
@@ -3427,45 +3427,45 @@
       "project_count": 32,
       "full_project_count": 32,
       "scope_planning_sample_count": 1000,
-      "scope_planning_median_milliseconds": 0.039,
-      "full_validation_median_milliseconds": 2363,
-      "fixed_phase_median_milliseconds": 1665,
-      "project_dependent_phase_median_milliseconds": 698,
+      "scope_planning_median_milliseconds": 0.036,
+      "full_validation_median_milliseconds": 1232,
+      "unscaled_phase_residual_milliseconds": 1113,
+      "project_scaled_upper_bound_phase_median_milliseconds": 119,
       "estimates": [
         {
           "change_class": "leaf-project-source-change",
           "disposition": "modeled-only",
           "affected_project_count": 1,
-          "affected_scope_ratio": 0.031,
-          "modeled_advisory_milliseconds": 1686.677,
-          "modeled_reduction_percent": 28.621,
-          "authority": "K/P model only; no advisory execution authority"
+          "affected_scope_ratio": 0.03125,
+          "modeled_advisory_milliseconds": 1116.755,
+          "modeled_upper_bound_reduction_percent": 9.354,
+          "authority": "Optimistic K/P upper bound only; no incremental execution or savings authority"
         },
         {
           "change_class": "middle-position-source-change",
           "disposition": "modeled-only",
           "affected_project_count": 17,
-          "affected_scope_ratio": 0.531,
-          "modeled_advisory_milliseconds": 2035.677,
-          "modeled_reduction_percent": 13.852,
-          "authority": "K/P model only; no advisory execution authority"
+          "affected_scope_ratio": 0.53125,
+          "modeled_advisory_milliseconds": 1176.255,
+          "modeled_upper_bound_reduction_percent": 4.525,
+          "authority": "Optimistic K/P upper bound only; no incremental execution or savings authority"
         },
         {
           "change_class": "shared-foundation-project-source-change",
           "disposition": "modeled-only",
           "affected_project_count": 32,
           "affected_scope_ratio": 1,
-          "modeled_advisory_milliseconds": 2363.039,
-          "modeled_reduction_percent": -0.002,
-          "authority": "K/P model only; no advisory execution authority"
+          "modeled_advisory_milliseconds": 1232.036,
+          "modeled_upper_bound_reduction_percent": -0.003,
+          "authority": "Optimistic K/P upper bound only; no incremental execution or savings authority"
         },
         {
           "change_class": "policy-or-import-change",
           "disposition": "modeled-only",
           "affected_project_count": 32,
           "affected_scope_ratio": 1,
-          "modeled_advisory_milliseconds": 2363.039,
-          "modeled_reduction_percent": -0.002,
+          "modeled_advisory_milliseconds": 1232.036,
+          "modeled_upper_bound_reduction_percent": -0.003,
           "authority": "GlobalExpansion/full strict fallback"
         }
       ],
@@ -3492,14 +3492,14 @@
             "output_sink_count": 1
           },
           "top_level_phase_milliseconds": {
-            "policy_composition": 1046,
-            "load_and_setup": 179,
-            "build_state_preflight": 4,
-            "configuration_check": 414,
-            "policy_consistency_check": 205,
-            "contract_checks": 386,
+            "policy_composition": 384,
+            "load_and_setup": 89,
+            "build_state_preflight": 2,
+            "configuration_check": 202,
+            "policy_consistency_check": 121,
+            "contract_checks": 114,
             "post_processing": 0,
-            "repository_metrics": 151
+            "repository_metrics": 38
           },
           "raw_analysis_profile": {
             "SchemaId": "analysis-profile/v1",
@@ -3597,32 +3597,32 @@
                 "Indent": 0,
                 "Ordinal": 0,
                 "Count": null,
-                "ElapsedMs": 2576,
-                "ProcessorTimeMs": 1149.19
+                "ElapsedMs": 1016,
+                "ProcessorTimeMs": 942.276
               },
               {
                 "Name": "policy_composition",
                 "Indent": 0,
                 "Ordinal": 1,
                 "Count": null,
-                "ElapsedMs": 1046,
-                "ProcessorTimeMs": 462.213
+                "ElapsedMs": 384,
+                "ProcessorTimeMs": 373.53
               },
               {
                 "Name": "yaml_loading",
                 "Indent": 1,
                 "Ordinal": 2,
                 "Count": null,
-                "ElapsedMs": 1009,
-                "ProcessorTimeMs": 458.214
+                "ElapsedMs": 381,
+                "ProcessorTimeMs": 370.496
               },
               {
                 "Name": "load_and_setup",
                 "Indent": 0,
                 "Ordinal": 3,
                 "Count": null,
-                "ElapsedMs": 179,
-                "ProcessorTimeMs": 96.841
+                "ElapsedMs": 89,
+                "ProcessorTimeMs": 83.274
               },
               {
                 "Name": "root_resolution",
@@ -3630,71 +3630,71 @@
                 "Ordinal": 4,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.163
+                "ProcessorTimeMs": 0.132
               },
               {
                 "Name": "condition_set_resolution",
                 "Indent": 1,
                 "Ordinal": 5,
                 "Count": null,
-                "ElapsedMs": 4,
-                "ProcessorTimeMs": 1.868
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.586
               },
               {
                 "Name": "assembly_resolution",
                 "Indent": 1,
                 "Ordinal": 6,
                 "Count": null,
-                "ElapsedMs": 171,
-                "ProcessorTimeMs": 92.888
+                "ElapsedMs": 87,
+                "ProcessorTimeMs": 81.53
               },
               {
                 "Name": "build_state_preflight",
                 "Indent": 0,
                 "Ordinal": 7,
                 "Count": null,
-                "ElapsedMs": 4,
-                "ProcessorTimeMs": 3.064
+                "ElapsedMs": 2,
+                "ProcessorTimeMs": 1.973
               },
               {
                 "Name": "configuration_check",
                 "Indent": 0,
                 "Ordinal": 8,
                 "Count": null,
-                "ElapsedMs": 414,
-                "ProcessorTimeMs": 183.605
+                "ElapsedMs": 202,
+                "ProcessorTimeMs": 181.725
               },
               {
                 "Name": "policy_consistency_check",
                 "Indent": 0,
                 "Ordinal": 9,
                 "Count": null,
-                "ElapsedMs": 205,
-                "ProcessorTimeMs": 102.812
+                "ElapsedMs": 121,
+                "ProcessorTimeMs": 93.525
               },
               {
                 "Name": "contract_checks",
                 "Indent": 0,
                 "Ordinal": 10,
                 "Count": null,
-                "ElapsedMs": 386,
-                "ProcessorTimeMs": 166.272
+                "ElapsedMs": 114,
+                "ProcessorTimeMs": 110.675
               },
               {
                 "Name": "dependency",
                 "Indent": 1,
                 "Ordinal": 11,
                 "Count": 4,
-                "ElapsedMs": 152,
-                "ProcessorTimeMs": 58.326
+                "ElapsedMs": 40,
+                "ProcessorTimeMs": 38.692
               },
               {
                 "Name": "layer",
                 "Indent": 1,
                 "Ordinal": 12,
                 "Count": 4,
-                "ElapsedMs": 132,
-                "ProcessorTimeMs": 50.311
+                "ElapsedMs": 33,
+                "ProcessorTimeMs": 33.503
               },
               {
                 "Name": "layer_template",
@@ -3718,7 +3718,7 @@
                 "Ordinal": 15,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "method_body",
@@ -3726,7 +3726,7 @@
                 "Ordinal": 16,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "asmdef",
@@ -3734,7 +3734,7 @@
                 "Ordinal": 17,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "independence",
@@ -3742,7 +3742,7 @@
                 "Ordinal": 18,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "assembly_independence",
@@ -3750,7 +3750,7 @@
                 "Ordinal": 19,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.021
               },
               {
                 "Name": "assembly_dependency",
@@ -3774,7 +3774,7 @@
                 "Ordinal": 22,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "package_allow_only",
@@ -3782,7 +3782,7 @@
                 "Ordinal": 23,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "framework_dependency",
@@ -3790,7 +3790,7 @@
                 "Ordinal": 24,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "framework_allow_only",
@@ -3798,7 +3798,7 @@
                 "Ordinal": 25,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "project_metadata",
@@ -3806,7 +3806,7 @@
                 "Ordinal": 26,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.005
               },
               {
                 "Name": "protected",
@@ -3814,7 +3814,7 @@
                 "Ordinal": 27,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "external",
@@ -3846,7 +3846,7 @@
                 "Ordinal": 31,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "type_placement",
@@ -3861,8 +3861,8 @@
                 "Indent": 1,
                 "Ordinal": 33,
                 "Count": 1,
-                "ElapsedMs": 69,
-                "ProcessorTimeMs": 44.571
+                "ElapsedMs": 25,
+                "ProcessorTimeMs": 25.128
               },
               {
                 "Name": "layout_convention_applicability",
@@ -3870,7 +3870,7 @@
                 "Ordinal": 34,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.004
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "public_api_surface",
@@ -3878,7 +3878,7 @@
                 "Ordinal": 35,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "contract_surface_exposure",
@@ -3886,7 +3886,7 @@
                 "Ordinal": 36,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "versioned_contract_surface_isolation",
@@ -3894,7 +3894,7 @@
                 "Ordinal": 37,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.009
+                "ProcessorTimeMs": 0.006
               },
               {
                 "Name": "attribute_usage",
@@ -3902,7 +3902,7 @@
                 "Ordinal": 38,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.006
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "inheritance",
@@ -3910,7 +3910,7 @@
                 "Ordinal": 39,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "interface_implementation",
@@ -3918,7 +3918,7 @@
                 "Ordinal": 40,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.005
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "composition",
@@ -3926,7 +3926,7 @@
                 "Ordinal": 41,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "coverage",
@@ -3934,15 +3934,15 @@
                 "Ordinal": 42,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.17
+                "ProcessorTimeMs": 0.153
               },
               {
                 "Name": "metric_budgets",
                 "Indent": 1,
                 "Ordinal": 43,
                 "Count": 0,
-                "ElapsedMs": 9,
-                "ProcessorTimeMs": 0.829
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 1.425
               },
               {
                 "Name": "context_dependency",
@@ -3950,7 +3950,7 @@
                 "Ordinal": 44,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.013
+                "ProcessorTimeMs": 0.028
               },
               {
                 "Name": "context_allow_only",
@@ -3958,7 +3958,7 @@
                 "Ordinal": 45,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "port_boundary",
@@ -3966,7 +3966,7 @@
                 "Ordinal": 46,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "post_processing",
@@ -3974,38 +3974,38 @@
                 "Ordinal": 47,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.448
+                "ProcessorTimeMs": 0.374
               },
               {
                 "Name": "repository_metrics",
                 "Indent": 0,
                 "Ordinal": 48,
                 "Count": null,
-                "ElapsedMs": 151,
-                "ProcessorTimeMs": 55.517
+                "ElapsedMs": 38,
+                "ProcessorTimeMs": 38.432
               },
               {
                 "Name": "render_json",
                 "Indent": 0,
                 "Ordinal": 49,
                 "Count": null,
-                "ElapsedMs": 453,
-                "ProcessorTimeMs": 214.244
+                "ElapsedMs": 179,
+                "ProcessorTimeMs": 168.209
               },
               {
                 "Name": "output_stream_write",
                 "Indent": 0,
                 "Ordinal": 50,
                 "Count": null,
-                "ElapsedMs": 35,
-                "ProcessorTimeMs": 3.938
+                "ElapsedMs": 4,
+                "ProcessorTimeMs": 3.849
               },
               {
                 "Name": "selector_predicate_evaluation",
                 "Indent": 1,
                 "Ordinal": 51,
                 "Count": 4096,
-                "ElapsedMs": 105.710731,
+                "ElapsedMs": 43.161343,
                 "ProcessorTimeMs": null
               }
             ],
@@ -4018,7 +4018,7 @@
             },
             "Measurements": {
               "PeakWorkingSetBytes": null,
-              "AllocatedBytesTotal": 52834424
+              "AllocatedBytesTotal": 52806240
             }
           }
         },
@@ -4044,14 +4044,14 @@
             "output_sink_count": 1
           },
           "top_level_phase_milliseconds": {
-            "policy_composition": 1180,
-            "load_and_setup": 223,
-            "build_state_preflight": 1,
-            "configuration_check": 374,
-            "policy_consistency_check": 212,
-            "contract_checks": 220,
+            "policy_composition": 670,
+            "load_and_setup": 113,
+            "build_state_preflight": 6,
+            "configuration_check": 298,
+            "policy_consistency_check": 108,
+            "contract_checks": 165,
             "post_processing": 0,
-            "repository_metrics": 153
+            "repository_metrics": 50
           },
           "raw_analysis_profile": {
             "SchemaId": "analysis-profile/v1",
@@ -4149,32 +4149,32 @@
                 "Indent": 0,
                 "Ordinal": 0,
                 "Count": null,
-                "ElapsedMs": 2483,
-                "ProcessorTimeMs": 1127.242
+                "ElapsedMs": 1512,
+                "ProcessorTimeMs": 1178.765
               },
               {
                 "Name": "policy_composition",
                 "Indent": 0,
                 "Ordinal": 1,
                 "Count": null,
-                "ElapsedMs": 1180,
-                "ProcessorTimeMs": 517.842
+                "ElapsedMs": 670,
+                "ProcessorTimeMs": 533.53
               },
               {
                 "Name": "yaml_loading",
                 "Indent": 1,
                 "Ordinal": 2,
                 "Count": null,
-                "ElapsedMs": 1159,
-                "ProcessorTimeMs": 509.693
+                "ElapsedMs": 664,
+                "ProcessorTimeMs": 527.546
               },
               {
                 "Name": "load_and_setup",
                 "Indent": 0,
                 "Ordinal": 3,
                 "Count": null,
-                "ElapsedMs": 223,
-                "ProcessorTimeMs": 103.247
+                "ElapsedMs": 113,
+                "ProcessorTimeMs": 94.38
               },
               {
                 "Name": "root_resolution",
@@ -4182,71 +4182,71 @@
                 "Ordinal": 4,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.157
+                "ProcessorTimeMs": 0.293
               },
               {
                 "Name": "condition_set_resolution",
                 "Indent": 1,
                 "Ordinal": 5,
                 "Count": null,
-                "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.651
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.081
               },
               {
                 "Name": "assembly_resolution",
                 "Indent": 1,
                 "Ordinal": 6,
                 "Count": null,
-                "ElapsedMs": 219,
-                "ProcessorTimeMs": 101.163
+                "ElapsedMs": 109,
+                "ProcessorTimeMs": 90.993
               },
               {
                 "Name": "build_state_preflight",
                 "Indent": 0,
                 "Ordinal": 7,
                 "Count": null,
-                "ElapsedMs": 1,
-                "ProcessorTimeMs": 1.618
+                "ElapsedMs": 6,
+                "ProcessorTimeMs": 3.645
               },
               {
                 "Name": "configuration_check",
                 "Indent": 0,
                 "Ordinal": 8,
                 "Count": null,
-                "ElapsedMs": 374,
-                "ProcessorTimeMs": 168.45
+                "ElapsedMs": 298,
+                "ProcessorTimeMs": 208.131
               },
               {
                 "Name": "policy_consistency_check",
                 "Indent": 0,
                 "Ordinal": 9,
                 "Count": null,
-                "ElapsedMs": 212,
-                "ProcessorTimeMs": 80.391
+                "ElapsedMs": 108,
+                "ProcessorTimeMs": 92.916
               },
               {
                 "Name": "contract_checks",
                 "Indent": 0,
                 "Ordinal": 10,
                 "Count": null,
-                "ElapsedMs": 220,
-                "ProcessorTimeMs": 134.301
+                "ElapsedMs": 165,
+                "ProcessorTimeMs": 128.06
               },
               {
                 "Name": "dependency",
                 "Indent": 1,
                 "Ordinal": 11,
                 "Count": 4,
-                "ElapsedMs": 86,
-                "ProcessorTimeMs": 51.561
+                "ElapsedMs": 90,
+                "ProcessorTimeMs": 59.921
               },
               {
                 "Name": "layer",
                 "Indent": 1,
                 "Ordinal": 12,
                 "Count": 4,
-                "ElapsedMs": 46,
-                "ProcessorTimeMs": 37.371
+                "ElapsedMs": 38,
+                "ProcessorTimeMs": 34.962
               },
               {
                 "Name": "layer_template",
@@ -4254,7 +4254,7 @@
                 "Ordinal": 13,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.005
               },
               {
                 "Name": "allow_only",
@@ -4262,7 +4262,7 @@
                 "Ordinal": 14,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "cycle",
@@ -4286,7 +4286,7 @@
                 "Ordinal": 17,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "independence",
@@ -4302,7 +4302,7 @@
                 "Ordinal": 19,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "assembly_dependency",
@@ -4310,7 +4310,7 @@
                 "Ordinal": 20,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "assembly_allow_only",
@@ -4326,7 +4326,7 @@
                 "Ordinal": 22,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "package_allow_only",
@@ -4334,7 +4334,7 @@
                 "Ordinal": 23,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "framework_dependency",
@@ -4350,7 +4350,7 @@
                 "Ordinal": 25,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "project_metadata",
@@ -4374,7 +4374,7 @@
                 "Ordinal": 28,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "external_allow_only",
@@ -4398,7 +4398,7 @@
                 "Ordinal": 31,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "type_placement",
@@ -4413,8 +4413,8 @@
                 "Indent": 1,
                 "Ordinal": 33,
                 "Count": 1,
-                "ElapsedMs": 65,
-                "ProcessorTimeMs": 35.127
+                "ElapsedMs": 27,
+                "ProcessorTimeMs": 25.721
               },
               {
                 "Name": "layout_convention_applicability",
@@ -4422,7 +4422,7 @@
                 "Ordinal": 34,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.004
               },
               {
                 "Name": "public_api_surface",
@@ -4430,7 +4430,7 @@
                 "Ordinal": 35,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "contract_surface_exposure",
@@ -4438,7 +4438,7 @@
                 "Ordinal": 36,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "versioned_contract_surface_isolation",
@@ -4446,7 +4446,7 @@
                 "Ordinal": 37,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.005
+                "ProcessorTimeMs": 0.009
               },
               {
                 "Name": "attribute_usage",
@@ -4454,7 +4454,7 @@
                 "Ordinal": 38,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "inheritance",
@@ -4478,7 +4478,7 @@
                 "Ordinal": 41,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "coverage",
@@ -4486,7 +4486,7 @@
                 "Ordinal": 42,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.078
+                "ProcessorTimeMs": 0.057
               },
               {
                 "Name": "metric_budgets",
@@ -4494,7 +4494,7 @@
                 "Ordinal": 43,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.618
+                "ProcessorTimeMs": 0.22
               },
               {
                 "Name": "context_dependency",
@@ -4502,7 +4502,7 @@
                 "Ordinal": 44,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.009
+                "ProcessorTimeMs": 0.003
               },
               {
                 "Name": "context_allow_only",
@@ -4510,7 +4510,7 @@
                 "Ordinal": 45,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "port_boundary",
@@ -4526,38 +4526,38 @@
                 "Ordinal": 47,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.386
+                "ProcessorTimeMs": 0.418
               },
               {
                 "Name": "repository_metrics",
                 "Indent": 0,
                 "Ordinal": 48,
                 "Count": null,
-                "ElapsedMs": 153,
-                "ProcessorTimeMs": 46.61
+                "ElapsedMs": 50,
+                "ProcessorTimeMs": 47.11
               },
               {
                 "Name": "render_json",
                 "Indent": 0,
                 "Ordinal": 49,
                 "Count": null,
-                "ElapsedMs": 464,
-                "ProcessorTimeMs": 191.013
+                "ElapsedMs": 198,
+                "ProcessorTimeMs": 188.991
               },
               {
                 "Name": "output_stream_write",
                 "Indent": 0,
                 "Ordinal": 50,
                 "Count": null,
-                "ElapsedMs": 9,
-                "ProcessorTimeMs": 2.628
+                "ElapsedMs": 4,
+                "ProcessorTimeMs": 3.824
               },
               {
                 "Name": "selector_predicate_evaluation",
                 "Indent": 1,
                 "Ordinal": 51,
                 "Count": 4096,
-                "ElapsedMs": 69.675669,
+                "ElapsedMs": 49.153947,
                 "ProcessorTimeMs": null
               }
             ],
@@ -4570,7 +4570,7 @@
             },
             "Measurements": {
               "PeakWorkingSetBytes": null,
-              "AllocatedBytesTotal": 52823472
+              "AllocatedBytesTotal": 52801144
             }
           }
         },
@@ -4596,14 +4596,14 @@
             "output_sink_count": 1
           },
           "top_level_phase_milliseconds": {
-            "policy_composition": 1130,
-            "load_and_setup": 216,
-            "build_state_preflight": 6,
-            "configuration_check": 322,
-            "policy_consistency_check": 180,
-            "contract_checks": 268,
-            "post_processing": 1,
-            "repository_metrics": 52
+            "policy_composition": 621,
+            "load_and_setup": 160,
+            "build_state_preflight": 1,
+            "configuration_check": 209,
+            "policy_consistency_check": 78,
+            "contract_checks": 119,
+            "post_processing": 0,
+            "repository_metrics": 44
           },
           "raw_analysis_profile": {
             "SchemaId": "analysis-profile/v1",
@@ -4701,32 +4701,32 @@
                 "Indent": 0,
                 "Ordinal": 0,
                 "Count": null,
-                "ElapsedMs": 2275,
-                "ProcessorTimeMs": 1266.065
+                "ElapsedMs": 1318,
+                "ProcessorTimeMs": 1094.219
               },
               {
                 "Name": "policy_composition",
                 "Indent": 0,
                 "Ordinal": 1,
                 "Count": null,
-                "ElapsedMs": 1130,
-                "ProcessorTimeMs": 560.532
+                "ElapsedMs": 621,
+                "ProcessorTimeMs": 495.811
               },
               {
                 "Name": "yaml_loading",
                 "Indent": 1,
                 "Ordinal": 2,
                 "Count": null,
-                "ElapsedMs": 1122,
-                "ProcessorTimeMs": 555.121
+                "ElapsedMs": 613,
+                "ProcessorTimeMs": 489.016
               },
               {
                 "Name": "load_and_setup",
                 "Indent": 0,
                 "Ordinal": 3,
                 "Count": null,
-                "ElapsedMs": 216,
-                "ProcessorTimeMs": 117.74
+                "ElapsedMs": 160,
+                "ProcessorTimeMs": 116.154
               },
               {
                 "Name": "root_resolution",
@@ -4734,71 +4734,71 @@
                 "Ordinal": 4,
                 "Count": null,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.353
+                "ProcessorTimeMs": 0.146
               },
               {
                 "Name": "condition_set_resolution",
                 "Indent": 1,
                 "Ordinal": 5,
                 "Count": null,
-                "ElapsedMs": 2,
-                "ProcessorTimeMs": 1.89
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.631
               },
               {
                 "Name": "assembly_resolution",
                 "Indent": 1,
                 "Ordinal": 6,
                 "Count": null,
-                "ElapsedMs": 211,
-                "ProcessorTimeMs": 113.418
+                "ElapsedMs": 158,
+                "ProcessorTimeMs": 114.048
               },
               {
                 "Name": "build_state_preflight",
                 "Indent": 0,
                 "Ordinal": 7,
                 "Count": null,
-                "ElapsedMs": 6,
-                "ProcessorTimeMs": 2.909
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.133
               },
               {
                 "Name": "configuration_check",
                 "Indent": 0,
                 "Ordinal": 8,
                 "Count": null,
-                "ElapsedMs": 322,
-                "ProcessorTimeMs": 206.494
+                "ElapsedMs": 209,
+                "ProcessorTimeMs": 177.357
               },
               {
                 "Name": "policy_consistency_check",
                 "Indent": 0,
                 "Ordinal": 9,
                 "Count": null,
-                "ElapsedMs": 180,
-                "ProcessorTimeMs": 100.058
+                "ElapsedMs": 78,
+                "ProcessorTimeMs": 74.912
               },
               {
                 "Name": "contract_checks",
                 "Indent": 0,
                 "Ordinal": 10,
                 "Count": null,
-                "ElapsedMs": 268,
-                "ProcessorTimeMs": 148.438
+                "ElapsedMs": 119,
+                "ProcessorTimeMs": 116.515
               },
               {
                 "Name": "dependency",
                 "Indent": 1,
                 "Ordinal": 11,
                 "Count": 4,
-                "ElapsedMs": 136,
-                "ProcessorTimeMs": 58.495
+                "ElapsedMs": 40,
+                "ProcessorTimeMs": 39.762
               },
               {
                 "Name": "layer",
                 "Indent": 1,
                 "Ordinal": 12,
                 "Count": 4,
-                "ElapsedMs": 70,
-                "ProcessorTimeMs": 41.479
+                "ElapsedMs": 34,
+                "ProcessorTimeMs": 34.052
               },
               {
                 "Name": "layer_template",
@@ -4806,7 +4806,7 @@
                 "Ordinal": 13,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.004
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "allow_only",
@@ -4822,7 +4822,7 @@
                 "Ordinal": 15,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "method_body",
@@ -4838,7 +4838,7 @@
                 "Ordinal": 17,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "independence",
@@ -4846,7 +4846,7 @@
                 "Ordinal": 18,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "assembly_independence",
@@ -4854,7 +4854,7 @@
                 "Ordinal": 19,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "assembly_dependency",
@@ -4862,7 +4862,7 @@
                 "Ordinal": 20,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "assembly_allow_only",
@@ -4870,7 +4870,7 @@
                 "Ordinal": 21,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "package_dependency",
@@ -4878,7 +4878,7 @@
                 "Ordinal": 22,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "package_allow_only",
@@ -4894,7 +4894,7 @@
                 "Ordinal": 24,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "framework_allow_only",
@@ -4902,7 +4902,7 @@
                 "Ordinal": 25,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.003
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "project_metadata",
@@ -4910,7 +4910,7 @@
                 "Ordinal": 26,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "protected",
@@ -4926,7 +4926,7 @@
                 "Ordinal": 28,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "external_allow_only",
@@ -4934,7 +4934,7 @@
                 "Ordinal": 29,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0
               },
               {
                 "Name": "acyclic_sibling",
@@ -4942,7 +4942,7 @@
                 "Ordinal": 30,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "module_container",
@@ -4965,8 +4965,8 @@
                 "Indent": 1,
                 "Ordinal": 33,
                 "Count": 1,
-                "ElapsedMs": 46,
-                "ProcessorTimeMs": 36.275
+                "ElapsedMs": 32,
+                "ProcessorTimeMs": 31.803
               },
               {
                 "Name": "layout_convention_applicability",
@@ -4974,7 +4974,7 @@
                 "Ordinal": 34,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.004
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "public_api_surface",
@@ -4982,7 +4982,7 @@
                 "Ordinal": 35,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "contract_surface_exposure",
@@ -4990,7 +4990,7 @@
                 "Ordinal": 36,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.002
+                "ProcessorTimeMs": 0.001
               },
               {
                 "Name": "versioned_contract_surface_isolation",
@@ -4998,7 +4998,7 @@
                 "Ordinal": 37,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.012
+                "ProcessorTimeMs": 0.006
               },
               {
                 "Name": "attribute_usage",
@@ -5014,7 +5014,7 @@
                 "Ordinal": 39,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "interface_implementation",
@@ -5022,7 +5022,7 @@
                 "Ordinal": 40,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "composition",
@@ -5038,7 +5038,7 @@
                 "Ordinal": 42,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.269
+                "ProcessorTimeMs": 0.085
               },
               {
                 "Name": "metric_budgets",
@@ -5046,7 +5046,7 @@
                 "Ordinal": 43,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.605
+                "ProcessorTimeMs": 0.606
               },
               {
                 "Name": "context_dependency",
@@ -5054,7 +5054,7 @@
                 "Ordinal": 44,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.009
+                "ProcessorTimeMs": 0.008
               },
               {
                 "Name": "context_allow_only",
@@ -5062,7 +5062,7 @@
                 "Ordinal": 45,
                 "Count": 0,
                 "ElapsedMs": 0,
-                "ProcessorTimeMs": 0.001
+                "ProcessorTimeMs": 0.002
               },
               {
                 "Name": "port_boundary",
@@ -5077,39 +5077,39 @@
                 "Indent": 0,
                 "Ordinal": 47,
                 "Count": null,
-                "ElapsedMs": 1,
-                "ProcessorTimeMs": 1.718
+                "ElapsedMs": 0,
+                "ProcessorTimeMs": 0.618
               },
               {
                 "Name": "repository_metrics",
                 "Indent": 0,
                 "Ordinal": 48,
                 "Count": null,
-                "ElapsedMs": 52,
-                "ProcessorTimeMs": 46.45
+                "ElapsedMs": 44,
+                "ProcessorTimeMs": 43.027
               },
               {
                 "Name": "render_json",
                 "Indent": 0,
                 "Ordinal": 49,
                 "Count": null,
-                "ElapsedMs": 380,
-                "ProcessorTimeMs": 227.448
+                "ElapsedMs": 259,
+                "ProcessorTimeMs": 205.741
               },
               {
                 "Name": "output_stream_write",
                 "Indent": 0,
                 "Ordinal": 50,
                 "Count": null,
-                "ElapsedMs": 3,
-                "ProcessorTimeMs": 2.224
+                "ElapsedMs": 1,
+                "ProcessorTimeMs": 1.928
               },
               {
                 "Name": "selector_predicate_evaluation",
                 "Indent": 1,
                 "Ordinal": 51,
                 "Count": 4096,
-                "ElapsedMs": 89.356691,
+                "ElapsedMs": 52.588187,
                 "ProcessorTimeMs": null
               }
             ],
@@ -5122,7 +5122,7 @@
             },
             "Measurements": {
               "PeakWorkingSetBytes": null,
-              "AllocatedBytesTotal": 52760880
+              "AllocatedBytesTotal": 52830096
             }
           }
         }
