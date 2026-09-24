@@ -11,8 +11,26 @@ internal sealed class SystemCliConsole : ICliConsole
     private readonly Stream? _canonicalJsonOutput;
 
     public SystemCliConsole()
-        : this(Console.Out, Console.Error, Console.IsOutputRedirected, Console.IsErrorRedirected, Console.OpenStandardOutput())
+        : this(
+            PrepareConsoleWriter(Console.Out, Console.IsOutputRedirected),
+            PrepareConsoleWriter(Console.Error, Console.IsErrorRedirected),
+            Console.IsOutputRedirected,
+            Console.IsErrorRedirected,
+            Console.OpenStandardOutput())
     {
+    }
+
+    private static TextWriter PrepareConsoleWriter(TextWriter writer, bool redirected)
+    {
+        if (redirected)
+        {
+            // Console.Out/Console.Error are intentionally retained so test hosts and embedders
+            // that replace them keep receiving writes. Setting the process encoding fixes the
+            // redirected stream without bypassing those replacement writers.
+            Console.OutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        }
+
+        return writer;
     }
 
     internal SystemCliConsole(

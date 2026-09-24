@@ -162,6 +162,47 @@ public sealed class HistoryCanonicalJsonTests
     }
 
     [Test]
+    public void PublicationFailureDiagnosticHasStableKindAndStructuredEvidence()
+    {
+        HistoryDiagnostic diagnostic = new(
+            HistoryDiagnosticKind.ReportPublicationFailed,
+            "History report publication did not complete.",
+            publicationStatus: "partial-output",
+            failedDestinations: new[] { "report.md" },
+            committedDestinations: new[] { "report.json" },
+            deliveredDestinations: new[] { "<stdout>" },
+            uncommittedDestinations: new[] { "report.md" },
+            publicationDetails: new[] { "rename denied" });
+
+        string json = HistoryDiagnosticJsonWriter.Write(diagnostic);
+
+        Assert.That(json, Is.EqualTo(
+            "{\n" +
+            "  \"kind\": \"report_publication_failed\",\n" +
+            "  \"message\": \"History report publication did not complete.\",\n" +
+            "  \"objectId\": null,\n" +
+            "  \"path\": null,\n" +
+            "  \"publicationStatus\": \"partial-output\",\n" +
+            "  \"cancelled\": false,\n" +
+            "  \"failed\": [\n" +
+            "    \"report.md\"\n" +
+            "  ],\n" +
+            "  \"committed\": [\n" +
+            "    \"report.json\"\n" +
+            "  ],\n" +
+            "  \"delivered\": [\n" +
+            "    \"<stdout>\"\n" +
+            "  ],\n" +
+            "  \"uncommitted\": [\n" +
+            "    \"report.md\"\n" +
+            "  ],\n" +
+            "  \"details\": [\n" +
+            "    \"rename denied\"\n" +
+            "  ]\n" +
+            "}\n"));
+    }
+
+    [Test]
     public void SuccessfulReportCarriesCanonicalConfigurationEnrichmentAndCandidates()
     {
         using GitTestRepository repository = GitTestRepository.Create();

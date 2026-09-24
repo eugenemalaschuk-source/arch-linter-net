@@ -18,7 +18,29 @@ internal static class HistoryDiagnosticJsonWriter
             writer.WriteNumber("spanEnd", end);
         }
 
+        if (diagnostic.Kind == HistoryDiagnosticKind.ReportPublicationFailed)
+        {
+            writer.WriteString("publicationStatus", diagnostic.PublicationStatus);
+            writer.WriteBoolean("cancelled", diagnostic.PublicationCancelled);
+            WriteStringArray(writer, "failed", diagnostic.FailedDestinations);
+            WriteStringArray(writer, "committed", diagnostic.CommittedDestinations);
+            WriteStringArray(writer, "delivered", diagnostic.DeliveredDestinations);
+            WriteStringArray(writer, "uncommitted", diagnostic.UncommittedDestinations);
+            WriteStringArray(writer, "details", diagnostic.PublicationDetails);
+        }
+
         writer.EndObject();
         return writer.ToCanonicalText() + "\n";
+    }
+
+    private static void WriteStringArray(CanonicalJsonWriter writer, string name, IReadOnlyList<string> values)
+    {
+        writer.BeginArray(name);
+        foreach (string value in values)
+        {
+            writer.WriteStringElement(value);
+        }
+
+        writer.EndArray();
     }
 }

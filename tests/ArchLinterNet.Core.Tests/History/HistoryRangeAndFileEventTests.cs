@@ -26,6 +26,20 @@ public sealed class HistoryRangeAndFileEventTests
     }
 
     [Test]
+    public void CancellationIsPropagatedBeforeHistoryResultConstruction()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        string commit = repository.Commit("first");
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+
+        Assert.That(
+            () => HistoryIngestionService.Default.Ingest(
+                new HistoryIngestionRequest(repository.Path, commit, commit), cancellation.Token),
+            Throws.TypeOf<OperationCanceledException>());
+    }
+
+    [Test]
     public void SideBranchCommitsBelongToTheRangeAndMergesStayMetadataOnly()
     {
         using GitTestRepository repository = GitTestRepository.Create();
