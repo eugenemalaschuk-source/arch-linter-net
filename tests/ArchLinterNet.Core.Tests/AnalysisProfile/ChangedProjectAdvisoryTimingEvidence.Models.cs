@@ -176,15 +176,22 @@ internal sealed record ChangedProjectAdvisoryTimingSample
 
     public void Validate(int projectCount)
     {
+        int discoveredProjects = Counters.GetValueOrDefault("discovered_project_count");
+        int selectedAssemblies = Counters.GetValueOrDefault("selected_assembly_count");
+        int retainedAssemblies = Counters.GetValueOrDefault("retained_assembly_count");
+        bool projectCountMatches = discoveredProjects == projectCount ||
+            selectedAssemblies == projectCount || retainedAssemblies == projectCount;
+        bool hasExpectedSchema = RawAnalysisProfile.TryGetProperty("SchemaId", out JsonElement schemaId) &&
+            schemaId.GetString() == "analysis-profile/v1";
+
         if (SampleOrdinal < 1 || CompletionStatus != "Success" || ExitCode != 0 || OutputFailed ||
-            string.IsNullOrWhiteSpace(CanonicalResultSha256) ||
-            Counters.GetValueOrDefault("discovered_project_count") != projectCount &&
-            Counters.GetValueOrDefault("selected_assembly_count") != projectCount &&
-            Counters.GetValueOrDefault("retained_assembly_count") != projectCount ||
-            !RawAnalysisProfile.TryGetProperty("SchemaId", out JsonElement schemaId) ||
-            schemaId.GetString() != "analysis-profile/v1")
+            string.IsNullOrWhiteSpace(CanonicalResultSha256) || !projectCountMatches || !hasExpectedSchema)
         {
-            throw new InvalidOperationException($"Invalid successful timing sample {SampleOrdinal}.");
+            throw new InvalidOperationException(
+                $"Invalid timing sample {SampleOrdinal}: status={CompletionStatus}, exit={ExitCode}, " +
+                $"outputFailed={OutputFailed}, projectCount={projectCount}, discovered={discoveredProjects}, " +
+                $"selected={selectedAssemblies}, retained={retainedAssemblies}, profileSchema=" +
+                $"{(hasExpectedSchema ? schemaId.GetString() : "missing-or-invalid")}.");
         }
 
         if (TopLevelPhaseMilliseconds.Count == 0 ||
