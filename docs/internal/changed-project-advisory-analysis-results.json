@@ -1,8 +1,8 @@
 {
   "schema_id": "changed-project-scope-plan-evidence/v1",
   "issue": "#503",
-  "disposition": "C-insufficient-benefit-or-unsafe-boundary",
-  "disposition_note": "Outcome C. Deterministic closure evidence, Buildalyzer/MSBuild evaluated-Compile ownership fixtures, explicit full-family safe fallback, and secondary S/M/L full-strict timing/effect evidence are now recorded. The timing values model advisory work only; no partial analyzer execution is claimed. The measured synthetic boundary is not safe or material enough to authorize an implementation child while #991 remains open, ownership/evaluator semantics remain conservative, and full strict validation remains authoritative. See docs/internal/changed-project-advisory-analysis-evidence.md 'Required decision outcome'.",
+  "disposition": "C-unsafe-implementation-boundary",
+  "disposition_note": "Outcome C is based on the unresolved correctness boundary: no production changed-path ownership planner, no narrower model for most contract families, and no proven preview/execution coverage contract. The S/M/L timing values are descriptive estimates only; no percentage authorization threshold is set. #991 still requires normalized consumer evidence before any later implementation decision. Full strict validation remains authoritative. See docs/internal/changed-project-advisory-analysis-evidence.md 'Required decision outcome'.",
   "source_identity": "synthetic-current-tree",
   "generator": {
     "workload_catalog": "large-solution-benchmark/v1 (#502)",
@@ -58,7 +58,7 @@
     "resolved_in_this_task": false
   },
   "evaluator_family_scope_by_family": {
-    "note": "Added after review, then revised after two further review passes: the reference-graph dependents closure above is not one safe superset for every contract family, and neither is 'the changed project alone'. These rows are grounded in the actual checkers under src/ArchLinterNet.Core/Execution/, not assumed, and are asserted by EvaluatorFamilies_RequireDifferentScopesThanTheGenericDependentsClosure. This is a representative five-family subset (four contract-family groups, with coverage split in two) of the ~34 contract families in schema/dependencies.arch.schema.json, not exhaustive coverage.",
+    "note": "Added after review, then revised after two further review passes: the reference-graph dependents closure above is not one safe superset for every contract family, and neither is 'the changed project alone'. These rows are grounded in the actual checkers under src/ArchLinterNet.Core/Execution/, not assumed, and are asserted by EvaluatorFamilies_RequireDifferentScopesThanTheGenericDependentsClosure. This is a representative five-family subset (four contract-family groups, with coverage split in two) of the roughly 35 named contract families in schema/dependencies.arch.schema.json, not exhaustive coverage. The schema's root strict/audit arrays also map to the base dependency family, which the exhaustive disposition test now includes and conservatively falls back to full population.",
     "fixed_comparison_workload": { "shape": "Linear", "project_count": 16, "changed_position_index": 8, "dependents_closure_k": 9 },
     "families": [
       { "family": "ReferenceGraphLocal", "contract_families": ["layers", "external", "external_allow_only", "allow_only"], "required_k": 9, "relationship_to_dependents_closure": "equal-not-narrower", "checker_evidence": "LayerChecker/ExternalDependencyChecker/AllowOnlyChecker scan only the changed project's own layer's own outgoing references, but ArchitectureNamespaceViolationFinder.MatchReference classifies the referenced TARGET type; a change to the target project can flip an unchanged dependent's verdict, so the safe bound is the dependents closure, not the changed project alone.", "revision_note": "First correction claimed required_k=1 (strictly-narrower); that was itself wrong and is corrected here." },
@@ -67,7 +67,14 @@
       { "family": "AggregatedGlobalScan", "contract_families": ["coverage:project", "coverage:assembly"], "required_k": 1, "relationship_to_dependents_closure": "strictly-narrower-but-not-yet-exploitable", "checker_evidence": "CheckProjectCoverageContract/CheckAssemblyCoverageContract classify each item independently from only that item's own namespaces against policy-declared layers, never another project's code, and each item is by construction exactly one project or one assembly; current execution re-scans the whole solution and aggregates into one findings list per run." },
       { "family": "CoverageGraphOrCatalogWide", "contract_families": ["coverage:namespace", "coverage:dependency_edge", "coverage:semantic_role", "coverage:rule_input"], "required_k": 16, "relationship_to_dependents_closure": "not-a-subset-relationship", "checker_evidence": "ArchitectureCoverageInventory.Build groups the whole solution's types by namespace string and picks one representative type, so a shared namespace entry can span multiple projects; ArchitectureDependencyEdgeCoverageService.Check evaluates declared layer-pairs against edges observed across the whole coverage inventory; ArchitectureSemanticCoverageService.BuildSummary iterates every type via the shared role catalog (same unproven cross-project classification risk as ReferenceGraphLocal); rule_input is policy-level, not project-scoped.", "revision_note": "First correction lumped all of 'coverage' into AggregatedGlobalScan at required_k=1. Second correction moved dependency_edge/semantic_role/rule_input out but still left namespace grouped with project/assembly at required_k=1 -- that was itself wrong, since only project and assembly are inherently single-project/assembly by construction; namespace is moved here in this revision." }
     ],
-    "unanalyzed_contract_families_count_approx": 29,
+    "base_dependency_family_fallback": {
+      "schema_properties": ["strict", "audit"],
+      "canonical_family": "dependency",
+      "disposition": "UnanalyzedSafeFallback",
+      "required_k": 16,
+      "reason": "The base dependencyContract arrays are represented explicitly in schema enumeration but do not yet have a checker-grounded narrower invalidation rule."
+    },
+    "unanalyzed_contract_families_count_approx": 30,
     "unanalyzed_families_default": "full-population-fallback (safe widening; not claimed safe by any model here)"
   },
   "repository_pr_traffic_mix": {
@@ -96,6 +103,6 @@
   "p0_gate": {
     "authority": "#991",
     "constraint": "No incremental-analysis implementation child issue may be created from this evidence based solely on the current (pre-normalization) dogfood latency table in #991. Re-evaluation against normalized consumer CI is required first.",
-    "action_taken_in_this_task": "Outcome C recorded and no implementation child issue created. The timing artifact measures full-strict baselines and models K/P effect at S/M/L; the ownership fixtures prove the evaluated Compile-item basis but do not add a production resolver; and every schema contract family now receives either a reviewed narrow taxonomy or an explicit full-population fallback. The measured evidence is insufficient and the correctness boundary remains unsafe for an incremental implementation. Re-evaluate only after #991 reaches its decision gate and normalized consumer evidence identifies a residual product-internal benefit."
+    "action_taken_in_this_task": "Outcome C recorded and no implementation child issue created because the correctness boundary remains unsafe: ownership fixtures establish the evaluated Compile-item basis but there is no production changed-path planner, only a few family scopes have a narrower reviewed disposition, and preview/execution coverage is unproven. The timing artifact is descriptive full-strict evidence with modeled K/P effects; no percentage threshold was used. Re-evaluate only after #991 reaches its decision gate and normalized consumer evidence plus issue-specific implementation/trust costs can support a decision."
   }
 }

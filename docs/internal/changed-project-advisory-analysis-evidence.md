@@ -16,7 +16,7 @@ deterministic graph computations**, not timed samples: every row is reproduced b
 which runs in every normal `make test` pass (no `[Explicit]` exclusion — there is no hardware
 sensitivity to isolate).
 
-**Outcome: C — insufficient benefit or unsafe boundary.** The change-to-project *disposition* mapping (Question 2) — given a changed
+**Outcome: C — unsafe implementation boundary.** The change-to-project *disposition* mapping (Question 2) — given a changed
 input's kind and its already-resolved owning project(s), which scope-widening rule applies — is
 complete and exact. The ownership evidence now exercises the authoritative Buildalyzer/MSBuild
 evaluated `@(Compile)` basis for ordinary, explicit include/exclude, single-owner linked, and
@@ -32,9 +32,10 @@ full-population fallback through `PlanContractFamily`, rather than inheriting an
 direction. The timing artifact records three successful full-strict profiles at each of S/M/L
 synthetic #502 staged-assembly scales and a K/P model using measured fixed versus project-dependent
 phase time. It does not execute an incremental path. The combination is enough to conclude that no
-safe, material implementation child is justified now: modeled leaf reductions are only 19–26% on
-this declared synthetic boundary, middle-position reductions are 8–13%, and global/shared changes
-fall back to full validation. See [Required decision outcome](#required-decision-outcome).
+safe implementation boundary is established: modeled leaf reductions are 15.265–26.114% on this
+declared synthetic boundary, middle-position reductions are 6.541–12.636%, and global/shared changes
+fall back to full validation. Those estimates are descriptive; see
+[Required decision outcome](#required-decision-outcome) for the safety basis.
 
 ## P0 consumer-normalization gate (#991)
 
@@ -81,8 +82,9 @@ Unity 41s, `firstice-map-editor` 249s). This task therefore:
   at 8, 16, and 32 staged synthetic projects, with three successful full-strict
   `analysis-profile/v1` samples at each scale. The harness separates measured policy/configuration
   phases from the remaining project-dependent top-level phase time, measures pure planner overhead,
-  and calculates K/P advisory estimates without executing a partial analyzer path. Reproduce with:
-  `dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~ChangedProjectAdvisoryEffectBenchmarkHarness`.
+  and calculates K/P advisory estimates without executing a partial analyzer path. It requires the
+  full SHA of the clean checked-out source commit in `ARCH_LINTER_SOURCE_SHA`. Reproduce with:
+  `ARCH_LINTER_SOURCE_SHA=$(git rev-parse HEAD) dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~ChangedProjectAdvisoryEffectBenchmarkHarness`.
 
 ## Environment
 
@@ -292,14 +294,15 @@ project population, and
 `ChangedProjectAdvisoryScopePlanningTests.cs` asserts all five rows above against the same fixed
 workload used for the §3a `K=9` baseline.
 
-**Scope of this correction**: `schema/dependencies.arch.schema.json` defines roughly 34 contract
+**Scope of this correction**: `schema/dependencies.arch.schema.json` defines roughly 35 named contract
 families (`layers`, `cycles`, `allow_only`, `external`, `assembly_dependency`, `package_dependency`,
 `coverage` (itself six sub-scopes), `public_api_surface`, `type_placement`, `metric_budgets`, …); this
 task analyzes five representative families (four contract-family groups, with `coverage` split in
 two) grounded in their actual checker code. The schema-driven
 `EverySchemaContractFamilyReceivesAnExplicitSafeDisposition` test now ensures every strict/audit
-family receives either one of those reviewed dispositions or `UnanalyzedSafeFallback` over the full
-population. Families outside the representative set are therefore **not** claimed to be safely
+family, including the base `dependency` family represented by the schema's `contracts.strict` and
+`contracts.audit` arrays, receives either one of those reviewed dispositions or
+`UnanalyzedSafeFallback` over the full population. Families outside the representative set are therefore **not** claimed to be safely
 bounded by a graph model; safe widening is explicit and tested rather than silently inheriting a
 reference-graph direction.
 
@@ -429,30 +432,30 @@ Neither reuse candidate is made a prerequisite by this evidence.
   counters, canonical result identities, and modeled rows are in
   [`changed-project-advisory-analysis-timing-results.json`](changed-project-advisory-analysis-timing-results.json).
 
-- **Success threshold / kill criterion**: the pre-implementation success threshold would require a
-  normalized consumer/product-internal lane to show at least 50% end-to-end reduction for a supported
-  class, with evaluated-item ownership, family-specific scope, preview/execution parity, and zero
-  coverage gaps. This evidence fails the current authorization gate: the modeled result is below that
-  threshold even before accounting for unresolved production ownership/family plumbing. A future
-  re-evaluation may reopen the question only after #991 normalization and new evidence materially
-  changes that boundary.
+- **Decision threshold**: this task sets no percentage cutoff. #502 explicitly requires an
+  issue-specific threshold derived from measured hotspot share, workload and implementation/trust
+  cost, and #991 has not yet supplied normalized consumer evidence from which to derive that
+  threshold. The timing values above are descriptive only. Any future Outcome A/B proposal must derive
+  its own success and kill criteria from those inputs.
 
 ## Required decision outcome
 
-**Outcome C — insufficient benefit or unsafe boundary.** The evidence is complete enough to close
-#503 without creating an implementation child under #19. The checked-in S/M/L harness measured three
-full strict profiles per scale, separated fixed and project-dependent phases, and applied the reviewed
-K/P model; the result is only 19–26% modeled reduction for the favorable leaf class and 8–13% for the
-middle-position class, with 0% for shared-foundation/global fallback. Fixed phases account for roughly
-73–83% of the measured full profile. These are environment-specific synthetic measurements, not a
-consumer SLA, but they are below the 50% gate required to justify incremental implementation work.
+**Outcome C — unsafe implementation boundary.** The evidence supports closing #503 without creating
+an implementation child under #19 because a selective advisory result cannot yet be proven safe.
+The ownership fixtures exercise MSBuild evaluated `@(Compile)` items, but there is no production
+changed-path-to-owner planner, including its failure and imported/conditional evaluation contract.
+Only a small set of evaluator scopes has a reviewed narrower disposition; the base `dependency`
+family and other unmodeled contract families safely fall back to the full population. The proposed
+narrow coverage scope also is not consumed by a production execution path, and preview/execution
+parity plus per-unit coverage accounting are not established. A clean-looking partial result would
+therefore have no proven completeness boundary.
 
-The boundary is also unsafe for implementation: ownership is evidenced through evaluated MSBuild
-`@(Compile)` items but is not yet a production resolver, and every strict/audit contract family now
-has an explicit reviewed disposition or conservative `UnanalyzedSafeFallback` rather than inheriting
-one generic graph direction. #991 remains the required normalization authority, so the old
-pre-normalization dogfood timing cannot reopen this decision. Full strict validation remains
-authoritative; no partial analyzer execution is introduced by this task.
+The measured timing table is descriptive evidence about the synthetic #502 workloads. It does not
+establish an implementation threshold: #502 forbids a universal percentage SLA, and #991 has not yet
+provided the normalized consumer measurements needed to derive an issue-specific threshold. The
+independent unsafe-boundary findings are sufficient for Outcome C under #503's decision criteria.
+Full strict validation remains authoritative; no partial analyzer execution is introduced by this
+task.
 
 The decision is therefore:
 

@@ -391,14 +391,21 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
             .GetProperty("contracts")
             .GetProperty("properties")
             .EnumerateObject()
-            .Select(property => property.Name)
-            .Where(name => name is not "strict" and not "audit")
-            .Select(name => name[(name.IndexOf('_') + 1)..])
+            .Select(property => property.Name switch
+            {
+                "strict" or "audit" => "dependency",
+                string name => name[(name.IndexOf('_') + 1)..],
+            })
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToList();
 
-        Assert.That(contractFamilies, Is.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(contractFamilies, Is.Not.Empty);
+            Assert.That(contractFamilies, Does.Contain("dependency"),
+                "The strict/audit root arrays must contribute the base dependencyContract family.");
+        });
         foreach (string contractFamily in contractFamilies)
         {
             EvaluatorScope scope = EvaluatorFamilyScopePlanner.PlanContractFamily(
@@ -412,6 +419,11 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
                     "layers" or "external" or "external_allow_only" or "allow_only"
                     ? dependentsClosureIds
                     : allProjectIds;
+                if (contractFamily == "dependency")
+                {
+                    Assert.That(scope.Family, Is.EqualTo(EvaluatorFamily.UnanalyzedSafeFallback));
+                }
+
                 Assert.That(scope.RequiredProjectIds, Is.EqualTo(expectedProjectIds),
                     $"Schema family '{contractFamily}' must use its reviewed scope or fail closed to the full population.");
             });

@@ -32,9 +32,11 @@ internal sealed record ChangedProjectAdvisoryTimingEvidenceDocument
     {
         if (!string.Equals(EvidenceSchemaId, SchemaId, StringComparison.Ordinal) ||
             !string.Equals(Issue, "#503", StringComparison.Ordinal) ||
-            !string.Equals(Outcome, "C", StringComparison.Ordinal))
+            !string.Equals(Outcome, "C", StringComparison.Ordinal) ||
+            SourceIdentity.Length != 40 || !SourceIdentity.All(char.IsAsciiHexDigit))
         {
-            throw new InvalidOperationException("Changed-project timing evidence has an invalid identity or outcome.");
+            throw new InvalidOperationException(
+                "Changed-project timing evidence has an invalid issue/outcome identity or lacks a full source commit SHA.");
         }
 
         if (ScalePoints.Count < 3)

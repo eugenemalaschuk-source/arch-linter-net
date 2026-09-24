@@ -60,9 +60,10 @@ namespace ArchLinterNet.Core.Tests;
 /// policy-level rather than project-scoped. This evidence task does not have a graph/catalog model
 /// precise enough to bound any of the four below the full project population.</item>
 /// </list>
-/// This taxonomy intentionally covers a representative subset, not all ~34 contract families in
-/// <c>schema/dependencies.arch.schema.json</c>; families outside this subset are not claimed to be
-/// safely bounded by any of the models below.
+/// The detailed checker models intentionally cover a representative subset of the contract families
+/// in <c>schema/dependencies.arch.schema.json</c>. <see cref="PlanContractFamily"/> maps schema
+/// family names to these reviewed models and assigns every other family an explicit
+/// <see cref="EvaluatorFamily.UnanalyzedSafeFallback"/> over the full project population.
 /// </summary>
 internal enum EvaluatorFamily
 {

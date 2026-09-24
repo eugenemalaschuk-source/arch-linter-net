@@ -32,6 +32,7 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
     [Test]
     public void RunChangedProjectAdvisoryEffectMatrix()
     {
+        string sourceIdentity = SourceIdentity();
         Assert.That(File.Exists(CliDllPath()), Is.True,
             $"CLI not built at {CliDllPath()} — run `dotnet build` first.");
 
@@ -54,7 +55,7 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             EvidenceSchemaId = ChangedProjectAdvisoryTimingEvidenceDocument.SchemaId,
             Issue = "#503",
             Outcome = "C",
-            SourceIdentity = SourceIdentity(),
+            SourceIdentity = sourceIdentity,
             Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
             OperatingSystem = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
             Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
@@ -68,6 +69,8 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             ScalePoints = scalePoints,
         };
 
+        Assert.That(SourceIdentity(), Is.EqualTo(sourceIdentity),
+            "The source revision and tracked/untracked working tree must remain unchanged during measurement.");
         string resultsPath = ResultsPath();
         File.WriteAllText(resultsPath, ChangedProjectAdvisoryTimingEvidenceJson.Serialize(document));
         TestContext.Out.WriteLine($"Changed-project advisory timing evidence written to {resultsPath}");
@@ -292,6 +295,55 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
     private static string SourceIdentity()
     {
         string? supplied = Environment.GetEnvironmentVariable("ARCH_LINTER_SOURCE_SHA");
-        return string.IsNullOrWhiteSpace(supplied) ? "working-tree" : supplied;
+        if (supplied is null || supplied.Length != 40 || !supplied.All(char.IsAsciiHexDigit))
+        {
+            throw new InvalidOperationException(
+                "Set ARCH_LINTER_SOURCE_SHA to the full 40-character SHA of the clean source commit being measured.");
+        }
+
+        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
+        string head = RunGit(repositoryRoot, "rev-parse", "HEAD");
+        if (!string.Equals(supplied, head, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"ARCH_LINTER_SOURCE_SHA '{supplied}' does not match checked-out HEAD '{head}'.");
+        }
+
+        string workingTree = RunGit(repositoryRoot, "status", "--porcelain", "--untracked-files=all");
+        if (!string.IsNullOrWhiteSpace(workingTree))
+        {
+            throw new InvalidOperationException(
+                "The timing evidence must be measured from a clean working tree; commit or remove all changes first.");
+        }
+
+        return head.ToLowerInvariant();
+    }
+
+    private static string RunGit(string workingDirectory, params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        foreach (string argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using Process process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Failed to start git for timing-evidence provenance.");
+        string stdout = process.StandardOutput.ReadToEnd();
+        string stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"git {string.Join(' ', arguments)} failed with exit code {process.ExitCode}: {stderr}");
+        }
+
+        return stdout.Trim();
     }
 }
