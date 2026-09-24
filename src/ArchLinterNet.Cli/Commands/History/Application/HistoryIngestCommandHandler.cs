@@ -441,12 +441,29 @@ internal sealed class HistoryIngestCommandHandler(
 
     private string? FindReportSinkCollision(IReadOnlyList<HistoryReportSink> sinks, string? policyPath)
     {
+        HistoryReportSink[] fileSinks = sinks
+            .Where(sink => sink.DestinationType == HistoryReportDestinationType.File)
+            .ToArray();
+
+        for (int firstIndex = 0; firstIndex < fileSinks.Length; firstIndex++)
+        {
+            for (int secondIndex = firstIndex + 1; secondIndex < fileSinks.Length; secondIndex++)
+            {
+                HistoryReportSink first = fileSinks[firstIndex];
+                HistoryReportSink second = fileSinks[secondIndex];
+                if (fileSystem.AreSameExistingFile(first.FilePath!, second.FilePath!))
+                {
+                    return $"--report destinations '{first.FilePath}' and '{second.FilePath}' refer to the same existing file";
+                }
+            }
+        }
+
         if (policyPath is null)
         {
             return null;
         }
 
-        foreach (HistoryReportSink sink in sinks.Where(sink => sink.DestinationType == HistoryReportDestinationType.File))
+        foreach (HistoryReportSink sink in fileSinks)
         {
             // AreSameExistingFile matches case-insensitively by path first (so a same-named
             // destination collides on a case-insensitive filesystem even before either file
