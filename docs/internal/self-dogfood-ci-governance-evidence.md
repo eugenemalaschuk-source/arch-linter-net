@@ -53,3 +53,66 @@ candidate CLI host. The independent projections then used these process counts:
 The report-input projection is the dominant wall-clock projection at 41.967–74.374 s; the strict, public-API, and coverage projections complete in parallel. Rendering and manifest steps consume the projection outputs and do not perform additional analysis.
 
 This evidence authorizes no ArchLinterNet Core optimization. The next step belongs to the linked performance/adoption authority issues (#991 and #19), where this GAP and the bounded attribution should remain visible before any Core algorithm change is proposed.
+
+## Issue #998 decision — same-process Public API projection (refreshed 2026-09-25)
+
+**Outcome C — not material; no product implementation.** This decision uses the Server
+`0.9.0-preview.1` consumer and three comparable verified samples. The separate Public API command is
+on the blocking path, but its entire measured duration is an upper bound on savings: eliminating it
+would still leave the normalized lane more than 177 seconds above the `<=60 s` target. No Core,
+CLI, Testing, policy, or public API behavior changed.
+
+### Current normalized Server evidence
+
+The samples use the current Server candidate from PR #549. The analyzed candidate SHA and workflow
+topology are identical across attempts 1–3; the candidate tree matches the merged PR #549 tree.
+Changes on current Server `main` after that merge are documentation-only. All three attempts used
+ArchLinterNet `0.9.0-preview.1`, exact base
+`55d1b543931a545113f6b4e79a6251c8358c2f57`, `Debug`, `net10.0`, and
+`BASE_ARCHITECTURE_EVIDENCE_STATE=verified`.
+
+| Sample | Run attempt / architecture job | Governance span | Blocking path | Health | Separate reviewed API |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 | [36036073386 / 1 / 107756472302](https://github.com/firstice-game/firstice-server/actions/runs/36036073386/attempts/1) | 200.012 s | 100.374 s | 85.592 s | 12.602 s |
+| 2 | [36036073386 / 2 / 108148853906](https://github.com/firstice-game/firstice-server/actions/runs/36036073386/attempts/2) | 254.843 s | 135.261 s | 115.129 s | 17.381 s |
+| 3 | [36036073386 / 3 / 108150958321](https://github.com/firstice-game/firstice-server/actions/runs/36036073386/attempts/3) | 259.292 s | 140.269 s | 119.138 s | 18.377 s |
+| **Median** | | **254.843 s** | **135.261 s** | **115.129 s** | **17.381 s** |
+
+The governance span range is **200.012–259.292 s**; the Public API command range is
+**12.602–18.377 s**. Immutable `lint-architecture` artifact IDs by attempt are
+`10825376767`, `10874092968`, and `10874773431`. The analyzed candidate SHA in the artifacts is
+`aee99dfb002bf7659ecdde6fa0f0066955f5461a`.
+
+The separate command is `strict` with the same selected reviewed/exported API `--contract` set and
+canonical JSON report across attempts. It requests `--ensure-built` on the same candidate as Health.
+Each artifact records 11 ArchLinterNet invocations, two full preparation passes, one `dotnet build`
+process and one `dotnet restore` process. Thus this version still repeats candidate preparation,
+while the earlier `0.8.0-main.157` samples' two build/restore processes do not describe the current
+lane. The API and Health invocations both have `profileRequested=false` in the hosted artifacts, so
+there are no current hosted `analysis-profile/v1` phase timings to split from wall time.
+
+The previously cited #525 samples (runs 35701418653, 35702624555 and 35703969681) remain historical
+evidence for `0.8.0-main.157` and are excluded from this decision. The newer single runs for PRs
+#548, #550 and #549 also do not form a median because their exact base SHAs differ; the three #549
+attempts above hold the base and candidate fixed.
+
+### Bounded effect and phase evidence
+
+Even the upper bound that removes the **entire** 17.381-second median Public API process would:
+
+- reduce the 135.261-second median blocking path by at most **12.85%**;
+- reduce the 254.843-second normalized governance span by at most **6.82%**;
+- reduce the 194.843-second gap above target by at most **8.92%**;
+- leave a best-case lane median of **237.462 s**, still **177.462 s** above target.
+
+This is a ceiling, not an expected saving: contract selection, snapshot comparison, result
+construction and canonical API output remain per projection. The samples also show runner variance
+within one base and candidate, so the three-sample median and full range are retained. Outcome C
+therefore follows the lane-level kill criterion in #998 even though the API process is a visible
+share of the blocking path.
+
+The earlier Windows current-source replay remains diagnostic only because it did not use the pinned
+consumer package or a comparable hosted Health profile. It measured 583,437,488 allocated bytes
+and a 238,510,080-byte peak working set for that Public API process, but no comparable Health
+allocation/working-set value exists. The current hosted samples provide no memory delta and there
+is no post-change measurement because outcome C makes no product change.
