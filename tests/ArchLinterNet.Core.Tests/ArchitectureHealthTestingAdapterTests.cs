@@ -3,6 +3,8 @@ using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Testing;
 using NUnit.Framework;
@@ -168,6 +170,66 @@ public sealed class ArchitectureHealthTestingAdapterTests
                 Is.EqualTo(ArchitectureChangeReports.SerializeSnapshot(independent)));
             Assert.That(snapshot.Counters.SnapshotMaterializations, Is.EqualTo(1));
             Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void SharedSnapshot_HealthProfile_UsesOneSnapshotAndMeasuredHealthPhases()
+    {
+        string policyPath = WritePolicy();
+        string baselinePath = WriteBaseline();
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder()
+            .AddArchLinterNetCore()
+            .Build();
+        ValidationTiming timing = new();
+        ArchitectureHealthOutcome health;
+        using (timing.Measure("total"))
+        using (ArchitectureAnalysisSnapshot snapshot = engine.CreateSnapshot(
+                   new AnalysisSnapshotRequest
+                   {
+                       PolicyPath = policyPath,
+                       BaselinePath = baselinePath,
+                       PreparationMode = BuildPreparationMode.Ordinary,
+                   },
+                   timing))
+        {
+            health = engine.EvaluateHealth(new ArchitectureHealthRequest
+            {
+                DebtGate = new ArchitectureDebtGateRequest
+                {
+                    PolicyPath = policyPath,
+                    BaselinePath = baselinePath,
+                    Mode = "all",
+                },
+            }, snapshot, timing);
+        }
+
+        AnalysisProfile profile = AnalysisProfileBuilder.Build(
+            health.AnalysisCounters,
+            timing,
+            renderedSinkCount: 1,
+            outputSinkCount: 1,
+            AnalysisProfileCompletionStatus.Success,
+            cancellationObserved: false,
+            new AnalysisProfileBuildOptions
+            {
+                Measurements = new AnalysisProfileMeasurements
+                {
+                    AllocatedBytesTotal = 0,
+                    PeakWorkingSetBytes = 1,
+                },
+            });
+        string[] phaseNames = profile.Phases.Select(phase => phase.Name).ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(phaseNames, Does.Contain("total"));
+            Assert.That(phaseNames, Does.Contain("health_validation_evaluation"));
+            Assert.That(phaseNames, Does.Contain("health_debt_gate"));
+            Assert.That(phaseNames, Does.Contain("health_projection"));
+            Assert.That(profile.Counters.ModesEvaluated, Is.EqualTo(2));
+            Assert.That(profile.Counters.SnapshotMaterializations, Is.EqualTo(1));
+            Assert.That(profile.Measurements, Is.Not.Null);
         });
     }
 

@@ -1,155 +1,66 @@
-# Consumer-shaped duration attribution evidence (#461)
+# Large-solution duration attribution evidence (#461)
+
+## Correction after PR review
+
+The earlier matrix launched every timed child with `--ensure-built`. Its reported `build_state_preflight = 4,301 ms` and `84.7%` share included the real graph build, post-build resolution, receipt creation/verification, and preflight. It was not a measurement of preflight alone, so that dominant-phase attribution is withdrawn.
+
+The refreshed matrix uses the prepared-receipt path requested by #461: one separate `--ensure-built` invocation prepares the build state before the timed scenarios; every measured child uses `--use-prepared-receipts`, which verifies the prepared receipts without restoring or building. The one-time build-preparation invocation has its own wall-clock and inner-command timings in the raw artifact. The refreshed phase figures below replace the mixed measurements.
 
 ## Decision
 
-Primary attribution state: **B — ArchLinterNet is measurable at scale, but no
-version regression is proven by this run.** This evidence does not close #461:
-the synthetic current-tree matrix still lacks consumer-side timestamps and
-comparable-version samples for attribution of the original CI duration spike.
+Primary attribution state: **B — ArchLinterNet performs measurable work at scale, but this evidence does not prove a version regression.** Prepared-receipt verification and analysis work repeat with each independent CLI process over unchanged build state. This synthetic current-tree matrix does not identify the cause of any private adopter's wall-clock regression or establish a historical product regression.
 
-The public-safe reproducer shows that independent CLI processes over one
-unchanged synthetic build each perform their own profiled preparation and
-analysis work. That establishes the ArchLinterNet inner boundary and makes
-duplicated per-process work visible. It does not turn one synthetic current-tree
-measurement into a claim about a private adopter's regression or a universal
-performance contract. The measured dominant phase is nevertheless concrete:
-`build_state_preflight` is 2,563.5 ms of the 3,131.5 ms 1-process inner median
-(81.9%); the scenario medians keep the same phase at about 81.9–82.4% of inner
-time.
+In the one-process prepared-receipt scenario, `build_state_preflight` has an 81.0 ms median, or 11.0% of the per-sample inner command median of 734.0 ms. The earlier 4,301 ms / 84.7% result cannot be used as a preflight figure because it included `--ensure-built` work. The measured counters still show repeated per-process graph and analysis work; bounded-parallel dispatch reduces caller-visible batch time while retaining that work.
 
-The complete raw profiles and sample distributions are retained in
-[`consumer-attribution-analysis-profile-results.json`](consumer-attribution-analysis-profile-results.json).
-Run the explicit `ConsumerAttributionAnalysisProfileBenchmarkHarness` to refresh
-the artifact; it is excluded from normal test and acceptance runs.
+The normalized self-dogfood evidence in [self-dogfood-ci-governance-evidence.md](self-dogfood-ci-governance-evidence.md) remains a separate aggregate measure: three comparable post-normalization spans were 144.831 s, 90.085 s, and 158.152 s, with a 144.831 s median and 90.085–158.152 s range. Compared with the 204 s baseline, that is a 29.004% reduction, but it remains a **GAP** against the `<=60 s` target. The report-input projection took 41.967–74.374 s across five CLI processes. Those spans show that workflow normalization improved the self-dogfood lane; they do not identify a Core phase or prove an adopter-wide version regression.
 
-## Public-safe workload
+Health now measures snapshot preparation, validation, optional evidence binding, debt-gate evaluation, and summary projection when `health --profile` is requested. The existing repository Health CI projection writes that profile to a separate artifact for future normalized-run analysis. The refreshed synthetic matrix below exercises `validate --profile`; it is not a Health CI profile from a post-normalization run. The new Health profile behavior is covered by focused CLI and Core tests.
 
-The harness reuses `large-multi-host`: eight synthetic host projects and two
-synthetic shared libraries. It builds the fixture once, then runs strict CLI
-validation with `--ensure-built --max-parallelism 1` over that unchanged build
-state. The independent-process variable is `R = 1, 2, 4`; each size is measured
-sequentially and with bounded parallel dispatch. Ten valid samples are retained
-per scenario. No private repository, namespace, topology, workflow URL, or raw
-consumer log is committed.
+The evidence supports state B and routes repeated cross-process preparation to its existing owners. It authorizes no guessed Core optimization. Comparable artifact samples plus caller-side timestamps that separate build, container, scheduler, and CI-runner time are still required to establish a historical product regression.
 
-The matrix is intentionally orthogonal to the existing post-optimization
-matrix: #409 already covers cache-disabled/population/hit, strict/audit versus
-combined execution, and within-process bounded assembly/source scanning. This
-artifact isolates repeated work caused by independent process count.
+## Public-safe workload and provenance
 
-The checked-in run was produced from source commit
-`d69e135de4f8241f10fcb6c21d31b19b73c949ea` in Release configuration on Windows
-10.0.26200, .NET 10.0.12, x64, with 16 logical processors. The fixture contained
-10 projects and 30 source files; its one-time build setup took 3,508.0 ms. The
-raw artifact is 2,558,192 bytes and retains every process profile.
+The explicit `ConsumerAttributionAnalysisProfileBenchmarkHarness` reuses the synthetic `large-multi-host` fixture: eight host projects, two shared libraries, and 30 source files. It builds the fixture once, invokes `--ensure-built --max-parallelism 1` once to prepare product receipts, then runs strict CLI validation with `--use-prepared-receipts --max-parallelism 1` over the unchanged build state. The matrix varies independent process count (`R = 1, 2, 4`) and dispatch mode (sequential or bounded parallel), with ten measured samples per scenario. All 130 measured child processes are recorded as `--use-prepared-receipts` in the raw evidence and are validated by the harness. It also validates successful exit/publication and identical canonical results across processes. No private adopter repository, namespace, workflow URL, topology, or raw log data is included.
 
-## Provenance and equivalence
+The refreshed Release run used macOS 15.8.0, .NET 10.0.10, x64, and six reported logical processors. Fixture build preparation took 4,071.3 ms. The separate one-time `--ensure-built` invocation took 5,656.0 ms outer wall time and 5,175.0 ms inner command time; this contains the graph build and associated resolution/receipt work and is not included in the timed scenario rows. The CLI package was `ArchLinterNet.Cli` `0.1.0-preview.658`; its launched and packaged assembly SHA-256 was `b226b045a0a98f4f8a995508914cbfe268c4fc0e32442f587541ade81b942964`, and the package SHA-256 was `73808f4e4036ba37b316a7e10c5db8205274de6f0389dc4851aa33fd4ecbcd08`. The raw artifact records source commit `f36563ddbab8c47d6ac68e78b910ab92a44ece99` through `ARCH_LINTER_SOURCE_SHA`; binary and package hashes identify the measured Release artifact.
 
-The evidence records the Release binary actually launched by every child process:
-`CliFileVersion=0.1.0.0` and
-`CliAssemblySha256=960184941645b0eae40ad4bd466cbbc898fb8f2c36ac8afebef3a5bdc5de7f6c`.
-The harness opens the selected package, hashes its
-`tools/net10.0/any/ArchLinterNet.Cli.dll` entry, and refuses to record evidence
-unless that hash equals the launched DLL. The verified package assembly hash is
-also recorded explicitly as `CliPackageAssemblySha256`.
-It also records the matching package identity:
-`ArchLinterNet.Cli` version `0.1.0-preview.658`, package SHA-256
-`19803137bdfd2470df68e230203f25c1e857eb3ed8d8b13ff12e0651d418d175`;
-the embedded assembly SHA-256 is
-`960184941645b0eae40ad4bd466cbbc898fb8f2c36ac8afebef3a5bdc5de7f6c`.
-
-Canonical equivalence includes the current JSON contract's
-`cycle_diagnostics`, `coverage_summary`, `preflight_diagnostics`, and
-`source_set_expansion` fields (alongside the remaining result and classification
-sections); it is not silently reduced to a nonexistent `cycle_findings` property.
-The harness observes NUnit's cooperative `TestContext.CurrentContext.CancellationToken`
-while building the fixture and while waiting for each child process, links it to
-300-second timeouts, kills the entire process tree on cancellation, and uses
-bounded cleanup.
+The full profiles and sample distributions are retained in [consumer-attribution-analysis-profile-results.json](consumer-attribution-analysis-profile-results.json), schema `consumer-attribution-evidence/v2`. Refresh them by building the package and running the explicit `ConsumerAttributionAnalysisProfileBenchmarkHarness`; it is excluded from normal test and acceptance runs.
 
 ## Observed matrix
 
-Times are milliseconds; each cell is median / p95 over ten valid samples.
-`Inner` is the sum of profile command totals across the processes in a batch,
-`build_state_preflight` is the corresponding dominant phase, `analysis` excludes
-preflight and output, `outer` is the whole local batch wall time, and `envelope`
-is the summed local process envelope.
+Times are milliseconds; each cell is median / p95 over ten valid samples. `Inner` is the sum of profile command totals across processes in a batch; `build_state_preflight` is the sum of that phase and, for these measured runs, represents prepared-receipt verification without restore or graph build; `analysis` is the harness's remaining analysis interval; `outer` is caller-visible batch wall time; `envelope` is the summed local process envelope.
 
-| Scenario | Inner | build_state_preflight | Analysis | Outer | Envelope |
+| Scenario | Inner | Receipt verification (`build_state_preflight`) | Analysis | Outer | Envelope |
 |---|---:|---:|---:|---:|---:|
-| 1 process, sequential | 3131.5 / 3316.0 | 2563.5 / 2704.0 | 467.5 / 544.0 | 3334.5 / 3539.5 | 201.6 / 216.0 |
-| 2 processes, sequential | 6284.5 / 6604.0 | 5149.0 / 5417.0 | 951.0 / 980.0 | 6705.8 / 7038.9 | 398.6 / 420.2 |
-| 4 processes, sequential | 12844.5 / 13050.0 | 10582.0 / 10789.0 | 1902.5 / 1928.0 | 13698.4 / 13886.1 | 811.4 / 831.9 |
-| 2 processes, bounded parallel | 6234.0 / 6460.0 | 5113.0 / 5279.0 | 936.5 / 974.0 | 3331.4 / 3439.7 | 406.4 / 420.2 |
-| 4 processes, bounded parallel | 13408.5 / 16188.0 | 11033.0 / 13596.0 | 1966.5 / 2259.0 | 3632.9 / 4306.6 | 841.6 / 998.1 |
+| 1 process, sequential | 734.0 / 757.0 | 81.0 / 86.0 | 586.5 / 608.0 | 1,188.7 / 1,217.3 | 449.4 / 477.6 |
+| 2 processes, sequential | 1,473.5 / 1,488.0 | 160.5 / 165.0 | 1,178.5 / 1,187.0 | 2,358.6 / 2,389.3 | 883.9 / 902.7 |
+| 4 processes, sequential | 2,952.0 / 2,989.0 | 324.0 / 332.0 | 2,355.0 / 2,390.0 | 4,733.6 / 4,797.9 | 1,767.1 / 1,810.6 |
+| 2 processes, bounded parallel | 1,486.0 / 1,544.0 | 162.5 / 175.0 | 1,184.5 / 1,225.0 | 1,401.2 / 1,430.2 | 895.0 / 915.4 |
+| 4 processes, bounded parallel | 3,101.0 / 3,365.0 | 355.5 / 382.0 | 2,457.5 / 2,699.0 | 1,871.2 / 1,909.5 | 1,844.5 / 1,930.8 |
 
-The deterministic counters show the attribution boundary more clearly than the
-wall clock. A single process records 10 discovered projects, one project-graph
-evaluation, one fact-index materialization, and two contract executions. The
-same counters are exactly 20/2/2/4 for two processes and 40/4/4/8 for four
-processes in both dispatch modes. Every process produced the same canonical
-result digest:
+The counters show the attribution boundary clearly. One process records 10 discovered projects, one project-graph evaluation, one fact-index materialization, one source-scan pass, and two contract executions. Two processes record 20/2/2/2/4; four record 40/4/4/4/8. Every measured process across all scenarios produced the same canonical result digest. Parallel dispatch shortens outer wall time but does not remove repeated inner work.
 
-`41a6639f73057c2dd682535e2383aefadd4e7ba4c92aa7b0156e8bb749b0c5cb`
-
-Thus bounded parallel dispatch hides duplicated inner work behind a relatively
-flat outer wall time, while the per-process profiles and aggregate counters
-show that the work was still performed four times. The dominant phase is
-`build_state_preflight`, not an undifferentiated analysis bucket. This is sufficient to route
-the repeated-process shape to #502 and the prepared-analysis decision to
-#492/#493; it is not sufficient to claim a historical regression.
-
-## Boundaries and measurements
+## Measurement boundaries
 
 | Boundary | Evidence | Interpretation |
 |---|---|---|
-| Fixture build / restore | One setup stopwatch before timed samples | Build setup is reported separately; it is not attributed to the CLI validation inner work. |
-| ArchLinterNet preparation | `build_state_preflight` and `post_ensure_built_preflight` phases | Includes the product's build-state/preflight work for the unchanged build. |
-| ArchLinterNet analysis | Profile phase totals after preflight and before output | Includes snapshot/index/fact/contract work exposed by `analysis-profile/v1`. |
-| Output | Profile render/staging/stream/commit phases | `--format json` is kept constant; output is not confused with analysis. |
+| Synthetic fixture build | One setup stopwatch before timed samples | Fixture build setup is reported separately from CLI timing. |
+| Product `--ensure-built` preparation | One priming invocation; 5,175.0 ms inner command and 5,656.0 ms outer wall time | Contains the real graph build plus post-build resolution and receipt creation/verification. It is reported separately and excluded from the measured scenario rows. |
+| Prepared-receipt verification | `build_state_preflight` in children marked `--use-prepared-receipts` | Measures receipt verification without restore or graph build; one-process median is 81.0 ms. |
+| ArchLinterNet analysis | Profile phases after preflight and before output | Includes snapshot, index, fact, and contract work exposed by `analysis-profile/v1`. |
+| Output | Profile render/staging/stream/commit phases | `--format json` stays constant; output is separated from analysis. |
 | Local process envelope | Outer child-process wall time minus profile command total | Includes local `dotnet` startup and redirected-pipe overhead. |
-| Container / scheduler / CI runner | Not observable from this repository harness | Requires timestamps from the caller; no product root cause is asserted from aggregate CI time. |
-
-Each process retains deterministic project/assembly/source/fact/contract
-counters, measurements, phases, completion status, exit category, publication
-status, and a canonical result digest. Batch totals are sums across processes;
-the outer batch wall time remains the caller-visible dispatch measurement. A
-matching digest across all processes protects canonical findings and ordering
-while the workload is repeated.
+| Container / scheduler / CI runner | Not observable in this repository harness | Requires timestamps from the caller; no product root cause is inferred from aggregate CI time. |
 
 ## Result interpretation and routing
 
-The process-count matrix is evidence of repeated inner work, not an optimization
-authorization. The current result is routed as follows:
+- **#502:** reuse the `large-multi-host` process-count shape, `R` variable, and per-process profile/counter envelope in the canonical benchmark foundation.
+- **#492/#493:** prepared-analysis reuse remains the owner for cross-process preparation; this evidence measures duplication and does not implement reuse.
+- **#655/#675/#503:** this matrix makes no selector/layer, real-MSBuild cache-eligibility, or changed-project advisory claim.
+- **#991:** retain the post-normalization self-dogfood gap and use the new Health profile artifact in later normalized runs before attributing aggregate consumer-shaped time to Core.
 
-- **#502:** reuse the `large-multi-host` process-count shape, `R` variable, and
-  per-process profile/counter envelope in the canonical very-large-solution
-  benchmark foundation.
-- **#492/#493:** decide whether verified prepared analysis should remove repeated
-  cross-process preparation; this issue does not implement persisted prepared
-  state.
-- **#655:** no selector/layer/reachability hypothesis is accepted or rejected
-  here because the current matrix does not vary those dimensions.
-- **#675:** cache eligibility is disabled and is not evaluated here.
-- **#503:** no changed-project/file advisory behavior is exercised.
-
-No new optimization issue is created: the measured repeated-process boundary is
-already owned by the prepared-analysis lane and the reusable benchmark lane.
-
-## Structural-stabilization and limitations
-
-The evidence is generated from the current post-v0.8 main-line tree. It does
-not reuse pre-#772/#784 timings as final release evidence. If structural cleanup
-changes the measured preparation or fact path, rerun this matrix before using
-the result for a v0.9 implementation decision.
-
-The artifact is environment-labelled, not a timing SLA. A version-regression
-claim requires comparable packed-artifact samples from the relevant versions
-and consumer-side timestamps that separate runner/container/build orchestration
-from ArchLinterNet's profile boundary.
+The matrix is environment-labelled evidence, not a timing SLA. The Windows run in the previous artifact and this macOS run are not compared as a before/after product pair. A version-regression claim requires comparable packed-artifact samples on a controlled environment and consumer-side timestamps that separate caller orchestration from ArchLinterNet's profile boundary.
 
 ## OpenSpec
 
-OpenSpec: not applicable. This change adds an explicitly invoked test harness
-and internal evidence only; it changes no product behavior, public API, policy
-semantics, schema, cache trust boundary, or documented user guarantee.
+OpenSpec change `profile-health-phase-timings` applies because this work adds opt-in Health phase measurements while preserving the existing profile schema and default behavior. It is archived with the implementation.
