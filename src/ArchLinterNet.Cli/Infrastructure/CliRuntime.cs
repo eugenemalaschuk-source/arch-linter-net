@@ -350,9 +350,24 @@ internal sealed class CliRuntime : ICliRuntime
 
     public ArchitectureHealthOutcome EvaluateHealth(
         ArchitectureHealthRequest request,
+        ValidationTiming? timing)
+    {
+        return _engine.EvaluateHealth(request, timing);
+    }
+
+    public ArchitectureHealthOutcome EvaluateHealth(
+        ArchitectureHealthRequest request,
         ArchitectureAnalysisSnapshot snapshot)
     {
         return _engine.EvaluateHealth(request, snapshot);
+    }
+
+    public ArchitectureHealthOutcome EvaluateHealth(
+        ArchitectureHealthRequest request,
+        ArchitectureAnalysisSnapshot snapshot,
+        ValidationTiming? timing)
+    {
+        return _engine.EvaluateHealth(request, snapshot, timing);
     }
 
     public BaselineVerifyOutcome VerifyBaseline(

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Cli.Commands.Baseline.Application;
@@ -6,6 +7,7 @@ using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyWeakening;
 using ArchLinterNet.Core.Profiling;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Health.Application;
@@ -140,6 +142,13 @@ internal sealed class HealthCommandHandler(
             }
         }
 
+        ValidationTiming? timing = options.ProfileDestination is not null
+            ? new ValidationTiming()
+            : null;
+        long allocatedBytesAtStart = timing is null
+            ? 0
+            : GC.GetTotalAllocatedBytes(precise: false);
+
         try
         {
             ArchitectureHealthRequest healthRequest = new()
@@ -150,8 +159,8 @@ internal sealed class HealthCommandHandler(
                 ExternalEvidenceAssessmentContext = externalEvidenceAssessmentContext,
             };
             ArchitectureHealthOutcome? outcome = changeSnapshotOutput is null
-                ? runtime.EvaluateHealth(healthRequest)
-                : EvaluateWithChangeSnapshot(options, healthRequest, changeSnapshotOutput, fileSystem);
+                ? runtime.EvaluateHealth(healthRequest, timing)
+                : EvaluateWithChangeSnapshot(options, healthRequest, changeSnapshotOutput, fileSystem, timing);
             if (outcome is null)
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -179,6 +188,8 @@ internal sealed class HealthCommandHandler(
                     ArchitectureHealthGate.Fail => AnalysisProfileCompletionStatus.ValidationFailure,
                     _ => AnalysisProfileCompletionStatus.PreparationFailure,
                 },
+                timing,
+                timing is null ? null : CaptureMeasurements(allocatedBytesAtStart),
                 profileTrustedInputs);
 
             return outcome.Gate switch
@@ -208,70 +219,84 @@ internal sealed class HealthCommandHandler(
         ArchitectureAnalysisCommandOptions options,
         ArchitectureHealthRequest healthRequest,
         string changeSnapshotOutput,
-        IFileSystem outputFileSystem)
+        IFileSystem outputFileSystem,
+        ValidationTiming? timing)
     {
-        ArchitectureDebtGateRequest debtGateRequest = healthRequest.DebtGate;
-        using ArchitectureAnalysisSnapshot snapshot = runtime.CreateSnapshot(
-            new AnalysisSnapshotRequest
-            {
-                PolicyPath = debtGateRequest.PolicyPath,
-                BaselinePath = debtGateRequest.BaselinePath,
-                ConditionSetName = debtGateRequest.ConditionSetName,
-                ContractIds = debtGateRequest.ContractIds,
-                PreparationMode = debtGateRequest.PreparationMode,
-                UsePreparedArtifacts = debtGateRequest.UsePreparedArtifacts,
-                NoRestore = debtGateRequest.NoRestore,
-                RequestedConfiguration = debtGateRequest.RequestedConfiguration,
-                RequestedTargetFramework = debtGateRequest.RequestedTargetFramework,
-                RequestedPlatform = debtGateRequest.RequestedPlatform,
-                RequestedRuntimeIdentifier = debtGateRequest.RequestedRuntimeIdentifier,
-                IncludeRepositoryMetrics = true,
-                CancellationToken = debtGateRequest.CancellationToken,
-            },
-            null);
-
-        ArchitectureHealthOutcome outcome = runtime.EvaluateHealth(healthRequest, snapshot);
-        string changeMode = options.Mode == "audit" ? "audit" : "strict";
-        ValidationOutcome validation = outcome.ValidationOutcomes
-            .FirstOrDefault(candidate => candidate.Mode == changeMode)?.Outcome
-            ?? throw new InvalidOperationException(
-                $"Health did not produce the '{changeMode}' validation receipt required for the change snapshot.");
-
-        BaselineVerifyOutcome baseline = runtime.VerifyBaseline(
-            new BaselineVerifyRequest
-            {
-                PolicyPath = debtGateRequest.PolicyPath,
-                BaselinePath = debtGateRequest.BaselinePath,
-                Mode = changeMode,
-                ConditionSetName = debtGateRequest.ConditionSetName,
-                ContractIds = debtGateRequest.ContractIds,
-                PreparationMode = debtGateRequest.PreparationMode,
-                NoRestore = debtGateRequest.NoRestore,
-                RequestedConfiguration = debtGateRequest.RequestedConfiguration,
-                RequestedTargetFramework = debtGateRequest.RequestedTargetFramework,
-                RequestedPlatform = debtGateRequest.RequestedPlatform,
-                RequestedRuntimeIdentifier = debtGateRequest.RequestedRuntimeIdentifier,
-                CancellationToken = debtGateRequest.CancellationToken,
-            },
-            snapshot);
-        if (!baseline.Succeeded)
+        using (timing?.Measure("total"))
         {
-            string detail = baseline.PreflightDiagnostics.Count == 0
-                ? "baseline candidates were not complete"
-                : "baseline build-state preflight was blocked";
-            throw new InvalidOperationException($"Could not create architecture change snapshot: {detail}.");
-        }
+            ArchitectureDebtGateRequest debtGateRequest = healthRequest.DebtGate;
+            using ArchitectureAnalysisSnapshot snapshot = runtime.CreateSnapshot(
+                new AnalysisSnapshotRequest
+                {
+                    PolicyPath = debtGateRequest.PolicyPath,
+                    BaselinePath = debtGateRequest.BaselinePath,
+                    ConditionSetName = debtGateRequest.ConditionSetName,
+                    ContractIds = debtGateRequest.ContractIds,
+                    PreparationMode = debtGateRequest.PreparationMode,
+                    UsePreparedArtifacts = debtGateRequest.UsePreparedArtifacts,
+                    NoRestore = debtGateRequest.NoRestore,
+                    RequestedConfiguration = debtGateRequest.RequestedConfiguration,
+                    RequestedTargetFramework = debtGateRequest.RequestedTargetFramework,
+                    RequestedPlatform = debtGateRequest.RequestedPlatform,
+                    RequestedRuntimeIdentifier = debtGateRequest.RequestedRuntimeIdentifier,
+                    IncludeRepositoryMetrics = true,
+                    CancellationToken = debtGateRequest.CancellationToken,
+                },
+                timing);
 
-        ArchitectureChangeSnapshot changeSnapshot = runtime.CreateChangeSnapshot(
-            snapshot,
-            changeMode,
-            validation,
-            baseline,
-            options.ConditionSetName);
-        outputFileSystem.WriteAllText(
-            changeSnapshotOutput,
-            ArchitectureChangeReports.SerializeSnapshot(changeSnapshot));
-        return outcome;
+            ArchitectureHealthOutcome outcome = runtime.EvaluateHealth(healthRequest, snapshot, timing);
+            string changeMode = options.Mode == "audit" ? "audit" : "strict";
+            ValidationOutcome validation = outcome.ValidationOutcomes
+                .FirstOrDefault(candidate => candidate.Mode == changeMode)?.Outcome
+                ?? throw new InvalidOperationException(
+                    $"Health did not produce the '{changeMode}' validation receipt required for the change snapshot.");
+
+            BaselineVerifyOutcome baseline = runtime.VerifyBaseline(
+                new BaselineVerifyRequest
+                {
+                    PolicyPath = debtGateRequest.PolicyPath,
+                    BaselinePath = debtGateRequest.BaselinePath,
+                    Mode = changeMode,
+                    ConditionSetName = debtGateRequest.ConditionSetName,
+                    ContractIds = debtGateRequest.ContractIds,
+                    PreparationMode = debtGateRequest.PreparationMode,
+                    NoRestore = debtGateRequest.NoRestore,
+                    RequestedConfiguration = debtGateRequest.RequestedConfiguration,
+                    RequestedTargetFramework = debtGateRequest.RequestedTargetFramework,
+                    RequestedPlatform = debtGateRequest.RequestedPlatform,
+                    RequestedRuntimeIdentifier = debtGateRequest.RequestedRuntimeIdentifier,
+                    CancellationToken = debtGateRequest.CancellationToken,
+                },
+                snapshot);
+            if (!baseline.Succeeded)
+            {
+                string detail = baseline.PreflightDiagnostics.Count == 0
+                    ? "baseline candidates were not complete"
+                    : "baseline build-state preflight was blocked";
+                throw new InvalidOperationException($"Could not create architecture change snapshot: {detail}.");
+            }
+
+            ArchitectureChangeSnapshot changeSnapshot = runtime.CreateChangeSnapshot(
+                snapshot,
+                changeMode,
+                validation,
+                baseline,
+                options.ConditionSetName);
+            outputFileSystem.WriteAllText(
+                changeSnapshotOutput,
+                ArchitectureChangeReports.SerializeSnapshot(changeSnapshot));
+            return outcome;
+        }
+    }
+
+    private static AnalysisProfileMeasurements CaptureMeasurements(long allocatedBytesAtStart)
+    {
+        long peakWorkingSetBytes = Process.GetCurrentProcess().PeakWorkingSet64;
+        return new AnalysisProfileMeasurements
+        {
+            PeakWorkingSetBytes = peakWorkingSetBytes > 0 ? peakWorkingSetBytes : null,
+            AllocatedBytesTotal = Math.Max(0, GC.GetTotalAllocatedBytes(precise: false) - allocatedBytesAtStart),
+        };
     }
 
     private static string? FindOutputCollision(

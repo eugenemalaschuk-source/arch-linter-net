@@ -574,6 +574,7 @@ jobs:
             dotnet run --no-build --project "$cli_project" -- health \
               "${health_args[@]}" \
               --format json \
+              --profile "$output_directory/architecture-health.analysis-profile.json" \
               --execution-context "$EXECUTION_CONTEXT" \
               --change-snapshot "$output_directory/current-architecture-change-snapshot.json" \
               > "$output_directory/architecture-health.json"
@@ -964,6 +965,13 @@ jobs:
             architecture-pr-report/repository-metrics-badge.json
             architecture-pr-report/repository.json
             architecture-pr-report/structure.json
+
+      - name: Upload architecture Health analysis profile
+        if: always() && hashFiles('architecture-pr-report/architecture-health.analysis-profile.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: architecture-health-analysis-profile
+          path: architecture-pr-report/architecture-health.analysis-profile.json
 
       - name: Upload architecture change artifact
         if: always() && hashFiles('architecture-pr-report/architecture-change.json') != ''
