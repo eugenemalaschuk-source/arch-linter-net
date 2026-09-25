@@ -56,7 +56,11 @@ When `OutputFailed` is true after analysis completed, `CompletionStatus` still d
 
 | Phase | Indent | Meaning |
 |---|---|---|
-| `total` | 0 | Whole single-mode `Validate` call, or the `total` wrapper `ExecuteCombinedModes` measures around snapshot construction. |
+| `total` | 0 | Whole single-mode `Validate`, combined-mode validation, or profiled `health` evaluation. The Health interval includes snapshot preparation and the requested Health projections; the composite `--change-snapshot` path includes its projections over the same snapshot. |
+| `health_validation_evaluation` | 0 | Strict/audit validation projections requested by one Health invocation, evaluated over the retained analysis snapshot. The per-mode Core phases are recorded separately. |
+| `health_external_evidence_binding` | 0 | Optional binding of declared external SARIF evidence to Health validation results. Recorded only when that binding work occurs. |
+| `health_debt_gate` | 0 | Persistent-debt and optional policy-weakening comparison for the Health request, using the same snapshot as its validation projections. |
+| `health_projection` | 0 | Projection of the canonical Architecture Health summary from the completed validation and debt-gate results. |
 | `policy_composition` | 0 | Policy load, import resolution, baseline merge, severity validation, contract-ID selection. |
 | `yaml_loading` | 1 | Sub-phase of `load_and_setup`: policy YAML parse. |
 | `baseline_loading` | 1 | Sub-phase of `load_and_setup`: baseline file merge, when configured. |

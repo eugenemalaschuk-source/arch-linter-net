@@ -39,31 +39,34 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         buildClock.Stop();
         cancellationToken.ThrowIfCancellationRequested();
 
-        BatchSample priming = await RunBatchAsync(fixture, processCount: 1, dispatchMode: "sequential", cancellationToken);
-        ValidateSuccessfulBatch(priming, "warm-state priming");
+        BatchSample priming = await RunBatchAsync(
+            fixture, processCount: 1, dispatchMode: "sequential", cancellationToken, ensureBuilt: true);
+        ValidateSuccessfulBatch(priming, "ensure-built receipt preparation");
+        Assert.That(priming.Processes.All(static process => process.PreparationMode == "--ensure-built"), Is.True,
+            "The one-time preparation sample must use --ensure-built.");
         int projectsPerProcess = priming.Processes[0].Counters.DiscoveredProjectCount;
 
         List<ScenarioSummary> scenarios = new();
         ScenarioSeries single = await RunSeriesAsync(fixture, processCount: 1, dispatchMode: "sequential", prime: false, cancellationToken);
         ScenarioSummary singleSummary = Summarize(
-            "1-process-sequential", "One independent strict validation process", single);
+            "1-process-sequential", "One independent strict validation process using prepared receipts", single);
         scenarios.Add(singleSummary);
 
         ScenarioSeries sequentialTwo = await RunSeriesAsync(fixture, processCount: 2, dispatchMode: "sequential", prime: false, cancellationToken);
         scenarios.Add(Summarize(
-            "2-process-sequential", "Two independent strict processes over one unchanged build", sequentialTwo));
+            "2-process-sequential", "Two independent strict processes using prepared receipts over one unchanged build", sequentialTwo));
 
         ScenarioSeries sequentialFour = await RunSeriesAsync(fixture, processCount: 4, dispatchMode: "sequential", prime: false, cancellationToken);
         scenarios.Add(Summarize(
-            "4-process-sequential", "Four independent strict processes over one unchanged build", sequentialFour));
+            "4-process-sequential", "Four independent strict processes using prepared receipts over one unchanged build", sequentialFour));
 
         ScenarioSeries parallelTwo = await RunSeriesAsync(fixture, processCount: 2, dispatchMode: "bounded-parallel", prime: false, cancellationToken);
         scenarios.Add(Summarize(
-            "2-process-bounded-parallel", "Two independent strict processes dispatched together", parallelTwo));
+            "2-process-bounded-parallel", "Two independent strict processes using prepared receipts dispatched together", parallelTwo));
 
         ScenarioSeries parallelFour = await RunSeriesAsync(fixture, processCount: 4, dispatchMode: "bounded-parallel", prime: false, cancellationToken);
         scenarios.Add(Summarize(
-            "4-process-bounded-parallel", "Four independent strict processes dispatched together", parallelFour));
+            "4-process-bounded-parallel", "Four independent strict processes using prepared receipts dispatched together", parallelFour));
 
         foreach (ScenarioSeries series in new[] { single, sequentialTwo, sequentialFour, parallelTwo, parallelFour })
         {
@@ -75,7 +78,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         }
 
         BenchmarkEvidence evidence = new(
-            "consumer-attribution-evidence/v1",
+            "consumer-attribution-evidence/v2",
             "#461",
             EnvironmentIdentity.Create(),
             new FixtureIdentity(
@@ -83,19 +86,23 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
                 fixture.ProjectPaths.Count,
                 fixture.SourcePaths.Count,
                 "Synthetic 8-host / 2-shared-library fixture; no private adopter data."),
-            new BuildPreparation(buildClock.Elapsed.TotalMilliseconds, "One fixture build completed before timed validation batches."),
+            new BuildPreparation(
+                buildClock.Elapsed.TotalMilliseconds,
+                priming.OuterWallClockMs,
+                priming.AggregateCommandTotalMs,
+                "The synthetic fixture build and one --ensure-built receipt-preparation invocation completed before timed batches. Every measured process used --use-prepared-receipts and did not restore or build."),
             scenarios,
             new AttributionDecision(
                 "B",
                 DescribeDominantPreparation(singleSummary),
-                "Outer process timing does not measure the caller's container or CI runner. Compare this artifact with consumer-side timestamps before asserting an external regression."),
+                "The one-time --ensure-built restore/build and receipt preparation are recorded separately from measured --use-prepared-receipts validation. Outer process timing does not measure the caller's container or CI runner; comparable-version consumer-side timestamps are still required to prove a regression."),
             new RoutingDecision[]
             {
                 new("#502", "Feed the reusable large-multi-host process-count shape and per-process profile counters into the canonical benchmark foundation; do not create a competing framework."),
                 new("#492/#493", "Prepared-analysis reuse remains the owner for cross-process preparation; this harness measures duplication but does not implement reuse."),
                 new("#655/#675/#503", "No selector/layer, real-MSBuild cache-eligibility, or changed-project advisory conclusion is asserted by this matrix."),
             },
-            "The harness measures startup/process and ArchLinterNet profile boundaries only. Container, scheduler, restore-service, and CI-runner time require caller-side instrumentation.");
+            "The fixture build and one --ensure-built receipt-preparation invocation are reported separately. Measured runs use --use-prepared-receipts, so their build_state_preflight phases measure prepared-receipt verification without restore or graph build. The harness measures local startup/process and ArchLinterNet boundaries; container, scheduler, and CI-runner time require caller-side instrumentation.");
 
         File.WriteAllText(ResultsPath(), JsonSerializer.Serialize(evidence, _jsonOptions));
         TestContext.Out.WriteLine($"Consumer attribution evidence written to {ResultsPath()}");
@@ -131,7 +138,11 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     }
 
     private static async Task<BatchSample> RunBatchAsync(
-        AdoptionAcceptanceFixture fixture, int processCount, string dispatchMode, CancellationToken cancellationToken)
+        AdoptionAcceptanceFixture fixture,
+        int processCount,
+        string dispatchMode,
+        CancellationToken cancellationToken,
+        bool ensureBuilt = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Stopwatch outerClock = Stopwatch.StartNew();
@@ -139,7 +150,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         if (dispatchMode == "bounded-parallel")
         {
             Task<ProcessSample>[] tasks = Enumerable.Range(0, processCount)
-                .Select(_ => RunProcessAsync(fixture, cancellationToken))
+                .Select(_ => RunProcessAsync(fixture, cancellationToken, ensureBuilt))
                 .ToArray();
             processes = await Task.WhenAll(tasks);
         }
@@ -148,7 +159,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             List<ProcessSample> samples = new(processCount);
             for (int index = 0; index < processCount; index++)
             {
-                samples.Add(await RunProcessAsync(fixture, cancellationToken));
+                samples.Add(await RunProcessAsync(fixture, cancellationToken, ensureBuilt));
             }
 
             processes = samples;
@@ -177,7 +188,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     }
 
     private static async Task<ProcessSample> RunProcessAsync(
-        AdoptionAcceptanceFixture fixture, CancellationToken cancellationToken)
+        AdoptionAcceptanceFixture fixture, CancellationToken cancellationToken, bool ensureBuilt)
     {
         cancellationToken.ThrowIfCancellationRequested();
         string profilePath = Path.Combine(Path.GetTempPath(), $"arch-linter-profile-461-{Guid.NewGuid():N}.json");
@@ -197,7 +208,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         startInfo.ArgumentList.Add("json");
         startInfo.ArgumentList.Add("--profile");
         startInfo.ArgumentList.Add(profilePath);
-        startInfo.ArgumentList.Add("--ensure-built");
+        startInfo.ArgumentList.Add(ensureBuilt ? "--ensure-built" : "--use-prepared-receipts");
         startInfo.ArgumentList.Add("--max-parallelism");
         startInfo.ArgumentList.Add("1");
 
@@ -225,7 +236,8 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
                     profileDocument.RootElement.Clone(),
                     resultDocument.RootElement.GetRawText(),
                     process.ExitCode,
-                    wallClock.Elapsed.TotalMilliseconds);
+                    wallClock.Elapsed.TotalMilliseconds,
+                    ensureBuilt ? "--ensure-built" : "--use-prepared-receipts");
             }
             catch (OperationCanceledException) when (linkedSource.IsCancellationRequested)
             {
@@ -280,7 +292,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     }
 
     private static ProcessSample CreateProcessSample(
-        JsonElement profile, string resultJson, int exitCode, double wallClockMs)
+        JsonElement profile, string resultJson, int exitCode, double wallClockMs, string preparationMode)
     {
         double preflightMs = 0;
         double buildStatePreflightMs = 0;
@@ -322,6 +334,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             commandTotalMs,
             preflightMs,
             buildStatePreflightMs,
+            preparationMode,
             Math.Max(0, commandTotalMs - preflightMs - outputMs),
             outputMs,
             Math.Max(0, wallClockMs - commandTotalMs),
@@ -351,6 +364,8 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     {
         Assert.Multiple(() =>
         {
+            Assert.That(sample.Processes.All(static process => process.PreparationMode == "--use-prepared-receipts"), Is.True,
+                "Every timed scenario process must verify prepared receipts without building.");
             Assert.That(sample.Processes.All(process => process.Counters.DiscoveredProjectCount == projectsPerProcess), Is.True,
                 "Every independent process must retain the same discovered-project inventory.");
             Assert.That(sample.Counters.DiscoveredProjectCount, Is.EqualTo(projectsPerProcess * sample.ProcessCount),
@@ -384,7 +399,8 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         double preflightMs = Median(singleSummary.Samples.Select(static sample => sample.AggregateBuildStatePreflightMs));
         double preflightShare = Median(singleSummary.Samples.Select(static sample =>
             100 * sample.AggregateBuildStatePreflightMs / sample.AggregateCommandTotalMs));
-        return $"ArchLinterNet inner work is repeated once per independent process; in the 1-process sequential scenario, build_state_preflight is the dominant phase at {preflightMs:F1}ms of {singleSummary.MedianAggregateCommandTotalMs:F1}ms inner median ({preflightShare:F1}%). No version regression is proven by this synthetic current-tree run; consumer-side timestamps and comparable versions are still required.";
+        return FormattableString.Invariant(
+            $"In the 1-process prepared-receipt scenario, build_state_preflight verification is {preflightMs:F1}ms of {singleSummary.MedianAggregateCommandTotalMs:F1}ms inner median ({preflightShare:F1}% median per-sample share). The separate --ensure-built priming measurement contains restore/build and receipt preparation and is not included in timed scenario samples. No version regression is proven by this synthetic current-tree run.");
     }
 
     private static string ExtractCanonicalResult(string json)

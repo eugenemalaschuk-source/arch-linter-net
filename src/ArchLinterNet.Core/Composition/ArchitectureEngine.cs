@@ -140,6 +140,14 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Evaluate(request);
     }
 
+    internal ArchitectureHealthOutcome EvaluateHealth(
+        ArchitectureHealthRequest request,
+        ValidationTiming? timing)
+    {
+        return _serviceProvider.GetRequiredService<ArchitectureHealthApplicationService>()
+            .Evaluate(request, timing);
+    }
+
     /// <summary>
     /// Internal composite-workflow seam: reuse a caller-owned immutable snapshot for Health.
     /// Public single-operation callers continue to use <see cref="EvaluateHealth"/> above.
@@ -148,8 +156,16 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
         ArchitectureHealthRequest request,
         ArchitectureAnalysisSnapshot snapshot)
     {
+        return EvaluateHealth(request, snapshot, timing: null);
+    }
+
+    internal ArchitectureHealthOutcome EvaluateHealth(
+        ArchitectureHealthRequest request,
+        ArchitectureAnalysisSnapshot snapshot,
+        ValidationTiming? timing)
+    {
         return _serviceProvider.GetRequiredService<ArchitectureHealthApplicationService>()
-            .Evaluate(request, snapshot);
+            .Evaluate(request, snapshot, timing);
     }
 
     /// <summary>

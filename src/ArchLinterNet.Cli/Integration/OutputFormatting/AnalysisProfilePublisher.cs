@@ -2,6 +2,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Profiling;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Integration.OutputFormatting;
@@ -39,6 +40,27 @@ internal static class AnalysisProfilePublisher
         AnalysisProfileCompletionStatus completionStatus,
         params (string Name, string? Path)[] protectedPaths)
     {
+        Write(
+            destination,
+            console,
+            fileSystem,
+            counters,
+            completionStatus,
+            timing: null,
+            measurements: null,
+            protectedPaths: protectedPaths);
+    }
+
+    internal static void Write(
+        string? destination,
+        ICliConsole console,
+        IFileSystem fileSystem,
+        ArchitectureAnalysisSnapshotCounters counters,
+        AnalysisProfileCompletionStatus completionStatus,
+        ValidationTiming? timing,
+        AnalysisProfileMeasurements? measurements,
+        params (string Name, string? Path)[] protectedPaths)
+    {
         if (destination is null)
         {
             return;
@@ -51,11 +73,15 @@ internal static class AnalysisProfilePublisher
 
         AnalysisProfile profile = AnalysisProfileBuilder.Build(
             counters,
-            timing: null,
+            timing,
             renderedSinkCount: 1,
             outputSinkCount: 1,
             completionStatus,
-            cancellationObserved: false);
+            cancellationObserved: false,
+            new AnalysisProfileBuildOptions
+            {
+                Measurements = measurements,
+            });
         string json = AnalysisProfileJsonWriter.Write(profile);
         switch (destination)
         {

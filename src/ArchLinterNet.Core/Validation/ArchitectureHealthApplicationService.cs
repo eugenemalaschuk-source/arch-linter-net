@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation.Abstractions;
 
 namespace ArchLinterNet.Core.Validation;
@@ -16,10 +17,21 @@ public sealed class ArchitectureHealthApplicationService(
 {
     public ArchitectureHealthOutcome Evaluate(ArchitectureHealthRequest request)
     {
-        ArchitectureDebtGateRequest debtGateRequest = RequireDebtGateRequest(request);
-        using ArchitectureAnalysisSnapshot snapshot = validationService.CreateSnapshot(
-            CreateSnapshotRequest(debtGateRequest));
-        return Evaluate(request, snapshot);
+        return Evaluate(request, timing: null);
+    }
+
+    internal ArchitectureHealthOutcome Evaluate(
+        ArchitectureHealthRequest request,
+        ValidationTiming? timing)
+    {
+        using (timing?.Measure("total"))
+        {
+            ArchitectureDebtGateRequest debtGateRequest = RequireDebtGateRequest(request);
+            using ArchitectureAnalysisSnapshot snapshot = validationService.CreateSnapshot(
+                CreateSnapshotRequest(debtGateRequest),
+                timing);
+            return Evaluate(request, snapshot, timing);
+        }
     }
 
     /// <summary>
@@ -32,20 +44,52 @@ public sealed class ArchitectureHealthApplicationService(
         ArchitectureHealthRequest request,
         ArchitectureAnalysisSnapshot snapshot)
     {
+        return Evaluate(request, snapshot, timing: null);
+    }
+
+    internal ArchitectureHealthOutcome Evaluate(
+        ArchitectureHealthRequest request,
+        ArchitectureAnalysisSnapshot snapshot,
+        ValidationTiming? timing)
+    {
         ArchitectureDebtGateRequest debtGateRequest = RequireDebtGateRequest(request);
         ArgumentNullException.ThrowIfNull(snapshot);
         string[] modes = ResolveModes(debtGateRequest.Mode);
-        ArchitectureHealthValidationOutcome[] validationOutcomes = modes
-            .Select(mode => new ArchitectureHealthValidationOutcome(mode, snapshot.Evaluate(mode)))
-            .ToArray();
-        validationOutcomes = AttachExternalEvidence(
-            validationOutcomes,
-            request.ExternalEvidenceArtifacts,
-            request.ExternalEvidenceAssessmentContext,
-            debtGateRequest.CancellationToken);
-        ArchitectureDebtGateOutcome debtGate = debtGateService.Evaluate(debtGateRequest, snapshot);
+        ArchitectureHealthValidationOutcome[] validationOutcomes;
+        using (timing?.Measure("health_validation_evaluation"))
+        {
+            validationOutcomes = modes
+                .Select(mode => new ArchitectureHealthValidationOutcome(mode, snapshot.Evaluate(mode, timing)))
+                .ToArray();
+        }
+
+        if (validationOutcomes[0].Outcome.ExternalEvidenceRequirements.Count > 0
+            || request.ExternalEvidenceArtifacts.Count > 0)
+        {
+            using (timing?.Measure("health_external_evidence_binding"))
+            {
+                validationOutcomes = AttachExternalEvidence(
+                    validationOutcomes,
+                    request.ExternalEvidenceArtifacts,
+                    request.ExternalEvidenceAssessmentContext,
+                    debtGateRequest.CancellationToken);
+            }
+        }
+
+        ArchitectureDebtGateOutcome debtGate;
+        using (timing?.Measure("health_debt_gate"))
+        {
+            debtGate = debtGateService.Evaluate(debtGateRequest, snapshot);
+        }
+
+        ArchitectureHealthSummary summary;
+        using (timing?.Measure("health_projection"))
+        {
+            summary = ArchitectureHealthProjector.Project(validationOutcomes, debtGate);
+        }
+
         return new ArchitectureHealthOutcome(
-            ArchitectureHealthProjector.Project(validationOutcomes, debtGate),
+            summary,
             validationOutcomes,
             debtGate)
         {

@@ -78,6 +78,94 @@ internal sealed class CliHealthIntegrationTests : CliIntegrationTestBase
     }
 
     [Test]
+    public void Health_Profile_ContainsMeasuredPhasesAndPreservesResult()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"architecture-health-profile-{Guid.NewGuid():N}.yml");
+        string profilePath = Path.Combine(Path.GetTempPath(), $"architecture-health-profile-{Guid.NewGuid():N}.json");
+        try
+        {
+            var (generationExit, _, generationError) = RunCli(
+                "baseline", "generate", "--policy", PassingPolicy, "--output", baselinePath);
+            Assert.That(generationExit, Is.EqualTo(0), $"stderr: {generationError}");
+
+            var unprofiled = RunCli(
+                "health", "--policy", PassingPolicy, "--baseline", baselinePath, "--format", "json");
+            var profiled = RunCli(
+                "health", "--policy", PassingPolicy, "--baseline", baselinePath, "--format", "json",
+                "--profile", profilePath);
+            using JsonDocument profile = JsonDocument.Parse(File.ReadAllText(profilePath));
+            JsonElement root = profile.RootElement;
+            string[] phaseNames = root.GetProperty("Phases")
+                .EnumerateArray()
+                .Select(phase => phase.GetProperty("Name").GetString()!)
+                .ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(profiled.ExitCode, Is.EqualTo(unprofiled.ExitCode), $"stderr: {profiled.StdErr}");
+                Assert.That(profiled.StdOut, Is.EqualTo(unprofiled.StdOut));
+                Assert.That(profiled.StdErr, Is.EqualTo(unprofiled.StdErr));
+                Assert.That(root.GetProperty("SchemaId").GetString(), Is.EqualTo("analysis-profile/v1"));
+                Assert.That(phaseNames, Does.Contain("total"));
+                Assert.That(phaseNames, Does.Contain("health_validation_evaluation"));
+                Assert.That(phaseNames, Does.Contain("health_debt_gate"));
+                Assert.That(phaseNames, Does.Contain("health_projection"));
+                Assert.That(root.GetProperty("Measurements").ValueKind, Is.EqualTo(JsonValueKind.Object));
+                Assert.That(root.GetProperty("Measurements").GetProperty("AllocatedBytesTotal").GetInt64(),
+                    Is.GreaterThanOrEqualTo(0));
+                Assert.That(root.GetProperty("Counters").GetProperty("ModesEvaluated").GetInt32(), Is.EqualTo(2));
+                Assert.That(root.GetProperty("Counters").GetProperty("SnapshotMaterializations").GetInt32(), Is.EqualTo(1));
+            });
+        }
+        finally
+        {
+            DeleteIfPresent(baselinePath);
+            DeleteIfPresent(profilePath);
+        }
+    }
+
+    [Test]
+    public void Health_ChangeSnapshotProfile_UsesOneMeasuredSnapshot()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"architecture-health-change-profile-{Guid.NewGuid():N}.yml");
+        string snapshotPath = Path.Combine(Path.GetTempPath(), $"architecture-health-change-profile-{Guid.NewGuid():N}.json");
+        string profilePath = Path.Combine(Path.GetTempPath(), $"architecture-health-change-profile-{Guid.NewGuid():N}.json");
+        try
+        {
+            var (generationExit, _, generationError) = RunCli(
+                "baseline", "generate", "--policy", PassingPolicy, "--output", baselinePath);
+            Assert.That(generationExit, Is.EqualTo(0), $"stderr: {generationError}");
+
+            var result = RunCli(
+                "health", "--policy", PassingPolicy, "--baseline", baselinePath, "--format", "json",
+                "--change-snapshot", snapshotPath, "--profile", profilePath);
+            using JsonDocument profile = JsonDocument.Parse(File.ReadAllText(profilePath));
+            string[] phaseNames = profile.RootElement.GetProperty("Phases")
+                .EnumerateArray()
+                .Select(phase => phase.GetProperty("Name").GetString()!)
+                .ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.ExitCode, Is.EqualTo(0), $"stderr: {result.StdErr}");
+                Assert.That(File.Exists(snapshotPath), Is.True);
+                Assert.That(profile.RootElement.GetProperty("SchemaId").GetString(), Is.EqualTo("analysis-profile/v1"));
+                Assert.That(profile.RootElement.GetProperty("Counters").GetProperty("SnapshotMaterializations").GetInt32(), Is.EqualTo(1));
+                Assert.That(phaseNames, Does.Contain("total"));
+                Assert.That(phaseNames, Does.Contain("health_validation_evaluation"));
+                Assert.That(phaseNames, Does.Contain("health_debt_gate"));
+                Assert.That(phaseNames, Does.Contain("health_projection"));
+            });
+        }
+        finally
+        {
+            DeleteIfPresent(baselinePath);
+            DeleteIfPresent(snapshotPath);
+            DeleteIfPresent(profilePath);
+        }
+    }
+
+    [Test]
     public void Health_CanonicalEmptyBaseline_ProjectsNonPassState()
     {
         string baselinePath = Path.Combine(Path.GetTempPath(), $"architecture-health-{Guid.NewGuid():N}.yml");

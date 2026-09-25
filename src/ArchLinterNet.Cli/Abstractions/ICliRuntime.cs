@@ -269,6 +269,15 @@ internal interface ICliRuntime
         throw new NotSupportedException("Architecture health is not configured for this CLI runtime.");
 
     /// <summary>
+    /// Evaluates Health with the caller's optional profile timing observer. The default keeps
+    /// existing CLI test doubles source-compatible.
+    /// </summary>
+    ArchitectureHealthOutcome EvaluateHealth(
+        ArchitectureHealthRequest request,
+        ValidationTiming? timing) =>
+        EvaluateHealth(request);
+
+    /// <summary>
     /// Reuses a caller-owned immutable snapshot for a composite Health/projection workflow. The
     /// default keeps existing CLI test doubles source-compatible.
     /// </summary>
@@ -276,6 +285,16 @@ internal interface ICliRuntime
         ArchitectureHealthRequest request,
         ArchitectureAnalysisSnapshot snapshot) =>
         throw new NotSupportedException("Shared-snapshot architecture health is not configured for this CLI runtime.");
+
+    /// <summary>
+    /// Evaluates Health from a caller-owned snapshot with the caller's optional profile timing
+    /// observer. The default keeps existing CLI test doubles source-compatible.
+    /// </summary>
+    ArchitectureHealthOutcome EvaluateHealth(
+        ArchitectureHealthRequest request,
+        ArchitectureAnalysisSnapshot snapshot,
+        ValidationTiming? timing) =>
+        EvaluateHealth(request, snapshot);
 
     /// <summary>
     /// Verifies baseline candidates already retained by a caller-owned snapshot. The default keeps

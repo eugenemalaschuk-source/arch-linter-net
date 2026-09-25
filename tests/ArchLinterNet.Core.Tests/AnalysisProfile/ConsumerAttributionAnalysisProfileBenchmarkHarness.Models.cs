@@ -13,6 +13,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         double CommandTotalMs,
         double PreflightMs,
         double BuildStatePreflightMs,
+        string PreparationMode,
         double AnalysisOnlyMs,
         double OutputMs,
         double ProcessEnvelopeMs,
@@ -204,7 +205,11 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
 
     private sealed record FixtureIdentity(string Id, int ProjectCount, int SourceFileCount, string Description);
 
-    private sealed record BuildPreparation(double BuildWallClockMs, string Description);
+    private sealed record BuildPreparation(
+        double FixtureBuildWallClockMs,
+        double EnsureBuiltPrimingOuterWallClockMs,
+        double EnsureBuiltPrimingInnerCommandMs,
+        string Description);
 
     private sealed record AttributionDecision(string State, string Conclusion, string Limitation);
 
