@@ -479,11 +479,7 @@ jobs:
         shell: bash
         run: |
           python3 tools/release/release_forensics.py run \
-            --repository . \
             --repository-name "$GITHUB_REPOSITORY" \
-            --package-directory artifacts/candidate \
-            --tool-directory artifacts/forensics-tool \
-            --bundle-directory artifacts/release-forensics \
             --candidate-version "$CANDIDATE_VERSION" \
             --target-tag "$CANDIDATE_TAG" \
             --candidate-sha "$CANDIDATE_SHA" \
@@ -787,7 +783,6 @@ jobs:
           EXPECTED_TREE: ${{ needs.release.outputs.candidate_tree }}
         run: |
           python3 tools/release/release_forensics.py verify \
-            --bundle-directory artifacts/release-forensics \
             --repository-name "$GITHUB_REPOSITORY" \
             --candidate-version "${{ needs.release.outputs.package_version }}" \
             --target-tag "${{ needs.release.outputs.target_tag }}" \
@@ -843,10 +838,6 @@ jobs:
             attachment_paths+=("artifacts/release-forensics/$asset")
           done
           python3 tools/release/publish_release_assets.py \
-            --repository "$GH_REPO" \
-            --tag "$TARGET_TAG" \
-            --candidate-sha "$RELEASE_COMMIT" \
-            --title "$TARGET_TAG" \
             --notes-file artifacts/release-notes/release-notes.md \
             --create-if-missing \
             "${attachment_paths[@]/#/--asset=}"

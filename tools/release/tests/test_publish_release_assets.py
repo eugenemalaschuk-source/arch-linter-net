@@ -162,8 +162,9 @@ def test_publisher_fails_closed_on_existing_asset_digest_mismatch(
     notes = tmp_path / "notes.md"
     notes.write_text("Release notes\n", encoding="utf-8")
 
+    arguments = _arguments(asset, notes, candidate_sha)
     with pytest.raises(publish_release_assets.ReleaseAssetError, match="refusing to replace"):
-        publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
+        publish_release_assets.publish(arguments)
 
     assert base64.b64decode(_state(state_path)["release"]["assets"][asset.name]) == b"other bytes"
 
@@ -188,8 +189,50 @@ def test_publisher_refuses_a_target_tag_on_another_commit(
     notes = tmp_path / "notes.md"
     notes.write_text("Release notes\n", encoding="utf-8")
 
+    arguments = _arguments(asset, notes, candidate_sha)
     with pytest.raises(publish_release_assets.ReleaseAssetError, match="exact candidate commit"):
-        publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
+        publish_release_assets.publish(arguments)
 
     assert _state(state_path)["tag_sha"] == "f" * 40
     assert _state(state_path)["release"]["assets"] == {}
+
+
+def test_publisher_main_reads_release_identity_from_the_workflow_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate_sha = "a" * 40
+    state_path = tmp_path / "state.json"
+    state_path.write_text(json.dumps({"tag_sha": None, "release": None}), encoding="utf-8")
+    _fake_gh(tmp_path / "bin", state_path, monkeypatch)
+    asset = tmp_path / "release-forensics.json"
+    asset.write_bytes(b"candidate bytes")
+    notes = tmp_path / "notes.md"
+    notes.write_text("Release notes\n", encoding="utf-8")
+    monkeypatch.setenv("GH_REPO", "example/project")
+    monkeypatch.setenv("TARGET_TAG", "v0.9.0")
+    monkeypatch.setenv("RELEASE_COMMIT", candidate_sha)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["publish_release_assets.py", "--notes-file", str(notes), "--create-if-missing", "--asset", str(asset)],
+    )
+
+    assert publish_release_assets.main() == 0
+    assert _state(state_path)["tag_sha"] == candidate_sha
+
+
+@pytest.mark.parametrize(
+    ("repository", "tag", "candidate_sha", "message"),
+    [
+        ("--repo/project", "v0.9.0", "a" * 40, "Repository identity"),
+        ("example/project", "--help", "a" * 40, "Release tag"),
+        ("example/project", "v0.9.0", "--help", "Candidate commit"),
+    ],
+)
+def test_publisher_rejects_untrusted_release_identity(
+    repository: str, tag: str, candidate_sha: str, message: str
+) -> None:
+    arguments = Namespace(repository=repository, tag=tag, candidate_sha=candidate_sha)
+
+    with pytest.raises(publish_release_assets.ReleaseAssetError, match=message):
+        publish_release_assets._validate_identity(arguments)  # noqa: SLF001

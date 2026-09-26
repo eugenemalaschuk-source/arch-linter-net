@@ -54,9 +54,13 @@ def test_history_forensics_uses_only_the_verified_candidate_package_and_identity
     assert "--manifest artifacts/candidate/package-manifest.json" in history
     assert "--source-commit" in history
     assert "release_forensics.py run" in history
-    assert '"tool",\n            "install",\n            "ArchLinterNet.Cli"' in runner
+    assert '_CLI_PACKAGE_ID = "ArchLinterNet.Cli"' in runner
+    assert '"tool",\n            "install",\n            _CLI_PACKAGE_ID' in runner
     assert '"--source",\n            str(package_directory)' in runner
-    assert '"--version",\n            package_version' in runner
+    assert '"--version",\n            str(parsed_version)' in runner
+    assert 'package_directory=root / "artifacts" / "candidate"' in runner
+    assert 'bundle_directory=root / "artifacts" / "release-forensics"' in runner
+    assert "--bundle-directory" not in history
     assert '"history",\n        "analyze"' in runner
     assert "--report\"" in runner
     assert '"json={json_path}"' in runner
@@ -82,7 +86,7 @@ def test_history_forensics_is_full_history_read_only_and_has_no_release_publishe
     assert "dotnet nuget push" not in history
     assert "contents: write" in _job_text(workflow, "create-release")
     publisher = (_REPOSITORY_ROOT / "tools" / "release" / "publish_release_assets.py").read_text(encoding="utf-8")
-    assert '"release",\n                "create"' in publisher
+    assert '"release",\n            "create"' in publisher
     assert '["release", "upload"' in publisher
     assert '"release",\n            "download"' in publisher
     assert "history-forensics" not in jobs["create-release"].get("needs", [])

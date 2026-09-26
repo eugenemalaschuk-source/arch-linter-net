@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from argparse import Namespace
@@ -15,7 +16,9 @@ sys.path.insert(0, str(_RELEASE_DIRECTORY))
 import package_manifest  # noqa: E402
 import release_forensics_analysis  # noqa: E402
 import release_forensics  # noqa: E402
+import release_forensics_transport  # noqa: E402
 from resolve_release_history_range import (  # noqa: E402
+    ReleaseHistoryRange,
     ReleaseHistoryRangeError,
     resolve_release_history_range,
 )
@@ -227,6 +230,170 @@ def test_candidate_package_verification_binds_every_manifested_subject(
         )
 
 
+def test_candidate_tool_install_uses_only_a_canonical_package_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    package_directory = tmp_path / "packages"
+    package_directory.mkdir()
+    tool_directory = tmp_path / "tool"
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/dotnet")
+    recorded: list[str] = []
+
+    def install(arguments: list[str], _cwd: Path) -> subprocess.CompletedProcess[str]:
+        recorded.extend(arguments)
+        command = tool_directory / "arch-linter-net"
+        command.write_text("#!/bin/sh\n", encoding="utf-8")
+        command.chmod(0o755)
+        return subprocess.CompletedProcess(arguments, 0, "", "")
+
+    monkeypatch.setattr(release_forensics, "_run_checked", install)
+    command = release_forensics._install_candidate_tool(  # noqa: SLF001
+        package_directory, tool_directory, "0.9.0-preview.2", repository
+    )
+
+    assert command == tool_directory / "arch-linter-net"
+    assert recorded[recorded.index("--version") + 1] == "0.9.0-preview.2"
+    with pytest.raises(release_forensics.ReleaseForensicsError, match="canonical release version"):
+        release_forensics._install_candidate_tool(  # noqa: SLF001
+            package_directory, tool_directory, "--help", repository
+        )
+
+
+def test_candidate_tool_install_reports_a_missing_dotnet_sdk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+
+    with pytest.raises(release_forensics.ReleaseForensicsError, match=".NET SDK is not available"):
+        release_forensics._install_candidate_tool(  # noqa: SLF001
+            tmp_path, tmp_path / "tool", "0.9.0", tmp_path
+        )
+
+
+def test_checked_subprocess_reports_its_failure_details(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        release_forensics.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(["dotnet"], 2, "", "restore failed"),
+    )
+
+    with pytest.raises(release_forensics.ReleaseForensicsError, match="restore failed"):
+        release_forensics._run_checked(["dotnet", "restore"], tmp_path)  # noqa: SLF001
+
+
+def test_analysis_requires_gnu_time_for_isolated_memory_measurement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_is_file = Path.is_file
+    monkeypatch.setattr(
+        Path,
+        "is_file",
+        lambda path: False if path == Path("/usr/bin/time") else original_is_file(path),
+    )
+
+    with pytest.raises(release_forensics_analysis.ReleaseForensicsError, match="GNU time is required"):
+        release_forensics_analysis._run_with_peak_memory(["candidate"], tmp_path)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("record", "message"),
+    [
+        ("", "did not emit its required"),
+        ("History timings (ms): malformed", "malformed timing data"),
+        ("History timings (ms): ingestion_calls=nope", "invalid ingestion count"),
+        ("History timings (ms): ingestion_calls=-1", "negative ingestion count"),
+        ("History timings (ms): ingestion_calls=1; ingestion=nan", "invalid phase duration"),
+        ("History timings (ms): ingestion_calls=2", "exactly one history ingestion"),
+        (
+            "History timings (ms): ingestion_calls=1; ingestion=1; scoring=2; policy=3; json_render=4; markdown_render=5; output=6; enrichment=0",
+            "enrichment as n/a",
+        ),
+        (
+            "History timings (ms): ingestion_calls=1; ingestion=1; scoring=2; policy=3; json_render=4; markdown_render=5; enrichment=n/a",
+            "missing output",
+        ),
+    ],
+)
+def test_timing_parser_rejects_invalid_or_incomplete_candidate_records(record: str, message: str) -> None:
+    with pytest.raises(release_forensics_analysis.ReleaseForensicsError, match=message):
+        release_forensics_analysis._parse_timings(record)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("contents", "message"),
+    [
+        (b"not json", "valid UTF-8 JSON"),
+        (b"\xff", "valid UTF-8 JSON"),
+        (b"[]", "root must be a JSON object"),
+    ],
+)
+def test_analysis_report_reader_rejects_invalid_json_roots(
+    tmp_path: Path, contents: bytes, message: str
+) -> None:
+    json_path = tmp_path / "report.json"
+    markdown_path = tmp_path / "report.md"
+    json_path.write_bytes(contents)
+    markdown_path.write_text("# report\n", encoding="utf-8")
+
+    with pytest.raises(release_forensics_analysis.ReleaseForensicsError, match=message):
+        release_forensics_analysis._read_report(json_path, markdown_path)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("report", "message"),
+    [
+        ({}, "valid analysis object"),
+        ({"analysis": {}}, "valid resolved range"),
+        (
+            {
+                "schemaVersion": 2,
+                "kind": "release-architecture-forensics",
+                "toolVersion": "0.9.0",
+                "historySemanticsVersion": "v1",
+                "analysis": {"range": {}, "analyzedCommitCount": 0, "historyAnalysisConfiguration": {}},
+            },
+            "schema or kind",
+        ),
+        (
+            {
+                "schemaVersion": 1,
+                "kind": "release-architecture-forensics",
+                "toolVersion": "0.9.0",
+                "historySemanticsVersion": "v1",
+                "analysis": {
+                    "range": {"resolvedFrom": "d" * 40, "resolvedTo": "a" * 40},
+                    "analyzedCommitCount": True,
+                    "historyAnalysisConfiguration": {},
+                },
+            },
+            "valid analyzed commit count",
+        ),
+    ],
+)
+def test_analysis_report_validator_rejects_invalid_candidate_evidence(
+    report: dict, message: str
+) -> None:
+    history_range = ReleaseHistoryRange(
+        status="applicable",
+        reason=None,
+        candidate_version="0.9.0",
+        target_tag="v0.9.0",
+        candidate_sha="a" * 40,
+        candidate_tree="b" * 40,
+        series_kind="stable",
+        series_identity="stable",
+        base_tag="v0.8.0",
+        base_sha="d" * 40,
+    )
+
+    with pytest.raises(release_forensics_analysis.ReleaseForensicsError, match=message):
+        release_forensics_analysis._validate_report(report, history_range)  # noqa: SLF001
+
+
 def _fake_tool(path: Path, expected_from: str, expected_to: str, calls_path: Path) -> Path:
     script = path / "arch-linter-net"
     script.parent.mkdir(parents=True, exist_ok=True)
@@ -290,11 +457,6 @@ def test_bundle_runs_one_candidate_cli_analysis_and_keeps_timings_out_of_report(
 
     monkeypatch.setattr(release_forensics_analysis, "_run_with_peak_memory", run_without_platform_timer)
     arguments = Namespace(
-        repository=str(repository),
-        package_directory=str(package_directory),
-        tool_directory=str(tmp_path / "unused-tool-path"),
-        bundle_directory=str(bundle_directory),
-        policy="architecture/dependencies.arch.yml",
         candidate_version="0.9.0",
         target_tag="v0.9.0",
         candidate_sha=candidate_sha,
@@ -302,10 +464,16 @@ def test_bundle_runs_one_candidate_cli_analysis_and_keeps_timings_out_of_report(
         repository_name="example/project",
         run_id="12345",
         run_attempt="1",
-        summary_file=None,
+    )
+    paths = release_forensics.ReleaseForensicsPaths(
+        repository=repository,
+        package_directory=package_directory,
+        tool_directory=tmp_path / "unused-tool-path",
+        bundle_directory=bundle_directory,
+        policy_path=policy,
     )
 
-    release_forensics.generate_bundle(arguments)
+    release_forensics.generate_bundle(arguments, paths)
 
     assert calls_path.read_text(encoding="utf-8").splitlines() == ["called"]
     report_bytes = (bundle_directory / "release-forensics.json").read_bytes()
@@ -316,7 +484,7 @@ def test_bundle_runs_one_candidate_cli_analysis_and_keeps_timings_out_of_report(
     assert manifest["content"]["json"]["sha256"] == release_forensics._sha256_bytes(report_bytes)  # noqa: SLF001
     observations = json.loads((bundle_directory / "release-forensics-observations.json").read_text(encoding="utf-8"))
     assert observations["analyzer"]["phase_durations_ms"]["ingestion_calls"] == 1
-    assert observations["analyzer"]["phase_durations_ms"]["json_render"] == 0.3
+    assert observations["analyzer"]["phase_durations_ms"]["json_render"] == pytest.approx(0.3)
     assert observations["analyzer"]["phase_durations_ms"]["enrichment"] == "n/a"
     assert "History timings" not in report_bytes.decode("utf-8")
     release_forensics._verify_bundle(  # noqa: SLF001
@@ -343,17 +511,16 @@ def test_not_applicable_bundle_is_typed_and_does_not_run_the_cli(
         "_verify_candidate_package",
         lambda *_: ({}, release_forensics._sha256_file(cli_package)),  # noqa: SLF001
     )
+
+    def unexpected_install(*_args: object) -> Path:
+        raise AssertionError("no analysis runs without a predecessor")
+
     monkeypatch.setattr(
         release_forensics,
         "_install_candidate_tool",
-        lambda *_: (_ for _ in ()).throw(AssertionError("no analysis runs without a predecessor")),
+        unexpected_install,
     )
     arguments = Namespace(
-        repository=str(repository),
-        package_directory=str(package_directory),
-        tool_directory=str(tmp_path / "unused-tool-path"),
-        bundle_directory=str(bundle_directory),
-        policy="architecture/dependencies.arch.yml",
         candidate_version="0.1.0",
         target_tag="v0.1.0",
         candidate_sha=candidate_sha,
@@ -361,16 +528,47 @@ def test_not_applicable_bundle_is_typed_and_does_not_run_the_cli(
         repository_name="example/project",
         run_id="12345",
         run_attempt="1",
-        summary_file=None,
+    )
+    paths = release_forensics.ReleaseForensicsPaths(
+        repository=repository,
+        package_directory=package_directory,
+        tool_directory=tmp_path / "unused-tool-path",
+        bundle_directory=bundle_directory,
+        policy_path=policy,
     )
 
-    manifest = release_forensics.generate_bundle(arguments)
+    manifest = release_forensics.generate_bundle(arguments, paths)
 
     report = json.loads((bundle_directory / "release-forensics.json").read_text(encoding="utf-8"))
     assert report["status"] == "not-applicable"
     assert report["reason"] == "no_previous_release"
     assert report["analysis"] is None
     assert manifest["history"]["kind"] == "release-forensics-not-applicable/v1"
+
+    workspace = tmp_path / "verify-workspace"
+    published_bundle = workspace / "artifacts" / "release-forensics"
+    published_bundle.parent.mkdir(parents=True)
+    shutil.copytree(bundle_directory, published_bundle)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "release_forensics.py",
+            "verify",
+            "--repository-name",
+            "example/project",
+            "--candidate-version",
+            "0.1.0",
+            "--target-tag",
+            "v0.1.0",
+            "--candidate-sha",
+            candidate_sha,
+            "--candidate-tree",
+            candidate_tree,
+        ],
+    )
+    assert release_forensics.main() == 0
 
 
 def test_bundle_verification_rejects_changed_published_report(tmp_path: Path) -> None:
@@ -448,3 +646,40 @@ def test_bundle_verification_rejects_changed_published_report(tmp_path: Path) ->
     (bundle / "release-forensics.json").write_text("tampered\n", encoding="utf-8")
     with pytest.raises(ValueError, match="digest mismatch"):
         release_forensics._verify_bundle(bundle)  # noqa: SLF001
+
+
+@pytest.mark.parametrize("status", ["applicable", "not_applicable"])
+def test_actions_summary_records_candidate_range_or_not_applicable_reason(
+    tmp_path: Path, status: str
+) -> None:
+    summary_path = tmp_path / "summary.md"
+    history_range = ReleaseHistoryRange(
+        status=status,
+        reason=None if status == "applicable" else "no_previous_release",
+        candidate_version="0.9.0",
+        target_tag="v0.9.0",
+        candidate_sha="a" * 40,
+        candidate_tree="b" * 40,
+        series_kind="stable",
+        series_identity="stable",
+        base_tag="v0.8.0" if status == "applicable" else None,
+        base_sha="c" * 40 if status == "applicable" else None,
+    )
+    report = {"analysis": {"analyzedCommitCount": 7}} if status == "applicable" else {}
+
+    release_forensics_transport.write_summary(
+        summary_path, "example/project", "12345", history_range, report
+    )
+
+    summary = summary_path.read_text(encoding="utf-8")
+    assert "Candidate: `0.9.0`" in summary
+    assert "open run" in summary
+    if status == "applicable":
+        assert "Analyzed 7 commits" in summary
+        assert f"`{'c' * 40}..{'a' * 40}`" in summary
+    else:
+        assert "Not applicable: no previous release" in summary
+        assert "No analysis range" in summary
+
+    with pytest.raises(release_forensics_analysis.ReleaseForensicsError, match="run identity is invalid"):
+        release_forensics_transport.write_summary(summary_path, "bad//repo", "12345", history_range, report)

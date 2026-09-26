@@ -16,6 +16,13 @@ BUNDLE_SCHEMA = "release-forensics-transport-manifest/v1"
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _GIT_OBJECT_ID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 _REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
+_REPORT_JSON = "release-forensics.json"
+_REPORT_MARKDOWN = "release-forensics.md"
+_REPORT_OBSERVATIONS = "release-forensics-observations.json"
+_REPORT_MANIFEST = "release-forensics-manifest.json"
+_REPORT_CHECKSUMS = "release-forensics-checksums.txt"
+_CLI_PACKAGE_ID = "ArchLinterNet.Cli"
+_CONTENT_FILES = {"json": _REPORT_JSON, "markdown": _REPORT_MARKDOWN}
 
 
 def _sha256_file(path: Path) -> str:
@@ -31,21 +38,24 @@ def _canonical_json_sha256(value: object) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
-def verify_bundle(
-    bundle_directory: Path,
-    expected_repository: str | None = None,
-    expected_version: str | None = None,
-    expected_tag: str | None = None,
-    expected_sha: str | None = None,
-    expected_tree: str | None = None,
-) -> dict[str, object]:
-    manifest_path = bundle_directory / "release-forensics-manifest.json"
+def _read_object(path: Path, description: str) -> dict[str, object]:
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ReleaseForensicsError(f"Cannot read release-forensics manifest: {error}") from error
-    if not isinstance(manifest, dict) or manifest.get("schema") != BUNDLE_SCHEMA:
-        raise ReleaseForensicsError("Unsupported release-forensics bundle manifest schema.")
+        raise ReleaseForensicsError(f"Cannot read {description}: {error}") from error
+    if not isinstance(value, dict):
+        raise ReleaseForensicsError(f"{description} root must be a JSON object.")
+    return value
+
+
+def _validate_candidate(
+    manifest: dict[str, object],
+    expected_repository: str | None,
+    expected_version: str | None,
+    expected_tag: str | None,
+    expected_sha: str | None,
+    expected_tree: str | None,
+) -> dict[str, object]:
     candidate = manifest.get("candidate")
     if not isinstance(candidate, dict):
         raise ReleaseForensicsError("Release-forensics candidate identity is malformed.")
@@ -58,22 +68,20 @@ def verify_bundle(
         raise ReleaseForensicsError("Release-forensics candidate commit is not a full lowercase Git object ID.")
     if _GIT_OBJECT_ID.fullmatch(candidate["tree"]) is None:
         raise ReleaseForensicsError("Release-forensics candidate tree is not a full lowercase Git object ID.")
-    checks = (
+    expected_values = (
         (expected_repository, manifest.get("repository"), "repository"),
         (expected_version, candidate.get("version"), "candidate version"),
         (expected_tag, candidate.get("target_tag"), "candidate tag"),
         (expected_sha, candidate.get("sha"), "candidate commit"),
         (expected_tree, candidate.get("tree"), "candidate tree"),
     )
-    for expected, actual, description in checks:
+    for expected, actual, description in expected_values:
         if expected is not None and expected != actual:
             raise ReleaseForensicsError(f"Release-forensics {description} does not match the expected candidate.")
+    return candidate
 
-    expected_files = {
-        "release-forensics.json",
-        "release-forensics.md",
-        "release-forensics-observations.json",
-    }
+
+def _verify_report_files(bundle_directory: Path, manifest: dict[str, object]) -> None:
     content = manifest.get("content")
     if not isinstance(content, dict) or set(content) != {"json", "markdown"}:
         raise ReleaseForensicsError("Release-forensics manifest does not identify both report content digests.")
@@ -83,10 +91,10 @@ def verify_bundle(
         name = record.get("file")
         size = record.get("size")
         digest = record.get("sha256")
-        expected_name = "release-forensics.json" if format_name == "json" else "release-forensics.md"
-        if not isinstance(name, str) or name != expected_name or name not in expected_files:
+        expected_name = _CONTENT_FILES[format_name]
+        if name != expected_name:
             raise ReleaseForensicsError("Release-forensics manifest contains an unexpected report path.")
-        path = bundle_directory / name
+        path = bundle_directory / expected_name
         if (
             not path.is_file()
             or not isinstance(size, int)
@@ -96,18 +104,10 @@ def verify_bundle(
             or _SHA256.fullmatch(digest) is None
             or _sha256_file(path) != digest
         ):
-            raise ReleaseForensicsError(f"Release-forensics report digest mismatch: {name}.")
-        expected_files.remove(name)
-    if expected_files != {"release-forensics-observations.json"}:
-        raise ReleaseForensicsError("Release-forensics report inventory is incomplete or duplicated.")
+            raise ReleaseForensicsError(f"Release-forensics report digest mismatch: {expected_name}.")
 
-    try:
-        report = json.loads((bundle_directory / "release-forensics.json").read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ReleaseForensicsError(f"Cannot read the transported history report: {error}") from error
-    if not isinstance(report, dict):
-        raise ReleaseForensicsError("The transported history report root must be a JSON object.")
-    status = manifest.get("status")
+
+def _validate_shared_metadata(manifest: dict[str, object]) -> tuple[dict, dict, dict, dict]:
     base = manifest.get("base")
     range_metadata = manifest.get("range")
     policy = manifest.get("policy")
@@ -125,75 +125,112 @@ def verify_bundle(
         or not isinstance(history, dict)
     ):
         raise ReleaseForensicsError("Release-forensics range, policy, or report identity is malformed.")
+    return base, range_metadata, policy, history
+
+
+def _validate_series_identity(candidate: dict[str, object], range_metadata: dict) -> None:
     preview_suffix = "-preview."
-    is_preview = preview_suffix in candidate["version"]
+    version = candidate["version"]
+    if not isinstance(version, str):
+        raise ReleaseForensicsError("Release-forensics candidate version is malformed.")
+    is_preview = preview_suffix in version
     expected_series = (
-        ("preview", f"preview:{candidate['version'].split(preview_suffix, 1)[0]}")
+        ("preview", f"preview:{version.split(preview_suffix, 1)[0]}")
         if is_preview
         else ("stable", "stable")
     )
     if (range_metadata.get("kind"), range_metadata.get("series_identity")) != expected_series:
         raise ReleaseForensicsError("Release-forensics series identity does not match the candidate version.")
-    if status == "applicable":
-        base_sha = base.get("sha")
-        tool = manifest.get("tool")
-        analysis = report.get("analysis")
-        report_range = analysis.get("range") if isinstance(analysis, dict) else None
-        configuration = analysis.get("historyAnalysisConfiguration") if isinstance(analysis, dict) else None
-        if (
-            not isinstance(base_sha, str)
-            or _GIT_OBJECT_ID.fullmatch(base_sha) is None
-            or not isinstance(base.get("tag"), str)
-            or not isinstance(range_metadata, dict)
-            or not isinstance(tool, dict)
-            or tool.get("package_id") != "ArchLinterNet.Cli"
-            or tool.get("package_version") != candidate["version"]
-            or tool.get("package_file") != f"ArchLinterNet.Cli.{candidate['version']}.nupkg"
-            or not isinstance(tool.get("package_sha256"), str)
-            or _SHA256.fullmatch(tool["package_sha256"]) is None
-            or history.get("schema_version") != 1
-            or history.get("kind") != "release-architecture-forensics"
-            or history.get("semantics_version") != report.get("historySemanticsVersion")
-            or history.get("tool_version") != report.get("toolVersion")
-            or report.get("schemaVersion") != 1
-            or report.get("kind") != "release-architecture-forensics"
-            or not isinstance(report.get("toolVersion"), str)
-            or not report["toolVersion"]
-            or not isinstance(report.get("historySemanticsVersion"), str)
-            or not report["historySemanticsVersion"]
-            or not isinstance(report_range, dict)
-            or report_range.get("resolvedFrom") != base_sha
-            or report_range.get("resolvedTo") != candidate["sha"]
-            or not isinstance(configuration, dict)
-            or policy.get("effective_history_configuration_sha256") != _canonical_json_sha256(configuration)
-        ):
-            raise ReleaseForensicsError("Transported history report does not match its candidate-bound manifest.")
-    elif status == "not_applicable":
-        report_candidate = report.get("candidate")
-        if (
-            manifest.get("reason") != "no_previous_release"
-            or base.get("tag") is not None
-            or base.get("sha") is not None
-            or history.get("schema_version") is not None
-            or history.get("kind") != "release-forensics-not-applicable/v1"
-            or history.get("semantics_version") is not None
-            or history.get("tool_version") is not None
-            or report.get("schema") != "release-forensics-not-applicable/v1"
-            or report.get("status") != "not-applicable"
-            or report.get("reason") != manifest.get("reason")
-            or not isinstance(report_candidate, dict)
-            or report_candidate.get("version") != candidate["version"]
-            or report_candidate.get("tag") != candidate["target_tag"]
-            or report_candidate.get("sha") != candidate["sha"]
-            or report_candidate.get("tree") != candidate["tree"]
-            or report.get("analysis") is not None
-            or policy.get("effective_history_configuration_sha256") is not None
-        ):
-            raise ReleaseForensicsError("Transported not-applicable report does not match its typed manifest result.")
-    else:
-        raise ReleaseForensicsError("Release-forensics bundle has an unsupported status.")
 
-    observations = bundle_directory / "release-forensics-observations.json"
+
+def _verify_applicable_report(
+    manifest: dict[str, object], candidate: dict[str, object], base: dict, policy: dict, history: dict, report: dict
+) -> None:
+    base_sha = base.get("sha")
+    if not isinstance(base_sha, str) or _GIT_OBJECT_ID.fullmatch(base_sha) is None:
+        raise ReleaseForensicsError("Release-forensics predecessor commit is malformed.")
+    if not isinstance(base.get("tag"), str):
+        raise ReleaseForensicsError("Release-forensics predecessor tag is malformed.")
+    tool = manifest.get("tool")
+    if not isinstance(tool, dict):
+        raise ReleaseForensicsError("Release-forensics candidate tool identity is malformed.")
+    _verify_tool_metadata(tool, candidate)
+    _verify_history_metadata(history, report)
+    _verify_analyzed_report(base_sha, candidate, policy, report)
+
+
+def _verify_tool_metadata(tool: dict, candidate: dict[str, object]) -> None:
+    version = candidate["version"]
+    if (
+        tool.get("package_id") != _CLI_PACKAGE_ID
+        or tool.get("package_version") != version
+        or tool.get("package_file") != f"{_CLI_PACKAGE_ID}.{version}.nupkg"
+        or not isinstance(tool.get("package_sha256"), str)
+        or _SHA256.fullmatch(tool["package_sha256"]) is None
+    ):
+        raise ReleaseForensicsError("Release-forensics candidate tool metadata is malformed.")
+
+
+def _verify_history_metadata(history: dict, report: dict) -> None:
+    if (
+        history.get("schema_version") != 1
+        or history.get("kind") != "release-architecture-forensics"
+        or history.get("semantics_version") != report.get("historySemanticsVersion")
+        or history.get("tool_version") != report.get("toolVersion")
+        or report.get("schemaVersion") != 1
+        or report.get("kind") != "release-architecture-forensics"
+        or not isinstance(report.get("toolVersion"), str)
+        or not report["toolVersion"]
+        or not isinstance(report.get("historySemanticsVersion"), str)
+        or not report["historySemanticsVersion"]
+    ):
+        raise ReleaseForensicsError("Transported history report metadata does not match its manifest.")
+
+
+def _verify_analyzed_report(base_sha: str, candidate: dict[str, object], policy: dict, report: dict) -> None:
+    analysis = report.get("analysis")
+    if not isinstance(analysis, dict):
+        raise ReleaseForensicsError("Transported history report analysis is malformed.")
+    report_range = analysis.get("range")
+    configuration = analysis.get("historyAnalysisConfiguration")
+    if (
+        not isinstance(report_range, dict)
+        or report_range.get("resolvedFrom") != base_sha
+        or report_range.get("resolvedTo") != candidate["sha"]
+        or not isinstance(configuration, dict)
+        or policy.get("effective_history_configuration_sha256") != _canonical_json_sha256(configuration)
+    ):
+        raise ReleaseForensicsError("Transported history report does not match its candidate-bound manifest.")
+
+
+def _verify_not_applicable_report(
+    manifest: dict[str, object], candidate: dict[str, object], base: dict, policy: dict, history: dict, report: dict
+) -> None:
+    report_candidate = report.get("candidate")
+    if (
+        manifest.get("reason") != "no_previous_release"
+        or base.get("tag") is not None
+        or base.get("sha") is not None
+        or history.get("schema_version") is not None
+        or history.get("kind") != "release-forensics-not-applicable/v1"
+        or history.get("semantics_version") is not None
+        or history.get("tool_version") is not None
+        or report.get("schema") != "release-forensics-not-applicable/v1"
+        or report.get("status") != "not-applicable"
+        or report.get("reason") != manifest.get("reason")
+        or not isinstance(report_candidate, dict)
+        or report_candidate.get("version") != candidate["version"]
+        or report_candidate.get("tag") != candidate["target_tag"]
+        or report_candidate.get("sha") != candidate["sha"]
+        or report_candidate.get("tree") != candidate["tree"]
+        or report.get("analysis") is not None
+        or policy.get("effective_history_configuration_sha256") is not None
+    ):
+        raise ReleaseForensicsError("Transported not-applicable report does not match its typed manifest result.")
+
+
+def _verify_observations(bundle_directory: Path, candidate: dict[str, object]) -> Path:
+    observations = bundle_directory / _REPORT_OBSERVATIONS
     if not observations.is_file() or observations.stat().st_size == 0:
         raise ReleaseForensicsError("Release-forensics operational observations are missing.")
     try:
@@ -210,7 +247,11 @@ def verify_bundle(
         or observation_candidate.get("tree") != candidate["tree"]
     ):
         raise ReleaseForensicsError("Operational observations do not match the candidate-bound manifest.")
-    checksums = bundle_directory / "release-forensics-checksums.txt"
+    return observations
+
+
+def _verify_checksums(bundle_directory: Path, manifest_path: Path, observations: Path) -> None:
+    checksums = bundle_directory / _REPORT_CHECKSUMS
     if not checksums.is_file():
         raise ReleaseForensicsError("Release-forensics checksum inventory is missing.")
     checksum_records: dict[str, str] = {}
@@ -222,8 +263,8 @@ def verify_bundle(
             raise ReleaseForensicsError("Release-forensics checksum inventory contains duplicate paths.")
         checksum_records[name] = digest
     checkable = [
-        bundle_directory / "release-forensics.json",
-        bundle_directory / "release-forensics.md",
+        bundle_directory / _REPORT_JSON,
+        bundle_directory / _REPORT_MARKDOWN,
         observations,
         manifest_path,
     ]
@@ -232,6 +273,36 @@ def verify_bundle(
     for path in checkable:
         if checksum_records[path.name] != _sha256_file(path):
             raise ReleaseForensicsError(f"Release-forensics checksum verification failed: {path.name}.")
+
+
+def verify_bundle(
+    bundle_directory: Path,
+    expected_repository: str | None = None,
+    expected_version: str | None = None,
+    expected_tag: str | None = None,
+    expected_sha: str | None = None,
+    expected_tree: str | None = None,
+) -> dict[str, object]:
+    manifest_path = bundle_directory / _REPORT_MANIFEST
+    manifest = _read_object(manifest_path, "release-forensics manifest")
+    if manifest.get("schema") != BUNDLE_SCHEMA:
+        raise ReleaseForensicsError("Unsupported release-forensics bundle manifest schema.")
+    candidate = _validate_candidate(
+        manifest, expected_repository, expected_version, expected_tag, expected_sha, expected_tree
+    )
+    _verify_report_files(bundle_directory, manifest)
+    report = _read_object(bundle_directory / _REPORT_JSON, "transported history report")
+    status = manifest.get("status")
+    base, range_metadata, policy, history = _validate_shared_metadata(manifest)
+    _validate_series_identity(candidate, range_metadata)
+    if status == "applicable":
+        _verify_applicable_report(manifest, candidate, base, policy, history, report)
+    elif status == "not_applicable":
+        _verify_not_applicable_report(manifest, candidate, base, policy, history, report)
+    else:
+        raise ReleaseForensicsError("Release-forensics bundle has an unsupported status.")
+    observations = _verify_observations(bundle_directory, candidate)
+    _verify_checksums(bundle_directory, manifest_path, observations)
     return manifest
 
 

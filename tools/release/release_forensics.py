@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -23,14 +24,42 @@ from release_forensics_transport import (
     write_summary as _write_summary,
 )
 from resolve_release_history_range import (
+    ReleaseVersion,
     ReleaseHistoryRange,
-    ReleaseHistoryRangeError,
     resolve_release_history_range,
 )
 
 
 _NOT_APPLICABLE_SCHEMA = "release-forensics-not-applicable/v1"
 _OBSERVATIONS_SCHEMA = "release-forensics-operational-observations/v1"
+_CLI_PACKAGE_ID = "ArchLinterNet.Cli"
+_REPORT_JSON = "release-forensics.json"
+_REPORT_MARKDOWN = "release-forensics.md"
+_REPORT_MANIFEST = "release-forensics-manifest.json"
+_REPORT_OBSERVATIONS = "release-forensics-observations.json"
+_REPORT_CHECKSUMS = "release-forensics-checksums.txt"
+
+
+@dataclass(frozen=True)
+class ReleaseForensicsPaths:
+    """Workspace-relative paths used by the runner and injectable by unit tests."""
+
+    repository: Path
+    package_directory: Path
+    tool_directory: Path
+    bundle_directory: Path
+    policy_path: Path
+
+
+def _workspace_paths(workspace: Path) -> ReleaseForensicsPaths:
+    root = workspace.resolve(strict=True)
+    return ReleaseForensicsPaths(
+        repository=root,
+        package_directory=root / "artifacts" / "candidate",
+        tool_directory=root / "artifacts" / "forensics-tool",
+        bundle_directory=root / "artifacts" / "release-forensics",
+        policy_path=root / "architecture" / "dependencies.arch.yml",
+    )
 
 
 def _utc_now() -> str:
@@ -65,9 +94,9 @@ def _verify_candidate_package(
     if manifest["version"] != candidate_version or manifest["source_commit"] != candidate_sha:
         raise ReleaseForensicsError("Candidate package manifest identity does not match the prepared candidate.")
     package_manifest._verify_inventory(package_directory, manifest)  # noqa: SLF001
-    cli_records = [record for record in manifest["packages"] if record.get("id") == "ArchLinterNet.Cli"]
+    cli_records = [record for record in manifest["packages"] if record.get("id") == _CLI_PACKAGE_ID]
     if len(cli_records) != 1:
-        raise ReleaseForensicsError("Candidate manifest must contain exactly one ArchLinterNet.Cli package.")
+        raise ReleaseForensicsError(f"Candidate manifest must contain exactly one {_CLI_PACKAGE_ID} package.")
     cli = cli_records[0]
     if cli["version"] != candidate_version:
         raise ReleaseForensicsError("Candidate CLI package version does not match the prepared candidate.")
@@ -94,6 +123,9 @@ def _install_candidate_tool(
     package_version: str,
     repository: Path,
 ) -> Path:
+    parsed_version = ReleaseVersion.parse(package_version)
+    if parsed_version is None or str(parsed_version) != package_version:
+        raise ReleaseForensicsError("Candidate package version is not a supported canonical release version.")
     dotnet = shutil.which("dotnet")
     if dotnet is None:
         raise ReleaseForensicsError("The .NET SDK is not available to install the verified candidate tool package.")
@@ -103,13 +135,13 @@ def _install_candidate_tool(
             dotnet,
             "tool",
             "install",
-            "ArchLinterNet.Cli",
+            _CLI_PACKAGE_ID,
             "--tool-path",
             str(tool_directory),
             "--source",
             str(package_directory),
             "--version",
-            package_version,
+            str(parsed_version),
         ],
         repository,
     )
@@ -180,12 +212,12 @@ def _file_record(path: Path) -> dict[str, Any]:
     return {"file": path.name, "size": path.stat().st_size, "sha256": _sha256_file(path)}
 
 
-def generate_bundle(arguments: argparse.Namespace) -> dict[str, Any]:
-    repository = Path(arguments.repository).resolve(strict=True)
-    package_directory = Path(arguments.package_directory).resolve(strict=True)
-    tool_directory = Path(arguments.tool_directory).resolve()
-    bundle_directory = Path(arguments.bundle_directory).resolve()
-    policy_path = (repository / arguments.policy).resolve(strict=False)
+def generate_bundle(arguments: argparse.Namespace, paths: ReleaseForensicsPaths) -> dict[str, Any]:
+    repository = paths.repository.resolve(strict=True)
+    package_directory = paths.package_directory.resolve(strict=True)
+    tool_directory = paths.tool_directory.resolve()
+    bundle_directory = paths.bundle_directory.resolve()
+    policy_path = paths.policy_path.resolve(strict=False)
     if not policy_path.is_file():
         raise ReleaseForensicsError(f"The effective history policy input is missing: {policy_path}")
     bundle_directory.mkdir(parents=True, exist_ok=True)
@@ -224,8 +256,8 @@ def generate_bundle(arguments: argparse.Namespace) -> dict[str, Any]:
         orchestration["bundle_render_ms"] = round((time.perf_counter() - tick) * 1000, 3)
     else:
         report = _not_applicable_report(history_range)
-        (bundle_directory / "release-forensics.json").write_bytes(_canonical_json(report))
-        (bundle_directory / "release-forensics.md").write_text(
+        (bundle_directory / _REPORT_JSON).write_bytes(_canonical_json(report))
+        (bundle_directory / _REPORT_MARKDOWN).write_text(
             _not_applicable_markdown(history_range), encoding="utf-8", newline="\n"
         )
         analyzer_measurements = {
@@ -236,8 +268,8 @@ def generate_bundle(arguments: argparse.Namespace) -> dict[str, Any]:
         orchestration["bundle_render_ms"] = 0.0
 
     report_files = {
-        "json": _file_record(bundle_directory / "release-forensics.json"),
-        "markdown": _file_record(bundle_directory / "release-forensics.md"),
+        "json": _file_record(bundle_directory / _REPORT_JSON),
+        "markdown": _file_record(bundle_directory / _REPORT_MARKDOWN),
     }
     report_metadata = _report_metadata(report)
     manifest = {
@@ -258,9 +290,9 @@ def generate_bundle(arguments: argparse.Namespace) -> dict[str, Any]:
             "semantics": "exclusive_base_inclusive_candidate",
         },
         "tool": {
-            "package_id": "ArchLinterNet.Cli",
+            "package_id": _CLI_PACKAGE_ID,
             "package_version": arguments.candidate_version,
-            "package_file": f"ArchLinterNet.Cli.{arguments.candidate_version}.nupkg",
+            "package_file": f"{_CLI_PACKAGE_ID}.{arguments.candidate_version}.nupkg",
             "package_sha256": cli_package_sha256,
             "command": "arch-linter-net",
         },
@@ -271,13 +303,13 @@ def generate_bundle(arguments: argparse.Namespace) -> dict[str, Any]:
             "tool_version": report_metadata["tool_version"],
         },
         "policy": {
-            "input_path": arguments.policy,
+            "input_path": str(policy_path.relative_to(repository)),
             "input_sha256": _sha256_file(policy_path) if policy_path.is_file() else None,
             "effective_history_configuration_sha256": report_metadata["effective_policy_sha256"],
         },
         "content": report_files,
     }
-    _write_json(bundle_directory / "release-forensics-manifest.json", manifest)
+    _write_json(bundle_directory / _REPORT_MANIFEST, manifest)
 
     observations = {
         "schema": _OBSERVATIONS_SCHEMA,
@@ -305,17 +337,17 @@ def generate_bundle(arguments: argparse.Namespace) -> dict[str, Any]:
             "peak_working_set_bytes": analyzer_measurements["peak_working_set_bytes"],
         },
     }
-    observations_path = bundle_directory / "release-forensics-observations.json"
+    observations_path = bundle_directory / _REPORT_OBSERVATIONS
     _write_json(observations_path, observations)
 
     names = (
-        "release-forensics.json",
-        "release-forensics.md",
-        "release-forensics-manifest.json",
-        "release-forensics-observations.json",
+        _REPORT_JSON,
+        _REPORT_MARKDOWN,
+        _REPORT_MANIFEST,
+        _REPORT_OBSERVATIONS,
     )
     checksum_text = "".join(f"{_sha256_file(bundle_directory / name)}  {name}\n" for name in names)
-    (bundle_directory / "release-forensics-checksums.txt").write_text(
+    (bundle_directory / _REPORT_CHECKSUMS).write_text(
         checksum_text, encoding="utf-8", newline="\n"
     )
     _verify_bundle(
@@ -327,7 +359,7 @@ def generate_bundle(arguments: argparse.Namespace) -> dict[str, Any]:
         arguments.candidate_tree,
     )
     _write_summary(
-        None if not arguments.summary_file else Path(arguments.summary_file),
+        None if not os.environ.get("GITHUB_STEP_SUMMARY") else Path(os.environ["GITHUB_STEP_SUMMARY"]),
         arguments.repository_name,
         arguments.run_id,
         history_range,
@@ -340,22 +372,15 @@ def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run", help="verify the candidate and generate its history bundle")
-    run.add_argument("--repository", default=".")
     run.add_argument("--repository-name", required=True)
-    run.add_argument("--package-directory", required=True)
-    run.add_argument("--tool-directory", required=True)
-    run.add_argument("--bundle-directory", required=True)
-    run.add_argument("--policy", default="architecture/dependencies.arch.yml")
     run.add_argument("--candidate-version", required=True)
     run.add_argument("--target-tag", required=True)
     run.add_argument("--candidate-sha", required=True)
     run.add_argument("--candidate-tree", required=True)
     run.add_argument("--run-id", default=os.environ.get("GITHUB_RUN_ID", "0"))
     run.add_argument("--run-attempt", default=os.environ.get("GITHUB_RUN_ATTEMPT", "0"))
-    run.add_argument("--summary-file", default=os.environ.get("GITHUB_STEP_SUMMARY"))
 
     verify = commands.add_parser("verify", help="verify bundle identity and all declared checksums")
-    verify.add_argument("--bundle-directory", required=True)
     verify.add_argument("--repository-name")
     verify.add_argument("--candidate-version")
     verify.add_argument("--target-tag")
@@ -367,12 +392,13 @@ def _parse_arguments() -> argparse.Namespace:
 def main() -> int:
     arguments = _parse_arguments()
     try:
+        paths = _workspace_paths(Path.cwd())
         if arguments.command == "run":
-            generate_bundle(arguments)
+            generate_bundle(arguments, paths)
             print("Release history-forensics bundle is complete.")
         else:
             _verify_bundle(
-                Path(arguments.bundle_directory),
+                paths.bundle_directory,
                 arguments.repository_name,
                 arguments.candidate_version,
                 arguments.target_tag,
@@ -381,7 +407,7 @@ def main() -> int:
             )
             print("Release history-forensics bundle identity and checksums verified.")
         return 0
-    except (OSError, ReleaseForensicsError, ReleaseHistoryRangeError, ValueError) as error:
+    except (OSError, ValueError) as error:
         print(f"release history-forensics failed: {error}", file=sys.stderr)
         return 1
 
