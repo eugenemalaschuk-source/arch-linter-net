@@ -97,7 +97,9 @@ def _bundle_file(bundle_directory: Path, name: str) -> Path:
 
 def _write_json(bundle_directory: Path, name: str, value: Any) -> None:
     destination = _bundle_file(bundle_directory, name)
-    destination.write_bytes(_canonical_json(value))
+    payload = _canonical_json(value)
+    with destination.open("wb") as output:
+        output.write(payload)
 
 
 def _verify_candidate_package(
