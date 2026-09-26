@@ -38,6 +38,9 @@ _REPORT_MARKDOWN = "release-forensics.md"
 _REPORT_MANIFEST = "release-forensics-manifest.json"
 _REPORT_OBSERVATIONS = "release-forensics-observations.json"
 _REPORT_CHECKSUMS = "release-forensics-checksums.txt"
+_BUNDLE_FILES = frozenset(
+    {_REPORT_JSON, _REPORT_MARKDOWN, _REPORT_MANIFEST, _REPORT_OBSERVATIONS, _REPORT_CHECKSUMS}
+)
 
 
 @dataclass(frozen=True)
@@ -82,8 +85,19 @@ def _canonical_json(value: Any) -> bytes:
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
-def _write_json(path: Path, value: Any) -> None:
-    path.write_bytes(_canonical_json(value))
+def _bundle_file(bundle_directory: Path, name: str) -> Path:
+    if name not in _BUNDLE_FILES:
+        raise ReleaseForensicsError("Release-forensics output filename is not part of the fixed bundle inventory.")
+    root = bundle_directory.resolve(strict=True)
+    destination = (root / name).resolve(strict=False)
+    if destination.parent != root or destination.name != name:
+        raise ReleaseForensicsError("Release-forensics output path escaped the bundle directory.")
+    return destination
+
+
+def _write_json(bundle_directory: Path, name: str, value: Any) -> None:
+    destination = _bundle_file(bundle_directory, name)
+    destination.write_bytes(_canonical_json(value))
 
 
 def _verify_candidate_package(
@@ -256,8 +270,8 @@ def generate_bundle(arguments: argparse.Namespace, paths: ReleaseForensicsPaths)
         orchestration["bundle_render_ms"] = round((time.perf_counter() - tick) * 1000, 3)
     else:
         report = _not_applicable_report(history_range)
-        (bundle_directory / _REPORT_JSON).write_bytes(_canonical_json(report))
-        (bundle_directory / _REPORT_MARKDOWN).write_text(
+        _write_json(bundle_directory, _REPORT_JSON, report)
+        _bundle_file(bundle_directory, _REPORT_MARKDOWN).write_text(
             _not_applicable_markdown(history_range), encoding="utf-8", newline="\n"
         )
         analyzer_measurements = {
@@ -268,8 +282,8 @@ def generate_bundle(arguments: argparse.Namespace, paths: ReleaseForensicsPaths)
         orchestration["bundle_render_ms"] = 0.0
 
     report_files = {
-        "json": _file_record(bundle_directory / _REPORT_JSON),
-        "markdown": _file_record(bundle_directory / _REPORT_MARKDOWN),
+        "json": _file_record(_bundle_file(bundle_directory, _REPORT_JSON)),
+        "markdown": _file_record(_bundle_file(bundle_directory, _REPORT_MARKDOWN)),
     }
     report_metadata = _report_metadata(report)
     manifest = {
@@ -309,7 +323,7 @@ def generate_bundle(arguments: argparse.Namespace, paths: ReleaseForensicsPaths)
         },
         "content": report_files,
     }
-    _write_json(bundle_directory / _REPORT_MANIFEST, manifest)
+    _write_json(bundle_directory, _REPORT_MANIFEST, manifest)
 
     observations = {
         "schema": _OBSERVATIONS_SCHEMA,
@@ -337,8 +351,7 @@ def generate_bundle(arguments: argparse.Namespace, paths: ReleaseForensicsPaths)
             "peak_working_set_bytes": analyzer_measurements["peak_working_set_bytes"],
         },
     }
-    observations_path = bundle_directory / _REPORT_OBSERVATIONS
-    _write_json(observations_path, observations)
+    _write_json(bundle_directory, _REPORT_OBSERVATIONS, observations)
 
     names = (
         _REPORT_JSON,
@@ -346,8 +359,8 @@ def generate_bundle(arguments: argparse.Namespace, paths: ReleaseForensicsPaths)
         _REPORT_MANIFEST,
         _REPORT_OBSERVATIONS,
     )
-    checksum_text = "".join(f"{_sha256_file(bundle_directory / name)}  {name}\n" for name in names)
-    (bundle_directory / _REPORT_CHECKSUMS).write_text(
+    checksum_text = "".join(f"{_sha256_file(_bundle_file(bundle_directory, name))}  {name}\n" for name in names)
+    _bundle_file(bundle_directory, _REPORT_CHECKSUMS).write_text(
         checksum_text, encoding="utf-8", newline="\n"
     )
     _verify_bundle(

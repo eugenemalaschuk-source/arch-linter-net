@@ -272,6 +272,21 @@ def test_candidate_tool_install_reports_a_missing_dotnet_sdk(
         )
 
 
+def test_bundle_output_paths_are_restricted_to_the_fixed_inventory(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+
+    with pytest.raises(release_forensics.ReleaseForensicsError, match="fixed bundle inventory"):
+        release_forensics._bundle_file(bundle, "../outside.json")  # noqa: SLF001
+
+    outside = tmp_path / "outside.json"
+    outside.write_text("preserve\n", encoding="utf-8")
+    (bundle / "release-forensics.json").symlink_to(outside)
+    with pytest.raises(release_forensics.ReleaseForensicsError, match="escaped the bundle directory"):
+        release_forensics._bundle_file(bundle, "release-forensics.json")  # noqa: SLF001
+    assert outside.read_text(encoding="utf-8") == "preserve\n"
+
+
 def test_checked_subprocess_reports_its_failure_details(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
