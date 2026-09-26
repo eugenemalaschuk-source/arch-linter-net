@@ -271,10 +271,12 @@ review these files under `artifacts/release-forensics/`:
 The history job checks out the complete Git object graph and consumes the exact
 CLI package and candidate commit produced by `prepare-candidate`. For a stable
 candidate, the exclusive base is the highest lower stable SemVer tag whose
-peeled commit is an ancestor. Preview candidates use the highest lower preview
-tag in the same `X.Y.Z-preview.N` line; the first preview in that line falls
-back to the highest lower stable ancestor. `main.N` and other development tags
-do not define a stable boundary. When no eligible predecessor exists, the
+peeled commit is an ancestor. Prerelease candidates (`alpha`, `beta`, `rc`, and
+`preview`) use the highest lower prerelease tag in the same `X.Y.Z` line, ordered
+by NuGet SemVer precedence; the first prerelease in that line falls back to the
+highest lower stable ancestor. Build metadata remains part of the candidate
+identity but does not affect predecessor ordering. `main.N` and other development
+tags do not define a stable boundary. When no eligible predecessor exists, the
 bundle records the typed result `not-applicable: no_previous_release`; it does
 not invent a root commit or report a successful empty analysis. Range selection,
 identity, ingestion, rendering, or bundle failures fail the workflow and keep

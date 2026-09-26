@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 from release_forensics_analysis import ReleaseForensicsError
-from resolve_release_history_range import ReleaseHistoryRange
+from resolve_release_history_range import ReleaseHistoryRange, ReleaseVersion
 
 
 BUNDLE_SCHEMA = "release-forensics-transport-manifest/v1"
@@ -129,13 +129,15 @@ def _validate_shared_metadata(manifest: dict[str, object]) -> tuple[dict, dict, 
 
 
 def _validate_series_identity(candidate: dict[str, object], range_metadata: dict) -> None:
-    preview_suffix = "-preview."
     version = candidate["version"]
     if not isinstance(version, str):
         raise ReleaseForensicsError("Release-forensics candidate version is malformed.")
-    is_preview = preview_suffix in version
+    parsed_version = ReleaseVersion.parse(version)
+    if parsed_version is None or str(parsed_version) != version:
+        raise ReleaseForensicsError("Release-forensics candidate version is malformed.")
+    is_preview = not parsed_version.is_stable
     expected_series = (
-        ("preview", f"preview:{version.split(preview_suffix, 1)[0]}")
+        ("preview", f"preview:{parsed_version.line}")
         if is_preview
         else ("stable", "stable")
     )

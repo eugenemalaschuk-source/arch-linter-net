@@ -264,13 +264,12 @@ def generate_bundle(arguments: argparse.Namespace, paths: ReleaseForensicsPaths)
             package_directory, tool_directory, arguments.candidate_version, repository
         )
         orchestration["candidate_tool_install_ms"] = round((time.perf_counter() - tick) * 1000, 3)
-        tick = time.perf_counter()
         report, analyzer_measurements = analyze(
             tool_command, repository, policy_path, history_range, bundle_directory
         )
-        orchestration["analysis_process_wall_ms"] = analyzer_measurements["process_wall_ms"]
-        orchestration["bundle_render_ms"] = round((time.perf_counter() - tick) * 1000, 3)
+        bundle_render_started = time.perf_counter()
     else:
+        bundle_render_started = time.perf_counter()
         report = _not_applicable_report(history_range)
         _write_json(bundle_directory, _REPORT_JSON, report)
         _bundle_file(bundle_directory, _REPORT_MARKDOWN).write_text(
@@ -281,7 +280,6 @@ def generate_bundle(arguments: argparse.Namespace, paths: ReleaseForensicsPaths)
             "process_wall_ms": None,
             "peak_working_set_bytes": None,
         }
-        orchestration["bundle_render_ms"] = 0.0
 
     report_files = {
         "json": _file_record(_bundle_file(bundle_directory, _REPORT_JSON)),
@@ -326,6 +324,7 @@ def generate_bundle(arguments: argparse.Namespace, paths: ReleaseForensicsPaths)
         "content": report_files,
     }
     _write_json(bundle_directory, _REPORT_MANIFEST, manifest)
+    orchestration["bundle_render_ms"] = round((time.perf_counter() - bundle_render_started) * 1000, 3)
 
     observations = {
         "schema": _OBSERVATIONS_SCHEMA,

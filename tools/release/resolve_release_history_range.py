@@ -9,24 +9,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from calculate_version import parse_package_version
 
-_VERSION = re.compile(
-    rb"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
-    rb"(?:-preview\.(0|[1-9][0-9]*))?$"
-)
 _OBJECT_ID = re.compile(r"[0-9a-f]+\Z")
+
+
+_PrereleaseIdentifierKey = tuple[int, int, str]
+_VersionPrecedenceKey = tuple[int, int, int, tuple[int, tuple[_PrereleaseIdentifierKey, ...]]]
 
 
 class ReleaseHistoryRangeError(ValueError):
     """Raised when candidate or predecessor identity cannot be established."""
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True)
 class ReleaseVersion:
     major: int
     minor: int
     patch: int
-    preview: int | None = None
+    prerelease: str | None = None
+    build_metadata: str | None = None
 
     @property
     def base(self) -> tuple[int, int, int]:
@@ -34,26 +36,43 @@ class ReleaseVersion:
 
     @property
     def is_stable(self) -> bool:
-        return self.preview is None
+        return self.prerelease is None
 
     @property
     def line(self) -> str:
         return f"{self.major}.{self.minor}.{self.patch}"
 
     def __str__(self) -> str:
-        suffix = "" if self.preview is None else f"-preview.{self.preview}"
-        return f"{self.line}{suffix}"
+        prerelease = "" if self.prerelease is None else f"-{self.prerelease}"
+        metadata = "" if self.build_metadata is None else f"+{self.build_metadata}"
+        return f"{self.line}{prerelease}{metadata}"
+
+    @property
+    def precedence_key(self) -> _VersionPrecedenceKey:
+        if self.prerelease is None:
+            qualifier = (1, ())
+        else:
+            qualifier = (0, tuple(_prerelease_identifier_key(item) for item in self.prerelease.split(".")))
+        return (self.major, self.minor, self.patch, qualifier)
 
     @staticmethod
     def parse(value: str | bytes) -> ReleaseVersion | None:
-        raw = value.encode("ascii") if isinstance(value, str) else value
-        match = _VERSION.fullmatch(raw.removeprefix(b"v"))
-        if match is None:
+        try:
+            text = value.decode("ascii") if isinstance(value, bytes) else value.encode("ascii").decode("ascii")
+        except (UnicodeDecodeError, UnicodeEncodeError):
             return None
-        major, minor, patch, preview = match.groups()
-        return ReleaseVersion(
-            int(major), int(minor), int(patch), None if preview is None else int(preview)
-        )
+        package_version = parse_package_version(text.removeprefix("v"))
+        if package_version is None:
+            return None
+        major, minor, patch, prerelease, build_metadata = package_version
+        return ReleaseVersion(major, minor, patch, prerelease, build_metadata)
+
+
+def _prerelease_identifier_key(identifier: str) -> _PrereleaseIdentifierKey:
+    if identifier.isascii() and identifier.isdigit():
+        numeric = identifier.lstrip("0") or "0"
+        return (0, len(numeric), numeric)
+    return (1, 0, identifier)
 
 
 @dataclass(frozen=True)
@@ -171,12 +190,19 @@ def _validate_existing_target(
 ) -> None:
     version = ReleaseVersion.parse(target_tag)
     if version is None:
-        raise ReleaseHistoryRangeError("The target tag is not a supported stable or preview tag.")
+        raise ReleaseHistoryRangeError("The target tag is not a valid NuGet SemVer release tag.")
+    equivalent_precedence = [tag for tag in tags if tag.version.precedence_key == version.precedence_key]
     aliases = [tag for tag in tags if tag.version == version]
     if len(aliases) > 1:
         names = ", ".join(sorted(tag.name for tag in aliases))
         raise ReleaseHistoryRangeError(
             f"Ambiguous release tags identify candidate version {version}: {names}."
+        )
+    metadata_aliases = [tag for tag in equivalent_precedence if tag.version != version]
+    if metadata_aliases:
+        names = ", ".join(sorted(tag.name for tag in equivalent_precedence))
+        raise ReleaseHistoryRangeError(
+            f"Candidate version {version} has existing tags with equivalent SemVer precedence: {names}."
         )
     if aliases:
         tag = aliases[0]
@@ -192,10 +218,10 @@ def _validate_existing_target(
 
 def _eligible(version: ReleaseVersion, candidate: ReleaseVersion) -> bool:
     if candidate.is_stable:
-        return version.is_stable and version.base < candidate.base
+        return version.is_stable and version.precedence_key < candidate.precedence_key
     if version.is_stable:
         return version.base < candidate.base
-    return version.base == candidate.base and version.preview < (candidate.preview or 0)
+    return version.base == candidate.base and version.precedence_key < candidate.precedence_key
 
 
 def resolve_release_history_range(
@@ -209,7 +235,7 @@ def resolve_release_history_range(
     repository = repository.resolve(strict=True)
     candidate = ReleaseVersion.parse(candidate_version)
     if candidate is None or str(candidate) != candidate_version:
-        raise ReleaseHistoryRangeError("Candidate version must be stable or X.Y.Z-preview.N.")
+        raise ReleaseHistoryRangeError("Candidate version must be a canonical NuGet SemVer package version.")
     if target_tag != f"v{candidate_version}":
         raise ReleaseHistoryRangeError("Target tag does not match the candidate package version.")
 
@@ -237,14 +263,14 @@ def resolve_release_history_range(
         if _is_ancestor(repository, commit, candidate_sha):
             reachable.append((tag, commit))
 
-    versions: dict[ReleaseVersion, list[str]] = {}
+    versions: dict[_VersionPrecedenceKey, list[str]] = {}
     for tag, _ in reachable:
-        versions.setdefault(tag.version, []).append(tag.name)
+        versions.setdefault(tag.version.precedence_key, []).append(tag.name)
     ambiguous = {version: names for version, names in versions.items() if len(names) > 1}
     if ambiguous:
-        version, names = max(ambiguous.items(), key=lambda item: item[0])
+        _, names = max(ambiguous.items(), key=lambda item: item[0])
         joined = ", ".join(sorted(names))
-        raise ReleaseHistoryRangeError(f"Ambiguous release tags identify version {version}: {joined}.")
+        raise ReleaseHistoryRangeError(f"Ambiguous release tags have equivalent SemVer precedence: {joined}.")
 
     if not reachable:
         return ReleaseHistoryRange(
@@ -260,7 +286,7 @@ def resolve_release_history_range(
             None,
         )
 
-    base_tag, base_sha = max(reachable, key=lambda item: item[0].version)
+    base_tag, base_sha = max(reachable, key=lambda item: item[0].version.precedence_key)
     return ReleaseHistoryRange(
         "applicable",
         None,

@@ -122,6 +122,30 @@ def test_first_preview_uses_highest_lower_stable_ancestor(tmp_path: Path) -> Non
     assert selected.series_identity == "preview:0.9.0"
 
 
+def test_candidate_override_prereleases_and_build_metadata_use_nuget_semver(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    _commit(repository, 1)
+    _tag(repository, "v0.0.9")
+    _commit(repository, 2)
+    _tag(repository, "v0.1.0-alpha.1")
+    _commit(repository, 3)
+    _tag(repository, "v0.1.0-beta.2")
+    _commit(repository, 4)
+    _tag(repository, "v0.1.0-beta.10")
+    _commit(repository, 5)
+
+    alpha = _resolve(repository, "0.1.0-alpha.2", "v0.1.0-alpha.2")
+    release_candidate = _resolve(repository, "0.1.0-rc.1", "v0.1.0-rc.1")
+    stable_with_metadata = _resolve(repository, "0.1.0+build.123", "v0.1.0+build.123")
+
+    assert alpha.base_tag == "v0.1.0-alpha.1"
+    assert release_candidate.base_tag == "v0.1.0-beta.10"
+    assert release_candidate.series_kind == "preview"
+    assert release_candidate.series_identity == "preview:0.1.0"
+    assert stable_with_metadata.candidate_version == "0.1.0+build.123"
+    assert stable_with_metadata.base_tag == "v0.0.9"
+
+
 def test_no_predecessor_is_typed_not_applicable_without_a_fake_range(tmp_path: Path) -> None:
     repository = _repository(tmp_path)
     _commit(repository, 1)
@@ -144,6 +168,38 @@ def test_duplicate_semver_tags_on_candidate_ancestry_fail_as_ambiguous(tmp_path:
 
     with pytest.raises(ReleaseHistoryRangeError, match="Ambiguous release tags"):
         _resolve(repository, "0.9.0", "v0.9.0")
+
+
+def test_build_metadata_tags_with_equal_precedence_fail_as_ambiguous(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    _commit(repository, 1)
+    _tag(repository, "v0.9.0-rc.1+build.1")
+    _commit(repository, 2)
+    _tag(repository, "0.9.0-rc.1+build.2")
+    candidate_sha = _commit(repository, 3)
+    candidate_tree = _git(repository, "rev-parse", "HEAD^{tree}")
+
+    with pytest.raises(ReleaseHistoryRangeError, match="equivalent SemVer precedence"):
+        resolve_release_history_range(
+            repository, "0.9.0-rc.2", "v0.9.0-rc.2", candidate_sha, candidate_tree
+        )
+
+
+def test_candidate_build_metadata_cannot_alias_an_existing_precedence(tmp_path: Path) -> None:
+    repository = _repository(tmp_path)
+    _commit(repository, 1)
+    _tag(repository, "v0.9.0-rc.1+build.1")
+    candidate_sha = _commit(repository, 2)
+    candidate_tree = _git(repository, "rev-parse", "HEAD^{tree}")
+
+    with pytest.raises(ReleaseHistoryRangeError, match="equivalent SemVer precedence"):
+        resolve_release_history_range(
+            repository,
+            "0.9.0-rc.1+build.2",
+            "v0.9.0-rc.1+build.2",
+            candidate_sha,
+            candidate_tree,
+        )
 
 
 def test_shallow_history_fails_closed(tmp_path: Path) -> None:
@@ -461,6 +517,29 @@ def test_bundle_runs_one_candidate_cli_analysis_and_keeps_timings_out_of_report(
         lambda *_: ({}, release_forensics._sha256_file(cli_package)),  # noqa: SLF001
     )
     monkeypatch.setattr(release_forensics, "_install_candidate_tool", lambda *_: fake_command)
+
+    class _Clock:
+        current = 0.0
+
+        def perf_counter(self) -> float:
+            value = self.current
+            self.current += 0.001
+            return value
+
+        def advance(self, seconds: float) -> None:
+            self.current += seconds
+
+    clock = _Clock()
+    original_analyze = release_forensics.analyze
+
+    def analyze_with_separate_process_wall(*args: object) -> tuple[dict, dict]:
+        result = original_analyze(*args)
+        clock.advance(0.75)
+        return result
+
+    monkeypatch.setattr(release_forensics, "time", clock)
+    monkeypatch.setattr(release_forensics, "analyze", analyze_with_separate_process_wall)
+
     def run_without_platform_timer(arguments: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(arguments, cwd=cwd, text=True, capture_output=True, check=False)
         return subprocess.CompletedProcess(
@@ -501,9 +580,27 @@ def test_bundle_runs_one_candidate_cli_analysis_and_keeps_timings_out_of_report(
     assert observations["analyzer"]["phase_durations_ms"]["ingestion_calls"] == 1
     assert observations["analyzer"]["phase_durations_ms"]["json_render"] == pytest.approx(0.3)
     assert observations["analyzer"]["phase_durations_ms"]["enrichment"] == "n/a"
+    assert observations["analyzer"]["process_wall_ms"] is not None
+    assert observations["orchestration_ms"]["bundle_render_ms"] == pytest.approx(1.0)
+    assert "analysis_process_wall_ms" not in observations["orchestration_ms"]
     assert "History timings" not in report_bytes.decode("utf-8")
     release_forensics._verify_bundle(  # noqa: SLF001
         bundle_directory, "example/project", "0.9.0", "v0.9.0", candidate_sha, candidate_tree
+    )
+
+
+@pytest.mark.parametrize(
+    ("candidate_version", "kind", "series_identity"),
+    [
+        ("0.2.0-rc.1", "preview", "preview:0.2.0"),
+        ("0.1.0+build.123", "stable", "stable"),
+    ],
+)
+def test_bundle_verifier_uses_the_candidate_nuget_semver_series(
+    candidate_version: str, kind: str, series_identity: str
+) -> None:
+    release_forensics_transport._validate_series_identity(  # noqa: SLF001
+        {"version": candidate_version}, {"kind": kind, "series_identity": series_identity}
     )
 
 

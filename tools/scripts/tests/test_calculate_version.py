@@ -15,6 +15,7 @@ from calculate_version import (  # noqa: E402
     detect_latest_detected_tag,
     calculate_next_version,
     validate_package_version,
+    parse_package_version,
     main,
     _strip_v,
     _latest_by_semver,
@@ -170,6 +171,20 @@ class TestValidatePackageVersion(unittest.TestCase):
 
     def test_valid_with_build_metadata(self):
         validate_package_version("0.1.0+build.123")
+
+    def test_parser_preserves_the_full_version_override_surface(self):
+        self.assertEqual(
+            (0, 2, 0, "rc.1", None),
+            parse_package_version("0.2.0-rc.1"),
+        )
+        self.assertEqual(
+            (0, 1, 0, "alpha.1", None),
+            parse_package_version("0.1.0-alpha.1"),
+        )
+        self.assertEqual(
+            (0, 1, 0, None, "build.123"),
+            parse_package_version("0.1.0+build.123"),
+        )
 
     def test_empty_raises(self):
         with self.assertRaises(ValueError):

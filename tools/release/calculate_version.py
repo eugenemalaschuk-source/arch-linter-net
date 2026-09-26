@@ -139,10 +139,28 @@ def calculate_next_version(
         raise ValueError(f"Unknown release type: {release_type}")
 
 
+def parse_package_version(
+    version: str,
+) -> tuple[int, int, int, str | None, str | None] | None:
+    """Parse the full package-version surface accepted by ``version_override``."""
+    if not isinstance(version, str):
+        return None
+    match = _NUGET_PACKAGE_VERSION_RE.fullmatch(version)
+    if match is None:
+        return None
+    return (
+        int(match.group(1)),
+        int(match.group(2)),
+        int(match.group(3)),
+        None if match.group(4) is None else match.group(4)[1:],
+        None if match.group(5) is None else match.group(5)[1:],
+    )
+
+
 def validate_package_version(version: str) -> None:
     if not version:
         raise ValueError("Package version is required.")
-    if not _NUGET_PACKAGE_VERSION_RE.match(version):
+    if parse_package_version(version) is None:
         raise ValueError(
             f"Package version '{version}' is not a valid SemVer-style NuGet version."
         )
