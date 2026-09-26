@@ -299,6 +299,8 @@ jobs:
     outputs:
       package_version: ${{ steps.release_metadata.outputs.package_version }}
       target_tag: ${{ steps.release_metadata.outputs.target_tag }}
+      candidate_commit: ${{ steps.release_metadata.outputs.candidate_commit }}
+      candidate_tree: ${{ steps.release_metadata.outputs.candidate_tree }}
 
     env:
       PACKAGE_OUTPUT: artifacts/packages
@@ -346,6 +348,10 @@ jobs:
         run: |
           echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
           echo "target_tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
+          candidate_commit=$(git rev-parse --verify --end-of-options "$GITHUB_SHA^{commit}")
+          candidate_tree=$(git rev-parse --verify --end-of-options "$candidate_commit^{tree}")
+          echo "candidate_commit=$candidate_commit" >> "$GITHUB_OUTPUT"
+          echo "candidate_tree=$candidate_tree" >> "$GITHUB_OUTPUT"
 
       - name: Restore
         run: make restore
@@ -427,6 +433,72 @@ jobs:
         with:
           name: checkpoint-b-repository-gates-${{ env.PACKAGE_VERSION }}
           path: artifacts/checkpoint-b/repository-gates.json
+          if-no-files-found: error
+
+  history-forensics:
+    name: Analyze candidate release history
+    needs: prepare-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.package_version }}
+      CANDIDATE_TAG: ${{ needs.prepare-candidate.outputs.target_tag }}
+      CANDIDATE_SHA: ${{ needs.prepare-candidate.outputs.candidate_commit }}
+      CANDIDATE_TREE: ${{ needs.prepare-candidate.outputs.candidate_tree }}
+
+    steps:
+      - name: Checkout complete release history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download immutable candidate packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/candidate
+
+      - name: Verify exact candidate package artifact
+        shell: bash
+        run: |
+          python3 tools/release/package_manifest.py verify \
+            --packages-dir artifacts/candidate \
+            --manifest artifacts/candidate/package-manifest.json \
+            --version "$CANDIDATE_VERSION" \
+            --source-commit "$CANDIDATE_SHA"
+
+      - name: Generate release history-forensics bundle
+        shell: bash
+        run: |
+          python3 tools/release/release_forensics.py run \
+            --repository . \
+            --repository-name "$GITHUB_REPOSITORY" \
+            --package-directory artifacts/candidate \
+            --tool-directory artifacts/forensics-tool \
+            --bundle-directory artifacts/release-forensics \
+            --candidate-version "$CANDIDATE_VERSION" \
+            --target-tag "$CANDIDATE_TAG" \
+            --candidate-sha "$CANDIDATE_SHA" \
+            --candidate-tree "$CANDIDATE_TREE"
+
+      - name: Upload immutable release history-forensics bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-forensics-${{ needs.prepare-candidate.outputs.package_version }}
+          path: |
+            artifacts/release-forensics/release-forensics.json
+            artifacts/release-forensics/release-forensics.md
+            artifacts/release-forensics/release-forensics-manifest.json
+            artifacts/release-forensics/release-forensics-checksums.txt
+            artifacts/release-forensics/release-forensics-observations.json
           if-no-files-found: error
 
   attest-prepublication-provenance:
@@ -577,6 +649,7 @@ jobs:
       [
         prepare-candidate,
         checkpoint-b-evidence,
+        history-forensics,
         verify-prepublication-provenance,
       ]
     runs-on: ubuntu-latest
@@ -587,6 +660,8 @@ jobs:
     outputs:
       package_version: ${{ needs.prepare-candidate.outputs.package_version }}
       target_tag: ${{ needs.prepare-candidate.outputs.target_tag }}
+      candidate_commit: ${{ needs.prepare-candidate.outputs.candidate_commit }}
+      candidate_tree: ${{ needs.prepare-candidate.outputs.candidate_tree }}
 
     steps:
       - name: Checkout release metadata
@@ -699,6 +774,26 @@ jobs:
           name: nuget-candidate-${{ needs.release.outputs.package_version }}
           path: artifacts/packages
 
+      - name: Download release history-forensics bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-forensics-${{ needs.release.outputs.package_version }}
+          path: artifacts/release-forensics
+
+      - name: Verify release history-forensics bundle identity and checksums
+        shell: bash
+        env:
+          EXPECTED_COMMIT: ${{ needs.release.outputs.candidate_commit }}
+          EXPECTED_TREE: ${{ needs.release.outputs.candidate_tree }}
+        run: |
+          python3 tools/release/release_forensics.py verify \
+            --bundle-directory artifacts/release-forensics \
+            --repository-name "$GITHUB_REPOSITORY" \
+            --candidate-version "${{ needs.release.outputs.package_version }}" \
+            --target-tag "${{ needs.release.outputs.target_tag }}" \
+            --candidate-sha "$EXPECTED_COMMIT" \
+            --candidate-tree "$EXPECTED_TREE"
+
       - name: Verify frozen release attachment subjects
         shell: bash
         run: |
@@ -728,7 +823,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TARGET_TAG: ${{ needs.release.outputs.target_tag }}
-          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_COMMIT: ${{ needs.release.outputs.candidate_commit }}
         run: |
           mapfile -t assets < <(python3 tools/release/package_manifest.py paths --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json --kind all)
           mapfile -t transport_assets < <(python3 tools/release/release_distribution.py paths --transport-dir artifacts/packages/transport --manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json --kind subjects)
@@ -739,11 +834,22 @@ jobs:
           for asset in "${transport_assets[@]}"; do
             attachment_paths+=("artifacts/packages/transport/$asset")
           done
-          gh release create "$TARGET_TAG" \
-            --target "$RELEASE_COMMIT" \
+          for asset in \
+            release-forensics.json \
+            release-forensics.md \
+            release-forensics-manifest.json \
+            release-forensics-checksums.txt \
+            release-forensics-observations.json; do
+            attachment_paths+=("artifacts/release-forensics/$asset")
+          done
+          python3 tools/release/publish_release_assets.py \
+            --repository "$GH_REPO" \
+            --tag "$TARGET_TAG" \
+            --candidate-sha "$RELEASE_COMMIT" \
             --title "$TARGET_TAG" \
             --notes-file artifacts/release-notes/release-notes.md \
-            "${attachment_paths[@]}"
+            --create-if-missing \
+            "${attachment_paths[@]/#/--asset=}"
 
   deploy-docs:
     name: Deploy GitHub Pages docs
