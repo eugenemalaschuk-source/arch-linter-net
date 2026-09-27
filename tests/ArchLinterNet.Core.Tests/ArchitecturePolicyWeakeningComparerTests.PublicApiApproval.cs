@@ -81,6 +81,22 @@ public sealed class ArchitecturePolicyWeakeningPublicApiApprovalTests
     }
 
     [Test]
+    public void Compare_ApprovalWithIncompleteAddedList_RemainsBlocking()
+    {
+        (ArchitecturePolicyContextExport baseline, ArchitecturePolicyContextExport current) = Contexts("exact");
+        ArchitecturePublicApiWeakeningApproval approval = Approval(baseline, current, "api");
+
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current)
+        {
+            PublicApiApprovals = [approval],
+            PublicApiLiveEvidence = [LiveEvidence(current, "api", _existingApi, _newApi)],
+        });
+
+        Assert.That(result.Findings.Select(finding => finding.ControlIdentity),
+            Does.Contain("public_api_surface:api:resolved_snapshot_entries"));
+    }
+
+    [Test]
     public void Compare_ApprovalForAnotherContract_RemainsBlocking()
     {
         (ArchitecturePolicyContextExport baseline, ArchitecturePolicyContextExport current) = Contexts("exact");

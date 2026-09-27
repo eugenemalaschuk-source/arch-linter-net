@@ -194,9 +194,12 @@ with the same CLI. The [review workflow](../guides/single-tool-workflow.md)
 shows the actual worktree sequence.
 
 `--public-api-approval` is optional. It binds the exact context digests,
-contract and complete approved additions. When supplied, the current CLR API
-must match the reviewed snapshot. It cannot approve removals, signature changes,
-selector changes or a different comparison mode. See [public API contracts](../contracts/public-api-surface.md).
+contract and complete approved additions. When supplied, pass `--ensure-built`
+so live CLR evidence comes from a fresh verified build; `--condition-set` selects
+the policy conditions and `--no-restore` skips restore during that build. The
+current CLR API must match the reviewed snapshot. Approval cannot authorize
+removals, signature changes, selector changes or a different comparison mode.
+See [public API contracts](../contracts/public-api-surface.md).
 
 ## Baseline workflow
 
