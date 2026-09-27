@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-09-26
+goal: Resolve history ranges for every accepted NuGet SemVer override and keep
+  bundle finalization timing separate from analyzer time.
