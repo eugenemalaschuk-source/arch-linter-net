@@ -27,11 +27,11 @@ Use the same exact CLI version for both revisions. The package version in the
 candidate's committed `.config/dotnet-tools.json` is the pin; entering the base
 worktree must not select its older tool manifest.
 
-`health --change-snapshot` is available in `0.9.0-preview.1`; it is absent from
-`0.8.2`. It produces Health and the current change snapshot in one analysis
-session. The example checks the installed command's help and uses a separate
-current snapshot only for older tools. A preview is an explicit adoption choice,
-not a recommendation to upgrade a stable consumer without review.
+`health --change-snapshot` is available in stable `0.9.0` and later; it was
+introduced in `0.9.0-preview.1` and is absent from `0.8.2`. It produces Health and
+the current change snapshot in one analysis session. The example checks the
+installed command's help and uses a separate current snapshot only for older
+tools. Consumers should still review and pin the exact tool version they adopt.
 
 This Bash example requires Git, Python 3, the CLI's .NET runtime and the SDKs
 needed to build **both** selected revisions. It is for a clean, solution-backed
