@@ -1,0 +1,132 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.9.0-stable-scope-cut",
+  "release_target": "0.9.0",
+  "story": 787,
+  "_comment": [
+    "Stable v0.9.0 scope cut approved by the maintainer on 2026-09-28.",
+    "This release ships the performance/scale foundations and supported command surfaces already integrated on main; it does not claim that every investigated optimization was implemented.",
+    "Residual four-repository profiling, staged-input optimization and persisted prepared-analysis work move to #1029 for the v0.9.x patch line.",
+    "Deferred #1026/#999/#492/#494-#501 work is neither reported as shipped nor treated as an evidence-backed rejection merely because stable v0.9.0 is published.",
+    "Required #650 keeps public documentation aligned with the exact stable capability set. Required #1030 restores the fail-closed first-party badge publisher self-pin before publication.",
+    "#787 remains the publication authority and is intentionally not a required CLOSED prerequisite because successful packed-artifact publication is what completes it.",
+    "Known correctness, security, privacy, integrity, data-corruption or false-PASS defects remain release blockers regardless of the performance scope cut."
+  ],
+  "required_items": [
+    {
+      "issue": 461,
+      "finding": "analysis-profile-attribution",
+      "summary": "Deliver consumer-shaped phase attribution and Health profiling used by the shipped v0.9 performance foundation"
+    },
+    {
+      "issue": 493,
+      "finding": "cross-process-preparation-evidence",
+      "summary": "Deliver the measurement and decision framework for repeated multi-command preparation without claiming persisted prepared analysis shipped"
+    },
+    {
+      "issue": 502,
+      "finding": "large-solution-benchmark-foundation",
+      "summary": "Deliver reusable scale, complexity, memory and expected-effect benchmarking foundations"
+    },
+    {
+      "issue": 503,
+      "finding": "incremental-pr-feedback-investigation",
+      "summary": "Complete the incremental PR feedback investigation while retaining full strict validation as authoritative"
+    },
+    {
+      "issue": 655,
+      "finding": "hot-path-hypothesis-disposition",
+      "summary": "Measure and disposition carried-forward selector, graph, reachability and repeated-work hypotheses without speculative optimization"
+    },
+    {
+      "issue": 675,
+      "finding": "analysis-cache-opportunity-decision",
+      "summary": "Complete the exact-request cache opportunity investigation without weakening fail-closed eligibility"
+    },
+    {
+      "issue": 849,
+      "finding": "verified-policy-weakening-public-api-approval",
+      "summary": "Require fresh verified build-state capture for reviewed public API expansion approval"
+    },
+    {
+      "issue": 992,
+      "finding": "self-dogfood-ci-normalization",
+      "summary": "Normalize ArchLinterNet self-dogfood CI around build-once and evidence reuse"
+    },
+    {
+      "issue": 998,
+      "finding": "same-session-public-api-decision",
+      "summary": "Resolve the focused same-session Public API optimization lane without inventing an unsupported capability"
+    },
+    {
+      "issue": 650,
+      "finding": "stable-public-documentation",
+      "summary": "Align executable public documentation and capability claims with the exact stable v0.9.0 product"
+    },
+    {
+      "issue": 1030,
+      "finding": "badge-publisher-self-pin",
+      "summary": "Restore the first-party Architecture Health publisher self-pin and remove the current workflow_mismatch failure"
+    }
+  ],
+  "excluded_items": [
+    {
+      "issue": 1029,
+      "reason": "Owner: @eugenemalaschuk-source. Post-v0.9.0 performance/scale continuation belongs to the v0.9.x patch line and does not block the stable cut."
+    },
+    {
+      "issue": 1026,
+      "reason": "Deferred by maintainer scope cut to #1029. The final four-repository normalized dogfood matrix may continue in v0.9.x; stable v0.9.0 makes no claim that this deferred matrix passed."
+    },
+    {
+      "issue": 999,
+      "reason": "Deferred by maintainer scope cut to #1029. Staged candidate-input optimization remains evidence-gated and is not advertised as a stable v0.9.0 capability."
+    },
+    {
+      "issue": 492,
+      "reason": "Deferred by maintainer scope cut to #1029. Cross-process prepared-analysis reuse remains a future evidence-gated decision, not shipped stable scope."
+    },
+    {
+      "issue": 494,
+      "reason": "Conditional prepared-analysis lifecycle/trust design remains post-v0.9.0 and starts only after a future #492 outcome A."
+    },
+    {
+      "issue": 495,
+      "reason": "Conditional prepared-state storage benchmarking remains post-v0.9.0 and starts only after a future #492 outcome A."
+    },
+    {
+      "issue": 496,
+      "reason": "Conditional prepared-analysis immutable store/hydration implementation remains post-v0.9.0 and starts only after a future #492 outcome A."
+    },
+    {
+      "issue": 497,
+      "reason": "Conditional prepared-analysis governance-consumer integration remains post-v0.9.0 and starts only after a future #492 outcome A."
+    },
+    {
+      "issue": 498,
+      "reason": "Conditional Public API prepared-fact reuse remains post-v0.9.0 and requires separate materiality evidence even if #492 later resolves A."
+    },
+    {
+      "issue": 499,
+      "reason": "Conditional prepared-analysis reliability hardening remains post-v0.9.0 and starts only if the lifecycle is later justified."
+    },
+    {
+      "issue": 500,
+      "reason": "Conditional Testing API and CI prepared-analysis lifecycle remains post-v0.9.0 and starts only if the lifecycle is later justified."
+    },
+    {
+      "issue": 501,
+      "reason": "Conditional prepared-analysis equivalence/performance proof remains post-v0.9.0 and applies only after a future implementation."
+    }
+  ],
+  "delivered_items": [
+    {
+      "issue": 19,
+      "reason": "Stable v0.9.0 closes the delivered performance/scale foundation; residual optimization work is explicitly routed to #1029 rather than claimed complete."
+    },
+    {
+      "issue": 991,
+      "reason": "The normalization umbrella is closed for the stable cut with residual candidate profiling and optimization decisions routed to #1029."
+    }
+  ]
+}
