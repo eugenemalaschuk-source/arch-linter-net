@@ -180,7 +180,8 @@ Ordinary mode uses available outputs and does not silently build.
 `--ensure-built` owns preparation; prepared receipts are a separate producer/
 consumer path. Read [prepared receipts](../usage/timings.md#prepared-receipts)
 before replacing a build step. That feature and `health --change-snapshot` are
-present in `0.9.0-preview.1`, not an implied capability of `0.8.2`.
+present in stable `0.9.0` and later (introduced in `0.9.0-preview.1`); they are
+not implied capabilities of `0.8.2`.
 
 ## Policy review workflow
 
