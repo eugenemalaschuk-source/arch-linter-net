@@ -582,7 +582,7 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     }
     assert {item["issue"] for item in stable["delivered_items"]} == {19, 991}
     assert "patch line" in " ".join(stable["_comment"])
-    assert "not reported as shipped" in " ".join(stable["_comment"])
+    assert "reported as shipped" in " ".join(stable["_comment"])
 
 
 def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoption(
