@@ -256,6 +256,63 @@ Before continuing, inspect:
 - package README;
 - project/repository/license links.
 
+The same dry run also uploads the candidate-bound history-forensics bundle as
+`release-forensics-<package-version>`. Download that workflow artifact and
+review these files under `artifacts/release-forensics/`:
+
+- `release-forensics.json` — the canonical history report;
+- `release-forensics.md` — the human-readable rendering from the same analysis;
+- `release-forensics-manifest.json` — candidate, predecessor, range, tool, policy,
+  schema, and report digest identity;
+- `release-forensics-checksums.txt` — checksums for the complete bundle;
+- `release-forensics-observations.json` — workflow and process measurements kept
+  separate from the canonical report.
+
+The history job checks out the complete Git object graph and consumes the exact
+CLI package and candidate commit produced by `prepare-candidate`. For a stable
+candidate, the exclusive base is the highest lower stable SemVer tag whose
+peeled commit is an ancestor. Prerelease candidates (`alpha`, `beta`, `rc`, and
+`preview`) use the highest lower prerelease tag in the same `X.Y.Z` line, ordered
+by NuGet SemVer precedence; the first prerelease in that line falls back to the
+highest lower stable ancestor. Build metadata remains part of the candidate
+identity but does not affect predecessor ordering. `main.N` and other development
+tags do not define a stable boundary. When no eligible predecessor exists, the
+bundle records the typed result `not-applicable: no_previous_release`; it does
+not invent a root commit or report a successful empty analysis. Range selection,
+identity, ingestion, rendering, or bundle failures fail the workflow and keep
+publication blocked. Findings in a complete report remain review evidence and
+do not authorize or block the release.
+
+To reproduce an applicable report from the packed candidate, first download
+the `nuget-candidate-<package-version>` artifact, verify its manifest, and use
+the exact CLI package from that directory. Set `BASE_SHA`, `CANDIDATE_SHA`, and
+`VERSION` to the full-SHA and version values recorded in the forensics manifest:
+
+```bash
+mkdir -p artifacts
+python3 tools/release/package_manifest.py verify \
+  --packages-dir artifacts/candidate \
+  --manifest artifacts/candidate/package-manifest.json \
+  --version "$VERSION" \
+  --source-commit "$CANDIDATE_SHA"
+dotnet tool install ArchLinterNet.Cli \
+  --tool-path artifacts/forensics-tool \
+  --source artifacts/candidate \
+  --version "$VERSION"
+artifacts/forensics-tool/arch-linter-net history analyze \
+  --repository . \
+  --policy architecture/dependencies.arch.yml \
+  --from "$BASE_SHA" \
+  --to "$CANDIDATE_SHA" \
+  --report json=artifacts/release-forensics.json \
+  --report markdown=artifacts/release-forensics.md \
+  --timings
+```
+
+The two `--report` sinks run one Git-only analysis. Keep the timing line and
+process observations separate from the canonical JSON when comparing or
+auditing the result.
+
 ### Step 2: public publication
 
 After dry-run artifacts are checked, rerun the workflow with the same release scenario and `publish: true`.
@@ -265,7 +322,7 @@ Expected public result:
 - packages are pushed to NuGet.org;
 - an existing primary package causes a fail-closed error; inspect the paired primary/symbol state on NuGet.org before deciding on a corrected release path;
 - GitHub tag and release are created from the workflow commit;
-- the attested package, symbol, canonical manifest, and checksum assets are attached to the GitHub Release without regeneration;
+- the attested package, symbol, canonical manifest, checksum, and complete history-forensics assets are attached to the GitHub Release without regeneration;
 - MkDocs product documentation is built and deployed to GitHub Pages.
 
 After publication, verify:
@@ -275,6 +332,7 @@ After publication, verify:
 - NuGet repository links open the GitHub repository;
 - NuGet package README is product-facing;
 - GitHub Release exists and contains every expected attested package, symbol, manifest, and checksum asset;
+- GitHub Release contains `release-forensics.json`, `release-forensics.md`, `release-forensics-manifest.json`, `release-forensics-checksums.txt`, and `release-forensics-observations.json`; each asset matches the candidate-bound checksums and is read back after attachment;
 - GitHub Pages deployment completed successfully;
 - internal docs are not visible in the published site navigation.
 
@@ -289,7 +347,7 @@ Record the published package IDs, version, GitHub Release URL, NuGet package URL
 - If the public dry-run fails, fix the underlying problem and rerun with `publish: false`.
 - If public publication fails before NuGet push completes, no GitHub Release should be created.
 - If NuGet.org publication partially succeeds, inspect NuGet.org and workflow logs before rerunning. A duplicate primary-package push is fail-closed because it cannot prove the paired symbol state; do not use duplicate-success behavior.
-- If a GitHub Release already exists for the target tag, do not overwrite it blindly. Inspect the existing release and decide whether to fix the release manually or publish a new version.
+- If a GitHub Release already exists for the target tag, the publisher first verifies that its tag points to the exact candidate. It keeps matching asset bytes, adds missing assets, and reads each expected asset back to verify its digest. A mismatched existing asset fails closed without replacement; inspect the release and correct it manually or prepare a new version.
 
 ## Non-goals
 
