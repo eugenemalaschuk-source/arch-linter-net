@@ -159,4 +159,20 @@ internal sealed class CliPolicyContextIntegrationTests : CliIntegrationTestBase
             }
         }
     }
+
+    [Test]
+    public void PolicyWeakening_Help_DescribesVerifiedPublicApiCaptureOptions()
+    {
+        var (exitCode, stdout, stderr) = RunCli("policy", "weakening", "--help");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stderr, Is.Empty);
+            Assert.That(stdout, Does.Contain("--condition-set"));
+            Assert.That(stdout, Does.Contain("--ensure-built"));
+            Assert.That(stdout, Does.Contain("--no-restore"));
+            Assert.That(stdout, Does.Contain("Build and verify before capturing approved live API evidence"));
+        });
+    }
 }

@@ -1,5 +1,6 @@
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
@@ -21,13 +22,17 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
           arch-linter-net policy context --policy <path> --format json
 
         Without a public API approval, this command reads only the supplied artifacts. An approval
-        additionally captures the current contract surface from --policy, without writing a file.
+        additionally captures the current contract surface from --policy after --ensure-built, without
+        writing a file. Use --condition-set to select its conditions and --no-restore to skip restore.
 
         Options:
           --base-context <path>     JSON policy context from the base state
           --current-context <path>  JSON policy context from the current state
           --public-api-approval <path> JSON approvals for exact reviewed API additions
           --policy <path>           Current policy used to capture approved live API evidence
+          --condition-set <name>    Select the policy condition set used for live capture
+          --ensure-built            Build and verify before capturing approved live API evidence
+          --no-restore             Do not restore while ensuring build state
           -f, --format <fmt>        Output format: human, json, or sarif (default: human)
           -h, --help                Show this help message
 
@@ -79,12 +84,20 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
             IReadOnlyList<ArchitecturePublicApiWeakeningApproval> approvals = options.PublicApiApprovalPath is null
                 ? []
                 : ArchitecturePolicyWeakeningFormatter.DeserializePublicApiApprovals(fileSystem.ReadAllText(options.PublicApiApprovalPath));
+            List<ArchitecturePublicApiLiveEvidence> liveEvidence = CaptureLiveEvidence(
+                runtime.CapturePublicApi,
+                options.PolicyPath!,
+                currentContext,
+                approvals,
+                options.ConditionSetName,
+                options.PreparationMode,
+                options.NoRestore);
             ArchitecturePolicyWeakeningResult result = runtime.ComparePolicyWeakening(new ArchitecturePolicyWeakeningRequest(
                 baseContext,
                 currentContext)
             {
                 PublicApiApprovals = approvals,
-                PublicApiLiveEvidence = CaptureLiveEvidence(runtime.CapturePublicApi, options.PolicyPath!, currentContext, approvals),
+                PublicApiLiveEvidence = liveEvidence,
             });
             console.Out.WriteLine(options.Format switch
             {
@@ -109,11 +122,20 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
         Func<PublicApiCaptureRequest, PublicApiCaptureOutcome> capturePublicApi,
         string policyPath,
         ArchitecturePolicyContextExport currentContext,
-        IReadOnlyList<ArchitecturePublicApiWeakeningApproval> approvals)
+        IReadOnlyList<ArchitecturePublicApiWeakeningApproval> approvals,
+        string? conditionSetName,
+        BuildPreparationMode preparationMode,
+        bool noRestore)
     {
         if (approvals.Count == 0)
         {
             return [];
+        }
+
+        if (preparationMode != BuildPreparationMode.EnsureBuilt)
+        {
+            throw new InvalidOperationException(
+                "Public API approvals require --ensure-built so live CLR evidence is captured from a fresh verified build.");
         }
 
         string contextDigest = ArchitecturePolicyWeakeningFormatter.ComputeContextDigest(currentContext);
@@ -124,6 +146,9 @@ internal sealed class PolicyWeakeningCommandHandler(ICliRuntime runtime, ICliCon
                 PolicyPath = policyPath,
                 ContractId = approval.ContractId,
                 OutputPath = "architecture/public-api-approval-evidence.txt",
+                ConditionSetName = conditionSetName,
+                PreparationMode = preparationMode,
+                NoRestore = noRestore,
             });
             if (!capture.Succeeded || capture.Snapshot is null)
             {

@@ -1,4 +1,5 @@
 using System.CommandLine;
+using ArchLinterNet.Core.BuildState;
 
 namespace ArchLinterNet.Cli.Commands.Policy.Application;
 
@@ -21,7 +22,7 @@ internal sealed class PolicyCommandDefinition(
 
         `check` validates policy and static configuration without architecture analysis.
         `context` summarizes effective policy facts for coding agents without project or assembly analysis.
-        `weakening` compares separately exported base/current policy contexts without policy loading or architecture analysis.
+        `weakening` compares separately exported base/current policy contexts without policy loading or architecture analysis; public API approvals additionally require verified live capture.
 
         Options:
           -h, --help            Show this help message
@@ -72,6 +73,9 @@ internal sealed class PolicyCommandDefinition(
         Option<string> publicApiApprovalOption = new("--public-api-approval");
         Option<string> publicApiApprovalPolicyOption = new("--policy");
         publicApiApprovalPolicyOption.DefaultValueFactory = _ => DefaultPolicyPath;
+        Option<string> conditionSetOption = new("--condition-set");
+        Option<bool> ensureBuiltOption = new("--ensure-built");
+        Option<bool> noRestoreOption = new("--no-restore");
         Option<string> weakeningFormatOption = new("--format");
         weakeningFormatOption.Aliases.Add("-f");
         weakeningFormatOption.DefaultValueFactory = _ => HumanFormat;
@@ -82,6 +86,9 @@ internal sealed class PolicyCommandDefinition(
         weakening.Options.Add(currentContextOption);
         weakening.Options.Add(publicApiApprovalOption);
         weakening.Options.Add(publicApiApprovalPolicyOption);
+        weakening.Options.Add(conditionSetOption);
+        weakening.Options.Add(ensureBuiltOption);
+        weakening.Options.Add(noRestoreOption);
         weakening.Options.Add(weakeningFormatOption);
         weakening.Options.Add(weakeningHelpOption);
         weakening.SetAction(parseResult => weakeningHandler.Execute(new PolicyWeakeningCommandOptions(
@@ -90,7 +97,10 @@ internal sealed class PolicyCommandDefinition(
             parseResult.GetValue(weakeningFormatOption) ?? HumanFormat,
             parseResult.GetValue(weakeningHelpOption),
             parseResult.GetValue(publicApiApprovalOption),
-            parseResult.GetValue(publicApiApprovalPolicyOption))));
+            parseResult.GetValue(publicApiApprovalPolicyOption),
+            parseResult.GetValue(conditionSetOption),
+            parseResult.GetValue(ensureBuiltOption) ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+            parseResult.GetValue(noRestoreOption))));
 
         policy.Subcommands.Add(check);
         policy.Subcommands.Add(context);
