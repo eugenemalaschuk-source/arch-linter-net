@@ -58,8 +58,9 @@ proof that a cache or code change caused the improvement.
 
 ## Prepared receipts
 
-These options are present in `0.9.0-preview.1`; do not assume they exist in
-`0.8.2`. Check the exact installed command before using them:
+These options are present in stable `0.9.0` and later; they were introduced in
+`0.9.0-preview.1` and are absent from `0.8.2`. Check the exact installed command
+before using them:
 
 ```bash
 arch-linter-net --help
