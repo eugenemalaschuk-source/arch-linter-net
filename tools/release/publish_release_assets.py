@@ -15,14 +15,11 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 
+from calculate_version import parse_package_version
+
 
 _OBJECT_ID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 _REPOSITORY = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
-_RELEASE_TAG = re.compile(
-    r"v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
-    r"(?:-preview\.(?:0|[1-9]\d*))?\Z",
-    re.ASCII,
-)
 _ASSET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 
@@ -186,8 +183,9 @@ def _read_back_asset(repository: str, tag: str, name: str, directory: Path) -> P
 def _validate_identity(arguments: argparse.Namespace) -> tuple[str, str, str]:
     if _REPOSITORY.fullmatch(arguments.repository) is None:
         raise ReleaseAssetError("Repository identity must be owner/name.")
-    if _RELEASE_TAG.fullmatch(arguments.tag) is None:
-        raise ReleaseAssetError("Release tag must be a canonical stable or preview SemVer tag.")
+    tag_version = arguments.tag.removeprefix("v")
+    if not arguments.tag.startswith("v") or parse_package_version(tag_version) is None:
+        raise ReleaseAssetError("Release tag must be a canonical NuGet SemVer tag.")
     if _OBJECT_ID.fullmatch(arguments.candidate_sha) is None:
         raise ReleaseAssetError("Candidate commit must be a full lowercase Git object ID.")
     return arguments.repository, arguments.tag, arguments.candidate_sha

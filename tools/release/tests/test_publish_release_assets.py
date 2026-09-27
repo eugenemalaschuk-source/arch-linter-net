@@ -221,6 +221,18 @@ def test_publisher_main_reads_release_identity_from_the_workflow_environment(
     assert _state(state_path)["tag_sha"] == candidate_sha
 
 
+@pytest.mark.parametrize("tag", ["v0.2.0-rc.1", "v0.2.0-alpha.1", "v0.2.0+build.123"])
+def test_publisher_accepts_the_complete_nuget_semver_tag_surface(tag: str) -> None:
+    candidate_sha = "c" * 40
+    arguments = Namespace(repository="example/project", tag=tag, candidate_sha=candidate_sha)
+
+    assert publish_release_assets._validate_identity(arguments) == (  # noqa: SLF001
+        "example/project",
+        tag,
+        candidate_sha,
+    )
+
+
 @pytest.mark.parametrize(
     ("repository", "tag", "candidate_sha", "message"),
     [
