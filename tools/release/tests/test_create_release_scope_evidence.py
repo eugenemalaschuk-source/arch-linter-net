@@ -475,10 +475,10 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 10
+    assert len(declarations) == len(by_target) == 11
     assert set(by_target) == {
         "0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4",
-        "0.8.0", "0.8.1", "0.8.2", "0.9.0-preview.1",
+        "0.8.0", "0.8.1", "0.8.2", "0.9.0-preview.1", "0.9.0",
     }
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
@@ -570,6 +570,19 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     assert preview["delivered_items"] == []
     assert "early-validation preview" in " ".join(preview["_comment"])
     assert "589.875" in " ".join(preview["_comment"])
+
+    stable = by_target["0.9.0"]
+    assert stable["declaration_id"] == "v0.9.0-stable-scope-cut"
+    assert stable["story"] == 787
+    assert {item["issue"] for item in stable["required_items"]} == {
+        461, 493, 502, 503, 650, 655, 675, 849, 992, 998, 1030, 1034,
+    }
+    assert {item["issue"] for item in stable["excluded_items"]} == {
+        492, 494, 495, 496, 497, 498, 499, 500, 501, 999, 1026, 1029,
+    }
+    assert {item["issue"] for item in stable["delivered_items"]} == {19, 991}
+    assert "patch line" in " ".join(stable["_comment"])
+    assert "not reported as shipped" in " ".join(stable["_comment"])
 
 
 def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoption(
