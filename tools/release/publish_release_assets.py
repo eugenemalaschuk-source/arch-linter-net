@@ -97,7 +97,8 @@ def _release_view(repository: str, tag: str) -> dict[str, object] | None:
     try:
         release = _api_json(repository, f"releases/tags/{encoded_tag}")
     except ReleaseAssetError as error:
-        if "http 404: not found" in str(error).lower():
+        detail = str(error).lower()
+        if "release not found" in detail or ("http 404" in detail and "not found" in detail):
             return None
         raise ReleaseAssetError(f"Cannot inspect GitHub release {tag!r}: {error}") from error
     if not isinstance(release, dict) or not isinstance(release.get("assets"), list):
