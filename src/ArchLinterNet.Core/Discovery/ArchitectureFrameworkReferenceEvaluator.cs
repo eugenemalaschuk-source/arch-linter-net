@@ -115,7 +115,7 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
             new[] { new ArchitectureFrameworkReferenceEvaluationFailure(projectAbsolutePath, targetFramework, reason) });
     }
 
-    private static bool HasRestoredTargets(string projectAbsolutePath)
+    internal static bool HasRestoredTargets(string projectAbsolutePath)
     {
         string? projectDirectory = Path.GetDirectoryName(projectAbsolutePath);
         if (projectDirectory == null)
@@ -132,7 +132,8 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
         try
         {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(assetsPath));
-            return document.RootElement.TryGetProperty("targets", out JsonElement targets)
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("targets", out JsonElement targets)
                 && targets.ValueKind == JsonValueKind.Object
                 && targets.EnumerateObject().Any();
         }
