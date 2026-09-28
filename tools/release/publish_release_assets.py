@@ -98,9 +98,34 @@ def _release_view(repository: str, tag: str) -> dict[str, object] | None:
         release = _api_json(repository, f"releases/tags/{encoded_tag}")
     except ReleaseAssetError as error:
         detail = str(error).lower()
-        if "release not found" in detail or ("http 404" in detail and "not found" in detail):
+        if "release not found" not in detail and not ("http 404" in detail and "not found" in detail):
+            raise ReleaseAssetError(f"Cannot inspect GitHub release {tag!r}: {error}") from error
+        release = _release_from_list(repository, tag)
+        if release is None:
             return None
-        raise ReleaseAssetError(f"Cannot inspect GitHub release {tag!r}: {error}") from error
+    return _validate_release_view(release, tag)
+
+
+def _release_from_list(repository: str, tag: str) -> dict[str, object] | None:
+    result = _gh(["api", "--paginate", "--slurp", f"repos/{repository}/releases?per_page=100"])
+    try:
+        pages = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise ReleaseAssetError("GitHub API returned invalid JSON while listing releases.") from error
+    if not isinstance(pages, list) or any(not isinstance(page, list) for page in pages):
+        raise ReleaseAssetError("GitHub API returned an invalid release-list response.")
+    matches = [
+        release
+        for page in pages
+        for release in page
+        if isinstance(release, dict) and release.get("tag_name") == tag
+    ]
+    if len(matches) > 1:
+        raise ReleaseAssetError(f"GitHub returned duplicate releases for tag {tag!r}.")
+    return matches[0] if matches else None
+
+
+def _validate_release_view(release: object, tag: str) -> dict[str, object]:
     if not isinstance(release, dict) or not isinstance(release.get("assets"), list):
         raise ReleaseAssetError("GitHub API returned an incomplete release record.")
     if release.get("tag_name") != tag:
