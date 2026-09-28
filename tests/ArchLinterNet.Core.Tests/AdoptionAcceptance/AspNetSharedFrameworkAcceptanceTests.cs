@@ -140,7 +140,11 @@ public sealed class AspNetSharedFrameworkAcceptanceTests
         Assert.That(result.RootElement.GetProperty("passed").GetBoolean(), Is.True, stdout);
     }
 
+    // This subprocess scenario exercises the real baseline-verify --ensure-built path. It can
+    // exceed the default unit-test budget on CI runners, so keep a wider cancellation bound while
+    // retaining the duration guard's warning for runs over 15 seconds.
     [Test]
+    [CancelAfter(60_000)]
     public void BaselineVerifyEnsureBuiltPackagedEntrypoint_AnalyzesAspNetHostFixture()
     {
         string cliDllPath = Path.Combine(

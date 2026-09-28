@@ -108,10 +108,9 @@ printf 'base=%s\nhead=%s\n' "$BASE_SHA" "$HEAD_SHA" > "$ARTIFACTS/revisions.txt"
 (
   cd "$BASE_WORKTREE"
   "$CLI" policy context --policy "$POLICY" --format json > "$ARTIFACTS/policy-base.json"
-  baseline_args=()
-  [[ ! -f "$BASELINE" ]] || baseline_args=(--baseline "$BASELINE")
-  "$CLI" change snapshot --policy "$POLICY" --mode strict \
-    "${baseline_args[@]}" --ensure-built --output "$ARTIFACTS/base.json"
+  base_snapshot_args=(change snapshot --policy "$POLICY" --mode strict)
+  [[ ! -f "$BASELINE" ]] || base_snapshot_args+=(--baseline "$BASELINE")
+  "$CLI" "${base_snapshot_args[@]}" --ensure-built --output "$ARTIFACTS/base.json"
 )
 "$CLI" policy context --policy "$POLICY" --format json > "$ARTIFACTS/policy-current.json"
 CURRENT_BASELINE="$ROOT/$BASELINE"
@@ -121,19 +120,18 @@ if [[ ! -f "$CURRENT_BASELINE" ]]; then
 fi
 
 health_help=$("$CLI" health --help)
-current_args=()
+health_args=(health --policy "$POLICY" --baseline "$CURRENT_BASELINE"
+  --base-context "$ARTIFACTS/policy-base.json"
+  --current-context "$ARTIFACTS/policy-current.json"
+  --mode strict --ensure-built --execution-context "$HEAD_SHA")
 if [[ "$health_help" == *'--change-snapshot'* ]]; then
-  current_args=(--change-snapshot "$ARTIFACTS/current.json")
+  health_args+=(--change-snapshot "$ARTIFACTS/current.json")
 else
   "$CLI" change snapshot --policy "$POLICY" --mode strict \
     --baseline "$CURRENT_BASELINE" --ensure-built --output "$ARTIFACTS/current.json"
 fi
 health_exit=0
-"$CLI" health --policy "$POLICY" --baseline "$CURRENT_BASELINE" \
-  --base-context "$ARTIFACTS/policy-base.json" \
-  --current-context "$ARTIFACTS/policy-current.json" \
-  --mode strict --ensure-built --execution-context "$HEAD_SHA" \
-  "${current_args[@]}" --format json > "$ARTIFACTS/health.json" || health_exit=$?
+"$CLI" "${health_args[@]}" --format json > "$ARTIFACTS/health.json" || health_exit=$?
 printf '%s\n' "$health_exit" > "$ARTIFACTS/health.exit-code"
 case "$health_exit" in 0|1|2) ;; *) exit 2 ;; esac
 # Incomplete analysis may leave Health diagnostics but no complete snapshot.

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ArchLinterNet.Core.Discovery.Abstractions;
 using Buildalyzer;
 using Buildalyzer.Environment;
@@ -42,13 +43,16 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
             analyzer.SetGlobalProperty("Configuration", configuration);
             analyzer.SetGlobalProperty("CleanFile", isolation.CleanFileName);
 
-            // Restore = true: empirically, a design-time build without a prior restore fails (no
-            // project.assets.json) even for a project that declares no PackageReferences at all -
-            // MSBuild's SDK resolution itself depends on the restore-generated assets file. This
-            // restore is local/offline in practice (implicit SDK packages are already present in the
-            // local NuGet cache alongside the installed SDK), so it does not require network access
-            // for a project whose dependencies are already restorable from cache.
-            IAnalyzerResults results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = true });
+            // A design-time build needs restore outputs even when the project declares no
+            // PackageReferences. Restore only when those outputs are absent or unusable: CI runs
+            // several independent architecture projections in parallel, and repeated restores of
+            // the same project can race while replacing project.assets.json underneath another
+            // projection's MSBuild evaluation.
+            IAnalyzerResults results = analyzer.Build(new EnvironmentOptions
+            {
+                DesignTime = true,
+                Restore = !HasRestoredTargets(projectAbsolutePath),
+            });
 
             List<IAnalyzerResult> perTfmResults = results.Results
                 .Where(result => !string.IsNullOrEmpty(result.TargetFramework))
@@ -109,5 +113,33 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
         return new ArchitectureFrameworkReferenceEvaluationResult(
             Array.Empty<ArchitectureDiscoveredFrameworkReference>(),
             new[] { new ArchitectureFrameworkReferenceEvaluationFailure(projectAbsolutePath, targetFramework, reason) });
+    }
+
+    private static bool HasRestoredTargets(string projectAbsolutePath)
+    {
+        string? projectDirectory = Path.GetDirectoryName(projectAbsolutePath);
+        if (projectDirectory == null)
+        {
+            return false;
+        }
+
+        string assetsPath = Path.Combine(projectDirectory, "obj", "project.assets.json");
+        if (!File.Exists(assetsPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(assetsPath));
+            return document.RootElement.TryGetProperty("targets", out JsonElement targets)
+                && targets.ValueKind == JsonValueKind.Object
+                && targets.EnumerateObject().Any();
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return false;
+        }
     }
 }
