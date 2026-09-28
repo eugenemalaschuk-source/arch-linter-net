@@ -33,25 +33,48 @@ public sealed class HistoryPackedCliAcceptanceTests
             "--report", $"json={jsonPath}",
             "--report", $"markdown={markdownPath}",
             "--timings");
+        ProcessResult enrichmentRequested = fixture.RunTool(
+            "history", "analyze", "--repository", fixture.RepositoryPath,
+            "--from", fixture.From, "--to", fixture.To,
+            "--enrich-dotnet", "--format", "json", "--timings");
 
         Assert.Multiple(() =>
         {
             AssertSuccessfulSingleIngestion(jsonOnly, "single-format JSON");
             AssertSuccessfulSingleIngestion(markdownOnly, "single-format Markdown");
             AssertSuccessfulSingleIngestion(packed, "packed multi-output invocation");
+            AssertSuccessfulSingleIngestion(enrichmentRequested, "requested .NET enrichment", enrichmentRequested: true);
             Assert.That(packed.StandardOutput, Is.Empty, "File sinks must not contaminate machine stdout.");
             Assert.That(File.ReadAllBytes(jsonPath), Is.EqualTo(Utf8WithoutBom(jsonOnly.StandardOutput)));
             Assert.That(File.ReadAllBytes(markdownPath), Is.EqualTo(Utf8WithoutBom(markdownOnly.StandardOutput)));
         });
     }
 
-    private static void AssertSuccessfulSingleIngestion(ProcessResult result, string operation)
+    private static void AssertSuccessfulSingleIngestion(
+        ProcessResult result, string operation, bool enrichmentRequested = false)
     {
         Assert.That(result.ExitCode, Is.Zero, $"{operation} failed: {result.StandardError}");
         Assert.That(ReadIngestionCallCount(result.StandardError), Is.EqualTo(1),
             $"{operation} must execute the actual Core ingestion service exactly once.");
-        Assert.That(ReadTimingRecord(result.StandardError), Does.Contain("enrichment=n/a"),
-            $"{operation} must report enrichment as not applicable when --enrich-dotnet was not requested.");
+        string enrichmentValue = ReadTimingRecord(result.StandardError)
+            .Split(';', StringSplitOptions.TrimEntries)
+            .Single(part => part.StartsWith("enrichment=", StringComparison.Ordinal))
+            .Split('=', 2)[1];
+        if (enrichmentRequested)
+        {
+            Assert.That(double.TryParse(
+                    enrichmentValue,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out _),
+                Is.True,
+                $"{operation} must report a numeric enrichment duration.");
+        }
+        else
+        {
+            Assert.That(enrichmentValue, Is.EqualTo("n/a"),
+                $"{operation} must report enrichment as not applicable when --enrich-dotnet was not requested.");
+        }
     }
 
     private static int ReadIngestionCallCount(string standardError)
