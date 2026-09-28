@@ -25,11 +25,15 @@ public sealed class HistoryPolicyIngestionTimingTests
             new HistoryIngestionRequest(repository.Path, revision, revision, requestDotNetEnrichment: true),
             policyPath: null,
             timing: requestedTiming);
+        HistoryIngestionOutcome requestedWithoutTiming = HistoryPolicyIngestionService.Ingest(
+            new HistoryIngestionRequest(repository.Path, revision, revision, requestDotNetEnrichment: true),
+            policyPath: null);
 
         Assert.Multiple(() =>
         {
             Assert.That(notRequested.Result, Is.Not.Null);
             Assert.That(requested.Result, Is.Not.Null);
+            Assert.That(requestedWithoutTiming.Result, Is.Not.Null);
             Assert.That(ReadEnrichmentTiming(notRequestedTiming), Is.EqualTo("n/a"));
             Assert.That(double.TryParse(
                     ReadEnrichmentTiming(requestedTiming),
