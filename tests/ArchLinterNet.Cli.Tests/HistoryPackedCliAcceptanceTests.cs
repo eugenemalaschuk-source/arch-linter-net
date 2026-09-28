@@ -50,17 +50,22 @@ public sealed class HistoryPackedCliAcceptanceTests
         Assert.That(result.ExitCode, Is.Zero, $"{operation} failed: {result.StandardError}");
         Assert.That(ReadIngestionCallCount(result.StandardError), Is.EqualTo(1),
             $"{operation} must execute the actual Core ingestion service exactly once.");
+        Assert.That(ReadTimingRecord(result.StandardError), Does.Contain("enrichment=n/a"),
+            $"{operation} must report enrichment as not applicable when --enrich-dotnet was not requested.");
     }
 
     private static int ReadIngestionCallCount(string standardError)
     {
-        string line = standardError.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
-            .Single(value => value.StartsWith("History timings (ms):", StringComparison.Ordinal));
+        string line = ReadTimingRecord(standardError);
         string count = line.Split(';', StringSplitOptions.TrimEntries)
             .Single(part => part.StartsWith("ingestion_calls=", StringComparison.Ordinal))
             .Split('=', 2)[1];
         return int.Parse(count, System.Globalization.CultureInfo.InvariantCulture);
     }
+
+    private static string ReadTimingRecord(string standardError) =>
+        standardError.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries)
+            .Single(value => value.StartsWith("History timings (ms):", StringComparison.Ordinal));
 
     private static byte[] Utf8WithoutBom(string content) => new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(content);
 
