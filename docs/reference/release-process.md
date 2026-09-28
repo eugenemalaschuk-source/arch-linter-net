@@ -321,8 +321,8 @@ Expected public result:
 
 - packages are pushed to NuGet.org;
 - an existing primary package causes a fail-closed error; inspect the paired primary/symbol state on NuGet.org before deciding on a corrected release path;
-- GitHub tag and release are created from the workflow commit;
-- the attested package, symbol, canonical manifest, checksum, and complete history-forensics assets are attached to the GitHub Release without regeneration;
+- the GitHub tag and a draft release are created from the workflow commit;
+- the attested package, symbol, canonical manifest, checksum, and complete history-forensics assets are attached to the draft without regeneration, then read back and digest-verified before the release is published;
 - MkDocs product documentation is built and deployed to GitHub Pages.
 
 After publication, verify:
@@ -336,6 +336,8 @@ After publication, verify:
 - GitHub Pages deployment completed successfully;
 - internal docs are not visible in the published site navigation.
 
+The GitHub Release remains a draft until its full expected asset inventory has been read back and verified. A published immutable release with missing assets cannot be repaired under its existing tag; prepare a new reviewed release version instead of retrying uploads to that tag.
+
 For post-publication integrity confirmation, download the GitHub Release assets, verify their GitHub attestations with the documented verification command, then compare their SHA-256 values with the verified canonical manifest. For a NuGet.org-downloaded primary package, verify NuGet repository-signature/trusted-repository semantics and expected package ID/version instead; do not report its expected repository-signing byte change as tampering. Do not assume the same raw-byte or signature behavior for downloaded `.snupkg` files without documented symbol-service evidence.
 
 Record the published package IDs, version, GitHub Release URL, NuGet package URL, and GitHub Pages URL in the related issue or pull request notes.
@@ -347,7 +349,7 @@ Record the published package IDs, version, GitHub Release URL, NuGet package URL
 - If the public dry-run fails, fix the underlying problem and rerun with `publish: false`.
 - If public publication fails before NuGet push completes, no GitHub Release should be created.
 - If NuGet.org publication partially succeeds, inspect NuGet.org and workflow logs before rerunning. A duplicate primary-package push is fail-closed because it cannot prove the paired symbol state; do not use duplicate-success behavior.
-- If a GitHub Release already exists for the target tag, the publisher first verifies that its tag points to the exact candidate. It keeps matching asset bytes, adds missing assets, and reads each expected asset back to verify its digest. A mismatched existing asset fails closed without replacement; inspect the release and correct it manually or prepare a new version.
+- If a GitHub Release already exists for the target tag, the publisher first verifies that its tag points to the exact candidate. It resumes a matching draft by retaining matching bytes, adding missing assets, and reading every expected asset back before publishing. A complete published release can be verified idempotently. A mismatched existing asset fails closed without replacement. An incomplete published immutable release fails before upload; prepare a new reviewed version because its existing tag cannot be repaired.
 
 ## Non-goals
 

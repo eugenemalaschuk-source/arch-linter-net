@@ -475,10 +475,10 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 11
+    assert len(declarations) == len(by_target) == 12
     assert set(by_target) == {
         "0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4",
-        "0.8.0", "0.8.1", "0.8.2", "0.9.0-preview.1", "0.9.0",
+        "0.8.0", "0.8.1", "0.8.2", "0.9.0-preview.1", "0.9.0", "0.9.1",
     }
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
@@ -583,6 +583,14 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     assert {item["issue"] for item in stable["delivered_items"]} == {19, 991}
     assert "patch line" in " ".join(stable["_comment"])
     assert "reported as shipped" in " ".join(stable["_comment"])
+
+    maintenance = by_target["0.9.1"]
+    assert maintenance["declaration_id"] == "v0.9.1-immutable-release-asset-integrity"
+    assert maintenance["story"] == 1042
+    assert {item["issue"] for item in maintenance["required_items"]} == {1043}
+    assert maintenance["excluded_items"] == []
+    assert maintenance["delivered_items"] == []
+    assert "published v0.9.0 GitHub Release" in " ".join(maintenance["_comment"])
 
 
 def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoption(

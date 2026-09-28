@@ -93,25 +93,19 @@ def _remote_tag_commit(repository: str, tag: str) -> str | None:
 
 
 def _release_view(repository: str, tag: str) -> dict[str, object] | None:
-    result = subprocess.run(
-        ["gh", "release", "view", tag, "--repo", repository, "--json", "tagName,assets"],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip()
-        if "release not found" in detail.lower() or "http 404: not found" in detail.lower():
-            return None
-        raise ReleaseAssetError(f"Cannot inspect GitHub release {tag!r}: {detail[-3000:]}")
+    encoded_tag = quote(tag, safe="")
     try:
-        release = json.loads(result.stdout)
-    except json.JSONDecodeError as error:
-        raise ReleaseAssetError("GitHub CLI returned invalid release metadata.") from error
+        release = _api_json(repository, f"releases/tags/{encoded_tag}")
+    except ReleaseAssetError as error:
+        if "http 404: not found" in str(error).lower():
+            return None
+        raise ReleaseAssetError(f"Cannot inspect GitHub release {tag!r}: {error}") from error
     if not isinstance(release, dict) or not isinstance(release.get("assets"), list):
-        raise ReleaseAssetError("GitHub CLI returned an incomplete release record.")
-    if release.get("tagName") != tag:
+        raise ReleaseAssetError("GitHub API returned an incomplete release record.")
+    if release.get("tag_name") != tag:
         raise ReleaseAssetError(f"The existing release does not use the requested tag {tag!r}.")
+    if not isinstance(release.get("draft"), bool) or not isinstance(release.get("immutable"), bool):
+        raise ReleaseAssetError("GitHub API release metadata is missing draft or immutable state.")
     return release
 
 
@@ -224,8 +218,23 @@ def _create_release(arguments: argparse.Namespace, repository: str, tag: str, ca
             tag,
             "--notes-file",
             str(notes_path),
+            "--draft",
         ]
     )
+
+
+def _publish_draft(repository: str, tag: str) -> None:
+    _gh(["release", "edit", tag, "--repo", repository, "--draft=false"])
+
+
+def _wait_for_published_release(repository: str, tag: str) -> dict[str, object]:
+    for attempt in range(10):
+        release = _release_view(repository, tag)
+        if release is not None and release.get("draft") is False:
+            return release
+        if attempt < 9:
+            time.sleep(1)
+    raise ReleaseAssetError("The GitHub Release did not become published after draft promotion.")
 
 
 def _load_or_create_release(
@@ -283,7 +292,7 @@ def _verify_published_assets(
         if name not in published_names:
             raise ReleaseAssetError(f"GitHub release is missing expected asset {name!r} after upload.")
         asset_directory = readback_root / f"verified-{name}"
-        asset_directory.mkdir()
+        asset_directory.mkdir(exist_ok=True)
         downloaded = _read_back_asset(repository, tag, name, asset_directory)
         if _sha256_file(downloaded) != _sha256_file(path):
             raise ReleaseAssetError(f"GitHub release asset read-back digest mismatch: {name}.")
@@ -294,11 +303,25 @@ def publish(arguments: argparse.Namespace) -> None:
     assets = _resolve_assets(arguments.asset)
     release = _load_or_create_release(arguments, repository, tag, candidate_sha)
     existing_names = _asset_names(release)
+    missing_names = set(assets) - existing_names
+    is_draft = release["draft"]
+    is_immutable = release["immutable"]
+    assert isinstance(is_draft, bool) and isinstance(is_immutable, bool)
+    if not is_draft and is_immutable and missing_names:
+        missing = ", ".join(sorted(missing_names))
+        raise ReleaseAssetError(
+            f"Published immutable release {tag} is missing expected assets ({missing}); "
+            "create and review a new release version because this tag cannot be repaired."
+        )
     with tempfile.TemporaryDirectory(prefix="release-asset-readback-") as temporary:
         readback_root = Path(temporary)
         _verify_existing_assets(assets, existing_names, repository, tag, readback_root)
         _upload_missing_assets(assets, existing_names, repository, tag)
         _verify_published_assets(assets, repository, tag, readback_root)
+        if is_draft:
+            _publish_draft(repository, tag)
+            _wait_for_published_release(repository, tag)
+            _verify_published_assets(assets, repository, tag, readback_root)
     print(f"Verified {len(assets)} release assets for {repository} {tag}.")
 
 

@@ -25,20 +25,25 @@ def _fake_gh(directory: Path, state_path: Path, monkeypatch: pytest.MonkeyPatch)
         "state_path = pathlib.Path(os.environ['FAKE_GH_STATE'])\n"
         "state = json.loads(state_path.read_text(encoding='utf-8'))\n"
         "args = sys.argv[1:]\n"
+        "state.setdefault('events', [])\n"
         "def save(): state_path.write_text(json.dumps(state), encoding='utf-8')\n"
         "if args[0] == 'api':\n"
-        "    ref = state.get('tag_sha')\n"
-        "    print(json.dumps([] if ref is None else [{'ref': 'refs/tags/v0.9.0', 'object': {'sha': ref, 'type': 'commit'}}]))\n"
-        "elif args[:2] == ['release', 'view']:\n"
-        "    release = state.get('release')\n"
-        "    if release is None:\n"
-        "        print('release not found', file=sys.stderr); sys.exit(1)\n"
-        "    print(json.dumps({'tagName': release['tag_name'], 'assets': [{'name': name} for name in release['assets']]}))\n"
+        "    path = args[1]\n"
+        "    if path.startswith('repos/example/project/git/matching-refs/tags/'):\n"
+        "        ref = state.get('tag_sha')\n"
+        "        print(json.dumps([] if ref is None else [{'ref': 'refs/tags/v0.9.0', 'object': {'sha': ref, 'type': 'commit'}}]))\n"
+        "    elif path.startswith('repos/example/project/releases/tags/'):\n"
+        "        release = state.get('release')\n"
+        "        if release is None:\n"
+        "            print('HTTP 404: Not Found', file=sys.stderr); sys.exit(1)\n"
+        "        print(json.dumps({'tag_name': release['tag_name'], 'draft': release.get('draft', False), 'immutable': release.get('immutable', False), 'assets': [{'name': name} for name in release['assets']]}))\n"
         "elif args[:2] == ['release', 'create']:\n"
         "    tag = args[2]; commit = args[args.index('--target') + 1]\n"
-        "    state['tag_sha'] = commit; state['release'] = {'tag_name': tag, 'assets': {}}; save()\n"
+        "    state['tag_sha'] = commit; state['release'] = {'tag_name': tag, 'draft': '--draft' in args, 'immutable': False, 'assets': {}}; state['events'].append('create-draft' if '--draft' in args else 'create-published'); save()\n"
+        "elif args[:2] == ['release', 'edit']:\n"
+        "    state['release']['draft'] = False; state['release']['immutable'] = True; state['events'].append('publish'); save()\n"
         "elif args[:2] == ['release', 'upload']:\n"
-        "    release = state['release']; path = pathlib.Path(args[3]); release['assets'][path.name] = base64.b64encode(path.read_bytes()).decode('ascii'); save()\n"
+        "    release = state['release']; path = pathlib.Path(args[3]); release['assets'][path.name] = base64.b64encode(path.read_bytes()).decode('ascii'); state['events'].append('upload:' + path.name); save()\n"
         "elif args[:2] == ['release', 'download']:\n"
         "    name = args[args.index('--pattern') + 1]; directory = pathlib.Path(args[args.index('--dir') + 1])\n"
         "    content = state['release']['assets'].get(name)\n"
@@ -87,6 +92,9 @@ def test_publisher_creates_missing_release_uploads_without_clobber_and_reads_bac
     state = _state(state_path)
     assert state["tag_sha"] == candidate_sha
     assert state["release"]["tag_name"] == "v0.9.0"
+    assert state["release"]["draft"] is False
+    assert state["release"]["immutable"] is True
+    assert state["events"] == ["create-draft", f"upload:{asset.name}", "publish"]
     assert base64.b64decode(state["release"]["assets"][asset.name]) == asset.read_bytes()
 
 
@@ -137,6 +145,91 @@ def test_publisher_resumes_release_by_uploading_a_missing_asset(
     publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
 
     assert base64.b64decode(_state(state_path)["release"]["assets"][asset.name]) == asset.read_bytes()
+
+
+def test_publisher_resumes_matching_draft_and_publishes_only_after_asset_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate_sha = "9" * 40
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        json.dumps({"tag_sha": candidate_sha, "release": {"tag_name": "v0.9.0", "draft": True, "assets": {}}}),
+        encoding="utf-8",
+    )
+    _fake_gh(tmp_path / "bin", state_path, monkeypatch)
+    asset = tmp_path / "release-forensics.json"
+    asset.write_bytes(b"draft candidate report")
+    notes = tmp_path / "notes.md"
+    notes.write_text("Release notes\n", encoding="utf-8")
+
+    publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
+
+    state = _state(state_path)
+    assert state["release"]["draft"] is False
+    assert state["events"] == [f"upload:{asset.name}", "publish"]
+
+
+def test_publisher_fails_before_upload_for_incomplete_immutable_release(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate_sha = "8" * 40
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "tag_sha": candidate_sha,
+                "release": {"tag_name": "v0.9.0", "draft": False, "immutable": True, "assets": {}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    _fake_gh(tmp_path / "bin", state_path, monkeypatch)
+    asset = tmp_path / "release-forensics.json"
+    asset.write_bytes(b"candidate report")
+    notes = tmp_path / "notes.md"
+    notes.write_text("Release notes\n", encoding="utf-8")
+
+    with pytest.raises(publish_release_assets.ReleaseAssetError, match="new release version"):
+        publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
+
+    state = _state(state_path)
+    assert state["release"]["assets"] == {}
+    assert not any(event.startswith("upload:") for event in state.get("events", []))
+
+
+def test_publisher_verifies_complete_immutable_release_without_mutating_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate_sha = "7" * 40
+    content = b"complete immutable report"
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "tag_sha": candidate_sha,
+                "release": {
+                    "tag_name": "v0.9.0",
+                    "draft": False,
+                    "immutable": True,
+                    "assets": {"release-forensics.json": base64.b64encode(content).decode("ascii")},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    _fake_gh(tmp_path / "bin", state_path, monkeypatch)
+    asset = tmp_path / "release-forensics.json"
+    asset.write_bytes(content)
+    notes = tmp_path / "notes.md"
+    notes.write_text("Release notes\n", encoding="utf-8")
+
+    publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
+
+    assert _state(state_path)["release"]["assets"][asset.name] == base64.b64encode(content).decode("ascii")
+    assert not any(
+        event.startswith("upload:") or event == "publish"
+        for event in _state(state_path).get("events", [])
+    )
 
 
 def test_publisher_fails_closed_on_existing_asset_digest_mismatch(

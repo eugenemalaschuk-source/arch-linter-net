@@ -87,6 +87,8 @@ def test_history_forensics_is_full_history_read_only_and_has_no_release_publishe
     assert "contents: write" in _job_text(workflow, "create-release")
     publisher = (_REPOSITORY_ROOT / "tools" / "release" / "publish_release_assets.py").read_text(encoding="utf-8")
     assert '"release",\n            "create"' in publisher
+    assert '"--draft",' in publisher
+    assert '"--draft=false"' in publisher
     assert '["release", "upload"' in publisher
     assert '"release",\n            "download"' in publisher
     assert "history-forensics" not in jobs["create-release"].get("needs", [])
