@@ -30,10 +30,10 @@ failures. Required package, provenance and release-integrity gates remain intact
 
 ## Audit boundary and ownership
 
-The workflow source audit was refreshed for the #979 temporal revalidation authority at
-`e35b0c6f41810f3460efd7e1d1ff4d7fd4571b24` on 2026-09-19. That SHA is the
-reviewed hidden-handoff workflow revision for the #979 temporal revalidation rotation, **not** a
-frozen or approved final `0.8.Z` package candidate.
+The workflow source audit was refreshed for the #1034 stable-v0.9.0 publisher identity rotation at
+`186dfe39a9a6336635b415764e8fdf3b93f4e271` on 2026-09-28. That SHA is the
+reviewed merged reusable-workflow revision for the squash-safe Stage C rotation, **not** a
+frozen or approved final `0.9.0` package candidate.
 The original audit at `ffd5e97f99cedf4982b4a9c28f1f45b3827ad7e7` identified
 the packaging defect described below; it is retained only as historical context.
 No candidate version, package hash, deployment identity, or acceptance run is
@@ -109,10 +109,10 @@ download link. A manifest containing a component name is not proof that the
 archive includes a usable copy. The four-package release family is not a
 requirement to install four packages just to use the CLI.
 
-For #982, the approved reusable workflow commit is
-`e35b0c6f41810f3460efd7e1d1ff4d7fd4571b24`, with workflow blob
-`406af8ee7995b63f6d10cfc8bb3d52a8ccbff805`. The composite action is
-separately pinned at `ac678db689a1faf2eb098d0027fc7d176a362d00`, with action
+For #1034, the approved reusable workflow commit is
+`186dfe39a9a6336635b415764e8fdf3b93f4e271`, with workflow blob
+`023e4cd795933d6f879bad32aafd489436de7240`. The composite action is
+separately pinned at `d07f5e93ea30ea02d93120b823d337df3e67deaa`, with action
 blob `dc40593075d84567642df8daee9a262451012edf`. These are Git-object
 identities, not distribution SHA-256 digests. Copy the full pinned
 workflow/action refs from the chosen candidate inventory, not from `main` or
