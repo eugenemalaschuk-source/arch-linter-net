@@ -28,15 +28,20 @@ def _fake_gh(directory: Path, state_path: Path, monkeypatch: pytest.MonkeyPatch)
         "state.setdefault('events', [])\n"
         "def save(): state_path.write_text(json.dumps(state), encoding='utf-8')\n"
         "if args[0] == 'api':\n"
-        "    path = args[1]\n"
+        "    path = next(argument for argument in args if argument.startswith('repos/'))\n"
         "    if path.startswith('repos/example/project/git/matching-refs/tags/'):\n"
         "        ref = state.get('tag_sha')\n"
         "        print(json.dumps([] if ref is None else [{'ref': 'refs/tags/v0.9.0', 'object': {'sha': ref, 'type': 'commit'}}]))\n"
         "    elif path.startswith('repos/example/project/releases/tags/'):\n"
         "        release = state.get('release')\n"
-        "        if release is None:\n"
+        "        if release is None or state.get('tag_sha') is None:\n"
         "            print('gh: Not Found (HTTP 404)', file=sys.stderr); sys.exit(1)\n"
         "        print(json.dumps({'tag_name': release['tag_name'], 'draft': release.get('draft', False), 'immutable': release.get('immutable', False), 'target_commitish': release.get('target_commitish', ''), 'assets': [{'name': name} for name in release['assets']]}))\n"
+        "    elif path.startswith('repos/example/project/releases?'):\n"
+        "        releases = state.get('releases')\n"
+        "        if releases is None: releases = [] if state.get('release') is None else [state['release']]\n"
+        "        page = [{'tag_name': release['tag_name'], 'draft': release.get('draft', False), 'immutable': release.get('immutable', False), 'target_commitish': release.get('target_commitish', ''), 'assets': [{'name': name} for name in release['assets']]} for release in releases]\n"
+        "        print(json.dumps([page]))\n"
         "elif args[:2] == ['release', 'create']:\n"
         "    tag = args[2]; commit = args[args.index('--target') + 1]\n"
         "    state['release'] = {'tag_name': tag, 'draft': '--draft' in args, 'immutable': False, 'target_commitish': commit, 'assets': {}}\n"
@@ -235,6 +240,31 @@ def test_publisher_refuses_untagged_draft_with_a_different_target(
         publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
 
     assert _state(state_path)["release"]["assets"] == {}
+
+
+def test_publisher_fails_closed_when_github_lists_duplicate_drafts_for_tag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate_sha = "3" * 40
+    draft = {
+        "tag_name": "v0.9.0",
+        "draft": True,
+        "immutable": False,
+        "target_commitish": candidate_sha,
+        "assets": {},
+    }
+    state_path = tmp_path / "state.json"
+    state_path.write_text(json.dumps({"tag_sha": None, "release": None, "releases": [draft, draft]}), encoding="utf-8")
+    _fake_gh(tmp_path / "bin", state_path, monkeypatch)
+    asset = tmp_path / "release-forensics.json"
+    asset.write_bytes(b"candidate report")
+    notes = tmp_path / "notes.md"
+    notes.write_text("Release notes\n", encoding="utf-8")
+
+    with pytest.raises(publish_release_assets.ReleaseAssetError, match="duplicate releases"):
+        publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
+
+    assert _state(state_path).get("events", []) == []
 
 
 def test_publisher_fails_before_upload_for_incomplete_immutable_release(
