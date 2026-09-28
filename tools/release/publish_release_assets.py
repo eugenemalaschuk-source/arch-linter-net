@@ -105,8 +105,12 @@ def _release_view(repository: str, tag: str) -> dict[str, object] | None:
         raise ReleaseAssetError("GitHub API returned an incomplete release record.")
     if release.get("tag_name") != tag:
         raise ReleaseAssetError(f"The existing release does not use the requested tag {tag!r}.")
-    if not isinstance(release.get("draft"), bool) or not isinstance(release.get("immutable"), bool):
-        raise ReleaseAssetError("GitHub API release metadata is missing draft or immutable state.")
+    if (
+        not isinstance(release.get("draft"), bool)
+        or not isinstance(release.get("immutable"), bool)
+        or not isinstance(release.get("target_commitish"), str)
+    ):
+        raise ReleaseAssetError("GitHub API release metadata is missing draft, immutable, or target commit state.")
     return release
 
 
@@ -249,11 +253,13 @@ def _load_or_create_release(
         if not arguments.create_if_missing:
             raise ReleaseAssetError("The requested GitHub release does not exist.")
         _create_release(arguments, repository, tag, candidate_sha)
-        _wait_for_tag_commit(repository, tag, candidate_sha)
-        return _wait_for_release(repository, tag)
-    if remote_tag_sha != candidate_sha:
-        raise ReleaseAssetError("The existing GitHub release has no verified candidate tag.")
-    return release
+        release = _wait_for_release(repository, tag)
+    if remote_tag_sha == candidate_sha:
+        return release
+    if release.get("draft") is True and release.get("target_commitish") == candidate_sha:
+        # GitHub does not create a missing tag until the draft release is published.
+        return release
+    raise ReleaseAssetError("The existing GitHub release has no verified candidate tag or matching draft target.")
 
 
 def _verify_existing_assets(
@@ -322,6 +328,7 @@ def publish(arguments: argparse.Namespace) -> None:
         if is_draft:
             _publish_draft(repository, tag)
             _wait_for_published_release(repository, tag)
+            _wait_for_tag_commit(repository, tag, candidate_sha)
             _verify_published_assets(assets, repository, tag, readback_root)
     print(f"Verified {len(assets)} release assets for {repository} {tag}.")
 
