@@ -35,7 +35,7 @@ def _fake_gh(directory: Path, state_path: Path, monkeypatch: pytest.MonkeyPatch)
         "    elif path.startswith('repos/example/project/releases/tags/'):\n"
         "        release = state.get('release')\n"
         "        if release is None:\n"
-        "            print('HTTP 404: Not Found', file=sys.stderr); sys.exit(1)\n"
+        "            print('gh: Not Found (HTTP 404)', file=sys.stderr); sys.exit(1)\n"
         "        print(json.dumps({'tag_name': release['tag_name'], 'draft': release.get('draft', False), 'immutable': release.get('immutable', False), 'assets': [{'name': name} for name in release['assets']]}))\n"
         "elif args[:2] == ['release', 'create']:\n"
         "    tag = args[2]; commit = args[args.index('--target') + 1]\n"
