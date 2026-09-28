@@ -1,0 +1,21 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.9.1-immutable-release-asset-integrity",
+  "release_target": "0.9.1",
+  "story": 1042,
+  "_comment": [
+    "Maintenance correction after the published v0.9.0 GitHub Release was left without assets when immutable-release protection rejected uploads to the already-published release.",
+    "This exact v0.9.1 scope requires the release publisher to stage and digest-verify the complete candidate-bound asset inventory on a draft before publishing the GitHub Release.",
+    "The v0.9.0 tag and immutable release are not reused. This patch changes release-integrity orchestration and makes no claim of new package product capability.",
+    "Issue #1042 is the release correction story. Required implementation task #1043 must be completed and closed before Checkpoint B can authorize publication; successful v0.9.1 publication completes the story."
+  ],
+  "required_items": [
+    {
+      "issue": 1043,
+      "finding": "immutable-release-asset-staging",
+      "summary": "Create or resume GitHub Releases as drafts, verify every candidate asset before publication, and fail closed for incomplete published immutable releases"
+    }
+  ],
+  "excluded_items": [],
+  "delivered_items": []
+}
