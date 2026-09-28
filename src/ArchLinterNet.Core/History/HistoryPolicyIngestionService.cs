@@ -44,7 +44,7 @@ internal static class HistoryPolicyIngestionService
         if (outcome.Result is HistoryIngestionResult result)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Stopwatch? enrichmentClock = timing?.Start();
+            Stopwatch? enrichmentClock = request.RequestDotNetEnrichment ? timing?.Start() : null;
             HistoryDotNetEnrichment dotNetEnrichment = new HistoryDotNetEnricher().Enrich(result, request, policyPath);
             cancellationToken.ThrowIfCancellationRequested();
             result.ApplyEnrichment(dotNetEnrichment.ToReportProjection(result.ResolvedTo));
