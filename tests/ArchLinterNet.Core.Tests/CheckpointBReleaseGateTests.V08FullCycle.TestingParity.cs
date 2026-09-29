@@ -50,6 +50,7 @@ public sealed partial class CheckpointBReleaseGateTests
                   <packageSources>
                     <clear />
                     <add key="candidate" value="{_feed}" />
+                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
                   </packageSources>
                 </configuration>
                 """);
