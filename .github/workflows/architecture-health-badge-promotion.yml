@@ -348,7 +348,7 @@ jobs:
           dotnet-version: 10.0.x
       - name: Run pinned trusted promotion contract
         id: promotion
-        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@e18fb064bc38a9b7321b77d329e85e5b430c9cbe
+        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@6040b35c462ff1d70b9a3e3d96b0140aacfba1b5
         with:
           configuration_id: ${{ inputs['configuration-id'] }}
           adapter: ${{ inputs.adapter }}
