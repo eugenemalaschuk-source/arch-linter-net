@@ -30,6 +30,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
   typed Core fact contexts, fail-closed semantics, and worked examples for the
   future policy-expression surface (#162/#163).
 
+- [v0.10 semantic annotation contract](semantic-annotations-v0.10-contract.md) — reviewed source-only package shape, canonical role identities and targets, context metadata/conflict semantics, and compatibility rules for #567–#574.
+
 - [Policy import format draft](policy-import-format-draft.md) - approved format decisions implemented by issue #281.
 
 - [Policy import architecture and implementation reference](policy-import-architecture.md) - resolver/composer/provenance boundaries and the #281/#282 test matrix.
