@@ -1,10 +1,4 @@
-# semantic-role-catalog Specification
-
-## Purpose
-
-Defines the style-neutral semantic role vocabulary, its static evidence and metadata guidance, existing support tiers, and the reviewed v0.10 annotation disposition for every catalog role. It guides policy authoring without prescribing one architecture style or implying that the approved package is already released.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: The catalog defines a bounded first-wave role vocabulary
 
@@ -33,15 +27,6 @@ The catalog SHALL retain its vocabulary support tiers—canonical vocabulary, op
 
 - **WHEN** a reviewer consults the catalog for any listed role
 - **THEN** exactly one v0.10 annotation disposition identifies it as first-class, custom-mapping-only, or deferred
-
-### Requirement: Metadata keys have explicit semantics and usage boundaries
-
-The catalog SHALL define the meaning, value intent, and example usage for `domain`, `boundedContext`, `module`, `feature`, `layer`, `subsystem`, `platform`, `runtime`, `adapter`, `direction`, and `stability`, and SHALL identify whether each key is suitable for contextual policy contracts, documentation only, discouraged, or deferred. `owner` SHALL be included only with an explicit policy-use qualification.
-
-#### Scenario: Context metadata is distinguishable from role identity
-
-- **WHEN** a policy assigns `role: Entity` with `boundedContext: Sales` and `module: Orders`
-- **THEN** the catalog explains that the role remains `Entity` while metadata supplies contextual selectors
 
 ### Requirement: Worked examples remain static-analysis-only
 
@@ -92,6 +77,22 @@ The semantic role catalog SHALL define `Port`, `Adapter`, `PrimaryPort`, `Second
 
 - **WHEN** a project uses a user-owned attribute for a named secondary port
 - **THEN** the catalog shows a YAML mapping and selector metadata without implying that ArchLinterNet supplies the attribute
+
+## REMOVED Requirements
+
+### Requirement: Type-level and assembly-level annotation use cases are documented
+
+**Reason**: The v0.10 model now distinguishes role-bearing annotations from metadata-only context attributes and defines their separate scope, precedence, and conflict behavior.
+
+**Migration**: Use the canonical FQNs and target matrix in the versioned v0.10 contract. Role-bearing assembly evidence still participates at assembly precedence; metadata-only context can enrich a higher-precedence type role under the bounded composition rules.
+
+### Requirement: The first wave approves no built-in annotation types
+
+**Reason**: Issue #566 supersedes the earlier no-package decision for the v0.10 capability wave and approves a bounded optional source-only package.
+
+**Migration**: Treat the package as planned contract until it is implemented and released. Existing releases continue to support user-owned attributes mapped by exact full type name.
+
+## ADDED Requirements
 
 ### Requirement: Canonical annotation identities, targets, and context composition are documented
 
