@@ -31,9 +31,12 @@ change enforcement by itself.
 
 ## Stable identity and source shape
 
-The reserved namespace is `ArchLinterNet.Annotations`. A role named `<Role>`
-uses `ArchLinterNet.Annotations.<Role>Attribute`. The six metadata-only
-identities are `DomainAttribute`, `BoundedContextAttribute`, `ModuleAttribute`,
+The reserved namespace is `ArchLinterNet.Annotations`. Each of the 49
+first-class role records in the manifest's `roles[]` array uses the FQN recorded
+there, following `ArchLinterNet.Annotations.<FirstClassRole>Attribute`. Names
+in the catalog's `customMappingOnly` and `deferred` dispositions do not imply
+role attribute identities. The six metadata-only identities are
+`DomainAttribute`, `BoundedContextAttribute`, `ModuleAttribute`,
 `FeatureAttribute`, `PlatformAttribute`, and `RuntimeAttribute`. Recognition
 uses exact fully qualified metadata names. Simple-name guessing, namespace
 prefix matching, inheritance matching, and defining-assembly identity are not
@@ -56,13 +59,17 @@ the same non-empty-value rule. They do not create a role. The metadata-only FQN
 role `Feature` remains custom-mapping-only and has no first-party role
 attribute.
 
-Every package-using consumer assembly carries
-`ArchLinterNet.Annotations.AnnotationCatalogGenerationAttribute(1)`. The marker
-is internal sealed, assembly-targeted, constructed by a public constructor, and
-present once. An annotation-aware tool
-recognizes generation 1 as defined by the manifest. Unknown generation or
-unknown attribute FQN under the reserved namespace produces a deterministic
-unsupported-annotation diagnostic rather than a guessed role.
+Every package-using consumer assembly carries one
+`ArchLinterNet.Annotations.AnnotationCatalogIdentityAttribute` with the
+catalog generation and exact SemVer of the package source compiled into it.
+The initial v0.10.0 package emits `(1, "0.10.0")`. The marker is internal
+sealed, assembly-targeted, and constructed by a public constructor. It makes
+both independent values observable from assembly metadata and contributes no
+role or context evidence. An annotation-aware tool checks each value against
+its advertised generation and package-version support. Unknown generation,
+unsupported or malformed package version, or an unknown attribute FQN under the
+reserved namespace produces a deterministic diagnostic rather than a guessed
+role.
 
 ### Attribute target matrix
 
@@ -143,21 +150,26 @@ primary role.
 
 ## Versioning and compatibility
 
-Package SemVer and catalog generation are independent. The initial package is
-`0.10.0`, catalog generation is `1`, and the generation marker is emitted in
-each authoring assembly. The package range compatible with generation 1 is
-`[0.10.0,0.11.0)`. Within that range, role FQNs and meanings, targets,
-constructors, and metadata property names/types remain stable. The manifest
-records the package range and marker.
+Package SemVer and catalog generation are independent compatibility axes. The
+initial package is `0.10.0`, catalog generation is `1`, and the catalog identity
+marker containing both values is emitted in each authoring assembly. The
+package range compatible with generation 1 is `[0.10.0,0.11.0)`. Within that
+range, role FQNs and meanings, targets, constructors, and metadata property
+names/types remain stable. The manifest records the package range and marker.
 
 Annotation-aware tool capability metadata advertises supported catalog
-generations and package range. A tool fails closed with a deterministic
-diagnostic for an unsupported newer generation or an unknown canonical FQN.
-Newer tools accept older generations only while they remain in their advertised
-support set. Package guidance names v0.10.0 as the minimum annotation-aware tool
-version. Older tools cannot diagnose source-only annotation metadata
-retroactively, so pre-v0.10 use is documented as unsupported rather than
-promising a diagnostic they cannot produce.
+generations and package SemVer ranges. The assembly marker gives tools enough
+information even in `target_assemblies`-only mode; no project file or
+`PackageReference` metadata is required. When a known canonical annotation FQN
+is present, the assembly must carry exactly one valid identity marker. A missing
+or malformed marker, unsupported generation, or malformed/out-of-range package
+version produces a deterministic diagnostic and canonical annotation evidence
+is not resolved. Unknown FQNs under the reserved namespace also fail closed.
+Newer tools accept older generation/package combinations only while both values
+remain in their advertised support sets. Package guidance names v0.10.0 as the
+minimum annotation-aware tool version. Older tools cannot diagnose source-only
+annotation metadata retroactively, so pre-v0.10 use is documented as
+unsupported rather than promising a diagnostic they cannot produce.
 
 An identity or semantic addition requires a reviewed catalog-generation change
 and matching tool capability update. Renames, removals, target changes, and

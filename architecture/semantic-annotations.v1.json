@@ -25,26 +25,38 @@
     "compatiblePackageRangeForGeneration1": "[0.10.0,0.11.0)"
   },
   "reservedNamespace": "ArchLinterNet.Annotations",
-  "generationMarker": {
-    "fqn": "ArchLinterNet.Annotations.AnnotationCatalogGenerationAttribute",
+  "catalogIdentityMarker": {
+    "fqn": "ArchLinterNet.Annotations.AnnotationCatalogIdentityAttribute",
     "accessibility": "internal sealed",
     "attributeTargets": [
       "assembly"
     ],
     "constructor": [
       {
-        "name": "generation",
+        "name": "catalogGeneration",
         "type": "int",
+        "required": true
+      },
+      {
+        "name": "packageVersion",
+        "type": "string",
         "required": true
       }
     ],
-    "value": 1,
+    "value": {
+      "catalogGeneration": 1,
+      "packageVersion": "0.10.0"
+    },
+    "valueRule": "catalogGeneration and exact package SemVer of the package source compiled into the assembly",
     "allowMultiple": false,
     "inherited": false,
     "constructorAccessibility": "public constructor on internal attribute type"
   },
   "roleAttributeContract": {
-    "fqnPattern": "ArchLinterNet.Annotations.<Role>Attribute",
+    "fqnPattern": "ArchLinterNet.Annotations.<FirstClassRole>Attribute",
+    "roleNameSource": "#/roles[].role",
+    "identitySource": "#/roles[].fqn",
+    "appliesOnlyTo": "Entries in roles[]; annotationDisposition.customMappingOnly and annotationDisposition.deferred do not imply role attribute identities",
     "accessibility": "internal sealed",
     "baseType": "System.Attribute",
     "constructor": [],
@@ -969,7 +981,10 @@
   "compatibility": {
     "generation1WithinPackageRange": "preserves FQNs, meanings, scopes, constructors, and metadata property names/types",
     "catalogGenerationIsSeparateFromSemVer": true,
+    "assemblyMetadataSufficientForTargetAssembliesOnly": true,
+    "missingCatalogIdentityBehavior": "when a canonical annotation FQN is present without exactly one catalog identity marker, report a deterministic missing-or-invalid catalog identity diagnostic and do not resolve canonical annotation evidence",
     "unsupportedGenerationBehavior": "annotation-aware tools fail closed with a deterministic diagnostic",
+    "invalidOrUnsupportedPackageVersionBehavior": "when the marker package version is malformed or outside the tool-advertised supported range, report a deterministic package-version compatibility diagnostic and do not resolve canonical annotation evidence",
     "preV010ToolLimitation": "tools older than 0.10.0 cannot diagnose source-only annotation metadata retroactively"
   }
 }

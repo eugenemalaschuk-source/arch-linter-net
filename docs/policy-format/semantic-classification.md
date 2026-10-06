@@ -52,7 +52,10 @@ YAML mappings remain supported.
 
 The [semantic role catalog](semantic-role-catalog.md) lists each role's v0.10
 annotation disposition. The repository maintains a versioned manifest for the
-exact FQNs, targets, package compatibility, and catalog-generation marker.
+exact FQNs, targets, package compatibility, and assembly catalog-identity
+marker, which records both catalog generation and package SemVer. Only
+first-class entries in the manifest's `roles[]` have canonical role FQNs;
+custom-mapping-only and deferred roles retain their existing mapping path.
 `ApiContract` remains a primary semantic role; reviewed API membership remains
 an independent policy selector decision under #525.
 

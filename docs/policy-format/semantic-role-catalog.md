@@ -202,18 +202,25 @@ available in released tools. Tool support begins at v0.10.0. The repository
 keeps a versioned manifest for its exact FQNs, targets, properties, package,
 and generation contract.
 
-Role attribute identities use `ArchLinterNet.Annotations.<Role>Attribute`. For
-example, the canonical form is `[AggregateRoot]` with optional named properties
-such as `Domain = "Sales"` or `BoundedContext = "Orders"`. Role properties are
+Only the 49 first-class role entries in the v0.10 manifest have canonical role
+attribute identities; each uses the FQN recorded in `roles[]`, following
+`ArchLinterNet.Annotations.<FirstClassRole>Attribute`. Custom-mapping-only and
+deferred catalog roles do not imply a built-in role FQN. For example, the
+canonical form is `[AggregateRoot]` with optional named properties such as
+`Domain = "Sales"` or `BoundedContext = "Orders"`. Role properties are
 `Domain`, `BoundedContext`, `Module`, `Feature`, `Platform`, and `Runtime`;
 values are exact non-empty strings. Metadata-only attributes (`Domain`,
 `BoundedContext`, `Module`, `Feature`, `Platform`, and `Runtime`) take one
-string value and support type or assembly scope. `DomainLayer`,
+string value and support type or assembly scope. The metadata-only
+`FeatureAttribute` supplies the `feature` context key; catalog role `Feature`
+remains custom-mapping-only and has no role attribute FQN. `DomainLayer`,
 `ApplicationLayer`, `InfrastructureLayer`, `PresentationLayer`, `ApiLayer`,
 `PersistenceLayer`, `IntegrationLayer`, `SharedKernel`, `UnityRuntime`, and
 `UnityEditor` are assembly-only; `CompositionRoot` supports type or assembly
-scope; other roles are type-only. The metadata-only `FeatureAttribute` supplies
-the `feature` context key; the catalog role `Feature` remains custom-mapping-only.
+scope; other first-class roles are type-only. Each package version's assembly
+identity marker records both catalog generation and its exact package SemVer,
+so annotation-aware tools can check compatibility from the target assembly
+alone.
 
 The package does not make adoption mandatory. Existing and future projects may
 define user-owned attributes and map them by exact full type name:
