@@ -27,6 +27,38 @@ type_attribute > assembly_attribute > inheritance > namespace
 
 Deferred sources do not contribute role facts merely because their YAML shape exists.
 
+## Optional first-party annotations (planned for v0.10.0)
+
+Released tools through v0.9.1 recognize user-owned attributes only when policies
+map them by exact full type name. They do not recognize the first-party package
+or reserved FQNs described here. The v0.10.0 contract approves an optional
+source-only `ArchLinterNet.Annotations` NuGet package, but the package and
+built-in recognition have not shipped yet. When implemented, each project that
+authors annotations will reference the package directly; it will compile
+internal source definitions into that project and add no annotation runtime
+assembly, analyzer, or source generator. v0.10.0 will be the minimum
+annotation-aware tool version.
+
+Role attributes use exact FQNs in `ArchLinterNet.Annotations` and feed the same
+attribute evidence and role-index pipeline as custom mappings. Role attributes
+have optional `Domain`, `BoundedContext`, `Module`, `Feature`, `Platform`, and
+`Runtime` string properties. The matching metadata-only attributes take one
+string value at type or assembly scope. Type-level role evidence outranks
+assembly-level role evidence. Contradictory canonical roles or conflicting
+same-specificity role metadata fail closed; equivalent evidence coalesces.
+Metadata-only context composes after the winning role evidence, then from type
+scope and assembly defaults. The package remains optional, and custom full-name
+YAML mappings remain supported.
+
+The [semantic role catalog](semantic-role-catalog.md) lists each role's v0.10
+annotation disposition. The repository maintains a versioned manifest for the
+exact FQNs, targets, package compatibility, and assembly catalog-identity
+marker, which records both catalog generation and package SemVer. Only
+first-class entries in the manifest's `roles[]` have canonical role FQNs;
+custom-mapping-only and deferred roles retain their existing mapping path.
+`ApiContract` remains a primary semantic role; reviewed API membership remains
+an independent policy selector decision under #525.
+
 ## Basic example
 
 ```yaml
@@ -215,7 +247,9 @@ Do not model orthogonal concerns by inventing multiple simultaneous roles. Use m
 
 ## Annotation strategy
 
-ArchLinterNet does not require or ship a mandatory architecture-annotation package. Repositories define their own attributes and map them by full type name in YAML:
+Released tools through v0.9.1 do not recognize first-party annotation types.
+Repositories may define their own attributes and map them by full type name in
+YAML:
 
 ```csharp
 [DomainLayer("Sales")]
@@ -231,9 +265,17 @@ classification:
         domain: constructor[0]
 ```
 
-This keeps ArchLinterNet decoupled from application binaries. Attributes are one evidence source, not a requirement: inheritance and namespace mappings remain supported alternatives.
+An optional source-only `ArchLinterNet.Annotations` package is approved for
+v0.10.0, but it has not shipped. It will inject internal attribute definitions
+into directly referencing SDK-style projects without adding an annotation
+runtime assembly. It will not be mandatory. Attributes are one evidence source,
+not a requirement: inheritance, namespace, and custom YAML mappings remain
+supported alternatives.
 
-The [Semantic role catalog](semantic-role-catalog.md) is vocabulary guidance, not a list of framework types that ArchLinterNet automatically injects or discovers by name.
+The [Semantic role catalog](semantic-role-catalog.md) separates roles with
+approved v0.10 canonical FQNs from roles that remain custom-mapping-only or
+deferred. Released tools do not recognize those planned canonical FQNs; support
+begins with the v0.10.0 annotation-aware tool.
 
 ## Current limits
 

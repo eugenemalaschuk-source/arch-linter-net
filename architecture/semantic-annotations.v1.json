@@ -1,0 +1,990 @@
+{
+  "manifestFormatVersion": 1,
+  "catalogGeneration": 1,
+  "productRelease": "0.10.0",
+  "package": {
+    "id": "ArchLinterNet.Annotations",
+    "version": "0.10.0",
+    "distribution": "source-only NuGet content files",
+    "contentFiles": {
+      "pattern": "cs/any/**/*.cs",
+      "buildAction": "Compile",
+      "copyToOutput": false,
+      "directReferenceRequiredPerAuthoringProject": true,
+      "transitiveSourceInjection": false
+    },
+    "prohibitedAssets": [
+      "lib",
+      "ref",
+      "runtime",
+      "analyzer",
+      "build",
+      "buildTransitive"
+    ],
+    "minimumAnnotationAwareToolVersion": "0.10.0",
+    "compatiblePackageRangeForGeneration1": "[0.10.0,0.11.0)"
+  },
+  "reservedNamespace": "ArchLinterNet.Annotations",
+  "catalogIdentityMarker": {
+    "fqn": "ArchLinterNet.Annotations.AnnotationCatalogIdentityAttribute",
+    "accessibility": "internal sealed",
+    "attributeTargets": [
+      "assembly"
+    ],
+    "constructor": [
+      {
+        "name": "catalogGeneration",
+        "type": "int",
+        "required": true
+      },
+      {
+        "name": "packageVersion",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "value": {
+      "catalogGeneration": 1,
+      "packageVersion": "0.10.0"
+    },
+    "valueRule": "catalogGeneration and exact package SemVer of the package source compiled into the assembly",
+    "allowMultiple": false,
+    "inherited": false,
+    "constructorAccessibility": "public constructor on internal attribute type"
+  },
+  "roleAttributeContract": {
+    "fqnPattern": "ArchLinterNet.Annotations.<FirstClassRole>Attribute",
+    "roleNameSource": "#/roles[].role",
+    "identitySource": "#/roles[].fqn",
+    "appliesOnlyTo": "Entries in roles[]; annotationDisposition.customMappingOnly and annotationDisposition.deferred do not imply role attribute identities",
+    "accessibility": "internal sealed",
+    "baseType": "System.Attribute",
+    "constructor": [],
+    "allowMultiple": false,
+    "inherited": false,
+    "metadataProperties": [
+      {
+        "property": "Domain",
+        "key": "domain",
+        "type": "string",
+        "optional": true,
+        "accessibility": "public get/set on internal attribute type"
+      },
+      {
+        "property": "BoundedContext",
+        "key": "boundedContext",
+        "type": "string",
+        "optional": true,
+        "accessibility": "public get/set on internal attribute type"
+      },
+      {
+        "property": "Module",
+        "key": "module",
+        "type": "string",
+        "optional": true,
+        "accessibility": "public get/set on internal attribute type"
+      },
+      {
+        "property": "Feature",
+        "key": "feature",
+        "type": "string",
+        "optional": true,
+        "accessibility": "public get/set on internal attribute type"
+      },
+      {
+        "property": "Platform",
+        "key": "platform",
+        "type": "string",
+        "optional": true,
+        "accessibility": "public get/set on internal attribute type"
+      },
+      {
+        "property": "Runtime",
+        "key": "runtime",
+        "type": "string",
+        "optional": true,
+        "accessibility": "public get/set on internal attribute type"
+      }
+    ],
+    "metadataValueRule": "exact non-empty compile-time string; no normalization or inference",
+    "constructorAccessibility": "public parameterless constructor on internal attribute type"
+  },
+  "contextAttributes": [
+    {
+      "key": "domain",
+      "fqn": "ArchLinterNet.Annotations.DomainAttribute",
+      "accessibility": "internal sealed",
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface",
+        "assembly"
+      ],
+      "constructor": [
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "allowMultiple": false,
+      "inherited": false,
+      "constructorAccessibility": "public constructor on internal attribute type",
+      "metadataValueRule": "exact non-empty compile-time string; no normalization or inference"
+    },
+    {
+      "key": "boundedContext",
+      "fqn": "ArchLinterNet.Annotations.BoundedContextAttribute",
+      "accessibility": "internal sealed",
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface",
+        "assembly"
+      ],
+      "constructor": [
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "allowMultiple": false,
+      "inherited": false,
+      "constructorAccessibility": "public constructor on internal attribute type",
+      "metadataValueRule": "exact non-empty compile-time string; no normalization or inference"
+    },
+    {
+      "key": "module",
+      "fqn": "ArchLinterNet.Annotations.ModuleAttribute",
+      "accessibility": "internal sealed",
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface",
+        "assembly"
+      ],
+      "constructor": [
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "allowMultiple": false,
+      "inherited": false,
+      "constructorAccessibility": "public constructor on internal attribute type",
+      "metadataValueRule": "exact non-empty compile-time string; no normalization or inference"
+    },
+    {
+      "key": "feature",
+      "fqn": "ArchLinterNet.Annotations.FeatureAttribute",
+      "accessibility": "internal sealed",
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface",
+        "assembly"
+      ],
+      "constructor": [
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "allowMultiple": false,
+      "inherited": false,
+      "constructorAccessibility": "public constructor on internal attribute type",
+      "metadataValueRule": "exact non-empty compile-time string; no normalization or inference"
+    },
+    {
+      "key": "platform",
+      "fqn": "ArchLinterNet.Annotations.PlatformAttribute",
+      "accessibility": "internal sealed",
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface",
+        "assembly"
+      ],
+      "constructor": [
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "allowMultiple": false,
+      "inherited": false,
+      "constructorAccessibility": "public constructor on internal attribute type",
+      "metadataValueRule": "exact non-empty compile-time string; no normalization or inference"
+    },
+    {
+      "key": "runtime",
+      "fqn": "ArchLinterNet.Annotations.RuntimeAttribute",
+      "accessibility": "internal sealed",
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface",
+        "assembly"
+      ],
+      "constructor": [
+        {
+          "name": "value",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "allowMultiple": false,
+      "inherited": false,
+      "constructorAccessibility": "public constructor on internal attribute type",
+      "metadataValueRule": "exact non-empty compile-time string; no normalization or inference"
+    }
+  ],
+  "roles": [
+    {
+      "role": "DomainLayer",
+      "family": "layered-clean",
+      "fqn": "ArchLinterNet.Annotations.DomainLayerAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "ApplicationLayer",
+      "family": "layered-clean",
+      "fqn": "ArchLinterNet.Annotations.ApplicationLayerAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "InfrastructureLayer",
+      "family": "layered-clean",
+      "fqn": "ArchLinterNet.Annotations.InfrastructureLayerAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "PresentationLayer",
+      "family": "layered-clean",
+      "fqn": "ArchLinterNet.Annotations.PresentationLayerAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "ApiLayer",
+      "family": "layered-clean",
+      "fqn": "ArchLinterNet.Annotations.ApiLayerAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "PersistenceLayer",
+      "family": "layered-clean",
+      "fqn": "ArchLinterNet.Annotations.PersistenceLayerAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "IntegrationLayer",
+      "family": "layered-clean",
+      "fqn": "ArchLinterNet.Annotations.IntegrationLayerAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "SharedKernel",
+      "family": "layered-clean",
+      "fqn": "ArchLinterNet.Annotations.SharedKernelAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "CompositionRoot",
+      "family": "layered-clean",
+      "fqn": "ArchLinterNet.Annotations.CompositionRootAttribute",
+      "scopes": [
+        "type",
+        "assembly"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface",
+        "assembly"
+      ]
+    },
+    {
+      "role": "Entity",
+      "family": "ddd",
+      "fqn": "ArchLinterNet.Annotations.EntityAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "AggregateRoot",
+      "family": "ddd",
+      "fqn": "ArchLinterNet.Annotations.AggregateRootAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "ValueObject",
+      "family": "ddd",
+      "fqn": "ArchLinterNet.Annotations.ValueObjectAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "DomainService",
+      "family": "ddd",
+      "fqn": "ArchLinterNet.Annotations.DomainServiceAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "DomainEvent",
+      "family": "ddd",
+      "fqn": "ArchLinterNet.Annotations.DomainEventAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Repository",
+      "family": "ddd",
+      "fqn": "ArchLinterNet.Annotations.RepositoryAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Specification",
+      "family": "ddd",
+      "fqn": "ArchLinterNet.Annotations.SpecificationAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Factory",
+      "family": "ddd",
+      "fqn": "ArchLinterNet.Annotations.FactoryAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Command",
+      "family": "cqrs-messages",
+      "fqn": "ArchLinterNet.Annotations.CommandAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "CommandHandler",
+      "family": "cqrs-messages",
+      "fqn": "ArchLinterNet.Annotations.CommandHandlerAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Query",
+      "family": "cqrs-messages",
+      "fqn": "ArchLinterNet.Annotations.QueryAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "QueryHandler",
+      "family": "cqrs-messages",
+      "fqn": "ArchLinterNet.Annotations.QueryHandlerAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Event",
+      "family": "cqrs-messages",
+      "fqn": "ArchLinterNet.Annotations.EventAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "EventHandler",
+      "family": "cqrs-messages",
+      "fqn": "ArchLinterNet.Annotations.EventHandlerAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "IntegrationEvent",
+      "family": "cqrs-messages",
+      "fqn": "ArchLinterNet.Annotations.IntegrationEventAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "ReadModel",
+      "family": "cqrs-messages",
+      "fqn": "ArchLinterNet.Annotations.ReadModelAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Controller",
+      "family": "web-api",
+      "fqn": "ArchLinterNet.Annotations.ControllerAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Endpoint",
+      "family": "web-api",
+      "fqn": "ArchLinterNet.Annotations.EndpointAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "RequestDto",
+      "family": "web-api",
+      "fqn": "ArchLinterNet.Annotations.RequestDtoAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "ResponseDto",
+      "family": "web-api",
+      "fqn": "ArchLinterNet.Annotations.ResponseDtoAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "ApiContract",
+      "family": "web-api",
+      "fqn": "ArchLinterNet.Annotations.ApiContractAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Validator",
+      "family": "web-api",
+      "fqn": "ArchLinterNet.Annotations.ValidatorAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Port",
+      "family": "ports-infrastructure",
+      "fqn": "ArchLinterNet.Annotations.PortAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Adapter",
+      "family": "ports-infrastructure",
+      "fqn": "ArchLinterNet.Annotations.AdapterAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "AntiCorruptionLayer",
+      "family": "ports-infrastructure",
+      "fqn": "ArchLinterNet.Annotations.AntiCorruptionLayerAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "DbContext",
+      "family": "ports-infrastructure",
+      "fqn": "ArchLinterNet.Annotations.DbContextAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "RepositoryImplementation",
+      "family": "ports-infrastructure",
+      "fqn": "ArchLinterNet.Annotations.RepositoryImplementationAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "ExternalClient",
+      "family": "ports-infrastructure",
+      "fqn": "ArchLinterNet.Annotations.ExternalClientAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "MessageBusAdapter",
+      "family": "ports-infrastructure",
+      "fqn": "ArchLinterNet.Annotations.MessageBusAdapterAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "FileSystemAdapter",
+      "family": "ports-infrastructure",
+      "fqn": "ArchLinterNet.Annotations.FileSystemAdapterAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "ClockAdapter",
+      "family": "ports-infrastructure",
+      "fqn": "ArchLinterNet.Annotations.ClockAdapterAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "View",
+      "family": "ui",
+      "fqn": "ArchLinterNet.Annotations.ViewAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "ViewModel",
+      "family": "ui",
+      "fqn": "ArchLinterNet.Annotations.ViewModelAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "Presenter",
+      "family": "ui",
+      "fqn": "ArchLinterNet.Annotations.PresenterAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "UnityRuntime",
+      "family": "unity-client",
+      "fqn": "ArchLinterNet.Annotations.UnityRuntimeAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "UnityEditor",
+      "family": "unity-client",
+      "fqn": "ArchLinterNet.Annotations.UnityEditorAttribute",
+      "scopes": [
+        "assembly"
+      ],
+      "attributeTargets": [
+        "assembly"
+      ]
+    },
+    {
+      "role": "MonoBehaviourAdapter",
+      "family": "unity-client",
+      "fqn": "ArchLinterNet.Annotations.MonoBehaviourAdapterAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "ScriptableObjectAsset",
+      "family": "unity-client",
+      "fqn": "ArchLinterNet.Annotations.ScriptableObjectAssetAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "InputAdapter",
+      "family": "unity-client",
+      "fqn": "ArchLinterNet.Annotations.InputAdapterAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    },
+    {
+      "role": "SceneAdapter",
+      "family": "unity-client",
+      "fqn": "ArchLinterNet.Annotations.SceneAdapterAttribute",
+      "scopes": [
+        "type"
+      ],
+      "attributeTargets": [
+        "class",
+        "struct",
+        "interface"
+      ]
+    }
+  ],
+  "annotationDisposition": {
+    "firstClass": [
+      "DomainLayer",
+      "ApplicationLayer",
+      "InfrastructureLayer",
+      "PresentationLayer",
+      "ApiLayer",
+      "PersistenceLayer",
+      "IntegrationLayer",
+      "SharedKernel",
+      "CompositionRoot",
+      "Entity",
+      "AggregateRoot",
+      "ValueObject",
+      "DomainService",
+      "DomainEvent",
+      "Repository",
+      "Specification",
+      "Factory",
+      "Command",
+      "CommandHandler",
+      "Query",
+      "QueryHandler",
+      "Event",
+      "EventHandler",
+      "IntegrationEvent",
+      "ReadModel",
+      "Controller",
+      "Endpoint",
+      "RequestDto",
+      "ResponseDto",
+      "ApiContract",
+      "Validator",
+      "Port",
+      "Adapter",
+      "AntiCorruptionLayer",
+      "DbContext",
+      "RepositoryImplementation",
+      "ExternalClient",
+      "MessageBusAdapter",
+      "FileSystemAdapter",
+      "ClockAdapter",
+      "View",
+      "ViewModel",
+      "Presenter",
+      "UnityRuntime",
+      "UnityEditor",
+      "MonoBehaviourAdapter",
+      "ScriptableObjectAsset",
+      "InputAdapter",
+      "SceneAdapter"
+    ],
+    "customMappingOnly": [
+      "Common",
+      "Policy",
+      "Filter",
+      "Mapper",
+      "Model",
+      "Component",
+      "UiService",
+      "Feature",
+      "System",
+      "PrimaryPort",
+      "SecondaryPort",
+      "ExternalSystem",
+      "IntegrationAdapter",
+      "PersistenceAdapter",
+      "PersistenceModel",
+      "Mapping",
+      "Options",
+      "Logging",
+      "Telemetry",
+      "Validation",
+      "Serialization",
+      "Authorization",
+      "Caching",
+      "Configuration",
+      "ExceptionHandling",
+      "Migration"
+    ],
+    "deferred": [
+      "Saga",
+      "ProcessManager",
+      "Projection",
+      "EventStore",
+      "Snapshot",
+      "Middleware",
+      "Page",
+      "NavigationService",
+      "Installer",
+      "TelemetryAdapter",
+      "BackgroundJob"
+    ],
+    "reservedNameCollisionNote": "FeatureAttribute is metadata-only for the feature key; the catalog role Feature remains custom-mapping-only."
+  },
+  "resolutionContract": {
+    "sourcePrecedence": [
+      "yaml_override",
+      "type_attribute",
+      "assembly_attribute",
+      "inheritance",
+      "namespace",
+      "path"
+    ],
+    "canonicalEvidenceAtSameSpecificity": "equivalent role and metadata coalesce with provenance; contradictory roles or metadata fail closed, with no effective role for role conflict",
+    "typeRoleVersusAssemblyRole": "type role wins; losing assembly role metadata is not merged",
+    "metadataComposition": [
+      "winning role evidence",
+      "type context attributes",
+      "assembly context defaults for absent keys"
+    ],
+    "sameScopeContextConflict": "omit only the conflicting key and retain an otherwise valid role",
+    "apiMembership": "ApiContract is a primary semantic role; reviewed API membership remains an independent policy selector"
+  },
+  "compatibility": {
+    "generation1WithinPackageRange": "preserves FQNs, meanings, scopes, constructors, and metadata property names/types",
+    "catalogGenerationIsSeparateFromSemVer": true,
+    "assemblyMetadataSufficientForTargetAssembliesOnly": true,
+    "missingCatalogIdentityBehavior": "when a canonical annotation FQN is present without exactly one catalog identity marker, report a deterministic missing-or-invalid catalog identity diagnostic and do not resolve canonical annotation evidence",
+    "unsupportedGenerationBehavior": "annotation-aware tools fail closed with a deterministic diagnostic",
+    "invalidOrUnsupportedPackageVersionBehavior": "when the marker package version is malformed or outside the tool-advertised supported range, report a deterministic package-version compatibility diagnostic and do not resolve canonical annotation evidence",
+    "preV010ToolLimitation": "tools older than 0.10.0 cannot diagnose source-only annotation metadata retroactively"
+  }
+}
