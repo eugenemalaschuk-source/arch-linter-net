@@ -17,6 +17,7 @@ internal sealed class CanonicalAnnotationRoleResolver
     {
         CanonicalAnnotationCatalog catalog = CanonicalAnnotationCatalog.Current;
         List<ArchitectureCanonicalAnnotationDiagnostic> diagnostics = new();
+        List<ArchitectureClassificationMetadataFailure> metadataFailures = new();
         List<(CanonicalAnnotationCatalog.CanonicalRole Role, IReadOnlyDictionary<string, object> Metadata)> matches = new();
 
         foreach (CustomAttributeData data in attributeData)
@@ -52,7 +53,8 @@ internal sealed class CanonicalAnnotationRoleResolver
                 continue;
             }
 
-            IReadOnlyDictionary<string, object> metadata = ReadMetadata(data, catalog, subject, diagnostics);
+            IReadOnlyDictionary<string, object> metadata = ReadMetadata(
+                data, catalog, source, subject, metadataFailures, diagnostics);
             matches.Add((role, metadata));
         }
 
@@ -61,7 +63,7 @@ internal sealed class CanonicalAnnotationRoleResolver
             return new ArchitectureAttributeClassificationCandidate(
                 null, new Dictionary<string, object>(), null,
                 Array.Empty<ArchitectureClassificationConflict>(),
-                Array.Empty<ArchitectureClassificationMetadataFailure>())
+                metadataFailures)
             {
                 CanonicalAnnotationDiagnostics = diagnostics
             };
@@ -88,7 +90,7 @@ internal sealed class CanonicalAnnotationRoleResolver
             return new ArchitectureAttributeClassificationCandidate(
                 null, new Dictionary<string, object>(), null,
                 Array.Empty<ArchitectureClassificationConflict>(),
-                Array.Empty<ArchitectureClassificationMetadataFailure>())
+                metadataFailures)
             {
                 CanonicalAnnotationDiagnostics = diagnostics
             };
@@ -113,7 +115,7 @@ internal sealed class CanonicalAnnotationRoleResolver
             return new ArchitectureAttributeClassificationCandidate(
                 null, new Dictionary<string, object>(), null,
                 Array.Empty<ArchitectureClassificationConflict>(),
-                Array.Empty<ArchitectureClassificationMetadataFailure>())
+                metadataFailures)
             {
                 EvidenceSources = evidenceSources,
                 CanonicalAnnotationDiagnostics = diagnostics,
@@ -126,7 +128,7 @@ internal sealed class CanonicalAnnotationRoleResolver
             first.Metadata,
             evidenceSources.FirstOrDefault(),
             Array.Empty<ArchitectureClassificationConflict>(),
-            Array.Empty<ArchitectureClassificationMetadataFailure>())
+            metadataFailures)
         {
             EvidenceSources = evidenceSources,
             ObservedEvidence = matches.Select(match => new ArchitectureAttributeRoleEvidence(
@@ -189,7 +191,9 @@ internal sealed class CanonicalAnnotationRoleResolver
     private static Dictionary<string, object> ReadMetadata(
         CustomAttributeData data,
         CanonicalAnnotationCatalog catalog,
+        ArchitectureClassificationSource source,
         string subject,
+        List<ArchitectureClassificationMetadataFailure> metadataFailures,
         List<ArchitectureCanonicalAnnotationDiagnostic> diagnostics)
     {
         Dictionary<string, object> metadata = new(StringComparer.Ordinal);
@@ -210,10 +214,13 @@ internal sealed class CanonicalAnnotationRoleResolver
             }
 
             string fqn = TryGetAttributeName(data) ?? "<unknown>";
+            const string FailureReason = "must contain an exact non-empty compile-time string value.";
+            metadataFailures.Add(new ArchitectureClassificationMetadataFailure(
+                subject, source, metadataKey, FailureReason));
             diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
                 subject,
                 "InvalidCanonicalMetadata",
-                $"'{fqn}.{propertyName}' must contain an exact non-empty compile-time string value.",
+                $"'{fqn}.{propertyName}' {FailureReason}",
                 fqn));
         }
 

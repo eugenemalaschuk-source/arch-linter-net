@@ -126,11 +126,13 @@ public sealed class CanonicalAnnotationRoleResolutionTests
     }
 
     [Test]
-    public void Extract_EmptyCanonicalMetadataValue_PreservesRoleAndReportsInvalidKey()
+    public void Extract_EmptyCanonicalMetadataValue_PreservesRoleAndReportsFailureThroughBothChannels()
     {
         Type type = CreateType("CanonicalEntityEmptyDomain", typeRole: true, domain: string.Empty);
+        ArchitectureClassificationConfiguration configuration = new();
         ArchitectureTypeClassificationResult result = new ArchitectureAttributeRoleExtractor(
-            new ArchitectureClassificationConfiguration(), [type]).Extract(type);
+            configuration, [type]).Extract(type);
+        ArchitectureRoleIndex roleIndex = new(configuration, new ArchitectureTypeIndex([type.Assembly]));
 
         Assert.Multiple(() =>
         {
@@ -139,6 +141,12 @@ public sealed class CanonicalAnnotationRoleResolutionTests
             Assert.That(result.CanonicalAnnotationDiagnostics.Select(diagnostic => diagnostic.Code),
                 Does.Contain("InvalidCanonicalMetadata"));
             Assert.That(result.CanonicalAnnotationDiagnostics.Single().Message, Does.Contain("non-empty"));
+            ArchitectureClassificationMetadataFailure metadataFailure = result.MetadataFailures.Single();
+            Assert.That(metadataFailure.Subject, Is.EqualTo(type.FullName));
+            Assert.That(metadataFailure.Source, Is.EqualTo(ArchitectureClassificationSource.TypeAttribute));
+            Assert.That(metadataFailure.MetadataKey, Is.EqualTo("domain"));
+            Assert.That(metadataFailure.Reason, Does.Contain("non-empty"));
+            Assert.That(roleIndex.MetadataFailures, Does.Contain(metadataFailure));
         });
     }
 

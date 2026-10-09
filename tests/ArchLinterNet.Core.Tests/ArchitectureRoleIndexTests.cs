@@ -198,7 +198,10 @@ public sealed class ArchitectureRoleIndexTests
         Assert.That(index.ClassifiedTypes(), Is.Empty);
         Assert.That(index.Conflicts, Is.Empty);
         Assert.That(index.MetadataFailures, Is.Empty);
-        Assert.That(index.CanonicalAnnotationDiagnostics, Is.Empty);
+        ArchitectureCanonicalAnnotationDiagnostic missingMarker = index.CanonicalAnnotationDiagnostics.Single();
+        Assert.That(missingMarker.Code, Is.EqualTo("MissingCatalogIdentity"));
+        Assert.That(missingMarker.EvidenceSources,
+            Does.Contain("ArchLinterNet.Annotations.AggregateRootAttribute"));
         Assert.That(countingAssemblies.EnumerationCount, Is.EqualTo(1));
     }
 
