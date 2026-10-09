@@ -116,3 +116,40 @@ Canonical annotations SHALL contribute only a primary semantic role or bounded c
 
 - **WHEN** a type has the primary role `ApiContract`
 - **THEN** the annotation alone does not add the type to any reviewed public API snapshot
+
+### Requirement: Layered and DDD role attributes follow the reviewed catalog
+
+The source-only annotation set SHALL provide internal sealed role attributes for every `layered-clean` and `ddd` role in `architecture/semantic-annotations.v1.json`. Each attribute SHALL use the manifest FQN, `AllowMultiple=false`, and `Inherited=false`; it SHALL expose the six optional public string metadata properties defined by the role attribute contract. Its valid attribute targets SHALL match the manifest exactly.
+
+#### Scenario: Layered and clean roles use approved targets
+
+- **WHEN** a project compiles the layered/clean annotation source set
+- **THEN** `DomainLayer`, `ApplicationLayer`, `InfrastructureLayer`, `PresentationLayer`, `ApiLayer`, `PersistenceLayer`, `IntegrationLayer`, and `SharedKernel` are assembly-only attributes, while `CompositionRoot` supports classes, structs, interfaces, and assemblies
+
+#### Scenario: DDD roles use type targets
+
+- **WHEN** a project compiles the DDD annotation source set
+- **THEN** `Entity`, `AggregateRoot`, `ValueObject`, `DomainService`, `DomainEvent`, `Repository`, `Specification`, and `Factory` support classes, structs, and interfaces
+
+#### Scenario: Role attribute definitions match the manifest contract
+
+- **WHEN** the source definitions are inspected
+- **THEN** each of the 17 roles has its exact manifest FQN, is internal and sealed, has a public parameterless constructor, and exposes the six optional public string metadata properties
+
+### Requirement: The annotation source set is compatible with C# 9.0
+
+The exact source set distributed by the package SHALL compile with C# 9.0 or newer and SHALL use only syntax available in C# 9.0. The repository SHALL include a `netstandard2.1` consumer configured with `LangVersion=9.0` that compiles the distributed source files. This source compatibility supports Unity source-import workflows and does not claim that every Unity project supports NuGet contentFiles installation.
+
+#### Scenario: Source definitions compile with C# 9.0
+
+- **WHEN** the repository builds the `netstandard2.1` consumer with `LangVersion=9.0`
+- **THEN** all distributed annotation sources and representative assembly/type annotations compile without syntax changes
+
+### Requirement: The role attribute base type relation follows the manifest
+
+The manifest's `roleAttributeContract.baseType` SHALL name a CLR ancestor of every role attribute. Its `baseTypeRelationship` value SHALL declare `assignable-ancestor`, meaning the named type can be either the direct base class or an indirect ancestor. Validation SHALL resolve the declared base type from the manifest and mechanically check each role attribute's inheritance chain against it.
+
+#### Scenario: Role attributes satisfy the manifest base type
+
+- **WHEN** the repository validates each role attribute against the semantic annotation manifest
+- **THEN** each type is a subclass of the manifest's declared `baseType`, whether that base type is immediate or indirect

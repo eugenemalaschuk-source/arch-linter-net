@@ -8,6 +8,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/ArchLinterNet.CEL.Tests/ArchLinterNet.CEL.Tests.csproj" />
     <Project Path="tests/ArchLinterNet.Cli.Tests/ArchLinterNet.Cli.Tests.csproj" />
+    <Project Path="tests/ArchLinterNet.Annotations.CSharp9Consumer/ArchLinterNet.Annotations.CSharp9Consumer.csproj" />
     <Project Path="tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" />
   </Folder>
   <Folder Name="/benchmarks/">
