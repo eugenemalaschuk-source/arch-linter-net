@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using ArchLinterNet.Annotations;
+using ArchLinterNet.Annotations.CSharp9Consumer;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
@@ -34,6 +35,13 @@ public sealed class SemanticAnnotationSourceContractTests
 
         Assert.That(roles, Has.Length.EqualTo(expectedCount));
 
+        JsonElement roleAttributeContract = manifest.RootElement.GetProperty("roleAttributeContract");
+        string baseTypeName = roleAttributeContract.GetProperty("baseType").GetString()!;
+        string baseTypeRelationship = roleAttributeContract.GetProperty("baseTypeRelationship").GetString()!;
+        Type requiredBaseType = Type.GetType(baseTypeName, throwOnError: true)!;
+
+        Assert.That(baseTypeRelationship, Is.EqualTo("assignable-ancestor"));
+
         Assembly annotationAssembly = typeof(RoleAnnotationAttributeBase).Assembly;
         foreach (JsonElement role in roles)
         {
@@ -47,7 +55,8 @@ public sealed class SemanticAnnotationSourceContractTests
                 Assert.That(annotationType.IsNotPublic, Is.True, $"{message} must remain internal");
                 Assert.That(annotationType.IsSealed, Is.True, $"{message} must be sealed");
                 Assert.That(annotationType.IsAbstract, Is.False, $"{message} must be constructible");
-                Assert.That(annotationType.BaseType, Is.EqualTo(typeof(RoleAnnotationAttributeBase)));
+                Assert.That(annotationType.IsSubclassOf(requiredBaseType), Is.True,
+                    $"{message} must descend from manifest base type {baseTypeName}");
                 Assert.That(annotationType.GetConstructor(Type.EmptyTypes), Is.Not.Null,
                     $"{message} must have a public parameterless constructor");
 
@@ -94,6 +103,30 @@ public sealed class SemanticAnnotationSourceContractTests
         Assert.That(descriptor.Role, Is.EqualTo("AggregateRoot"));
         Assert.That(descriptor.Source, Is.EqualTo(ArchitectureClassificationSource.TypeAttribute));
         Assert.That(descriptor.Metadata["boundedContext"], Is.EqualTo("Sales"));
+        Assert.That(descriptor.Metadata["module"], Is.EqualTo("Orders"));
+    }
+
+    [Test]
+    public void ExplicitlyMappedAssemblyAttribute_EntersExistingRoleIndexWithMetadata()
+    {
+        ArchitectureClassificationConfiguration configuration = new();
+        configuration.AssemblyAttributes.Add(new ArchitectureAttributeClassificationMapping
+        {
+            Attribute = "ArchLinterNet.Annotations.DomainLayerAttribute",
+            Role = "DomainLayer",
+            Metadata = new Dictionary<string, object>
+            {
+                ["boundedContext"] = "property:BoundedContext",
+                ["module"] = "property:Module"
+            }
+        });
+
+        ArchitectureRoleIndex index = new(configuration, new ArchitectureTypeIndex([typeof(DomainLayerConsumerFixture).Assembly]));
+
+        Assert.That(index.TryGetRole(typeof(DomainLayerConsumerFixture), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(descriptor.Source, Is.EqualTo(ArchitectureClassificationSource.AssemblyAttribute));
+        Assert.That(descriptor.Metadata["boundedContext"], Is.EqualTo("Commerce"));
         Assert.That(descriptor.Metadata["module"], Is.EqualTo("Orders"));
     }
 

@@ -135,3 +135,21 @@ The source-only annotation set SHALL provide internal sealed role attributes for
 
 - **WHEN** the source definitions are inspected
 - **THEN** each of the 17 roles has its exact manifest FQN, is internal and sealed, has a public parameterless constructor, and exposes the six optional public string metadata properties
+
+### Requirement: The annotation source set is compatible with C# 9.0
+
+The exact source set distributed by the package SHALL compile with C# 9.0 or newer and SHALL use only syntax available in C# 9.0. The repository SHALL include a `netstandard2.1` consumer configured with `LangVersion=9.0` that compiles the distributed source files. This source compatibility supports Unity source-import workflows and does not claim that every Unity project supports NuGet contentFiles installation.
+
+#### Scenario: Source definitions compile with C# 9.0
+
+- **WHEN** the repository builds the `netstandard2.1` consumer with `LangVersion=9.0`
+- **THEN** all distributed annotation sources and representative assembly/type annotations compile without syntax changes
+
+### Requirement: The role attribute base type relation follows the manifest
+
+The manifest's `roleAttributeContract.baseType` SHALL name a CLR ancestor of every role attribute. Its `baseTypeRelationship` value SHALL declare `assignable-ancestor`, meaning the named type can be either the direct base class or an indirect ancestor. Validation SHALL resolve the declared base type from the manifest and mechanically check each role attribute's inheritance chain against it.
+
+#### Scenario: Role attributes satisfy the manifest base type
+
+- **WHEN** the repository validates each role attribute against the semantic annotation manifest
+- **THEN** each type is a subclass of the manifest's declared `baseType`, whether that base type is immediate or indirect
