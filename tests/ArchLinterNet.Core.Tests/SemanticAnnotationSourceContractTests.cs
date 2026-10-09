@@ -42,13 +42,17 @@ public sealed class SemanticAnnotationSourceContractTests
 
         Assert.That(baseTypeRelationship, Is.EqualTo("assignable-ancestor"));
 
-        Assembly annotationAssembly = typeof(RoleAnnotationAttributeBase).Assembly;
+        Assembly annotationAssembly = typeof(DomainLayerConsumerFixture).Assembly;
         foreach (JsonElement role in roles)
         {
             string roleName = role.GetProperty("role").GetString()!;
             string expectedFullName = role.GetProperty("fqn").GetString()!;
             Type annotationType = annotationAssembly.GetType(expectedFullName, throwOnError: true)!;
             string message = $"{family} role {roleName}";
+            ConstructorInfo? parameterlessConstructor = annotationType.GetConstructor(Type.EmptyTypes);
+            PropertyInfo[] properties = annotationType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(property => property.DeclaringType != typeof(Attribute))
+                .ToArray();
 
             Assert.Multiple(() =>
             {
@@ -57,7 +61,7 @@ public sealed class SemanticAnnotationSourceContractTests
                 Assert.That(annotationType.IsAbstract, Is.False, $"{message} must be constructible");
                 Assert.That(annotationType.IsSubclassOf(requiredBaseType), Is.True,
                     $"{message} must descend from manifest base type {baseTypeName}");
-                Assert.That(annotationType.GetConstructor(Type.EmptyTypes), Is.Not.Null,
+                Assert.That(parameterlessConstructor, Is.Not.Null,
                     $"{message} must have a public parameterless constructor");
 
                 AttributeUsageAttribute? usage = annotationType.GetCustomAttribute<AttributeUsageAttribute>(inherit: false);
@@ -67,9 +71,6 @@ public sealed class SemanticAnnotationSourceContractTests
                 Assert.That(usage.AllowMultiple, Is.False, $"{message} must reject accumulated primary roles");
                 Assert.That(usage.Inherited, Is.False, $"{message} must not apply through inheritance");
 
-                PropertyInfo[] properties = annotationType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                    .Where(property => property.DeclaringType != typeof(Attribute))
-                    .ToArray();
                 Assert.That(properties.Select(property => property.Name), Is.EquivalentTo(_expectedMetadataProperties),
                     $"{message} must expose only the bounded metadata properties");
                 foreach (PropertyInfo property in properties)
@@ -79,6 +80,20 @@ public sealed class SemanticAnnotationSourceContractTests
                     Assert.That(property.SetMethod?.IsPublic, Is.True, $"{message}.{property.Name} must be publicly settable");
                 }
             });
+
+            if (parameterlessConstructor is null)
+            {
+                continue;
+            }
+
+            object instance = parameterlessConstructor.Invoke(null);
+            foreach (PropertyInfo property in properties)
+            {
+                string expectedValue = $"coverage-{roleName}-{property.Name}";
+                property.SetValue(instance, expectedValue);
+                Assert.That(property.GetValue(instance), Is.EqualTo(expectedValue),
+                    $"{message}.{property.Name} must retain an assigned metadata value");
+            }
         }
     }
 
