@@ -84,8 +84,15 @@ public sealed class CanonicalAnnotationRoleResolutionTests
         Assert.Multiple(() =>
         {
             Assert.That(found, Is.False);
-            Assert.That(index.CanonicalAnnotationDiagnostics.Select(diagnostic => diagnostic.Code),
-                Is.EqualTo(new[] { "MissingCatalogIdentity" }));
+            ArchitectureCanonicalAnnotationDiagnostic diagnostic = index.CanonicalAnnotationDiagnostics.Single();
+            Assert.That(diagnostic.Code, Is.EqualTo("MissingCatalogIdentity"));
+            Assert.That(diagnostic.Subject, Does.Contain(type.Name));
+            Assert.That(diagnostic.Message, Does.Contain(type.Name).And.Contain(EntityFqn));
+            Assert.That(diagnostic.EvidenceSources, Is.EqualTo(new[]
+            {
+                "ArchLinterNet.Annotations.AnnotationCatalogIdentityAttribute",
+                EntityFqn
+            }));
         });
     }
 
@@ -119,7 +126,7 @@ public sealed class CanonicalAnnotationRoleResolutionTests
     }
 
     [Test]
-    public void Extract_EmptyCanonicalMetadataValue_FailsClosedWithActionableDiagnostic()
+    public void Extract_EmptyCanonicalMetadataValue_PreservesRoleAndReportsInvalidKey()
     {
         Type type = CreateType("CanonicalEntityEmptyDomain", typeRole: true, domain: string.Empty);
         ArchitectureTypeClassificationResult result = new ArchitectureAttributeRoleExtractor(
@@ -127,7 +134,8 @@ public sealed class CanonicalAnnotationRoleResolutionTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.Role, Is.Null);
+            Assert.That(result.Role, Is.EqualTo("Entity"));
+            Assert.That(result.Metadata, Does.Not.ContainKey("domain"));
             Assert.That(result.CanonicalAnnotationDiagnostics.Select(diagnostic => diagnostic.Code),
                 Does.Contain("InvalidCanonicalMetadata"));
             Assert.That(result.CanonicalAnnotationDiagnostics.Single().Message, Does.Contain("non-empty"));
@@ -176,6 +184,41 @@ public sealed class CanonicalAnnotationRoleResolutionTests
             {
                 EntityFqn,
                 "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute"
+            }));
+        });
+    }
+
+    [Test]
+    public void Extract_EquivalentCustomEvidence_RetainsEveryMappedAttributeFqn()
+    {
+        Type type = CreateType("TwoCustomEntityAttributes", customRole: true, secondCustomRole: true);
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "Entity"
+                },
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.SecondMarkerAttribute",
+                    Role = "Entity"
+                }
+            }
+        };
+        var extractor = new ArchitectureAttributeRoleExtractor(configuration, [type]);
+
+        ArchitectureTypeClassificationResult result = extractor.Extract(type);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Role, Is.EqualTo("Entity"));
+            Assert.That(result.EvidenceSources, Is.EqualTo(new[]
+            {
+                "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                "AttributeRoleExtractionTestFixtures.SecondMarkerAttribute"
             }));
         });
     }

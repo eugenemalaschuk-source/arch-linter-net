@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archlinternet.dev/schema/0.8.0/analysis-cache.schema.json",
+  "$id": "https://archlinternet.dev/schema/0.10.0/analysis-cache.schema.json",
   "title": "ArchLinterNet analysis cache v1",
   "description": "Machine-readable analysis-cache/v1 persisted entry: the AnalysisCacheEntryV1 envelope AnalysisCacheStore reads/writes under a resolved cache root. The Outcome.Violations[].Payload discriminator ($kind) is restricted to the 20 known concrete IArchitectureDiagnosticPayload record types AnalysisCacheDiagnosticPayloadConverter enumerates; each payload's own fields are intentionally left permissive here (additionalProperties not restricted per-kind) rather than fully duplicating each of the 20 shapes in this schema — the closed-set safety guarantee lives in the converter's C# switch statement, not in this schema.",
   "type": "object",
@@ -58,6 +58,21 @@
         "PolicyConsistencyConfig": { "enum": ["error", "warn", "off"] },
         "ClassificationConflicts": { "type": "array", "items": { "type": "object" } },
         "ClassificationMetadataFailures": { "type": "array", "items": { "type": "object" } },
+        "CanonicalAnnotationDiagnostics": {
+          "description": "Informational canonical annotation identity and compatibility diagnostics. Optional for analysis-cache/v1 entries written before this field was introduced.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["Subject", "Code", "Message", "EvidenceSources"],
+            "properties": {
+              "Subject": { "type": "string" },
+              "Code": { "type": "string" },
+              "Message": { "type": "string" },
+              "EvidenceSources": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          }
+        },
         "ClassificationRoles": { "type": "array", "items": { "type": "object" } },
         "ClassificationPathDeferred": { "type": ["object", "null"] },
         "CycleFindings": { "type": "array", "items": { "type": "object" } },

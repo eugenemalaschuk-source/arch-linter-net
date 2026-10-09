@@ -54,24 +54,39 @@ internal static partial class FileIdentityComparer
     private static bool TryGetUnixIdentity(string path, out FileIdentity identity)
     {
         using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        IntPtr buffer = Marshal.AllocHGlobal(StatBufferSize);
-        try
+
+        if (OperatingSystem.IsMacOS())
         {
-            int result = OperatingSystem.IsMacOS()
-                ? FStatMacOsInode64(stream.SafeFileHandle, buffer)
-                : FStatUnix(stream.SafeFileHandle, buffer);
+            DarwinStat stat = default;
+            int result = RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.Arm64 => FStatMacOs(stream.SafeFileHandle, out stat),
+                Architecture.X64 => FStatMacOsInode64(stream.SafeFileHandle, out stat),
+                _ => -1
+            };
             if (result != 0)
             {
                 identity = default;
                 return false;
             }
 
-            // The modern Darwin fstat$INODE64 and Linux fstat ABIs both place the device at byte 0
-            // and the 64-bit inode at byte 8. FileStream follows a symlink before reading the
-            // opened file descriptor.
-            ulong device = OperatingSystem.IsMacOS()
-                ? unchecked((uint)Marshal.ReadInt32(buffer, 0))
-                : unchecked((ulong)Marshal.ReadInt64(buffer, 0));
+            identity = new FileIdentity(unchecked((uint)stat.Device), stat.Inode);
+            return true;
+        }
+
+        IntPtr buffer = Marshal.AllocHGlobal(StatBufferSize);
+        try
+        {
+            int result = FStatUnix(stream.SafeFileHandle, buffer);
+            if (result != 0)
+            {
+                identity = default;
+                return false;
+            }
+
+            // Linux's 64-bit struct stat places the device at byte 0 and inode at byte 8.
+            // FileStream follows a symlink before reading the opened file descriptor.
+            ulong device = unchecked((ulong)Marshal.ReadInt64(buffer, 0));
             ulong inode = unchecked((ulong)Marshal.ReadInt64(buffer, 8));
             identity = new FileIdentity(device, inode);
             return true;
@@ -95,10 +110,24 @@ internal static partial class FileIdentityComparer
     [LibraryImport("libc", SetLastError = true, EntryPoint = "fstat")]
     private static partial int FStatUnix(SafeFileHandle fileDescriptor, IntPtr buffer);
 
-    // macOS's unadorned fstat symbol uses the legacy 32-bit inode layout, which cannot be read
-    // using the current struct stat offsets above. Pin the modern ABI explicitly.
+    // The macOS SDK declares fstat as fstat$INODE64 on x86_64, while arm64 exports the 64-bit
+    // struct stat ABI as fstat. Darwin's 64-bit struct stat is 144 bytes with st_dev at offset 0
+    // and st_ino at offset 8 on both architectures.
+    [LibraryImport("libc", SetLastError = true, EntryPoint = "fstat")]
+    private static partial int FStatMacOs(SafeFileHandle fileDescriptor, out DarwinStat stat);
+
     [LibraryImport("libc", SetLastError = true, EntryPoint = "fstat$INODE64")]
-    private static partial int FStatMacOsInode64(SafeFileHandle fileDescriptor, IntPtr buffer);
+    private static partial int FStatMacOsInode64(SafeFileHandle fileDescriptor, out DarwinStat stat);
+
+    [StructLayout(LayoutKind.Explicit, Size = 144)]
+    private struct DarwinStat
+    {
+        [FieldOffset(0)]
+        public int Device;
+
+        [FieldOffset(8)]
+        public ulong Inode;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ByHandleFileInformation

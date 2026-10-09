@@ -70,7 +70,17 @@ internal sealed class CanonicalAnnotationRoleResolver
         CatalogIdentityValidation identity = GetIdentityValidation(assembly, catalog);
         if (identity.Diagnostic is not null)
         {
-            diagnostics.Add(identity.Diagnostic);
+            string subjectKind = string.Equals(scope, "assembly", StringComparison.Ordinal) ? "assembly" : "type";
+            string[] annotationEvidence = matches.Select(match => match.Role.AttributeFullName)
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            diagnostics.Add(identity.Diagnostic with
+            {
+                Subject = subject,
+                Message = $"{identity.Diagnostic.Message} The affected {subjectKind} is '{subject}' and carries canonical annotation(s): "
+                    + $"{string.Join(", ", annotationEvidence)}.",
+                EvidenceSources = identity.Diagnostic.EvidenceSources.Concat(annotationEvidence)
+                    .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray()
+            });
         }
 
         if (!identity.IsCompatible)
@@ -111,10 +121,9 @@ internal sealed class CanonicalAnnotationRoleResolver
             };
         }
 
-        bool invalidMetadata = diagnostics.Any(diagnostic => diagnostic.Code == "InvalidCanonicalMetadata");
         return new ArchitectureAttributeClassificationCandidate(
-            invalidMetadata ? null : first.Role.Name,
-            invalidMetadata ? new Dictionary<string, object>() : first.Metadata,
+            first.Role.Name,
+            first.Metadata,
             evidenceSources.FirstOrDefault(),
             Array.Empty<ArchitectureClassificationConflict>(),
             Array.Empty<ArchitectureClassificationMetadataFailure>())
@@ -122,8 +131,7 @@ internal sealed class CanonicalAnnotationRoleResolver
             EvidenceSources = evidenceSources,
             ObservedEvidence = matches.Select(match => new ArchitectureAttributeRoleEvidence(
                 match.Role.Name, match.Metadata, match.Role.AttributeFullName)).ToArray(),
-            CanonicalAnnotationDiagnostics = diagnostics,
-            Blocked = invalidMetadata
+            CanonicalAnnotationDiagnostics = diagnostics
         };
     }
 
@@ -290,7 +298,11 @@ internal static class CanonicalAnnotationCandidateComposer
 
         if (canonical.Role is null)
         {
-            return configured with { CanonicalAnnotationDiagnostics = diagnostics };
+            return configured with
+            {
+                EvidenceSources = MergeEvidence(configured, canonical),
+                CanonicalAnnotationDiagnostics = diagnostics
+            };
         }
 
         IReadOnlyList<ArchitectureAttributeRoleEvidence> observedEvidence = configured.ObservedEvidence

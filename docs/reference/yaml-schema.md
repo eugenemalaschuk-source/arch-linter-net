@@ -13,7 +13,7 @@ arch-linter-net schema print policy-root
 
 Persisted format schemas are versioned independently from package SemVer. Do not synthesize schema URLs from the tool package version.
 
-Immutable release-qualified schema IDs remain valid when the version is itself the machine contract. Policy root/fragment schemas currently use `https://archlinternet.dev/schema/0.8.0/dependencies.arch.schema.json` and `https://archlinternet.dev/schema/0.8.0/dependencies.arch.fragment.schema.json`; other frozen registry entries retain their immutable `0.5.1` or `0.6.1` identities. These numbers are schema-contract identities, not the identity of this evergreen page.
+Immutable release-qualified schema IDs remain valid when the version is itself the machine contract. Policy root/fragment, baseline, and normalized-finding schemas currently use their `0.8.0` identities; analysis-cache uses `https://archlinternet.dev/schema/0.10.0/analysis-cache.schema.json`. The earlier `0.8.0` analysis-cache schema and manifest remain preserved for existing consumers, while unaffected entries retain their `0.5.1` or `0.6.1` identities. These numbers are schema-contract identities, not the identity of this evergreen page.
 
 ## Root and fragment schemas
 
