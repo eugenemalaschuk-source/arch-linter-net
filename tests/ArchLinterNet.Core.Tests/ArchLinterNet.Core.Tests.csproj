@@ -36,12 +36,14 @@
 
   <ItemGroup>
     <Compile Remove="AdoptionAcceptance\Fixtures\**\*.cs" />
+    <Compile Include="..\..\src\ArchLinterNet.Annotations\contentFiles\cs\any\**\*.cs" Link="SemanticAnnotations\%(RecursiveDir)%(Filename)%(Extension)" />
     <None Include="AdoptionAcceptance\Fixtures\**\*" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="ApprovedApi\**" CopyToOutputDirectory="PreserveNewest" />
     <None Update="SarifSchemas\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\architecture\semantic-annotations.v1.json" Link="architecture\semantic-annotations.v1.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tools\ArchLinterNet.GitFuzz\corpus-source\*.hex" Link="corpus-source\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
