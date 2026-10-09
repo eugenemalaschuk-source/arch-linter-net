@@ -19,10 +19,12 @@ annotations references the package directly; Central Package Management may
 centralize the version but does not substitute for that direct reference. The
 source is compiled separately into each opting-in project, including each
 authoring project in a multi-project solution. The linter recognizes exact
-metadata names and does not load a shared annotation assembly. The v0.10 package
-guarantee covers SDK-style projects. Non-SDK and Unity source injection is
-outside this package contract; those consumers retain the user-owned attribute
-and YAML-mapping path.
+metadata names and does not load a shared annotation assembly. The source set
+requires C# 9.0 or newer and remains compilable unchanged in Unity source-import
+workflows. A `netstandard2.1` smoke consumer pinned to `LangVersion=9.0` checks
+this source compatibility. The NuGet contentFiles delivery guarantee covers
+supported SDK-style projects; source compatibility does not imply that every
+Unity project supports that package installation mechanism.
 
 The package is not required. User-owned attributes mapped by exact full type
 name in `classification.attributes` or `classification.assembly_attributes`
@@ -43,7 +45,10 @@ prefix matching, inheritance matching, and defining-assembly identity are not
 recognition rules.
 
 All injected attribute types are `internal sealed`, apply once, and are not
-inherited. Role attributes have a public parameterless constructor and six
+inherited. Each role attribute descends directly or indirectly from the
+manifest's `roleAttributeContract.baseType`; `baseTypeRelationship` means an
+assignable CLR ancestor and does not require that type to be the immediate base
+class. Role attributes have a public parameterless constructor and six
 optional public settable string properties: `Domain`, `BoundedContext`,
 `Module`, `Feature`, `Platform`, and `Runtime`. Constructors and named
 properties are public on the internal attribute types so C# attribute syntax

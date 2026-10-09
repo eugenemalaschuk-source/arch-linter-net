@@ -6,6 +6,7 @@
     "id": "ArchLinterNet.Annotations",
     "version": "0.10.0",
     "distribution": "source-only NuGet content files",
+    "minimumCSharpLanguageVersion": "9.0",
     "contentFiles": {
       "pattern": "cs/any/**/*.cs",
       "buildAction": "Compile",
@@ -59,6 +60,7 @@
     "appliesOnlyTo": "Entries in roles[]; annotationDisposition.customMappingOnly and annotationDisposition.deferred do not imply role attribute identities",
     "accessibility": "internal sealed",
     "baseType": "System.Attribute",
+    "baseTypeRelationship": "assignable-ancestor",
     "constructor": [],
     "allowMultiple": false,
     "inherited": false,
