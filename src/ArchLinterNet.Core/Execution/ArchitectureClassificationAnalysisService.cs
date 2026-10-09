@@ -46,12 +46,18 @@ internal sealed class ArchitectureClassificationAnalysisService
             }
 
             roles.Add(new ArchitectureClassificationRoleFact(
-                ArchitectureTypeNames.SafeFullName(type), descriptor.Role!, descriptor.Source!.Value, descriptor.Evidence, descriptor.Metadata));
+                ArchitectureTypeNames.SafeFullName(type), descriptor.Role!, descriptor.Source!.Value, descriptor.Evidence, descriptor.Metadata)
+            {
+                EvidenceSources = descriptor.EvidenceSources
+            });
         }
 
         roles.Sort((a, b) => string.CompareOrdinal(a.Subject, b.Subject));
         return roles;
     }
+
+    public IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CheckCanonicalAnnotationDiagnostics() =>
+        _session.RoleIndex.CanonicalAnnotationDiagnostics;
 
     // Non-null when the loaded policy declared a non-empty classification.path section — path-convention
     // classification is deferred pending issue #171, see ArchitecturePolicyDocumentLoader.

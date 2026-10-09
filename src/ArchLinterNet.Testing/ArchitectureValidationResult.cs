@@ -13,6 +13,7 @@ public sealed class ArchitectureValidationResult
     public IReadOnlyCollection<ArchitectureViolation> Violations { get; }
     public IReadOnlyCollection<ArchitectureFinding> Findings { get; }
     public IReadOnlyCollection<string> Cycles { get; }
+    public IReadOnlyCollection<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics { get; }
     public IReadOnlyCollection<ArchitectureCycleFinding> CycleFindings { get; }
     public IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings { get; }
     public string PolicyConsistencyConfig { get; }
@@ -62,6 +63,7 @@ public sealed class ArchitectureValidationResult
         Passed = @params.Passed && !ImportedDiagnostics.HasBlockingFindings;
         Violations = @params.Violations;
         Cycles = @params.Cycles;
+        CanonicalAnnotationDiagnostics = @params.CanonicalAnnotationDiagnostics ?? Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>();
         CycleFindings = @params.CycleFindings ?? Array.Empty<ArchitectureCycleFinding>();
         PolicyConsistencyFindings = @params.PolicyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>();
         PolicyConsistencyConfig = @params.PolicyConsistencyConfig;
@@ -247,6 +249,7 @@ public sealed record ArchitectureValidationResultParams(
     ValidationTiming? Timing = null)
 {
     public IReadOnlyCollection<ArchitectureCycleFinding>? CycleFindings { get; init; }
+    public IReadOnlyCollection<ArchitectureCanonicalAnnotationDiagnostic>? CanonicalAnnotationDiagnostics { get; init; }
     public IReadOnlyCollection<BuildStatePreflightDiagnostic>? PreflightDiagnostics { get; init; }
     public bool PreflightBlocked { get; init; }
     public string? Mode { get; init; }

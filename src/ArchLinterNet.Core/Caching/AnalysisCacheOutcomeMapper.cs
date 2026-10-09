@@ -101,6 +101,7 @@ public static class AnalysisCacheOutcomeMapper
             SourceExpansion = sourceExpansion,
             PreflightBlocked = false,
             ClassificationRoles = cached.ClassificationRoles.ToArray(),
+            CanonicalAnnotationDiagnostics = cached.CanonicalAnnotationDiagnostics.ToArray(),
             ClassificationPathDeferred = cached.ClassificationPathDeferred,
             CycleFindings = cached.CycleFindings.ToArray(),
             SubtractiveMatcherParticipation = cached.SubtractiveMatcherParticipation.ToArray(),
@@ -147,6 +148,7 @@ public static class AnalysisCacheOutcomeMapper
             Waivers = outcome.Waivers.ToArray(),
             PolicyInventory = outcome.PolicyInventory,
             RepositoryMetrics = outcome.RepositoryMetrics,
+            CanonicalAnnotationDiagnostics = outcome.CanonicalAnnotationDiagnostics.ToArray(),
         };
     }
 }

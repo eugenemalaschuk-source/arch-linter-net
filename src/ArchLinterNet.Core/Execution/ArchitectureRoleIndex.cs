@@ -33,6 +33,9 @@ public sealed class ArchitectureRoleIndex
 
     public IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures => _data.Value.MetadataFailures;
 
+    public IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics =>
+        _data.Value.CanonicalAnnotationDiagnostics;
+
     public bool TryGetRole(Type type, out ArchitectureTypeClassificationResult descriptor)
     {
         ArgumentNullException.ThrowIfNull(type);
@@ -61,18 +64,13 @@ public sealed class ArchitectureRoleIndex
 
     private RoleIndexData BuildData()
     {
-        if (_configuration.Attributes.Count == 0 && _configuration.AssemblyAttributes.Count == 0
-            && _configuration.Inheritance.Count == 0 && _configuration.Namespace.Count == 0)
-        {
-            return RoleIndexData.Empty;
-        }
-
         Type[] types = _typeIndex.AllTypes();
         var extractor = new ArchitectureAttributeRoleExtractor(_configuration, types, MatchNamespaceMapping);
 
         Dictionary<Type, ArchitectureTypeClassificationResult> rolesByType = new();
         HashSet<ArchitectureClassificationConflict> conflicts = new();
         HashSet<ArchitectureClassificationMetadataFailure> metadataFailures = new();
+        HashSet<ArchitectureCanonicalAnnotationDiagnostic> canonicalDiagnostics = new();
 
         // Checked per type — mirrors ArchitectureSourceFileFactIndex.RunReflectionPass's
         // per-type check, the same granularity a full-codebase extractor pass over every type
@@ -83,6 +81,7 @@ public sealed class ArchitectureRoleIndex
             ArchitectureTypeClassificationResult result = extractor.Extract(type);
             conflicts.UnionWith(result.Conflicts);
             metadataFailures.UnionWith(result.MetadataFailures);
+            canonicalDiagnostics.UnionWith(result.CanonicalAnnotationDiagnostics);
 
             if (result.Role != null)
             {
@@ -90,7 +89,14 @@ public sealed class ArchitectureRoleIndex
             }
         }
 
-        return new RoleIndexData(rolesByType, conflicts.ToList(), metadataFailures.ToList());
+        return new RoleIndexData(
+            rolesByType,
+            conflicts.ToList(),
+            metadataFailures.ToList(),
+            canonicalDiagnostics.OrderBy(diagnostic => diagnostic.Subject, StringComparer.Ordinal)
+                .ThenBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
+                .ThenBy(diagnostic => string.Join("\u001f", diagnostic.EvidenceSources.OrderBy(value => value, StringComparer.Ordinal)), StringComparer.Ordinal)
+                .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal).ToList());
     }
 
     // Reuses ArchitectureLayerResolver's namespace-glob matching (the same mechanism layers.<name>.namespace
@@ -127,11 +133,13 @@ public sealed class ArchitectureRoleIndex
     private sealed record RoleIndexData(
         Dictionary<Type, ArchitectureTypeClassificationResult> RolesByType,
         IReadOnlyList<ArchitectureClassificationConflict> Conflicts,
-        IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures)
+        IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures,
+        IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics)
     {
         public static readonly RoleIndexData Empty = new(
             new Dictionary<Type, ArchitectureTypeClassificationResult>(),
             Array.Empty<ArchitectureClassificationConflict>(),
-            Array.Empty<ArchitectureClassificationMetadataFailure>());
+            Array.Empty<ArchitectureClassificationMetadataFailure>(),
+            Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>());
     }
 }

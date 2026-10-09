@@ -31,6 +31,7 @@ public sealed class ArchitectureAttributeRoleExtractor
     private readonly ArchitectureClassificationConfiguration _configuration;
     private readonly Func<ArchitectureNamespaceClassificationMapping, string, (bool Matched, string? MatchedPattern)> _matchNamespace;
     private readonly Dictionary<Assembly, ArchitectureAttributeClassificationCandidate> _assemblyCandidateCache = new();
+    private readonly CanonicalAnnotationRoleResolver _canonicalResolver = new();
     private readonly Lazy<Dictionary<string, Type?>> _typesByFullName;
 
     // Preserves the original public two-argument constructor's exact signature for binary
@@ -87,9 +88,15 @@ public sealed class ArchitectureAttributeRoleExtractor
 
         if (_configuration.IsSourceEnabled(TypeAttributeSourceName))
         {
-            candidates[ArchitectureClassificationSource.TypeAttribute] = ResolveCandidate(
-                SafeGetCustomAttributesData(type), _configuration.Attributes, ArchitectureClassificationSource.TypeAttribute,
+            IReadOnlyList<CustomAttributeData> attributeData = SafeGetCustomAttributesData(type);
+            ArchitectureAttributeClassificationCandidate configured = ResolveCandidate(
+                attributeData, _configuration.Attributes, ArchitectureClassificationSource.TypeAttribute,
                 ArchitectureTypeNames.SafeFullName(type));
+            ArchitectureAttributeClassificationCandidate canonical = _canonicalResolver.Resolve(
+                attributeData, type.Assembly, ArchitectureClassificationSource.TypeAttribute,
+                "type", ArchitectureTypeNames.SafeFullName(type));
+            candidates[ArchitectureClassificationSource.TypeAttribute] = CanonicalAnnotationCandidateComposer.Merge(
+                configured, canonical, ArchitectureTypeNames.SafeFullName(type));
         }
 
         if (_configuration.IsSourceEnabled(AssemblyAttributeSourceName))
@@ -118,8 +125,13 @@ public sealed class ArchitectureAttributeRoleExtractor
         }
 
         string subject = SafeGetAssemblyName(assembly);
-        ArchitectureAttributeClassificationCandidate candidate = ResolveCandidate(
-            SafeGetCustomAttributesData(assembly), _configuration.AssemblyAttributes, ArchitectureClassificationSource.AssemblyAttribute, subject);
+        IReadOnlyList<CustomAttributeData> attributeData = SafeGetCustomAttributesData(assembly);
+        ArchitectureAttributeClassificationCandidate configured = ResolveCandidate(
+            attributeData, _configuration.AssemblyAttributes, ArchitectureClassificationSource.AssemblyAttribute, subject);
+        ArchitectureAttributeClassificationCandidate canonical = _canonicalResolver.Resolve(
+            attributeData, assembly, ArchitectureClassificationSource.AssemblyAttribute, "assembly", subject);
+        ArchitectureAttributeClassificationCandidate candidate = CanonicalAnnotationCandidateComposer.Merge(
+            configured, canonical, subject);
 
         _assemblyCandidateCache[assembly] = candidate;
         return candidate;
@@ -297,24 +309,50 @@ public sealed class ArchitectureAttributeRoleExtractor
     {
         List<ArchitectureClassificationConflict> conflicts = new();
         List<ArchitectureClassificationMetadataFailure> failures = new();
+        List<ArchitectureCanonicalAnnotationDiagnostic> canonicalDiagnostics = new();
 
         foreach (ArchitectureAttributeClassificationCandidate candidate in candidates.Values)
         {
             conflicts.AddRange(candidate.Conflicts);
             failures.AddRange(candidate.MetadataFailures);
+            canonicalDiagnostics.AddRange(candidate.CanonicalAnnotationDiagnostics);
         }
+        canonicalDiagnostics = canonicalDiagnostics.Distinct()
+            .OrderBy(diagnostic => diagnostic.Subject, StringComparer.Ordinal)
+            .ThenBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
+            .ThenBy(diagnostic => string.Join("\u001f", diagnostic.EvidenceSources.OrderBy(value => value, StringComparer.Ordinal)), StringComparer.Ordinal)
+            .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal)
+            .ToList();
 
         foreach (ArchitectureClassificationSource source in _tierOrder)
         {
-            if (candidates.TryGetValue(source, out ArchitectureAttributeClassificationCandidate? candidate)
-                && candidate.Role != null)
+            if (candidates.TryGetValue(source, out ArchitectureAttributeClassificationCandidate? candidate))
             {
-                return new ArchitectureTypeClassificationResult(
-                    candidate.Role, source, candidate.Metadata, candidate.Evidence, conflicts, failures);
+                if (candidate.Blocked)
+                {
+                    return new ArchitectureTypeClassificationResult(
+                        null, null, new Dictionary<string, object>(), null, conflicts, failures)
+                    {
+                        CanonicalAnnotationDiagnostics = canonicalDiagnostics
+                    };
+                }
+
+                if (candidate.Role != null)
+                {
+                    return new ArchitectureTypeClassificationResult(
+                        candidate.Role, source, candidate.Metadata, candidate.Evidence, conflicts, failures)
+                    {
+                        EvidenceSources = candidate.EvidenceSources,
+                        CanonicalAnnotationDiagnostics = canonicalDiagnostics
+                    };
+                }
             }
         }
 
-        return new ArchitectureTypeClassificationResult(null, null, new Dictionary<string, object>(), null, conflicts, failures);
+        return new ArchitectureTypeClassificationResult(null, null, new Dictionary<string, object>(), null, conflicts, failures)
+        {
+            CanonicalAnnotationDiagnostics = canonicalDiagnostics
+        };
     }
 
     private ArchitectureAttributeClassificationCandidate ResolveCandidate(
@@ -325,6 +363,7 @@ public sealed class ArchitectureAttributeRoleExtractor
     {
         List<ArchitectureClassificationConflict> conflicts = new();
         List<ArchitectureClassificationMetadataFailure> failures = new();
+        List<ArchitectureAttributeRoleEvidence> observedEvidence = new();
         string? winningRole = null;
         string? winningEvidence = null;
         IReadOnlyDictionary<string, object> winningMetadata = new Dictionary<string, object>();
@@ -343,8 +382,10 @@ public sealed class ArchitectureAttributeRoleExtractor
             }
 
             string mappingPath = ClassificationMappingPath(SourceCollectionName(source), index);
-            (string Role, IReadOnlyDictionary<string, object> Metadata) entryResult = ResolveEntryAcrossInstances(
-                matchedInstances, mapping, source, subject, conflicts, failures, mappingPath);
+            (string Role, IReadOnlyDictionary<string, object> Metadata,
+                IReadOnlyList<ArchitectureAttributeRoleEvidence> ObservedEvidence) entryResult = ResolveEntryAcrossInstances(
+                    matchedInstances, mapping, source, subject, conflicts, failures, mappingPath);
+            observedEvidence.AddRange(entryResult.ObservedEvidence);
 
             if (winningRole == null)
             {
@@ -364,10 +405,14 @@ public sealed class ArchitectureAttributeRoleExtractor
             }
         }
 
-        return new ArchitectureAttributeClassificationCandidate(winningRole, winningMetadata, winningEvidence, conflicts, failures);
+        return new ArchitectureAttributeClassificationCandidate(winningRole, winningMetadata, winningEvidence, conflicts, failures)
+        {
+            ObservedEvidence = observedEvidence
+        };
     }
 
-    private (string Role, IReadOnlyDictionary<string, object> Metadata) ResolveEntryAcrossInstances(
+    private (string Role, IReadOnlyDictionary<string, object> Metadata,
+        IReadOnlyList<ArchitectureAttributeRoleEvidence> ObservedEvidence) ResolveEntryAcrossInstances(
         List<CustomAttributeData> matchedInstances,
         ArchitectureAttributeClassificationMapping mapping,
         ArchitectureClassificationSource source,
@@ -376,13 +421,16 @@ public sealed class ArchitectureAttributeRoleExtractor
         List<ArchitectureClassificationMetadataFailure> failures,
         string mappingPath)
     {
+        List<ArchitectureAttributeRoleEvidence> observedEvidence = new();
         IReadOnlyDictionary<string, object> firstMetadata = ExtractMetadata(
             matchedInstances[0], mapping, source, subject, failures, mappingPath);
+        observedEvidence.Add(new ArchitectureAttributeRoleEvidence(mapping.Role, firstMetadata, mapping.Attribute));
 
         for (int i = 1; i < matchedInstances.Count; i++)
         {
             IReadOnlyDictionary<string, object> instanceMetadata = ExtractMetadata(
                 matchedInstances[i], mapping, source, subject, failures, mappingPath);
+            observedEvidence.Add(new ArchitectureAttributeRoleEvidence(mapping.Role, instanceMetadata, mapping.Attribute));
             if (!RoleMetadataEqual(mapping.Role, firstMetadata, mapping.Role, instanceMetadata))
             {
                 conflicts.Add(new ArchitectureClassificationConflict(
@@ -393,7 +441,7 @@ public sealed class ArchitectureAttributeRoleExtractor
             }
         }
 
-        return (mapping.Role, firstMetadata);
+        return (mapping.Role, firstMetadata, observedEvidence);
     }
 
     private Dictionary<string, object> ExtractMetadata(

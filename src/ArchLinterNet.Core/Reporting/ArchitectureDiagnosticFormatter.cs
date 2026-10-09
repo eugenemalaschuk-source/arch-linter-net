@@ -7,6 +7,10 @@ namespace ArchLinterNet.Core.Reporting;
 public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFormatter
 {
     private const string None = "<none>";
+
+    internal static object[] BuildCanonicalAnnotationDiagnosticsJson(
+        IReadOnlyCollection<ArchitectureCanonicalAnnotationDiagnostic> diagnostics) =>
+        ArchitectureClassificationCiArtifactsRenderer.BuildCanonicalAnnotationDiagnosticsJson(diagnostics);
     public static string FormatAssessmentCompletionForHumans(
         ArchitectureAssessmentCompletionEvidence? completion) =>
         ArchitectureApplicabilityHumanRenderer.RenderAssessmentCompletion(completion);

@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="..\..\schema\dependencies.arch.schema.json" Link="Schema\dependencies.arch.schema.json" />
+    <EmbeddedResource Include="..\..\architecture\semantic-annotations.v1.json" Link="SemanticAnnotations\semantic-annotations.v1.json" LogicalName="ArchLinterNet.Core.SemanticAnnotations.semantic-annotations.v1.json" />
     <EmbeddedResource Include="..\..\schema\dependencies.arch.fragment.schema.json" Link="Schema\dependencies.arch.fragment.schema.json" />
     <EmbeddedResource Include="..\..\schema\baseline.schema.json" Link="Schema\baseline.schema.json" />
     <!-- Frozen packaged-registry snapshots of the policy-root/policy-fragment schemas, distinct
