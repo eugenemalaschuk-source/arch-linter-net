@@ -6,17 +6,17 @@
   "base_sha": null,
   "head_sha": null,
   "head_tree_sha": null,
-  "main_sha": "4ff23d030a38ad96e6e4973cd4a08be4885f3139",
+  "main_sha": "3b6140365630636d67459533a5c81f7365f47f46",
   "main_tree_sha": null,
   "pr_number": null,
   "producer_run_id": null,
   "producer_run_attempt": null,
-  "publisher_run_id": "37985375257",
+  "publisher_run_id": "37997752833",
   "publisher_run_attempt": "1",
   "payload_sha256": "da2189f448656c69dbed7a7cd9f903372b290e0c7693a68f3e8dbf00bccf327e",
   "source_health_sha256": null,
   "producer_identity_sha256": null,
   "temporal_verified_at": null,
   "temporal_receipt": null,
-  "published_at": "2026-10-09T20:12:39Z"
+  "published_at": "2026-10-09T22:11:04Z"
 }
