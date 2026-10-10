@@ -475,10 +475,11 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 12
+    assert len(declarations) == len(by_target) == 13
     assert set(by_target) == {
         "0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4",
         "0.8.0", "0.8.1", "0.8.2", "0.9.0-preview.1", "0.9.0", "0.9.1",
+        "0.10.0-preview.1",
     }
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
@@ -591,6 +592,19 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     assert maintenance["excluded_items"] == []
     assert maintenance["delivered_items"] == []
     assert "published v0.9.0 GitHub Release" in " ".join(maintenance["_comment"])
+
+    semantic_preview = by_target["0.10.0-preview.1"]
+    assert semantic_preview["declaration_id"] == "v0.10.0-preview.1-semantic-annotations-and-metrics"
+    assert semantic_preview["story"] == 565
+    assert {item["issue"] for item in semantic_preview["required_items"]} == {566, 569, 1057}
+    assert {item["issue"] for item in semantic_preview["excluded_items"]} == {
+        567, 568, 570, 571, 572, 573, 574,
+    }
+    assert {item["issue"] for item in semantic_preview["delivered_items"]} == {1042}
+    assert "does not claim that task or the v0.10.0 capability wave complete" in " ".join(
+        semantic_preview["_comment"]
+    )
+    assert "version_override=0.10.0-preview.1" in " ".join(semantic_preview["_comment"])
 
 
 def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoption(
