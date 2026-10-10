@@ -212,11 +212,6 @@ internal sealed class ArchitectureSourceFileFactTraversal
 
             string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
             string? assemblyName = ResolveOwnedAssemblyName(normalizedFilePath, ownershipEntries);
-            if (assemblyName == null)
-            {
-                continue;
-            }
-
             if (ProcessSourceFile(
                     localMap,
                     assemblyName,
@@ -238,7 +233,7 @@ internal sealed class ArchitectureSourceFileFactTraversal
 
     private bool ProcessSourceFile(
         Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap,
-        string assemblyName,
+        string? assemblyName,
         string absoluteRoot,
         string absoluteFile,
         Dictionary<string, int> sourceFileLineCounts,
@@ -261,13 +256,20 @@ internal sealed class ArchitectureSourceFileFactTraversal
             return false;
         }
 
-        // Count only files that passed generated-file exclusion and were successfully read,
-        // i.e. the files the parser actually receives.
+        // Physical source inventory follows the configured roots and generated-file exclusions,
+        // independently of project ownership. Ownership is only needed to attribute parsed type
+        // declarations; projects can share a directory (for example Unity-generated root-level
+        // project files), leaving those declarations ambiguous without making the source file
+        // itself unreadable or uncountable.
         _profilingCounters?.RecordSourceFileScanned();
 
         string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
         sourceFileLineCounts.TryAdd(normalizedFilePath, CountPhysicalLines(sourceText));
-        AddParsedTypes(sourceMap, assemblyName, normalizedFilePath, sourceText);
+        if (assemblyName != null)
+        {
+            AddParsedTypes(sourceMap, assemblyName, normalizedFilePath, sourceText);
+        }
+
         return true;
     }
 

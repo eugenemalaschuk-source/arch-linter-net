@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
@@ -147,6 +148,61 @@ public sealed class RepositoryMetricsTests
         session.GetRepositoryMetrics(includeSourceInventory: true);
 
         Assert.That(session.SourceFileFactIndex.IsMaterialized, Is.True);
+    }
+
+    [Test]
+    public void Calculator_CountsPhysicalSourceMetricsWhenRootLevelProjectOwnershipIsAmbiguous()
+    {
+        string repositoryRoot = Path.Combine(Path.GetTempPath(), $"ArchLinterNet.RepositoryMetrics.{Guid.NewGuid():N}");
+        string sourceRoot = Path.Combine(repositoryRoot, "Assets");
+        Directory.CreateDirectory(sourceRoot);
+        const string Source = "namespace ArchLinterNet.Core.Tests.SourceFactFixtures {\n    public sealed class SingleTypeFixture { }\n}\n";
+        File.WriteAllText(Path.Combine(sourceRoot, "SingleTypeFixture.cs"), Source);
+
+        Assembly testAssembly = typeof(RepositoryMetricsTests).Assembly;
+        Assembly coreAssembly = typeof(ArchitectureAnalysisSession).Assembly;
+        ProjectDiscoveryResult discovery = new([], [], [], [])
+        {
+            DiscoveredProjects =
+            [
+                Project("First.csproj", testAssembly.GetName().Name!),
+                Project("Second.csproj", coreAssembly.GetName().Name!),
+            ],
+        };
+
+        try
+        {
+            using ArchitectureAnalysisContext context = new(
+                repositoryRoot,
+                [testAssembly, coreAssembly],
+                [],
+                [],
+                projectDiscovery: discovery);
+            ArchitectureAnalysisSession session = new(
+                context,
+                new ArchitectureContractDocument
+                {
+                    Name = "repository-metrics",
+                    Analysis = new ArchitectureAnalysisConfiguration { SourceRoots = ["Assets"] },
+                },
+                null,
+                false,
+                null);
+
+            RepositoryMetricsSnapshot metrics = session.GetRepositoryMetrics(includeSourceInventory: true);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(metrics.Size.SourceFiles, Is.EqualTo(1));
+                Assert.That(metrics.Size.SourceLines, Is.EqualTo(3));
+                Assert.That(session.SourceFileFactIndex.SourceDeclarations, Is.Empty,
+                    "ambiguous project ownership must not attribute declarations to either assembly");
+            });
+        }
+        finally
+        {
+            Directory.Delete(repositoryRoot, recursive: true);
+        }
     }
 
     [Test]

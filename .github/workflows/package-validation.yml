@@ -58,7 +58,7 @@ jobs:
             fi
           done
 
-          if printf '%s\n' "${packages[@]}" | grep -q '^ArchLinterNet\.Unity\.'; then
+          if grep -q '^ArchLinterNet\.Unity\.' <<< "${packages[*]}"; then
             echo 'ArchLinterNet.Unity package must not be produced.' >&2
             exit 1
           fi
@@ -67,13 +67,13 @@ jobs:
           cel_nuspec=$(unzip -p "nupkg/$cel_nupkg" '*.nuspec')
           cel_listing=$(unzip -Z1 "nupkg/$cel_nupkg")
 
-          if printf '%s\n' "$cel_nuspec" | grep -q '<dependency '; then
+          if grep -qF '<dependency ' <<< "$cel_nuspec"; then
             echo "ArchLinterNet.CEL .nuspec must declare no dependencies (it must remain a self-contained leaf package)." >&2
             exit 1
           fi
 
           for required_entry in README.md lib/net10.0/ArchLinterNet.CEL.dll lib/net10.0/ArchLinterNet.CEL.xml; do
-            if ! printf '%s\n' "$cel_listing" | grep -qxF "$required_entry"; then
+            if ! grep -Fxq -- "$required_entry" <<< "$cel_listing"; then
               echo "ArchLinterNet.CEL package is missing required entry '$required_entry' (README and XML API docs must ship in the package)." >&2
               exit 1
             fi
@@ -83,7 +83,7 @@ jobs:
           # loading, JSON schema, MSBuild/Buildalyzer, or Roslyn compilation by library name, or
           # a raw YAML/JSON-schema file of any origin (not just from a named dependency).
           cel_forbidden_pattern='ArchLinterNet\.(Core|Cli|Testing)\.(dll|xml)$|YamlDotNet|JsonSchema\.Net|Buildalyzer|Microsoft\.CodeAnalysis|Microsoft\.Extensions\.DependencyInjection|System\.Security\.Cryptography\.Xml|\.ya?ml$|\.schema\.json$'
-          if printf '%s\n' "$cel_listing" | grep -Ei "$cel_forbidden_pattern"; then
+          if grep -Ei "$cel_forbidden_pattern" <<< "$cel_listing"; then
             echo "ArchLinterNet.CEL package contains forbidden content (see entries above): must not embed Core/CLI/Testing assemblies, YAML/JSON-schema/Buildalyzer/Roslyn assets, or raw .yml/.yaml/.schema.json files." >&2
             exit 1
           fi
@@ -103,7 +103,7 @@ jobs:
             baseline.schema.json \
             normalized-finding.schema.json; do
             required_entry="contentFiles/any/any/schema/0.5.1/$required_schema"
-            if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
+            if ! grep -Fxq -- "$required_entry" <<< "$core_listing"; then
               echo "Core package is missing release-matched schema '$required_entry'." >&2
               exit 1
             fi
@@ -120,7 +120,7 @@ jobs:
             normalized-finding.schema.json \
             analysis-cache.schema.json; do
             required_entry="contentFiles/any/any/schema/0.8.0/$required_schema"
-            if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
+            if ! grep -Fxq -- "$required_entry" <<< "$core_listing"; then
               echo "Core package is missing release-matched schema '$required_entry'." >&2
               exit 1
             fi
@@ -130,7 +130,7 @@ jobs:
             compatibility-manifest.json \
             analysis-cache.schema.json; do
             required_entry="contentFiles/any/any/schema/0.10.0/$required_schema"
-            if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
+            if ! grep -Fxq -- "$required_entry" <<< "$core_listing"; then
               echo "Core package is missing release-matched schema '$required_entry'." >&2
               exit 1
             fi
@@ -142,7 +142,7 @@ jobs:
             normalized-finding.schema.json \
             analysis-cache.schema.json; do
             required_entry="contentFiles/any/any/schema/0.6.1/$required_schema"
-            if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
+            if ! grep -Fxq -- "$required_entry" <<< "$core_listing"; then
               echo "Core package is missing release-matched schema '$required_entry'." >&2
               exit 1
             fi
@@ -160,7 +160,7 @@ jobs:
             exit 1
           fi
 
-          if printf '%s\n' "$core_listing" | grep -qxF 'lib/net10.0/ArchLinterNet.CEL.dll'; then
+          if grep -Fxq -- 'lib/net10.0/ArchLinterNet.CEL.dll' <<< "$core_listing"; then
             echo "Core package must not embed ArchLinterNet.CEL.dll; ArchLinterNet.CEL must be a declared dependency only." >&2
             exit 1
           fi

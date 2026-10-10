@@ -35,9 +35,11 @@ metrics are unavailable, not zero. Do not run every metric separately.
 
 The size group includes physical C# source lines, readable source files,
 discovered projects, reflected types and public types. Physical source lines
-are not a promise of Visual Studio logical SLOC equivalence. Existing generated-
-file exclusions and project ownership apply; overlapping roots do not count a
-file twice.
+are not a promise of Visual Studio logical SLOC equivalence. The physical source
+inventory counts readable, non-generated C# files under configured source roots,
+even when project ownership is ambiguous. Type declarations remain attached only
+when exactly one analyzed assembly owns the source file. Overlapping roots do not
+count a file twice.
 
 The coupling group contains deduplicated internal project-reference edges,
 dependencies per project, directed density, maximum fan-in/fan-out and per-project
@@ -67,6 +69,8 @@ in the existing bounded report, not another comment or a new governance decision
 
 Source lines and optional grouped Repository/Structure badges are absolute
 snapshots, not PR deltas or quality grades. Health uses its own separate badge.
+The Structure badge groups maximum dependency depth, dependency count and
+largest SCC size.
 The upstream repository publishes metrics beside Health on its existing raw
 badge branch, using verified producer artifacts. That is a
 [repository-specific publication example](repository-ci.md), not a requirement

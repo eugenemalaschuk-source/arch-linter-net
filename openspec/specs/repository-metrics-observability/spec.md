@@ -21,17 +21,22 @@ The system SHALL expose a versioned `repository-metrics/v1` snapshot with typed 
 - **AND** the metric state is reported as informational evidence rather than pass/fail quality
 
 ### Requirement: Size metrics use explicit source identity semantics
-
-The snapshot SHALL report `sourceLines`, `sourceFiles`, `projects`, `types`, and `publicTypes`. `sourceLines` SHALL count physical lines in successfully read analyzed C# files after the existing generated-file exclusion and source ownership rules. A file participating in multiple compilation/source-root contexts SHALL count once by normalized repository-relative identity; a file that cannot be read or whose ownership is ambiguous SHALL not be silently counted as complete evidence.
+The snapshot SHALL report `sourceLines`, `sourceFiles`, `projects`, `types`, and `publicTypes`. `sourceLines` and `sourceFiles` SHALL count every successfully read C# file within configured source roots after the existing generated-file exclusion, regardless of whether the file can be assigned to one target assembly. A file discovered through multiple source-root contexts SHALL count once by normalized repository-relative identity. Source declarations used to enrich type facts SHALL remain ownership-aware. Unreadable source evidence SHALL make source metrics partial or unavailable rather than fabricating a complete value; ambiguous assembly ownership alone SHALL NOT make a readable physical source inventory incomplete.
 
 #### Scenario: Overlapping source roots do not multiply files
 - **WHEN** the same physical C# file is discovered through more than one configured source root
 - **THEN** it contributes one source file and one physical line count to the repository snapshot
 
 #### Scenario: Generated and unreadable files are explicit
-- **WHEN** a generated C# file is encountered or an analyzed source file cannot be read
+- **WHEN** a generated C# file is encountered or a configured source file cannot be read
 - **THEN** generated code is excluded according to the existing generated-file policy
-- **AND** unreadable/ambiguous source evidence makes the source metric partial or unavailable rather than fabricating a complete value
+- **AND** unreadable source evidence makes the source metric partial or unavailable rather than fabricating a complete value
+
+#### Scenario: Ambiguous project ownership does not erase physical source size
+- **WHEN** readable non-generated C# files are under configured source roots but multiple discovered projects share the same owning directory
+- **THEN** those files contribute once to `sourceFiles` and `sourceLines`
+- **AND** declarations from those files remain unowned for type-source correlation
+- **AND** the source-size metrics remain complete when the configured roots were fully readable and the other metric inputs are complete
 
 ### Requirement: Coupling metrics derive from the canonical project graph
 
@@ -71,8 +76,7 @@ The snapshot SHALL carry an explicit availability state of complete, partial, or
 - **THEN** the report marks the repository metrics delta unavailable and does not render base values as zero
 
 ### Requirement: Absolute reporting and badge projection are neutral
-
-The human and machine-readable reporting surfaces SHALL expose the absolute current snapshot in a bounded grouped Size, Coupling, and Structure section. A Core/CLI-owned badge projection SHALL expose at least `Source lines` as a compact absolute Shields endpoint payload and MAY expose bounded grouped `Repository` and `Structure` payloads. Grouped badges SHALL not become one badge per metric. Badge output SHALL use current verified main evidence only, SHALL contain no PR delta, threshold, quality color, or pass/fail interpretation, and SHALL preserve the existing trusted badge publication/privacy boundary. When a custom ArchLinterNet logo is present, it SHALL be embedded as a reviewed local SVG in the Shields payload rather than loaded from an external URL.
+The human and machine-readable reporting surfaces SHALL expose the absolute current snapshot in a bounded grouped Size, Coupling, and Structure section. A Core/CLI-owned badge projection SHALL expose at least `Source lines` as a compact absolute Shields endpoint payload and MAY expose bounded grouped `Repository` and `Structure` payloads. The `Structure` payload SHALL include maximum dependency depth, dependency count, and largest strongly connected component size when those values are available. Grouped badges SHALL not become one badge per metric. Badge output SHALL use current verified main evidence only, SHALL contain no PR delta, threshold, quality color, or pass/fail interpretation, and SHALL preserve the existing trusted badge publication/privacy boundary. When a custom ArchLinterNet logo is present, it SHALL be embedded as a reviewed local SVG in the Shields payload rather than loaded from an external URL.
 
 #### Scenario: Absolute report is grouped and bounded
 - **WHEN** a current repository metrics snapshot is complete or partial
@@ -86,9 +90,18 @@ The human and machine-readable reporting surfaces SHALL expose the absolute curr
 
 #### Scenario: Optional grouped badges remain compact and recognizable
 - **WHEN** verified default-branch automation publishes grouped repository metrics
-- **THEN** it may publish one `Repository` payload for projects/types and one `Structure` payload for dependencies/largest SCC
+- **THEN** it may publish one `Repository` payload for projects/types and one `Structure` payload for dependency depth, dependency count and largest SCC
 - **AND** each payload contains the reviewed ArchLinterNet SVG logo inline
 - **AND** no payload contains a PR delta or a per-metric quality interpretation
+
+#### Scenario: Structure badge includes dependency depth
+- **WHEN** a complete repository-metrics snapshot contains maximum dependency depth, dependency count, and largest SCC size
+- **THEN** the grouped `Structure` payload presents all three absolute values
+- **AND** it does not imply a threshold or quality verdict
+
+#### Scenario: Missing depth does not produce a misleading structure badge
+- **WHEN** a complete snapshot lacks maximum dependency depth
+- **THEN** the `Structure` badge is reported as unavailable
 
 ### Requirement: Metrics calculation reuses existing analysis work
 
