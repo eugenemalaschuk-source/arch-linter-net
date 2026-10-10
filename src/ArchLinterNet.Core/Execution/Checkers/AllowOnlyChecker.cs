@@ -21,13 +21,14 @@ internal static class AllowOnlyChecker
             .Select(layerName => ArchitectureLayerResolver.ResolveLayer(context.Document, contract.Name, layerName))
             .Append(sourceLayer)
             .ToList();
+        HashSet<string> allowedTypes = new(contract.AllowedTypes, StringComparer.Ordinal);
 
         return sourceTypes
             .Select(type =>
             {
                 string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
                 string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty;
-                string[] forbiddenRefs = ArchitectureReferenceScanner.GetReferencedTypes(type)
+                string[] forbiddenRefs = context.ReferenceGraph.GetReferencedTypes(type)
                     .Select(refType => new
                     {
                         FullName = ArchitectureTypeNames.SafeFullName(refType),
@@ -35,7 +36,7 @@ internal static class AllowOnlyChecker
                         Type = refType
                     })
                     .Where(r => !string.IsNullOrEmpty(r.FullName))
-                    .Where(r => !contract.AllowedTypes.Contains(r.FullName))
+                    .Where(r => !allowedTypes.Contains(r.FullName))
                     .Where(r => r.Type != null && context.IsInAnyDeclaredLayer(r.Type))
                     .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(
                         r.Type, allowedLayers, context.RoleIndex, context.ExpressionFacts))

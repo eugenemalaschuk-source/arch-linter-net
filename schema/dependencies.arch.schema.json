@@ -860,7 +860,7 @@
     "classification": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Semantic-classification-model design (see openspec/changes/archive/2026-07-10-design-semantic-classification-model). `attributes`/`assembly_attributes`/`inheritance`/`namespace` extraction is implemented (see openspec/specs/attribute-role-extraction and openspec/specs/semantic-classification-model). `precedence` is enforced at runtime for these four implemented sources (a source it omits is disabled; its `yaml_override`/`path` entries have no effect either way, since those two sources are not yet implemented). `path`, `overrides`, and `exclusions` remain schema-acceptance only; declaring `overrides`/`exclusions` has no runtime effect, and declaring `path` produces a deferred-support diagnostic but no role assignment yet.",
+      "description": "Semantic-classification-model design (see openspec/changes/archive/2026-07-10-design-semantic-classification-model). `attributes`/`assembly_attributes`/`inheritance`/`namespace` extraction is implemented (see openspec/specs/attribute-role-extraction and openspec/specs/semantic-classification-model). `precedence` is enforced at runtime for these four implemented sources (a source it omits is disabled; its `yaml_override`/`path` entries have no effect either way, since those two sources are not yet implemented). `path`, `overrides`, and `exclusions` remain schema-acceptance only; declaring `overrides`/`exclusions` has no runtime effect, and declaring `path` produces a deferred-support diagnostic but no role assignment yet. In annotation-aware v0.10.0 tools, canonical semantic roles are recognized only by exact FQN from the manifest-backed `ArchLinterNet.Annotations` catalog and a compatible assembly identity marker; policy YAML must not map any FQN in that reserved namespace.",
       "properties": {
         "precedence": {
           "type": "array",
@@ -977,7 +977,7 @@
         "attribute": {
           "type": "string",
           "minLength": 1,
-          "description": "Full type name of the attribute, matched against attributes declared or referenced in scanned code. No binary ArchLinterNet annotation dependency is required."
+          "description": "Full type name of the attribute, matched exactly against attributes declared or referenced in scanned code. In annotation-aware v0.10.0 tools, manifest-listed `ArchLinterNet.Annotations.*` canonical identities are built-in evidence and must not be repeated or remapped in YAML; any mapping in that reserved namespace is rejected. User-owned attributes outside the reserved namespace remain supported without a binary ArchLinterNet annotation dependency."
         },
         "role": { "type": "string", "minLength": 1 },
         "metadata": {
@@ -994,7 +994,7 @@
         "attribute": {
           "type": "string",
           "minLength": 1,
-          "description": "Full type name of the assembly-level attribute providing bulk defaults for a project or bounded context."
+          "description": "Full type name of the assembly-level attribute providing bulk defaults for a project or bounded context. In annotation-aware v0.10.0 tools, manifest-listed `ArchLinterNet.Annotations.*` canonical identities are exact-FQN built-in evidence and must not be repeated or remapped in YAML; any mapping in that reserved namespace is rejected."
         },
         "role": { "type": "string", "minLength": 1 },
         "metadata": { "$ref": "#/$defs/scalarMap" }

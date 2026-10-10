@@ -470,6 +470,9 @@ public sealed class ArchitectureAnalysisSession
     public IReadOnlyList<ArchitectureClassificationRoleFact> CheckClassificationRoles() =>
         _classificationAnalysisService.CheckClassificationRoles();
 
+    public IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CheckCanonicalAnnotationDiagnostics() =>
+        _classificationAnalysisService.CheckCanonicalAnnotationDiagnostics();
+
     public ArchitectureClassificationPathDeferredNotice? CheckClassificationPathDeferred() =>
         _classificationAnalysisService.CheckClassificationPathDeferred();
 

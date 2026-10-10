@@ -40,6 +40,7 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
         new MetricDefinitionValidator(),
         new MetricBudgetValidator(),
         new AttributeUsageValidator(),
+        new ReservedCanonicalAnnotationMappingValidator(),
         new InheritanceValidator(),
         new InterfaceImplementationValidator(),
         new CompositionValidator(),

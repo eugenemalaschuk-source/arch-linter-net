@@ -156,6 +156,8 @@ internal static class ArchitectureAnalysisSnapshotEvaluationProjector
             IReadOnlyList<ArchitectureClassificationMetadataFailure> classificationMetadataFailures) =
                 runner.Session.CheckClassificationFacts();
         IReadOnlyList<ArchitectureClassificationRoleFact> classificationRoles = runner.Session.CheckClassificationRoles();
+        IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> canonicalAnnotationDiagnostics =
+            runner.Session.CheckCanonicalAnnotationDiagnostics();
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred =
             runner.Session.CheckClassificationPathDeferred();
 
@@ -194,6 +196,7 @@ internal static class ArchitectureAnalysisSnapshotEvaluationProjector
             RepositoryRoot = input.RepositoryRoot,
             CycleFindings = execution.CycleFindings,
             ClassificationRoles = classificationRoles,
+            CanonicalAnnotationDiagnostics = canonicalAnnotationDiagnostics,
             ClassificationPathDeferred = classificationPathDeferred,
             PreflightDiagnostics = input.PreflightDiagnostics,
             PolicyImportPaths = input.PolicyImportPaths,

@@ -62,5 +62,10 @@ public sealed class ArchitectureReferenceGraph
         }
     }
 
+    internal IEnumerable<ArchitectureTransitiveReference> EnumerateTransitiveReferencedTypes(
+        Type type,
+        Func<Type, bool>? traversePredicate = null) =>
+        ArchitectureTransitiveReferenceTraversal.Enumerate(type, source => GetReferencedTypes(source), traversePredicate);
+
     private sealed record ReferenceScan(IReadOnlyList<Type> ReferencedTypes, bool IsComplete);
 }

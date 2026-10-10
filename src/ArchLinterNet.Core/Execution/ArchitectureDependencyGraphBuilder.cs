@@ -116,7 +116,7 @@ internal static class ArchitectureDependencyGraphBuilder
         foreach ((string groupName, ArchitectureExternalDependencyGroup group) in externalGroups)
         {
             IEnumerable<ArchitectureViolation> matches = ArchitectureExternalDependencyViolationFinder.FindViolations(
-                    groupName, allTypes, group, executionContext)
+                    groupName, allTypes, group, executionContext, referenceGraph: session.ReferenceGraph)
                 .Concat(ilScanner.FindMethodBodyViolations(allTypes, groupName, group, executionContext));
 
             foreach (ArchitectureViolation match in matches)

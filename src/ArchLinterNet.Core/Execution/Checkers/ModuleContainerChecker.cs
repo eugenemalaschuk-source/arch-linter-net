@@ -32,7 +32,7 @@ internal static class ModuleContainerChecker
         var violations = new List<ArchitectureViolation>();
 
         CheckStructure(contract, inventory, executionContext, violations);
-        CheckDependencies(contract, inventory, executionContext, violations);
+        CheckDependencies(contract, inventory, context.ReferenceGraph, executionContext, violations);
         return violations;
     }
 
@@ -79,6 +79,7 @@ internal static class ModuleContainerChecker
     private static void CheckDependencies(
         ArchitectureModuleContainerContract contract,
         ArchitectureModuleContainerDiscovery.Inventory inventory,
+        ArchitectureReferenceGraph referenceGraph,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations)
     {
@@ -86,7 +87,7 @@ internal static class ModuleContainerChecker
                      .Where(candidate => candidate.Value.ModuleName != null)
                      .OrderBy(candidate => ArchitectureTypeNames.SafeFullName(candidate.Key), StringComparer.Ordinal))
         {
-            foreach (Type target in ArchitectureReferenceScanner.GetReferencedTypes(sourceType)
+            foreach (Type target in referenceGraph.GetReferencedTypes(sourceType)
                          .Distinct()
                          .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal))
             {

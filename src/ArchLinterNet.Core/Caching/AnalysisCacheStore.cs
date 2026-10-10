@@ -218,6 +218,7 @@ public static class AnalysisCacheStore
         && outcome.PolicyConsistencyFindings is not null
         && outcome.ClassificationConflicts is not null
         && outcome.ClassificationMetadataFailures is not null
+        && outcome.CanonicalAnnotationDiagnostics is not null
         && outcome.ClassificationRoles is not null
         && outcome.CycleFindings is not null
         && outcome.CoverageSummaries is not null

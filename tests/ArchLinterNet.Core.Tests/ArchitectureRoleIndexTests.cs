@@ -190,7 +190,7 @@ public sealed class ArchitectureRoleIndexTests
     }
 
     [Test]
-    public void EmptyClassificationConfiguration_ShortCircuitsWithoutScanningTypes()
+    public void EmptyClassificationConfiguration_ScansTypesForCanonicalAnnotations()
     {
         var countingAssemblies = new EnumerationCountingCollection(_targetAssemblies);
         var index = new ArchitectureRoleIndex(new ArchitectureClassificationConfiguration(), new ArchitectureTypeIndex(countingAssemblies));
@@ -198,7 +198,11 @@ public sealed class ArchitectureRoleIndexTests
         Assert.That(index.ClassifiedTypes(), Is.Empty);
         Assert.That(index.Conflicts, Is.Empty);
         Assert.That(index.MetadataFailures, Is.Empty);
-        Assert.That(countingAssemblies.EnumerationCount, Is.EqualTo(0));
+        ArchitectureCanonicalAnnotationDiagnostic missingMarker = index.CanonicalAnnotationDiagnostics.Single();
+        Assert.That(missingMarker.Code, Is.EqualTo("MissingCatalogIdentity"));
+        Assert.That(missingMarker.EvidenceSources,
+            Does.Contain("ArchLinterNet.Annotations.AggregateRootAttribute"));
+        Assert.That(countingAssemblies.EnumerationCount, Is.EqualTo(1));
     }
 
     [Test]

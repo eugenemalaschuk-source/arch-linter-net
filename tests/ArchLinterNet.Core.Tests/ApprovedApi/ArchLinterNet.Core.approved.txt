@@ -317,6 +317,7 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 : System.IEquatab
   property ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? RepositoryMetrics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord> ApplicabilityRecords {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> ClassificationRoles {get;init;}
@@ -1754,6 +1755,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureAnalysisSession
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract> StrictProtectedContracts()
   method System.Collections.Generic.IReadOnlyCollection<string> CheckAcyclicSiblingContract(ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract contract)
   method System.Collections.Generic.IReadOnlyCollection<string> CheckCycleContract(ArchLinterNet.Core.Contracts.Families.ArchitectureCycleContract contract)
+  method System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic> CheckCanonicalAnnotationDiagnostics()
   method System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> CheckClassificationRoles()
   method System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PublicApiSnapshotEntry> CapturePublicApiSurface(ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceContract contract, out System.Collections.Generic.IReadOnlyList<string> missingAssemblies)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckAllowOnlyContract(ArchLinterNet.Core.Contracts.Families.ArchitectureAllowOnlyContract contract)
@@ -1940,6 +1942,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureRoleIndex
   ctor(ArchLinterNet.Core.Contracts.ArchitectureClassificationConfiguration configuration, ArchLinterNet.Core.Execution.ArchitectureTypeIndex typeIndex, System.Threading.CancellationToken cancellationToken = null)
   method System.Collections.Generic.IReadOnlyCollection<System.Type> ClassifiedTypes()
   method bool TryGetRole(System.Type type, out ArchLinterNet.Core.Scanning.ArchitectureTypeClassificationResult descriptor)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics {get;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> Conflicts {get;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> MetadataFailures {get;}
 sealed class ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation : System.IEquatable<ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation>
@@ -2459,6 +2462,21 @@ sealed class ArchLinterNet.Core.Model.ArchitectureBaselineComparisonResult : Sys
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> New {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> OutOfScope {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> Resolved {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic>
+  ctor(string Subject, string Code, string Message, System.Collections.Generic.IReadOnlyList<string> EvidenceSources)
+  method ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method static ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic Create(string subject, string code, string message, params string[] evidenceSources)
+  method string ToString()
+  method void Deconstruct(out string Subject, out string Code, out string Message, out System.Collections.Generic.IReadOnlyList<string> EvidenceSources)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic? left, ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic? left, ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic? right)
+  property System.Collections.Generic.IReadOnlyList<string> EvidenceSources {get;init;}
+  property string Code {get;init;}
+  property string Message {get;init;}
+  property string Subject {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitectureClassificationConflict : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>
   ctor(string Subject, ArchLinterNet.Core.Model.ArchitectureClassificationSource Source, string WinningRole, string DiscardedRole, string? MetadataDetail)
   method ArchLinterNet.Core.Model.ArchitectureClassificationConflict <Clone>$()
@@ -2515,6 +2533,7 @@ sealed class ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact : Syste
   operator ==(ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact? left, ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact? right)
   property ArchLinterNet.Core.Model.ArchitectureClassificationSource Source {get;init;}
   property System.Collections.Generic.IReadOnlyDictionary<string,object> Metadata {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> EvidenceSources {get;init;}
   property string Role {get;init;}
   property string Subject {get;init;}
   property string? Evidence {get;init;}
@@ -6449,8 +6468,10 @@ sealed class ArchLinterNet.Core.Scanning.ArchitectureTypeClassificationResult
   ctor(string? role, ArchLinterNet.Core.Model.ArchitectureClassificationSource? source, System.Collections.Generic.IReadOnlyDictionary<string,object> metadata, string? evidence, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> conflicts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> metadataFailures)
   property ArchLinterNet.Core.Model.ArchitectureClassificationSource? Source {get;}
   property System.Collections.Generic.IReadOnlyDictionary<string,object> Metadata {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> Conflicts {get;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> MetadataFailures {get;}
+  property System.Collections.Generic.IReadOnlyList<string> EvidenceSources {get;init;}
   property string? Evidence {get;}
   property string? Role {get;}
 sealed class ArchLinterNet.Core.Schema.PackagedSchemaDescriptor : System.IEquatable<ArchLinterNet.Core.Schema.PackagedSchemaDescriptor>
@@ -7355,6 +7376,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? WaiverLifecycleAssessment {get;init;}
   property ArchLinterNet.Core.Model.ImportedExternalDiagnosticProjection ImportedDiagnostics {get;private init;}
   property ArchLinterNet.Core.Model.RepositoryMetricsSnapshot? RepositoryMetrics {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> ClassificationRoles {get;init;}

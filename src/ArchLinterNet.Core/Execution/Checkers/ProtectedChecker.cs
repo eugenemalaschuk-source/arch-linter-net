@@ -53,17 +53,14 @@ internal static class ProtectedChecker
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations)
     {
-        foreach (Assembly assembly in context.AnalysisContext.TargetAssemblies)
+        foreach (Type sourceType in context.TypeIndex.AllTypes())
         {
-            foreach (Type sourceType in ArchitectureTypeScanner.GetLoadableTypes(assembly))
-            {
-                ArchitectureViolation? violation = BuildViolation(
-                    contract, context, sourceType, scope, executionContext);
+            ArchitectureViolation? violation = BuildViolation(
+                contract, context, sourceType, scope, executionContext);
 
-                if (violation != null)
-                {
-                    violations.Add(violation);
-                }
+            if (violation != null)
+            {
+                violations.Add(violation);
             }
         }
     }
@@ -134,7 +131,7 @@ internal static class ProtectedChecker
         List<string> matchingRefs,
         HashSet<string> matchedNamespacePrefixes)
     {
-        foreach (Type refType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
+        foreach (Type refType in context.ReferenceGraph.GetReferencedTypes(sourceType))
         {
             string refFullName = ArchitectureTypeNames.SafeFullName(refType);
             if (string.IsNullOrEmpty(refFullName))

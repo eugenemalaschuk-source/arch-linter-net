@@ -159,6 +159,9 @@ public sealed record AnalysisCacheOutcomeV1(
     public IReadOnlyList<ArchitectureWaiverLifecycleRecord> Waivers { get; init; } =
         Array.Empty<ArchitectureWaiverLifecycleRecord>();
 
+    public IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics { get; init; } =
+        Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>();
+
     // Added after the original cache/v1 payload. Null deliberately means the entry predates
     // effective-policy inventory evidence; cache reconstruction must preserve that absence rather
     // than manufacturing an all-zero inventory.

@@ -135,10 +135,24 @@ internal sealed class HumanReportRenderer
         AppendSection(sb, outcome.CoverageSummaries.Count > 0,
             () => _runtime.FormatCoverageSummaryForHumans(outcome.CoverageSummaries));
         cancellationToken.ThrowIfCancellationRequested();
-        AppendSection(sb, outcome.ClassificationConflicts.Count > 0 || outcome.ClassificationMetadataFailures.Count > 0
-                || outcome.ClassificationPathDeferred != null,
-            () => _runtime.FormatClassificationFactsForHumans(
-                outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures, outcome.ClassificationPathDeferred));
+        bool hasClassificationFindings = outcome.ClassificationConflicts.Count > 0
+            || outcome.ClassificationMetadataFailures.Count > 0
+            || outcome.ClassificationPathDeferred != null
+            || outcome.CanonicalAnnotationDiagnostics.Count > 0;
+        AppendSection(sb, hasClassificationFindings, () =>
+        {
+            string classificationText = _runtime.FormatClassificationFactsForHumans(
+                outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures, outcome.ClassificationPathDeferred);
+            string canonicalDiagnosticText = FormatCanonicalAnnotationDiagnostics(outcome.CanonicalAnnotationDiagnostics);
+            if (canonicalDiagnosticText.Length > 0)
+            {
+                classificationText = string.IsNullOrEmpty(classificationText)
+                    ? "Classification findings:" + Environment.NewLine + canonicalDiagnosticText
+                    : classificationText + Environment.NewLine + canonicalDiagnosticText;
+            }
+
+            return classificationText;
+        });
     }
 
     private string FormatPreflight(ValidationOutcome outcome)
@@ -150,6 +164,21 @@ internal sealed class HumanReportRenderer
 
         string text = _runtime.FormatBuildStatePreflightForHumans(outcome.PreflightDiagnostics);
         return string.IsNullOrEmpty(text) ? string.Empty : $"\n{text}";
+    }
+
+    private static string FormatCanonicalAnnotationDiagnostics(
+        IReadOnlyCollection<ArchitectureCanonicalAnnotationDiagnostic> diagnostics)
+    {
+        if (diagnostics.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(Environment.NewLine, diagnostics
+            .OrderBy(diagnostic => diagnostic.Subject, StringComparer.Ordinal)
+            .ThenBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
+            .Select(diagnostic => $"  {diagnostic.Code}: {diagnostic.Subject}: {diagnostic.Message}"))
+            + Environment.NewLine;
     }
 
     private static void AppendSection(StringBuilder sb, bool shouldWrite, Func<string> contentFactory)

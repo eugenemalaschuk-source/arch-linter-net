@@ -26,6 +26,7 @@ internal static class ArchitectureValidationResultMapper
             timing)
         {
             CycleFindings = outcome.CycleFindings,
+            CanonicalAnnotationDiagnostics = outcome.CanonicalAnnotationDiagnostics,
             PreflightDiagnostics = outcome.PreflightDiagnostics,
             PreflightBlocked = outcome.PreflightBlocked,
             Mode = mode,

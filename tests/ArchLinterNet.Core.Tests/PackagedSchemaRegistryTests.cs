@@ -19,7 +19,8 @@ public sealed class PackagedSchemaRegistryTests
     private static readonly string[] _value = {
                 "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
             };
-    private static readonly string[] _version080SchemaIds = ["analysis-cache", "baseline", "policy-root", "policy-fragment", "normalized-finding"];
+    private static readonly string[] _version080SchemaIds = ["baseline", "policy-root", "policy-fragment", "normalized-finding"];
+    private static readonly string[] _version0100SchemaIds = ["analysis-cache"];
 
     [Test]
     public void List_ReturnsEveryReleaseMatchedSchemaInOrdinalOrder()
@@ -33,11 +34,12 @@ public sealed class PackagedSchemaRegistryTests
             Assert.That(schemas.Select(static schema => schema.LogicalId), Is.EqualTo(_value));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v3"));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "normalized-finding").DocumentVersion, Is.EqualTo("v3"));
-            // Policy root/fragment, baseline, normalized findings, and the analysis cache advanced to 0.8.0.
-            // Every previous 0.5.1 resource remains byte-for-byte frozen (see
-            // openspec/specs/packaged-schema-registry and schema/0.5.1/compatibility-manifest.json).
+            // Policy root/fragment, baseline, and normalized findings remain at 0.8.0; the cache
+            // advances to 0.10.0 without changing the prior manifest or schema bytes.
+            // Earlier identities remain byte-for-byte frozen per packaged-schema-registry.
             Assert.That(
-                schemas.Where(schema => !_version080SchemaIds.Contains(schema.LogicalId))
+                schemas.Where(schema => !_version080SchemaIds.Contains(schema.LogicalId)
+                        && !_version0100SchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
@@ -45,12 +47,21 @@ public sealed class PackagedSchemaRegistryTests
                     .All(static schema => schema.SchemaId.Contains("/schema/0.8.0/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => !_version080SchemaIds.Contains(schema.LogicalId))
+                schemas.Where(schema => _version0100SchemaIds.Contains(schema.LogicalId))
+                    .All(static schema => schema.SchemaId.Contains("/schema/0.10.0/", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                schemas.Where(schema => !_version080SchemaIds.Contains(schema.LogicalId)
+                        && !_version0100SchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.ResourcePath.StartsWith("schema/0.5.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
                 schemas.Where(schema => _version080SchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.ResourcePath.StartsWith("schema/0.8.0/", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                schemas.Where(schema => _version0100SchemaIds.Contains(schema.LogicalId))
+                    .All(static schema => schema.ResourcePath.StartsWith("schema/0.10.0/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(schemas.All(static schema => schema.Sha256.Length == 64), Is.True);
             Assert.That(
@@ -98,6 +109,8 @@ public sealed class PackagedSchemaRegistryTests
             ["schema/0.5.1/normalized-finding.schema.json"] = "f3b6fb5de05de315e6c59bfdeedf921423165bdc7da6d2da4681600fcc4947d3",
             ["schema/0.5.1/analysis-cache.schema.json"] = "b0958295d23fc6bb4d575ddd81e837e8e458c355662cdae4844bf7a48dfcc9f2",
             ["schema/0.5.1/baseline.schema.json"] = "5f1d45820133e77403245dbe1f965a464dee6bf3e68654b1162b857db4f96bb2",
+            ["schema/0.8.0/analysis-cache.schema.json"] = "84515473b56ca4cd1c29546f667887b02fe7884cfe1cf5875a01126b494fbc9e",
+            ["schema/0.8.0/compatibility-manifest.json"] = "48aea525253a87a45b4bc5eaf91a2c3781fb67d23b06b6e6c4f0047c461a5cc9",
             ["schema/0.8.0/baseline.schema.json"] = "83a8555939d1a976ca23c84832120d0108d3914f0e92ce314c256bfb44ed9b21",
         };
 

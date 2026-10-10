@@ -44,4 +44,23 @@ public sealed class ArchitectureReferenceGraphTests
             Assert.That(referenced.Any(type => type.Name == "UnloadableTargetType"), Is.False);
         });
     }
+
+    [Test]
+    public void EnumerateTransitiveReferencedTypes_MaterializedPaths_MatchesCompatibilityTraversal()
+    {
+        var graph = new ArchitectureReferenceGraph();
+        Type source = typeof(List<string>);
+        var expected = graph.GetTransitiveReferencedTypes(source)
+            .Select(entry => (entry.referenced, entry.path.ToArray()))
+            .ToArray();
+        ArchitectureTransitiveReference[] traversals = graph
+            .EnumerateTransitiveReferencedTypes(source)
+            .ToArray();
+
+        var actual = traversals
+            .Select(entry => (entry.Referenced, entry.BuildPath().ToArray()))
+            .ToArray();
+
+        Assert.That(actual, Is.EqualTo(expected));
+    }
 }

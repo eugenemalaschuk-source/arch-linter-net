@@ -19,6 +19,12 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
     // deterministic and per-run.
     private readonly Dictionary<IlTokenKey, ResolvedMember> _resolvedMembers = new();
 
+    // A scanner commonly evaluates several external groups over the same source methods. Token
+    // decoding is independent of the group and generic context, so retain the parsed token stream
+    // once per method while keeping member resolution and group matching scoped as before.
+    private readonly Dictionary<MethodBase, MethodTokenScanResult> _validationTokenScans = new();
+    private readonly Dictionary<MethodBase, MethodTokenScanResult> _metricsTokenScans = new();
+
     // Seam over Module.ResolveMember. The cache is invisible in the scanner's results — an uncached
     // implementation reports exactly the same findings — so a test can only prove the cache exists
     // by observing how often resolution is actually requested. This is that observation point;
@@ -34,7 +40,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
     internal ArchitectureExternalDependencyIlScanner(
         Func<Module, int, Type[], Type[], MemberInfo?> resolveMember)
     {
-        _resolveMember = resolveMember;
+        _resolveMember = resolveMember ?? throw new ArgumentNullException(nameof(resolveMember));
     }
 
     public IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
@@ -175,7 +181,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         ArchitectureExternalDependencyGroup externalGroup,
         Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
     {
-        if (!TryGetValidationIl(method, out byte[]? il))
+        if (!TryGetValidationTokenScan(method, out MethodTokenScanResult tokenScan))
         {
             yield break;
         }
@@ -186,24 +192,8 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
             yield break;
         }
 
-        int position = 0;
-        while (position < il!.Length)
+        foreach (int token in tokenScan.Tokens)
         {
-            if (!TryReadOpCode(il, ref position, out OpCode opCode))
-            {
-                yield break;
-            }
-
-            if (!ArchitectureIlOperandSkipper.TryReadMetadataTokenIfPresent(opCode, il, ref position, out int token))
-            {
-                yield break;
-            }
-
-            if (token == 0)
-            {
-                continue;
-            }
-
             ExternalMemberMatch? memberMatch = ResolveMemberMatch(
                 method, token, genericContext, externalGroup, matchedTypes, out bool resolutionComplete);
             if (!resolutionComplete || memberMatch == null)
@@ -217,6 +207,29 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 memberMatch.MatchedType,
                 memberMatch.TargetAssembly);
         }
+
+        // Parsing stores only the valid prefix before an unsupported/malformed operand. Validation
+        // has always retained findings from that prefix and stopped at the first malformed operand.
+    }
+
+    private bool TryGetValidationTokenScan(MethodBase method, out MethodTokenScanResult tokenScan)
+    {
+        if (_validationTokenScans.TryGetValue(method, out tokenScan!))
+        {
+            return tokenScan.Status == IlRetrievalStatus.Ready;
+        }
+
+        if (!TryGetValidationIl(method, out byte[]? il))
+        {
+            tokenScan = MethodTokenScanResult.Empty;
+        }
+        else
+        {
+            tokenScan = ParseMetadataTokens(il!);
+        }
+
+        _validationTokenScans[method] = tokenScan;
+        return tokenScan.Status == IlRetrievalStatus.Ready;
     }
 
     // Shared by both the validation iterator above and the metrics scan below: resolves one IL
@@ -341,13 +354,13 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         ArchitectureExternalDependencyGroup externalGroup,
         Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
     {
-        IlRetrievalStatus status = TryGetMetricsIl(method, out byte[]? il);
-        if (status == IlRetrievalStatus.Incomplete)
+        MethodTokenScanResult tokenScan = GetMetricsTokenScan(method);
+        if (tokenScan.Status == IlRetrievalStatus.Incomplete)
         {
             return MethodScanResult.Incomplete;
         }
 
-        if (status == IlRetrievalStatus.Empty)
+        if (tokenScan.Status == IlRetrievalStatus.Empty)
         {
             return MethodScanResult.Empty;
         }
@@ -362,24 +375,8 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
 
         var matches = new List<ExternalIlMatch>();
-        int position = 0;
-        while (position < il!.Length)
+        foreach (int token in tokenScan.Tokens)
         {
-            if (!TryReadOpCode(il, ref position, out OpCode opCode))
-            {
-                return MethodScanResult.Incomplete;
-            }
-
-            if (!ArchitectureIlOperandSkipper.TryReadMetadataTokenIfPresent(opCode, il, ref position, out int token))
-            {
-                return MethodScanResult.Incomplete;
-            }
-
-            if (token == 0)
-            {
-                continue;
-            }
-
             ExternalMemberMatch? memberMatch = ResolveMemberMatch(
                 method, token, genericContext, externalGroup, matchedTypes, out bool resolutionComplete);
             if (!resolutionComplete)
@@ -399,7 +396,47 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 memberMatch.TargetAssembly));
         }
 
-        return new MethodScanResult(matches, IsComplete: true);
+        return new MethodScanResult(matches, tokenScan.IsComplete);
+    }
+
+    private MethodTokenScanResult GetMetricsTokenScan(MethodBase method)
+    {
+        if (_metricsTokenScans.TryGetValue(method, out MethodTokenScanResult? cached))
+        {
+            return cached;
+        }
+
+        IlRetrievalStatus status = TryGetMetricsIl(method, out byte[]? il);
+        MethodTokenScanResult scan = status switch
+        {
+            IlRetrievalStatus.Incomplete => MethodTokenScanResult.Incomplete,
+            IlRetrievalStatus.Empty => MethodTokenScanResult.Empty,
+            IlRetrievalStatus.Ready => ParseMetadataTokens(il!),
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unknown IL retrieval status."),
+        };
+        _metricsTokenScans[method] = scan;
+        return scan;
+    }
+
+    private static MethodTokenScanResult ParseMetadataTokens(byte[] il)
+    {
+        List<int> tokens = new();
+        int position = 0;
+        while (position < il.Length)
+        {
+            if (!TryReadOpCode(il, ref position, out OpCode opCode)
+                || !ArchitectureIlOperandSkipper.TryReadMetadataTokenIfPresent(opCode, il, ref position, out int token))
+            {
+                return new MethodTokenScanResult(IlRetrievalStatus.Ready, tokens.ToArray(), IsComplete: false);
+            }
+
+            if (token != 0)
+            {
+                tokens.Add(token);
+            }
+        }
+
+        return new MethodTokenScanResult(IlRetrievalStatus.Ready, tokens.ToArray(), IsComplete: true);
     }
 
     private enum IlRetrievalStatus
@@ -616,6 +653,15 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         internal static MethodScanResult Empty { get; } = new(Array.Empty<ExternalIlMatch>(), true);
 
         internal static MethodScanResult Incomplete { get; } = new(Array.Empty<ExternalIlMatch>(), false);
+    }
+
+    private sealed record MethodTokenScanResult(IlRetrievalStatus Status, int[] Tokens, bool IsComplete)
+    {
+        internal static MethodTokenScanResult Empty { get; } =
+            new(IlRetrievalStatus.Empty, Array.Empty<int>(), IsComplete: true);
+
+        internal static MethodTokenScanResult Incomplete { get; } =
+            new(IlRetrievalStatus.Incomplete, Array.Empty<int>(), IsComplete: false);
     }
 
     private sealed record ResolvedMember(MemberInfo? Member, bool IsComplete)

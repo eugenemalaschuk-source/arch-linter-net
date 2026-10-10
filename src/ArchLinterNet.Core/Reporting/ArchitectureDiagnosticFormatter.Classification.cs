@@ -425,7 +425,24 @@ internal static class ArchitectureClassificationCiArtifactsRenderer
                 role = r.Role,
                 source = r.Source.ToString(),
                 evidence = r.Evidence,
+                evidence_sources = r.EvidenceSources.OrderBy(source => source, StringComparer.Ordinal).ToArray(),
                 metadata = r.Metadata
+            })
+            .ToArray();
+    }
+
+    internal static object[] BuildCanonicalAnnotationDiagnosticsJson(
+        IReadOnlyCollection<ArchitectureCanonicalAnnotationDiagnostic>? diagnostics)
+    {
+        return (diagnostics ?? Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>())
+            .OrderBy(diagnostic => diagnostic.Subject, StringComparer.Ordinal)
+            .ThenBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
+            .Select(diagnostic => (object)new
+            {
+                subject = diagnostic.Subject,
+                code = diagnostic.Code,
+                message = diagnostic.Message,
+                evidence_sources = diagnostic.EvidenceSources.OrderBy(source => source, StringComparer.Ordinal).ToArray()
             })
             .ToArray();
     }

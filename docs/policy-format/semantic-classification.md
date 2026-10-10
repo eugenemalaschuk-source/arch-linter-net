@@ -59,6 +59,18 @@ custom-mapping-only and deferred roles retain their existing mapping path.
 `ApiContract` remains a primary semantic role; reviewed API membership remains
 an independent policy selector decision under #525.
 
+Annotation-aware v0.10.0 tools recognize 49 first-class role FQNs from that
+manifest. They match exact names under the reserved `ArchLinterNet.Annotations`
+namespace and require exactly one compatible generation 1 catalog identity
+marker with package version in `[0.10.0,0.11.0)`. A policy must not map any
+reserved-namespace FQN in `classification.attributes` or
+`classification.assembly_attributes`, even when the mapping repeats a canonical
+role. Missing, malformed, duplicate, unsupported, or unknown reserved
+identities fail closed with compatibility diagnostics. Canonical annotations
+remain semantic evidence only: they do not create policy rules or reviewed API
+membership, and metadata-only context attributes do not become role
+annotations.
+
 ## Basic example
 
 ```yaml

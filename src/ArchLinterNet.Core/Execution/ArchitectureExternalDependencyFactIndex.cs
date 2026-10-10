@@ -39,39 +39,45 @@ internal sealed class ArchitectureExternalDependencyFactIndex
         var facts = new HashSet<ArchitectureExternalDependencyFact>();
         var incompleteSourceTypes = new HashSet<Type>();
         ArchitectureExternalDependencyIlScanner ilScanner = new();
-        foreach ((string groupName, ArchitectureExternalDependencyGroup group) in groups
-                     .OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        KeyValuePair<string, ArchitectureExternalDependencyGroup>[] orderedGroups = groups
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .ToArray();
+        foreach (Type sourceType in sourceTypes)
         {
-            foreach (Type sourceType in sourceTypes)
+            _session.Context.CancellationToken.ThrowIfCancellationRequested();
+            bool isComplete = _session.ReferenceGraph.TryGetReferencedTypes(
+                sourceType,
+                out IReadOnlyList<Type> referencedTypes);
+            if (!isComplete)
+            {
+                incompleteSourceTypes.Add(sourceType);
+            }
+
+            foreach (Type targetType in referencedTypes
+                         .Distinct()
+                         .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal))
             {
                 _session.Context.CancellationToken.ThrowIfCancellationRequested();
-                bool isComplete = _session.ReferenceGraph.TryGetReferencedTypes(
-                    sourceType,
-                    out IReadOnlyList<Type> referencedTypes);
-                if (!isComplete)
+                string fullName = ArchitectureTypeNames.SafeFullName(targetType);
+                if (string.IsNullOrEmpty(fullName))
                 {
-                    incompleteSourceTypes.Add(sourceType);
+                    continue;
                 }
 
-                foreach (Type targetType in referencedTypes
-                             .Distinct()
-                             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal))
+                string namespaceName = ArchitectureTypeNames.SafeNamespace(targetType);
+                foreach ((string groupName, ArchitectureExternalDependencyGroup group) in orderedGroups)
                 {
                     _session.Context.CancellationToken.ThrowIfCancellationRequested();
-                    string fullName = ArchitectureTypeNames.SafeFullName(targetType);
-                    if (string.IsNullOrEmpty(fullName))
-                    {
-                        continue;
-                    }
-
-                    string namespaceName = ArchitectureTypeNames.SafeNamespace(targetType);
                     if (ArchitectureExternalDependencyResolver.MatchesGroup(group, fullName, namespaceName))
                     {
                         facts.Add(new ArchitectureExternalDependencyFact(sourceType, fullName, groupName));
                     }
                 }
             }
+        }
 
+        foreach ((string groupName, ArchitectureExternalDependencyGroup group) in orderedGroups)
+        {
             ArchitectureExternalDependencyIlScanResult ilFacts = ilScanner.FindMethodBodyFactsWithCompleteness(
                 sourceTypes, group, _session.Context.CancellationToken);
             incompleteSourceTypes.UnionWith(ilFacts.IncompleteSourceTypes);

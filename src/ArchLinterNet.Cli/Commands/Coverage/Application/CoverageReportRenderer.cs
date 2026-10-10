@@ -19,9 +19,18 @@ internal static class CoverageReportRenderer
     {
         var lines = new List<string> { "## Architecture coverage", "", $"**Status:** {(Passed(report) ? "✅ pass" : "❌ fail")}", "" };
         IReadOnlyList<FailureRule> failures = Passed(report) ? [] : CollectFailures(report);
+        JsonElement canonicalAnnotationDiagnostics = ArrayElement(report, "canonical_annotation_diagnostics");
+        int canonicalAnnotationDiagnosticCount = canonicalAnnotationDiagnostics.ValueKind == JsonValueKind.Array
+            ? canonicalAnnotationDiagnostics.GetArrayLength()
+            : 0;
         if (!Passed(report))
         {
             RenderFailures(lines, failures, maxFailures);
+            lines.Add(string.Empty);
+        }
+        if (canonicalAnnotationDiagnosticCount > 0)
+        {
+            RenderCanonicalAnnotationDiagnostics(lines, canonicalAnnotationDiagnostics);
             lines.Add(string.Empty);
         }
 
@@ -36,7 +45,7 @@ internal static class CoverageReportRenderer
             }
         }
 
-        lines.AddRange(["| Metric | Count |", "| --- | --- |", $"| Failed rules | {failures.Count} |", $"| Failed diagnostics | {failures.Sum(static rule => rule.Diagnostics.Count)} |",
+        lines.AddRange(["| Metric | Count |", "| --- | --- |", $"| Failed rules | {failures.Count} |", $"| Failed diagnostics | {failures.Sum(static rule => rule.Diagnostics.Count)} |", $"| Canonical annotation diagnostics | {canonicalAnnotationDiagnosticCount} |",
             $"| Covered | {totals[CoveredState]} |", $"| Excluded | {totals["excluded"]} |", $"| Uncovered | {totals[UncoveredState]} |", $"| Stale | {totals[StaleState]} |", $"| Unknown | {totals[UnknownState]} |"]);
         if (coverage.GetArrayLength() == 0)
         {
@@ -53,6 +62,29 @@ internal static class CoverageReportRenderer
         }
 
         return string.Join('\n', lines) + "\n";
+    }
+
+    private static void RenderCanonicalAnnotationDiagnostics(List<string> lines, JsonElement diagnostics)
+    {
+        JsonElement[] ordered = diagnostics.EnumerateArray()
+            .OrderBy(diagnostic => String(diagnostic, "subject"), StringComparer.Ordinal)
+            .ThenBy(diagnostic => String(diagnostic, "code"), StringComparer.Ordinal)
+            .ToArray();
+        lines.Add($"### Canonical annotation diagnostics ({ordered.Length})");
+        lines.Add(string.Empty);
+        foreach (JsonElement diagnostic in ordered)
+        {
+            string subject = String(diagnostic, "subject") ?? "<unknown subject>";
+            string code = String(diagnostic, "code") ?? "canonical-annotation";
+            string message = String(diagnostic, "message") ?? "No diagnostic detail was provided.";
+            string[] evidence = ArrayElement(diagnostic, "evidence_sources").EnumerateArray()
+                .Where(value => value.ValueKind == JsonValueKind.String)
+                .Select(value => value.GetString()!)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
+            string evidenceText = evidence.Length == 0 ? string.Empty : $" (evidence: `{string.Join("`, `", evidence)}`)";
+            lines.Add($"- **`{code}`** `{subject}` — {message}{evidenceText}");
+        }
     }
 
     private static void RenderFailures(List<string> lines, IReadOnlyList<FailureRule> rules, int? max)
