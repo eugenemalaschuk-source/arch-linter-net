@@ -64,6 +64,9 @@ public sealed class ArchitectureRoleIndex
 
     private RoleIndexData BuildData()
     {
+        // An empty YAML configuration still needs a type pass: canonical role annotations and
+        // reserved-namespace diagnostics are discovered from attribute metadata, independently of YAML.
+        // The no-mapping extraction path avoids allocating empty candidates for every unannotated type.
         Type[] types = _typeIndex.AllTypes();
         var extractor = new ArchitectureAttributeRoleExtractor(_configuration, types, MatchNamespaceMapping);
 

@@ -15,6 +15,11 @@ internal sealed class CanonicalAnnotationRoleResolver
         string scope,
         string subject)
     {
+        if (attributeData is ICollection<CustomAttributeData> { Count: 0 })
+        {
+            return ArchitectureAttributeClassificationCandidate.Empty;
+        }
+
         CanonicalAnnotationCatalog catalog = CanonicalAnnotationCatalog.Current;
         List<ArchitectureCanonicalAnnotationDiagnostic> diagnostics = new();
         List<ArchitectureClassificationMetadataFailure> metadataFailures = new();
@@ -60,6 +65,11 @@ internal sealed class CanonicalAnnotationRoleResolver
 
         if (matches.Count == 0)
         {
+            if (diagnostics.Count == 0 && metadataFailures.Count == 0)
+            {
+                return ArchitectureAttributeClassificationCandidate.Empty;
+            }
+
             return new ArchitectureAttributeClassificationCandidate(
                 null, new Dictionary<string, object>(), null,
                 Array.Empty<ArchitectureClassificationConflict>(),
@@ -272,6 +282,12 @@ internal static class CanonicalAnnotationCandidateComposer
         ArchitectureAttributeClassificationCandidate canonical,
         string subject)
     {
+        if (ReferenceEquals(configured, ArchitectureAttributeClassificationCandidate.Empty)
+            && ReferenceEquals(canonical, ArchitectureAttributeClassificationCandidate.Empty))
+        {
+            return ArchitectureAttributeClassificationCandidate.Empty;
+        }
+
         List<ArchitectureCanonicalAnnotationDiagnostic> diagnostics = configured.CanonicalAnnotationDiagnostics
             .Concat(canonical.CanonicalAnnotationDiagnostics)
             .Distinct()
@@ -308,6 +324,8 @@ internal static class CanonicalAnnotationCandidateComposer
             return configured with
             {
                 EvidenceSources = MergeEvidence(configured, canonical),
+                Conflicts = conflicts,
+                MetadataFailures = failures,
                 CanonicalAnnotationDiagnostics = diagnostics
             };
         }
@@ -324,6 +342,8 @@ internal static class CanonicalAnnotationCandidateComposer
             {
                 EvidenceSources = MergeEvidence(configured, canonical, observedEvidence),
                 ObservedEvidence = observedEvidence,
+                Conflicts = conflicts,
+                MetadataFailures = failures,
                 CanonicalAnnotationDiagnostics = diagnostics
             };
         }

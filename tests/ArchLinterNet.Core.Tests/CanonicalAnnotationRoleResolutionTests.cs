@@ -197,6 +197,62 @@ public sealed class CanonicalAnnotationRoleResolutionTests
     }
 
     [Test]
+    public void Extract_EquivalentCustomAndCanonicalEvidence_PreservesCanonicalMetadataFailure()
+    {
+        Type type = CreateType("CanonicalAndCustomWithInvalidMetadata", typeRole: true,
+            customRole: true, domain: string.Empty);
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "Entity"
+                }
+            }
+        };
+        ArchitectureTypeClassificationResult result = new ArchitectureAttributeRoleExtractor(
+            configuration, [type]).Extract(type);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Role, Is.EqualTo("Entity"));
+            Assert.That(result.MetadataFailures.Select(failure => failure.MetadataKey), Is.EqualTo(new[] { "domain" }));
+            Assert.That(result.CanonicalAnnotationDiagnostics.Select(diagnostic => diagnostic.Code),
+                Does.Contain("InvalidCanonicalMetadata"));
+        });
+    }
+
+    [Test]
+    public void Extract_ConfiguredRoleWhenCanonicalIdentityIsInvalid_PreservesCanonicalMetadataFailure()
+    {
+        Type type = CreateType("CustomWithInvalidCanonicalIdentityAndMetadata", typeRole: true,
+            customRole: true, domain: string.Empty, includeMarker: false);
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "Entity"
+                }
+            }
+        };
+        ArchitectureTypeClassificationResult result = new ArchitectureAttributeRoleExtractor(
+            configuration, [type]).Extract(type);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Role, Is.EqualTo("Entity"));
+            Assert.That(result.MetadataFailures.Select(failure => failure.MetadataKey), Is.EqualTo(new[] { "domain" }));
+            Assert.That(result.CanonicalAnnotationDiagnostics.Select(diagnostic => diagnostic.Code),
+                Does.Contain("InvalidCanonicalMetadata").And.Contain("MissingCatalogIdentity"));
+        });
+    }
+
+    [Test]
     public void Extract_EquivalentCustomEvidence_RetainsEveryMappedAttributeFqn()
     {
         Type type = CreateType("TwoCustomEntityAttributes", customRole: true, secondCustomRole: true);

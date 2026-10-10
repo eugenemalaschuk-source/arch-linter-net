@@ -104,12 +104,12 @@ public sealed class ArchitectureAttributeRoleExtractor
             candidates[ArchitectureClassificationSource.AssemblyAttribute] = ResolveAssemblyCandidate(type.Assembly);
         }
 
-        if (_configuration.IsSourceEnabled(InheritanceSourceName))
+        if (_configuration.Inheritance.Count > 0 && _configuration.IsSourceEnabled(InheritanceSourceName))
         {
             candidates[ArchitectureClassificationSource.Inheritance] = ResolveInheritanceCandidate(type);
         }
 
-        if (_configuration.IsSourceEnabled(NamespaceSourceName))
+        if (_configuration.Namespace.Count > 0 && _configuration.IsSourceEnabled(NamespaceSourceName))
         {
             candidates[ArchitectureClassificationSource.Namespace] = ResolveNamespaceCandidate(type);
         }
@@ -307,6 +307,14 @@ public sealed class ArchitectureAttributeRoleExtractor
     private static ArchitectureTypeClassificationResult Combine(
         Dictionary<ArchitectureClassificationSource, ArchitectureAttributeClassificationCandidate> candidates)
     {
+        if (candidates.Values.All(candidate => ReferenceEquals(candidate, ArchitectureAttributeClassificationCandidate.Empty)))
+        {
+            return new ArchitectureTypeClassificationResult(
+                null, null, new Dictionary<string, object>(), null,
+                Array.Empty<ArchitectureClassificationConflict>(),
+                Array.Empty<ArchitectureClassificationMetadataFailure>());
+        }
+
         List<ArchitectureClassificationConflict> conflicts = new();
         List<ArchitectureClassificationMetadataFailure> failures = new();
         List<ArchitectureCanonicalAnnotationDiagnostic> canonicalDiagnostics = new();
@@ -361,6 +369,11 @@ public sealed class ArchitectureAttributeRoleExtractor
         ArchitectureClassificationSource source,
         string subject)
     {
+        if (mappings.Count == 0)
+        {
+            return ArchitectureAttributeClassificationCandidate.Empty;
+        }
+
         List<ArchitectureClassificationConflict> conflicts = new();
         List<ArchitectureClassificationMetadataFailure> failures = new();
         List<ArchitectureAttributeRoleEvidence> observedEvidence = new();
@@ -624,7 +637,8 @@ public sealed class ArchitectureAttributeRoleExtractor
     {
         try
         {
-            return type.GetCustomAttributesData().ToList();
+            IList<CustomAttributeData> attributes = type.GetCustomAttributesData();
+            return attributes.Count == 0 ? Array.Empty<CustomAttributeData>() : attributes.ToList();
         }
         catch (TypeLoadException)
         {
@@ -644,7 +658,8 @@ public sealed class ArchitectureAttributeRoleExtractor
     {
         try
         {
-            return assembly.GetCustomAttributesData().ToList();
+            IList<CustomAttributeData> attributes = assembly.GetCustomAttributesData();
+            return attributes.Count == 0 ? Array.Empty<CustomAttributeData>() : attributes.ToList();
         }
         catch (TypeLoadException)
         {
