@@ -28,7 +28,7 @@ jobs:
     name: Checkpoint B shard (${{ matrix.platform.id }} / ${{ matrix.shard.name }})
     needs: prepare-candidate
     runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
     strategy:
