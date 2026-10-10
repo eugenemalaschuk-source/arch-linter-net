@@ -187,6 +187,10 @@ def _resolve_states(repository: str, numbers: list[int]) -> dict[int, dict[str, 
         ):
             raise ValueError(f"Cannot resolve issue #{number}: invalid GitHub response.")
         state = state.lower()
+        # `gh issue view` reports merged pull requests as MERGED, even though the
+        # issue-tracker state relevant to release scope is closed.
+        if state == "merged":
+            state = "closed"
         if state not in {"open", "closed"}:
             raise ValueError(f"Cannot resolve issue #{number}: invalid GitHub response.")
         resolved[number] = {

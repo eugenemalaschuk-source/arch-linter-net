@@ -275,6 +275,15 @@ def test_unresolvable_required_issue_is_fatal(tmp_path: Path, monkeypatch) -> No
         build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
 
 
+def test_merged_pull_request_is_resolved_as_closed(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _stub_gh(monkeypatch, {525: "MERGED"})
+
+    states = generator._resolve_states(_REPOSITORY, [525])
+
+    assert states[525]["state"] == "closed"
+
+
 def test_malformed_required_issue_response_is_fatal(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     scopes = tmp_path / "scopes"
