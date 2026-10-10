@@ -1,0 +1,69 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.10.0-preview.1-semantic-annotations-and-metrics",
+  "release_target": "0.10.0-preview.1",
+  "story": 565,
+  "_comment": [
+    "First early-validation preview of the v0.10.0 capability wave after public v0.9.1; this declaration authorizes exactly 0.10.0-preview.1.",
+    "The inspected candidate starts at v0.9.1 commit 5a55bab4aaed9437f3c51797c1e794c87b5f3779 and contains current main through PR #1054 plus PR #1057. The actual published candidate is the exact merge commit of the reviewed PR that carries this declaration.",
+    "Required scope is the reviewed semantic annotation contract (#566), the layered/DDD annotation source family (#569), and PR #1057's correction of repository source metrics and Structure badge depth.",
+    "PR #1054 contributes the shared canonical-classifier seam, but #568 remains open for final package/catalog parity and full integration acceptance; this preview does not claim that task or the v0.10.0 capability wave complete.",
+    "The source-only annotation package and remaining role families, context composition, adoption guidance, and annotation-specific packed-consumer gate remain explicitly outside this preview. The four existing release packages do not yet distribute the full annotation source set.",
+    "Release-publisher fixes under #1042 were merged after the v0.9.1 tag to complete that previous publication and are present as delivered release-process context, not as v0.10 product capability. Dependency updates from PRs #1048 and #1051 are categorized separately in generated release notes.",
+    "The release-note delta is based on merged PRs #1045-#1048, #1050, #1051, #1053-#1055, and #1057; release-pipeline-only and test-only PRs are excluded from public notes by their existing ignore-for-release label.",
+    "Because v0.9.1 is the latest stable tag, the maintainer handoff must use release_type=preview and version_override=0.10.0-preview.1; automatic calculation would select 0.9.2-preview.1. This declaration authorizes no stable 0.10.0 or other preview number."
+  ],
+  "required_items": [
+    {
+      "issue": 566,
+      "finding": "semantic-annotation-contract",
+      "summary": "Define canonical annotation identities, source-only packaging boundaries, role semantics, metadata composition, and version compatibility"
+    },
+    {
+      "issue": 569,
+      "finding": "layered-ddd-annotation-sources",
+      "summary": "Add the reviewed layered/clean and DDD semantic annotation source definitions"
+    },
+    {
+      "issue": 1057,
+      "finding": "repository-metrics-badge-correction",
+      "summary": "Count source files and lines across ambiguous project ownership and include dependency depth in the Structure badge"
+    }
+  ],
+  "excluded_items": [
+    {
+      "issue": 567,
+      "reason": "The complete source-only ArchLinterNet.Annotations package distribution and integration of all approved role families remain open; this preview does not claim the finished package adoption experience."
+    },
+    {
+      "issue": 568,
+      "reason": "The candidate contains the already-merged shared classifier seam from PR #1054, but the issue remains open for package/catalog parity and full integration acceptance."
+    },
+    {
+      "issue": 570,
+      "reason": "CQRS, messaging, and web/API annotation families are separate open v0.10 work and are not required for this early preview."
+    },
+    {
+      "issue": 571,
+      "reason": "Infrastructure, UI, and Unity annotation families are separate open v0.10 work and are not required for this early preview."
+    },
+    {
+      "issue": 572,
+      "reason": "The complete bounded context metadata composition model remains open; this preview does not claim its final semantics."
+    },
+    {
+      "issue": 573,
+      "reason": "The full annotation-first adoption, migration, compatibility, and AI-authoring guidance remains open and is not claimed by this preview."
+    },
+    {
+      "issue": 574,
+      "reason": "Annotation-specific packed external-consumer acceptance remains open; the preview uses only the existing release package set and does not claim final v0.10.0 consumer acceptance."
+    }
+  ],
+  "delivered_items": [
+    {
+      "issue": 1042,
+      "reason": "The v0.9.1 immutable-release correction was completed after its tag; publisher fixes now present in this candidate are prior-release process context, not v0.10 product scope."
+    }
+  ]
+}

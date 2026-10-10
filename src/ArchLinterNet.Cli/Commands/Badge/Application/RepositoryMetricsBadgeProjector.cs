@@ -43,9 +43,10 @@ internal static class RepositoryMetricsBadgeProjector
                     Complete("source lines", FormatSourceLines(sourceLines)),
                 RepositoryMetricsBadgeKind.Repository when metrics.Size.Projects is int projects && metrics.Size.Types is int types =>
                     Complete("repository", $"{FormatCount(projects)} projects · {FormatCount(types)} types"),
-                RepositoryMetricsBadgeKind.Structure when metrics.Coupling.DependencyCount is int dependencies
+                RepositoryMetricsBadgeKind.Structure when metrics.Structure.MaxDependencyDepth is int depth
+                    && metrics.Coupling.DependencyCount is int dependencies
                     && metrics.Structure.LargestSccSize is int largestScc =>
-                    Complete("structure", $"{FormatCount(dependencies)} deps · SCC {FormatCount(largestScc)}"),
+                    Complete("structure", $"depth {FormatCount(depth)} · {FormatCount(dependencies)} deps · SCC {FormatCount(largestScc)}"),
                 _ => Unavailable(kind),
             };
         }
