@@ -33,7 +33,7 @@ internal static class LayerIndependenceChecker
                 ArchitectureLayer forbiddenLayer =
                     ArchitectureLayerResolver.ResolveLayer(context.Document, contract.Name, forbiddenLayerName);
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(
-                    sourceTypes, forbiddenLayer, Array.Empty<string>(), executionContext, null,
+                    sourceTypes, forbiddenLayer, Array.Empty<string>(), executionContext, context.ReferenceGraph,
                     context.RoleIndex, context.ExpressionFacts));
             }
         }
