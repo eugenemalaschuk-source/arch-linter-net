@@ -69,6 +69,8 @@ in the existing bounded report, not another comment or a new governance decision
 
 Source lines and optional grouped Repository/Structure badges are absolute
 snapshots, not PR deltas or quality grades. Health uses its own separate badge.
+The Structure badge groups maximum dependency depth, dependency count and
+largest SCC size.
 The upstream repository publishes metrics beside Health on its existing raw
 badge branch, using verified producer artifacts. That is a
 [repository-specific publication example](repository-ci.md), not a requirement
