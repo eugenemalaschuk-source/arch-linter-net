@@ -147,6 +147,21 @@ def test_github_release_notes_link_to_the_evergreen_provenance_guide() -> None:
     assert "https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/" in workflow
 
 
+def test_dry_run_generates_reviewable_notes_before_publication() -> None:
+    workflow = _workflow()
+    notes_job = _job(workflow, "generate-release-notes")
+    release_job = _job(workflow, "release")
+
+    assert "if: ${{ inputs.publish == true }}" not in notes_job
+    assert "contents: write" in notes_job
+    assert "releases/generate-notes" in notes_job
+    assert "name: release-notes-${{ needs.prepare-candidate.outputs.package_version }}" in notes_job
+    assert "generate-release-notes" in release_job
+    assert "if: ${{ inputs.publish == true }}" in release_job
+    assert "Download reviewed release notes artifact" in release_job
+    assert "Upload release notes artifact" not in release_job
+
+
 def test_provenance_job_attests_exact_frozen_subject_inventories_with_least_privilege() -> None:
     workflow = _workflow()
     attestation_job = workflow.split("  attest-prepublication-provenance:\n", maxsplit=1)[1].split(
@@ -229,7 +244,7 @@ def test_nuget_metadata_contains_the_experimental_support_boundary(tmp_path: Pat
 
 @pytest.mark.parametrize("generated_notes", ("", "## What's Changed\n* Fixes and experimental Relay changes\n"))
 def test_generated_release_notes_render_support_boundary_before_changelog(generated_notes: str) -> None:
-    run = _step_run("release", "Generate release notes after Checkpoint B")
+    run = _step_run("generate-release-notes", "Generate release notes after Checkpoint B")
     # Execute the existing renderer, not a second implementation or a mocked expected string.
     # GitHub's generated body is input; this never calls GitHub or creates a release.
     match = re.search(r"\| \{\n(?P<body>.*?)\n\s*\} \\", run, re.DOTALL)
