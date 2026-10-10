@@ -141,6 +141,7 @@ public static class ArchitectureHealthProjector
         IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes)
     {
         ArchitectureAssessmentCompletionEvidence[] completion = outcomes
+            .Where(outcome => string.Equals(outcome.Mode, "strict", StringComparison.Ordinal))
             .Select(outcome => outcome.Outcome.AssessmentCompletionEvidence)
             .Where(evidence => evidence is not null)
             .Cast<ArchitectureAssessmentCompletionEvidence>()

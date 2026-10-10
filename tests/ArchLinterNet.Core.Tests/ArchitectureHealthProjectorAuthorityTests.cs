@@ -74,15 +74,30 @@ public sealed class ArchitectureHealthProjectorAuthorityTests
             "Sample.Api.Service",
             "Sample.Infrastructure.Repository",
             ["Sample.Infrastructure.Repository"]);
+        ArchitectureAssessmentCompletionEvidence auditCompletion = ArchitectureApplicabilityEvaluator.Evaluate(
+            [new ArchitectureApplicabilityExpectedEntry(
+                "audit-layering",
+                "dependency",
+                ArchitectureApplicabilityMembership.Required,
+                new ArchitectureApplicabilityProvenance("dependency", "audit-layering", "audit-policy"))],
+            [new ArchitectureApplicabilityRecord(
+                "audit-layering",
+                "dependency",
+                ArchitectureApplicabilityRecordState.Evaluable,
+                new ArchitectureApplicabilityProvenance("dependency", "audit-layering", "audit-policy"))],
+            conformancePassed: false)!;
         ArchitectureHealthSummary summary = Project(
-            [Outcome("strict"), Outcome("audit", passed: false, violations: [auditFinding])],
+            [Outcome("strict"), Outcome("audit", passed: false, completion: auditCompletion, violations: [auditFinding])],
             DebtGate());
 
         ArchitectureHealthReason reason = Dimension(summary, "audit_evidence").Reasons.Single();
         Assert.Multiple(() =>
         {
+            Assert.That(auditCompletion.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Fail));
             Assert.That(summary.Gate, Is.EqualTo(ArchitectureHealthGate.Pass));
             Assert.That(Dimension(summary, "current_evaluation").State,
+                Is.EqualTo(ArchitectureHealthDimensionState.Pass));
+            Assert.That(Dimension(summary, "applicability").State,
                 Is.EqualTo(ArchitectureHealthDimensionState.Pass));
             Assert.That(Dimension(summary, "audit_evidence").State,
                 Is.EqualTo(ArchitectureHealthDimensionState.Degrading));

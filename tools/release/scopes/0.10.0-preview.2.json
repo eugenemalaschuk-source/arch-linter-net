@@ -1,0 +1,64 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.10.0-preview.2-health-audit-applicability",
+  "release_target": "0.10.0-preview.2",
+  "story": 565,
+  "_comment": [
+    "Second early-validation preview of the v0.10.0 capability wave, following the published v0.10.0-preview.1 tag at 784e877f39497fe80a2ae1befc8fc7ca5c7e244c. The actual candidate source is the merge commit of the reviewed preparation PR.",
+    "The next target is 0.10.0-preview.2: the repository's normal preview calculation increments the existing preview.1 tag, so the maintainer should use release_type=preview without version_override.",
+    "The candidate delta after preview.1 is the Architecture Health audit/applicability correction tracked by #1061. It prevents audit-only completion failures from failing strict applicability while retaining the audit evidence.",
+    "Preview.1 already shipped the v0.10 contract (#566), layered/DDD annotation sources (#569), and repository metrics/dependency-depth badge correction (#1057); they remain delivered context in this cumulative candidate, not new preview.2 work.",
+    "Open annotation package/catalog, additional role-family, context metadata, adoption guidance, and packed-consumer work remains excluded. In particular, #574 remains the required packed-artifact gate for final stable v0.10.0. This declaration authorizes exactly 0.10.0-preview.2 and no stable or other preview target."
+  ],
+  "required_items": [
+    {
+      "issue": 1061,
+      "finding": "audit-applicability-gate-isolation",
+      "summary": "Keep audit-only applicability failures observable without allowing them to fail the strict Architecture Health gate"
+    }
+  ],
+  "excluded_items": [
+    {
+      "issue": 567,
+      "reason": "The source-only annotation package distribution and integration of the complete approved annotation set remain open; this preview does not claim package adoption completion."
+    },
+    {
+      "issue": 568,
+      "reason": "Canonical classifier integration remains open for package/catalog parity and full integration acceptance; the shared classifier seam shipped in preview.1 does not complete this work."
+    },
+    {
+      "issue": 570,
+      "reason": "CQRS, messaging, and web/API annotation families are separate open v0.10 work and are not required for this early preview."
+    },
+    {
+      "issue": 571,
+      "reason": "Infrastructure, UI, and Unity annotation families are separate open v0.10 work and are not required for this early preview."
+    },
+    {
+      "issue": 572,
+      "reason": "The bounded semantic context metadata model remains open and is not claimed complete by this preview."
+    },
+    {
+      "issue": 573,
+      "reason": "Annotation-first adoption, migration, compatibility, and AI-authoring guidance remains open and is not required for this early preview."
+    },
+    {
+      "issue": 574,
+      "reason": "Packed external-consumer acceptance remains the release gate for stable v0.10.0; this preview does not claim that gate or stable release completion."
+    }
+  ],
+  "delivered_items": [
+    {
+      "issue": 566,
+      "reason": "The v0.10 semantic annotation contract was included in published preview.1; it is prior-preview context, not new preview.2 work."
+    },
+    {
+      "issue": 569,
+      "reason": "Layered and DDD annotation sources were included in published preview.1; they are prior-preview context, not new preview.2 work."
+    },
+    {
+      "issue": 1057,
+      "reason": "The repository source metrics and Structure badge depth correction was included in published preview.1; it is prior-preview context, not new preview.2 work."
+    }
+  ]
+}

@@ -484,11 +484,11 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 13
+    assert len(declarations) == len(by_target) == 14
     assert set(by_target) == {
         "0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4",
         "0.8.0", "0.8.1", "0.8.2", "0.9.0-preview.1", "0.9.0", "0.9.1",
-        "0.10.0-preview.1",
+        "0.10.0-preview.1", "0.10.0-preview.2",
     }
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
@@ -614,6 +614,17 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
         semantic_preview["_comment"]
     )
     assert "version_override=0.10.0-preview.1" in " ".join(semantic_preview["_comment"])
+
+    next_preview = by_target["0.10.0-preview.2"]
+    assert next_preview["declaration_id"] == "v0.10.0-preview.2-health-audit-applicability"
+    assert next_preview["story"] == 565
+    assert {item["issue"] for item in next_preview["required_items"]} == {1061}
+    assert {item["issue"] for item in next_preview["excluded_items"]} == {
+        567, 568, 570, 571, 572, 573, 574,
+    }
+    assert {item["issue"] for item in next_preview["delivered_items"]} == {566, 569, 1057}
+    assert "exactly 0.10.0-preview.2" in " ".join(next_preview["_comment"])
+    assert "without version_override" in " ".join(next_preview["_comment"])
 
 
 def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoption(
