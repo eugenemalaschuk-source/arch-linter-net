@@ -46,7 +46,7 @@ internal static class ContextDependencyChecker
         // does not itself deduplicate (it walks interfaces/base type/fields/properties/methods/
         // constructors independently), and a target matching more than one forbidden selector must
         // still produce exactly one finding per source/target pair, not one per matching selector.
-        foreach (Type referencedType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType).Distinct())
+        foreach (Type referencedType in context.ReferenceGraph.GetReferencedTypes(sourceType).Distinct())
         {
             if (context.IsExcludedFromContextMatch(referencedType, contract.Exclude, sourceDescriptor, sourceType))
             {

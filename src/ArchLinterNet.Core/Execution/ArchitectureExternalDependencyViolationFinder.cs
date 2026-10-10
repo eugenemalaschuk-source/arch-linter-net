@@ -12,14 +12,17 @@ internal static class ArchitectureExternalDependencyViolationFinder
         Type[] sourceTypes,
         ArchitectureExternalDependencyGroup externalGroup,
         ArchitectureContractExecutionContext executionContext,
-        IReadOnlyCollection<string>? excludedTypes = null)
+        IReadOnlySet<string>? excludedTypes = null,
+        ArchitectureReferenceGraph? referenceGraph = null)
     {
         return sourceTypes
             .Select(type =>
             {
                 string sourceType = ArchitectureTypeNames.SafeFullName(type);
                 string sourceAssembly = type.Assembly.GetName().Name ?? string.Empty;
-                string[] forbiddenReferences = ArchitectureReferenceScanner.GetReferencedTypes(type)
+                string[] forbiddenReferences = (referenceGraph == null
+                        ? ArchitectureReferenceScanner.GetReferencedTypes(type)
+                        : referenceGraph.GetReferencedTypes(type))
                     .Select(reference => new
                     {
                         FullName = ArchitectureTypeNames.SafeFullName(reference),

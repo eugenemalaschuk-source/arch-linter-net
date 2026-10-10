@@ -24,7 +24,7 @@ internal static class AcyclicSiblingChecker
             }
 
             Dictionary<string, HashSet<string>> graph =
-                BuildSiblingReferenceGraph(siblingGroups, ancestor, executionContext);
+                BuildSiblingReferenceGraph(siblingGroups, ancestor, context.ReferenceGraph, executionContext);
 
             IReadOnlyCollection<string> ancestorCycles = ArchitectureCycleDetector.FindCycles(graph);
 
@@ -37,6 +37,7 @@ internal static class AcyclicSiblingChecker
     private static Dictionary<string, HashSet<string>> BuildSiblingReferenceGraph(
         Dictionary<string, List<Type>> siblingGroups,
         string ancestor,
+        ArchitectureReferenceGraph referenceGraph,
         ArchitectureContractExecutionContext executionContext)
     {
         Dictionary<string, HashSet<string>> graph = new(StringComparer.Ordinal);
@@ -52,7 +53,7 @@ internal static class AcyclicSiblingChecker
 
             foreach (Type sourceType in sourceEntry.Value)
             {
-                CollectSiblingCycleEdges(sourceType, sourceSibling, siblingGroups, ancestor, executionContext, graph);
+                CollectSiblingCycleEdges(sourceType, sourceSibling, siblingGroups, ancestor, referenceGraph, executionContext, graph);
             }
         }
 
@@ -64,13 +65,14 @@ internal static class AcyclicSiblingChecker
         string sourceSibling,
         Dictionary<string, List<Type>> siblingGroups,
         string ancestor,
+        ArchitectureReferenceGraph referenceGraph,
         ArchitectureContractExecutionContext executionContext,
         Dictionary<string, HashSet<string>> graph)
     {
         string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
         string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty;
 
-        foreach (Type referencedType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
+        foreach (Type referencedType in referenceGraph.GetReferencedTypes(sourceType))
         {
             string referencedTypeName = ArchitectureTypeNames.SafeFullName(referencedType);
             string? referencedSibling = ResolveSiblingGroup(siblingGroups, referencedTypeName, ancestor);

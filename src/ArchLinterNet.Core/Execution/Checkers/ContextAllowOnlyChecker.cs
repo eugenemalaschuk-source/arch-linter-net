@@ -43,7 +43,7 @@ internal static class ContextAllowOnlyChecker
         // GetReferencedTypes does not itself deduplicate, so a target referenced via more than one
         // member (field, property, method signature, etc.) must be collapsed before evaluation —
         // otherwise it would produce one violation per occurrence instead of one per source/target pair.
-        foreach (Type referencedType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType).Distinct())
+        foreach (Type referencedType in context.ReferenceGraph.GetReferencedTypes(sourceType).Distinct())
         {
             if (!IsCandidateViolation(
                     contract, referencedType, context, sourceDescriptor, sourceType,

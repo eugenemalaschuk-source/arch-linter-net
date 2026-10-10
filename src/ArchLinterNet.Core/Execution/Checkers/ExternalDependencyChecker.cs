@@ -37,7 +37,8 @@ internal static class ExternalDependencyChecker
                 externalGroupName,
                 sourceTypes,
                 externalGroup,
-                executionContext));
+                executionContext,
+                referenceGraph: context.ReferenceGraph));
 
             violations.AddRange(ilScanner.FindMethodBodyViolations(
                 sourceTypes,
@@ -66,13 +67,15 @@ internal static class ExternalDependencyChecker
             .OrderBy(name => name, StringComparer.Ordinal);
 
         string allowedGroupsSuffix = $" (allowed groups: [{string.Join(", ", contract.Allowed)}])";
+        HashSet<string> allowedTypes = new(contract.AllowedTypes, StringComparer.Ordinal);
 
         foreach (string externalGroupName in disallowedGroups)
         {
             ArchitectureExternalDependencyGroup externalGroup = context.Document.ExternalDependencies[externalGroupName];
 
             foreach (ArchitectureViolation violation in ArchitectureExternalDependencyViolationFinder.FindViolations(
-                         externalGroupName, sourceTypes, externalGroup, executionContext, contract.AllowedTypes))
+                         externalGroupName, sourceTypes, externalGroup, executionContext,
+                         allowedTypes, context.ReferenceGraph))
             {
                 violations.Add(violation with { ForbiddenNamespace = violation.ForbiddenNamespace + allowedGroupsSuffix });
             }
