@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="..\..\schema\dependencies.arch.schema.json" Link="Schema\dependencies.arch.schema.json" />
+    <EmbeddedResource Include="..\..\architecture\semantic-annotations.v1.json" Link="SemanticAnnotations\semantic-annotations.v1.json" LogicalName="ArchLinterNet.Core.SemanticAnnotations.semantic-annotations.v1.json" />
     <EmbeddedResource Include="..\..\schema\dependencies.arch.fragment.schema.json" Link="Schema\dependencies.arch.fragment.schema.json" />
     <EmbeddedResource Include="..\..\schema\baseline.schema.json" Link="Schema\baseline.schema.json" />
     <!-- Frozen packaged-registry snapshots of the policy-root/policy-fragment schemas, distinct
@@ -51,16 +52,15 @@
     <EmbeddedResource Include="..\..\schema\0.8.0\normalized-finding.schema.json" Link="Schema\0.8.0\normalized-finding.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.normalized-finding.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.8.0\analysis-cache.schema.json" Link="Schema\0.8.0\analysis-cache.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.analysis-cache.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.8.0\baseline.schema.json" Link="Schema\0.8.0\baseline.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.baseline.schema.json" />
-    <!-- The manifest itself is release-qualified (its own $id/bytes are the immutable contract),
-         so advancing any entry (policy-root/policy-fragment to 0.8.0) requires a new manifest
-         generation rather than editing schema/0.5.1/compatibility-manifest.json in place - that
-         file stays byte-for-byte frozen (preserved, no longer embedded) alongside the frozen
-         policy-root/policy-fragment schemas above. PackagedSchemaRegistry loads this 0.8.0
-         manifest, which lists the schemas that advanced at 0.8.0 and every unaffected schema at
-         its existing 0.5.1 identity. The frozen finding/cache schemas are also shipped as
-         non-discoverable legacy content so offline consumers retain the exact 0.5.1 and 0.6.1
-         contracts while the registry resolves the current 0.8.0 resources. -->
+    <!-- The 0.8.0 manifest and its listed schema bytes remain immutable and packaged for existing
+         consumers. PackagedSchemaRegistry loads the 0.10.0 manifest, which advances only the
+         analysis-cache entry to its new 0.10.0 identity while retaining the policy-root,
+         policy-fragment, baseline, and normalized-finding identities at 0.8.0 and unaffected
+         entries at 0.5.1. Frozen finding/cache resources at 0.5.1, 0.6.1, and 0.8.0 remain
+         packaged as legacy contracts. -->
     <EmbeddedResource Include="..\..\schema\0.8.0\compatibility-manifest.json" Link="Schema\0.8.0\compatibility-manifest.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.compatibility-manifest.json" />
+    <EmbeddedResource Include="..\..\schema\0.10.0\analysis-cache.schema.json" Link="Schema\0.10.0\analysis-cache.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.10.0.analysis-cache.schema.json" />
+    <EmbeddedResource Include="..\..\schema\0.10.0\compatibility-manifest.json" Link="Schema\0.10.0\compatibility-manifest.json" LogicalName="ArchLinterNet.Core.Schema.0.10.0.compatibility-manifest.json" />
     <EmbeddedResource Include="..\..\schema\0.5.1\api-snapshot.schema.json" Link="Schema\0.5.1\api-snapshot.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.5.1.api-snapshot.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.6.1\normalized-finding.schema.json" Link="Schema\0.6.1\normalized-finding.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.6.1.normalized-finding.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.5.1\analysis-build-state.schema.json" Link="Schema\0.5.1\analysis-build-state.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.5.1.analysis-build-state.schema.json" />
@@ -72,6 +72,8 @@
     <Content Include="..\..\schema\0.8.0\analysis-cache.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.8.0/analysis-cache.schema.json" />
     <Content Include="..\..\schema\0.8.0\baseline.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.8.0/baseline.schema.json" />
     <Content Include="..\..\schema\0.8.0\compatibility-manifest.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.8.0/" />
+    <Content Include="..\..\schema\0.10.0\analysis-cache.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.10.0/analysis-cache.schema.json" />
+    <Content Include="..\..\schema\0.10.0\compatibility-manifest.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.10.0/" />
     <Content Include="..\..\schema\0.5.1\api-snapshot.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />
     <Content Include="..\..\schema\0.5.1\baseline.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />
     <Content Include="..\..\schema\0.5.1\normalized-finding.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />

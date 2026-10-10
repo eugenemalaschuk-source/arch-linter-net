@@ -57,6 +57,14 @@ public sealed class AnalysisCacheSchemaValidationTests
             ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
             ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>())
         {
+            CanonicalAnnotationDiagnostics =
+            [
+                new ArchitectureCanonicalAnnotationDiagnostic(
+                    "MyApp.Domain.Order",
+                    "UnsupportedAnnotationPackageVersion",
+                    "The annotation package version is outside the supported range.",
+                    ["ArchLinterNet.Annotations.EntityAttribute"]),
+            ],
             PolicyInventory = new ArchitecturePolicyInventory(
                 ArchitecturePolicyInventory.CurrentSchemaId,
                 2,
@@ -163,6 +171,7 @@ public sealed class AnalysisCacheSchemaValidationTests
             AnalysisCacheEntryV1 entry = BuildSampleEntry(cacheRoot);
             JsonObject json = JsonNode.Parse(JsonSerializer.Serialize(entry, AnalysisCacheJson.Options))!.AsObject();
             Assert.That(json.Remove("WorkProvenance"), Is.True);
+            Assert.That(json["Outcome"]!.AsObject().Remove("CanonicalAnnotationDiagnostics"), Is.True);
 
             EvaluationResults evaluation = LoadSchema().Evaluate(
                 json, new EvaluationOptions { OutputFormat = OutputFormat.List });

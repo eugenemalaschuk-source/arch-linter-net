@@ -63,6 +63,8 @@ public sealed record ValidationOutcome
     public IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries { get; init; }
     public IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts { get; init; }
     public IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures { get; init; }
+    public IReadOnlyCollection<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics { get; init; } =
+        Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>();
 
     /// <summary>
     /// Preserves the public positional-record deconstruction shape that callers used before the

@@ -62,6 +62,43 @@ public sealed class AnalysisCacheOutcomeMapperExternalEvidenceTests
         });
     }
 
+    [Test]
+    public void CanonicalAnnotationDiagnosticsAndRoleEvidence_RoundTripThroughCacheV1()
+    {
+        ArchitectureCanonicalAnnotationDiagnostic diagnostic = ArchitectureCanonicalAnnotationDiagnostic.Create(
+            "Example.Order", "UnsupportedCatalogGeneration", "Unsupported annotation catalog generation.",
+            "ArchLinterNet.Annotations.EntityAttribute");
+        ArchitectureClassificationRoleFact role = new(
+            "Example.Order", "Entity", ArchitectureClassificationSource.TypeAttribute,
+            "Example.DomainMarkerAttribute", new Dictionary<string, object>())
+        {
+            EvidenceSources = ["ArchLinterNet.Annotations.EntityAttribute", "Example.DomainMarkerAttribute"]
+        };
+        ValidationOutcome original = PassingOutcome() with
+        {
+            ClassificationRoles = [role],
+            CanonicalAnnotationDiagnostics = [diagnostic]
+        };
+
+        AnalysisCacheOutcomeV1 payload = AnalysisCacheOutcomeMapper.ToCacheOutcome(original);
+        string serialized = System.Text.Json.JsonSerializer.Serialize(payload, AnalysisCacheJson.Options);
+        AnalysisCacheOutcomeV1 deserialized = System.Text.Json.JsonSerializer.Deserialize<AnalysisCacheOutcomeV1>(
+            serialized, AnalysisCacheJson.Options)!;
+        ValidationOutcome reconstructed = AnalysisCacheOutcomeMapper.FromCacheOutcome(
+            deserialized, "/repo", Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
+            ArchitectureSourceExpansionInventory.Empty);
+
+        Assert.Multiple(() =>
+        {
+            ArchitectureCanonicalAnnotationDiagnostic reconstructedDiagnostic = reconstructed.CanonicalAnnotationDiagnostics.Single();
+            Assert.That(reconstructedDiagnostic.Code, Is.EqualTo(diagnostic.Code));
+            Assert.That(reconstructedDiagnostic.Message, Is.EqualTo(diagnostic.Message));
+            Assert.That(reconstructedDiagnostic.EvidenceSources, Is.EqualTo(diagnostic.EvidenceSources));
+            Assert.That(reconstructed.ClassificationRoles.Single().EvidenceSources, Is.EqualTo(role.EvidenceSources));
+            Assert.That(reconstructed.Passed, Is.True);
+        });
+    }
+
     private static ValidationOutcome PassingOutcome() => new(
         Passed: true,
         Violations: Array.Empty<ArchitectureViolation>(),

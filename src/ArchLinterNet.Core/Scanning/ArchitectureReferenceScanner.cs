@@ -186,6 +186,11 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
+    internal static IEnumerable<ArchitectureTransitiveReference> EnumerateTransitiveReferencedTypes(
+        Type type,
+        Func<Type, bool>? traversePredicate = null) =>
+        ArchitectureTransitiveReferenceTraversal.Enumerate(type, GetReferencedTypes, traversePredicate);
+
     private static IEnumerable<Type> EnumerateBaseTypes(Type type)
     {
         foreach (Type interfaceType in SafeGetInterfaces(type))

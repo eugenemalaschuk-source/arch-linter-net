@@ -60,6 +60,18 @@ Implemented classification evidence includes type attributes, assembly attribute
 
 Schema-accepted fields explicitly documented as deferred/no-op remain deferred. Presence in YAML schema alone is not proof that runtime analysis is implemented.
 
+### Canonical semantic annotations (v0.10.0 development)
+
+The v0.10.0 annotation-aware tool recognizes the 49 canonical role attributes listed in the manifest-backed `semanticAnnotations.roleAnnotations` capability projection. Matching uses the exact fully qualified name (FQN), with these role names and scopes:
+
+- assembly scope: `DomainLayer`, `ApplicationLayer`, `InfrastructureLayer`, `PresentationLayer`, `ApiLayer`, `PersistenceLayer`, `IntegrationLayer`, `SharedKernel`, `UnityRuntime`, and `UnityEditor`;
+- type scope: `Entity`, `AggregateRoot`, `ValueObject`, `DomainService`, `DomainEvent`, `Repository`, `Specification`, `Factory`, `Command`, `CommandHandler`, `Query`, `QueryHandler`, `Event`, `EventHandler`, `IntegrationEvent`, `ReadModel`, `Controller`, `Endpoint`, `RequestDto`, `ResponseDto`, `ApiContract`, `Validator`, `Port`, `Adapter`, `AntiCorruptionLayer`, `DbContext`, `RepositoryImplementation`, `ExternalClient`, `MessageBusAdapter`, `FileSystemAdapter`, `ClockAdapter`, `View`, `ViewModel`, `Presenter`, `MonoBehaviourAdapter`, `ScriptableObjectAsset`, `InputAdapter`, and `SceneAdapter`;
+- both type and assembly scope: `CompositionRoot`.
+
+Every canonical FQN is under the reserved `ArchLinterNet.Annotations` namespace. Do not add `classification.attributes` or `classification.assembly_attributes` mappings for that namespace, including redundant mappings of a known role. The assembly must carry exactly one compatible generation 1 catalog marker for package range `[0.10.0,0.11.0)`; missing, malformed, duplicate, unsupported, or unknown reserved identities fail closed with compatibility diagnostics. Canonical annotations provide semantic evidence only: they do not create policy rules, grant reviewed API membership, or turn custom-mapping-only/deferred role names or metadata-only context attributes into role annotations.
+
+Released v0.9.1 tools do not recognize these canonical identities. The source-only `ArchLinterNet.Annotations` package and built-in recognition are being developed for v0.10.0 and have not shipped.
+
 ## Bounded reasoning rules
 
 When authoring or reviewing:

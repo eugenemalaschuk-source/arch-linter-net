@@ -18,6 +18,7 @@ public sealed class ArchitectureTypeClassificationResult
         Evidence = evidence;
         Conflicts = conflicts;
         MetadataFailures = metadataFailures;
+        EvidenceSources = evidence is null ? Array.Empty<string>() : new[] { evidence };
     }
 
     public string? Role { get; }
@@ -34,6 +35,11 @@ public sealed class ArchitectureTypeClassificationResult
     public IReadOnlyList<ArchitectureClassificationConflict> Conflicts { get; }
 
     public IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures { get; }
+
+    public IReadOnlyList<string> EvidenceSources { get; init; }
+
+    public IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics { get; init; } =
+        Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>();
 }
 
 // Per-source (type_attribute, assembly_attribute, inheritance, or namespace) resolved candidate,
@@ -46,8 +52,26 @@ internal sealed record ArchitectureAttributeClassificationCandidate(
     IReadOnlyList<ArchitectureClassificationConflict> Conflicts,
     IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures)
 {
+    public IReadOnlyList<string> EvidenceSources { get; init; } =
+        Evidence is null ? Array.Empty<string>() : new[] { Evidence };
+
+    public IReadOnlyList<ArchitectureAttributeRoleEvidence> ObservedEvidence { get; init; } =
+        Role is null || Evidence is null
+            ? Array.Empty<ArchitectureAttributeRoleEvidence>()
+            : new[] { new ArchitectureAttributeRoleEvidence(Role, Metadata, Evidence) };
+
+    public IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics { get; init; } =
+        Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>();
+
+    public bool Blocked { get; init; }
+
     public static readonly ArchitectureAttributeClassificationCandidate Empty = new(
         null, new Dictionary<string, object>(), null,
         Array.Empty<ArchitectureClassificationConflict>(),
         Array.Empty<ArchitectureClassificationMetadataFailure>());
 }
+
+internal sealed record ArchitectureAttributeRoleEvidence(
+    string Role,
+    IReadOnlyDictionary<string, object> Metadata,
+    string Evidence);

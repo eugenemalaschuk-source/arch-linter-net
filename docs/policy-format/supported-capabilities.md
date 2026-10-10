@@ -86,6 +86,18 @@ Contextual dependency/allow-only and semantic port-boundary contracts use discov
 
 Fields documented as deferred or reserved are not silently promoted to support just because a schema accepts them.
 
+### Canonical semantic annotations
+
+Annotation-aware v0.10.0 development builds recognize the exact FQNs in the machine inventory's `semanticAnnotations.roleAnnotations` projection. The 49 role names are scoped as follows:
+
+- assembly: `DomainLayer`, `ApplicationLayer`, `InfrastructureLayer`, `PresentationLayer`, `ApiLayer`, `PersistenceLayer`, `IntegrationLayer`, `SharedKernel`, `UnityRuntime`, and `UnityEditor`;
+- type: `Entity`, `AggregateRoot`, `ValueObject`, `DomainService`, `DomainEvent`, `Repository`, `Specification`, `Factory`, `Command`, `CommandHandler`, `Query`, `QueryHandler`, `Event`, `EventHandler`, `IntegrationEvent`, `ReadModel`, `Controller`, `Endpoint`, `RequestDto`, `ResponseDto`, `ApiContract`, `Validator`, `Port`, `Adapter`, `AntiCorruptionLayer`, `DbContext`, `RepositoryImplementation`, `ExternalClient`, `MessageBusAdapter`, `FileSystemAdapter`, `ClockAdapter`, `View`, `ViewModel`, `Presenter`, `MonoBehaviourAdapter`, `ScriptableObjectAsset`, `InputAdapter`, and `SceneAdapter`;
+- type and assembly: `CompositionRoot`.
+
+The reserved namespace is `ArchLinterNet.Annotations`; all recognized identities use exact FQN matching. YAML cannot map or remap any FQN in this namespace, including a redundant mapping of a known canonical role. Canonical evidence requires exactly one compatible generation 1 catalog identity and package version in `[0.10.0,0.11.0)`; compatibility failures and unknown reserved FQNs are diagnosed and canonical evidence is suppressed. These annotations provide evidence for the existing classification model and do not create policy rules or grant reviewed API membership. Roles listed as custom-mapping-only or deferred in the manifest, and metadata-only context attributes, are not canonical role annotations.
+
+Released v0.9.1 does not recognize these identities. The source-only annotation package and v0.10.0 recognition remain under development.
+
 ## CLI and governance workflows
 
 The CLI supports normal validation plus:

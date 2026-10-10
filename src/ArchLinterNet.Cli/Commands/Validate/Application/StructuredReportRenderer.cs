@@ -101,6 +101,7 @@ internal sealed class StructuredReportRenderer
             : ArchitectureDiagnosticFormatter.AddWaiversToCiArtifacts(result, outcome.Waivers);
         result = ArchitectureDiagnosticFormatter.AddPolicyInventoryToCiArtifacts(result, outcome.PolicyInventory);
         result = AddImportedDiagnosticsToJson(result, outcome.ImportedDiagnosticFindings);
+        result = AddCanonicalAnnotationDiagnosticsToJson(result, outcome.CanonicalAnnotationDiagnostics);
         result = AddRepositoryMetricsToJson(result, outcome.RepositoryMetrics);
 
         return ReportApplicabilityRenderer.AddAssessmentCompletionToJson(
@@ -122,6 +123,27 @@ internal sealed class StructuredReportRenderer
         }
 
         payload["repository_metrics"] = JsonNode.Parse(RepositoryMetricsJson.Serialize(metrics));
+        return payload.ToJsonString();
+    }
+
+    private static string AddCanonicalAnnotationDiagnosticsToJson(
+        string json,
+        IReadOnlyCollection<ArchitectureCanonicalAnnotationDiagnostic> diagnostics)
+    {
+        if (diagnostics.Count == 0)
+        {
+            return json;
+        }
+
+        JsonNode document = JsonNode.Parse(json)
+            ?? throw new InvalidOperationException("The validation JSON report was empty.");
+        if (document is not JsonObject payload)
+        {
+            throw new InvalidOperationException("The validation JSON report was not an object.");
+        }
+
+        payload["canonical_annotation_diagnostics"] = JsonSerializer.SerializeToNode(
+            ArchitectureDiagnosticFormatter.BuildCanonicalAnnotationDiagnosticsJson(diagnostics));
         return payload.ToJsonString();
     }
 
@@ -159,9 +181,68 @@ internal sealed class StructuredReportRenderer
             mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics,
             outcome.CoverageSummaries, outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
         result = AddImportedDiagnosticsToSarif(result, outcome.ImportedDiagnosticFindings, cancellationToken);
+        result = AddCanonicalAnnotationDiagnosticsToSarif(result, outcome.CanonicalAnnotationDiagnostics, cancellationToken);
 
         return ReportApplicabilityRenderer.AddAssessmentCompletionToSarif(
             result, outcome.AssessmentCompletionEvidence, outcome.ApplicabilityProjection);
+    }
+
+    private static string AddCanonicalAnnotationDiagnosticsToSarif(
+        string json,
+        IReadOnlyCollection<ArchitectureCanonicalAnnotationDiagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        if (diagnostics.Count == 0)
+        {
+            return json;
+        }
+
+        JsonNode document = JsonNode.Parse(json)
+            ?? throw new InvalidOperationException("The SARIF report was empty.");
+        JsonObject run = document["runs"]?.AsArray().FirstOrDefault()?.AsObject()
+            ?? throw new InvalidOperationException("The SARIF report contained no run.");
+        JsonArray results = run["results"]?.AsArray() ?? new JsonArray();
+        run["results"] = results;
+        JsonObject driver = run["tool"]?["driver"]?.AsObject()
+            ?? throw new InvalidOperationException("The SARIF report contained no tool driver.");
+        JsonArray rules = driver["rules"]?.AsArray() ?? new JsonArray();
+        driver["rules"] = rules;
+
+        foreach (ArchitectureCanonicalAnnotationDiagnostic diagnostic in diagnostics
+                     .OrderBy(value => value.Subject, StringComparer.Ordinal)
+                     .ThenBy(value => value.Code, StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string ruleId = "canonical-annotation:" + diagnostic.Code;
+            int ruleIndex = rules.Select((rule, index) => (rule, index))
+                .FirstOrDefault(pair => string.Equals(pair.rule?["id"]?.GetValue<string>(), ruleId, StringComparison.Ordinal), (null, -1)).index;
+            if (ruleIndex < 0)
+            {
+                ruleIndex = rules.Count;
+                rules.Add(new JsonObject
+                {
+                    ["id"] = ruleId,
+                    ["shortDescription"] = new JsonObject { ["text"] = diagnostic.Code }
+                });
+            }
+
+            results.Add(new JsonObject
+            {
+                ["ruleId"] = ruleId,
+                ["ruleIndex"] = ruleIndex,
+                ["level"] = "note",
+                ["message"] = new JsonObject { ["text"] = $"{diagnostic.Subject}: {diagnostic.Message}" },
+                ["properties"] = new JsonObject
+                {
+                    ["category"] = "canonical-annotation",
+                    ["subject"] = diagnostic.Subject,
+                    ["diagnosticCode"] = diagnostic.Code,
+                    ["evidenceSources"] = JsonSerializer.SerializeToNode(diagnostic.EvidenceSources)
+                }
+            });
+        }
+
+        return document.ToJsonString();
     }
 
     // Reuses the Core SARIF formatter (the same one ArchitectureExternalEvidenceBinder's caller

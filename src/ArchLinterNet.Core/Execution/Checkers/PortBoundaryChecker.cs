@@ -29,7 +29,8 @@ internal static class PortBoundaryChecker
             // dropped from the reference scan, not merely skipped - the source's real target set may
             // be incomplete, so a forbidden direct edge could vanish with no violation and no signal.
             // Report that explicitly instead of letting the contract pass on partial evidence.
-            bool scanComplete = ArchitectureReferenceScanner.TryGetReferencedTypes(source, out List<Type> referencedTypes);
+            bool scanComplete = checkerContext.ReferenceGraph.TryGetReferencedTypes(
+                source, out IReadOnlyList<Type> referencedTypes);
             if (!scanComplete && !context.IsIgnored(
                     sourceName,
                     UnsupportedEvidenceReference,

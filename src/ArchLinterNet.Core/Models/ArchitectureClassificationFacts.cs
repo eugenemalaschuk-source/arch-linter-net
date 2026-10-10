@@ -52,7 +52,12 @@ public sealed record ArchitectureClassificationRoleFact(
     string Role,
     ArchitectureClassificationSource Source,
     string? Evidence,
-    IReadOnlyDictionary<string, object> Metadata);
+    IReadOnlyDictionary<string, object> Metadata)
+{
+    /// <summary>All exact attribute full names that coalesced into this role assignment.</summary>
+    public IReadOnlyList<string> EvidenceSources { get; init; } =
+        Evidence is null ? Array.Empty<string>() : new[] { Evidence };
+}
 
 // Recorded once per policy load when classification.path declares at least one entry - path-convention
 // classification depends on source/declared-type fact discovery (issue #171) and produces no role

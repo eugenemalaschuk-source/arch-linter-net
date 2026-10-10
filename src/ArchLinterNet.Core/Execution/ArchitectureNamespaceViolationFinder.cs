@@ -18,6 +18,7 @@ internal static class ArchitectureNamespaceViolationFinder
         ArchitectureRoleIndex? roleIndex = null,
         ArchitectureExpressionFactService? expressionFacts = null)
     {
+        HashSet<string> allowedTypes = new(allowedTypeFullNames, StringComparer.Ordinal);
         return sourceTypes
             .Select(type =>
             {
@@ -39,7 +40,7 @@ internal static class ArchitectureNamespaceViolationFinder
                         x.Reference
                     })
                     .Where(x => !string.IsNullOrEmpty(x.FullName))
-                    .Where(x => !allowedTypeFullNames.Contains(x.FullName))
+                    .Where(x => !allowedTypes.Contains(x.FullName))
                     .Where(x => !executionContext.IsIgnored(
                         sourceFullName, x.FullName,
                         sourceAssembly: sourceAssemblyName,
@@ -85,13 +86,14 @@ internal static class ArchitectureNamespaceViolationFinder
         ArchitectureRoleIndex? roleIndex = null,
         ArchitectureExpressionFactService? expressionFacts = null)
     {
+        HashSet<string> allowedTypes = new(allowedTypeFullNames, StringComparer.Ordinal);
         HashSet<Assembly> assemblySet = targetAssemblies.ToHashSet();
         Func<Type, bool> traversePredicate = t => assemblySet.Contains(t.Assembly);
 
         return sourceTypes
             .OrderBy(type => ArchitectureTypeNames.SafeFullName(type), StringComparer.Ordinal)
             .Select(type => BuildTransitiveViolation(
-                type, forbiddenLayer, allowedTypeFullNames, executionContext, referenceGraph, traversePredicate,
+                type, forbiddenLayer, allowedTypes, executionContext, referenceGraph, traversePredicate,
                 roleIndex, expressionFacts))
             .Where(violation => violation != null)!;
     }
@@ -99,7 +101,7 @@ internal static class ArchitectureNamespaceViolationFinder
     private static ArchitectureViolation? BuildTransitiveViolation(
         Type type,
         ArchitectureLayer forbiddenLayer,
-        IReadOnlyCollection<string> allowedTypeFullNames,
+        IReadOnlySet<string> allowedTypeFullNames,
         ArchitectureContractExecutionContext executionContext,
         ArchitectureReferenceGraph? referenceGraph,
         Func<Type, bool> traversePredicate,
@@ -112,14 +114,14 @@ internal static class ArchitectureNamespaceViolationFinder
         HashSet<string> matchedPrefixes = new(StringComparer.Ordinal);
         List<IReadOnlyCollection<string>> paths = new();
 
-        IEnumerable<(Type referenced, List<Type> path)> transitiveReferences = referenceGraph != null
-            ? referenceGraph.GetTransitiveReferencedTypes(type, traversePredicate)
-            : ArchitectureReferenceScanner.GetTransitiveReferencedTypes(type, traversePredicate);
+        IEnumerable<ArchitectureTransitiveReference> transitiveReferences = referenceGraph != null
+            ? referenceGraph.EnumerateTransitiveReferencedTypes(type, traversePredicate)
+            : ArchitectureReferenceScanner.EnumerateTransitiveReferencedTypes(type, traversePredicate);
 
-        foreach (var (referenced, path) in transitiveReferences)
+        foreach (ArchitectureTransitiveReference traversal in transitiveReferences)
         {
             CollectForbiddenTransitiveReference(
-                referenced, path, forbiddenLayer, allowedTypeFullNames, executionContext, sourceFullName,
+                traversal, forbiddenLayer, allowedTypeFullNames, executionContext, sourceFullName,
                 sourceAssemblyName, forbiddenRefs, matchedPrefixes, paths, roleIndex, expressionFacts);
         }
 
@@ -149,10 +151,9 @@ internal static class ArchitectureNamespaceViolationFinder
     }
 
     private static void CollectForbiddenTransitiveReference( // NOSONAR: traversal state is intentionally explicit and mutable.
-        Type referenced,
-        List<Type> path,
+        ArchitectureTransitiveReference traversal,
         ArchitectureLayer forbiddenLayer,
-        IReadOnlyCollection<string> allowedTypeFullNames,
+        IReadOnlySet<string> allowedTypeFullNames,
         ArchitectureContractExecutionContext executionContext,
         string sourceFullName,
         string? sourceAssemblyName,
@@ -162,6 +163,7 @@ internal static class ArchitectureNamespaceViolationFinder
         ArchitectureRoleIndex? roleIndex,
         ArchitectureExpressionFactService? expressionFacts)
     {
+        Type referenced = traversal.Referenced;
         string refFullName = ArchitectureTypeNames.SafeFullName(referenced);
         if (string.IsNullOrEmpty(refFullName))
         {
@@ -195,7 +197,7 @@ internal static class ArchitectureNamespaceViolationFinder
             matchedPrefixes.Add(match.MatchedNamespacePrefix);
         }
 
-        paths.Add(path.Select(ArchitectureTypeNames.SafeFullName)
+        paths.Add(traversal.BuildPath().Select(ArchitectureTypeNames.SafeFullName)
             .Where(n => !string.IsNullOrEmpty(n))
             .ToArray());
     }
