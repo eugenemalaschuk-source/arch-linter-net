@@ -108,8 +108,8 @@ public sealed class ArchitectureSourceFileFactIndex
     internal IReadOnlyList<ArchitectureTypeSourceDeclaration> SourceDeclarations => _data.Value.SourceDeclarations;
 
     // Do not force lazy source materialization merely to publish an input manifest. If a contract
-    // consumed source text, BuildData retained the exact files successfully passed to the parser;
-    // otherwise there are no source files to protect from this analysis session.
+    // or repository-metrics inventory consumed source text, BuildData retained the exact readable
+    // files; otherwise there are no source files to protect from this analysis session.
     internal IReadOnlyList<string> ConsumedSourceInputPaths => _data.IsValueCreated
         ? _data.Value.ConsumedSourceInputPaths
         : Array.Empty<string>();
