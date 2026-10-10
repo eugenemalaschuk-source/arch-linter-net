@@ -8,8 +8,8 @@
 - [x] 2.1 Include maximum dependency depth in the Structure badge message and fail closed when it is missing.
 - [x] 2.2 Update repository metrics documentation with the grouped badge contents.
 - [x] 2.3 Run focused CLI tests, formatting, lint, and OpenSpec validation.
-- [ ] 2.4 Archive the completed OpenSpec change and revalidate all specs.
+- [x] 2.4 Archive the completed OpenSpec change and revalidate all specs.
 
 ## 3. Pull request
 
-- [ ] 3.1 Review the final diff and update the existing ArchLinterNet pull request.
+- [x] 3.1 Review the final diff and update the existing ArchLinterNet pull request.
