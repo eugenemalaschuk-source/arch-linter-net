@@ -12,7 +12,7 @@ public sealed class CanonicalAnnotationTestingAdapterTests
     {
         ArchitectureCanonicalAnnotationDiagnostic diagnostic = ArchitectureCanonicalAnnotationDiagnostic.Create(
             "Example.Order", "MissingCatalogIdentity", "Assembly is missing a catalog identity marker.",
-            "ArchLinterNet.Annotations.EntityAttribute");
+            "ArchLinterNet.Annotations.CommandHandlerAttribute");
         var result = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
             true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>())
         {

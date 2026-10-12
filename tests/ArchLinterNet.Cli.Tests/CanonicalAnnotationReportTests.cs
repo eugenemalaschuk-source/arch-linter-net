@@ -12,7 +12,9 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class CanonicalAnnotationReportTests
 {
-    private static ValidationOutcome Outcome => new(
+    private static ValidationOutcome CreateOutcome(
+        IReadOnlyList<ArchitectureClassificationRoleFact>? classificationRoles = null,
+        IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic>? canonicalAnnotationDiagnostics = null) => new(
         true,
         Array.Empty<ArchitectureViolation>(),
         Array.Empty<string>(),
@@ -25,62 +27,90 @@ public sealed class CanonicalAnnotationReportTests
         Array.Empty<ArchitectureCoverageSummary>(),
         Array.Empty<ArchitectureClassificationConflict>(),
         Array.Empty<ArchitectureClassificationMetadataFailure>())
-    {
-        ClassificationRoles =
+        {
+            ClassificationRoles = classificationRoles ?? Array.Empty<ArchitectureClassificationRoleFact>(),
+            CanonicalAnnotationDiagnostics = canonicalAnnotationDiagnostics
+            ?? Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>()
+        };
+
+    private static ValidationOutcome CanonicalRoleOutcome => CreateOutcome(
+        classificationRoles:
         [
             new ArchitectureClassificationRoleFact(
-                "Example.Order", "Entity", ArchitectureClassificationSource.TypeAttribute,
-                "ArchLinterNet.Annotations.EntityAttribute", new Dictionary<string, object>())
+                "ValidCatalog.Order", "CommandHandler", ArchitectureClassificationSource.TypeAttribute,
+                "ArchLinterNet.Annotations.CommandHandlerAttribute",
+                new Dictionary<string, object> { ["boundedContext"] = "Sales", ["module"] = "Orders" })
             {
                 EvidenceSources = [
-                    "ArchLinterNet.Annotations.EntityAttribute",
+                    "ArchLinterNet.Annotations.CommandHandlerAttribute",
                     "Example.DomainMarkerAttribute"
                 ]
             }
-        ],
-        CanonicalAnnotationDiagnostics =
+        ]);
+
+    private static ValidationOutcome MissingCatalogIdentityOutcome => CreateOutcome(
+        canonicalAnnotationDiagnostics:
         [
             ArchitectureCanonicalAnnotationDiagnostic.Create(
-                "Example.Order", "MissingCatalogIdentity",
-                "Assembly 'Example' is missing its annotation catalog marker.",
-                "ArchLinterNet.Annotations.EntityAttribute")
-        ]
-    };
+                "MissingIdentity.Order", "MissingCatalogIdentity",
+                "Assembly 'MissingIdentity' is missing its annotation catalog marker.",
+                "ArchLinterNet.Annotations.CommandHandlerAttribute")
+        ]);
 
     [Test]
-    public void JsonReport_ProjectsCanonicalDiagnosticsAndAllRoleEvidenceSources()
+    public void JsonReport_ProjectsCanonicalRoleAndAllRoleEvidenceSources()
     {
         var renderer = new StructuredReportRenderer(new CliRuntime());
-        string result = renderer.Render("json", true, [("strict", Outcome)]);
+        string result = renderer.Render("json", true, [("strict", CanonicalRoleOutcome)]);
         using JsonDocument json = JsonDocument.Parse(result);
 
         JsonElement role = json.RootElement.GetProperty("classification_roles")[0];
-        JsonElement diagnostic = json.RootElement.GetProperty("canonical_annotation_diagnostics")[0];
         Assert.Multiple(() =>
         {
             Assert.That(json.RootElement.GetProperty("passed").GetBoolean(), Is.True);
+            Assert.That(role.GetProperty("role").GetString(), Is.EqualTo("CommandHandler"));
+            Assert.That(role.GetProperty("metadata").GetProperty("boundedContext").GetString(), Is.EqualTo("Sales"));
             Assert.That(role.GetProperty("evidence_sources").EnumerateArray()
                 .Select(value => value.GetString()).ToArray(), Is.EqualTo(new[]
                 {
-                    "ArchLinterNet.Annotations.EntityAttribute",
+                    "ArchLinterNet.Annotations.CommandHandlerAttribute",
                     "Example.DomainMarkerAttribute"
                 }));
+            Assert.That(
+                json.RootElement.TryGetProperty("canonical_annotation_diagnostics", out _),
+                Is.False);
+        });
+    }
+
+    [Test]
+    public void JsonReport_ProjectsMissingCatalogIdentityWithoutCanonicalRole()
+    {
+        var renderer = new StructuredReportRenderer(new CliRuntime());
+        string result = renderer.Render("json", true, [("strict", MissingCatalogIdentityOutcome)]);
+        using JsonDocument json = JsonDocument.Parse(result);
+
+        JsonElement roles = json.RootElement.GetProperty("classification_roles");
+        JsonElement diagnostic = json.RootElement.GetProperty("canonical_annotation_diagnostics")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(roles.GetArrayLength(), Is.Zero);
             Assert.That(diagnostic.GetProperty("code").GetString(), Is.EqualTo("MissingCatalogIdentity"));
             Assert.That(diagnostic.GetProperty("evidence_sources")[0].GetString(),
-                Is.EqualTo("ArchLinterNet.Annotations.EntityAttribute"));
+                Is.EqualTo("ArchLinterNet.Annotations.CommandHandlerAttribute"));
         });
     }
 
     [Test]
     public void HumanAndSarifReports_ExposeCanonicalDiagnosticsWithoutChangingPassState()
     {
-        string human = new HumanReportRenderer(new CliRuntime()).Render(true, [("strict", Outcome)]);
-        string sarif = new StructuredReportRenderer(new CliRuntime()).Render("sarif", true, [("strict", Outcome)]);
+        ValidationOutcome outcome = MissingCatalogIdentityOutcome;
+        string human = new HumanReportRenderer(new CliRuntime()).Render(true, [("strict", outcome)]);
+        string sarif = new StructuredReportRenderer(new CliRuntime()).Render("sarif", true, [("strict", outcome)]);
         using JsonDocument json = JsonDocument.Parse(sarif);
 
         Assert.Multiple(() =>
         {
-            Assert.That(Outcome.Passed, Is.True);
+            Assert.That(outcome.Passed, Is.True);
             Assert.That(human, Does.Contain("MissingCatalogIdentity"));
             Assert.That(human, Does.Contain("Classification findings:"));
             Assert.That(sarif, Does.Contain("canonical-annotation:MissingCatalogIdentity"));
@@ -94,7 +124,7 @@ public sealed class CanonicalAnnotationReportTests
     public void CoverageReport_ListsCanonicalDiagnosticsAsInformationalEvidence()
     {
         string validationJson = new StructuredReportRenderer(new CliRuntime())
-            .Render("json", true, [("strict", Outcome)]);
+            .Render("json", true, [("strict", MissingCatalogIdentityOutcome)]);
         using JsonDocument json = JsonDocument.Parse(validationJson);
         string coverage = CoverageReportRenderer.Render(json.RootElement, null, "/repo", diffFailed: false, maxFailures: null);
 
@@ -103,7 +133,7 @@ public sealed class CanonicalAnnotationReportTests
             Assert.That(coverage, Does.Contain("**Status:** ✅ pass"));
             Assert.That(coverage, Does.Contain("### Canonical annotation diagnostics (1)"));
             Assert.That(coverage, Does.Contain("MissingCatalogIdentity"));
-            Assert.That(coverage, Does.Contain("ArchLinterNet.Annotations.EntityAttribute"));
+            Assert.That(coverage, Does.Contain("ArchLinterNet.Annotations.CommandHandlerAttribute"));
         });
     }
 }
