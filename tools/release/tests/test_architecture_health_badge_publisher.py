@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".github" / "workflows"
 STAGE_B_ACTION_REF = (
     "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion"
-    "@e18fb064bc38a9b7321b77d329e85e5b430c9cbe"
+    "@641b0377fb123d7327142005b1422c31903161d8"
 )
 
 
@@ -60,8 +60,8 @@ def test_repository_metrics_badges_use_canonical_evidence_in_the_trusted_pipelin
 
 def test_reusable_workflow_resolves_its_action_from_the_workflow_repository() -> None:
     workflow = read_workflow("architecture-health-badge-promotion.yml")
-    # Stage B of #982 intentionally updates the live reusable workflow before
-    # the post-merge inventory rotation can bind the final #981 squash SHA.
+    # Keep the live publisher on a reviewed merged-history action snapshot whose
+    # embedded registry carries the current first-party producer workflow pin.
     assert f"uses: {STAGE_B_ACTION_REF}" in workflow
     assert "uses: ./.github/actions/architecture-health-badge-promotion" not in workflow
 
