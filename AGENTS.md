@@ -159,6 +159,8 @@ load and follow the `feature-implementation` skill. Treat the URL as the workflo
 
 Do not ask the user to repeat the workflow or confirm that implementation should begin. This routing rule does not apply to pull request URLs. Do not merge the resulting pull request unless explicitly requested.
 
+For issue-driven feature work, the pull request title MUST exactly match the GitHub issue title, copied verbatim including its typed prefix, capitalization, and punctuation. Do not replace it with a commit-style title or append an issue number unless that text is already part of the issue title.
+
 ## Release preparation routing
 When the current user asks to prepare, ready, close, or otherwise assemble repository-side content/authority for a concrete ArchLinterNet release, load and follow the `release-preparation` skill.
 

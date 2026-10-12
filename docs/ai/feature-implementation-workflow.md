@@ -185,6 +185,8 @@ Follow repository commit conventions, push the feature branch without rewriting 
 
 Open exactly one PR targeting `main` unless repository instructions specify otherwise. Include `Closes #<issue-number>` when appropriate and use these body sections:
 
+The PR title MUST match the GitHub issue title verbatim, including its typed prefix, capitalization, and punctuation. Copy it exactly; do not convert it to a commit-style title or append an issue number unless that text is already in the issue title.
+
 - `Summary`
 - `Architecture notes`
 - `Scope / non-goals`
