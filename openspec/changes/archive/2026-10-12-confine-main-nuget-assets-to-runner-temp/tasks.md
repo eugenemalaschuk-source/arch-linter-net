@@ -1,0 +1,3 @@
+- [x] 1.1 Route CLI `--assets` through the existing runner-temp path validator.
+- [x] 1.2 Add tests for runner-temp acceptance and rejection outside the runner root.
+- [x] 2.1 Run release-tooling tests and validate/archive the OpenSpec change.

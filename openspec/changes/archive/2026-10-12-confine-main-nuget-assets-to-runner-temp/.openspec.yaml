@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-12
+goal: Keep the main package smoke verifier compatible with the runner-owned
+  restore output while preventing arbitrary filesystem reads.

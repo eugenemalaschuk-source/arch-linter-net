@@ -1,6 +1,7 @@
 # release-tooling-workspace-confinement Specification
 
 ## Purpose
+
 TBD - created by archiving change fix-sonarcloud-new-code-debt. Update Purpose after archive.
 
 ## Requirements
@@ -86,7 +87,8 @@ value, accepts the candidate only when it remains contained by that resolved roo
 `ValueError` naming the argument otherwise. The boundary SHALL not accept paths solely because they
 share a filename with a workflow log, and it SHALL remain limited to explicitly designated
 read-only verification inputs. Sonar verification SHALL treat both the scanner log and the Sonar
-project analyses response as designated inputs under this boundary.
+project analyses response as designated inputs under this boundary. The main package verifier SHALL
+also treat its `--assets` NuGet restore output as a designated read-only input under this boundary.
 
 #### Scenario: The workflow-owned Sonar scanner log is accepted
 
@@ -102,6 +104,13 @@ project analyses response as designated inputs under this boundary.
 - **THEN** it reads the response for current-revision verification without treating it as a
   release-workspace path
 
+#### Scenario: Runner-owned main NuGet assets are accepted
+
+- **WHEN** `verify_restored_main_packages.py` receives `--assets` pointing to the restored
+  `project.assets.json` under the current resolved `RUNNER_TEMP` root
+- **THEN** it reads the assets file for package-version verification without treating it as a
+  release-workspace path
+
 #### Scenario: Arbitrary external Sonar verification inputs are rejected
 
 - **WHEN** `main_quality_coverage.py verify-sonar` receives either a scanner-log path or an analyses
@@ -109,12 +118,17 @@ project analyses response as designated inputs under this boundary.
   home-directory, sibling-workspace, traversal, or symlink-resolved external path
 - **THEN** it raises a `ValueError` before reading that input
 
+#### Scenario: Arbitrary external main NuGet assets are rejected
+
+- **WHEN** `verify_restored_main_packages.py` receives a `--assets` path outside the current resolved
+  `RUNNER_TEMP` root
+- **THEN** it raises a `ValueError` before reading that input
+
 #### Scenario: A missing or mismatched runner context fails closed
 
-- **WHEN** `RUNNER_TEMP` is unset or either Sonar verification input is not contained by its
-  resolved value
-- **THEN** `main_quality_coverage.py verify-sonar` rejects the input with a `ValueError` and does
-  not read it
+- **WHEN** `RUNNER_TEMP` is unset or a designated runner-temp verification input is not contained by
+  its resolved value
+- **THEN** the verifier rejects the input with a `ValueError` and does not read it
 
 ### Requirement: Confinement survives SonarCloud Python security analysis
 

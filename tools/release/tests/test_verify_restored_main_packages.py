@@ -54,3 +54,48 @@ def test_unreadable_or_invalid_assets_are_rejected(tmp_path: Path) -> None:
     invalid.write_text(json.dumps({"libraries": []}), encoding="utf-8")
     with pytest.raises(ValueError, match="libraries"):
         verifier.verify_restored_main_packages(invalid, "0.8.0-main.11")
+
+
+def test_cli_accepts_assets_under_runner_temp(tmp_path: Path, monkeypatch, capsys) -> None:
+    version = "0.8.0-main.11"
+    runner_temp = tmp_path / "runner-temp"
+    workspace = runner_temp / "arch-linter-main-package-smoke" / "library"
+    assets = workspace / "obj" / "project.assets.json"
+    assets.parent.mkdir(parents=True)
+    _write_assets(
+        assets,
+        f"ArchLinterNet.CEL/{version}",
+        f"ArchLinterNet.Core/{version}",
+        f"ArchLinterNet.Testing/{version}",
+    )
+    monkeypatch.setenv("RUNNER_TEMP", str(runner_temp))
+    monkeypatch.chdir(workspace)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["verify_restored_main_packages.py", "--assets", "obj/project.assets.json", "--version", version],
+    )
+
+    verifier.main()
+
+    assert f"Verified restored ArchLinterNet library package set {version}." in capsys.readouterr().out
+
+
+def test_cli_rejects_assets_outside_runner_temp_before_read(tmp_path: Path, monkeypatch, capsys) -> None:
+    version = "0.8.0-main.11"
+    runner_temp = tmp_path / "runner-temp"
+    runner_temp.mkdir()
+    outside_assets = tmp_path / "outside-assets.json"
+    _write_assets(outside_assets, f"ArchLinterNet.CEL/{version}")
+    monkeypatch.setenv("RUNNER_TEMP", str(runner_temp))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["verify_restored_main_packages.py", "--assets", str(outside_assets), "--version", version],
+    )
+
+    with pytest.raises(SystemExit) as error:
+        verifier.main()
+
+    assert error.value.code == 2
+    assert "outside the runner-provided RUNNER_TEMP directory" in capsys.readouterr().err

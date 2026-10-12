@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from _release_workspace import _safe_path
+from _release_workspace import _github_runner_temp_path
 
 LIBRARY_PACKAGE_IDS = (
     "ArchLinterNet.CEL",
@@ -79,7 +79,7 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> None:
     arguments = _parser().parse_args()
     try:
-        assets_path = _safe_path(arguments.assets, "NuGet assets file")
+        assets_path = _github_runner_temp_path(arguments.assets, "NuGet assets file", "RUNNER_TEMP")
         verify_restored_main_packages(assets_path, arguments.version)
     except ValueError as error:
         print(f"Error: {error}", file=sys.stderr)
