@@ -190,6 +190,48 @@ def test_attestation_subject_checksums_are_exact_and_deterministic(tmp_path: Pat
     assert all(line.count("  ") == 1 for line in package_lines + evidence_lines)
 
 
+def test_manifest_creation_rejects_output_outside_the_release_workspace(tmp_path: Path) -> None:
+    packages, _ = _candidate(tmp_path)
+    output = tmp_path.parent / f"{tmp_path.name}-outside-manifest.json"
+
+    with pytest.raises(ValueError, match="outside the release workspace"):
+        manifest._create(argparse.Namespace(
+            packages_dir=packages,
+            version=_VERSION,
+            source_commit=_COMMIT,
+            output=output,
+        ))
+
+    assert not output.exists()
+
+
+def test_checksum_rendering_rejects_output_outside_the_release_workspace(tmp_path: Path) -> None:
+    packages, candidate_manifest = _candidate(tmp_path)
+    output = tmp_path.parent / f"{tmp_path.name}-outside-checksums.txt"
+
+    with pytest.raises(ValueError, match="outside the release workspace"):
+        manifest._render_checksums(argparse.Namespace(manifest=candidate_manifest, output=output))
+
+    assert not output.exists()
+
+
+def test_attestation_rendering_rejects_output_outside_the_release_workspace(tmp_path: Path) -> None:
+    packages, candidate_manifest = _candidate(tmp_path)
+    checksums = _release_evidence(packages, candidate_manifest)
+    output = tmp_path.parent / f"{tmp_path.name}-outside-subjects.txt"
+
+    with pytest.raises(ValueError, match="outside the release workspace"):
+        manifest._render_attestation_subject_checksums(argparse.Namespace(
+            packages_dir=packages,
+            manifest=candidate_manifest,
+            checksums=checksums,
+            subject_class="package",
+            output=output,
+        ))
+
+    assert not output.exists()
+
+
 def test_main_dispatches_the_verified_manifest_path_listing(tmp_path: Path, monkeypatch, capsys) -> None:
     packages, output = _candidate(tmp_path)
     monkeypatch.setattr(sys, "argv", [

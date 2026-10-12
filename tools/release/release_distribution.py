@@ -309,11 +309,14 @@ def _git_blob_object(source_root: Path, blob_sha: str) -> bytes:
     the exact source blob is still present in the merged tree. The blob identity remains the
     immutable boundary; the mutable checkout or index must not replace it.
     """
+    if not isinstance(blob_sha, str) or not _GIT_BLOB_PATTERN.fullmatch(blob_sha):
+        raise ValueError("The approved publisher blob identity is invalid.")
+    # A lowercase, fixed-width object ID cannot be parsed as a Git option.
     completed = subprocess.run(
         ["git", "-C", str(source_root), "cat-file", "blob", blob_sha],
         check=False,
         capture_output=True,
-    )  # NOSONAR(S4721,S8707)
+    )  # NOSONAR(S6350,S4721,S8707)
     if completed.returncode != 0:
         details = completed.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError(f"Approved publisher blob '{blob_sha}' is unavailable: {details}")
@@ -340,6 +343,8 @@ def _index_blob(source_root: Path, relative: str) -> bytes:
 
 
 def _approved_source_bytes(source_root: Path, relative: str, inventory: dict[str, Any]) -> tuple[bytes, str, str]:
+    if relative not in (_WORKFLOW_PATH, _ACTION_PATH):
+        raise ValueError("Only the approved publisher workflow and action may use an immutable source.")
     component = next(component for component in inventory["components"] if component["path"] == relative)
     commit = _APPROVED_PUBLISHER_COMMIT if relative == _WORKFLOW_PATH else _APPROVED_PUBLISHER_ACTION_COMMIT
     try:
@@ -373,24 +378,32 @@ def _approved_source_bytes(source_root: Path, relative: str, inventory: dict[str
 
 
 def _source_bytes(source_root: Path, member: dict[str, Any], source_commit: str, inventory: dict[str, Any]) -> tuple[bytes, dict[str, Any]]:
-    relative = member["path"]
-    if member["source"] == "working-tree":
+    source_commit = _validate_source_commit(source_commit)
+    if not isinstance(member, dict):
+        raise ValueError("The bundle member is invalid.")
+    relative = member.get("path")
+    reviewed_source = next(
+        (source for path, _, source in _REVIEWED_BUNDLE_MEMBERS if path == relative),
+        None,
+    )
+    if reviewed_source is None or member.get("source") != reviewed_source:
+        raise ValueError("The bundle member is outside the reviewed source allowlist.")
+    if reviewed_source == "working-tree":
         path = _safe_source_path(source_root, relative, "bundle source path")
         contents = path.read_bytes()
         # When the checkout contains the candidate commit, bind the working-tree source bytes to
         # that commit too. Unit fixtures may use a non-Git temporary tree, so the check is skipped
         # only when Git cannot resolve the fixture's synthetic commit.
+        # The commit uses the validated hex grammar and the member path is in the fixed allowlist.
         committed = subprocess.run(
             ["git", "-C", str(source_root), "cat-file", "blob", f"{source_commit}:{relative}"],
             check=False,
             capture_output=True,
-        )  # NOSONAR(S4721,S8707)
+        )  # NOSONAR(S6350,S4721,S8707)
         if committed.returncode == 0 and committed.stdout != contents:
             raise ValueError(f"Bundle source '{relative}' does not match source commit '{source_commit}'.")
         identity = {"kind": "candidate-source", "path": relative, "commit": source_commit}
     else:
-        if member["path"] not in (_WORKFLOW_PATH, _ACTION_PATH):
-            raise ValueError("Only the approved publisher workflow and action may use an immutable source.")
         contents, observed_sha, approved_commit = _approved_source_bytes(source_root, relative, inventory)
         identity = {
             "kind": "approved-immutable-commit",
@@ -875,7 +888,8 @@ def _render_attestation_subject_checksums(arguments: argparse.Namespace) -> None
     }:
         raise ValueError("Attestation output cannot overwrite a transport subject or evidence file.")
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # This canonical destination is workspace-confined and cannot replace validated inputs.
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")  # NOSONAR(S2083)
 
 
 def _paths(arguments: argparse.Namespace) -> None:

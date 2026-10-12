@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import _release_workspace  # noqa: E402
 import create_release_scope_evidence as generator  # noqa: E402
+from _release_workspace import _allowed_roots  # noqa: E402
 from create_release_scope_evidence import (  # noqa: E402
     _issue_number,
     _read_declaration,
@@ -406,6 +407,19 @@ def test_path_inside_the_workspace_is_accepted(tmp_path: Path, monkeypatch) -> N
     monkeypatch.chdir(tmp_path)
 
     assert _safe_path(Path("nested/file.json"), "output") == (tmp_path / "nested" / "file.json").resolve()
+
+
+def test_allowed_roots_ignore_untrusted_cwd_and_git_markers(tmp_path: Path, monkeypatch) -> None:
+    repository_root = _release_workspace._repository_root()
+    fake_workspace = tmp_path / "attacker-controlled-workspace"
+    fake_workspace.mkdir()
+    (fake_workspace / ".git").mkdir()
+    monkeypatch.setattr(_release_workspace, "_allowed_roots", _allowed_roots)
+    monkeypatch.chdir(fake_workspace)
+
+    assert _allowed_roots() == (repository_root,)
+    with pytest.raises(ValueError, match="resolves outside the release workspace"):
+        _safe_path(fake_workspace / "outside.json", "candidate manifest")
 
 
 def test_incomparable_root_is_treated_as_not_containing(tmp_path: Path, monkeypatch) -> None:

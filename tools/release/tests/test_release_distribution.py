@@ -290,9 +290,9 @@ def test_shallow_publisher_source_fallback_prefers_pinned_blob_over_staged_bytes
     tmp_path: Path, monkeypatch
 ) -> None:
     repository = tmp_path / "shallow-checkout"
-    action_path = repository / ".github" / "actions" / "publisher" / "action.yml"
+    action_path = repository / distribution._ACTION_PATH
     action_path.parent.mkdir(parents=True)
-    relative = ".github/actions/publisher/action.yml"
+    relative = distribution._ACTION_PATH
     expected_bytes = b"name: publisher\n"
     action_path.write_bytes(expected_bytes)
 
@@ -340,7 +340,7 @@ def test_publisher_source_fallback_without_git_index_requires_exact_workspace_by
     tmp_path: Path, monkeypatch
 ) -> None:
     fixture = tmp_path / "non-git-fixture"
-    relative = ".github/actions/publisher/action.yml"
+    relative = distribution._ACTION_PATH
     action_path = fixture / relative
     action_path.parent.mkdir(parents=True)
     expected_bytes = b"name: publisher\n"
@@ -368,6 +368,37 @@ def test_publisher_source_fallback_without_git_index_requires_exact_workspace_by
     action_path.write_bytes(b"name: publisher\r\n")
     with pytest.raises(ValueError, match="digest mismatch"):
         distribution._approved_source_bytes(fixture, relative, inventory)
+
+
+def test_git_blob_object_rejects_non_hex_identity_before_subprocess(monkeypatch) -> None:
+    def fail_if_invoked(*_args: object, **_kwargs: object) -> object:
+        pytest.fail("invalid blob identity reached Git")
+
+    monkeypatch.setattr(distribution.subprocess, "run", fail_if_invoked)
+
+    with pytest.raises(ValueError, match="blob identity is invalid"):
+        distribution._git_blob_object(ROOT, "--help")
+
+
+@pytest.mark.parametrize(
+    ("member", "source_commit"),
+    [
+        ({"path": distribution._WORKFLOW_PATH, "source": "approved-commit"}, "--upload-pack=evil"),
+        ({"path": "../../etc/passwd", "source": "working-tree"}, "a" * 40),
+    ],
+)
+def test_source_bytes_rejects_untrusted_git_arguments_before_subprocess(
+    monkeypatch,
+    member: dict[str, str],
+    source_commit: str,
+) -> None:
+    def fail_if_invoked(*_args: object, **_kwargs: object) -> object:
+        pytest.fail("invalid source identity reached Git")
+
+    monkeypatch.setattr(distribution.subprocess, "run", fail_if_invoked)
+
+    with pytest.raises(ValueError):
+        distribution._source_bytes(ROOT, member, source_commit, {"components": []})
 
 
 def test_validate_version_accepts_release_line_neutral_semver_and_rejects_unicode_digits() -> None:

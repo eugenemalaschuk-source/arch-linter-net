@@ -210,8 +210,17 @@ def _create(arguments: argparse.Namespace) -> None:
     }
     _validate_v2(manifest)
     _verify_inventory(arguments.packages_dir, manifest)
-    arguments.output.parent.mkdir(parents=True, exist_ok=True)
-    arguments.output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output = _safe_path(arguments.output, "candidate manifest output")
+    protected_subjects = {
+        _safe_path(arguments.packages_dir / _expected_filename(package_id, arguments.version, kind), "package subject")
+        for package_id in _PACKAGE_IDS
+        for kind in _SUBJECT_KINDS
+    }
+    if output in protected_subjects:
+        raise ValueError("Candidate manifest output cannot overwrite a package subject.")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    # The output is confined by _safe_path above before it is written.
+    output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _verify(arguments: argparse.Namespace) -> None:
@@ -291,8 +300,12 @@ def _verify_release_evidence(
 
 def _render_checksums(arguments: argparse.Namespace) -> None:
     manifest = _load_manifest(arguments.manifest)
-    arguments.output.parent.mkdir(parents=True, exist_ok=True)
-    arguments.output.write_text(_checksum_text(manifest), encoding="utf-8")
+    output = _safe_path(arguments.output, "candidate checksum output")
+    if output == _safe_path(arguments.manifest, "candidate manifest"):
+        raise ValueError("Candidate checksum output cannot overwrite its manifest.")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    # The output is confined by _safe_path above before it is written.
+    output.write_text(_checksum_text(manifest), encoding="utf-8")  # NOSONAR(S2083)
 
 
 def _render_attestation_subject_checksums(arguments: argparse.Namespace) -> None:
@@ -303,8 +316,17 @@ def _render_attestation_subject_checksums(arguments: argparse.Namespace) -> None
     else:
         evidence_subjects = (arguments.manifest, arguments.checksums)
         lines = [f"{_sha256(path)}  {path.name}" for path in evidence_subjects]
-    arguments.output.parent.mkdir(parents=True, exist_ok=True)
-    arguments.output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    output = _safe_path(arguments.output, "attestation subject checksum output")
+    protected_paths = {
+        _safe_path(arguments.manifest, "candidate manifest"),
+        _safe_path(arguments.checksums, "candidate checksum evidence"),
+        *(_safe_path(arguments.packages_dir / subject["file"], "package subject") for subject in _subjects(manifest)),
+    }
+    if output in protected_paths:
+        raise ValueError("Attestation output cannot overwrite candidate evidence or a package subject.")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    # The output is confined by _safe_path above before it is written.
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _verify_release_evidence_command(arguments: argparse.Namespace) -> None:

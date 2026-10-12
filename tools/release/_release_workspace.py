@@ -14,11 +14,14 @@ def _repository_root() -> Path:
 
 
 def _allowed_roots() -> tuple[Path, ...]:
-    """Paths are accepted only inside the working tree or the repository this script ships in, so a
-    faulty caller (including an LLM agent invoking this script with a hallucinated path) cannot read
-    or write outside the release workspace. Resolved per call rather than at import time, so the
-    answer never depends on when the module was loaded."""
-    return (Path.cwd().resolve(), _repository_root())
+    """Allow paths only under the repository that ships this script.
+
+    The process CWD is caller-controlled. In particular, neither the CWD nor a ``.git`` marker
+    discovered above it is a trust anchor; an attacker can choose both. Derive the boundary from
+    this module's location so an invocation from ``/`` or a directory with a fake ``.git`` cannot
+    broaden the paths accepted by release tooling.
+    """
+    return (_repository_root(),)
 
 
 def _safe_path(value: Path, description: str) -> Path:
