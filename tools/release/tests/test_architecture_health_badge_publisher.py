@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -9,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".github" / "workflows"
 STAGE_B_ACTION_REF = (
     "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion"
-    "@641b0377fb123d7327142005b1422c31903161d8"
+    "@4756dbd313795fd169593e5b3e48cdeb1ba74fa1"
 )
 
 
@@ -60,10 +61,36 @@ def test_repository_metrics_badges_use_canonical_evidence_in_the_trusted_pipelin
 
 def test_reusable_workflow_resolves_its_action_from_the_workflow_repository() -> None:
     workflow = read_workflow("architecture-health-badge-promotion.yml")
-    # Keep the live publisher on a reviewed merged-history action snapshot whose
-    # embedded registry carries the current first-party producer workflow pin.
+    # Keep the live publisher on a reviewed merged-history action snapshot.
     assert f"uses: {STAGE_B_ACTION_REF}" in workflow
     assert "uses: ./.github/actions/architecture-health-badge-promotion" not in workflow
+
+
+def test_pinned_action_snapshot_embeds_the_current_first_party_producer_registry() -> None:
+    action_sha = STAGE_B_ACTION_REF.rsplit("@", 1)[1]
+    pinned_registry = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(ROOT),
+            "show",
+            f"{action_sha}:.github/badge-promotion/registry.json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    ).stdout
+    current_registry = json.loads((ROOT / ".github" / "badge-promotion" / "registry.json").read_text(encoding="utf-8"))
+    snapshot_registry = json.loads(pinned_registry)
+
+    for configuration_id in ("reference-public-raw", "reference-none"):
+        assert snapshot_registry["configurations"][configuration_id]["producer"] == current_registry[
+            "configurations"
+        ][configuration_id]["producer"], (
+            f"The live action snapshot {action_sha} must carry the current {configuration_id} producer pin. "
+            "Rotate the immutable action reference with the producer workflow/registry update."
+        )
 
 
 def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_boundary() -> None:
