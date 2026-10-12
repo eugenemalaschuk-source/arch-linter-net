@@ -26,6 +26,20 @@ def test_main_sonar_distinguishes_refresh_failure_from_processed_gate_failure() 
     assert "Require complete main telemetry" in workflow
 
 
+def test_pr_sonar_gate_failure_fails_the_required_coverage_check() -> None:
+    workflow = _read("ci.yml")
+    sonar_end_start = workflow.index("      - name: End SonarCloud analysis")
+    sonar_summary_start = workflow.index("      - name: Publish SonarCloud PR summary link", sonar_end_start)
+    sonar_end = workflow[sonar_end_start:sonar_summary_start]
+
+    assert "/d:sonar.qualitygate.wait=true" in workflow
+    assert "verify_sonar_quality_gate.py" in sonar_end
+    assert "continue-on-error: true" not in sonar_end
+    assert 'scanner_status="${PIPESTATUS[0]}"' in sonar_end
+    assert "steps.sonar_end.outputs.quality_gate" in workflow
+    assert "required Coverage + Sonar check fails" in workflow
+
+
 def test_main_package_workflow_restores_exact_build_before_safe_cleanup() -> None:
     workflow = _read("main-packages.yml")
     smoke_start = workflow.index("Verify exact published package set is consumable")

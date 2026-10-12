@@ -298,12 +298,21 @@ jobs:
       - name: End SonarCloud analysis
         id: sonar_end
         if: success() && steps.sonar_begin.outcome == 'success'
-        continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: bash
         run: |
-          ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+          set -uo pipefail
+          log="$RUNNER_TEMP/sonar-end.log"
+
+          set +e
+          ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN" 2>&1 | tee "$log"
+          scanner_status="${PIPESTATUS[0]}"
+          set -e
+
+          python3 tools/release/verify_sonar_quality_gate.py \
+            --scanner-exit-code "$scanner_status" \
+            --github-output "$GITHUB_OUTPUT" < "$log"
 
       - name: Publish SonarCloud PR summary link
         if: always() && env.TRUSTED_PR == 'true'
@@ -313,8 +322,9 @@ jobs:
             echo "### SonarCloud PR analysis"
             echo
             echo "- Scanner completion: ${{ steps.sonar_end.outcome || 'skipped' }}"
+            echo "- SonarCloud quality gate: ${{ steps.sonar_end.outputs.quality_gate || 'unknown/skipped' }}"
             echo "- Coverage reports: ${{ steps.coverage_reports.outputs.files != '' && 'found' || 'not found' }}"
-            echo "- Quality gate check: review the Sonar-created GitHub status/check on this pull request."
+            echo "- The required Coverage + Sonar check fails when the trusted PR analysis fails or has no verified Quality Gate result."
             echo "- SonarCloud PR analysis: [Open SonarCloud PR report](https://sonarcloud.io/summary/new_code?id=${SONAR_PROJECT_KEY}&pullRequest=${{ github.event.pull_request.number }})"
           } >> "$GITHUB_STEP_SUMMARY"
 
