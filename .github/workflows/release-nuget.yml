@@ -119,7 +119,7 @@ jobs:
         run: dotnet restore tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --nologo
 
       - name: Download immutable candidate packages
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/candidate
@@ -146,7 +146,7 @@ jobs:
         run: make ${{ matrix.shard.target }}
 
       - name: Upload Checkpoint B shard evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checkpoint-b-shard-${{ matrix.platform.id }}-${{ matrix.shard.id }}
           path: artifacts/checkpoint-b-shard
@@ -183,7 +183,7 @@ jobs:
           persist-credentials: false
 
       - name: Download immutable candidate manifest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/candidate
@@ -202,7 +202,7 @@ jobs:
             --checksums artifacts/candidate/transport/architecture-health-badge-release-checksums.txt
 
       - name: Download platform shard evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: checkpoint-b-shard-${{ matrix.platform.id }}-*
           path: artifacts/checkpoint-b-shards
@@ -215,7 +215,7 @@ jobs:
             --output artifacts/checkpoint-b/${{ matrix.platform.id }}/checkpoint-b-platform-evidence.json
 
       - name: Upload Checkpoint B platform evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checkpoint-b-evidence-${{ matrix.platform.id }}
           path: artifacts/checkpoint-b/${{ matrix.platform.id }}
@@ -237,10 +237,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
 
       - name: Download immutable candidate manifest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/candidate
@@ -263,7 +263,7 @@ jobs:
             --checksums artifacts/candidate/transport/architecture-health-badge-release-checksums.txt
 
       - name: Download repository-gate evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: checkpoint-b-repository-gates-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/checkpoint-b
@@ -275,7 +275,7 @@ jobs:
         run: python3 tools/release/create_release_scope_evidence.py --source-commit "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY" --mode "$CANDIDATE_AUTHORIZATION_MODE"
 
       - name: Download platform evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: checkpoint-b-evidence-*
           path: artifacts/checkpoint-b/platforms
@@ -284,7 +284,7 @@ jobs:
         run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --candidate-manifest artifacts/candidate/package-manifest.json --repository-gates artifacts/checkpoint-b/repository-gates.json --candidate-authorization artifacts/checkpoint-b/candidate-authorization.json --output-dir artifacts/checkpoint-b/release-evidence
 
       - name: Upload release evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checkpoint-b-release-evidence-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/checkpoint-b/release-evidence
@@ -326,7 +326,7 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
       - name: Verify Relay dependency and license evidence
         run: python3 tools/release/verify_relay_dependencies.py --source-root .
@@ -421,7 +421,7 @@ jobs:
         run: python3 tools/release/create_repository_gate_evidence.py --candidate-manifest artifacts/packages/package-manifest.json --source-commit "$GITHUB_SHA" --output artifacts/checkpoint-b/repository-gates.json
 
       - name: Upload package artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: nuget-candidate-${{ env.PACKAGE_VERSION }}
           path: |
@@ -429,7 +429,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload repository-gate evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checkpoint-b-repository-gates-${{ env.PACKAGE_VERSION }}
           path: artifacts/checkpoint-b/repository-gates.json
@@ -461,7 +461,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Download immutable candidate packages
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/candidate
@@ -486,7 +486,7 @@ jobs:
             --candidate-tree "$CANDIDATE_TREE"
 
       - name: Upload immutable release history-forensics bundle
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: release-forensics-${{ needs.prepare-candidate.outputs.package_version }}
           path: |
@@ -513,7 +513,7 @@ jobs:
           persist-credentials: false
 
       - name: Download Checkpoint-B-approved candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/packages
@@ -616,7 +616,7 @@ jobs:
           persist-credentials: false
 
       - name: Download frozen attested candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/packages
@@ -683,7 +683,7 @@ jobs:
             | tee artifacts/release-notes/release-notes.md
 
       - name: Upload release notes artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: release-notes-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/release-notes/release-notes.md
@@ -718,7 +718,7 @@ jobs:
           persist-credentials: false
 
       - name: Download validated candidate packages
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/packages
@@ -747,7 +747,7 @@ jobs:
             --checksums artifacts/packages/transport/architecture-health-badge-release-checksums.txt
 
       - name: Download reviewed release notes artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: release-notes-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/release-notes
@@ -785,19 +785,19 @@ jobs:
           persist-credentials: false
 
       - name: Download release notes artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: release-notes-${{ needs.release.outputs.package_version }}
           path: artifacts/release-notes
 
       - name: Download package artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: nuget-candidate-${{ needs.release.outputs.package_version }}
           path: artifacts/packages
 
       - name: Download release history-forensics bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: release-forensics-${{ needs.release.outputs.package_version }}
           path: artifacts/release-forensics
@@ -888,7 +888,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d

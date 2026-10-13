@@ -322,7 +322,7 @@ jobs:
           pull request process. This artifact does not authorize a direct base-branch write.
           EOF
       - name: Upload private trusted bootstrap handoff
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-health-bootstrap-handoff
           path: ${{ runner.temp }}/arch-linter-net-bootstrap-handoff
@@ -348,7 +348,7 @@ jobs:
           dotnet-version: 10.0.x
       - name: Run pinned trusted promotion contract
         id: promotion
-        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@4756dbd313795fd169593e5b3e48cdeb1ba74fa1
+        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@ee7a697d88c83aa9a59b6219dcdcb3511a72aa13
         with:
           configuration_id: ${{ inputs['configuration-id'] }}
           adapter: ${{ inputs.adapter }}

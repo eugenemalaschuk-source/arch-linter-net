@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".github" / "workflows"
 STAGE_B_ACTION_REF = (
     "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion"
-    "@4756dbd313795fd169593e5b3e48cdeb1ba74fa1"
+    "@ee7a697d88c83aa9a59b6219dcdcb3511a72aa13"
 )
 
 
@@ -121,7 +121,7 @@ def test_bootstrap_emits_a_private_no_app_handoff_without_consumer_remote_writes
     assert "bootstrap:\n    if: inputs.operation == 'bootstrap'" in bootstrap
     assert "contents: read" in bootstrap
     assert "contents: write" not in bootstrap
-    assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflow
+    assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in workflow
     assert "name: architecture-health-bootstrap-handoff" in workflow
     assert '"schema": "architecture-health-badge-bootstrap-handoff/v1"' in workflow
     assert "OWNER-APPLY-HANDOFF.md" in workflow

@@ -77,7 +77,7 @@ jobs:
             --output-root test-results/main-quality-shard
 
       - name: Upload canonical .NET coverage shard
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: main-dotnet-coverage-${{ matrix.id }}
           path: |
@@ -107,7 +107,7 @@ jobs:
           persist-credentials: false
 
       - name: Download canonical .NET coverage shards
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: main-dotnet-coverage-*
           path: test-results/coverage-shards
@@ -123,7 +123,7 @@ jobs:
             --github-output "$GITHUB_OUTPUT"
 
       - name: Upload complete canonical coverage inventory
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: main-dotnet-coverage-canonical
           path: test-results/main-quality-canonical
@@ -151,13 +151,13 @@ jobs:
           persist-credentials: false
 
       - name: Download complete canonical coverage inventory
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: main-dotnet-coverage-canonical
           path: test-results/main-quality-canonical
 
       - name: Download .NET test execution reports
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: main-dotnet-coverage-*
           path: test-results/test-execution-shards
@@ -172,7 +172,7 @@ jobs:
             --github-output "$GITHUB_OUTPUT"
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -200,7 +200,7 @@ jobs:
         run: make test-tooling-coverage
 
       - name: Setup Node.js for badge relay coverage
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.x
           cache: npm
@@ -342,7 +342,7 @@ jobs:
           persist-credentials: false
 
       - name: Download complete canonical coverage inventory
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: main-dotnet-coverage-canonical
           path: test-results/main-quality-canonical

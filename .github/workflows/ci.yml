@@ -71,7 +71,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -139,7 +139,7 @@ jobs:
         run: make ${{ matrix.target }}
 
       - name: Upload .NET coverage shard
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: dotnet-coverage-${{ matrix.id }}
           path: test-results/coverage
@@ -171,13 +171,13 @@ jobs:
           persist-credentials: false
 
       - name: Download .NET coverage shards
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: dotnet-coverage-*
           path: test-results/coverage-shards
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -202,7 +202,7 @@ jobs:
         run: make restore
 
       - name: Setup Node.js for badge relay coverage
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.x
           cache: npm
@@ -363,7 +363,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -814,14 +814,14 @@ jobs:
 
       - name: Upload candidate identity
         if: always() && steps.architecture_candidate.outcome == 'success'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-candidate-v1
           path: ${{ env.ARCHITECTURE_CANDIDATE_MANIFEST }}
 
       - name: Upload architecture DAG evidence
         if: always() && hashFiles('architecture-pr-report/architecture-dag-evidence.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-ci-dag-v1
           path: architecture-pr-report/architecture-dag-evidence.json
@@ -946,28 +946,28 @@ jobs:
 
       - name: Upload strict diagnostics
         if: always() && hashFiles('architecture-strict.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-strict
           path: architecture-strict.json
 
       - name: Upload audit diagnostics
         if: always() && hashFiles('architecture-audit.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-audit
           path: architecture-audit.json
 
       - name: Upload architecture coverage report
         if: always() && hashFiles('architecture-coverage.md') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-coverage-report
           path: architecture-coverage.md
 
       - name: Upload architecture Health artifact
         if: always() && hashFiles('architecture-pr-report/architecture-health.json') != '' && hashFiles('architecture-pr-report/repository-metrics-badge.json') != '' && hashFiles('architecture-pr-report/repository.json') != '' && hashFiles('architecture-pr-report/structure.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-health
           path: |
@@ -978,21 +978,21 @@ jobs:
 
       - name: Upload architecture Health analysis profile
         if: always() && hashFiles('architecture-pr-report/architecture-health.analysis-profile.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-health-analysis-profile
           path: architecture-pr-report/architecture-health.analysis-profile.json
 
       - name: Upload architecture change artifact
         if: always() && hashFiles('architecture-pr-report/architecture-change.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-change
           path: architecture-pr-report/architecture-change.json
 
       - name: Upload bound architecture PR report
         if: always() && hashFiles('architecture-pr-report-artifact/architecture-pr-report.md') != '' && hashFiles('architecture-pr-report-artifact/architecture-pr-report.manifest.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-pr-report-v1
           path: |
@@ -1002,7 +1002,7 @@ jobs:
 
       - name: Upload bound Architecture Health badge
         if: always() && hashFiles('architecture-health-badge-artifact/architecture-health-badge.json') != '' && hashFiles('architecture-health-badge-artifact/architecture-health-badge.manifest.json') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: architecture-health-badge-v1
           path: |
@@ -1071,7 +1071,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
       - name: Test packed-artifact release-evidence aggregator
         run: make test-release-evidence
@@ -1213,7 +1213,7 @@ jobs:
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/checkpoint-b-candidate --manifest artifacts/checkpoint-b-candidate/package-manifest.json --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
 
       - name: Upload immutable candidate
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checkpoint-b-pr-candidate
           path: artifacts/checkpoint-b-candidate
@@ -1359,7 +1359,7 @@ jobs:
         run: dotnet restore tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --nologo
 
       - name: Download immutable candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: checkpoint-b-pr-candidate
           path: artifacts/candidate
@@ -1373,7 +1373,7 @@ jobs:
         run: make ${{ matrix.target }}
 
       - name: Upload shard evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checkpoint-b-pr-${{ matrix.platform }}-${{ matrix.shard }}
           path: artifacts/checkpoint-b-shard
@@ -1466,7 +1466,7 @@ jobs:
         run: dotnet restore tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --nologo
 
       - name: Download immutable candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: checkpoint-b-pr-candidate
           path: artifacts/candidate
@@ -1480,7 +1480,7 @@ jobs:
         run: make ${{ matrix.target }}
 
       - name: Upload shard evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checkpoint-b-pr-macos-arm64-${{ matrix.shard }}
           path: artifacts/checkpoint-b-shard
@@ -1510,13 +1510,13 @@ jobs:
           persist-credentials: false
 
       - name: Download immutable candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: checkpoint-b-pr-candidate
           path: artifacts/candidate
 
       - name: Download Windows shard evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: checkpoint-b-pr-windows-x64-*
           path: artifacts/checkpoint-b-shards
@@ -1529,7 +1529,7 @@ jobs:
             --output artifacts/checkpoint-b-platform/checkpoint-b-platform-evidence.json
 
       - name: Upload canonical Windows platform evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checkpoint-b-pr-platform-windows-x64
           path: artifacts/checkpoint-b-platform
@@ -1559,13 +1559,13 @@ jobs:
           persist-credentials: false
 
       - name: Download immutable candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: checkpoint-b-pr-candidate
           path: artifacts/candidate
 
       - name: Download Apple Silicon macOS shard evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: checkpoint-b-pr-macos-arm64-*
           path: artifacts/checkpoint-b-shards
@@ -1578,7 +1578,7 @@ jobs:
             --output artifacts/checkpoint-b-platform/checkpoint-b-platform-evidence.json
 
       - name: Upload canonical Apple Silicon macOS platform evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checkpoint-b-pr-platform-macos-arm64
           path: artifacts/checkpoint-b-platform
