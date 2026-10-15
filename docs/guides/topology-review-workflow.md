@@ -23,16 +23,28 @@ analysis:
 contracts: {}
 ```
 
-For the first capture, use `--ensure-built` so ArchLinterNet builds the selected project graph
+For the preparation step, use `--ensure-built` so ArchLinterNet builds the selected project graph
 and writes the receipt that proves which artifacts it analyzed. A regular `dotnet build` alone
-does not create that receipt. Later commands can reuse receipt-backed artifacts while their
-inputs remain unchanged.
+does not create that receipt. After preparation, the capture, diff, and verify readers can use
+`--use-prepared-receipts`; that path reads the published receipts without building or restoring.
 
 ```bash
 dotnet arch-linter-net topology capture \
   --policy architecture/arch.yml \
   --subject-kind assembly \
   --ensure-built \
+  --format json \
+  --output artifacts/topology-capture.json
+```
+
+If another capture is needed after the preparation step, reuse the receipts without building or
+restoring:
+
+```bash
+dotnet arch-linter-net topology capture \
+  --policy architecture/arch.yml \
+  --subject-kind assembly \
+  --use-prepared-receipts \
   --format json \
   --output artifacts/topology-capture.json
 ```
@@ -91,7 +103,7 @@ Once a declaration is present, ask for a review projection:
 dotnet arch-linter-net topology diff \
   --policy architecture/arch.yml \
   --mode strict \
-  --ensure-built \
+  --use-prepared-receipts \
   --format json \
   --output artifacts/topology-diff.json
 ```
@@ -117,13 +129,13 @@ Use verify when a focused topology result is useful to a review or CI job:
 dotnet arch-linter-net topology verify \
   --policy architecture/arch.yml \
   --mode strict \
-  --ensure-built \
+  --use-prepared-receipts \
   --format json
 
 dotnet arch-linter-net topology verify \
   --policy architecture/arch.yml \
   --mode audit \
-  --ensure-built \
+  --use-prepared-receipts \
   --format json
 ```
 

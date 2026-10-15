@@ -37,6 +37,7 @@ internal abstract class TopologyValidationSubcommandModule
         Option<string> baseline = new("--baseline");
         Option<string[]> contract = new("--contract");
         Option<bool> ensureBuilt = new("--ensure-built");
+        Option<bool> usePreparedArtifacts = new("--use-prepared-receipts");
         Option<bool> noRestore = new("--no-restore");
         Option<string> configuration = new("--configuration");
         Option<string> framework = new("--framework");
@@ -54,7 +55,8 @@ internal abstract class TopologyValidationSubcommandModule
         foreach (Option option in new Option[]
         {
             policy, mode, strict, audit, format, json, output, conditionSet, baseline, contract, help,
-            ensureBuilt, noRestore, configuration, framework, platform, runtimeOption, maxParallelism,
+            ensureBuilt, usePreparedArtifacts, noRestore, configuration, framework, platform, runtimeOption,
+            maxParallelism,
             waiverEvaluationDate, externalEvidence, evidenceRepository, evidenceRevision, evidenceScope,
         })
         {
@@ -63,7 +65,8 @@ internal abstract class TopologyValidationSubcommandModule
 
         command.SetAction(result => Execute(handler, CreateOptions(
             result, policy, format, json, output, conditionSet, baseline, contract, help,
-            ensureBuilt, noRestore, configuration, framework, platform, runtimeOption, maxParallelism,
+            ensureBuilt, usePreparedArtifacts, noRestore, configuration, framework, platform, runtimeOption,
+            maxParallelism,
             waiverEvaluationDate, externalEvidence, evidenceRepository, evidenceRevision, evidenceScope)));
         return command;
     }
@@ -109,6 +112,7 @@ internal abstract class TopologyValidationSubcommandModule
         Option<string[]> contract,
         Option<bool> help,
         Option<bool> ensureBuilt,
+        Option<bool> usePreparedArtifacts,
         Option<bool> noRestore,
         Option<string> configuration,
         Option<string> framework,
@@ -152,6 +156,7 @@ internal abstract class TopologyValidationSubcommandModule
             result.GetValue(maxParallelism))
         {
             HasFormatConflict = result.GetValue(json) && result.GetValue(format) is not null,
+            UsePreparedArtifacts = result.GetValue(usePreparedArtifacts),
             WaiverEvaluationDate = result.GetValue(waiverEvaluationDate),
             ExternalEvidenceArtifacts = externalEvidenceArtifacts,
             ExternalEvidenceAssessmentContext = ExternalEvidenceCommandSupport.ResolveAssessmentContext(

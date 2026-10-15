@@ -99,6 +99,7 @@ internal sealed class ArchitectureTopologyCaptureService(
         PreprocessorSymbols = request.PreprocessorSymbols,
         IncludeAsmdefContracts = request.IncludeAsmdefContracts,
         PreparationMode = request.PreparationMode,
+        UsePreparedArtifacts = request.UsePreparedArtifacts,
         NoRestore = request.NoRestore,
         RequestedConfiguration = request.RequestedConfiguration,
         RequestedTargetFramework = request.RequestedTargetFramework,

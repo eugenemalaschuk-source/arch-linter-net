@@ -1,0 +1,19 @@
+version: 1
+name: Receipt-backed read-only diagnostics consumer
+analysis:
+  target_assemblies: [Repro.Consumer]
+  projects: [ReadOnlyDiagnostics.csproj]
+topology:
+  mode: exhaustive
+  subject_kind: type
+  scope:
+    allow_empty: false
+    selectors:
+      - namespace: Repro.Consumer
+  nodes:
+    - id: consumer
+      mappings:
+        - namespace: Repro.Consumer
+  allowed_edges: []
+  stale_declarations: true
+contracts: {}

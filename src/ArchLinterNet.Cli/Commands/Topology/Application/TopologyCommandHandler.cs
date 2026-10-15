@@ -48,6 +48,7 @@ internal sealed class TopologyCommandHandler(
                 SubjectKind = options.SubjectKind,
                 ConditionSetName = options.ConditionSetName,
                 PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                UsePreparedArtifacts = options.UsePreparedArtifacts,
                 NoRestore = options.NoRestore,
                 RequestedConfiguration = options.Configuration,
                 RequestedTargetFramework = options.TargetFramework,

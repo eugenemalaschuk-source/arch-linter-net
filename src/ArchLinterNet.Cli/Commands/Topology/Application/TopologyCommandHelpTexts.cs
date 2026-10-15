@@ -17,6 +17,8 @@ internal static class TopologyCommandHelpTexts
               --output <path>       Write the review artifact to a file
               --condition-set <n>   Named condition set for source analysis
               --ensure-built        Build and verify the selected project graph
+              --use-prepared-receipts
+                                    Read producer-published receipts without building or restoring
               --no-restore          Fail closed instead of restoring
               --configuration <n>   Build configuration
               --framework <tfm>     Target framework
@@ -62,6 +64,8 @@ internal static class TopologyCommandHelpTexts
               --contract <id>       Restrict validation to a contract (repeatable)
               --condition-set <n>   Named condition set for source analysis
               --ensure-built        Build and verify the selected project graph
+              --use-prepared-receipts
+                                    Read producer-published receipts without building or restoring
               --no-restore          Fail closed instead of restoring
               --configuration <n>   Build configuration
               --framework <tfm>     Target framework

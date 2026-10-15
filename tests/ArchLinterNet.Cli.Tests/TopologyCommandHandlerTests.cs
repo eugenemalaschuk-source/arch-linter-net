@@ -572,12 +572,14 @@ public sealed partial class TopologyCommandHandlerTests
 
         Assert.That(handler.Capture(new("policy.yml", "assembly", "human", null, null, true)),
             Is.EqualTo(CliExitCodes.Success));
-        Assert.That(console.Output, Does.Not.Contain("--waiver-evaluation-date").And.Not.Contain("--external-evidence"));
+        Assert.That(console.Output, Does.Contain("--use-prepared-receipts")
+            .And.Not.Contain("--waiver-evaluation-date").And.Not.Contain("--external-evidence"));
 
         console.Clear();
         Assert.That(handler.Diff(new("policy.yml", "strict", "human", null, null, null, [], true)),
             Is.EqualTo(CliExitCodes.Success));
-        Assert.That(console.Output, Does.Contain("--waiver-evaluation-date").And.Contain("--external-evidence")
+        Assert.That(console.Output, Does.Contain("--use-prepared-receipts")
+            .And.Contain("--waiver-evaluation-date").And.Contain("--external-evidence")
             .And.Contain("--evidence-repository").And.Contain("--evidence-revision").And.Contain("--evidence-scope"));
 
         Command command = new TopologyCommandModule().CreateCommand(new FakeRuntime(), new FakeConsole(), new FakeFileSystem());
@@ -672,10 +674,12 @@ public sealed partial class TopologyCommandHandlerTests
         public string ValidationJson { get; init; } = "{\"passed\":true,\"mode\":\"strict\",\"violations\":[]}";
         public int CaptureCalls { get; private set; }
         public int ValidateCalls { get; private set; }
+        public ArchitectureTopologyCaptureRequest? LastCaptureRequest { get; private set; }
         public ValidationRequest? LastValidationRequest { get; private set; }
         public ArchitectureTopologyCaptureOutcome CaptureTopology(ArchitectureTopologyCaptureRequest request)
         {
             CaptureCalls++;
+            LastCaptureRequest = request;
             return CaptureResult;
         }
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)

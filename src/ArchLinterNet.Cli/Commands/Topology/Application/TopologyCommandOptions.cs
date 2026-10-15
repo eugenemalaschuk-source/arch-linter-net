@@ -20,6 +20,8 @@ internal sealed record TopologyCaptureCommandOptions(
     string? ProfileDestination = null)
 {
     public bool HasFormatConflict { get; init; }
+
+    public bool UsePreparedArtifacts { get; init; }
 }
 
 internal sealed record TopologyValidationCommandOptions(
@@ -40,6 +42,8 @@ internal sealed record TopologyValidationCommandOptions(
     int? MaxParallelism = null) : IValidationExecutionOptions
 {
     public bool HasFormatConflict { get; init; }
+
+    public bool UsePreparedArtifacts { get; init; }
 
     public string? WaiverEvaluationDate { get; init; }
 

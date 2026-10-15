@@ -31,6 +31,11 @@ internal static class ArchitectureTopologyValidationObserver
         string subjectKind)
     {
         ArgumentNullException.ThrowIfNull(session);
+        if (!session.TypeIndex.HasCompleteTypeUniverse)
+        {
+            throw new InvalidOperationException(
+                "Topology observation requires a complete type universe; one or more target assemblies could not load all types.");
+        }
 
         Type[] types = session.TypeIndex.AllTypes()
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)

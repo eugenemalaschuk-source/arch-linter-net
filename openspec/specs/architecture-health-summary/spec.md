@@ -4,9 +4,7 @@
 Provide a deterministic, versioned Architecture Health summary that reports
 the assessability and state of repository architecture governance without
 recomputing any owning authority or producing a compensating score.
-
 ## Requirements
-
 ### Requirement: Health summary projects canonical governance authorities
 
 The system SHALL expose a versioned `architecture-health/v1` summary composed
@@ -292,3 +290,16 @@ payload as complete.
   external-evidence authority
 - **THEN** the availability map records the appropriate `not_configured`
   state and omits the corresponding payload
+
+### Requirement: Health honors prepared receipt selection in every snapshot path
+Health SHALL preserve the request's prepared-receipt selection when it creates its analysis snapshot. This SHALL apply to standalone Health and to Health that also writes a current change snapshot. Health's gate, health, and canonical evidence projections SHALL retain their existing meaning while using the exact selected receipt-verified artifacts.
+
+#### Scenario: Standalone Health uses prepared receipts
+- **WHEN** Health is invoked with `--use-prepared-receipts` and no change-snapshot output
+- **THEN** its snapshot verifies and analyzes the selected receipt-backed artifacts without building or restoring
+- **AND** the Health result matches the equivalent prepared reference analysis
+
+#### Scenario: Health with change snapshot uses the same prepared selection
+- **WHEN** Health is invoked with both `--use-prepared-receipts` and `--change-snapshot <path>`
+- **THEN** Health and its change-snapshot projection use the same receipt-verified selection
+- **AND** their canonical output semantics match the equivalent prepared reference analysis

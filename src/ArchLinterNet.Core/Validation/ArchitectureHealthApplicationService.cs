@@ -118,6 +118,7 @@ public sealed class ArchitectureHealthApplicationService(
         ConditionSetName = request.ConditionSetName,
         ContractIds = request.ContractIds,
         PreparationMode = request.PreparationMode,
+        UsePreparedArtifacts = request.UsePreparedArtifacts,
         NoRestore = request.NoRestore,
         RequestedConfiguration = request.RequestedConfiguration,
         RequestedTargetFramework = request.RequestedTargetFramework,
