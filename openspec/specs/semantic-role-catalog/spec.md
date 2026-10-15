@@ -120,3 +120,15 @@ The v0.10 semantic annotation wave SHALL approve the optional source-only `ArchL
 
 - **WHEN** a reader searches the catalog or policy-format documentation for an installable ArchLinterNet annotation package
 - **THEN** the documentation states that the v0.10 package is planned but not available in already-released tools, explains the optional source-only form, and confirms that custom full-name YAML mappings remain supported today
+
+### Requirement: Canonical context metadata precedence and conflicts are explicit
+
+The semantic role catalog SHALL define the finite canonical context metadata vocabulary and composition order. Winning role evidence metadata SHALL be authoritative; type-scope context values SHALL fill absent keys; assembly-scope context values SHALL fill only keys still absent. Equal values SHALL coalesce. Distinct values from the same context scope SHALL omit the affected context key and be reported deterministically. Context metadata SHALL remain separate from role identity and governance authority.
+
+#### Scenario: Catalog documents role, type, and assembly precedence
+- **WHEN** a user reviews the canonical annotation catalog
+- **THEN** it states that role evidence wins, type context fills missing keys, and assembly context supplies only remaining defaults
+
+#### Scenario: Catalog documents deterministic same-scope conflicts
+- **WHEN** a user reviews the canonical annotation catalog
+- **THEN** it states that equivalent values coalesce and conflicting same-scope values omit only the affected context key with a diagnostic

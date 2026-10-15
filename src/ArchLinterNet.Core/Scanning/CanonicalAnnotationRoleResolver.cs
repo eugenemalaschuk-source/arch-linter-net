@@ -24,6 +24,10 @@ internal sealed class CanonicalAnnotationRoleResolver
         List<ArchitectureCanonicalAnnotationDiagnostic> diagnostics = new();
         List<ArchitectureClassificationMetadataFailure> metadataFailures = new();
         List<(CanonicalAnnotationCatalog.CanonicalRole Role, IReadOnlyDictionary<string, object> Metadata)> matches = new();
+        List<ContextEvidence> contextEvidence = new();
+        HashSet<string> invalidContextMetadataKeys = new(StringComparer.Ordinal);
+        List<string> canonicalEvidenceNames = new();
+        bool canonicalEvidenceSeen = false;
 
         foreach (CustomAttributeData data in attributeData)
         {
@@ -45,6 +49,30 @@ internal sealed class CanonicalAnnotationRoleResolver
 
             if (!catalog.TryGetRole(attributeName, out CanonicalAnnotationCatalog.CanonicalRole role))
             {
+                if (!catalog.TryGetContext(attributeName, out CanonicalAnnotationCatalog.CanonicalContext context))
+                {
+                    continue;
+                }
+
+                if (!context.Scopes.Contains(scope, StringComparer.Ordinal))
+                {
+                    diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
+                        subject,
+                        "AnnotationScopeMismatch",
+                        $"'{attributeName}' is catalogued for {string.Join(" and ", context.Scopes)} scope, not {scope} scope.",
+                        attributeName));
+                    continue;
+                }
+
+                canonicalEvidenceSeen = true;
+                canonicalEvidenceNames.Add(attributeName);
+                if (TryReadContextValue(
+                    data, context, source, subject, metadataFailures, diagnostics,
+                    invalidContextMetadataKeys, out string value))
+                {
+                    contextEvidence.Add(new ContextEvidence(context.Key, attributeName, value));
+                }
+
                 continue;
             }
 
@@ -58,12 +86,14 @@ internal sealed class CanonicalAnnotationRoleResolver
                 continue;
             }
 
+            canonicalEvidenceSeen = true;
+            canonicalEvidenceNames.Add(attributeName);
             IReadOnlyDictionary<string, object> metadata = ReadMetadata(
                 data, catalog, source, subject, metadataFailures, diagnostics);
             matches.Add((role, metadata));
         }
 
-        if (matches.Count == 0)
+        if (!canonicalEvidenceSeen)
         {
             if (diagnostics.Count == 0 && metadataFailures.Count == 0)
             {
@@ -83,7 +113,7 @@ internal sealed class CanonicalAnnotationRoleResolver
         if (identity.Diagnostic is not null)
         {
             string subjectKind = string.Equals(scope, "assembly", StringComparison.Ordinal) ? "assembly" : "type";
-            string[] annotationEvidence = matches.Select(match => match.Role.AttributeFullName)
+            string[] annotationEvidence = canonicalEvidenceNames
                 .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
             diagnostics.Add(identity.Diagnostic with
             {
@@ -102,6 +132,22 @@ internal sealed class CanonicalAnnotationRoleResolver
                 Array.Empty<ArchitectureClassificationConflict>(),
                 metadataFailures)
             {
+                CanonicalAnnotationDiagnostics = diagnostics
+            };
+        }
+
+        (Dictionary<string, object> resolvedContextMetadata, IReadOnlySet<string> blockedContextMetadataKeys) =
+            ResolveContextMetadata(contextEvidence, invalidContextMetadataKeys, scope, subject, diagnostics);
+
+        if (matches.Count == 0)
+        {
+            return new ArchitectureAttributeClassificationCandidate(
+                null, new Dictionary<string, object>(), null,
+                Array.Empty<ArchitectureClassificationConflict>(),
+                metadataFailures)
+            {
+                ContextMetadata = resolvedContextMetadata,
+                ContextMetadataBlockedKeys = blockedContextMetadataKeys,
                 CanonicalAnnotationDiagnostics = diagnostics
             };
         }
@@ -129,6 +175,8 @@ internal sealed class CanonicalAnnotationRoleResolver
             {
                 EvidenceSources = evidenceSources,
                 CanonicalAnnotationDiagnostics = diagnostics,
+                ContextMetadata = resolvedContextMetadata,
+                ContextMetadataBlockedKeys = blockedContextMetadataKeys,
                 Blocked = true
             };
         }
@@ -143,7 +191,9 @@ internal sealed class CanonicalAnnotationRoleResolver
             EvidenceSources = evidenceSources,
             ObservedEvidence = matches.Select(match => new ArchitectureAttributeRoleEvidence(
                 match.Role.Name, match.Metadata, match.Role.AttributeFullName)).ToArray(),
-            CanonicalAnnotationDiagnostics = diagnostics
+            CanonicalAnnotationDiagnostics = diagnostics,
+            ContextMetadata = resolvedContextMetadata,
+            ContextMetadataBlockedKeys = blockedContextMetadataKeys
         };
     }
 
@@ -237,6 +287,88 @@ internal sealed class CanonicalAnnotationRoleResolver
         return metadata;
     }
 
+    private static bool TryReadContextValue(
+        CustomAttributeData data,
+        CanonicalAnnotationCatalog.CanonicalContext context,
+        ArchitectureClassificationSource source,
+        string subject,
+        List<ArchitectureClassificationMetadataFailure> metadataFailures,
+        List<ArchitectureCanonicalAnnotationDiagnostic> diagnostics,
+        HashSet<string> invalidContextMetadataKeys,
+        out string value)
+    {
+        value = string.Empty;
+        if (data.ConstructorArguments.Count == 1
+            && data.ConstructorArguments[0].ArgumentType == typeof(string)
+            && data.ConstructorArguments[0].Value is string constructorValue
+            && constructorValue.Length > 0)
+        {
+            value = constructorValue;
+            return true;
+        }
+
+        const string FailureReason = "must contain an exact non-empty compile-time string value.";
+        invalidContextMetadataKeys.Add(context.Key);
+        metadataFailures.Add(new ArchitectureClassificationMetadataFailure(
+            subject, source, context.Key, FailureReason));
+        diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
+            subject,
+            "InvalidCanonicalMetadata",
+            $"'{context.AttributeFullName}' {FailureReason}",
+            context.AttributeFullName));
+        return false;
+    }
+
+    private static (Dictionary<string, object> Metadata, IReadOnlySet<string> BlockedKeys) ResolveContextMetadata(
+        IReadOnlyList<ContextEvidence> evidence,
+        IReadOnlySet<string> invalidKeys,
+        string scope,
+        string subject,
+        List<ArchitectureCanonicalAnnotationDiagnostic> diagnostics)
+    {
+        Dictionary<string, object> metadata = new(StringComparer.Ordinal);
+        HashSet<string> blockedKeys = new(invalidKeys, StringComparer.Ordinal);
+        foreach (IGrouping<string, ContextEvidence> group in evidence
+                     .GroupBy(item => item.Key, StringComparer.Ordinal)
+                     .OrderBy(group => group.Key, StringComparer.Ordinal))
+        {
+            string[] values = group.Select(item => item.Value)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
+            if (values.Length == 1)
+            {
+                if (!blockedKeys.Contains(group.Key))
+                {
+                    metadata[group.Key] = values[0];
+                }
+                continue;
+            }
+
+            blockedKeys.Add(group.Key);
+
+            string[] evidenceSources = group.Select(item => item.AttributeFullName)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
+            string evidenceDescription = string.Join(
+                "; ",
+                group.Select(item => $"{item.AttributeFullName}='{item.Value}'")
+                    .OrderBy(value => value, StringComparer.Ordinal));
+            diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
+                subject,
+                "CanonicalContextConflict",
+                $"Canonical context metadata at {scope} specificity for key '{group.Key}' has conflicting values "
+                    + $"[{string.Join(", ", values.Select(FormatContextValue))}] from [{evidenceDescription}]. "
+                    + "The key is omitted from this context scope.",
+                evidenceSources));
+        }
+
+        return (metadata, blockedKeys);
+    }
+
+    private static string FormatContextValue(string value) => $"'{value}'";
+
     private static IReadOnlyList<CustomAttributeData> GetAssemblyAttributes(Assembly assembly)
     {
         try
@@ -272,6 +404,8 @@ internal sealed class CanonicalAnnotationRoleResolver
         metadata.Count == 0 ? "no metadata" : string.Join(", ", metadata.OrderBy(entry => entry.Key, StringComparer.Ordinal)
             .Select(entry => $"{entry.Key}='{entry.Value}'"));
 
+    private sealed record ContextEvidence(string Key, string AttributeFullName, string Value);
+
     private sealed record CatalogIdentityValidation(bool IsCompatible, ArchitectureCanonicalAnnotationDiagnostic? Diagnostic);
 }
 
@@ -305,6 +439,8 @@ internal static class CanonicalAnnotationCandidateComposer
             {
                 EvidenceSources = MergeEvidence(configured, canonical),
                 CanonicalAnnotationDiagnostics = diagnostics,
+                ContextMetadata = MergeContextMetadata(configured, canonical),
+                ContextMetadataBlockedKeys = MergeContextMetadataBlockedKeys(configured, canonical),
                 Blocked = true
             };
         }
@@ -315,7 +451,9 @@ internal static class CanonicalAnnotationCandidateComposer
             {
                 Conflicts = conflicts,
                 MetadataFailures = failures,
-                CanonicalAnnotationDiagnostics = diagnostics
+                CanonicalAnnotationDiagnostics = diagnostics,
+                ContextMetadata = MergeContextMetadata(configured, canonical),
+                ContextMetadataBlockedKeys = MergeContextMetadataBlockedKeys(configured, canonical)
             };
         }
 
@@ -326,7 +464,9 @@ internal static class CanonicalAnnotationCandidateComposer
                 EvidenceSources = MergeEvidence(configured, canonical),
                 Conflicts = conflicts,
                 MetadataFailures = failures,
-                CanonicalAnnotationDiagnostics = diagnostics
+                CanonicalAnnotationDiagnostics = diagnostics,
+                ContextMetadata = MergeContextMetadata(configured, canonical),
+                ContextMetadataBlockedKeys = MergeContextMetadataBlockedKeys(configured, canonical)
             };
         }
 
@@ -344,7 +484,9 @@ internal static class CanonicalAnnotationCandidateComposer
                 ObservedEvidence = observedEvidence,
                 Conflicts = conflicts,
                 MetadataFailures = failures,
-                CanonicalAnnotationDiagnostics = diagnostics
+                CanonicalAnnotationDiagnostics = diagnostics,
+                ContextMetadata = MergeContextMetadata(configured, canonical),
+                ContextMetadataBlockedKeys = MergeContextMetadataBlockedKeys(configured, canonical)
             };
         }
 
@@ -362,8 +504,57 @@ internal static class CanonicalAnnotationCandidateComposer
             EvidenceSources = evidenceSources,
             ObservedEvidence = observedEvidence,
             CanonicalAnnotationDiagnostics = diagnostics,
+            ContextMetadata = MergeContextMetadata(configured, canonical),
+            ContextMetadataBlockedKeys = MergeContextMetadataBlockedKeys(configured, canonical),
             Blocked = true
         };
+    }
+
+    private static IReadOnlyDictionary<string, object> MergeContextMetadata(
+        ArchitectureAttributeClassificationCandidate configured,
+        ArchitectureAttributeClassificationCandidate canonical)
+    {
+        if (configured.ContextMetadata.Count == 0)
+        {
+            return canonical.ContextMetadata;
+        }
+
+        if (canonical.ContextMetadata.Count == 0)
+        {
+            return configured.ContextMetadata;
+        }
+
+        Dictionary<string, object> merged = new(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, object> entry in configured.ContextMetadata)
+        {
+            merged[entry.Key] = entry.Value;
+        }
+
+        foreach (KeyValuePair<string, object> entry in canonical.ContextMetadata)
+        {
+            merged.TryAdd(entry.Key, entry.Value);
+        }
+
+        return merged;
+    }
+
+    private static IReadOnlySet<string> MergeContextMetadataBlockedKeys(
+        ArchitectureAttributeClassificationCandidate configured,
+        ArchitectureAttributeClassificationCandidate canonical)
+    {
+        if (configured.ContextMetadataBlockedKeys.Count == 0)
+        {
+            return canonical.ContextMetadataBlockedKeys;
+        }
+
+        if (canonical.ContextMetadataBlockedKeys.Count == 0)
+        {
+            return configured.ContextMetadataBlockedKeys;
+        }
+
+        HashSet<string> merged = new(configured.ContextMetadataBlockedKeys, StringComparer.Ordinal);
+        merged.UnionWith(canonical.ContextMetadataBlockedKeys);
+        return merged;
     }
 
     private static IReadOnlyList<string> MergeEvidence(

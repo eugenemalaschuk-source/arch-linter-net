@@ -41,11 +41,11 @@ resolved required-item states.
 - **AND** no stable or preview declaration is treated as authority
 
 ### Requirement: Version override does not create publication authority
-The release workflow MAY use an exact version override when tag-based
-calculation cannot express the intended release target, including the first
-preview of a new minor line. The override SHALL NOT select, synthesize, or
-weaken release authority. Publication SHALL still require exactly one reviewed
-declaration whose target equals the immutable candidate version.
+The release workflow SHALL keep exact version overrides non-authoritative,
+though it MAY use one when tag-based calculation cannot express the intended
+release target, including the first preview of a new minor line. Publication
+SHALL still require exactly one reviewed declaration whose target equals the
+immutable candidate version.
 
 #### Scenario: First next-minor preview uses an exact override safely
 - **WHEN** the latest stable tag is `v0.8.2`

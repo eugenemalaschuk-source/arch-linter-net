@@ -1,12 +1,5 @@
 namespace ArchLinterNet.Annotations;
 
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
-    AllowMultiple = false, Inherited = false)]
-public sealed class DomainAttribute : Attribute
-{
-    public string? Value { get; set; }
-}
-
 [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
 public sealed class AnnotationCatalogIdentityAttribute(int catalogGeneration, string packageVersion) : Attribute
 {

@@ -199,9 +199,10 @@ rejected as reuse of a cancelled snapshot.
   cancellation rather than reusing the partial session
 
 ### Requirement: Repository inventory completes selected waiver lifecycle evidence
-Before returning a non-blocked `ValidationOutcome` with a policy inventory, an
-`ArchitectureAnalysisSnapshot` SHALL obtain normal canonical waiver lifecycle
-records for every selected strict or audit mode that declares a manual waiver.
+An `ArchitectureAnalysisSnapshot` SHALL obtain normal canonical waiver
+lifecycle records for every selected strict or audit mode that declares a
+manual waiver before returning a non-blocked `ValidationOutcome` with a policy
+inventory.
 It SHALL combine those records into the Core-owned repository policy inventory.
 The outcome's `Waivers`, waiver gating, findings, and pass/fail value SHALL
 remain the results of its requested mode only. Companion lifecycle work SHALL

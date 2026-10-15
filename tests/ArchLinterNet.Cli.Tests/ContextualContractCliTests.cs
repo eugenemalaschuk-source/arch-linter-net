@@ -29,9 +29,15 @@ public sealed class ContextualContractCliTests
         return tempDir;
     }
 
-    private static string WritePolicy(string tempDir, string contractsYaml)
+    private static string WritePolicy(
+        string tempDir,
+        string contractsYaml,
+        bool includeCanonicalContextRoleMapping = false)
     {
         string policyPath = Path.Combine(tempDir, "dependencies.arch.yml");
+        string canonicalContextRoleMapping = includeCanonicalContextRoleMapping
+            ? "    - attribute: ContextualContractCanonicalCliFixtures.CanonicalContextRoleAttribute\n      role: DomainLayer\n"
+            : string.Empty;
         File.WriteAllText(policyPath, $$"""
             version: 1
             name: Contextual CLI Test Policy
@@ -42,6 +48,7 @@ public sealed class ContextualContractCliTests
                   role: DomainLayer
                   metadata:
                     domain: constructor[0]
+            {{canonicalContextRoleMapping}}
 
             layers: {}
 
@@ -217,6 +224,42 @@ public sealed class ContextualContractCliTests
                 Assert.That(stdOut, Does.Contain("\"matched_selector\""));
                 Assert.That(stdOut, Does.Contain("\"target_metadata\""));
                 Assert.That(stdOut, Does.Contain("Inventory"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Test]
+    public void Validate_StrictContextDependencies_CanonicalContextMetadataOnCustomRole_Fails()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            string policyPath = WritePolicy(tempDir, """
+                  strict_context_dependencies:
+                    - id: canonical-sales-no-inventory
+                      name: canonical-sales-must-not-depend-on-inventory
+                      source:
+                        role: DomainLayer
+                        metadata:
+                          boundedContext: Sales
+                      forbidden:
+                        - role: DomainLayer
+                          metadata:
+                            boundedContext: Inventory
+                      reason: Canonical context metadata must feed contextual selectors.
+                """, includeCanonicalContextRoleMapping: true);
+
+            (int exitCode, string stdOut, string stdErr) = RunValidate(policyPath, "strict", "human");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.Not.EqualTo(0));
+                Assert.That(stdOut, Does.Contain("CanonicalSalesCheckout"));
+                Assert.That(stdErr, Is.Empty);
             });
         }
         finally

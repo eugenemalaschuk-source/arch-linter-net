@@ -1,5 +1,6 @@
 using ArchLinterNet.Annotations;
 
+[assembly: AnnotationCatalogIdentity(1, "0.10.0")]
 [assembly: DomainLayer(BoundedContext = "Commerce", Module = "Orders")]
 
 namespace ArchLinterNet.Annotations.CSharp9Consumer
@@ -10,6 +11,29 @@ namespace ArchLinterNet.Annotations.CSharp9Consumer
     }
 
     public sealed class DomainLayerConsumerFixture
+    {
+    }
+
+    [Domain("Commerce")]
+    [BoundedContext("Orders")]
+    [Module("Checkout")]
+    [Feature("OrderEntry")]
+    [Platform("Web")]
+    [Runtime("Server")]
+    public sealed class ContextMetadataConsumerFixture
+    {
+    }
+
+    [Entity]
+    [BoundedContext("Sales")]
+    public sealed class SalesCheckout
+    {
+        public InventoryStockItem Stock { get; } = null!;
+    }
+
+    [Entity]
+    [BoundedContext("Inventory")]
+    public sealed class InventoryStockItem
     {
     }
 }

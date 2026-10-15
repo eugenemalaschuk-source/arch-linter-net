@@ -57,6 +57,19 @@ public sealed class CanonicalAnnotationReportTests
                 "ArchLinterNet.Annotations.CommandHandlerAttribute")
         ]);
 
+    private static ValidationOutcome ContextDiagnosticsOutcome => CreateOutcome(
+        canonicalAnnotationDiagnostics:
+        [
+            ArchitectureCanonicalAnnotationDiagnostic.Create(
+                "ContextConflict.Order", "CanonicalContextConflict",
+                "Type context values conflict for key 'boundedContext'.",
+                "ArchLinterNet.Annotations.BoundedContextAttribute"),
+            ArchitectureCanonicalAnnotationDiagnostic.Create(
+                "InvalidContext.Order", "InvalidCanonicalMetadata",
+                "The context value must be a non-empty string.",
+                "ArchLinterNet.Annotations.DomainAttribute")
+        ]);
+
     [Test]
     public void JsonReport_ProjectsCanonicalRoleAndAllRoleEvidenceSources()
     {
@@ -117,6 +130,31 @@ public sealed class CanonicalAnnotationReportTests
             Assert.That(json.RootElement.GetProperty("runs")[0].GetProperty("results")
                 .EnumerateArray().Any(result => result.GetProperty("ruleId").GetString()
                     == "canonical-annotation:MissingCatalogIdentity"), Is.True);
+        });
+    }
+
+    [Test]
+    public void JsonAndSarifReports_ProjectContextConflictAndInvalidValueDiagnostics()
+    {
+        var renderer = new StructuredReportRenderer(new CliRuntime());
+        string jsonReport = renderer.Render("json", true, [("strict", ContextDiagnosticsOutcome)]);
+        string sarifReport = renderer.Render("sarif", true, [("strict", ContextDiagnosticsOutcome)]);
+        using JsonDocument json = JsonDocument.Parse(jsonReport);
+        using JsonDocument sarif = JsonDocument.Parse(sarifReport);
+
+        string[] jsonCodes = json.RootElement.GetProperty("canonical_annotation_diagnostics")
+            .EnumerateArray().Select(diagnostic => diagnostic.GetProperty("code").GetString()!).ToArray();
+        string[] sarifRuleIds = sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
+            .EnumerateArray().Select(result => result.GetProperty("ruleId").GetString()!).ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(jsonCodes, Is.EquivalentTo(new[] { "CanonicalContextConflict", "InvalidCanonicalMetadata" }));
+            Assert.That(sarifRuleIds, Is.EquivalentTo(new[]
+            {
+                "canonical-annotation:CanonicalContextConflict",
+                "canonical-annotation:InvalidCanonicalMetadata"
+            }));
         });
     }
 

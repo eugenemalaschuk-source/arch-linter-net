@@ -506,8 +506,8 @@ public sealed class CanonicalAnnotationRoleResolutionTests
 
         if (contextMetadataOnly)
         {
-            ConstructorInfo constructor = typeof(DomainAttribute).GetConstructor(Type.EmptyTypes)!;
-            typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(constructor, Array.Empty<object>()));
+            ConstructorInfo constructor = typeof(DomainAttribute).GetConstructor([typeof(string)])!;
+            typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(constructor, ["Sales"]));
         }
 
         if (customRole)

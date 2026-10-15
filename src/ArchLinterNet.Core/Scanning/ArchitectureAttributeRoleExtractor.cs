@@ -347,8 +347,10 @@ public sealed class ArchitectureAttributeRoleExtractor
 
                 if (candidate.Role != null)
                 {
+                    IReadOnlyDictionary<string, object> metadata = ComposeMetadata(
+                        candidate.Metadata, candidates);
                     return new ArchitectureTypeClassificationResult(
-                        candidate.Role, source, candidate.Metadata, candidate.Evidence, conflicts, failures)
+                        candidate.Role, source, metadata, candidate.Evidence, conflicts, failures)
                     {
                         EvidenceSources = candidate.EvidenceSources,
                         CanonicalAnnotationDiagnostics = canonicalDiagnostics
@@ -361,6 +363,53 @@ public sealed class ArchitectureAttributeRoleExtractor
         {
             CanonicalAnnotationDiagnostics = canonicalDiagnostics
         };
+    }
+
+    private static IReadOnlyDictionary<string, object> ComposeMetadata(
+        IReadOnlyDictionary<string, object> winningRoleMetadata,
+        IReadOnlyDictionary<ArchitectureClassificationSource, ArchitectureAttributeClassificationCandidate> candidates)
+    {
+        Dictionary<string, object> metadata = new(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, object> entry in winningRoleMetadata)
+        {
+            metadata[entry.Key] = entry.Value;
+        }
+
+        if (candidates.TryGetValue(
+                ArchitectureClassificationSource.TypeAttribute,
+                out ArchitectureAttributeClassificationCandidate? typeCandidate))
+        {
+            AddMissingMetadata(metadata, typeCandidate.ContextMetadata);
+        }
+
+        if (candidates.TryGetValue(
+                ArchitectureClassificationSource.AssemblyAttribute,
+                out ArchitectureAttributeClassificationCandidate? assemblyCandidate))
+        {
+            IReadOnlySet<string> blockedTypeContextKeys =
+                candidates.TryGetValue(
+                    ArchitectureClassificationSource.TypeAttribute,
+                    out typeCandidate)
+                    ? typeCandidate.ContextMetadataBlockedKeys
+                    : new HashSet<string>(StringComparer.Ordinal);
+            AddMissingMetadata(metadata, assemblyCandidate.ContextMetadata, blockedTypeContextKeys);
+        }
+
+        return metadata;
+    }
+
+    private static void AddMissingMetadata(
+        Dictionary<string, object> metadata,
+        IReadOnlyDictionary<string, object> contextMetadata,
+        IReadOnlySet<string>? blockedKeys = null)
+    {
+        foreach (KeyValuePair<string, object> entry in contextMetadata.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            if (blockedKeys is null || !blockedKeys.Contains(entry.Key))
+            {
+                metadata.TryAdd(entry.Key, entry.Value);
+            }
+        }
     }
 
     private ArchitectureAttributeClassificationCandidate ResolveCandidate(

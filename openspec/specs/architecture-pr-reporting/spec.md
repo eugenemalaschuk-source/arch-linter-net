@@ -94,9 +94,9 @@ For active-only reviewed waiver debt, compact aggregate disclosure is sufficient
 - **AND** it does not generate a new remediation instruction
 
 ### Requirement: PR report artifacts share one compatible execution context
-When a Health artifact supplies reporting evidence, the PR-report projection
-SHALL accept it with an architecture-change report only when both artifacts
-declare the same non-empty execution identifier and condition-set scope. It
+The PR-report projection SHALL accept a Health artifact with reporting evidence
+alongside an architecture-change report only when both artifacts declare the
+same non-empty execution identifier and condition-set scope. It
 SHALL select a Health validation receipt whose canonical mode equals the change
 report mode. Different execution identifiers, condition sets, receipt modes,
 missing context fields in a supplied evidence envelope, duplicate candidate

@@ -100,6 +100,44 @@ public sealed class SemanticAnnotationSourceContractTests
     }
 
     [Test]
+    public void ContextAttributes_MatchManifestIdentityAndTargetContract()
+    {
+        using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(ManifestPath()));
+        JsonElement[] contexts = manifest.RootElement.GetProperty("contextAttributes")
+            .EnumerateArray()
+            .ToArray();
+        Assembly annotationAssembly = typeof(DomainLayerConsumerFixture).Assembly;
+
+        Assert.That(contexts, Has.Length.EqualTo(6));
+        foreach (JsonElement context in contexts)
+        {
+            string expectedFullName = context.GetProperty("fqn").GetString()!;
+            Type annotationType = annotationAssembly.GetType(expectedFullName, throwOnError: true)!;
+            ConstructorInfo[] constructors = annotationType.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+            ParameterInfo[] parameters = constructors.Single().GetParameters();
+            string message = $"context {context.GetProperty("key").GetString()}";
+
+            AttributeUsageAttribute? usage = annotationType.GetCustomAttribute<AttributeUsageAttribute>(inherit: false);
+            Assert.Multiple(() =>
+            {
+                Assert.That(annotationType.IsNotPublic, Is.True, $"{message} must remain internal");
+                Assert.That(annotationType.IsSealed, Is.True, $"{message} must be sealed");
+                Assert.That(annotationType.IsSubclassOf(typeof(Attribute)), Is.True,
+                    $"{message} must derive from System.Attribute");
+                Assert.That(constructors, Has.Length.EqualTo(1), $"{message} must expose one constructor");
+                Assert.That(parameters, Has.Length.EqualTo(1), $"{message} must accept one value");
+                Assert.That(parameters[0].Name, Is.EqualTo("value"), $"{message} constructor parameter");
+                Assert.That(parameters[0].ParameterType, Is.EqualTo(typeof(string)), $"{message} value type");
+                Assert.That(usage, Is.Not.Null, $"{message} must declare its target contract");
+                Assert.That(usage!.ValidOn, Is.EqualTo(ReadTargets(context.GetProperty("attributeTargets"))),
+                    $"{message} must match its manifest targets");
+                Assert.That(usage.AllowMultiple, Is.False, $"{message} must reject duplicates");
+                Assert.That(usage.Inherited, Is.False, $"{message} must not apply through inheritance");
+            });
+        }
+    }
+
+    [Test]
     public void ExplicitlyMappedCanonicalSource_EntersExistingRoleIndexWithMetadata()
     {
         ArchitectureClassificationConfiguration configuration = new();

@@ -19,4 +19,8 @@
     <ProjectReference Include="..\..\src\ArchLinterNet.Cli\ArchLinterNet.Cli.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\..\src\ArchLinterNet.Annotations\contentFiles\cs\any\ContextAttributes.cs" Link="SemanticAnnotations\ContextAttributes.cs" />
+  </ItemGroup>
+
 </Project>

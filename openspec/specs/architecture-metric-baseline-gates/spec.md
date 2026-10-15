@@ -53,9 +53,9 @@ a finding-level baseline match, or an automatic baseline refresh.
   compare its value to the changed metric definition
 
 ### Requirement: Metric baseline capture is explicit and does not update values
-An explicit `baseline generate` operation for a policy that selects one or more
-relative metric budgets SHALL write a deterministic version-3 baseline. It
-SHALL include one current scalar entry for each unique, complete referenced
+An explicit `baseline generate` operation SHALL write a deterministic
+version-3 baseline for a policy that selects one or more relative metric
+budgets. It SHALL include one current scalar entry for each unique, complete referenced
 metric and retain the normal structured finding-baseline entries. An incomplete
 metric measurement SHALL not be captured as a scalar baseline value.
 

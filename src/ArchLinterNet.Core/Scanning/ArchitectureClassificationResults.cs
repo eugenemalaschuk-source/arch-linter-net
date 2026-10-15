@@ -63,6 +63,18 @@ internal sealed record ArchitectureAttributeClassificationCandidate(
     public IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics { get; init; } =
         Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>();
 
+    // Metadata-only canonical context evidence is kept separate from role metadata until the
+    // source-precedence combiner has selected the winning role. This prevents a context-only
+    // attribute from creating a role and prevents metadata on a losing assembly role from leaking
+    // into a winning type role.
+    public IReadOnlyDictionary<string, object> ContextMetadata { get; init; } =
+        new Dictionary<string, object>();
+
+    // A rejected type-scope context key must remain absent when less-specific assembly defaults
+    // are composed. Winning role metadata is still applied first by the extractor.
+    public IReadOnlySet<string> ContextMetadataBlockedKeys { get; init; } =
+        new HashSet<string>(StringComparer.Ordinal);
+
     public bool Blocked { get; init; }
 
     public static readonly ArchitectureAttributeClassificationCandidate Empty = new(

@@ -9,6 +9,7 @@ internal sealed class CanonicalAnnotationCatalog
     private static readonly Lazy<CanonicalAnnotationCatalog> _current = new(Load);
 
     private readonly Dictionary<string, CanonicalRole> _rolesByAttribute;
+    private readonly Dictionary<string, CanonicalContext> _contextsByAttribute;
     private readonly HashSet<string> _knownAttributes;
     private readonly Dictionary<string, string> _metadataKeysByProperty;
 
@@ -20,6 +21,7 @@ internal sealed class CanonicalAnnotationCatalog
         string reservedNamespace,
         string catalogIdentityMarker,
         Dictionary<string, CanonicalRole> rolesByAttribute,
+        Dictionary<string, CanonicalContext> contextsByAttribute,
         HashSet<string> knownAttributes,
         Dictionary<string, string> metadataKeysByProperty)
     {
@@ -30,6 +32,7 @@ internal sealed class CanonicalAnnotationCatalog
         ReservedNamespace = reservedNamespace;
         CatalogIdentityMarker = catalogIdentityMarker;
         _rolesByAttribute = rolesByAttribute;
+        _contextsByAttribute = contextsByAttribute;
         _knownAttributes = knownAttributes;
         _metadataKeysByProperty = metadataKeysByProperty;
     }
@@ -55,6 +58,9 @@ internal sealed class CanonicalAnnotationCatalog
 
     public bool TryGetRole(string attributeFullName, out CanonicalRole role) =>
         _rolesByAttribute.TryGetValue(attributeFullName, out role!);
+
+    public bool TryGetContext(string attributeFullName, out CanonicalContext context) =>
+        _contextsByAttribute.TryGetValue(attributeFullName, out context!);
 
     public bool IsKnownAttribute(string attributeFullName) => _knownAttributes.Contains(attributeFullName);
 
@@ -88,6 +94,7 @@ internal sealed class CanonicalAnnotationCatalog
         string reservedNamespace = root.GetProperty("reservedNamespace").GetString()!;
         string identityMarker = root.GetProperty("catalogIdentityMarker").GetProperty("fqn").GetString()!;
         Dictionary<string, CanonicalRole> roles = new(StringComparer.Ordinal);
+        Dictionary<string, CanonicalContext> contexts = new(StringComparer.Ordinal);
         HashSet<string> known = new(StringComparer.Ordinal) { identityMarker };
         Dictionary<string, string> metadataKeysByProperty = new(StringComparer.Ordinal);
         foreach (JsonElement metadataProperty in root.GetProperty("roleAttributeContract")
@@ -109,7 +116,17 @@ internal sealed class CanonicalAnnotationCatalog
 
         foreach (JsonElement contextAttribute in root.GetProperty("contextAttributes").EnumerateArray())
         {
-            known.Add(contextAttribute.GetProperty("fqn").GetString()!);
+            string fqn = contextAttribute.GetProperty("fqn").GetString()!;
+            string key = contextAttribute.GetProperty("key").GetString()!;
+            string[] scopes = contextAttribute.GetProperty("attributeTargets").EnumerateArray()
+                .Select(target => target.GetString()!)
+                .Where(target => target is "assembly" or "class" or "struct" or "interface")
+                .Select(target => target == "assembly" ? "assembly" : "type")
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(scope => scope, StringComparer.Ordinal)
+                .ToArray();
+            contexts.Add(fqn, new CanonicalContext(key, fqn, scopes));
+            known.Add(fqn);
         }
 
         return new CanonicalAnnotationCatalog(
@@ -120,6 +137,7 @@ internal sealed class CanonicalAnnotationCatalog
             reservedNamespace,
             identityMarker,
             roles,
+            contexts,
             known,
             metadataKeysByProperty);
     }
@@ -154,6 +172,8 @@ internal sealed class CanonicalAnnotationCatalog
     }
 
     internal sealed record CanonicalRole(string Name, string AttributeFullName, IReadOnlyList<string> Scopes);
+
+    internal sealed record CanonicalContext(string Key, string AttributeFullName, IReadOnlyList<string> Scopes);
 
     internal readonly record struct SemanticVersion(BigInteger Major, BigInteger Minor, BigInteger Patch, string? PreRelease)
         : IComparable<SemanticVersion>
