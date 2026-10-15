@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <AssemblyName>Repro.Consumer</AssemblyName>
+    <RootNamespace>Repro.Consumer</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+  </ItemGroup>
+  <Target Name="RecordReadOnlyDiagnosticsBuildInvocation" BeforeTargets="Build">
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)/build-invocations.log" Lines="build" Overwrite="false" />
+  </Target>
+  <Target Name="RecordReadOnlyDiagnosticsRestoreInvocation" BeforeTargets="Restore">
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)/restore-invocations.log" Lines="restore" Overwrite="false" />
+  </Target>
+</Project>

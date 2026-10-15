@@ -2,9 +2,7 @@
 
 ## Purpose
 TBD - created by archiving change analysis-build-state-preflight. Update Purpose after archive.
-
 ## Requirements
-
 ### Requirement: Build-state preflight applies only to projects assembly resolution actually attempted
 Build-state preflight SHALL evaluate a discovered project only when assembly resolution actually attempted to resolve it — i.e. its assembly name appears in either the resolved-assemblies set or the missing-assemblies set produced by that resolution attempt. This applies uniformly whether resolution was driven by `analysis.target_assemblies` or by the discovered project graph itself; it is not gated on which one configured it. A policy may declare a project list solely to feed project-scope coverage contracts, independently of which assemblies get resolved — such projects have no necessary correspondence to a resolved/missing assembly and SHALL NOT be preflight-blocked merely for being discovered. Separately, when assembly resolution was not attempted at all (neither set populated — the project-scope-coverage-tolerant path deliberately defers to the coverage engine), preflight SHALL NOT run for that request.
 
@@ -283,3 +281,20 @@ When a change-snapshot request selects `--ensure-built`, `--no-restore`, or an o
 - **WHEN** an explicitly prepared graph or baseline contributor has blocking preflight diagnostics
 - **THEN** that contributor does not continue with ordinary-resolution facts
 - **AND THEN** the snapshot command does not write a partial result
+
+### Requirement: Prepared receipt selection covers Health and topology diagnostics
+The CLI SHALL support `--use-prepared-receipts` for standalone Health and for topology capture, diff, and verify. Each operation SHALL use the existing metadata-only prepared-artifact preflight to verify the selected receipts before loading target assemblies. Reader invocations SHALL NOT build or restore, and SHALL reject missing, stale, wrong-context, or otherwise unverifiable selected artifacts before analysis.
+
+#### Scenario: Topology readers consume a current prepared selection
+- **WHEN** topology capture, diff, or verify runs with `--use-prepared-receipts` after an authoritative preparation published current receipts
+- **THEN** the operation reports current preflight and analyzes the exact receipt-verified output selection
+- **AND** it does not build, restore, or rewrite the selected outputs
+
+#### Scenario: Topology reader rejects a stale receipt
+- **WHEN** a selected project input changes after its receipt was published and a topology reader runs with `--use-prepared-receipts`
+- **THEN** preflight reports the existing stale-artifact diagnostic before target assembly loading or topology evaluation
+
+#### Scenario: Standalone Health preserves prepared receipt selection
+- **WHEN** Health runs with `--use-prepared-receipts`, with or without `--change-snapshot`
+- **THEN** Health verifies and analyzes the selected receipt-backed artifacts without building or restoring
+- **AND** the presence of `--change-snapshot` does not change Health's receipt-selection semantics

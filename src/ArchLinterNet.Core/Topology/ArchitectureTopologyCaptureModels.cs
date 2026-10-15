@@ -22,6 +22,10 @@ public sealed record ArchitectureTopologyCaptureRequest
 
     public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
 
+    // Internal reader selector: read producer-published receipts without entering the
+    // build-capable EnsureBuilt path. See ValidationRequest.UsePreparedArtifacts.
+    internal bool UsePreparedArtifacts { get; init; }
+
     public bool NoRestore { get; init; }
 
     public string? RequestedConfiguration { get; init; }

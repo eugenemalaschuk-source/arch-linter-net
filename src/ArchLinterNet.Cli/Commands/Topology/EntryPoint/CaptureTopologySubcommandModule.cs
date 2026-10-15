@@ -26,6 +26,7 @@ internal sealed class CaptureTopologySubcommandModule : ITopologySubcommandModul
         Option<string> output = new("--output");
         Option<string> conditionSet = new("--condition-set");
         Option<bool> ensureBuilt = new("--ensure-built");
+        Option<bool> usePreparedArtifacts = new("--use-prepared-receipts");
         Option<bool> noRestore = new("--no-restore");
         Option<string> configuration = new("--configuration");
         Option<string> framework = new("--framework");
@@ -43,6 +44,7 @@ internal sealed class CaptureTopologySubcommandModule : ITopologySubcommandModul
         command.Options.Add(output);
         command.Options.Add(conditionSet);
         command.Options.Add(ensureBuilt);
+        command.Options.Add(usePreparedArtifacts);
         command.Options.Add(noRestore);
         command.Options.Add(configuration);
         command.Options.Add(framework);
@@ -68,6 +70,7 @@ internal sealed class CaptureTopologySubcommandModule : ITopologySubcommandModul
             result.GetValue(profile))
         {
             HasFormatConflict = result.GetValue(json) && result.GetValue(format) is not null,
+            UsePreparedArtifacts = result.GetValue(usePreparedArtifacts),
         }));
 
         return command;
