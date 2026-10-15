@@ -650,7 +650,10 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
         source_health_sha256=hashlib.sha256(health_bytes).hexdigest(),
         producer_identity_sha256=producer_identity_sha256,
     )
-    if datetime.now(timezone.utc) >= semantic_horizon:
+    revalidation_check_at = datetime.now(timezone.utc)
+    producer_lease_horizon = verified_at + timedelta(seconds=config.limits.max_lease_seconds)
+    # Match the earliest boundary enforced by the pure promotion decision.
+    if revalidation_check_at >= min(semantic_horizon, producer_lease_horizon):
         try:
             validated = validate_artifact(archive, config, evidence)
         except ArtifactValidationError as error:
