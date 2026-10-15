@@ -127,12 +127,18 @@ workflow outputs, URLs, or job summaries.
   credential material
 
 ### Requirement: Promotion consumes exact-bound temporal receipts for every adapter
-When the stored semantic horizon has elapsed, the trusted promotion path SHALL obtain and validate a canonical temporal receipt before deciding readiness for `github-raw`, `relay`, or metadata-only renewal. The receipt SHALL match the exact merged-tree SHA, source Health evidence bytes, badge payload bytes, producer identity, and approved configuration facts already resolved by the provider. The promotion path SHALL use the receipt's horizon only as a bounded input to the existing decision and adapter contracts.
+When either the stored semantic horizon or the bounded producer freshness lease has elapsed, the trusted promotion path SHALL obtain and validate a canonical temporal receipt before deciding readiness for `github-raw`, `relay`, or metadata-only renewal. The receipt SHALL match the exact merged-tree SHA, source Health evidence bytes, badge payload bytes, producer identity, and approved configuration facts already resolved by the provider. The promotion path SHALL use the receipt's horizon only as a bounded input to the existing decision and adapter contracts.
 
 #### Scenario: First-party raw promotion crosses a UTC-day boundary
 - **WHEN** exact merged-tree evidence remains unchanged across midnight and the trusted temporal receipt is ready and identity-matched
 - **THEN** `github-raw` promotion publishes the unchanged canonical badge payload as ready
 - **AND** the publication receipt records the refreshed temporal receipt identity and horizon
+
+#### Scenario: Delayed promotion refreshes an elapsed producer lease
+- **WHEN** the producer freshness lease has elapsed but the product-owned semantic horizon remains in the future
+- **AND** the trusted temporal receipt is ready and bound to the exact source Health bytes, payload bytes, merged tree, and producer identity
+- **THEN** promotion may publish the unchanged canonical badge payload as ready
+- **AND** it anchors the new transport lease at the trusted temporal verification time
 
 #### Scenario: Relay renewal uses the same canonical receipt
 - **WHEN** a Relay renewal crosses midnight with unchanged exact-tree evidence and a ready identity-matched temporal receipt

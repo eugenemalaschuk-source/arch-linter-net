@@ -329,12 +329,14 @@ def test_temporal_revalidation_fails_closed_if_one_midnight_retry_is_still_unsaf
         )
 
 
-def test_resolve_evidence_then_decide_uses_post_receipt_lease_anchor(monkeypatch) -> None:
+def test_resolve_evidence_revalidates_expired_producer_lease_and_uses_post_receipt_anchor(monkeypatch) -> None:
     config = parse_config(json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text()))
     repository = config.repository
     main_sha = "a" * 40
-    old_horizon = datetime(2026, 9, 19, tzinfo=timezone.utc)
-    refreshed_horizon = datetime.now(timezone.utc) + timedelta(days=1)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    verified_at = now - timedelta(seconds=config.limits.max_lease_seconds + 60)
+    old_horizon = now + timedelta(days=1)
+    refreshed_horizon = now + timedelta(days=2)
     archive = b"exact-badge-archive"
     health = b"exact-health-evidence"
 
@@ -347,7 +349,7 @@ def test_resolve_evidence_then_decide_uses_post_receipt_lease_anchor(monkeypatch
         cli,
         "_producer_run",
         lambda *_: (
-            {"created_at": "2026-09-18T21:38:26Z"},
+            {"created_at": verified_at.strftime("%Y-%m-%dT%H:%M:%SZ")},
             7001,
             {"id": 8001, "name": config.producer.job_name, "run_attempt": 1},
         ),
@@ -368,7 +370,7 @@ def test_resolve_evidence_then_decide_uses_post_receipt_lease_anchor(monkeypatch
             return archive
 
     resolved, resolved_archive = cli.resolve_evidence(StubApi(), config)
-    assert resolved.verified_at == datetime(2026, 9, 18, 21, 38, 26, tzinfo=timezone.utc)
+    assert resolved.verified_at == verified_at
     assert resolved.temporal_verified_at is not None
 
     now = resolved.temporal_verified_at + timedelta(seconds=1)
