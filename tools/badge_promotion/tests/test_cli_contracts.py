@@ -225,6 +225,7 @@ def test_resolve_evidence_binds_manifest_attempt_to_producer_job(monkeypatch: py
     tree_sha = "d" * 40
     run_id = 7001
     job_id = 8001
+    producer_created_at = datetime.now(timezone.utc).isoformat()
     workflow_path = config.producer.workflow_path
     workflow_ref = f"/repos/{repository}/contents/{workflow_path}?ref={head_sha}"
     check_path = f"/repos/{repository}/commits/{head_sha}/check-runs?check_name=Architecture%20Coverage&filter=latest&per_page=100"
@@ -247,7 +248,7 @@ def test_resolve_evidence_binds_manifest_attempt_to_producer_job(monkeypatch: py
                 f"/repos/{repository}/commits/{head_sha}": {"commit": {"tree": {"sha": tree_sha}}},
                 workflow_ref: {"type": "file", "sha": config.producer.workflow_sha},
                 check_path: {"check_runs": [{"name": "Architecture Coverage", "status": "completed", "conclusion": "success", "app": {"slug": "github-actions", "id": 15368}, "details_url": f"https://github.com/{repository}/actions/runs/{run_id}/job/{job_id}"}]},
-                producer_run_path: {"workflow_runs": [{"id": run_id, "path": workflow_path, "event": "pull_request", "head_sha": head_sha, "conclusion": "success", "run_attempt": 2, "created_at": "2026-09-13T15:00:00Z"}]},
+                producer_run_path: {"workflow_runs": [{"id": run_id, "path": workflow_path, "event": "pull_request", "head_sha": head_sha, "conclusion": "success", "run_attempt": 2, "created_at": producer_created_at}]},
                 job_path: {"jobs": [{"id": job_id, "name": config.producer.job_name, "conclusion": "success", "run_attempt": 1}]},
                 artifacts_path: {"artifacts": [{"id": 9001, "name": config.producer.artifact_name, "expired": False, "archive_download_url": "badge"}, {"id": 9002, "name": config.producer.evidence_artifact_name, "expired": False, "archive_download_url": "evidence"}]},
                 f"/repos/{repository}/rules/branches/main": [{"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": True, "required_status_checks": [{"context": "Architecture Coverage", "integration_id": 15368}]}}],
