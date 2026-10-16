@@ -32,6 +32,29 @@ public sealed class HistoryCanonicalJsonTests
     }
 
     [Test]
+    public void ReleaseEvidenceProfileRetainsCanonicalEvidenceWithoutExpandedScoringGraphs()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("src/a.cs", "one\n");
+        string first = repository.Commit("first");
+        repository.Write("src/a.cs", "one\ntwo\n");
+        string second = repository.Commit("second #12");
+
+        string json = HistoryIngestionJsonWriter.Write(
+            HistoryIngestionFixture.Succeed(repository, first, second),
+            releaseSummary: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json, Does.Contain("\"reportProfile\": \"release-canonical-evidence/v1\""));
+            Assert.That(json, Does.Contain("\"commits\": ["));
+            Assert.That(json, Does.Contain("\"logicalFiles\": ["));
+            Assert.That(json, Does.Not.Contain("\"coChangeGraph\""));
+            Assert.That(json, Does.Not.Contain("\"candidates\""));
+        });
+    }
+
+    [Test]
     public void RepeatedRunsOverIdenticalObjectsProduceIdenticalBytes()
     {
         using GitTestRepository repository = GitTestRepository.Create();
