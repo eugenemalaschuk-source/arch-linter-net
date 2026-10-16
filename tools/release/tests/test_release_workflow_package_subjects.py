@@ -249,9 +249,12 @@ def test_generated_release_notes_render_support_boundary_before_changelog(genera
     # GitHub's generated body is input; this never calls GitHub or creates a release.
     match = re.search(r"\| \{\n(?P<body>.*?)\n\s*\} \\", run, re.DOTALL)
     assert match is not None
+    jq_stub = "jq() { printf '%s\\n' '* #570 — Add reviewed semantic annotation families'; }\n"
     rendered = subprocess.run(
-        ["bash", "-euo", "pipefail", "-c", textwrap.dedent(match.group("body"))],
-        input=generated_notes, capture_output=True, text=True, check=True,
+        ["bash", "-euo", "pipefail", "-c", jq_stub + textwrap.dedent(match.group("body"))],
+        input=generated_notes,
+        env={**os.environ, "SCOPE_DECLARATION": "scope.json"},
+        capture_output=True, text=True, check=True,
     ).stdout
     assert rendered.startswith("## Private Relay: experimental / opt-in\n")
     assert "full hosted/lifecycle acceptance is pending" in rendered
@@ -261,6 +264,7 @@ def test_generated_release_notes_render_support_boundary_before_changelog(genera
     assert "OIDC updates Relay state, not consumer badge commits" in rendered
     assert "not a waiver for known security, privacy, integrity, data-corruption or false-PASS" in rendered
     assert generated_notes in rendered
+    assert "## Included reviewed scope\n\n* #570 — Add reviewed semantic annotation families" in rendered
     assert "## Verify release provenance" in rendered
     if generated_notes:
         assert rendered.index("experimental / opt-in") < rendered.index("## What's Changed")
