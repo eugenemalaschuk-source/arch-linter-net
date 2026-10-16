@@ -14,7 +14,7 @@ internal sealed class HistoryIngestCommandHandler(
     IFileSystem fileSystem,
     CancellationToken cancellationToken = default)
 {
-    private const string Usage = "arch-linter-net history analyze --from <rev> --to <rev> [--repository <path>] [--policy <path>] [--enrich-dotnet] [--format json|markdown] [--report <format>=<destination>] [--timings]";
+    private const string Usage = "arch-linter-net history analyze --from <rev> --to <rev> [--repository <path>] [--policy <path>] [--enrich-dotnet] [--format json|markdown] [--report <format>=<destination>] [--release-summary-json] [--timings]";
 
     private readonly CancellationToken _cancellationToken = cancellationToken;
 
@@ -74,6 +74,15 @@ internal sealed class HistoryIngestCommandHandler(
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        bool hasJsonSink = sinks.Count == 0
+            ? options.Format == "json"
+            : sinks.Any(static sink => sink.Format == "json");
+        if (options.ReleaseSummaryJson && !hasJsonSink)
+        {
+            console.Error.WriteLine($"--release-summary-json requires a JSON output. Usage: {Usage}");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         string? collision = FindReportSinkCollision(sinks, options.PolicyPath);
         if (collision is not null)
         {
@@ -99,13 +108,17 @@ internal sealed class HistoryIngestCommandHandler(
 
         if (sinks.Count == 0)
         {
-            return ExecuteLegacySingleFormat(options.Format, result, timing);
+            return ExecuteLegacySingleFormat(options.Format, result, timing, options.ReleaseSummaryJson);
         }
 
-        return ExecuteReportSinks(sinks, result, timing);
+        return ExecuteReportSinks(sinks, result, timing, options.ReleaseSummaryJson);
     }
 
-    private int ExecuteLegacySingleFormat(string format, HistoryIngestionResult result, HistoryIngestionTiming? timing)
+    private int ExecuteLegacySingleFormat(
+        string format,
+        HistoryIngestionResult result,
+        HistoryIngestionTiming? timing,
+        bool releaseSummaryJson)
     {
         _cancellationToken.ThrowIfCancellationRequested();
         if (format == "markdown")
@@ -122,7 +135,7 @@ internal sealed class HistoryIngestCommandHandler(
         {
             Stopwatch? jsonClock = timing?.Start();
             _cancellationToken.ThrowIfCancellationRequested();
-            string content = HistoryIngestionJsonWriter.Write(result);
+            string content = HistoryIngestionJsonWriter.Write(result, releaseSummaryJson);
             timing?.Record("json_render", jsonClock);
             return content;
         });
@@ -135,7 +148,8 @@ internal sealed class HistoryIngestCommandHandler(
     private int ExecuteReportSinks(
         IReadOnlyList<HistoryReportSink> sinks,
         HistoryIngestionResult result,
-        HistoryIngestionTiming? timing)
+        HistoryIngestionTiming? timing,
+        bool releaseSummaryJson)
     {
         string? jsonContent = null;
         string? markdownContent = null;
@@ -148,7 +162,7 @@ internal sealed class HistoryIngestCommandHandler(
                     () =>
                     {
                         _cancellationToken.ThrowIfCancellationRequested();
-                        return HistoryIngestionJsonWriter.Write(result);
+                        return HistoryIngestionJsonWriter.Write(result, releaseSummaryJson);
                     },
                     out jsonContent))
             {

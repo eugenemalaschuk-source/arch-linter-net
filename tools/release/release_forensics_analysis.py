@@ -17,6 +17,7 @@ from resolve_release_history_range import ReleaseHistoryRange
 
 _TIME_MARKER = re.compile(r"release_forensics_peak_rss_kb=(\d+)")
 _TIMINGS = re.compile(r"^History timings \(ms\): (.+)$", re.MULTILINE)
+_RELEASE_REPORT_PROFILE = "release-canonical-evidence/v1"
 _REPORT_JSON = "release-forensics.json"
 _REPORT_MARKDOWN = "release-forensics.md"
 
@@ -105,6 +106,8 @@ def _validate_report(report: dict[str, Any], history_range: ReleaseHistoryRange)
         raise ReleaseForensicsError("History report does not include a valid resolved range.")
     if report.get("schemaVersion") != 1 or report.get("kind") != "release-architecture-forensics":
         raise ReleaseForensicsError("History report schema or kind does not match the candidate CLI contract.")
+    if report.get("reportProfile") != _RELEASE_REPORT_PROFILE:
+        raise ReleaseForensicsError("History report does not use the required bounded release evidence profile.")
     if not isinstance(report.get("toolVersion"), str) or not report["toolVersion"]:
         raise ReleaseForensicsError("History report does not identify its assembly version.")
     if not isinstance(report.get("historySemanticsVersion"), str) or not report["historySemanticsVersion"]:
@@ -114,6 +117,8 @@ def _validate_report(report: dict[str, Any], history_range: ReleaseHistoryRange)
         or analysis_range.get("resolvedTo") != history_range.candidate_sha
     ):
         raise ReleaseForensicsError("History report resolved range does not match the pinned candidate range.")
+    if any(not isinstance(report.get(name), list) for name in ("commits", "renameCandidates", "renameComponents", "logicalFiles")):
+        raise ReleaseForensicsError("History report does not retain all canonical Git evidence arrays.")
     _validate_analyzed_commit_count(analysis)
     if not isinstance(analysis.get("historyAnalysisConfiguration"), dict):
         raise ReleaseForensicsError("History report does not include the effective history policy configuration.")
@@ -150,6 +155,7 @@ def analyze(
         history_range.base_sha,
         "--to",
         history_range.candidate_sha,
+        "--release-summary-json",
         "--report",
         f"json={json_path}",
         "--report",

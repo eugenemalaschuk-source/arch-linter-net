@@ -181,6 +181,7 @@ def _verify_history_metadata(history: dict, report: dict) -> None:
         or history.get("tool_version") != report.get("toolVersion")
         or report.get("schemaVersion") != 1
         or report.get("kind") != "release-architecture-forensics"
+        or report.get("reportProfile") != "release-canonical-evidence/v1"
         or not isinstance(report.get("toolVersion"), str)
         or not report["toolVersion"]
         or not isinstance(report.get("historySemanticsVersion"), str)
@@ -193,6 +194,8 @@ def _verify_analyzed_report(base_sha: str, candidate: dict[str, object], policy:
     analysis = report.get("analysis")
     if not isinstance(analysis, dict):
         raise ReleaseForensicsError("Transported history report analysis is malformed.")
+    if any(not isinstance(report.get(name), list) for name in ("commits", "renameCandidates", "renameComponents", "logicalFiles")):
+        raise ReleaseForensicsError("Transported history report does not retain all canonical Git evidence arrays.")
     report_range = analysis.get("range")
     configuration = analysis.get("historyAnalysisConfiguration")
     if (

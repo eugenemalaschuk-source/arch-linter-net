@@ -18,6 +18,7 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         format.DefaultValueFactory = _ => "json";
         Option<string[]> report = new("--report") { AllowMultipleArgumentsPerToken = true };
         Option<bool> timings = new("--timings");
+        Option<bool> releaseSummaryJson = new("--release-summary-json");
         Option<bool> help = new("--help");
         help.Aliases.Add("-h");
         analyze.Options.Add(repository);
@@ -28,6 +29,7 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         analyze.Options.Add(format);
         analyze.Options.Add(report);
         analyze.Options.Add(timings);
+        analyze.Options.Add(releaseSummaryJson);
         analyze.Options.Add(help);
         analyze.SetAction(result =>
         {
@@ -52,7 +54,8 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
                 result.GetValue(enrichDotNet),
                 reportSinks,
                 reportParseError,
-                result.GetValue(timings)));
+                result.GetValue(timings),
+                result.GetValue(releaseSummaryJson)));
         });
         history.Subcommands.Add(analyze);
         return history;

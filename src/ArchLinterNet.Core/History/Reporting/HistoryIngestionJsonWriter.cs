@@ -6,8 +6,9 @@ internal static class HistoryIngestionJsonWriter
 {
     private const string ReportKind = "release-architecture-forensics";
     private const string HistorySemanticsVersion = "v1";
+    private const string ReleaseSummaryProfile = "release-canonical-evidence/v1";
 
-    public static string Write(HistoryIngestionResult result)
+    public static string Write(HistoryIngestionResult result, bool releaseSummary = false)
     {
         CanonicalJsonWriter writer = new();
         writer.BeginObject();
@@ -15,14 +16,23 @@ internal static class HistoryIngestionJsonWriter
         writer.WriteString("kind", ReportKind);
         writer.WriteString("historySemanticsVersion", HistorySemanticsVersion);
         writer.WriteString("toolVersion", ToolVersion());
+        if (releaseSummary)
+        {
+            writer.WriteString("reportProfile", ReleaseSummaryProfile);
+        }
+
         HistoryReportAnalysisWriter.Write(writer, result);
         HistoryReportEvidenceWriter.Write(writer, result);
-        HistoryReportHotspotWriter.Write(writer, result.HotspotAnalysis);
-        HistoryReportCoChangeWriter.Write(writer, result);
-        HistoryReportBottleneckWriter.Write(writer, result.BottleneckAnalysis);
-        HistoryReportOcpWriter.Write(writer, result.OcpAnalysis);
-        HistoryReportEnrichmentWriter.Write(writer, result.Enrichment);
-        HistoryReportCandidateWriter.Write(writer, result);
+        if (!releaseSummary)
+        {
+            HistoryReportHotspotWriter.Write(writer, result.HotspotAnalysis);
+            HistoryReportCoChangeWriter.Write(writer, result);
+            HistoryReportBottleneckWriter.Write(writer, result.BottleneckAnalysis);
+            HistoryReportOcpWriter.Write(writer, result.OcpAnalysis);
+            HistoryReportEnrichmentWriter.Write(writer, result.Enrichment);
+            HistoryReportCandidateWriter.Write(writer, result);
+        }
+
         writer.EndObject();
         return writer.ToCanonicalText() + "\n";
     }
