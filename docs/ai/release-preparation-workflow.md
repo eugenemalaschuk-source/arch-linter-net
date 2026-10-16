@@ -29,11 +29,11 @@ Release-specific history is not maintained as a committed version-named changelo
 Repository-side release preparation consists of:
 
 1. a reviewed release story that states the intended product delta and publication contract;
-2. correct labels on the PRs/issues that feed `.github/release.yml` categories;
-3. `tools/release/scopes/<version>.json` as the reviewed Checkpoint B release authority;
-4. shipped-declaration regression coverage;
-5. exact local/CI validation evidence in the preparation PR;
-6. an explicit handoff to the maintainer-only dry-run/publication procedure.
+1. correct labels on the PRs/issues that feed `.github/release.yml` categories;
+1. a generated `tools/release/scopes/<version>.json` declaration as the reviewed Checkpoint B release authority;
+1. generic shipped-declaration regression coverage;
+1. exact local/CI validation evidence in the preparation PR;
+1. an explicit handoff to the maintainer-only dry-run/publication procedure.
 
 Do **not** create a new evergreen docs page merely to record one release. Update evergreen user documentation only when the product behavior or adoption guidance itself changed and the owning implementation/release backlog requires that update.
 
@@ -48,7 +48,7 @@ Read these before authoring release content:
 - `README.md` for the NuGet-visible concise versioning statement;
 - `docs/reference/release-process.md`;
 - `.github/release.yml`;
-- `tools/release/scopes/` and the current release-scope schema/consumer tests;
+- `tools/release/scopes/`, the current release-scope schema/consumer tests, and the structured scope block in the release story;
 - the latest relevant published GitHub Release and SemVer tag;
 - the candidate commit/ref that would be released;
 - merged pull requests, closed issues, and commits in the candidate delta;
@@ -62,14 +62,14 @@ Milestone membership is a **discovery and traceability aid**, never release auth
 Execute these phases in order:
 
 1. Establish release identity and candidate.
-2. Reconstruct the factual candidate delta.
-3. Define or reconcile the release story.
-4. Audit release-note categorization.
-5. Author the reviewed release-scope declaration.
-6. Update shipped-declaration regression coverage.
-7. Validate the preparation change.
-8. Open one release-preparation pull request.
-9. Stop at the publication boundary and report the maintainer handoff.
+1. Reconstruct the factual candidate delta.
+1. Define or reconcile the release story.
+1. Audit release-note categorization.
+1. Generate and review the release-scope declaration.
+1. Validate shipped-declaration regression coverage.
+1. Validate the preparation change.
+1. Open one release-preparation pull request.
+1. Stop at the publication boundary and report the maintainer handoff.
 
 Do not skip directly to a JSON declaration before understanding the candidate delta.
 
@@ -185,11 +185,36 @@ Check the full intended release delta, not only the release-scope PR itself. A c
 
 Do not commit generated release notes. The release workflow generates them and the GitHub Release is the durable release-history record.
 
-## 5. Author the reviewed release-scope declaration
+## 5. Generate the reviewed release-scope declaration
 
-Create `tools/release/scopes/<RELEASE_TARGET>.json` only after the release story and factual scope are coherent.
+After the release story and factual candidate scope are coherent, put one machine-readable block in the release story issue. Keep the surrounding prose as the human-facing explanation. The block is TOML and uses this versioned shape:
 
-Follow the current schema and neighboring declarations rather than copying stale field assumptions. Publication declarations may target an exact stable `X.Y.Z` version or an exact preview `X.Y.Z-preview.N` version. They use:
+```toml release-scope/v1
+schema = "release-scope-input/v1"
+release_target = "X.Y.Z or X.Y.Z-preview.N"
+declaration_id = "vX.Y.Z-release-intent"
+comments = ["Explain the exact release intent and authority."]
+excluded_items = []
+delivered_items = []
+
+[[required_items]]
+issue = 123
+finding = "release-scope"
+summary = "A reviewed required product or release item."
+```
+
+For excluded and delivered items, use `[[excluded_items]]` or `[[delivered_items]]` tables with `issue` and a non-empty `reason`. The release story's own GitHub issue number supplies the declaration's `story` field. Required items must be non-empty. Empty optional inventories must be top-level arrays before any `[[...]]` table, as in the example.
+
+Preview the exact generated JSON and then write it with:
+
+```bash
+python3 tools/release/generate_release_scope_declaration.py preview --story <STORY_NUMBER>
+python3 tools/release/generate_release_scope_declaration.py generate --story <STORY_NUMBER>
+```
+
+The generator fetches the issue through `gh`, validates the unique block and all fields, and writes only `tools/release/scopes/<release_target>.json`. It has no arbitrary output-path option. Repeating an identical write is safe; a different existing declaration is left untouched and causes a failure that must be resolved through the preparation PR review. Do not hand-edit the generated JSON.
+
+The generated file retains the current publication-authority schema. For reference, the resulting declaration has this shape:
 
 ```json
 {
@@ -204,7 +229,7 @@ Follow the current schema and neighboring declarations rather than copying stale
 }
 ```
 
-Rules:
+The reviewed scope rules remain:
 
 - `release_target` must exactly match the immutable candidate version the declaration is meant to authorize; stable and preview targets are separate authorities;
 - a preview declaration authorizes only its exact `X.Y.Z-preview.N` target and never authorizes stable `X.Y.Z`;
@@ -220,34 +245,24 @@ Rules:
 
 For corrective patch releases, empty `excluded_items` and `delivered_items` are normal when the scope is simply the reviewed bug-fix set. For richer releases, use all three lists when the reviewed intent requires them.
 
-## 6. Update shipped-declaration regression coverage
+## 6. Validate shipped-declaration regression coverage
 
-Find the existing release-scope regression test that loads the shipped declarations and asserts the authorized target set/story/item identities.
-
-Update it for the new declaration so the repository proves at least:
-
-- every shipped declaration has a unique target;
-- the new target is included in the reviewed target set;
-- the story number is correct;
-- required issue identities are correct;
-- excluded/delivered identities or emptiness match reviewed intent.
-
-Follow the current test structure; do not create a second competing declaration inventory unless the existing test architecture genuinely requires refactoring.
+The release-scope test discovers tracked declarations, checks schema validity and target uniqueness, and retains focused assertions for historical release decisions. A new target does not need to be copied into a second hard-coded full target inventory. Run the generator tests and the release-tool suite to verify parsing, canonical output, path confinement, idempotence, and conflict handling.
 
 ## 7. Validate the preparation change
 
 OpenSpec is normally **not applicable** to release-content/scope authoring because it does not change product capability semantics. Say so explicitly in the PR. If the preparation work unexpectedly changes a public capability, schema, release-pipeline contract, or documented product guarantee, stop treating it as content-only work and follow the normal OpenSpec lifecycle for that additional change.
 
-At minimum for a normal declaration-only release preparation:
+At minimum for a normal release-scope preparation:
 
 1. run the complete release-tool test suite containing the release-scope evidence tests, currently `python -m pytest tools/release/tests/` using the repository's active virtual environment/interpreter;
-2. inspect the final declaration and regression-test diff;
-3. verify the release story and declaration agree exactly;
-4. verify intended public-note labels against `.github/release.yml`;
-5. verify no generated changelog/release-note page was added;
-6. verify no package/version property was changed merely to force the release version;
-7. verify that the chosen release scenario is consistent with `docs/reference/versioning-and-releases.md` and the NuGet-visible README summary;
-8. for a publishing preview, verify that the exact preview target has its own reviewed declaration and that the corresponding stable target remains independently unauthorized unless its own declaration/gates are complete.
+1. inspect the structured release-story block and generated declaration diff;
+1. verify the release story and declaration agree exactly;
+1. verify intended public-note labels against `.github/release.yml`;
+1. verify no generated changelog/release-note page was added;
+1. verify no package/version property was changed merely to force the release version;
+1. verify that the chosen release scenario is consistent with `docs/reference/versioning-and-releases.md` and the NuGet-visible README summary;
+1. for a publishing preview, verify that the exact preview target has its own reviewed declaration and that the corresponding stable target remains independently unauthorized unless its own declaration/gates are complete.
 
 If release scripts, workflow logic, schemas, packaging, or publication authority are modified beyond adding a declaration/test entry, escalate validation to the repository's release/publication risk tier and run the broader release-specific gates required by those files.
 
@@ -294,9 +309,9 @@ Release preparation is complete when the reviewed repository-side authority PR i
 The canonical maintainer procedure in `docs/reference/release-process.md` requires:
 
 1. a manual dry run with publication disabled;
-2. review of generated release notes, package artifacts/metadata/README and release evidence;
-3. a separate manual public publication run;
-4. post-publication verification of NuGet.org, GitHub Release/assets/provenance, and GitHub Pages.
+1. review of generated release notes, package artifacts/metadata/README and release evidence;
+1. a separate manual public publication run;
+1. post-publication verification of NuGet.org, GitHub Release/assets/provenance, and GitHub Pages.
 
 Do not trigger publication merely because the preparation PR is green. Do not create tags or GitHub Releases manually as a shortcut around the workflow.
 

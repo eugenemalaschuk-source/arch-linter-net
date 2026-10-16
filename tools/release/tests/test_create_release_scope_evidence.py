@@ -498,12 +498,13 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 14
-    assert set(by_target) == {
+    assert len(declarations) == len(by_target)
+    historical_targets = {
         "0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4",
         "0.8.0", "0.8.1", "0.8.2", "0.9.0-preview.1", "0.9.0", "0.9.1",
         "0.10.0-preview.1", "0.10.0-preview.2",
     }
+    assert historical_targets <= set(by_target)
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
     assert by_target["0.7.0"]["story"] == 613
