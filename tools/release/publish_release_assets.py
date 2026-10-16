@@ -235,26 +235,30 @@ def _create_release(arguments: argparse.Namespace, repository: str, tag: str, ca
     notes_path = Path(arguments.notes_file).resolve(strict=True)
     if not notes_path.is_file():
         raise ReleaseAssetError("Release notes must be a regular file.")
-    _gh(
-        [
-            "release",
-            "create",
-            tag,
-            "--repo",
-            repository,
-            "--target",
-            candidate_sha,
-            "--title",
-            tag,
-            "--notes-file",
-            str(notes_path),
-            "--draft",
-        ]
-    )
+    command = [
+        "release",
+        "create",
+        tag,
+        "--repo",
+        repository,
+        "--target",
+        candidate_sha,
+        "--title",
+        tag,
+        "--notes-file",
+        str(notes_path),
+        "--draft",
+    ]
+    if arguments.prerelease:
+        command.append("--prerelease")
+    _gh(command)
 
 
-def _publish_draft(repository: str, tag: str) -> None:
-    _gh(["release", "edit", tag, "--repo", repository, "--draft=false"])
+def _publish_draft(repository: str, tag: str, prerelease: bool) -> None:
+    command = ["release", "edit", tag, "--repo", repository, "--draft=false"]
+    if prerelease:
+        command.append("--prerelease")
+    _gh(command)
 
 
 def _wait_for_published_release(repository: str, tag: str) -> dict[str, object]:
@@ -351,7 +355,7 @@ def publish(arguments: argparse.Namespace) -> None:
         _upload_missing_assets(assets, existing_names, repository, tag)
         _verify_published_assets(assets, repository, tag, readback_root)
         if is_draft:
-            _publish_draft(repository, tag)
+            _publish_draft(repository, tag, arguments.prerelease)
             _wait_for_published_release(repository, tag)
             _wait_for_tag_commit(repository, tag, candidate_sha)
             _verify_published_assets(assets, repository, tag, readback_root)
@@ -362,6 +366,7 @@ def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--notes-file", required=True)
     parser.add_argument("--create-if-missing", action="store_true")
+    parser.add_argument("--prerelease", action="store_true")
     parser.add_argument("--asset", action="append", required=True)
     return parser.parse_args()
 
