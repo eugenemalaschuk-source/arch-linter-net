@@ -235,23 +235,27 @@ def _create_release(arguments: argparse.Namespace, repository: str, tag: str, ca
     notes_path = Path(arguments.notes_file).resolve(strict=True)
     if not notes_path.is_file():
         raise ReleaseAssetError("Release notes must be a regular file.")
-    command = [
-        "release",
-        "create",
-        tag,
-        "--repo",
-        repository,
-        "--target",
-        candidate_sha,
-        "--title",
-        tag,
-        "--notes-file",
-        str(notes_path),
-        "--draft",
-    ]
-    if getattr(arguments, "prerelease", False):
-        command.append("--prerelease")
-    _gh(command)
+    _gh(
+        [
+            "release",
+            "create",
+            tag,
+            "--repo",
+            repository,
+            "--target",
+            candidate_sha,
+            "--title",
+            tag,
+            "--notes-file",
+            str(notes_path),
+            "--draft",
+            *(
+                ["--prerelease"]
+                if getattr(arguments, "prerelease", False)
+                else []
+            ),
+        ]
+    )
 
 
 def _publish_draft(repository: str, tag: str, prerelease: bool) -> None:
