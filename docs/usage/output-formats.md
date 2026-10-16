@@ -20,6 +20,12 @@ artifact. Git-only analysis remains valid when enrichment is not requested,
 inapplicable, or unavailable. Failed canonical analysis writes a separate stable
 diagnostic and no partial report, ranking, or candidate set.
 
+Release automation uses `--release-summary-json` with a JSON sink to keep the
+release JSON smaller while retaining canonical commit, TaskKey, rename, and
+logical-file evidence. It omits expanded derived scores, graphs, and ranked
+findings; the paired Markdown report retains those findings, and the default full
+JSON output is unchanged.
+
 Use the repeatable `--report <format>=<destination>` option to produce both the
 JSON and Markdown views from a single completed analysis instead of running the
 command twice — `<format>` is `json` or `markdown`, and `<destination>` is

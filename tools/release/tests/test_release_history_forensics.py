@@ -425,6 +425,7 @@ def test_analysis_report_reader_rejects_invalid_json_roots(
                 "kind": "release-architecture-forensics",
                 "toolVersion": "0.9.0",
                 "historySemanticsVersion": "v1",
+                "reportProfile": "release-canonical-evidence/v1",
                 "analysis": {"range": {}, "analyzedCommitCount": 0, "historyAnalysisConfiguration": {}},
             },
             "schema or kind",
@@ -435,11 +436,16 @@ def test_analysis_report_reader_rejects_invalid_json_roots(
                 "kind": "release-architecture-forensics",
                 "toolVersion": "0.9.0",
                 "historySemanticsVersion": "v1",
+                "reportProfile": "release-canonical-evidence/v1",
                 "analysis": {
                     "range": {"resolvedFrom": "d" * 40, "resolvedTo": "a" * 40},
                     "analyzedCommitCount": True,
                     "historyAnalysisConfiguration": {},
                 },
+                "commits": [],
+                "renameCandidates": [],
+                "renameComponents": [],
+                "logicalFiles": [],
             },
             "valid analyzed commit count",
         ),
@@ -478,7 +484,7 @@ def _fake_tool(path: Path, expected_from: str, expected_to: str, calls_path: Pat
         f"assert from_ref == {expected_from!r} and to_ref == {expected_to!r}\n"
         "assert '--enrich-dotnet' not in args\n"
         "configuration = {'builtInExtractors': ['issue'], 'ignore': [], 'paths': {}, 'weights': {}}\n"
-        "report = {'schemaVersion': 1, 'kind': 'release-architecture-forensics', 'historySemanticsVersion': 'v1', 'toolVersion': '0.9.0', 'analysis': {'range': {'resolvedFrom': from_ref, 'resolvedTo': to_ref}, 'analyzedCommitCount': 2, 'historyAnalysisConfiguration': configuration}}\n"
+        "report = {'schemaVersion': 1, 'kind': 'release-architecture-forensics', 'historySemanticsVersion': 'v1', 'toolVersion': '0.9.0', 'reportProfile': 'release-canonical-evidence/v1', 'analysis': {'range': {'resolvedFrom': from_ref, 'resolvedTo': to_ref}, 'analyzedCommitCount': 2, 'historyAnalysisConfiguration': configuration}, 'commits': [], 'renameCandidates': [], 'renameComponents': [], 'logicalFiles': []}\n"
         "for item in args:\n"
         "    if item.startswith('json='):\n"
         "        pathlib.Path(item[5:]).write_text(json.dumps(report, indent=2) + '\\n', encoding='utf-8')\n"
@@ -692,10 +698,15 @@ def test_bundle_verification_rejects_changed_published_report(tmp_path: Path) ->
         "kind": "release-architecture-forensics",
         "historySemanticsVersion": "v1",
         "toolVersion": "0.9.0",
+        "reportProfile": "release-canonical-evidence/v1",
         "analysis": {
             "range": {"resolvedFrom": "d" * 40, "resolvedTo": "a" * 40},
             "historyAnalysisConfiguration": configuration,
         },
+        "commits": [],
+        "renameCandidates": [],
+        "renameComponents": [],
+        "logicalFiles": [],
     }
     observations = {
         "schema": "release-forensics-operational-observations/v1",

@@ -102,6 +102,12 @@ operands, effective configuration, and tool version SHALL produce identical byte
 An empty analyzed range SHALL succeed and emit a report with zero commits, zero
 logical files, a zero excluded merge count, and no candidates.
 
+`analyze` SHALL also accept `--release-summary-json` when a JSON output is
+requested. This opt-in profile SHALL identify itself as
+`release-canonical-evidence/v1` and retain all canonical commit, TaskKey,
+rename, and logical-file evidence above while omitting expanded derived scores,
+graphs, and ranked findings. The default JSON report SHALL remain unchanged.
+
 #### Scenario: Byte-identical repeat run
 - **WHEN** the same authored range is analyzed twice from the same repository objects
 - **THEN** both runs emit identical canonical JSON report bytes
@@ -114,6 +120,11 @@ logical files, a zero excluded merge count, and no candidates.
 - **WHEN** `--format markdown` is authored
 - **THEN** a deterministic human-readable report of the same finalized evidence
   is written and the canonical JSON artifact semantics remain unchanged
+
+#### Scenario: Bounded release evidence profile
+- **WHEN** release automation authors `--release-summary-json` with a JSON sink
+- **THEN** the report retains all canonical Git evidence, identifies its profile,
+  and leaves derived findings available in the paired Markdown report
 
 ### Requirement: Fail-closed diagnostic surface
 Every fail-closed condition SHALL produce a diagnostic carrying a stable diagnostic

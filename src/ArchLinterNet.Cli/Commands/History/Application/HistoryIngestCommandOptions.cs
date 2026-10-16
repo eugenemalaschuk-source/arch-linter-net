@@ -10,4 +10,5 @@ internal sealed record HistoryIngestCommandOptions(
     bool RequestDotNetEnrichment = false,
     IReadOnlyList<HistoryReportSink>? ReportSinks = null,
     string? ReportParseError = null,
-    bool TimingsEnabled = false);
+    bool TimingsEnabled = false,
+    bool ReleaseSummaryJson = false);

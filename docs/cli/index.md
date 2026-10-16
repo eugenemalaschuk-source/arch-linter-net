@@ -99,7 +99,7 @@ sequence of every analytical command in this catalog.
 | `arch-linter-net graph` | Export JSON, DOT or Mermaid dependency graphs. |
 | `arch-linter-net measure` | Measure declared architecture metrics without budget violations. |
 | `arch-linter-net history` | Investigate architecture history. |
-| `arch-linter-net history analyze --from <ref> --to <ref>` | Analyze an explicit Git range; select JSON or Markdown, repeat `--report` for one-analysis multi-output, and use `--timings` for phase evidence. |
+| `arch-linter-net history analyze --from <ref> --to <ref>` | Analyze an explicit Git range; select JSON or Markdown, repeat `--report` for one-analysis multi-output, use `--release-summary-json` for release bundles, and use `--timings` for phase evidence. |
 | `arch-linter-net policy` | Inspect/review policy. |
 | `arch-linter-net policy check --policy <path>` | Validate static configuration, not architecture compliance. |
 | `arch-linter-net policy context --policy <path> --format <json\|markdown>` | Export effective policy facts. |

@@ -260,8 +260,8 @@ The same dry run also uploads the candidate-bound history-forensics bundle as
 `release-forensics-<package-version>`. Download that workflow artifact and
 review these files under `artifacts/release-forensics/`:
 
-- `release-forensics.json` — the canonical history report;
-- `release-forensics.md` — the human-readable rendering from the same analysis;
+- `release-forensics.json` — canonical commit, TaskKey, rename, and file evidence without expanded derived scores, graphs, or ranked findings;
+- `release-forensics.md` — the human-readable rendering with those findings from the same analysis;
 - `release-forensics-manifest.json` — candidate, predecessor, range, tool, policy,
   schema, and report digest identity;
 - `release-forensics-checksums.txt` — checksums for the complete bundle;
