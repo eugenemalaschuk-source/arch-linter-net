@@ -249,7 +249,7 @@ def _create_release(arguments: argparse.Namespace, repository: str, tag: str, ca
         str(notes_path),
         "--draft",
     ]
-    if arguments.prerelease:
+    if getattr(arguments, "prerelease", False):
         command.append("--prerelease")
     _gh(command)
 
@@ -355,7 +355,7 @@ def publish(arguments: argparse.Namespace) -> None:
         _upload_missing_assets(assets, existing_names, repository, tag)
         _verify_published_assets(assets, repository, tag, readback_root)
         if is_draft:
-            _publish_draft(repository, tag, arguments.prerelease)
+            _publish_draft(repository, tag, getattr(arguments, "prerelease", False))
             _wait_for_published_release(repository, tag)
             _wait_for_tag_commit(repository, tag, candidate_sha)
             _verify_published_assets(assets, repository, tag, readback_root)
