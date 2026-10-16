@@ -14,8 +14,9 @@ import release_distribution as distribution  # noqa: E402
 MODELS = ROOT / "src/ArchLinterNet.Cli/Commands/Badge/Application/Setup/BadgeSetupModels.cs"
 MANIFEST = ROOT / "relay/bundle-manifest.json"
 SCHEMA = ROOT / "schema/0.8.0/badge-relay-config.schema.json"
-NO_APP_BOOTSTRAP_WORKFLOW_COMMIT = "6040b35c462ff1d70b9a3e3d96b0140aacfba1b5"
-PUBLISHER_ACTION_COMMIT = "e18fb064bc38a9b7321b77d329e85e5b430c9cbe"
+RELEASE_WORKFLOW = ROOT / ".github/workflows/release-nuget.yml"
+PUBLISHER_WORKFLOW_COMMIT = "4f8bf1af16fdb681cdf751a9e318da767ce28d62"
+PUBLISHER_ACTION_COMMIT = "8efe4b6e840f05c28aa70e76b1b41b50dba86e79"
 
 
 def _constant(name: str) -> str:
@@ -47,12 +48,14 @@ def test_all_shipped_publisher_references_match_reviewed_inventory() -> None:
     assert schema_pins["action_ref"]["enum"] == [None, action]
 
 
-def test_inventory_rotates_only_the_workflow_pin_to_the_no_app_bootstrap() -> None:
+def test_inventory_pins_match_the_release_workflow_fetch() -> None:
     inventory = json.loads((ROOT / ".github/badge-promotion/release-inventory.json").read_text())
     compatibility = inventory["compatibility"]
 
-    assert compatibility["publisher_commit"] == NO_APP_BOOTSTRAP_WORKFLOW_COMMIT
+    assert compatibility["publisher_commit"] == PUBLISHER_WORKFLOW_COMMIT
     assert compatibility["action_commit"] == PUBLISHER_ACTION_COMMIT
+    fetch_command = f"git fetch --no-tags --depth=1 origin {PUBLISHER_WORKFLOW_COMMIT} {PUBLISHER_ACTION_COMMIT}"
+    assert fetch_command in RELEASE_WORKFLOW.read_text()
 
 
 def test_rotated_schema_and_bundle_have_exact_installer_digests() -> None:

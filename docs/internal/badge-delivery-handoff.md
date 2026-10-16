@@ -120,17 +120,18 @@ this source-audit paragraph. Bind the separate generated producer Git-blob SHA
 from setup as well.
 
 The follow-up publisher-pin rotation aligns the release distribution with the
-workflow and action pins already used on `main` after #1048:
+workflow and action pins represented on `main` after #1048. The selected commits
+are reachable from `main` and retain the exact reviewed file blobs:
 
-- workflow commit `6040b35c462ff1d70b9a3e3d96b0140aacfba1b5`, blob
+- workflow commit `4f8bf1af16fdb681cdf751a9e318da767ce28d62`, blob
   `acaa992ba965ed6b8771015aad186889652e3ae0`;
-- composite action commit `e18fb064bc38a9b7321b77d329e85e5b430c9cbe`, blob
+- composite action commit `8efe4b6e840f05c28aa70e76b1b41b50dba86e79`, blob
   `dc40593075d84567642df8daee9a262451012edf`.
 
 The rotated setup schema SHA-256 is
-`43e293eee625f998a268b728e1caf0027f6530501740b584f0010bca3d06814f`; the
+`75118190fbf9d1ddcf9ab7c0156a9ea39077b0052fafd628c0d042ff105965ef`; the
 rotated Relay bundle-manifest SHA-256 is
-`6af123f168dbd3d9271b23f12383b25f16e6750bbff2f46ac8a6415bd30a838e`. These
+`a3792a8f80df760547d1fa56bb7ea8788f3528b82d025f810989e3a3292f790d`. These
 source-tree digests bind the setup assets; they do not prove that a release
 candidate passed Checkpoint B or was published.
 
