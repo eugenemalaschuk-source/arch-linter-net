@@ -873,6 +873,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TARGET_TAG: ${{ needs.release.outputs.target_tag }}
           RELEASE_COMMIT: ${{ needs.release.outputs.candidate_commit }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
         run: |
           mapfile -t assets < <(python3 tools/release/package_manifest.py paths --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json --kind all)
           mapfile -t transport_assets < <(python3 tools/release/release_distribution.py paths --transport-dir artifacts/packages/transport --manifest artifacts/packages/transport/architecture-health-badge-release-distribution.json --kind subjects)
@@ -891,7 +892,12 @@ jobs:
             release-forensics-observations.json; do
             attachment_paths+=("artifacts/release-forensics/$asset")
           done
+          publish_flags=()
+          if [[ "$RELEASE_TYPE" == "preview" ]]; then
+            publish_flags+=(--prerelease)
+          fi
           python3 tools/release/publish_release_assets.py \
+            "${publish_flags[@]}" \
             --notes-file artifacts/release-notes/release-notes.md \
             --create-if-missing \
             "${attachment_paths[@]/#/--asset=}"
