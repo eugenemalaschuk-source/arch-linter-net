@@ -678,8 +678,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_TAG: ${{ needs.prepare-candidate.outputs.target_tag }}
+          SCOPE_DECLARATION: tools/release/scopes/${{ needs.prepare-candidate.outputs.package_version }}.json
         run: |
           mkdir -p artifacts/release-notes
+          test -f "$SCOPE_DECLARATION"
           jq -n \
             --arg tag_name "$TARGET_TAG" \
             --arg target_commitish "$GITHUB_SHA" \
@@ -694,6 +696,8 @@ jobs:
                   'Bootstrap is read-only with a private, content-verified handoff and an owner-reviewed protected setup PR. OIDC updates Relay state, not consumer badge commits.' \
                   'Experimental is not a waiver for known security, privacy, integrity, data-corruption or false-PASS defects; those remain blockers.'
                 cat
+                printf '\n\n## Included reviewed scope\n\n'
+                jq -r '.required_items[] | "* #\(.issue) — \(.summary)"' "$SCOPE_DECLARATION"
                 printf '\n\n## Verify release provenance\n\nVerify the project-controlled release assets, GitHub provenance, and NuGet.org repository-signature boundary: https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/\n'
               } \
             | tee artifacts/release-notes/release-notes.md
