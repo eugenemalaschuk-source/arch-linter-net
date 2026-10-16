@@ -1,0 +1,70 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.10.0-preview.3-semantic-annotations-and-diagnostics",
+  "release_target": "0.10.0-preview.3",
+  "story": 565,
+  "_comment": [
+    "This declaration authorizes exactly 0.10.0-preview.3. The latest SemVer-compatible repository tag is v0.4.2, so the maintainer must set version_override to this exact target.",
+    "The new v0.10 product scope is the completed CQRS/messaging/web/API annotation family (#570) and bounded context metadata composition (#572).",
+    "The candidate also includes the required real-consumer read-only diagnostics correction tracked by #1084.",
+    "The v0.10 contract (#566), layered/DDD annotations (#569), repository metrics and Structure badge correction (#1057), and audit applicability correction (#1061) are prior-preview context, not new preview.3 blockers.",
+    "The source-only package (#567), full classifier/catalog integration (#568), remaining infrastructure/UI/Unity annotations (#571), adoption guidance (#573), and packed-artifact stable-release gate (#574) remain excluded. In particular, #574 is still required before stable 0.10.0."
+  ],
+  "required_items": [
+    {
+      "issue": 570,
+      "finding": "cqrs-messaging-web-api-annotations",
+      "summary": "Add the reviewed first-class CQRS, messaging, and web/API semantic annotation families"
+    },
+    {
+      "issue": 572,
+      "finding": "bounded-semantic-context-metadata",
+      "summary": "Compose the reviewed bounded context metadata while retaining one-primary-role semantics"
+    },
+    {
+      "issue": 1084,
+      "finding": "read-only-diagnostics-correctness",
+      "summary": "Preserve receipt-backed read-only diagnostics and fail closed when topology observation is incomplete"
+    }
+  ],
+  "excluded_items": [
+    {
+      "issue": 567,
+      "reason": "The source-only annotation package distribution and complete approved annotation set remain open; preview.3 does not claim finished package adoption."
+    },
+    {
+      "issue": 568,
+      "reason": "Full classifier/catalog parity and integration acceptance remain open; preview.3 does not claim this issue complete."
+    },
+    {
+      "issue": 571,
+      "reason": "Infrastructure, UI, and Unity role families remain separate open v0.10 work and are not required for preview.3."
+    },
+    {
+      "issue": 573,
+      "reason": "Annotation-first adoption, migration, compatibility, and AI-authoring guidance remain open and are not required for this early preview."
+    },
+    {
+      "issue": 574,
+      "reason": "Packed external-consumer acceptance remains the gate for stable v0.10.0; preview.3 does not claim that gate or stable-release completion."
+    }
+  ],
+  "delivered_items": [
+    {
+      "issue": 566,
+      "reason": "The v0.10 annotation contract was delivered in an earlier preview; it is cumulative context, not new preview.3 scope."
+    },
+    {
+      "issue": 569,
+      "reason": "Layered/DDD annotation sources were delivered in an earlier preview; they are cumulative context, not new preview.3 scope."
+    },
+    {
+      "issue": 1057,
+      "reason": "The repository metrics and Structure badge-depth correction was delivered in an earlier preview; it is not new preview.3 scope."
+    },
+    {
+      "issue": 1061,
+      "reason": "The audit-only applicability gate correction was delivered in preview.2; it is not new preview.3 scope."
+    }
+  ]
+}
