@@ -27,6 +27,9 @@ public sealed class SemanticAnnotationSourceContractTests
     [TestCase("ddd", 8)]
     [TestCase("cqrs-messages", 8)]
     [TestCase("web-api", 6)]
+    [TestCase("ports-infrastructure", 9)]
+    [TestCase("ui", 3)]
+    [TestCase("unity-client", 6)]
     public void RoleAttributes_MatchManifestIdentityAndTargetContract(string family, int expectedCount)
     {
         using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(ManifestPath()));

@@ -12,9 +12,6 @@ public sealed class AnnotationCatalogIdentityAttribute(int catalogGeneration, st
     public string PackageVersion { get; } = packageVersion;
 }
 
-[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-public sealed class UnityRuntimeAttribute : Attribute;
-
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
     AllowMultiple = false, Inherited = false)]
 public sealed class FutureRoleAttribute : Attribute;

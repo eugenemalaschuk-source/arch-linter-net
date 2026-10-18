@@ -32,18 +32,36 @@ public sealed class CanonicalAnnotationFamilyResolutionTests
     [TestCase("ResponseDtoAttribute", "ResponseDto")]
     [TestCase("ApiContractAttribute", "ApiContract")]
     [TestCase("ValidatorAttribute", "Validator")]
-    public void Extract_EveryApprovedRole_UsesTheExistingCanonicalCatalog(string attributeTypeName, string expectedRole)
+    [TestCase("PortAttribute", "Port")]
+    [TestCase("AdapterAttribute", "Adapter")]
+    [TestCase("AntiCorruptionLayerAttribute", "AntiCorruptionLayer")]
+    [TestCase("DbContextAttribute", "DbContext")]
+    [TestCase("RepositoryImplementationAttribute", "RepositoryImplementation")]
+    [TestCase("ExternalClientAttribute", "ExternalClient")]
+    [TestCase("MessageBusAdapterAttribute", "MessageBusAdapter")]
+    [TestCase("FileSystemAdapterAttribute", "FileSystemAdapter")]
+    [TestCase("ClockAdapterAttribute", "ClockAdapter")]
+    [TestCase("ViewAttribute", "View")]
+    [TestCase("ViewModelAttribute", "ViewModel")]
+    [TestCase("PresenterAttribute", "Presenter")]
+    [TestCase("MonoBehaviourAdapterAttribute", "MonoBehaviourAdapter")]
+    [TestCase("ScriptableObjectAssetAttribute", "ScriptableObjectAsset")]
+    [TestCase("InputAdapterAttribute", "InputAdapter")]
+    [TestCase("SceneAdapterAttribute", "SceneAdapter")]
+    public void RoleIndex_EveryApprovedRole_UsesTheExistingCanonicalCatalog(string attributeTypeName, string expectedRole)
     {
         Type attributeType = typeof(RoleAnnotationAttributeBase).Assembly.GetType(
             $"ArchLinterNet.Annotations.{attributeTypeName}", throwOnError: true)!;
         (AssemblyBuilder assembly, ModuleBuilder module) = CreateMarkedModule(expectedRole);
         TypeBuilder typeBuilder = DefineRoleType(module, $"CanonicalAnnotationFixtures.{expectedRole}Fixture", attributeType);
         Type type = typeBuilder.CreateType()!;
-        ArchitectureTypeClassificationResult result = new ArchitectureAttributeRoleExtractor(
-            new ArchitectureClassificationConfiguration(), [type]).Extract(type);
+        ArchitectureRoleIndex roleIndex = new(
+            new ArchitectureClassificationConfiguration(), new ArchitectureTypeIndex([assembly]));
+        bool found = roleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult result);
 
         Assert.Multiple(() =>
         {
+            Assert.That(found, Is.True);
             Assert.That(result.Role, Is.EqualTo(expectedRole));
             Assert.That(result.Source, Is.EqualTo(ArchitectureClassificationSource.TypeAttribute));
             Assert.That(result.Evidence, Is.EqualTo($"ArchLinterNet.Annotations.{attributeTypeName}"));
@@ -51,6 +69,7 @@ public sealed class CanonicalAnnotationFamilyResolutionTests
             Assert.That(result.Metadata["boundedContext"], Is.EqualTo("Sales"));
             Assert.That(result.Metadata["module"], Is.EqualTo("Orders"));
             Assert.That(result.CanonicalAnnotationDiagnostics, Is.Empty);
+            Assert.That(roleIndex.CanonicalAnnotationDiagnostics, Is.Empty);
         });
     }
 
@@ -68,6 +87,22 @@ public sealed class CanonicalAnnotationFamilyResolutionTests
     [TestCase("ResponseDtoAttribute", "ResponseDto")]
     [TestCase("ApiContractAttribute", "ApiContract")]
     [TestCase("ValidatorAttribute", "Validator")]
+    [TestCase("PortAttribute", "Port")]
+    [TestCase("AdapterAttribute", "Adapter")]
+    [TestCase("AntiCorruptionLayerAttribute", "AntiCorruptionLayer")]
+    [TestCase("DbContextAttribute", "DbContext")]
+    [TestCase("RepositoryImplementationAttribute", "RepositoryImplementation")]
+    [TestCase("ExternalClientAttribute", "ExternalClient")]
+    [TestCase("MessageBusAdapterAttribute", "MessageBusAdapter")]
+    [TestCase("FileSystemAdapterAttribute", "FileSystemAdapter")]
+    [TestCase("ClockAdapterAttribute", "ClockAdapter")]
+    [TestCase("ViewAttribute", "View")]
+    [TestCase("ViewModelAttribute", "ViewModel")]
+    [TestCase("PresenterAttribute", "Presenter")]
+    [TestCase("MonoBehaviourAdapterAttribute", "MonoBehaviourAdapter")]
+    [TestCase("ScriptableObjectAssetAttribute", "ScriptableObjectAsset")]
+    [TestCase("InputAdapterAttribute", "InputAdapter")]
+    [TestCase("SceneAdapterAttribute", "SceneAdapter")]
     public void Extract_EquivalentCustomMapping_ProducesSameRoleAndMetadata(
         string attributeTypeName,
         string expectedRole)
