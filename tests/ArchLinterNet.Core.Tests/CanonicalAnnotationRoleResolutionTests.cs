@@ -38,19 +38,43 @@ public sealed class CanonicalAnnotationRoleResolutionTests
     }
 
     [Test]
-    public void Extract_AssemblyAnnotationWithoutYamlMapping_UsesCanonicalCatalog()
+    public void RoleIndex_AssemblyUnityRuntimeAnnotationWithoutYamlMapping_UsesCanonicalCatalog()
     {
         Type type = CreateType("CanonicalUnityAssembly", assemblyRole: true);
-        var extractor = new ArchitectureAttributeRoleExtractor(new ArchitectureClassificationConfiguration(), [type]);
-
-        ArchitectureTypeClassificationResult result = extractor.Extract(type);
+        ArchitectureRoleIndex roleIndex = new(
+            new ArchitectureClassificationConfiguration(), new ArchitectureTypeIndex([type.Assembly]));
+        bool found = roleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult result);
 
         Assert.Multiple(() =>
         {
+            Assert.That(found, Is.True);
             Assert.That(result.Role, Is.EqualTo("UnityRuntime"));
             Assert.That(result.Source, Is.EqualTo(ArchitectureClassificationSource.AssemblyAttribute));
             Assert.That(result.Evidence, Is.EqualTo(UnityRuntimeFqn));
             Assert.That(result.EvidenceSources, Is.EqualTo(new[] { UnityRuntimeFqn }));
+            Assert.That(result.CanonicalAnnotationDiagnostics, Is.Empty);
+            Assert.That(roleIndex.CanonicalAnnotationDiagnostics, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Extract_UnityEditorAssemblyAnnotationWithoutYamlMapping_UsesCanonicalCatalog()
+    {
+        Type type = CreateType("CanonicalUnityEditorAssembly", unityEditorAssemblyRole: true);
+        ArchitectureRoleIndex roleIndex = new(
+            new ArchitectureClassificationConfiguration(), new ArchitectureTypeIndex([type.Assembly]));
+        bool found = roleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult result);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(found, Is.True);
+            Assert.That(result.Role, Is.EqualTo("UnityEditor"));
+            Assert.That(result.Source, Is.EqualTo(ArchitectureClassificationSource.AssemblyAttribute));
+            Assert.That(result.Evidence, Is.EqualTo("ArchLinterNet.Annotations.UnityEditorAttribute"));
+            Assert.That(result.EvidenceSources,
+                Is.EqualTo(new[] { "ArchLinterNet.Annotations.UnityEditorAttribute" }));
+            Assert.That(result.CanonicalAnnotationDiagnostics, Is.Empty);
+            Assert.That(roleIndex.CanonicalAnnotationDiagnostics, Is.Empty);
         });
     }
 
@@ -441,6 +465,7 @@ public sealed class CanonicalAnnotationRoleResolutionTests
         string name,
         bool typeRole = false,
         bool assemblyRole = false,
+        bool unityEditorAssemblyRole = false,
         bool aggregateRootRole = false,
         bool customRole = false,
         bool secondCustomRole = false,
@@ -476,6 +501,12 @@ public sealed class CanonicalAnnotationRoleResolutionTests
         if (assemblyRole)
         {
             ConstructorInfo constructor = typeof(UnityRuntimeAttribute).GetConstructor(Type.EmptyTypes)!;
+            assembly.SetCustomAttribute(new CustomAttributeBuilder(constructor, Array.Empty<object>()));
+        }
+
+        if (unityEditorAssemblyRole)
+        {
+            ConstructorInfo constructor = typeof(UnityEditorAttribute).GetConstructor(Type.EmptyTypes)!;
             assembly.SetCustomAttribute(new CustomAttributeBuilder(constructor, Array.Empty<object>()));
         }
 
