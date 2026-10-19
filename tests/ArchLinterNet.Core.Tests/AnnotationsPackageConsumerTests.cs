@@ -58,7 +58,8 @@ public sealed class AnnotationsPackageConsumerTests
         _packageVersion = manifest.RootElement.GetProperty("package").GetProperty("version").GetString()!;
 
         _ = RunDotnet(repositoryRoot, "pack", packageProject,
-            "--configuration", "Release", "--output", _feed, "--nologo", "--verbosity", "quiet");
+            "--configuration", "Release", "--output", _feed, "--nologo", "--verbosity", "quiet",
+            "-p:PackageVersion=" + _packageVersion, "-p:Version=" + _packageVersion);
         string[] packages = Directory.GetFiles(_feed, "ArchLinterNet.Annotations.*.nupkg");
         Assert.That(packages, Has.Length.EqualTo(1), string.Join(Environment.NewLine, packages));
         Assert.That(Directory.GetFiles(_feed, "ArchLinterNet.Annotations.*.snupkg"), Is.Empty,

@@ -3,7 +3,7 @@
 `ArchLinterNet.Annotations` is an optional source-only NuGet package for authoring architecture roles and context metadata recognized by ArchLinterNet 0.10.x.
 
 ```xml
-<PackageReference Include="ArchLinterNet.Annotations" Version="0.10.0" />
+<PackageReference Include="ArchLinterNet.Annotations" Version="0.10.*" />
 ```
 
 The package adds its internal C# definitions to the project that directly references it. Each project compiles its own definitions, so the package adds no runtime assembly or package dependency. Use a matching ArchLinterNet 0.10.x tool to analyze the compiled annotations. Earlier tools do not recognize the catalog identity marker.
