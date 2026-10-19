@@ -1,6 +1,5 @@
 using ArchLinterNet.Annotations;
 
-[assembly: AnnotationCatalogIdentity(1, "0.10.0")]
 [assembly: DomainLayer(BoundedContext = "Commerce", Module = "Orders")]
 
 namespace ArchLinterNet.Annotations.CSharp9Consumer

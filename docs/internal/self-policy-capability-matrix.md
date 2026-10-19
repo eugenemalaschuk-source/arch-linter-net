@@ -34,6 +34,7 @@ ArchLinterNet.Testing ─┘
 - `ArchLinterNet.Core` — engine package consumers reference directly.
 - `ArchLinterNet.Testing` — NUnit adapter package.
 - `ArchLinterNet.CEL` — standalone, dependency-light, host-agnostic expression engine.
+- `ArchLinterNet.Annotations` — pack-only source package; its build output is excluded from the NuGet package and it defines no runtime architecture surface.
 
 Project discovery is authoritative: `analysis.solution: ArchLinterNet.slnx`, with
 `project_exclude` removing `tests/**`, `benchmarks/**`, and `tools/**`. Those roots are deliberately
@@ -84,7 +85,7 @@ contains no project files.
 | `project-metadata` (friend assemblies) | Each shipped project's `InternalsVisibleTo` set is exactly the reviewed one | Solution discovery | **adopt** | Four rules, one per shipped project, including `allowed_friend_assemblies: []` for Testing. |
 | `project-metadata` (forbidden project references) | No shipped project references a `tests/**` or `benchmarks/**` project | `production_projects` project set | **adopt** | Reuses solution-discovered project sets instead of a duplicated path inventory. |
 | `project-metadata` (properties) | A shipped project is never a test project | Solution discovery | **adopt** | Only `IsTestProject` is frozen. Incidental SDK/build-style properties are deliberately **not** frozen. |
-| `coverage` `scope: project` | Every discovered production project maps to a declared layer | Solution discovery | **adopt** | Complements assembly and namespace coverage; a new `src/` project cannot silently escape governance. |
+| `coverage` `scope: project` | Every runtime production project maps to a declared layer; pack-only projects without a shipped assembly are explicitly excluded | Solution discovery | **adopt** | Complements assembly and namespace coverage; a new `src/` project cannot silently escape governance. The source-only annotations pack project has a reasoned exclusion because it contributes no runtime assembly or architecture namespace. |
 | `coverage` `scope: assembly` / `namespace` | — | — | **already covered** | Pre-existing. |
 | `coverage` `scope: dependency_edge` | — | — | **defer** | Would require enumerating the intended edge pairs of a 21-layer graph. The directional rules already state the forbidden edges; an edge-coverage inventory would restate them in a second, hand-maintained form with no new failure it catches. |
 | `coverage` `scope: semantic_role` | — | — | **N/A** | The repository declares no `classification` block — see semantic families below. |

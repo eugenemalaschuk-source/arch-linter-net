@@ -335,6 +335,7 @@ implemented extraction capabilities.
 The catalog does not add runtime dependencies, execute annotations, validate DI
 registration, validate framework behavior, run plugins, or replace
 project-specific YAML. Released tools through v0.9.1 do not recognize the
-planned canonical annotation FQNs. Starting with the v0.10.0 annotation-aware
-tool, the optional source-only package contributes static role/context
+canonical annotation FQNs. Stable 0.10.x packages include the optional
+source-only annotations for use with a matching annotation-aware tool; v0.10
+previews omit the package. The annotations contribute static role/context
 evidence; policy remains YAML-authored and YAML-first.

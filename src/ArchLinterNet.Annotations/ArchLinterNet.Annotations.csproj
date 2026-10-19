@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>ArchLinterNet.Annotations</PackageId>
+    <Version Condition="'$(Version)' == ''">0.10.0</Version>
+    <PackageVersion Condition="'$(PackageVersion)' == ''">0.10.0</PackageVersion>
+    <IsPackable>false</IsPackable>
+    <IsPackable Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(PackageVersion)', '^0\.10\.[0-9]+(\+[0-9A-Za-z.-]+)?$'))">true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <IncludeSource>false</IncludeSource>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Description>Optional source-only compile-time architecture annotations for ArchLinterNet 0.10.x. No runtime assembly is shipped.</Description>
+    <PackageTags>architecture;annotations;source-only;dotnet</PackageTags>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackCanonicalAnnotationSources</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="contentFiles/cs/any/**/*.cs" />
+  </ItemGroup>
+
+  <Target Name="PackCanonicalAnnotationSources">
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <ItemGroup>
+      <AssemblyAttribute Include="ArchLinterNet.Annotations.AnnotationCatalogIdentityAttribute">
+        <_Parameter1>1</_Parameter1>
+        <_Parameter1_TypeName>System.Int32</_Parameter1_TypeName>
+        <_Parameter2>$(PackageVersion)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+    <WriteCodeFragment AssemblyAttributes="@(AssemblyAttribute)" Language="C#" OutputFile="$(IntermediateOutputPath)AnnotationCatalogIdentityAssemblyAttribute.cs" />
+
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(MSBuildProjectDirectory)\contentFiles\cs\any\**\*.cs">
+        <PackagePath>contentFiles/cs/any/%(RecursiveDir)</PackagePath>
+        <BuildAction>Compile</BuildAction>
+        <PackageCopyToOutput>false</PackageCopyToOutput>
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="$(IntermediateOutputPath)AnnotationCatalogIdentityAssemblyAttribute.cs">
+        <PackagePath>contentFiles/cs/any/</PackagePath>
+        <BuildAction>Compile</BuildAction>
+        <PackageCopyToOutput>false</PackageCopyToOutput>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
+
+</Project>

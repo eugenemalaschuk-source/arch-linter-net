@@ -486,7 +486,7 @@ public sealed class CanonicalAnnotationRoleResolutionTests
         if (includeMarker)
         {
             ConstructorInfo constructor = malformedMarker
-                ? typeof(AnnotationCatalogIdentityAttribute).GetConstructor([typeof(string)])!
+                ? CreateMalformedCatalogMarkerConstructor()
                 : typeof(AnnotationCatalogIdentityAttribute).GetConstructor([typeof(int), typeof(string)])!;
             object[] constructorArguments = malformedMarker ? [version] : [generation, version];
             assembly.SetCustomAttribute(new CustomAttributeBuilder(constructor, constructorArguments));
@@ -566,6 +566,33 @@ public sealed class CanonicalAnnotationRoleResolutionTests
         }
 
         return typeBuilder.CreateType()!;
+    }
+
+    private static ConstructorInfo CreateMalformedCatalogMarkerConstructor()
+    {
+        AssemblyBuilder markerAssembly = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName($"MalformedCatalogMarker.{Guid.NewGuid():N}"), AssemblyBuilderAccess.Run);
+        ModuleBuilder markerModule = markerAssembly.DefineDynamicModule("marker");
+        TypeBuilder markerType = markerModule.DefineType(
+            "ArchLinterNet.Annotations.AnnotationCatalogIdentityAttribute",
+            TypeAttributes.Public | TypeAttributes.Class,
+            typeof(Attribute));
+        ConstructorBuilder constructor = markerType.DefineConstructor(
+            MethodAttributes.Public,
+            CallingConventions.Standard,
+            [typeof(string)]);
+        ILGenerator il = constructor.GetILGenerator();
+        ConstructorInfo attributeConstructor = typeof(Attribute).GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            Type.EmptyTypes,
+            modifiers: null)!;
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, attributeConstructor);
+        il.Emit(OpCodes.Ret);
+
+        Type createdMarkerType = markerType.CreateType()!;
+        return createdMarkerType.GetConstructor([typeof(string)])!;
     }
 
     private static ArchitectureCanonicalAnnotationDiagnostic ExtractConflict(

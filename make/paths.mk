@@ -56,6 +56,7 @@ ifeq ($(GIT_BASH),)
 $(error Git Bash was not found. These make targets require Git Bash (installed with Git for Windows), not WSL. Install Git for Windows from https://git-scm.com/download/win, or set GIT_BASH=<path to bash.exe> if Git is installed in a non-default location. WSL is not required and is not used by these targets.)
 endif
 
+export GIT_BASH
 SHELL := $(GIT_BASH)
 else
 BUNDLE_OS := unix

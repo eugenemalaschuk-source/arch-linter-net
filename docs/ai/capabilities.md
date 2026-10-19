@@ -70,7 +70,7 @@ The v0.10.0 annotation-aware tool recognizes the 49 canonical role attributes li
 
 Every canonical FQN is under the reserved `ArchLinterNet.Annotations` namespace. Do not add `classification.attributes` or `classification.assembly_attributes` mappings for that namespace, including redundant mappings of a known role. The assembly must carry exactly one compatible generation 1 catalog marker for package range `[0.10.0,0.11.0)`; missing, malformed, duplicate, unsupported, or unknown reserved identities fail closed with compatibility diagnostics. Canonical annotations provide semantic evidence only: they do not create policy rules, grant reviewed API membership, or turn custom-mapping-only/deferred role names or metadata-only context attributes into role annotations.
 
-Released v0.9.1 tools do not recognize these canonical identities. The source-only `ArchLinterNet.Annotations` package and built-in recognition are being developed for v0.10.0 and have not shipped.
+The source-only `ArchLinterNet.Annotations` package is prepared for stable 0.10.x releases. It is excluded from v0.10 previews and earlier package sets; a matching 0.10.x tool is required. Released v0.9.1 tools do not recognize these canonical identities.
 
 ## Bounded reasoning rules
 

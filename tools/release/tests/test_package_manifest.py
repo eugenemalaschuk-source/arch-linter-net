@@ -38,11 +38,29 @@ def _candidate(tmp_path: Path) -> tuple[Path, Path]:
     return packages, output
 
 
-def _verify(packages: Path, output: Path, allow_v1: bool = False) -> None:
+def _annotations_candidate(tmp_path: Path, version: str = "0.10.0") -> tuple[Path, Path]:
+    packages = tmp_path / "packages"
+    packages.mkdir(parents=True)
+    for package_id in manifest._package_ids_for_version(version):  # noqa: SLF001
+        kinds = ("package",) if package_id == "ArchLinterNet.Annotations" else manifest._SUBJECT_KINDS
+        for kind in kinds:
+            path = packages / manifest._expected_filename(package_id, version, kind)
+            path.write_bytes(f"{package_id}/{kind}".encode())
+    output = packages / "package-manifest.json"
+    manifest._create(argparse.Namespace(
+        packages_dir=packages,
+        version=version,
+        source_commit=_COMMIT,
+        output=output,
+    ))
+    return packages, output
+
+
+def _verify(packages: Path, output: Path, allow_v1: bool = False, version: str = _VERSION) -> None:
     manifest._verify(argparse.Namespace(
         packages_dir=packages,
         manifest=output,
-        version=_VERSION,
+        version=version,
         source_commit=_COMMIT,
         allow_v1=allow_v1,
     ))
@@ -65,6 +83,72 @@ def test_create_records_deterministic_paired_subject_inventory(tmp_path: Path) -
     assert [record["package"]["kind"] for record in value["packages"]] == ["package"] * 4
     assert [record["symbols"]["kind"] for record in value["packages"]] == ["symbols"] * 4
     _verify(packages, output)
+
+
+@pytest.mark.parametrize(
+    ("version", "expected"),
+    [
+        ("0.9.1", list(manifest._PACKAGE_IDS)),
+        ("0.10.0-preview.3", list(manifest._PACKAGE_IDS)),
+        ("0.10.0", list(manifest._PACKAGE_IDS_WITH_ANNOTATIONS)),
+        ("0.10.7+build.4", list(manifest._PACKAGE_IDS_WITH_ANNOTATIONS)),
+        ("0.11.0", list(manifest._PACKAGE_IDS)),
+    ],
+)
+def test_package_set_follows_catalog_generation_compatibility_range(version: str, expected: list[str]) -> None:
+    assert list(manifest._package_ids_for_version(version)) == expected  # noqa: SLF001
+
+
+def test_v3_manifest_records_source_only_annotations_without_symbol_subject(tmp_path: Path, capsys) -> None:
+    packages, output = _annotations_candidate(tmp_path)
+    value = json.loads(output.read_text())
+    annotation_record = value["packages"][-1]
+
+    assert value["schema"] == "checkpoint-b-candidate-manifest/v3"
+    assert [record["id"] for record in value["packages"]] == list(manifest._PACKAGE_IDS_WITH_ANNOTATIONS)
+    assert annotation_record == {
+        "id": "ArchLinterNet.Annotations",
+        "version": "0.10.0",
+        "package": {
+            "kind": "package",
+            "file": "ArchLinterNet.Annotations.0.10.0.nupkg",
+            "size": len(b"ArchLinterNet.Annotations/package"),
+            "sha256": manifest._sha256(packages / "ArchLinterNet.Annotations.0.10.0.nupkg"),  # noqa: SLF001
+        },
+    }
+    _verify(packages, output, version="0.10.0")
+
+    manifest._paths(argparse.Namespace(packages_dir=packages, manifest=output, kind="all"))
+    all_paths = capsys.readouterr().out.splitlines()
+    assert len(all_paths) == 9
+    assert all_paths[-1] == "ArchLinterNet.Annotations.0.10.0.nupkg"
+
+    checksums = _release_evidence(packages, output)
+    assert "ArchLinterNet.Annotations.0.10.0.nupkg" in checksums.read_text()
+    package_subjects = tmp_path / "package-subjects.txt"
+    manifest._render_attestation_subject_checksums(argparse.Namespace(
+        packages_dir=packages,
+        manifest=output,
+        checksums=checksums,
+        subject_class="package",
+        output=package_subjects,
+    ))
+    assert package_subjects.read_text().splitlines()[-1].endswith("ArchLinterNet.Annotations.0.10.0.nupkg")
+
+
+def test_v3_manifest_rejects_symbols_for_the_source_only_annotations_package(tmp_path: Path) -> None:
+    _, output = _annotations_candidate(tmp_path)
+    value = json.loads(output.read_text())
+    value["packages"][-1]["symbols"] = {
+        "kind": "symbols",
+        "file": "ArchLinterNet.Annotations.0.10.0.snupkg",
+        "size": 1,
+        "sha256": "c" * 64,
+    }
+    output.write_text(json.dumps(value))
+
+    with pytest.raises(ValueError, match="package record is invalid"):
+        manifest._load_manifest(output)
 
 
 def test_verification_rejects_missing_or_tampered_subjects(tmp_path: Path) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -12,6 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import aggregate_checkpoint_b_evidence as aggregator  # noqa: E402
+import package_manifest as package_manifest  # noqa: E402
 from aggregate_checkpoint_b_evidence import (  # noqa: E402
     _CONSUMER_CLEANUP_SCENARIOS,
     _REQUIRED_PLATFORMS,
@@ -165,6 +167,28 @@ def _aggregate(tmp_path: Path, **kwargs) -> dict:
     gates = _read_gates(gates_path, manifest, digest)
     scope = _read_candidate_authorization(scope_path, manifest, digest)
     return _summary(records, manifest, gates, scope, digest)
+
+
+def test_manifest_reader_accepts_source_only_v3_inventory(tmp_path: Path) -> None:
+    packages = tmp_path / "packages"
+    packages.mkdir()
+    version = "0.10.0"
+    for package_id in package_manifest._package_ids_for_version(version):  # noqa: SLF001
+        kinds = ("package",) if package_id == "ArchLinterNet.Annotations" else package_manifest._SUBJECT_KINDS
+        for kind in kinds:
+            subject = packages / package_manifest._expected_filename(package_id, version, kind)  # noqa: SLF001
+            subject.write_bytes(f"{package_id}/{kind}".encode())
+    manifest_path = packages / "package-manifest.json"
+    package_manifest._create(  # noqa: SLF001
+        argparse.Namespace(
+            packages_dir=packages,
+            version=version,
+            source_commit=_COMMIT,
+            output=manifest_path,
+        )
+    )
+
+    assert _read_manifest(manifest_path)["schema"] == "checkpoint-b-candidate-manifest/v3"
 
 
 def test_consumer_cleanup_scenarios_are_required() -> None:

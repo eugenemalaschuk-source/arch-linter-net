@@ -96,7 +96,7 @@ Annotation-aware v0.10.0 development builds recognize the exact FQNs in the mach
 
 The reserved namespace is `ArchLinterNet.Annotations`; all recognized identities use exact FQN matching. YAML cannot map or remap any FQN in this namespace, including a redundant mapping of a known canonical role. Canonical evidence requires exactly one compatible generation 1 catalog identity and package version in `[0.10.0,0.11.0)`; compatibility failures and unknown reserved FQNs are diagnosed and canonical evidence is suppressed. These annotations provide evidence for the existing classification model and do not create policy rules or grant reviewed API membership. Roles listed as custom-mapping-only or deferred in the manifest, and metadata-only context attributes, are not canonical role annotations.
 
-Released v0.9.1 does not recognize these identities. The source-only annotation package and v0.10.0 recognition remain under development.
+The source-only annotation package is prepared for stable 0.10.x releases covered by catalog generation 1. It is excluded from v0.10 previews and earlier package sets. Released v0.9.1 does not recognize these identities.
 
 ## CLI and governance workflows
 
