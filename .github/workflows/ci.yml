@@ -45,7 +45,7 @@ jobs:
           fail-on-error: true
 
       - name: Lint workflows with zizmor
-        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482
+        uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e
         with:
           advanced-security: false
           annotations: false
@@ -185,7 +185,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Setup Java
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with:
           distribution: temurin
           java-version: "21"
