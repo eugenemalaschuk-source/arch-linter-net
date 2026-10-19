@@ -3,7 +3,7 @@ using System;
 namespace ArchLinterNet.Annotations
 {
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class UnityRuntimeAttribute : RoleAnnotationAttributeBase
+    internal sealed class UnityRuntimeAttribute : RoleAnnotationBaseAttribute
     {
         public UnityRuntimeAttribute()
         {
@@ -11,7 +11,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class UnityEditorAttribute : RoleAnnotationAttributeBase
+    internal sealed class UnityEditorAttribute : RoleAnnotationBaseAttribute
     {
         public UnityEditorAttribute()
         {
@@ -20,7 +20,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class MonoBehaviourAdapterAttribute : RoleAnnotationAttributeBase
+    internal sealed class MonoBehaviourAdapterAttribute : RoleAnnotationBaseAttribute
     {
         public MonoBehaviourAdapterAttribute()
         {
@@ -29,7 +29,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class ScriptableObjectAssetAttribute : RoleAnnotationAttributeBase
+    internal sealed class ScriptableObjectAssetAttribute : RoleAnnotationBaseAttribute
     {
         public ScriptableObjectAssetAttribute()
         {
@@ -38,7 +38,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class InputAdapterAttribute : RoleAnnotationAttributeBase
+    internal sealed class InputAdapterAttribute : RoleAnnotationBaseAttribute
     {
         public InputAdapterAttribute()
         {
@@ -47,7 +47,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class SceneAdapterAttribute : RoleAnnotationAttributeBase
+    internal sealed class SceneAdapterAttribute : RoleAnnotationBaseAttribute
     {
         public SceneAdapterAttribute()
         {

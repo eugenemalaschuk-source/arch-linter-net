@@ -25,7 +25,7 @@ public sealed class AnnotationsPackageConsumerTests
         "LayeredCleanAttributes.cs",
         "PortsInfrastructureAttributes.cs",
         "AnnotationCatalogIdentityAttribute.cs",
-        "RoleAnnotationAttributeBase.cs",
+        "RoleAnnotationBaseAttribute.cs",
         "UiAttributes.cs",
         "UnityAttributes.cs",
         "WebApiAttributes.cs"

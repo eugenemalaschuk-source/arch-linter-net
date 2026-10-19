@@ -3,7 +3,7 @@ using System;
 namespace ArchLinterNet.Annotations
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class CommandAttribute : RoleAnnotationAttributeBase
+    internal sealed class CommandAttribute : RoleAnnotationBaseAttribute
     {
         public CommandAttribute()
         {
@@ -11,7 +11,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class CommandHandlerAttribute : RoleAnnotationAttributeBase
+    internal sealed class CommandHandlerAttribute : RoleAnnotationBaseAttribute
     {
         public CommandHandlerAttribute()
         {
@@ -19,7 +19,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class QueryAttribute : RoleAnnotationAttributeBase
+    internal sealed class QueryAttribute : RoleAnnotationBaseAttribute
     {
         public QueryAttribute()
         {
@@ -27,7 +27,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class QueryHandlerAttribute : RoleAnnotationAttributeBase
+    internal sealed class QueryHandlerAttribute : RoleAnnotationBaseAttribute
     {
         public QueryHandlerAttribute()
         {
@@ -35,7 +35,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class EventAttribute : RoleAnnotationAttributeBase
+    internal sealed class EventAttribute : RoleAnnotationBaseAttribute
     {
         public EventAttribute()
         {
@@ -43,7 +43,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class EventHandlerAttribute : RoleAnnotationAttributeBase
+    internal sealed class EventHandlerAttribute : RoleAnnotationBaseAttribute
     {
         public EventHandlerAttribute()
         {
@@ -51,7 +51,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class IntegrationEventAttribute : RoleAnnotationAttributeBase
+    internal sealed class IntegrationEventAttribute : RoleAnnotationBaseAttribute
     {
         public IntegrationEventAttribute()
         {
@@ -59,7 +59,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class ReadModelAttribute : RoleAnnotationAttributeBase
+    internal sealed class ReadModelAttribute : RoleAnnotationBaseAttribute
     {
         public ReadModelAttribute()
         {

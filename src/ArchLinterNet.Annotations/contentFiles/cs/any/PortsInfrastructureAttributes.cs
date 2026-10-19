@@ -4,7 +4,7 @@ namespace ArchLinterNet.Annotations
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class PortAttribute : RoleAnnotationAttributeBase
+    internal sealed class PortAttribute : RoleAnnotationBaseAttribute
     {
         public PortAttribute()
         {
@@ -13,7 +13,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class AdapterAttribute : RoleAnnotationAttributeBase
+    internal sealed class AdapterAttribute : RoleAnnotationBaseAttribute
     {
         public AdapterAttribute()
         {
@@ -22,7 +22,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class AntiCorruptionLayerAttribute : RoleAnnotationAttributeBase
+    internal sealed class AntiCorruptionLayerAttribute : RoleAnnotationBaseAttribute
     {
         public AntiCorruptionLayerAttribute()
         {
@@ -31,7 +31,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class DbContextAttribute : RoleAnnotationAttributeBase
+    internal sealed class DbContextAttribute : RoleAnnotationBaseAttribute
     {
         public DbContextAttribute()
         {
@@ -40,7 +40,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class RepositoryImplementationAttribute : RoleAnnotationAttributeBase
+    internal sealed class RepositoryImplementationAttribute : RoleAnnotationBaseAttribute
     {
         public RepositoryImplementationAttribute()
         {
@@ -49,7 +49,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class ExternalClientAttribute : RoleAnnotationAttributeBase
+    internal sealed class ExternalClientAttribute : RoleAnnotationBaseAttribute
     {
         public ExternalClientAttribute()
         {
@@ -58,7 +58,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class MessageBusAdapterAttribute : RoleAnnotationAttributeBase
+    internal sealed class MessageBusAdapterAttribute : RoleAnnotationBaseAttribute
     {
         public MessageBusAdapterAttribute()
         {
@@ -67,7 +67,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class FileSystemAdapterAttribute : RoleAnnotationAttributeBase
+    internal sealed class FileSystemAdapterAttribute : RoleAnnotationBaseAttribute
     {
         public FileSystemAdapterAttribute()
         {
@@ -76,7 +76,7 @@ namespace ArchLinterNet.Annotations
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
         AllowMultiple = false, Inherited = false)]
-    internal sealed class ClockAdapterAttribute : RoleAnnotationAttributeBase
+    internal sealed class ClockAdapterAttribute : RoleAnnotationBaseAttribute
     {
         public ClockAdapterAttribute()
         {
