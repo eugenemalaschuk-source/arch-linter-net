@@ -4,7 +4,7 @@ namespace ArchLinterNet.Annotations
 {
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class EntityAttribute : RoleAnnotationAttributeBase
+    internal sealed class EntityAttribute : RoleAnnotationBaseAttribute
     {
         public EntityAttribute()
         {
@@ -12,7 +12,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class AggregateRootAttribute : RoleAnnotationAttributeBase
+    internal sealed class AggregateRootAttribute : RoleAnnotationBaseAttribute
     {
         public AggregateRootAttribute()
         {
@@ -20,7 +20,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class ValueObjectAttribute : RoleAnnotationAttributeBase
+    internal sealed class ValueObjectAttribute : RoleAnnotationBaseAttribute
     {
         public ValueObjectAttribute()
         {
@@ -28,7 +28,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class DomainServiceAttribute : RoleAnnotationAttributeBase
+    internal sealed class DomainServiceAttribute : RoleAnnotationBaseAttribute
     {
         public DomainServiceAttribute()
         {
@@ -36,7 +36,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class DomainEventAttribute : RoleAnnotationAttributeBase
+    internal sealed class DomainEventAttribute : RoleAnnotationBaseAttribute
     {
         public DomainEventAttribute()
         {
@@ -44,7 +44,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class RepositoryAttribute : RoleAnnotationAttributeBase
+    internal sealed class RepositoryAttribute : RoleAnnotationBaseAttribute
     {
         public RepositoryAttribute()
         {
@@ -52,7 +52,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class SpecificationAttribute : RoleAnnotationAttributeBase
+    internal sealed class SpecificationAttribute : RoleAnnotationBaseAttribute
     {
         public SpecificationAttribute()
         {
@@ -60,7 +60,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class FactoryAttribute : RoleAnnotationAttributeBase
+    internal sealed class FactoryAttribute : RoleAnnotationBaseAttribute
     {
         public FactoryAttribute()
         {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import textwrap
 from pathlib import Path
@@ -20,6 +21,17 @@ def _ci_workflow() -> str:
     return (Path(__file__).resolve().parents[3] / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
+
+
+def _bash_executable() -> str:
+    configured = os.environ.get("GIT_BASH")
+    if configured:
+        return configured
+    if os.name == "nt":
+        for candidate in (r"C:\Program Files\Git\bin\bash.exe", r"C:\Program Files (x86)\Git\bin\bash.exe"):
+            if Path(candidate).is_file():
+                return candidate
+    return shutil.which("bash") or "bash"
 
 
 def _job(workflow: str, job_name: str) -> str:
@@ -84,15 +96,22 @@ def test_checkpoint_b_and_publication_handoffs_verify_frozen_transport() -> None
         assert "architecture-health-badge-release-checksums.txt" in job
 
 
-def test_nuget_push_uses_manifest_selected_primary_subjects_and_checks_symbols() -> None:
+def test_nuget_push_uses_manifest_selected_primary_subjects_with_optional_symbols() -> None:
     workflow = _workflow()
 
     assert "--kind package" in workflow
-    assert "--kind symbols" in workflow
-    assert 'test -f "artifacts/packages/${symbols[$index]}"' in workflow
-    assert 'dotnet nuget push "artifacts/packages/${packages[$index]}"' in workflow
+    assert 'dotnet nuget push "artifacts/packages/$package"' in workflow
+    assert 'test "${#packages[@]}" -eq "${#symbols[@]}"' not in workflow
     assert "--skip-duplicate" not in workflow
     assert "artifacts/packages/*.nupkg" not in workflow
+
+
+def test_release_package_set_is_selected_from_version_compatible_manifest_model() -> None:
+    prepare_job = _job(_workflow(), "prepare-candidate")
+
+    assert "package_manifest.py package-ids --version \"$PACKAGE_VERSION\"" in prepare_job
+    assert 'ArchLinterNet.Annotations) project="src/ArchLinterNet.Annotations/ArchLinterNet.Annotations.csproj"' in prepare_job
+    assert "package_manifest.py create" in prepare_job
 
 
 def test_manifest_verification_uses_bash_on_windows_and_release_matrices() -> None:
@@ -225,7 +244,7 @@ def test_nuget_metadata_contains_the_experimental_support_boundary(tmp_path: Pat
     env_file = tmp_path / "github-env"
     run = _step_run("prepare-candidate", "Prepare NuGet package release notes")
     subprocess.run(
-        ["bash", "-euo", "pipefail", "-c", run],
+        [_bash_executable(), "-euo", "pipefail", "-c", run],
         env={**os.environ, "GITHUB_ENV": str(env_file), "TARGET_TAG": "v0.8.1"},
         check=True, capture_output=True, text=True,
     )
@@ -251,7 +270,7 @@ def test_generated_release_notes_render_support_boundary_before_changelog(genera
     assert match is not None
     jq_stub = "jq() { printf '%s\\n' '* #570 — Add reviewed semantic annotation families'; }\n"
     rendered = subprocess.run(
-        ["bash", "-euo", "pipefail", "-c", jq_stub + textwrap.dedent(match.group("body"))],
+        [_bash_executable(), "-euo", "pipefail", "-c", jq_stub + textwrap.dedent(match.group("body"))],
         input=generated_notes,
         env={**os.environ, "SCOPE_DECLARATION": "scope.json"},
         capture_output=True, text=True, check=True,

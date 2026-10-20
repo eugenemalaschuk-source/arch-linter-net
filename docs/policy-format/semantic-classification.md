@@ -27,16 +27,16 @@ type_attribute > assembly_attribute > inheritance > namespace
 
 Deferred sources do not contribute role facts merely because their YAML shape exists.
 
-## Optional first-party annotations (planned for v0.10.0)
+## Optional first-party annotations
 
 Released tools through v0.9.1 recognize user-owned attributes only when policies
 map them by exact full type name. They do not recognize the first-party package
-or reserved FQNs described here. The v0.10.0 contract approves an optional
-source-only `ArchLinterNet.Annotations` NuGet package, but the package and
-built-in recognition have not shipped yet. When implemented, each project that
-authors annotations will reference the package directly; it will compile
-internal source definitions into that project and add no annotation runtime
-assembly, analyzer, or source generator. v0.10.0 will be the minimum
+or reserved FQNs described here. The source-only `ArchLinterNet.Annotations`
+package is prepared for stable 0.10.x releases. v0.10 previews and earlier
+package sets do not include it. Each authoring project references the package
+directly; it compiles internal source definitions into that project and adds
+no annotation runtime assembly, analyzer, or source generator.
+Use a matching ArchLinterNet 0.10.x tool; v0.10.0 is the minimum
 annotation-aware tool version.
 
 Role attributes use exact FQNs in `ArchLinterNet.Annotations` and feed the same
@@ -277,11 +277,11 @@ classification:
         domain: constructor[0]
 ```
 
-An optional source-only `ArchLinterNet.Annotations` package is approved for
-v0.10.0, but it has not shipped. It will inject internal attribute definitions
-into directly referencing SDK-style projects without adding an annotation
-runtime assembly. It will not be mandatory. Attributes are one evidence source,
-not a requirement: inheritance, namespace, and custom YAML mappings remain
+The optional source-only `ArchLinterNet.Annotations` package injects internal
+attribute definitions into directly referencing SDK-style projects without
+adding an annotation runtime assembly. It is distributed with stable 0.10.x
+releases covered by catalog generation 1. It is not mandatory. Attributes are
+one evidence source: inheritance, namespace, and custom YAML mappings remain
 supported alternatives.
 
 The [Semantic role catalog](semantic-role-catalog.md) separates roles with

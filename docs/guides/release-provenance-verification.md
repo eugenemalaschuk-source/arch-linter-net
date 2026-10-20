@@ -114,11 +114,17 @@ paired package/symbol inventory:
 
 ```bash
 jq '{schema, version, source_commit,
-     packages: [.packages[] | {id, version, package: .package.file, symbols: .symbols.file}]}' \
+     packages: [.packages[] | {id, version, package: .package.file, symbols: (.symbols.file // null)}]}' \
   package-manifest.json
 
+# Stable 0.10.x candidates require v3 because their inventory includes
+# ArchLinterNet.Annotations; older and preview inventories may use v2.
 jq -e --arg commit "$SOURCE_COMMIT" \
-  '.schema == "checkpoint-b-candidate-manifest/v2" and .source_commit == $commit' \
+  '(.schema == "checkpoint-b-candidate-manifest/v2" or .schema == "checkpoint-b-candidate-manifest/v3")
+   and .source_commit == $commit
+   and (if (.version | test("^0\\.10\\.[0-9]+(\\+[0-9A-Za-z.-]+)?$")) then
+          .schema == "checkpoint-b-candidate-manifest/v3"
+        else true end)' \
   package-manifest.json
 ```
 
@@ -129,7 +135,7 @@ before calculating any hashes; this fails closed on both missing and extra
 release assets:
 
 ```bash
-jq -r '.packages[] | .package.file, .symbols.file' package-manifest.json \
+jq -r '.packages[] | .package.file, (.symbols.file // empty)' package-manifest.json \
   | LC_ALL=C sort -u > expected-package-subjects.txt
 
 for asset in ./*.nupkg ./*.snupkg; do

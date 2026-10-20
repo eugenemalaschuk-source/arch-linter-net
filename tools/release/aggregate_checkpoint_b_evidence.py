@@ -21,7 +21,10 @@ from create_release_scope_evidence import (
 
 _EVIDENCE_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _GATES_SCHEMA = "checkpoint-b-repository-gates/v1"
-_MANIFEST_SCHEMA = "checkpoint-b-candidate-manifest/v2"
+_MANIFEST_SCHEMAS = {
+    "checkpoint-b-candidate-manifest/v2",
+    "checkpoint-b-candidate-manifest/v3",
+}
 _RELEASE_SCOPE_SCHEMA = "checkpoint-b-release-scope/v2"
 _RELEASE_SCOPE_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _RELEASE_SCOPE_DECLARATION_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -158,7 +161,7 @@ def _load_json(path: Path, description: str) -> dict[str, Any]:
 
 def _read_manifest(path: Path) -> dict[str, Any]:
     raw_manifest = _load_json(path, "candidate manifest")
-    if raw_manifest.get("schema") != _MANIFEST_SCHEMA:
+    if raw_manifest.get("schema") not in _MANIFEST_SCHEMAS:
         raise ValueError("Candidate manifest schema is invalid.")
     return _load_candidate_manifest(path)
 

@@ -4,7 +4,7 @@ namespace ArchLinterNet.Annotations
 {
 
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class DomainLayerAttribute : RoleAnnotationAttributeBase
+    internal sealed class DomainLayerAttribute : RoleAnnotationBaseAttribute
     {
         public DomainLayerAttribute()
         {
@@ -12,7 +12,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class ApplicationLayerAttribute : RoleAnnotationAttributeBase
+    internal sealed class ApplicationLayerAttribute : RoleAnnotationBaseAttribute
     {
         public ApplicationLayerAttribute()
         {
@@ -20,7 +20,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class InfrastructureLayerAttribute : RoleAnnotationAttributeBase
+    internal sealed class InfrastructureLayerAttribute : RoleAnnotationBaseAttribute
     {
         public InfrastructureLayerAttribute()
         {
@@ -28,7 +28,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class PresentationLayerAttribute : RoleAnnotationAttributeBase
+    internal sealed class PresentationLayerAttribute : RoleAnnotationBaseAttribute
     {
         public PresentationLayerAttribute()
         {
@@ -36,7 +36,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class ApiLayerAttribute : RoleAnnotationAttributeBase
+    internal sealed class ApiLayerAttribute : RoleAnnotationBaseAttribute
     {
         public ApiLayerAttribute()
         {
@@ -44,7 +44,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class PersistenceLayerAttribute : RoleAnnotationAttributeBase
+    internal sealed class PersistenceLayerAttribute : RoleAnnotationBaseAttribute
     {
         public PersistenceLayerAttribute()
         {
@@ -52,7 +52,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class IntegrationLayerAttribute : RoleAnnotationAttributeBase
+    internal sealed class IntegrationLayerAttribute : RoleAnnotationBaseAttribute
     {
         public IntegrationLayerAttribute()
         {
@@ -60,7 +60,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class SharedKernelAttribute : RoleAnnotationAttributeBase
+    internal sealed class SharedKernelAttribute : RoleAnnotationBaseAttribute
     {
         public SharedKernelAttribute()
         {
@@ -68,7 +68,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface | AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-    internal sealed class CompositionRootAttribute : RoleAnnotationAttributeBase
+    internal sealed class CompositionRootAttribute : RoleAnnotationBaseAttribute
     {
         public CompositionRootAttribute()
         {

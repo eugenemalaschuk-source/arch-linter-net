@@ -3,7 +3,7 @@ using System;
 namespace ArchLinterNet.Annotations
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class ControllerAttribute : RoleAnnotationAttributeBase
+    internal sealed class ControllerAttribute : RoleAnnotationBaseAttribute
     {
         public ControllerAttribute()
         {
@@ -11,7 +11,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class EndpointAttribute : RoleAnnotationAttributeBase
+    internal sealed class EndpointAttribute : RoleAnnotationBaseAttribute
     {
         public EndpointAttribute()
         {
@@ -19,7 +19,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class RequestDtoAttribute : RoleAnnotationAttributeBase
+    internal sealed class RequestDtoAttribute : RoleAnnotationBaseAttribute
     {
         public RequestDtoAttribute()
         {
@@ -27,7 +27,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class ResponseDtoAttribute : RoleAnnotationAttributeBase
+    internal sealed class ResponseDtoAttribute : RoleAnnotationBaseAttribute
     {
         public ResponseDtoAttribute()
         {
@@ -35,7 +35,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class ApiContractAttribute : RoleAnnotationAttributeBase
+    internal sealed class ApiContractAttribute : RoleAnnotationBaseAttribute
     {
         public ApiContractAttribute()
         {
@@ -43,7 +43,7 @@ namespace ArchLinterNet.Annotations
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
-    internal sealed class ValidatorAttribute : RoleAnnotationAttributeBase
+    internal sealed class ValidatorAttribute : RoleAnnotationBaseAttribute
     {
         public ValidatorAttribute()
         {

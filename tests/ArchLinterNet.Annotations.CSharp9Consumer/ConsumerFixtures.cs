@@ -1,16 +1,15 @@
 using ArchLinterNet.Annotations;
 
-[assembly: AnnotationCatalogIdentity(1, "0.10.0")]
 [assembly: DomainLayer(BoundedContext = "Commerce", Module = "Orders")]
 
 namespace ArchLinterNet.Annotations.CSharp9Consumer
 {
-    [AggregateRoot(BoundedContext = "Commerce", Module = "Orders")]
-    public sealed class AnnotatedOrder
+    public sealed class DomainLayerConsumerFixture
     {
     }
 
-    public sealed class DomainLayerConsumerFixture
+    [AggregateRoot(BoundedContext = "Commerce", Module = "Orders")]
+    public sealed class AnnotatedOrder
     {
     }
 

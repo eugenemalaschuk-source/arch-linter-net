@@ -50,7 +50,7 @@ public sealed class CanonicalAnnotationFamilyResolutionTests
     [TestCase("SceneAdapterAttribute", "SceneAdapter")]
     public void RoleIndex_EveryApprovedRole_UsesTheExistingCanonicalCatalog(string attributeTypeName, string expectedRole)
     {
-        Type attributeType = typeof(RoleAnnotationAttributeBase).Assembly.GetType(
+        Type attributeType = typeof(RoleAnnotationBaseAttribute).Assembly.GetType(
             $"ArchLinterNet.Annotations.{attributeTypeName}", throwOnError: true)!;
         (AssemblyBuilder assembly, ModuleBuilder module) = CreateMarkedModule(expectedRole);
         TypeBuilder typeBuilder = DefineRoleType(module, $"CanonicalAnnotationFixtures.{expectedRole}Fixture", attributeType);
@@ -107,7 +107,7 @@ public sealed class CanonicalAnnotationFamilyResolutionTests
         string attributeTypeName,
         string expectedRole)
     {
-        Type canonicalAttribute = typeof(RoleAnnotationAttributeBase).Assembly.GetType(
+        Type canonicalAttribute = typeof(RoleAnnotationBaseAttribute).Assembly.GetType(
             $"ArchLinterNet.Annotations.{attributeTypeName}", throwOnError: true)!;
         Type canonicalType = CreateSingleAnnotatedType($"Canonical{expectedRole}", canonicalAttribute);
         Type mappedType = CreateSingleMappedType($"Mapped{expectedRole}");
@@ -393,8 +393,8 @@ public sealed class CanonicalAnnotationFamilyResolutionTests
         string moduleName = "Orders")
     {
         ConstructorInfo constructor = roleAttributeType.GetConstructor(Type.EmptyTypes)!;
-        PropertyInfo boundedContextProperty = roleAttributeType.GetProperty(nameof(RoleAnnotationAttributeBase.BoundedContext))!;
-        PropertyInfo moduleProperty = roleAttributeType.GetProperty(nameof(RoleAnnotationAttributeBase.Module))!;
+        PropertyInfo boundedContextProperty = roleAttributeType.GetProperty(nameof(RoleAnnotationBaseAttribute.BoundedContext))!;
+        PropertyInfo moduleProperty = roleAttributeType.GetProperty(nameof(RoleAnnotationBaseAttribute.Module))!;
         typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(
             constructor,
             Array.Empty<object>(),

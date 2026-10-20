@@ -91,6 +91,15 @@ def test_sonar_workflows_collect_badge_relay_lcov_coverage() -> None:
         assert '/d:sonar.javascript.lcov.reportPaths="relay/coverage/lcov.info"' in workflow
 
 
+def test_pr_ci_uploads_python_tooling_coverage_to_codecov() -> None:
+    workflow = _read("ci.yml")
+    makefile = (_REPOSITORY_ROOT / "make" / "lint.mk").read_text(encoding="utf-8")
+
+    assert "find test-results -name 'coverage.cobertura.xml'" in workflow
+    assert "--cov-report=xml:coverage-python.xml" in makefile
+    assert "test-results/python-tooling/coverage.cobertura.xml" in makefile
+
+
 def test_main_sonar_and_codecov_refresh_independently_from_same_coverage() -> None:
     workflow = _read("main-quality.yml")
 

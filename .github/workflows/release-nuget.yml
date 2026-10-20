@@ -387,17 +387,23 @@ jobs:
         run: >-
           echo "PACKAGE_RELEASE_NOTES=See GitHub release notes for $TARGET_TAG. Private Relay is experimental / opt-in. Its full hosted/lifecycle acceptance is pending. Stable core governance plus private reports and public github-raw snapshots remain independent of Relay. Private default: none. There is no automatic cloud setup or badge egress. Adopter-owned infrastructure and explicit disclosure consent are required. Experimental is not a waiver for known security or privacy or integrity or data-corruption or false-PASS defects." >> "$GITHUB_ENV"
 
-      - name: Pack CEL
-        run: dotnet pack src/ArchLinterNet.CEL/ArchLinterNet.CEL.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
-
-      - name: Pack Core
-        run: dotnet pack src/ArchLinterNet.Core/ArchLinterNet.Core.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
-
-      - name: Pack CLI
-        run: dotnet pack src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
-
-      - name: Pack Testing
-        run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
+      - name: Pack version-compatible package set
+        shell: bash
+        run: |
+          mapfile -t package_ids < <(python3 tools/release/package_manifest.py package-ids --version "$PACKAGE_VERSION")
+          for package_id in "${package_ids[@]}"; do
+            case "$package_id" in
+              ArchLinterNet.CEL) project="src/ArchLinterNet.CEL/ArchLinterNet.CEL.csproj" ;;
+              ArchLinterNet.Cli) project="src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" ;;
+              ArchLinterNet.Core) project="src/ArchLinterNet.Core/ArchLinterNet.Core.csproj" ;;
+              ArchLinterNet.Testing) project="src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" ;;
+              ArchLinterNet.Annotations) project="src/ArchLinterNet.Annotations/ArchLinterNet.Annotations.csproj" ;;
+              *) echo "Unexpected release package id: $package_id" >&2; exit 1 ;;
+            esac
+            dotnet pack "$project" --configuration Release --no-build --output "$PACKAGE_OUTPUT" \
+              -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" \
+              -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
+          done
 
       - name: Create immutable candidate manifest
         run: python3 tools/release/package_manifest.py create --packages-dir "$PACKAGE_OUTPUT" --version "$PACKAGE_VERSION" --source-commit "$GITHUB_SHA" --output artifacts/packages/package-manifest.json
@@ -788,11 +794,8 @@ jobs:
         shell: bash
         run: |
           mapfile -t packages < <(python3 tools/release/package_manifest.py paths --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json --kind package)
-          mapfile -t symbols < <(python3 tools/release/package_manifest.py paths --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json --kind symbols)
-          test "${#packages[@]}" -eq "${#symbols[@]}"
-          for index in "${!packages[@]}"; do
-            test -f "artifacts/packages/${symbols[$index]}"
-            dotnet nuget push "artifacts/packages/${packages[$index]}" --source https://api.nuget.org/v3/index.json --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+          for package in "${packages[@]}"; do
+            dotnet nuget push "artifacts/packages/$package" --source https://api.nuget.org/v3/index.json --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           done
 
   create-release:

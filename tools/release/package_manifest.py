@@ -18,8 +18,10 @@ _PACKAGE_IDS = (
     "ArchLinterNet.Core",
     "ArchLinterNet.Testing",
 )
+_PACKAGE_IDS_WITH_ANNOTATIONS = (*_PACKAGE_IDS, "ArchLinterNet.Annotations")
 _SCHEMA_V1 = "checkpoint-b-candidate-manifest/v1"
 _SCHEMA_V2 = "checkpoint-b-candidate-manifest/v2"
+_SCHEMA_V3 = "checkpoint-b-candidate-manifest/v3"
 _SUBJECT_KINDS = ("package", "symbols")
 _CANONICAL_MANIFEST_FILE = "package-manifest.json"
 _CANONICAL_CHECKSUM_FILE = "package-checksums.txt"
@@ -40,7 +42,25 @@ def _sha256(path: Path) -> str:
 
 def _expected_filename(package_id: str, version: str, kind: str) -> str:
     extension = ".nupkg" if kind == "package" else ".snupkg"
-    return f"{package_id}.{version}{extension}"
+    # NuGet removes SemVer build metadata from the package filename even though the
+    # candidate and package metadata retain the complete version identity.
+    artifact_version = version.partition("+")[0]
+    return f"{package_id}.{artifact_version}{extension}"
+
+
+def _package_ids_for_version(version: str) -> tuple[str, ...]:
+    """Return the reviewed package set for this release line.
+
+    Catalog generation 1 is explicitly compatible with stable 0.10.x package versions. Preview
+    candidates and later minor lines keep the existing four-package inventory until the catalog
+    contract is revised.
+    """
+    from calculate_version import parse_package_version
+
+    parsed = parse_package_version(version)
+    if parsed is not None and parsed[0:2] == (0, 10) and parsed[3] is None:
+        return _PACKAGE_IDS_WITH_ANNOTATIONS
+    return _PACKAGE_IDS
 
 
 def _subject(path: Path, kind: str) -> dict[str, Any]:
@@ -94,22 +114,58 @@ def _validate_v2(manifest: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(_UNSUPPORTED_SCHEMA)
     _validate_identity(manifest)
     version = manifest["version"]
+    if _package_ids_for_version(version) != _PACKAGE_IDS:
+        raise ValueError("Candidate manifest schema is incompatible with its package version.")
     packages = manifest.get("packages")
     if not isinstance(packages, list) or len(packages) != len(_PACKAGE_IDS):
         raise ValueError("Candidate manifest package inventory is invalid.")
 
     subject_files: set[str] = set()
     for package_id, record in zip(_PACKAGE_IDS, packages, strict=True):
-        _validate_package_record(record, package_id, version, subject_files)
+        _validate_package_record(record, package_id, version, subject_files, require_symbols=True)
     return manifest
 
 
-def _validate_package_record(record: Any, package_id: str, version: str, subject_files: set[str]) -> None:
-    if not isinstance(record, dict) or set(record) != {"id", "version", "package", "symbols"}:
+def _validate_v3(manifest: dict[str, Any]) -> dict[str, Any]:
+    if set(manifest) != {"schema", "version", "source_commit", "packages"}:
+        raise ValueError("Candidate manifest fields are invalid.")
+    if manifest.get("schema") != _SCHEMA_V3:
+        raise ValueError(_UNSUPPORTED_SCHEMA)
+    _validate_identity(manifest)
+    version = manifest["version"]
+    package_ids = _package_ids_for_version(version)
+    if package_ids != _PACKAGE_IDS_WITH_ANNOTATIONS:
+        raise ValueError("Candidate manifest schema is incompatible with its package version.")
+    packages = manifest.get("packages")
+    if not isinstance(packages, list) or len(packages) != len(package_ids):
+        raise ValueError("Candidate manifest package inventory is invalid.")
+
+    subject_files: set[str] = set()
+    for package_id, record in zip(package_ids, packages, strict=True):
+        _validate_package_record(
+            record,
+            package_id,
+            version,
+            subject_files,
+            require_symbols=package_id != "ArchLinterNet.Annotations",
+        )
+    return manifest
+
+
+def _validate_package_record(
+    record: Any,
+    package_id: str,
+    version: str,
+    subject_files: set[str],
+    *,
+    require_symbols: bool,
+) -> None:
+    expected_fields = {"id", "version", "package", "symbols"} if require_symbols else {"id", "version", "package"}
+    if not isinstance(record, dict) or set(record) != expected_fields:
         raise ValueError("Candidate manifest package record is invalid.")
     if record.get("id") != package_id or record.get("version") != version:
         raise ValueError("Candidate manifest package identity is invalid.")
-    for kind in _SUBJECT_KINDS:
+    for kind in ("package", "symbols") if require_symbols else ("package",):
         subject = _validate_subject(record.get(kind), package_id, version, kind)
         if subject["file"] in subject_files:
             raise ValueError("Candidate manifest contains duplicated subject files.")
@@ -142,18 +198,21 @@ def _load_manifest(path: Path, allow_v1: bool = False) -> dict[str, Any]:
     manifest = _read_manifest(path)
     if manifest.get("schema") == _SCHEMA_V2:
         return _validate_v2(manifest)
+    if manifest.get("schema") == _SCHEMA_V3:
+        return _validate_v3(manifest)
     if allow_v1 and manifest.get("schema") == _SCHEMA_V1:
         return _validate_v1(manifest)
     raise ValueError(_UNSUPPORTED_SCHEMA)
 
 
 def _subjects(manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    if manifest["schema"] != _SCHEMA_V2:
+    if manifest["schema"] not in {_SCHEMA_V2, _SCHEMA_V3}:
         raise ValueError("Candidate manifest does not contain a complete package-subject inventory.")
     return [
         {"id": record["id"], "version": record["version"], **record[kind]}
         for record in manifest["packages"]
         for kind in _SUBJECT_KINDS
+        if kind in record
     ]
 
 
@@ -192,10 +251,13 @@ def _verify_inventory(packages_directory: Path, manifest: dict[str, Any]) -> Non
 
 
 def _create(arguments: argparse.Namespace) -> None:
+    package_ids = _package_ids_for_version(arguments.version)
+    schema = _SCHEMA_V3 if package_ids == _PACKAGE_IDS_WITH_ANNOTATIONS else _SCHEMA_V2
     records = []
-    for package_id in _PACKAGE_IDS:
+    for package_id in package_ids:
         subjects: dict[str, dict[str, Any]] = {}
-        for kind in _SUBJECT_KINDS:
+        subject_kinds = _SUBJECT_KINDS if package_id != "ArchLinterNet.Annotations" else ("package",)
+        for kind in subject_kinds:
             path = arguments.packages_dir / _expected_filename(package_id, arguments.version, kind)
             if not path.is_file():
                 raise ValueError(f"Missing candidate {kind} package: {path}")
@@ -203,18 +265,20 @@ def _create(arguments: argparse.Namespace) -> None:
         records.append({"id": package_id, "version": arguments.version, **subjects})
 
     manifest = {
-        "schema": _SCHEMA_V2,
+        "schema": schema,
         "version": arguments.version,
         "source_commit": arguments.source_commit,
         "packages": records,
     }
-    _validate_v2(manifest)
+    if schema == _SCHEMA_V3:
+        _validate_v3(manifest)
+    else:
+        _validate_v2(manifest)
     _verify_inventory(arguments.packages_dir, manifest)
     output = _safe_path(arguments.output, "candidate manifest output")
     protected_subjects = {
-        _safe_path(arguments.packages_dir / _expected_filename(package_id, arguments.version, kind), "package subject")
-        for package_id in _PACKAGE_IDS
-        for kind in _SUBJECT_KINDS
+        _safe_path(arguments.packages_dir / subject["file"], "package subject")
+        for subject in _subjects(manifest)
     }
     if output in protected_subjects:
         raise ValueError("Candidate manifest output cannot overwrite a package subject.")
@@ -347,6 +411,15 @@ def _paths(arguments: argparse.Namespace) -> None:
             print(subject["file"])
 
 
+def _package_ids(arguments: argparse.Namespace) -> None:
+    from calculate_version import parse_package_version
+
+    if parse_package_version(arguments.version) is None:
+        raise ValueError("Candidate package version is invalid.")
+    for package_id in _package_ids_for_version(arguments.version):
+        print(package_id)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -392,6 +465,10 @@ def main() -> int:
     paths.add_argument("--manifest", type=Path, required=True)
     paths.add_argument("--kind", choices=(*_SUBJECT_KINDS, "all"), required=True)
     paths.set_defaults(handler=_paths)
+
+    package_ids = subcommands.add_parser("package-ids")
+    package_ids.add_argument("--version", required=True)
+    package_ids.set_defaults(handler=_package_ids)
 
     arguments = parser.parse_args()
     arguments.handler(arguments)

@@ -37,6 +37,9 @@ contracts:
     - name: project-coverage
       id: project-coverage
       scope: project
+      exclude:
+        - project: src/ArchLinterNet.Annotations/ArchLinterNet.Annotations.csproj
+          reason: Pack-only source distribution project; its compiled build output is excluded from the NuGet package and it defines no runtime architecture surface.
       reason: Every first-party production project discovered from ArchLinterNet.slnx must be mapped to a declared layer, so a newly added src/ project cannot silently escape governance.
 
     - name: namespace-coverage

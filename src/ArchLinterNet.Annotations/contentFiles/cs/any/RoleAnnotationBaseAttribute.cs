@@ -5,7 +5,7 @@ using System;
 namespace ArchLinterNet.Annotations
 {
 
-    internal abstract class RoleAnnotationAttributeBase : Attribute
+    internal abstract class RoleAnnotationBaseAttribute : Attribute
     {
         public string? Domain { get; set; }
 

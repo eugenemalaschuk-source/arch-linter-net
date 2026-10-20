@@ -1,17 +1,5 @@
 namespace ArchLinterNet.Annotations;
 
-[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false, Inherited = false)]
-public sealed class AnnotationCatalogIdentityAttribute(int catalogGeneration, string packageVersion) : Attribute
-{
-    public AnnotationCatalogIdentityAttribute(string packageVersion) : this(1, packageVersion)
-    {
-    }
-
-    public int CatalogGeneration { get; } = catalogGeneration;
-
-    public string PackageVersion { get; } = packageVersion;
-}
-
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
     AllowMultiple = false, Inherited = false)]
 public sealed class FutureRoleAttribute : Attribute;

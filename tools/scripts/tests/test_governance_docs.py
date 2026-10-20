@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,17 @@ PAGES = (
     "guides/history-forensics.md", "usage/timings.md",
     "installation/index.md", "reference/repository-metrics.md",
 )
+
+
+def bash_executable() -> str:
+    configured = os.environ.get("GIT_BASH")
+    if configured:
+        return configured
+    if os.name == "nt":
+        for candidate in (r"C:\Program Files\Git\bin\bash.exe", r"C:\Program Files (x86)\Git\bin\bash.exe"):
+            if Path(candidate).is_file():
+                return candidate
+    return shutil.which("bash") or "bash"
 
 
 def text(page: str) -> str:
@@ -71,7 +83,7 @@ def test_structured_examples_parse_and_shell_has_valid_syntax(page: str) -> None
     for block in blocks(page, "yaml"):
         yaml.safe_load(block)
     for block in blocks(page, "bash"):
-        result = subprocess.run(["bash", "-n"], input=block, capture_output=True, text=True)
+        result = subprocess.run([bash_executable(), "-n"], input=block, capture_output=True, text=True)
         assert result.returncode == 0, result.stderr
 
 
@@ -193,7 +205,7 @@ def execute_review(repo: Path, env: dict[str, str]) -> subprocess.CompletedProce
     recipe = text("guides/single-tool-workflow.md").split("<!-- example: governance-review -->", 1)[1]
     script = re.search(r"```bash\n(.*?)\n```", recipe, re.S)
     assert script is not None
-    return subprocess.run(["bash"], input=script.group(1), cwd=repo, env=env,
+    return subprocess.run([bash_executable()], input=script.group(1), cwd=repo, env=env,
                           capture_output=True, text=True, timeout=30)
 
 

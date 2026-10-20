@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/ArchLinterNet.CEL/ArchLinterNet.CEL.csproj" />
+    <Project Path="src/ArchLinterNet.Annotations/ArchLinterNet.Annotations.csproj" />
     <Project Path="src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" />
     <Project Path="src/ArchLinterNet.Core/ArchLinterNet.Core.csproj" />
     <Project Path="src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" />

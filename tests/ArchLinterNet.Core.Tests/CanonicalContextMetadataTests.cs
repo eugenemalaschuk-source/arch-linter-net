@@ -17,6 +17,18 @@ public sealed class CanonicalContextMetadataTests
     private const string BoundedContextFqn = "ArchLinterNet.Annotations.BoundedContextAttribute";
 
     [Test]
+    public void CatalogIdentityAttribute_ExposesItsCatalogGenerationAndPackageVersion()
+    {
+        AnnotationCatalogIdentityAttribute identity = new(1, "0.10.0");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(identity.CatalogGeneration, Is.EqualTo(1));
+            Assert.That(identity.PackageVersion, Is.EqualTo("0.10.0"));
+        });
+    }
+
+    [Test]
     public void Extract_ComposesRoleThenTypeContextThenAssemblyDefaults()
     {
         (AssemblyBuilder assembly, ModuleBuilder module) = CreateAssembly("RoleAndContextComposition");

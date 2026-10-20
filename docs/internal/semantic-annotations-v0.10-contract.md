@@ -204,6 +204,7 @@ Issues #567–#574 divide implementation as follows:
 | #573 | Adoption/compatibility docs and generated or parity-tested role reference. |
 | #574 | Packed-artifact compatibility and consumer exit gate. |
 
-Package/runtime implementation and release publication are outside the scope of
-this design change. The package is not shipped until its implementation issues
-and the v0.10 release lifecycle authorize those steps.
+Issue #567's package implementation and packed SDK-consumer proof are complete
+in the repository. The package has not been published; the v0.10 release
+lifecycle and separate maintainer publication procedure still govern that
+release.
