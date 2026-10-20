@@ -142,9 +142,9 @@ test-architecture-candidate:  ## Run tests for architecture candidate identity t
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/scripts/tests/test_architecture_candidate.py
 
-# Both Python suites in one run, emitting the Cobertura report SonarCloud needs. Without it the
-# release-evidence aggregator and the coverage-report generator are measured as 0%-covered new
-# code even though both are tested.
+# Both Python suites in one run, emitting the root Cobertura report SonarCloud needs and a discoverable
+# test-results copy for the PR Codecov upload. Without the report the release-evidence aggregator and
+# the coverage-report generator are measured as 0%-covered new code even though both are tested.
 test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-python.xml)
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/release/tests \
@@ -161,6 +161,8 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 		tests/qodana \
 		--cov=tools/release --cov=tools/scripts --cov=tools/badge_promotion \
 		--cov-report=xml:coverage-python.xml --cov-report=term-missing
+	@mkdir -p "$(PROJECT_ROOT)/test-results/python-tooling"
+	@cp "$(PROJECT_ROOT)/coverage-python.xml" "$(PROJECT_ROOT)/test-results/python-tooling/coverage.cobertura.xml"
 
 # --ensure-built prepares and verifies the analysed project graph; the policy declares
 # analysis.solution, so a run without a build receipt is blocked by build-state preflight. It never
