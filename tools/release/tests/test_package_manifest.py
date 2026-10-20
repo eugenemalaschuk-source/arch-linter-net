@@ -2,18 +2,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import aggregate_checkpoint_b_evidence as checkpoint_b_evidence  # noqa: E402
 import package_manifest as manifest  # noqa: E402
 
 
 _COMMIT = "b" * 40
 _VERSION = "0.7.0-preview.1"
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(autouse=True)
@@ -97,6 +102,121 @@ def test_create_records_deterministic_paired_subject_inventory(tmp_path: Path) -
 )
 def test_package_set_follows_catalog_generation_compatibility_range(version: str, expected: list[str]) -> None:
     assert list(manifest._package_ids_for_version(version)) == expected  # noqa: SLF001
+
+
+def test_v2_manifest_rejects_stable_0_10_without_annotations(tmp_path: Path) -> None:
+    packages = tmp_path / "packages"
+    packages.mkdir()
+    version = "0.10.0"
+    records = []
+    for package_id in manifest._PACKAGE_IDS:
+        subjects = {}
+        for kind in manifest._SUBJECT_KINDS:
+            path = packages / manifest._expected_filename(package_id, version, kind)
+            path.write_bytes(f"{package_id}/{kind}".encode())
+            subjects[kind] = {
+                "kind": kind,
+                "file": path.name,
+                "size": path.stat().st_size,
+                "sha256": manifest._sha256(path),
+            }
+        records.append({"id": package_id, "version": version, **subjects})
+    output = packages / "package-manifest.json"
+    output.write_text(json.dumps({
+        "schema": "checkpoint-b-candidate-manifest/v2",
+        "version": version,
+        "source_commit": _COMMIT,
+        "packages": records,
+    }))
+
+    with pytest.raises(ValueError, match="schema is incompatible with its package version"):
+        manifest._verify(argparse.Namespace(
+            packages_dir=packages,
+            manifest=output,
+            version=version,
+            source_commit=_COMMIT,
+            allow_v1=False,
+        ))
+    with pytest.raises(ValueError, match="schema is incompatible with its package version"):
+        checkpoint_b_evidence._read_manifest(output)
+
+
+@pytest.mark.skipif(shutil.which("dotnet") is None, reason=".NET SDK is required for the pack regression")
+def test_dotnet_pack_build_metadata_filename_is_accepted_by_manifest_create() -> None:
+    version = "0.10.7+build.4"
+    with tempfile.TemporaryDirectory(prefix=".package-manifest-pack-", dir=_REPOSITORY_ROOT) as workspace_name:
+        workspace = Path(workspace_name)
+        packages = workspace / "packages"
+        packages.mkdir()
+        project = _REPOSITORY_ROOT / "src/ArchLinterNet.Annotations/ArchLinterNet.Annotations.csproj"
+        build_artifacts = workspace / "dotnet-artifacts"
+        subprocess.run(
+            [
+                "dotnet",
+                "pack",
+                str(project),
+                "--configuration",
+                "Release",
+                "--output",
+                str(packages),
+                "--artifacts-path",
+                str(build_artifacts),
+                "--nologo",
+                "--verbosity",
+                "quiet",
+                f"-p:PackageVersion={version}",
+                f"-p:Version={version}",
+            ],
+            cwd=_REPOSITORY_ROOT,
+            capture_output=True,
+            check=True,
+            text=True,
+            timeout=180,
+        )
+
+        normalized_annotation_package = packages / "ArchLinterNet.Annotations.0.10.7.nupkg"
+        assert normalized_annotation_package.is_file()
+        assert not (packages / f"ArchLinterNet.Annotations.{version}.nupkg").exists()
+
+        for package_id in manifest._PACKAGE_IDS:
+            for kind in manifest._SUBJECT_KINDS:
+                path = packages / manifest._expected_filename(package_id, version, kind)
+                path.write_bytes(f"{package_id}/{kind}".encode())
+
+        output = packages / "package-manifest.json"
+        subprocess.run(
+            [
+                sys.executable,
+                str(_REPOSITORY_ROOT / "tools/release/package_manifest.py"),
+                "create",
+                "--packages-dir",
+                str(packages),
+                "--version",
+                version,
+                "--source-commit",
+                _COMMIT,
+                "--output",
+                str(output),
+            ],
+            cwd=workspace,
+            capture_output=True,
+            check=True,
+            text=True,
+            timeout=30,
+        )
+
+        created = json.loads(output.read_text(encoding="utf-8"))
+        annotation_record = created["packages"][-1]
+        assert created["version"] == version
+        assert annotation_record["version"] == version
+        assert annotation_record["package"]["file"] == normalized_annotation_package.name
+        manifest._verify(argparse.Namespace(
+            packages_dir=packages,
+            manifest=output,
+            version=version,
+            source_commit=_COMMIT,
+            allow_v1=False,
+        ))
 
 
 def test_v3_manifest_records_source_only_annotations_without_symbol_subject(tmp_path: Path, capsys) -> None:

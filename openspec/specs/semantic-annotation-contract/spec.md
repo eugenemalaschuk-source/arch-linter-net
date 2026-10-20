@@ -3,7 +3,9 @@
 ## Purpose
 
 Defines the optional v0.10 source-only annotation package, the stable identities and compatibility contract that consumers and ArchLinterNet tooling rely on, and the boundaries that keep annotations separate from policy authority and reviewed API membership.
+
 ## Requirements
+
 ### Requirement: The optional annotations package is source-only and internal by default
 
 ArchLinterNet SHALL provide the v0.10 canonical annotations as an optional NuGet package for supported SDK-style projects. The package SHALL compile-inject source through NuGet content files and SHALL NOT ship or require a separate annotation runtime assembly, analyzer, source generator, or runtime service. Every project that authors these attributes SHALL opt in directly; central package management MAY centralize the version. Injected annotation types SHALL be internal so installing the package does not add supported public API declarations to the consumer.
@@ -157,18 +159,22 @@ The manifest's `roleAttributeContract.baseType` SHALL name a CLR ancestor of eve
 When canonical role annotation evidence is present, the annotation-aware tool SHALL require exactly one valid assembly catalog identity and SHALL resolve the evidence only when its catalog generation and package SemVer are supported. Missing, malformed, duplicated, or unsupported identity markers and unknown FQNs under the reserved namespace SHALL produce deterministic diagnostics that identify the subject, exact FQN, and compatibility or identity reason. Any policy mapping whose attribute FQN is in the reserved namespace SHALL produce a deterministic configuration diagnostic, even when it repeats the canonical role or metadata exactly, and SHALL NOT reinterpret that identity. Analysis diagnostics SHALL be represented consistently in human, JSON, SARIF, and Testing outputs.
 
 #### Scenario: Canonical evidence without a valid catalog marker fails closed
+
 - **WHEN** a target contains a known canonical role FQN but its assembly has no unique valid marker, an unsupported generation, or a malformed or unsupported package version
 - **THEN** the tool reports the applicable actionable diagnostic and does not resolve that annotation as role evidence
 
 #### Scenario: Unknown reserved FQN fails closed
+
 - **WHEN** a target contains an attribute FQN under `ArchLinterNet.Annotations` that is not a supported canonical role identity
 - **THEN** the tool reports the exact unsupported FQN and does not guess a role by simple name, namespace prefix, or inheritance
 
 #### Scenario: YAML cannot name a reserved canonical identity
+
 - **WHEN** policy YAML maps an attribute FQN in the reserved namespace, including an exact redundant mapping of a known canonical role FQN
 - **THEN** policy validation reports the reserved-identity configuration error and does not reinterpret the annotation
 
 #### Scenario: Analysis diagnostic projections agree
+
 - **WHEN** one of these identity or compatibility conditions is encountered during analysis
 - **THEN** human, JSON, SARIF, and Testing surfaces preserve the same subject, exact FQN, reason, and deterministic ordering
 
@@ -177,14 +183,17 @@ When canonical role annotation evidence is present, the annotation-aware tool SH
 The machine-readable capability inventory SHALL advertise the canonical role FQNs recognized by the tool, each corresponding role and allowed scope, the reserved namespace, supported catalog generations, supported package SemVer ranges, and minimum annotation-aware tool version. Packaged policy-schema help SHALL explain that canonical roles are exact-FQN semantic evidence requiring a supported catalog identity and do not grant policy authority. Capability and schema catalog projections SHALL be validated against the versioned canonical manifest so drift is reported by the repository checks.
 
 #### Scenario: Capability inventory describes the exact supported role identities
+
 - **WHEN** tooling reads the capability inventory for an annotation-aware release
 - **THEN** it can determine the exact canonical role FQNs and their type or assembly scope together with the supported catalog and package versions
 
 #### Scenario: Schema help explains the canonical annotation boundary
+
 - **WHEN** an adopter inspects the packaged policy schema or semantic-classification help
 - **THEN** the metadata explains exact identity matching, version compatibility, and that annotations do not create policy rules or reviewed API membership
 
 #### Scenario: Catalog projection drift is detected
+
 - **WHEN** a supported role FQN, role name, scope, generation, or package range differs between a capability/schema projection and the canonical manifest
 - **THEN** the focused repository validation fails and identifies the mismatched projection
 
@@ -193,22 +202,27 @@ The machine-readable capability inventory SHALL advertise the canonical role FQN
 The source-only annotation set SHALL provide role attributes for every `cqrs-messages` and `web-api` first-class role in `architecture/semantic-annotations.v1.json`: `Command`, `CommandHandler`, `Query`, `QueryHandler`, `Event`, `EventHandler`, `IntegrationEvent`, `ReadModel`, `Controller`, `Endpoint`, `RequestDto`, `ResponseDto`, `ApiContract`, and `Validator`. Each attribute SHALL use its exact manifest FQN and targets, be internal and sealed, reject multiple uses and inheritance, have a public parameterless constructor, and expose only the six bounded string metadata properties defined by the role-attribute contract.
 
 #### Scenario: The approved role family source set matches the manifest
+
 - **WHEN** a consumer compiles the annotation source set
 - **THEN** all 14 approved CQRS/messaging and web/API role identities are available on classes, structs, and interfaces with the exact manifest FQNs and no role identity is added for deferred or custom-mapping-only catalog entries
 
 #### Scenario: Canonical role evidence uses the existing classifier
+
 - **WHEN** a consumer type uses one approved role attribute and its assembly has a supported catalog identity
 - **THEN** the existing semantic classifier resolves the exact FQN to the manifest role without a YAML mapping and exposes its bounded metadata through the existing role fact and index
 
 #### Scenario: Custom mappings remain equivalent semantic evidence
+
 - **WHEN** a user-owned attribute is explicitly mapped to the same role and metadata as an approved canonical annotation
 - **THEN** both inputs produce the same effective role and metadata through the existing semantic model while retaining their respective evidence provenance
 
 #### Scenario: CQRS and API facts compose through existing selectors
+
 - **WHEN** an application marks a command and its handler in the same bounded context, a query and read model, an integration-event boundary, request and response DTOs, or a controller and endpoint
 - **THEN** those distinct types resolve to their approved single roles and the existing selectors, contextual contracts, semantic coverage, and explain projections consume those facts without inferring runtime behavior
 
 #### Scenario: ApiContract remains separate from reviewed API membership
+
 - **WHEN** a type has the primary semantic role `ApiContract`, or a `ValueObject` is selected into a reviewed API surface by an authored #525 selector
 - **THEN** the role annotation alone does not select reviewed API membership and the selected `ValueObject` retains its primary semantic role
 
@@ -217,18 +231,22 @@ The source-only annotation set SHALL provide role attributes for every `cqrs-mes
 The six manifest-defined context-only annotations SHALL contribute only their corresponding bounded metadata key and SHALL NOT assign or replace a primary role. A role's own effective metadata SHALL take precedence, followed by type-scope context values for missing keys, followed by assembly-scope context defaults for remaining missing keys. Equivalent values SHALL coalesce. Invalid or conflicting type-scope context evidence SHALL block assembly fallback for the affected key, while preserving winning role metadata. Conflicting values at the same context scope SHALL omit only the affected context key and produce a deterministic diagnostic while preserving an otherwise valid role and unrelated metadata.
 
 #### Scenario: Role metadata and separate context metadata compose without replacing the role
+
 - **WHEN** a type has one canonical role annotation, a context-only annotation, and its assembly has a context default
 - **THEN** the existing role remains primary, role metadata wins for keys it supplies, type context fills missing keys, and assembly context fills only the remaining missing keys
 
 #### Scenario: Type context overrides an assembly context default
+
 - **WHEN** a type and its assembly provide different context values for the same key and the winning role evidence does not provide that key
 - **THEN** the type-scope value appears in the effective role metadata
 
 #### Scenario: Context metadata alone does not classify a type
+
 - **WHEN** a type or assembly carries canonical context annotations but no classification source assigns a role
 - **THEN** no role descriptor is produced and no role is inferred from the context value
 
 #### Scenario: Feature context does not become the Feature role
+
 - **WHEN** a type carries `ArchLinterNet.Annotations.FeatureAttribute`
 - **THEN** it contributes only the `feature` metadata key and does not receive the custom-mapping-only `Feature` role
 
@@ -283,7 +301,12 @@ The `ArchLinterNet.Annotations` package SHALL include the approved annotation C#
 #### Scenario: Release inventory adds annotations only to the compatible stable line
 
 - **WHEN** a release candidate has a stable version in `[0.10.0,0.11.0)`
-- **THEN** its immutable package inventory records the exact-version annotation `.nupkg` once without requiring a symbol package, while previews and versions outside the reviewed range retain their reviewed package set
+- **THEN** its immutable manifest uses schema v3 with exactly the reviewed five-package inventory, records the full candidate version on every package record, and includes one annotation `.nupkg` without requiring a symbol package; NuGet-normalized filenames omit SemVer build metadata while the manifest retains it, and previews and versions outside the reviewed range retain their reviewed package set
+
+#### Scenario: Legacy v2 inventory cannot omit annotations from stable 0.10.x
+
+- **WHEN** a v2 candidate manifest declares a stable version in `[0.10.0,0.11.0)` with only the legacy four packages
+- **THEN** manifest validation rejects it as incompatible with the required stable-line package inventory
 
 #### Scenario: Unity source import uses the same package source set
 

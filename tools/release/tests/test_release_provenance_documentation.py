@@ -24,7 +24,10 @@ def test_guide_verifies_outer_evidence_before_package_subjects() -> None:
     assert rehearsal_download < rehearsal_source < manifest_verification
     assert manifest_verification < checksum_verification < package_set_verification < package_hash_verification < package_attestation
     assert "while IFS= read -r subject" in guide
-    assert ".package.file, .symbols.file" in guide
+    assert ".schema == \"checkpoint-b-candidate-manifest/v2\"" in guide
+    assert ".schema == \"checkpoint-b-candidate-manifest/v3\"" in guide
+    assert ".symbols.file // empty" in guide
+    assert "Stable 0.10.x candidates require v3" in guide
     assert "for asset in ./*.nupkg ./*.snupkg" in guide
     assert "actual-package-subjects.txt" in guide
     assert "Package/symbol release assets do not match the verified manifest." in guide

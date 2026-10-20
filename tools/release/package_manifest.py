@@ -42,7 +42,10 @@ def _sha256(path: Path) -> str:
 
 def _expected_filename(package_id: str, version: str, kind: str) -> str:
     extension = ".nupkg" if kind == "package" else ".snupkg"
-    return f"{package_id}.{version}{extension}"
+    # NuGet removes SemVer build metadata from the package filename even though the
+    # candidate and package metadata retain the complete version identity.
+    artifact_version = version.partition("+")[0]
+    return f"{package_id}.{artifact_version}{extension}"
 
 
 def _package_ids_for_version(version: str) -> tuple[str, ...]:
@@ -111,6 +114,8 @@ def _validate_v2(manifest: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(_UNSUPPORTED_SCHEMA)
     _validate_identity(manifest)
     version = manifest["version"]
+    if _package_ids_for_version(version) != _PACKAGE_IDS:
+        raise ValueError("Candidate manifest schema is incompatible with its package version.")
     packages = manifest.get("packages")
     if not isinstance(packages, list) or len(packages) != len(_PACKAGE_IDS):
         raise ValueError("Candidate manifest package inventory is invalid.")
