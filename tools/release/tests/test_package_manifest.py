@@ -271,6 +271,28 @@ def test_v3_manifest_rejects_symbols_for_the_source_only_annotations_package(tmp
         manifest._load_manifest(output)
 
 
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda value: value.update(unexpected=True), "fields are invalid"),
+        (lambda value: value.update(schema="checkpoint-b-candidate-manifest/v2"), "Unsupported candidate manifest schema"),
+        (lambda value: value.update(version="0.10.0-preview.1"), "schema is incompatible with its package version"),
+        (lambda value: value["packages"].pop(), "package inventory is invalid"),
+    ],
+)
+def test_v3_manifest_rejects_invalid_schema_identity_or_inventory(
+    tmp_path: Path,
+    mutate,
+    message: str,
+) -> None:
+    _, output = _annotations_candidate(tmp_path)
+    value = json.loads(output.read_text())
+    mutate(value)
+
+    with pytest.raises(ValueError, match=message):
+        manifest._validate_v3(value)  # noqa: SLF001
+
+
 def test_verification_rejects_missing_or_tampered_subjects(tmp_path: Path) -> None:
     packages, output = _candidate(tmp_path)
     (packages / manifest._expected_filename(manifest._PACKAGE_IDS[0], _VERSION, "symbols")).unlink()
@@ -451,6 +473,20 @@ def test_main_dispatches_the_verified_manifest_path_listing(tmp_path: Path, monk
         manifest._expected_filename(package_id, _VERSION, "package")
         for package_id in manifest._PACKAGE_IDS
     ]
+
+
+def test_main_dispatches_package_ids_for_stable_annotation_release(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "argv", ["package_manifest.py", "package-ids", "--version", "0.10.0"])
+
+    assert manifest.main() == 0
+    assert capsys.readouterr().out.splitlines() == list(manifest._PACKAGE_IDS_WITH_ANNOTATIONS)
+
+
+def test_main_rejects_invalid_package_ids_version(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["package_manifest.py", "package-ids", "--version", "not-a-version"])
+
+    with pytest.raises(ValueError, match="Candidate package version is invalid"):
+        manifest.main()
 
 
 def test_v1_reading_requires_explicit_compatibility_mode(tmp_path: Path) -> None:
