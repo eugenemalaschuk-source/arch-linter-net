@@ -123,7 +123,7 @@ ArchLinterNet focuses on static architecture governance:
 
 ### Optional canonical annotations
 
-Stable ArchLinterNet 0.10.x releases include the separate `ArchLinterNet.Annotations` package for C# role and context annotations. It compiles internal source definitions into each directly referencing authoring project and adds no annotation runtime assembly or package dependency. Use the matching 0.10.x tool line. The package is not part of v0.10 preview or earlier package sets; see the [semantic classification guide](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/semantic-classification/) for the compatibility contract.
+Stable ArchLinterNet 0.10.x releases include the separate `ArchLinterNet.Annotations` package for C# role and context annotations. It compiles internal source definitions into each directly referencing authoring project and adds no annotation runtime assembly or package dependency. Use the matching 0.10.x tool line. The package is not part of v0.10 preview or earlier package sets; see the [semantic annotation adoption guide](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/semantic-annotations/) and [canonical annotation catalog](https://eugenemalaschuk-source.github.io/arch-linter-net/reference/semantic-annotation-catalog/) for the compatibility contract.
 
 ArchLinterNet does **not** validate runtime dependency-injection behavior, authorization/security correctness, code ownership, arbitrary semantic data flow, or undocumented custom YAML contract families.
 

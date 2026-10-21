@@ -80,6 +80,7 @@ nav:
       - Semantic port boundary contracts: contracts/port-boundary.md
   - Guides:
       - Adopt in an existing repository: guides/adoption.md
+      - Adopt semantic annotations: guides/semantic-annotations.md
       - Real-repository workflow: guides/real-repository-workflow.md
       - Extended governance adoption: guides/extended-governance-adoption.md
       - Topology review workflow: guides/topology-review-workflow.md
@@ -105,6 +106,7 @@ nav:
       - Policy review checklist: ai/policy-review-checklist.md
   - Reference:
       - YAML schema: reference/yaml-schema.md
+      - Semantic annotation catalog: reference/semantic-annotation-catalog.md
       - Architecture Health: reference/architecture-health.md
       - Repository metrics: reference/repository-metrics.md
       - Experimental Relay distribution: reference/badge-distribution.md

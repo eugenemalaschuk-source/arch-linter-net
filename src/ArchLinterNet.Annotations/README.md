@@ -10,6 +10,8 @@ The package adds its internal C# definitions to the project that directly refere
 
 The package targets C# 9-compatible source and uses NuGet `contentFiles/cs/any` with compile build action. Central Package Management is supported by placing the package version in `Directory.Packages.props` and keeping a versionless `PackageReference` in each authoring project.
 
+For end-to-end examples, custom attribute mappings, migration guidance, and the manifest-backed catalog, see the [semantic annotation adoption guide](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/semantic-annotations/) and [canonical annotation reference](https://eugenemalaschuk-source.github.io/arch-linter-net/reference/semantic-annotation-catalog/).
+
 Add the direct reference to every project that uses the annotations. A reference in one project does not inject sources into other projects, and no package source is copied to build or publish output. Removing the reference and rebuilding removes the package-provided source definitions.
 
 ## Unity source import

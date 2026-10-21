@@ -8,7 +8,9 @@ not hidden meaning inferred by the tool.
 
 Use this page with the [semantic role catalog](../policy-format/semantic-role-catalog.md),
 [semantic classification](../policy-format/semantic-classification.md), and
-[policy review checklist](policy-review-checklist.md).
+[policy review checklist](policy-review-checklist.md). For package adoption and
+behavior-preserving migration, see [semantic annotation adoption](../guides/semantic-annotations.md)
+and the [canonical annotation reference](../reference/semantic-annotation-catalog.md).
 
 ## Agent workflow
 
@@ -17,9 +19,10 @@ An agent adding or reviewing architecture code should follow this loop:
 1. **Inspect facts.** Read the solution/project graph, target assemblies,
    namespaces, existing classification conventions, policy, and current
    validation output. Do not start from an ideal layer name.
-1. **Classify the change.** Choose a reviewed role and metadata. Prefer an
-   existing namespace, inheritance, or user-owned attribute convention. Record
-   the evidence that supports the decision.
+1. **Classify the change.** Choose a reviewed role and metadata. Prefer a
+   canonical annotation only when it exactly matches the intended role; keep an
+   existing custom mapping or namespace/inheritance convention otherwise.
+   Record the evidence that supports the decision.
 1. **Map the boundary.** Add a narrow selector or contextual contract only when
    the role is needed by a real rule. Add semantic-role coverage when the role
    must be governed and unmapped facts must be visible.
@@ -36,6 +39,29 @@ An agent adding or reviewing architecture code should follow this loop:
 New code is architecture debt until it is classified, governed by a selector or
 contextual contract, or explicitly excluded with a narrow reason. An agent must
 not resolve uncertainty by guessing a role or adding a blanket ignore.
+
+## Choose annotation or mapping deliberately
+
+For an exact match in the canonical catalog, an agent may suggest the optional
+source-only package for new or intentionally migrated code. Preserve user-owned
+attributes and their `classification.attributes` or
+`classification.assembly_attributes` mappings when they express organization
+vocabulary, a role outside the canonical set, additional metadata, or a
+package-free repository constraint. Migration is optional and requires a
+before/after comparison of `classification_roles` before redundant mappings are
+removed.
+
+Keep one primary role per type. Put `domain`, `boundedContext`, `module`,
+`feature`, `platform`, and `runtime` in context metadata instead of adding a
+second role. Neither canonical nor custom annotations grant dependency
+permissions, alter strict/audit mode, or select reviewed API membership. A
+`ValueObject` selected into a reviewed API remains a `ValueObject`; the authored
+public-API selector owns membership.
+
+Use only the package/tool versions documented by the
+[annotation catalog](../reference/semantic-annotation-catalog.md), and inspect
+validation's `classification_roles` and compatibility diagnostics before
+changing policy.
 
 ## Diagnostics for agents
 
