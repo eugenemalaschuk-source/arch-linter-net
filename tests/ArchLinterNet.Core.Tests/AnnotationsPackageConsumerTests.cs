@@ -311,7 +311,8 @@ namespace RemovableConsumer
         AssemblyLoadContext loadContext = new($"annotations-consumer-{Guid.NewGuid():N}", isCollectible: true);
         try
         {
-            Assembly assembly = loadContext.LoadFromAssemblyPath(consumer.AssemblyPath);
+            using FileStream assemblyStream = File.OpenRead(consumer.AssemblyPath);
+            Assembly assembly = loadContext.LoadFromStream(assemblyStream);
             Type markerType = assembly.GetType("ArchLinterNet.Annotations.AnnotationCatalogIdentityAttribute", throwOnError: true)!;
             CustomAttributeData[] markers = assembly.GetCustomAttributesData()
                 .Where(attribute => attribute.AttributeType.FullName == markerType.FullName)
