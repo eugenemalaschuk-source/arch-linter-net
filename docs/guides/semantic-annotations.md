@@ -46,11 +46,15 @@ Other types in the same assembly without a more specific role can be classified 
 
 ## Inspect facts, then author policy
 
-Run your normal validation against the assemblies that contain the annotated code. The JSON report includes discovered facts in `classification_roles` and reports catalog compatibility problems in `canonical_annotation_diagnostics`:
+For ordinary .NET projects, make sure the policy's `analysis.solution` or `analysis.projects` includes each annotated authoring project, then opt into building and verifying that selected graph before validation. `--ensure-built` is explicit; validation does not silently rebuild:
 
 ```bash
-arch-linter-net --policy architecture/dependencies.arch.yml --mode audit --format json
+arch-linter-net --policy architecture/dependencies.arch.yml --mode audit --format json --ensure-built
 ```
+
+The JSON report includes discovered facts in `classification_roles` and reports catalog compatibility problems in `canonical_annotation_diagnostics`. If the selected graph is already restored and the build must stay offline, add `--no-restore`.
+
+**Unity projects have a separate build step.** Compile or import scripts with Unity first; `--ensure-built` builds the selected .NET project graph and does not invoke Unity's compiler. Point `analysis.target_assemblies` and `analysis.assembly_search_paths` at the freshly compiled Unity assemblies before validating them. Recompile in Unity after changing annotated source.
 
 Use the report to confirm the subject, winning role, metadata, and evidence before changing policy. A compatible annotation creates classification evidence; YAML still decides which evidence a layer, contract, or coverage rule governs.
 

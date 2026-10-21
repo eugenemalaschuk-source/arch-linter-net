@@ -23,7 +23,11 @@ public sealed class CanonicalAnnotationDocumentationTests
 
         JsonElement root = manifest.RootElement;
         IReadOnlyList<IReadOnlyDictionary<string, string>> roleRows = ReadTable(
-            catalog, "## Role attribute contract");
+            catalog, "### Canonical roles");
+        IReadOnlyDictionary<string, string> documentedRoleContract = ReadKeyValueTable(
+            ReadTable(catalog, "### Shared role contract"), "Manifest field", "Value");
+        IReadOnlyList<IReadOnlyDictionary<string, string>> rolePropertyRows = ReadTable(
+            catalog, "### Role metadata properties");
         IReadOnlyList<IReadOnlyDictionary<string, string>> contextRows = ReadTable(
             catalog, "## Context metadata attributes");
         IReadOnlyDictionary<string, string> compatibility = ReadKeyValueTable(
@@ -33,6 +37,12 @@ public sealed class CanonicalAnnotationDocumentationTests
 
         JsonElement[] manifestRoles = root.GetProperty("roles").EnumerateArray().ToArray();
         JsonElement[] manifestContexts = root.GetProperty("contextAttributes").EnumerateArray().ToArray();
+        JsonElement roleAttributeContract = root.GetProperty("roleAttributeContract");
+        JsonElement[] manifestRoleProperties = roleAttributeContract.GetProperty("metadataProperties")
+            .EnumerateArray().ToArray();
+        var expectedRoleContract = roleAttributeContract.EnumerateObject()
+            .Where(property => property.Name != "metadataProperties")
+            .ToDictionary(property => property.Name, property => ManifestValue(property.Value), StringComparer.Ordinal);
         var documentedRoleFqns = roleRows
             .Select(row => CodeTokens(row["Exact FQN"]).Single())
             .ToArray();
@@ -49,6 +59,12 @@ public sealed class CanonicalAnnotationDocumentationTests
             Assert.That(documentedRoleFqns, Is.EquivalentTo(manifestRoles
                 .Select(role => role.GetProperty("fqn").GetString()!)),
                 "The role table must cover exactly the manifest role FQNs.");
+            Assert.That(documentedRoleContract.Keys, Is.EquivalentTo(expectedRoleContract.Keys),
+                "The shared role contract table must cover every non-property roleAttributeContract field.");
+            Assert.That(rolePropertyRows.Count, Is.EqualTo(manifestRoleProperties.Length),
+                "The role metadata table must contain one row for every manifest metadata property.");
+            Assert.That(rolePropertyRows.Select(row => CodeValue(row["Property"])), Is.Unique,
+                "The role metadata table must not contain duplicate properties.");
             Assert.That(contextRows.Count, Is.EqualTo(manifestContexts.Length),
                 "The context table must contain one row for every manifest context attribute.");
             Assert.That(documentedContextFqns, Is.Unique,
@@ -57,6 +73,29 @@ public sealed class CanonicalAnnotationDocumentationTests
                 .Select(context => context.GetProperty("fqn").GetString()!)),
                 "The context table must cover exactly the manifest context FQNs.");
         });
+
+        foreach ((string field, string expectedValue) in expectedRoleContract)
+        {
+            Assert.That(CodeTokens(documentedRoleContract[field]), Is.EqualTo(new[] { expectedValue }),
+                $"roleAttributeContract.{field}");
+        }
+
+        var rolePropertiesByName = rolePropertyRows.ToDictionary(
+            row => CodeValue(row["Property"]), StringComparer.Ordinal);
+        foreach (JsonElement property in manifestRoleProperties)
+        {
+            string name = property.GetProperty("property").GetString()!;
+            IReadOnlyDictionary<string, string> row = rolePropertiesByName[name];
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(CodeValue(row["Metadata key"]), Is.EqualTo(property.GetProperty("key").GetString()), name);
+                Assert.That(CodeValue(row["Type"]), Is.EqualTo(property.GetProperty("type").GetString()), name);
+                Assert.That(row["Optional"].Trim().ToLowerInvariant(), Is.EqualTo(
+                    property.GetProperty("optional").GetBoolean() ? "yes" : "no"), name);
+                Assert.That(CodeValue(row["Accessibility"]), Is.EqualTo(property.GetProperty("accessibility").GetString()), name);
+            });
+        }
 
         var roleByFqn = roleRows.ToDictionary(
             row => CodeTokens(row["Exact FQN"]).Single(), StringComparer.Ordinal);
@@ -70,10 +109,8 @@ public sealed class CanonicalAnnotationDocumentationTests
             string roleName = role.GetProperty("role").GetString()!;
             string[] expectedTargets = role.GetProperty("attributeTargets")
                 .EnumerateArray().Select(value => value.GetString()!).ToArray();
-            string[] expectedProperties = root.GetProperty("roleAttributeContract")
-                .GetProperty("metadataProperties")
-                .EnumerateArray()
-                .Select(value => value.GetProperty("property").GetString()!)
+            string[] expectedProperties = manifestRoleProperties
+                .Select(property => property.GetProperty("property").GetString()!)
                 .ToArray();
 
             Assert.Multiple(() =>
@@ -100,7 +137,12 @@ public sealed class CanonicalAnnotationDocumentationTests
                 Assert.That(CodeTokens(row["Valid attributeTargets"]), Is.EqualTo(
                     context.GetProperty("attributeTargets").EnumerateArray()
                         .Select(value => value.GetString()!).ToArray()), fqn);
-                Assert.That(row["Constructor"], Does.Contain("value: string").And.Contain("required"), fqn);
+                JsonElement[] constructorParameters = context.GetProperty("constructor").EnumerateArray().ToArray();
+                string expectedConstructor = string.Join(", ", constructorParameters.Select(parameter =>
+                    $"{parameter.GetProperty("name").GetString()}: {parameter.GetProperty("type").GetString()} " +
+                    $"({(parameter.GetProperty("required").GetBoolean() ? "required" : "optional")})"));
+                Assert.That(row["Constructor"].Replace("`", string.Empty, StringComparison.Ordinal),
+                    Is.EqualTo(expectedConstructor), fqn);
                 Assert.That(CodeValue(row["Accessibility"]), Is.EqualTo(context.GetProperty("accessibility").GetString()), fqn);
                 Assert.That(row["allowMultiple"].Trim().ToLowerInvariant(), Is.EqualTo(
                     context.GetProperty("allowMultiple").GetBoolean().ToString().ToLowerInvariant()), fqn);
@@ -245,6 +287,19 @@ public sealed class CanonicalAnnotationDocumentationTests
     private static string CodeValue(string value)
     {
         return CodeTokens(value).FirstOrDefault() ?? value.Trim();
+    }
+
+    private static string ManifestValue(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString()!,
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            JsonValueKind.Array => value.GetRawText(),
+            _ => throw new InvalidOperationException(
+                $"Unsupported role contract manifest value {value.ValueKind}.")
+        };
     }
 
     private static string[] CodeTokens(string value)

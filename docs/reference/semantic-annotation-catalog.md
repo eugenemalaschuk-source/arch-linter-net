@@ -44,11 +44,46 @@ than `0.10.0` cannot diagnose source only annotation metadata retroactively.
 
 ## Role attribute contract
 
-Every row in this table is a first class role from `roles[]`. Role attributes
-are `internal sealed` types deriving from `System.Attribute`, have a public
-parameterless constructor, can be used once, and are not inherited. The
-supported role properties are the six optional string properties shown in the
-table. Each value must be an exact, non empty compile time string.
+Each first class role in `roles[]` has one canonical attribute identity. The
+shared contract below is defined by `roleAttributeContract` in the manifest.
+
+### Shared role contract
+
+| Manifest field | Value |
+| --- | --- |
+| `fqnPattern` | `ArchLinterNet.Annotations.<FirstClassRole>Attribute` |
+| `roleNameSource` | `#/roles[].role` |
+| `identitySource` | `#/roles[].fqn` |
+| `appliesOnlyTo` | `Entries in roles[]; annotationDisposition.customMappingOnly and annotationDisposition.deferred do not imply role attribute identities` |
+| `accessibility` | `internal sealed` |
+| `baseType` | `System.Attribute` |
+| `baseTypeRelationship` | `assignable-ancestor` |
+| `constructor` | `[]` (no declared arguments) |
+| `allowMultiple` | `false` |
+| `inherited` | `false` |
+| `metadataValueRule` | `exact non-empty compile-time string; no normalization or inference` |
+| `constructorAccessibility` | `public parameterless constructor on internal attribute type` |
+
+### Role metadata properties
+
+Each role attribute is a sealed `System.Attribute` type. It has a public
+parameterless constructor, can be used once, and is not inherited. The six
+optional string properties map to the corresponding context keys; each value
+must be an exact, non-empty compile-time string.
+
+| Property | Metadata key | Type | Optional | Accessibility |
+| --- | --- | --- | --- | --- |
+| `Domain` | `domain` | `string` | yes | `public get/set on internal attribute type` |
+| `BoundedContext` | `boundedContext` | `string` | yes | `public get/set on internal attribute type` |
+| `Module` | `module` | `string` | yes | `public get/set on internal attribute type` |
+| `Feature` | `feature` | `string` | yes | `public get/set on internal attribute type` |
+| `Platform` | `platform` | `string` | yes | `public get/set on internal attribute type` |
+| `Runtime` | `runtime` | `string` | yes | `public get/set on internal attribute type` |
+
+### Canonical roles
+
+Every row in this table is a first class role from `roles[]`. The supported
+role properties are the six properties above.
 
 | Canonical role | Exact FQN | Manifest family | Valid `attributeTargets` | Supported role properties | Assembly use supported | Example selector or policy use |
 | --- | --- | --- | --- | --- | --- | --- |
