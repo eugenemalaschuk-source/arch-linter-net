@@ -8,6 +8,9 @@ execution behavior, or data flow. The v0.10 annotation dispositions below are
 approved design contract; the optional package and built-in recognition are not
 available in released tools yet.
 
+For the exact first-party annotation identities, targets, context keys, and
+version compatibility, see the [canonical annotation catalog](../reference/semantic-annotation-catalog.md).
+
 ## Support tiers
 
 | Tier | Meaning |

@@ -60,6 +60,12 @@ Implemented classification evidence includes type attributes, assembly attribute
 
 Schema-accepted fields explicitly documented as deferred/no-op remain deferred. Presence in YAML schema alone is not proof that runtime analysis is implemented.
 
+For annotation-first adoption, package compatibility, and behavior-preserving
+migration, use the public [semantic annotation guide](../guides/semantic-annotations.md)
+and [canonical reference](../reference/semantic-annotation-catalog.md). The
+manifest-backed capability projection identifies the supported role identities;
+do not recreate that catalog manually in policy advice.
+
 ### Canonical semantic annotations (v0.10.0 development)
 
 The v0.10.0 annotation-aware tool recognizes the 49 canonical role attributes listed in the manifest-backed `semanticAnnotations.roleAnnotations` capability projection. Matching uses the exact fully qualified name (FQN), with these role names and scopes:
@@ -71,6 +77,18 @@ The v0.10.0 annotation-aware tool recognizes the 49 canonical role attributes li
 Every canonical FQN is under the reserved `ArchLinterNet.Annotations` namespace. Do not add `classification.attributes` or `classification.assembly_attributes` mappings for that namespace, including redundant mappings of a known role. The assembly must carry exactly one compatible generation 1 catalog marker for package range `[0.10.0,0.11.0)`; missing, malformed, duplicate, unsupported, or unknown reserved identities fail closed with compatibility diagnostics. Canonical annotations provide semantic evidence only: they do not create policy rules, grant reviewed API membership, or turn custom-mapping-only/deferred role names or metadata-only context attributes into role annotations.
 
 The source-only `ArchLinterNet.Annotations` package is prepared for stable 0.10.x releases. It is excluded from v0.10 previews and earlier package sets; a matching 0.10.x tool is required. Released v0.9.1 tools do not recognize these canonical identities.
+
+When advising a code or policy change:
+
+- Prefer a canonical annotation only when its role exactly expresses the type's
+  intent; otherwise preserve the existing user-owned mapping.
+- Keep one primary semantic role and express context through the six supported
+  metadata keys. Do not add multiple roles to make separate contracts match.
+- Treat annotations as evidence only. YAML selects and governs that evidence;
+  annotations do not grant permissions or reviewed API membership.
+- Keep `ApiContract` as a primary role only where it describes the type. The
+  authored public-API selector decides membership independently, so a selected
+  `ValueObject` remains a `ValueObject`.
 
 ## Bounded reasoning rules
 

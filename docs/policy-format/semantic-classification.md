@@ -71,6 +71,11 @@ remain semantic evidence only: they do not create policy rules or reviewed API
 membership, and metadata-only context attributes do not become role
 annotations.
 
+For an adopter workflow, custom mapping examples, and safe migration steps, see
+[Adopt semantic annotations](../guides/semantic-annotations.md). The exhaustive
+FQN, target, metadata, assembly-use, and compatibility reference is the
+[canonical annotation catalog](../reference/semantic-annotation-catalog.md).
+
 ## Basic example
 
 ```yaml
