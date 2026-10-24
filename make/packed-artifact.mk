@@ -43,11 +43,26 @@ prepare-packed-artifact-candidate:  ## CI: pack one manifest-bound Checkpoint B 
 	@dotnet pack "$(SLNX)" --configuration Release --output "$(CHECKPOINT_B_CANDIDATE_DIR)" \
 		--no-restore -p:Version="$(CHECKPOINT_B_CANDIDATE_VERSION)" \
 		-p:PackageVersion="$(CHECKPOINT_B_CANDIDATE_VERSION)" --nologo
-	@python3 "$(PROJECT_ROOT)/tools/release/package_manifest.py" create \
-		--packages-dir "$(CHECKPOINT_B_CANDIDATE_DIR)" \
-		--version "$(CHECKPOINT_B_CANDIDATE_VERSION)" \
-		--source-commit "$(ARCH_LINTER_SOURCE_SHA)" \
-		--output "$(CHECKPOINT_B_CANDIDATE_MANIFEST)"
+	@cd "$(PROJECT_ROOT)" && \
+	if [ -x ".venv/Scripts/python.exe" ]; then \
+		".venv/Scripts/python.exe" tools/release/package_manifest.py create \
+			--packages-dir "$(CHECKPOINT_B_CANDIDATE_DIR)" \
+			--version "$(CHECKPOINT_B_CANDIDATE_VERSION)" \
+			--source-commit "$(ARCH_LINTER_SOURCE_SHA)" \
+			--output "$(CHECKPOINT_B_CANDIDATE_MANIFEST)"; \
+	elif [ -x ".venv/bin/python" ]; then \
+		".venv/bin/python" tools/release/package_manifest.py create \
+			--packages-dir "$(CHECKPOINT_B_CANDIDATE_DIR)" \
+			--version "$(CHECKPOINT_B_CANDIDATE_VERSION)" \
+			--source-commit "$(ARCH_LINTER_SOURCE_SHA)" \
+			--output "$(CHECKPOINT_B_CANDIDATE_MANIFEST)"; \
+	else \
+		python3 tools/release/package_manifest.py create \
+			--packages-dir "$(CHECKPOINT_B_CANDIDATE_DIR)" \
+			--version "$(CHECKPOINT_B_CANDIDATE_VERSION)" \
+			--source-commit "$(ARCH_LINTER_SOURCE_SHA)" \
+			--output "$(CHECKPOINT_B_CANDIDATE_MANIFEST)"; \
+	fi
 
 # Shards deliberately build only the Core test project. Product packages come from the supplied
 # immutable feed; building the whole solution again in every shard would only recreate source-tree

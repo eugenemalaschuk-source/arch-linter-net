@@ -21,6 +21,7 @@ from aggregate_checkpoint_b_evidence import (  # noqa: E402
     _read_gates,
     _read_manifest,
     _read_records,
+    _required_scenarios,
     _read_candidate_authorization,
     _read_release_scope,
     _summary,
@@ -37,6 +38,16 @@ _PACKAGES = [
     }
     for name in _PACKAGE_IDS
 ]
+_ANNOTATIONS_PACKAGE = {
+    "id": "ArchLinterNet.Annotations",
+    "version": "0.10.0",
+    "package": {
+        "kind": "package",
+        "file": "ArchLinterNet.Annotations.0.10.0.nupkg",
+        "size": 1,
+        "sha256": "e" * 64,
+    },
+}
 _COMMIT = "b" * 40
 _POLICY_SHAPE = {
     "policy_documents": 5,
@@ -57,10 +68,19 @@ def _release_workspace(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
 
 
-def _scenarios(shell: str, platform: str, failed: dict[str, str] | None = None) -> list[dict]:
+def _scenarios(
+    shell: str,
+    platform: str,
+    failed: dict[str, str] | None = None,
+    *,
+    annotations: bool = False,
+) -> list[dict]:
     failed = failed or {}
     results = []
-    for scenario_id in sorted(_REQUIRED_SCENARIOS):
+    required_scenarios = _REQUIRED_SCENARIOS | (
+        {"semantic-annotations-packed-consumer"} if annotations else set()
+    )
+    for scenario_id in sorted(required_scenarios):
         if scenario_id in failed:
             results.append({"id": scenario_id, "result": "failed", "reason": failed[scenario_id]})
         elif scenario_id == "posix-entrypoint" and shell == "pwsh":
@@ -96,10 +116,10 @@ def _release_scope(digest: str, open_items: set[int] | None = None) -> dict:
     }
 
 
-def _prepublication_authorization(digest: str) -> dict:
+def _prepublication_authorization(digest: str, version: str = _VERSION) -> dict:
     return {
         "schema": "checkpoint-b-prepublication-authorization/v1",
-        "candidate_version": _VERSION,
+        "candidate_version": version,
         "repository": "owner/repo",
         "source_commit": _COMMIT,
         "candidate_manifest_sha256": digest,
@@ -113,25 +133,49 @@ def _write_corpus(
     policy_shape: dict | None = None,
     open_scope_items: set[int] | None = None,
     prepublication: bool = False,
+    annotations: bool = False,
 ) -> tuple[Path, Path, Path, Path]:
+    candidate_version = "0.10.0" if annotations else _VERSION
+    packages = [
+        {
+            **package,
+            "version": candidate_version,
+            "package": {
+                **package["package"],
+                "file": f"{package['id']}.{candidate_version}.nupkg",
+            },
+            "symbols": {
+                **package["symbols"],
+                "file": f"{package['id']}.{candidate_version}.snupkg",
+            },
+        }
+        for package in _PACKAGES
+    ]
+    if annotations:
+        packages.append(_ANNOTATIONS_PACKAGE)
     manifest_path = tmp_path / "package-manifest.json"
     manifest_path.write_text(json.dumps({
-        "schema": "checkpoint-b-candidate-manifest/v2",
-        "version": _VERSION,
+        "schema": "checkpoint-b-candidate-manifest/v3" if annotations else "checkpoint-b-candidate-manifest/v2",
+        "version": candidate_version,
         "source_commit": _COMMIT,
-        "packages": _PACKAGES,
+        "packages": packages,
     }))
     digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
 
     platforms = tmp_path / "platforms"
     platforms.mkdir()
     for platform, (architecture, shell) in _REQUIRED_PLATFORMS.items():
-        scenarios = _scenarios(shell, platform, failed if platform == "linux-x64" else None)
+        scenarios = _scenarios(
+            shell,
+            platform,
+            failed if platform == "linux-x64" else None,
+            annotations=annotations,
+        )
         (platforms / f"{platform}.json").write_text(json.dumps({
             "schema": "checkpoint-b-platform-evidence/v1",
             "checkpoint": "B",
             "result": "failed" if any(s["result"] == "failed" for s in scenarios) else "passed",
-            "candidate_version": _VERSION,
+            "candidate_version": candidate_version,
             "source_commit": _COMMIT,
             "platform_id": platform,
             "platform": platform,
@@ -140,7 +184,7 @@ def _write_corpus(
             "shell": shell,
             "synthetic_identities_only": True,
             "candidate_manifest_sha256": digest,
-            "packages": _PACKAGES,
+            "packages": packages,
             "policy_shape": policy_shape or _POLICY_SHAPE,
             "scenarios": scenarios,
         }))
@@ -154,7 +198,9 @@ def _write_corpus(
     }))
     scope_path = tmp_path / "candidate-authorization.json"
     scope_path.write_text(json.dumps(
-        _prepublication_authorization(digest) if prepublication else _release_scope(digest, open_scope_items)
+        _prepublication_authorization(digest, candidate_version)
+        if prepublication or annotations
+        else _release_scope(digest, open_scope_items)
     ))
     return manifest_path, platforms, gates_path, scope_path
 
@@ -189,6 +235,68 @@ def test_manifest_reader_accepts_source_only_v3_inventory(tmp_path: Path) -> Non
     )
 
     assert _read_manifest(manifest_path)["schema"] == "checkpoint-b-candidate-manifest/v3"
+
+
+def test_v2_candidate_keeps_existing_required_scenarios(tmp_path: Path) -> None:
+    manifest_path, _, _, _ = _write_corpus(tmp_path)
+
+    assert _required_scenarios(_read_manifest(manifest_path)) == _REQUIRED_SCENARIOS
+
+
+def test_v3_annotation_candidate_requires_passing_packed_consumer_on_each_platform(tmp_path: Path) -> None:
+    summary = _aggregate(tmp_path, annotations=True, prepublication=True)
+
+    assert summary["result"] == "passed"
+    assert "semantic-annotations-packed-consumer" in summary["required_scenarios"]
+    assert {record["platform_id"] for record in summary["semantic_annotation_gate"]} == set(_REQUIRED_PLATFORMS)
+    assert all(record["result"] == "passed" for record in summary["semantic_annotation_gate"])
+
+
+def test_v3_annotation_consumer_failure_blocks_candidate_evidence(tmp_path: Path) -> None:
+    summary = _aggregate(
+        tmp_path,
+        annotations=True,
+        prepublication=True,
+        failed={"semantic-annotations-packed-consumer": "Packed consumer failed."},
+    )
+
+    assert summary["result"] == "failed"
+    assert summary["failed_scenarios"] == [{
+        "id": "semantic-annotations-packed-consumer",
+        "platform_id": "linux-x64",
+        "reason": "Packed consumer failed.",
+    }]
+
+
+def test_v3_annotation_scenario_cannot_be_not_applicable_everywhere(tmp_path: Path) -> None:
+    manifest_path, platforms, gates_path, authorization_path = _write_corpus(
+        tmp_path, annotations=True, prepublication=True
+    )
+    for record_path in platforms.glob("*.json"):
+        record = json.loads(record_path.read_text())
+        scenario = next(
+            item for item in record["scenarios"]
+            if item["id"] == "semantic-annotations-packed-consumer"
+        )
+        scenario.update(result="not_applicable", reason="Skipped.")
+        record_path.write_text(json.dumps(record))
+
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    summary = _summary(
+        _read_records(platforms, manifest, digest),
+        manifest,
+        _read_gates(gates_path, manifest, digest),
+        _read_candidate_authorization(authorization_path, manifest, digest),
+        digest,
+    )
+
+    assert summary["result"] == "failed"
+    assert summary["failed_scenarios"] == [{
+        "id": "semantic-annotations-packed-consumer",
+        "platform_id": None,
+        "reason": "No platform executed this required scenario to a passing result.",
+    }]
 
 
 def test_consumer_cleanup_scenarios_are_required() -> None:
@@ -328,6 +436,18 @@ def test_main_writes_pass_evidence_and_succeeds(tmp_path: Path) -> None:
     assert "Copied project inventories: 0" in markdown
     assert markdown.count("| passed |") == len(_REQUIRED_PLATFORMS)
     assert "Failed required scenarios" not in markdown
+
+
+def test_main_records_v3_semantic_annotation_gate(tmp_path: Path) -> None:
+    exit_code, summary, markdown = _run_main(tmp_path, annotations=True, prepublication=True)
+
+    assert exit_code == 0
+    assert summary["result"] == "passed"
+    assert "semantic-annotations-packed-consumer" in summary["required_scenarios"]
+    assert "## Semantic annotation packed-consumer gate" in markdown
+    annotation_section = markdown.split("## Semantic annotation packed-consumer gate", maxsplit=1)[1]
+    annotation_table = annotation_section.split("## Pre-publication candidate authorization", maxsplit=1)[0]
+    assert annotation_table.count("| passed |") == len(_REQUIRED_PLATFORMS)
 
 
 def test_prepublication_candidate_evidence_passes_without_publication_authority(tmp_path: Path) -> None:

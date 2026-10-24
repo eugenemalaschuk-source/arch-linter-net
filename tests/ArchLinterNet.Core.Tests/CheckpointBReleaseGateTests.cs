@@ -21,6 +21,7 @@ public sealed partial class CheckpointBReleaseGateTests
     private const string ProductSchemaGeneration = "0.8.0";
     private static readonly string[] _packageIds =
         ["ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing"];
+    private const string AnnotationsPackageId = "ArchLinterNet.Annotations";
 
     private CandidatePackageFeed? _candidate;
 
@@ -54,6 +55,11 @@ public sealed partial class CheckpointBReleaseGateTests
         };
         scenarios.AddRange(candidate.ShellScenarios());
         scenarios.Add(candidate.AssertCliInFlightCancellation());
+        if (candidate.HasPackage(AnnotationsPackageId))
+        {
+            scenarios.Add(candidate.AssertSemanticAnnotationsPackedConsumer());
+        }
+
         candidate.WriteShardEvidence("package-and-entrypoints", scenarios);
     }
 
@@ -345,7 +351,7 @@ public sealed partial class CheckpointBReleaseGateTests
         string Id,
         string Version,
         PackageSubjectEvidence Package,
-        PackageSubjectEvidence Symbols);
+        PackageSubjectEvidence? Symbols);
 
     private sealed record PackageSubjectEvidence(string Kind, string File, long Size, string Sha256);
 

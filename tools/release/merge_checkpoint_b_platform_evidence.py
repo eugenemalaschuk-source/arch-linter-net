@@ -11,8 +11,8 @@ from typing import Any
 from _release_workspace import _safe_path
 from aggregate_checkpoint_b_evidence import (
     _POLICY_SHAPE_FIELDS,
-    _REQUIRED_SCENARIOS,
     _SCENARIO_RESULTS,
+    _required_scenarios,
     _read_manifest,
     _sha256,
 )
@@ -79,7 +79,7 @@ def merge_platform_shards(input_directory: Path, candidate_manifest: Path) -> di
         _validate_shard_record(path, record, first_path, first, manifest, manifest_digest)
 
     all_scenarios = [scenario for _, record in records for scenario in record["scenarios"]]
-    _validate_scenario_union(all_scenarios)
+    _validate_scenario_union(all_scenarios, _required_scenarios(manifest))
 
     policy_shape = _extract_policy_shape(records)
 
@@ -143,13 +143,13 @@ def _validate_shard_scenarios(path: Path, record: dict[str, Any]) -> None:
         raise ValueError(f"{path} shard result contradicts its scenario results.")
 
 
-def _validate_scenario_union(all_scenarios: list[dict[str, Any]]) -> None:
+def _validate_scenario_union(all_scenarios: list[dict[str, Any]], required_scenarios: set[str]) -> None:
     all_ids = [scenario["id"] for scenario in all_scenarios]
     if len(all_ids) != len(set(all_ids)):
         raise ValueError("Checkpoint B scenario IDs overlap between shards.")
-    if set(all_ids) != _REQUIRED_SCENARIOS:
-        missing = sorted(_REQUIRED_SCENARIOS - set(all_ids))
-        unexpected = sorted(set(all_ids) - _REQUIRED_SCENARIOS)
+    if set(all_ids) != required_scenarios:
+        missing = sorted(required_scenarios - set(all_ids))
+        unexpected = sorted(set(all_ids) - required_scenarios)
         raise ValueError(
             f"Checkpoint B shard union is incomplete: missing={missing}, unexpected={unexpected}."
         )
