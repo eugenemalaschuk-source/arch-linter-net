@@ -11,6 +11,31 @@ public sealed partial class CheckpointBReleaseGateTests
 {
     internal sealed partial class CandidatePackageFeed
     {
+        private void AssertNoRepositoryRootOutsideCandidateFeed(string content, string description)
+        {
+            string sanitized = content;
+            foreach (string feedPath in PathTextVariants(_feed))
+            {
+                sanitized = sanitized.Replace(feedPath, string.Empty, StringComparison.OrdinalIgnoreCase);
+            }
+
+            foreach (string repositoryPath in PathTextVariants(_repositoryRoot))
+            {
+                Assert.That(sanitized, Does.Not.Contain(repositoryPath), description);
+            }
+        }
+
+        private static IEnumerable<string> PathTextVariants(string path)
+        {
+            string[] variants = [path, path.Replace('\\', '/'), path.Replace('/', '\\')];
+            foreach (string variant in variants.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                yield return variant;
+                string jsonEscaped = JsonSerializer.Serialize(variant);
+                yield return jsonEscaped[1..^1];
+            }
+        }
+
         /// <summary>
         /// Proves that freshly packed semantic annotations are consumed from an external SDK
         /// project alongside the candidate Testing package and installed CLI. The fixture is
@@ -324,7 +349,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(File.ReadAllText(assetsPath), Does.Contain($"ArchLinterNet.Annotations/{_candidateVersion}"));
                 Assert.That(File.ReadAllText(assetsPath), Does.Contain($"ArchLinterNet.Testing/{_candidateVersion}"));
                 Assert.That(File.ReadAllText(assetsPath), Does.Contain($"ArchLinterNet.Core/{_candidateVersion}"));
-                Assert.That(File.ReadAllText(assetsPath), Does.Not.Contain(_repositoryRoot));
+                AssertNoRepositoryRootOutsideCandidateFeed(File.ReadAllText(assetsPath), assetsPath);
                 foreach (string projectPath in Directory.GetFiles(consumerDirectory, "*.csproj", SearchOption.AllDirectories))
                 {
                     Assert.That(File.ReadAllText(projectPath), Does.Not.Contain(_repositoryRoot), projectPath);
@@ -341,7 +366,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 {
                     string content = File.ReadAllText(projectAssets);
                     Assert.That(content, Does.Contain($"ArchLinterNet.Annotations/{_candidateVersion}"), projectAssets);
-                    Assert.That(content, Does.Not.Contain(_repositoryRoot), projectAssets);
+                    AssertNoRepositoryRootOutsideCandidateFeed(content, projectAssets);
                 }
                 Assembly publicLibrary = Assembly.Load(File.ReadAllBytes(Path.GetFullPath(Path.Combine(consumerDirectory,
                     "Public", "Library", "bin", "Debug", "net10.0", "Public.Library.dll"))));
