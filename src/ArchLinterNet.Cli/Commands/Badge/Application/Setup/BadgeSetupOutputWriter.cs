@@ -322,7 +322,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
       - name: Create trusted NuGet configuration
         shell: bash
         run: |
