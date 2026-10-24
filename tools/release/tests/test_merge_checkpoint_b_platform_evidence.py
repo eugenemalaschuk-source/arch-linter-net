@@ -12,7 +12,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import merge_checkpoint_b_platform_evidence as merger  # noqa: E402
-from aggregate_checkpoint_b_evidence import _REQUIRED_SCENARIOS  # noqa: E402
+from aggregate_checkpoint_b_evidence import _REQUIRED_SCENARIOS, _required_scenarios  # noqa: E402
 from merge_checkpoint_b_platform_evidence import merge_platform_shards  # noqa: E402
 
 _PACKAGE_IDS = ("ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing")
@@ -59,13 +59,40 @@ def _release_workspace(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
 
 
-def _write_corpus(tmp_path: Path) -> tuple[Path, Path]:
+def _write_corpus(tmp_path: Path, *, annotations: bool = False) -> tuple[Path, Path]:
+    candidate_version = "0.10.0" if annotations else "0.6.1"
+    packages = [
+        {
+            **package,
+            "version": candidate_version,
+            "package": {
+                **package["package"],
+                "file": f"{package['id']}.{candidate_version}.nupkg",
+            },
+            "symbols": {
+                **package["symbols"],
+                "file": f"{package['id']}.{candidate_version}.snupkg",
+            },
+        }
+        for package in _PACKAGES
+    ]
+    if annotations:
+        packages.append({
+            "id": "ArchLinterNet.Annotations",
+            "version": candidate_version,
+            "package": {
+                "kind": "package",
+                "file": f"ArchLinterNet.Annotations.{candidate_version}.nupkg",
+                "size": 1,
+                "sha256": "e" * 64,
+            },
+        })
     manifest_path = tmp_path / "package-manifest.json"
     manifest_path.write_text(json.dumps({
-        "schema": "checkpoint-b-candidate-manifest/v2",
-        "version": "0.6.1",
+        "schema": "checkpoint-b-candidate-manifest/v3" if annotations else "checkpoint-b-candidate-manifest/v2",
+        "version": candidate_version,
         "source_commit": _COMMIT,
-        "packages": _PACKAGES,
+        "packages": packages,
     }))
     digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     shards = tmp_path / "shards"
@@ -73,7 +100,9 @@ def _write_corpus(tmp_path: Path) -> tuple[Path, Path]:
 
     scenarios = [
         {"id": scenario_id, "result": "passed", "reason": None}
-        for scenario_id in sorted(_REQUIRED_SCENARIOS)
+        for scenario_id in sorted(
+            _REQUIRED_SCENARIOS | ({"semantic-annotations-packed-consumer"} if annotations else set())
+        )
     ]
     buckets = {shard: [] for shard in _SHARDS}
     for index, scenario in enumerate(scenarios):
@@ -85,7 +114,7 @@ def _write_corpus(tmp_path: Path) -> tuple[Path, Path]:
             "checkpoint": "B",
             "shard_id": shard_id,
             "result": "passed",
-            "candidate_version": "0.6.1",
+            "candidate_version": candidate_version,
             "source_commit": _COMMIT,
             "platform_id": "windows-x64",
             "platform": "Windows",
@@ -94,7 +123,7 @@ def _write_corpus(tmp_path: Path) -> tuple[Path, Path]:
             "shell": "pwsh",
             "synthetic_identities_only": True,
             "candidate_manifest_sha256": digest,
-            "packages": _PACKAGES,
+            "packages": packages,
             "policy_shape": _POLICY_SHAPE if shard_id == "consumer-cleanup-layer-overlap-and-policy-shape" else None,
             "scenarios": shard_scenarios,
         }))
@@ -118,6 +147,35 @@ def test_merges_complete_disjoint_shards(tmp_path: Path) -> None:
     assert merged["platform_id"] == "windows-x64"
     assert merged["policy_shape"] == _POLICY_SHAPE
     assert {scenario["id"] for scenario in merged["scenarios"]} == _REQUIRED_SCENARIOS
+
+
+def test_v3_merger_requires_semantic_annotation_result(tmp_path: Path) -> None:
+    manifest, shards = _write_corpus(tmp_path, annotations=True)
+
+    merged = merge_platform_shards(shards, manifest)
+
+    assert "semantic-annotations-packed-consumer" in _required_scenarios(json.loads(manifest.read_text()))
+    assert "semantic-annotations-packed-consumer" in {scenario["id"] for scenario in merged["scenarios"]}
+
+
+def test_v3_merger_rejects_missing_semantic_annotation_result(tmp_path: Path) -> None:
+    manifest, shards = _write_corpus(tmp_path, annotations=True)
+    annotation_shard = next(
+        path for path in shards.glob("*.json")
+        if any(
+            scenario["id"] == "semantic-annotations-packed-consumer"
+            for scenario in json.loads(path.read_text())["scenarios"]
+        )
+    )
+    record = json.loads(annotation_shard.read_text())
+    record["scenarios"] = [
+        scenario for scenario in record["scenarios"]
+        if scenario["id"] != "semantic-annotations-packed-consumer"
+    ]
+    annotation_shard.write_text(json.dumps(record))
+
+    with pytest.raises(ValueError, match="shard union is incomplete"):
+        merge_platform_shards(shards, manifest)
 
 
 def test_rejects_missing_shard(tmp_path: Path) -> None:
