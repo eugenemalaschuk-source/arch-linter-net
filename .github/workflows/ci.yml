@@ -1105,6 +1105,11 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
+      - name: Setup locked .NET SDK for the pack regression
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+
       - name: Test packed-artifact release-evidence aggregator
         run: make test-release-evidence
 
