@@ -28,7 +28,7 @@ public sealed partial class CheckpointBReleaseGateTests
             File.WriteAllText(Path.Combine(directory, "Program.cs"), """
                 using System.Text.Json;
                 using ArchLinterNet.Testing;
-                ArchitectureValidationResult result = new ArchitectureValidationBuilder(args[0]).WithEnsureBuilt().ValidateStrict();
+                ArchitectureValidationResult result = new ArchitectureValidationBuilder(args[0]).ValidateStrict();
                 Console.WriteLine(JsonSerializer.Serialize(new { passed = result.Passed, violations = result.Violations.Select(item => item.ContractId) }));
                 """);
             File.WriteAllText(Path.Combine(directory, "CustomOnly.cs"), """
@@ -43,7 +43,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 name: Custom-only compatibility consumer
                 analysis:
                   target_assemblies: [CustomOnly]
-                  projects: [CustomOnly.csproj]
+                  assembly_search_paths: [bin/Debug/net10.0]
                 classification:
                   attributes:
                     - attribute: OwnedEntityAttribute
@@ -60,7 +60,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 """);
             CommandResult restore = RunIsolatedDotnet(directory, "restore", "CustomOnly.csproj", "--configfile", "NuGet.Config", "--no-cache");
             CommandResult build = RunIsolatedDotnet(directory, "build", "CustomOnly.csproj", "--no-restore", "--nologo", "--verbosity", "quiet");
-            CommandResult cli = RunTool(directory, "--policy", policy, "--strict", "--format", "json", "--ensure-built");
+            CommandResult cli = RunTool(directory, "--policy", policy, "--strict", "--format", "json");
             CommandResult testing = RunIsolatedDotnet(directory, "run", "--no-restore", "--", policy);
             string assets = File.ReadAllText(Path.Combine(directory, "obj", "project.assets.json"));
             Assert.Multiple(() =>

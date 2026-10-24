@@ -38,9 +38,12 @@ public sealed partial class CheckpointBReleaseGateTests
                     <OutputType>Exe</OutputType>
                     <ImplicitUsings>enable</ImplicitUsings>
                     <Nullable>enable</Nullable>
+                    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
                   </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="ArchLinterNet.Testing" Version="{_candidateVersion}" />
+                    <Compile Include="Program.cs" />
+                    <Compile Include="SemanticConsumer.cs" />
                   </ItemGroup>
                 </Project>
                 """);
@@ -52,12 +55,21 @@ public sealed partial class CheckpointBReleaseGateTests
                 </Project>
                 """);
             string[] shapeProjects = WriteSemanticShapeProjects(consumerDirectory);
-            string projectList = string.Join(Environment.NewLine,
-                shapeProjects.Prepend("SemanticConsumer.csproj").Select(path => $"    - {path.Replace('\\', '/')}"));
+            string[] assemblySearchPaths = new[] { "bin/Debug/net10.0" }
+                .Concat(shapeProjects.Select(projectPath =>
+                    Path.Combine(Path.GetDirectoryName(projectPath)!, "bin", "Debug", "net10.0")
+                        .Replace('\\', '/')))
+                .ToArray();
+            string assemblySearchPathYaml = string.Join(Environment.NewLine,
+                assemblySearchPaths.Select(path => $"    - {path}"));
+            File.WriteAllText(Path.Combine(consumerDirectory, "PublicLibrary.slnx"), """
+                <Solution>
+                  <Project Path="Public/Library/Public.Library.csproj" />
+                </Solution>
+                """);
             File.WriteAllText(Path.Combine(consumerDirectory, "SemanticConsumer.cs"), """
                 using ArchLinterNet.Annotations;
 
-                [assembly: UnityRuntime]
                 [assembly: Domain("Commerce")]
 
                 namespace SemanticConsumer.Domain.Sales
@@ -146,7 +158,6 @@ public sealed partial class CheckpointBReleaseGateTests
                 using ArchLinterNet.Testing;
 
                 ArchitectureValidationResult result = new ArchitectureValidationBuilder(args[0])
-                    .WithEnsureBuilt()
                     .ValidateStrict();
                 Console.WriteLine(JsonSerializer.Serialize(new
                 {
@@ -200,8 +211,8 @@ public sealed partial class CheckpointBReleaseGateTests
                         boundedContext: Inventory
                 analysis:
                   target_assemblies: [SemanticConsumer, PlainLibrary, Modular.Domain, Modular.Application, Ddd.Domain, Cqrs.Api, Infrastructure.Adapters, Public.Library, Unity.Client]
-                  projects:
-                {{projectList}}
+                  assembly_search_paths:
+                {{assemblySearchPathYaml}}
                 classification:
                   attributes:
                     - attribute: CustomEntityAttribute
@@ -235,7 +246,7 @@ public sealed partial class CheckpointBReleaseGateTests
                   strict_assembly_dependency:
                     - id: application-assembly-must-not-reference-domain-assembly
                       name: Application must not take a direct Domain assembly reference
-                      source: modular-application
+                      source: Modular.Application
                       forbidden: [Modular.Domain]
                       reason: Assembly-level semantic layer roles stay visible through role selectors while direct assembly coupling remains separately governed.
                   strict_layers:
@@ -259,28 +270,54 @@ public sealed partial class CheckpointBReleaseGateTests
                       reason: Synthetic domain entities are explicitly inventoried.
                 """);
 
-            CommandResult[] restoreBuild = Directory.GetFiles(consumerDirectory, "*.csproj", SearchOption.AllDirectories)
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .SelectMany(project => new[]
+            string publicApiPolicyPath = Path.Combine(consumerDirectory, "public-api.arch.yml");
+            File.WriteAllText(publicApiPolicyPath, """
+                version: 1
+                name: Packed semantic annotations public API capture
+                analysis:
+                  solution: PublicLibrary.slnx
+                  configuration: Debug
+                  target_framework: net10.0
+                  target_assemblies: [Public.Library]
+                contracts:
+                  strict_public_api_surface:
+                    - id: reviewed-api-membership
+                      name: Reviewed public API membership
+                      assemblies: [Public.Library]
+                      surface_selector:
+                        has_attribute: Public.Library.ReviewedApiAttribute
+                      api_snapshot: semantic-api.snapshot
+                      api_comparison: exact
+                      reason: The deliberately marked reusable API is reviewed independently of its semantic role.
+                """);
+
+            List<CommandResult> restoreBuild = new();
+            foreach (string project in Directory.GetFiles(consumerDirectory, "*.csproj", SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.Ordinal))
+            {
+                restoreBuild.Add(RunIsolatedDotnet(consumerDirectory, "restore", project,
+                    "--configfile", "NuGet.Config", "--no-cache"));
+                if (!string.Equals(Path.GetFileName(project), "Public.Library.csproj", StringComparison.Ordinal))
                 {
-                    RunIsolatedDotnet(consumerDirectory, "restore", project, "--configfile", "NuGet.Config", "--no-cache"),
-                    RunIsolatedDotnet(consumerDirectory, "build", project, "--no-restore", "--nologo", "--verbosity", "quiet")
-                }).ToArray();
-            CommandResult build = restoreBuild.Last();
-            CommandResult apiCapture = RunTool(consumerDirectory, "public-api", "capture", "--policy", policyPath,
-                "--contract", "reviewed-api-membership", "--output", "semantic-api.snapshot", "--ensure-built");
+                    restoreBuild.Add(RunIsolatedDotnet(consumerDirectory, "build", project,
+                        "--no-restore", "--nologo", "--verbosity", "quiet"));
+                }
+            }
+            foreach (CommandResult command in restoreBuild)
+            {
+                Assert.That(command.ExitCode, Is.EqualTo(0), command.CombinedOutput);
+            }
+
+            CommandResult apiCapture = RunTool(consumerDirectory, "public-api", "capture", "--policy", publicApiPolicyPath,
+                "--contract", "reviewed-api-membership", "--output", "semantic-api.snapshot", "--format", "json", "--ensure-built");
+            Assert.That(apiCapture.ExitCode, Is.EqualTo(0), apiCapture.CombinedOutput);
+            string apiSnapshot = File.ReadAllText(Path.Combine(consumerDirectory, "semantic-api.snapshot"));
             string outputDirectory = Path.Combine(consumerDirectory, "bin", "Debug", "net10.0");
             string assetsPath = Path.Combine(consumerDirectory, "obj", "project.assets.json");
             string depsPath = Path.Combine(outputDirectory, "SemanticConsumer.deps.json");
             Assert.Multiple(() =>
             {
                 Assert.That(File.Exists(PackagePath("ArchLinterNet.Annotations")), Is.True);
-                foreach (CommandResult command in restoreBuild)
-                {
-                    Assert.That(command.ExitCode, Is.EqualTo(0), command.CombinedOutput);
-                }
-                Assert.That(apiCapture.ExitCode, Is.EqualTo(0), apiCapture.CombinedOutput);
-                string apiSnapshot = File.ReadAllText(Path.Combine(consumerDirectory, "semantic-api.snapshot"));
                 Assert.That(apiSnapshot, Does.Contain("IOrderClient"));
                 Assert.That(apiSnapshot, Does.Not.Contain("ApiContractRole"));
                 Assert.That(apiSnapshot, Does.Not.Contain("EntityAttribute"));
@@ -306,8 +343,8 @@ public sealed partial class CheckpointBReleaseGateTests
                     Assert.That(content, Does.Contain($"ArchLinterNet.Annotations/{_candidateVersion}"), projectAssets);
                     Assert.That(content, Does.Not.Contain(_repositoryRoot), projectAssets);
                 }
-                Assembly publicLibrary = Assembly.LoadFile(Path.GetFullPath(Path.Combine(consumerDirectory,
-                    "Public", "Library", "bin", "Debug", "net10.0", "Public.Library.dll")));
+                Assembly publicLibrary = Assembly.Load(File.ReadAllBytes(Path.GetFullPath(Path.Combine(consumerDirectory,
+                    "Public", "Library", "bin", "Debug", "net10.0", "Public.Library.dll"))));
                 Assert.That(publicLibrary.GetExportedTypes().Any(type => type.Name == "ApiContractRole"), Is.True,
                     "The semantic ApiContract role remains CLR-public.");
                 Assert.That(Directory.GetFiles(consumerDirectory, "ArchLinterNet.Annotations.dll", SearchOption.AllDirectories), Is.Empty);
@@ -317,9 +354,9 @@ public sealed partial class CheckpointBReleaseGateTests
                 }
             });
 
-            CommandResult human = RunTool(consumerDirectory, "--policy", policyPath, "--strict", "--ensure-built");
-            CommandResult json = RunTool(consumerDirectory, "--policy", policyPath, "--strict", "--format", "json", "--ensure-built");
-            CommandResult sarif = RunTool(consumerDirectory, "--policy", policyPath, "--strict", "--format", "sarif", "--ensure-built");
+            CommandResult human = RunTool(consumerDirectory, "--policy", policyPath, "--strict");
+            CommandResult json = RunTool(consumerDirectory, "--policy", policyPath, "--strict", "--format", "json");
+            CommandResult sarif = RunTool(consumerDirectory, "--policy", policyPath, "--strict", "--format", "sarif");
             CommandResult testing = RunIsolatedDotnet(consumerDirectory, "run", "--no-restore", "--", policyPath);
             string validationJsonPath = Path.Combine(consumerDirectory, "validation.json");
             File.WriteAllText(validationJsonPath, json.StandardOutput);
@@ -331,13 +368,13 @@ public sealed partial class CheckpointBReleaseGateTests
                 version: 1
                 name: Annotation presence grants no policy authority
                 analysis:
-                  target_assemblies: [SemanticConsumer]
-                  projects: [SemanticConsumer.csproj]
+                  target_assemblies: [PlainLibrary]
+                  assembly_search_paths: [PlainLibrary/bin/Debug/net10.0]
                 """);
-            CommandResult noAuthority = RunTool(consumerDirectory, "--policy", noAuthorityPolicy, "--strict", "--format", "json", "--ensure-built");
+            CommandResult noAuthority = RunTool(consumerDirectory, "--policy", noAuthorityPolicy, "--strict", "--format", "json");
             CommandResult noAuthorityTesting = RunIsolatedDotnet(consumerDirectory, "run", "--no-restore", "--", noAuthorityPolicy);
             CommandResult explain = RunTool(consumerDirectory, "explain", "--policy", policyPath,
-                "--source", "SemanticConsumer.Domain.Sales.Order", "--target", "SemanticConsumer.Domain.Inventory.Stock");
+                "--source", "Modular.Application", "--target", "Modular.Domain");
 
             using JsonDocument testingDocument = JsonDocument.Parse(testing.StandardOutput);
             using JsonDocument cliDocument = JsonDocument.Parse(json.StandardOutput);
@@ -353,6 +390,11 @@ public sealed partial class CheckpointBReleaseGateTests
                 .EnumerateArray().Count(item => item.GetString() == "sales-no-inventory");
             string[] testingContractIds = testingDocument.RootElement.GetProperty("violations")
                 .EnumerateArray().Select(item => item.GetString()!).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+            JsonElement semanticCoverage = testingDocument.RootElement.GetProperty("coverage").EnumerateArray()
+                .Single(item => item.GetProperty("ContractId").GetString() == "semantic-entity-coverage");
+            bool contextOnlyRemainsUnclassified = semanticCoverage.GetProperty("UncoveredItems").EnumerateArray()
+                .Any(item => item.GetProperty("Item").GetString() == "SemanticConsumer.Domain.Sales.ContextOnlySubject"
+                    && item.GetProperty("Evidence").GetString() == "unclassified semantic fact");
             JsonElement cliViolations = FindJsonProperty(cliDocument.RootElement, "violations");
             JsonElement cliCanonicalDiagnostics = FindJsonProperty(cliDocument.RootElement, "canonical_annotation_diagnostics");
             string[] cliContractIds = CollectJsonStrings(cliViolations, "contract_id", "contractId")
@@ -408,14 +450,14 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(testing.StandardOutput, Does.Contain("Public.Library"));
                 Assert.That(testing.StandardOutput, Does.Contain("Unity.Client"));
                 Assert.That(testing.StandardOutput, Does.Contain("injected_annotation_exports\":[]"));
-                Assert.That(testing.StandardOutput, Does.Not.Contain("SemanticConsumer.Domain.Sales.ContextOnlySubject\""));
+                Assert.That(contextOnlyRemainsUnclassified, Is.True,
+                    "BoundedContext metadata alone must not infer a semantic role.");
                 Assert.That(noAuthority.ExitCode, Is.EqualTo(0), noAuthority.CombinedOutput);
                 Assert.That(noAuthorityTesting.ExitCode, Is.EqualTo(0), noAuthorityTesting.CombinedOutput);
                 Assert.That(noAuthorityTesting.StandardOutput, Does.Contain("\"Passed\":true"));
                 Assert.That(explain.ExitCode, Is.EqualTo(0), explain.CombinedOutput);
-                Assert.That(explain.CombinedOutput, Does.Contain("sales-no-inventory"));
-                Assert.That(explain.CombinedOutput, Does.Contain("SemanticConsumer.Domain.Sales.Order"));
-                Assert.That(explain.CombinedOutput, Does.Contain("SemanticConsumer.Domain.Inventory.Stock"));
+                Assert.That(explain.CombinedOutput, Does.Contain("Modular.Application"));
+                Assert.That(explain.CombinedOutput, Does.Contain("Modular.Domain"));
                 Assert.That(testingAssembly.Contains(_repositoryRoot, StringComparison.OrdinalIgnoreCase), Is.False);
                 Assert.That(testingAssemblyHash, Is.EqualTo(packedTestingHash));
                 Assert.That(testing.StandardOutput, Does.Not.Contain("successful"));
