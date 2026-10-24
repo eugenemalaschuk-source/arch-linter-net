@@ -1329,7 +1329,7 @@ jobs:
       contents: read
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
-      CHECKPOINT_B_CANDIDATE_VERSION: 0.6.1-ci.${{ github.run_id }}
+      CHECKPOINT_B_CANDIDATE_VERSION: 0.10.0
       CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
       CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
       CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b-shard
@@ -1437,7 +1437,7 @@ jobs:
       contents: read
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
-      CHECKPOINT_B_CANDIDATE_VERSION: 0.6.1-ci.${{ github.run_id }}
+      CHECKPOINT_B_CANDIDATE_VERSION: 0.10.0
       CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
       CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
       CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b-shard
