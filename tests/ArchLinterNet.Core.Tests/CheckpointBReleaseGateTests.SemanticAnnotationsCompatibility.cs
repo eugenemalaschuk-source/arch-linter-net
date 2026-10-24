@@ -134,7 +134,9 @@ public sealed partial class CheckpointBReleaseGateTests
                   assembly_search_paths: [bin/Debug/net10.0]
                 """);
 
-            string packageCache = Path.Combine(root, "packages");
+            // Keep the NuGet cache outside the project tree. SDK default compile globs can
+            // otherwise pick up source-only package content from this cache on macOS.
+            string packageCache = Path.Combine(_root, "semantic-annotations-skew-packages");
             CommandResult restore = RunWithNugetPackages(root, packageCache,
                 "restore", "SkewConsumer.csproj", "--configfile", "NuGet.Config", "--no-cache");
             CommandResult build = RunWithNugetPackages(root, packageCache,
