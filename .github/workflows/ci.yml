@@ -1183,7 +1183,8 @@ jobs:
       contents: read
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
-      CHECKPOINT_B_CANDIDATE_VERSION: 0.6.1-ci.${{ github.run_id }}
+      # Validate the final v0.10.0 inventory, including the source-only annotation package.
+      CHECKPOINT_B_CANDIDATE_VERSION: 0.10.0
 
     steps:
       - name: Checkout
