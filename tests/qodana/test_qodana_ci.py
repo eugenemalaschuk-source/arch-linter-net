@@ -158,12 +158,33 @@ class RunnerTests(unittest.TestCase):
             self.assertIn("exceeded", log.read_text())
             self.assertIn("Unable to execute", log.read_text())
 
+    def test_locked_dotnet_sdk_root_requires_the_exact_installed_sdk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "project"
+            sdk_root = root / "dotnet"
+            project.mkdir()
+            (project / "global.json").write_text(
+                json.dumps({"sdk": {"version": "10.0.402", "rollForward": "disable"}}),
+                encoding="utf-8",
+            )
+            (sdk_root / "sdk" / "10.0.402").mkdir(parents=True)
+            with patch.dict(os.environ, {"QODANA_DOTNET_ROOT": str(sdk_root)}):
+                self.assertEqual((sdk_root.resolve(), "10.0.402"),
+                                 ci.locked_dotnet_sdk_root(project))
+
+            with patch.dict(os.environ, {"QODANA_DOTNET_ROOT": str(root / "missing")}):
+                with self.assertRaisesRegex(ValueError, "does not contain the pinned"):
+                    ci.locked_dotnet_sdk_root(project)
+
     def exercise_scan(self, exit_code=0, document=None, produce=True, internal_log=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             project, work, artifacts = root / "project", root / "work", root / "artifacts"
             project.mkdir()
             artifacts.mkdir()
+            dotnet_root = root / "dotnet"
+            (dotnet_root / "sdk" / "10.0.402").mkdir(parents=True)
             invocations = []
 
             def fake_command(args, log, timeout):
@@ -182,7 +203,11 @@ class RunnerTests(unittest.TestCase):
             with patch.object(ci, "command", side_effect=fake_command), \
                  patch.object(ci.os, "getuid", create=True, return_value=1000), \
                  patch.object(ci.os, "getgid", create=True, return_value=1000):
-                result = ci.scan(project, work, artifacts, IMAGE_ID, "cold", root / "cache", 2)
+                result = ci.scan(project, work, artifacts, IMAGE_ID, "cold", root / "cache", 2,
+                                 dotnet_root=dotnet_root)
+            self.assertIn(f"{dotnet_root.resolve()}:/usr/share/dotnet:ro", invocations[0])
+            self.assertIn("DOTNET_ROOT=/usr/share/dotnet", invocations[0])
+            self.assertIn("DOTNET_ROOT_X64=/usr/share/dotnet", invocations[0])
             saved = (artifacts / "cold.sarif.json").is_file()
             log_preserved = (artifacts / "cold-log/qodana.log").is_file()
             return result, invocations, saved, log_preserved
@@ -193,8 +218,9 @@ class RunnerTests(unittest.TestCase):
         self.assertTrue(saved)
         self.assertEqual(["docker", "rm", "--force"], commands[-1][:3])
         self.assertIn(IMAGE_ID, commands[0])
-        for forbidden in ("--env", "-e", "--privileged", "/var/run/docker.sock"):
+        for forbidden in ("-e", "--privileged", "/var/run/docker.sock"):
             self.assertNotIn(forbidden, " ".join(commands[0]) if forbidden.startswith("/") else commands[0])
+        self.assertIn("--env", commands[0])
 
     def test_nonzero_exit_with_partial_report_remains_failed(self):
         result, commands, saved, _ = self.exercise_scan(exit_code=1, document=sarif([finding()]))
@@ -427,7 +453,14 @@ class RunnerTests(unittest.TestCase):
             project.mkdir()
             (project / "ArchLinterNet.slnx").write_text("<Solution />")
             (project / "qodana.yaml").write_text("linter: jetbrains/qodana-cdnet:2026.2\n")
-            with patch.object(ci, "command", return_value=127), patch.dict(os.environ, {}, clear=True):
+            dotnet_root = root / "dotnet"
+            (dotnet_root / "sdk" / "10.0.402").mkdir(parents=True)
+            (project / "global.json").write_text(
+                json.dumps({"sdk": {"version": "10.0.402", "rollForward": "disable"}})
+            )
+            with patch.object(ci, "command", return_value=127), patch.dict(
+                os.environ, {"QODANA_DOTNET_ROOT": str(dotnet_root)}, clear=True
+            ):
                 code = ci.main(["--project", str(project), "--output", str(root / "out")])
             evidence = json.loads((root / "out/artifacts/evidence.json").read_text())
             self.assertEqual(1, code)
@@ -455,6 +488,9 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("runs-on: ubuntu-24.04", workflow)
         self.assertIn("persist-credentials: false", workflow)
         self.assertIn("name: Qodana Community .NET (advisory)", workflow)
+        self.assertIn("actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68", workflow)
+        self.assertIn("global-json-file: global.json", workflow)
+        self.assertIn("QODANA_DOTNET_ROOT", workflow)
         for forbidden in (r"secrets[.\[]", r"pull_request_target", r"\bneeds:",
                           r"\b(?:contents|checks|pull-requests|security-events|id-token): write",
                           r"(?m)^\s+continue-on-error:", r"self-hosted"):

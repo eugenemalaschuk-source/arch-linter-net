@@ -37,15 +37,29 @@ class LifecycleTests(unittest.TestCase):
         self.project.mkdir()
         (self.project / "ArchLinterNet.slnx").write_text("<Solution />\n", encoding="utf-8")
         (self.project / "qodana.yaml").write_text(f"linter: {IMAGE}\n", encoding="utf-8")
+        (self.project / "global.json").write_text(
+            json.dumps({"sdk": {"version": "10.0.402", "rollForward": "disable"}}),
+            encoding="utf-8",
+        )
+        self.dotnet_root = self.root / "dotnet"
+        (self.dotnet_root / "sdk" / "10.0.402").mkdir(parents=True)
         self.output = self.root / "evidence"
-        self.command = self.enterContext(patch.object(qodana, "command", return_value=0))
-        self.inspect = self.enterContext(patch.object(
+
+        def start(patcher):
+            self.addCleanup(patcher.__exit__, None, None, None)
+            return patcher.__enter__()
+
+        self.command = start(patch.object(qodana, "command", return_value=0))
+        self.inspect = start(patch.object(
             qodana.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, IMAGE_ID + "\n")))
-        self.scan = self.enterContext(patch.object(
+        self.scan = start(patch.object(
             qodana, "scan", side_effect=lambda *args, **kwargs: completed(args[4])))
-        self.enterContext(patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": "", "QODANA_ANALYZED_SHA": "b" * 40}))
-        self.enterContext(contextlib.redirect_stdout(io.StringIO()))
-        self.enterContext(contextlib.redirect_stderr(io.StringIO()))
+        start(patch.dict(os.environ, {
+            "GITHUB_STEP_SUMMARY": "", "QODANA_ANALYZED_SHA": "b" * 40,
+            "QODANA_DOTNET_ROOT": str(self.dotnet_root),
+        }))
+        start(contextlib.redirect_stdout(io.StringIO()))
+        start(contextlib.redirect_stderr(io.StringIO()))
 
     def run_main(self, burn_in=False):
         args = ["--project", str(self.project), "--output", str(self.output)]
