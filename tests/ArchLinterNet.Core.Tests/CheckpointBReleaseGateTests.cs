@@ -55,6 +55,11 @@ public sealed partial class CheckpointBReleaseGateTests
         };
         scenarios.AddRange(candidate.ShellScenarios());
         scenarios.Add(candidate.AssertCliInFlightCancellation());
+        if (candidate.HasPackage(AnnotationsPackageId))
+        {
+            scenarios.Add(candidate.AssertSemanticAnnotationsPackedConsumer());
+        }
+
         candidate.WriteShardEvidence("package-and-entrypoints", scenarios);
     }
 
