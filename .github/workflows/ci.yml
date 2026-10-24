@@ -1085,6 +1085,11 @@ jobs:
       - name: Test test-coverage badge Markdown generator
         run: make test-coverage-badge-script
 
+      - name: Shut down .NET build servers
+        if: always()
+        run: dotnet build-server shutdown
+        continue-on-error: true
+
   unit_tests:
     name: Unit Test Suite (${{ matrix.name }})
     if: github.event_name == 'pull_request'
@@ -1330,8 +1335,6 @@ jobs:
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
       CHECKPOINT_B_CANDIDATE_VERSION: 0.10.0
-      CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
-      CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
       CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b-shard
       CHECKPOINT_B_PLATFORM: ${{ matrix.platform }}
       CHECKPOINT_B_SHELL: ${{ matrix.shell_adapter }}
@@ -1366,15 +1369,26 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: checkpoint-b-pr-candidate
-          path: artifacts/candidate
+          path: ${{ runner.temp }}/checkpoint-b-candidate
 
       - name: Verify immutable candidate
         shell: bash
-        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
+        env:
+          CHECKPOINT_B_PACKAGE_FEED: ${{ runner.temp }}/checkpoint-b-candidate
+          CHECKPOINT_B_PACKAGE_MANIFEST: ${{ runner.temp }}/checkpoint-b-candidate/package-manifest.json
+        run: python3 tools/release/package_manifest.py verify --packages-dir "$CHECKPOINT_B_PACKAGE_FEED" --manifest "$CHECKPOINT_B_PACKAGE_MANIFEST" --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
 
       - name: Run ${{ matrix.shard_name }} shard
         shell: bash
+        env:
+          CHECKPOINT_B_PACKAGE_FEED: ${{ runner.temp }}/checkpoint-b-candidate
+          CHECKPOINT_B_PACKAGE_MANIFEST: ${{ runner.temp }}/checkpoint-b-candidate/package-manifest.json
         run: make ${{ matrix.target }}
+
+      - name: Shut down .NET build servers
+        if: always()
+        run: dotnet build-server shutdown
+        continue-on-error: true
 
       - name: Upload shard evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -1438,8 +1452,6 @@ jobs:
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
       CHECKPOINT_B_CANDIDATE_VERSION: 0.10.0
-      CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
-      CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
       CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b-shard
       CHECKPOINT_B_PLATFORM: macos-arm64
       CHECKPOINT_B_SHELL: bash
@@ -1473,15 +1485,26 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: checkpoint-b-pr-candidate
-          path: artifacts/candidate
+          path: ${{ runner.temp }}/checkpoint-b-candidate
 
       - name: Verify immutable candidate
         shell: bash
-        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
+        env:
+          CHECKPOINT_B_PACKAGE_FEED: ${{ runner.temp }}/checkpoint-b-candidate
+          CHECKPOINT_B_PACKAGE_MANIFEST: ${{ runner.temp }}/checkpoint-b-candidate/package-manifest.json
+        run: python3 tools/release/package_manifest.py verify --packages-dir "$CHECKPOINT_B_PACKAGE_FEED" --manifest "$CHECKPOINT_B_PACKAGE_MANIFEST" --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
 
       - name: Run ${{ matrix.shard_name }} shard
         shell: bash
+        env:
+          CHECKPOINT_B_PACKAGE_FEED: ${{ runner.temp }}/checkpoint-b-candidate
+          CHECKPOINT_B_PACKAGE_MANIFEST: ${{ runner.temp }}/checkpoint-b-candidate/package-manifest.json
         run: make ${{ matrix.target }}
+
+      - name: Shut down .NET build servers
+        if: always()
+        run: dotnet build-server shutdown
+        continue-on-error: true
 
       - name: Upload shard evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
