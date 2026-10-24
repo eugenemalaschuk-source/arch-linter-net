@@ -43,7 +43,8 @@ prepare-packed-artifact-candidate:  ## CI: pack one manifest-bound Checkpoint B 
 	@dotnet pack "$(SLNX)" --configuration Release --output "$(CHECKPOINT_B_CANDIDATE_DIR)" \
 		--no-restore -p:Version="$(CHECKPOINT_B_CANDIDATE_VERSION)" \
 		-p:PackageVersion="$(CHECKPOINT_B_CANDIDATE_VERSION)" --nologo
-	@python3 "$(PROJECT_ROOT)/tools/release/package_manifest.py" create \
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		python tools/release/package_manifest.py create \
 		--packages-dir "$(CHECKPOINT_B_CANDIDATE_DIR)" \
 		--version "$(CHECKPOINT_B_CANDIDATE_VERSION)" \
 		--source-commit "$(ARCH_LINTER_SOURCE_SHA)" \
