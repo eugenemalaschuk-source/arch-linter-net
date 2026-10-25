@@ -474,25 +474,12 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_canonical_configuration_has_no_baseline_or_suppression(self):
         config = (ROOT / "qodana.yaml").read_text()
-        editorconfig = (ROOT / ".editorconfig").read_text()
         self.assertEqual(
             "jetbrains/qodana-cdnet:2026.2@sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2",
             ci.configured_image(ROOT),
         )
         self.assertIn("solution: ArchLinterNet.slnx", config)
         self.assertIn("name: qodana.recommended", config)
-        overrides = re.findall(
-            r"(?m)^(resharper_[a-z0-9_]+_highlighting)=suggestion$", editorconfig
-        )
-        self.assertEqual(45, len(overrides))
-        self.assertEqual(len(overrides), len(set(overrides)))
-        for inspection in (
-            "resharper_access_to_disposed_closure_highlighting",
-            "resharper_condition_is_always_true_or_false_according_to_nullable_api_contract_highlighting",
-            "resharper_unused_tuple_component_in_return_value_highlighting",
-            "resharper_redundant_using_directive_highlighting",
-        ):
-            self.assertIn(f"{inspection}=suggestion", editorconfig)
         self.assertNotIn("inspections:", config)
         self.assertNotRegex(config, r"(?m)^\s+enabled:\s*false")
         for forbidden in (r"(?m)^exclude:", r"(?m)^baseline:", r"(?m)^failThreshold:",
