@@ -2,16 +2,12 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".github" / "workflows"
-STAGE_B_ACTION_REF = (
-    "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion"
-    "@79a84e1dc03e9fc38b773c75f8f6be7a6495d79b"
-)
+STAGE_B_ACTION_PATH = ".github/actions/architecture-health-badge-promotion"
 
 
 def read_workflow(name: str) -> str:
@@ -59,38 +55,19 @@ def test_repository_metrics_badges_use_canonical_evidence_in_the_trusted_pipelin
     assert 'svg_without_namespace = logo_svg.replace(svg_namespace, "")' in workflow
 
 
-def test_reusable_workflow_resolves_its_action_from_the_workflow_repository() -> None:
+def test_reusable_workflow_runs_the_action_from_its_exact_checked_out_revision() -> None:
     workflow = read_workflow("architecture-health-badge-promotion.yml")
-    # Keep the live publisher on a reviewed merged-history action snapshot.
-    assert f"uses: {STAGE_B_ACTION_REF}" in workflow
-    assert "uses: ./.github/actions/architecture-health-badge-promotion" not in workflow
+    assert "name: Check out the exact trusted workflow revision" in workflow
+    assert "ref: ${{ github.sha }}" in workflow
+    assert "persist-credentials: false" in workflow
+    assert f"uses: $/{STAGE_B_ACTION_PATH}" in workflow
 
 
-def test_pinned_action_snapshot_embeds_the_current_first_party_producer_registry() -> None:
-    action_sha = STAGE_B_ACTION_REF.rsplit("@", 1)[1]
-    pinned_registry = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(ROOT),
-            "show",
-            f"{action_sha}:.github/badge-promotion/registry.json",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=10,
-    ).stdout
-    current_registry = json.loads((ROOT / ".github" / "badge-promotion" / "registry.json").read_text(encoding="utf-8"))
-    snapshot_registry = json.loads(pinned_registry)
-
-    for configuration_id in ("reference-public-raw", "reference-none"):
-        assert snapshot_registry["configurations"][configuration_id]["producer"] == current_registry[
-            "configurations"
-        ][configuration_id]["producer"], (
-            f"The live action snapshot {action_sha} must carry the current {configuration_id} producer pin. "
-            "Rotate the immutable action reference with the producer workflow/registry update."
-        )
+def test_reusable_workflow_action_and_registry_are_present_at_the_run_revision() -> None:
+    workflow = read_workflow("architecture-health-badge-promotion.yml")
+    assert f"uses: $/{STAGE_B_ACTION_PATH}" in workflow
+    assert (ROOT / STAGE_B_ACTION_PATH / "action.yml").is_file()
+    assert (ROOT / ".github" / "badge-promotion" / "registry.json").is_file()
 
 
 def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_boundary() -> None:
@@ -110,7 +87,10 @@ def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_bounda
     workflow_call = workflow.split("workflow_call:", 1)[1]
     assert workflow_call.index("inputs:") < workflow_call.index("secrets:")
     assert "secrets: inherit" not in workflow
-    assert "actions/checkout" not in workflow
+    assert "name: Check out the exact trusted workflow revision" in workflow
+    assert "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" in workflow
+    assert "ref: ${{ github.sha }}" in workflow
+    assert "persist-credentials: false" in workflow
     assert "run-url" not in workflow
     assert "artifact-url" not in workflow
 
