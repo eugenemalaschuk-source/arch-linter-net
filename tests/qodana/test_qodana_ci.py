@@ -480,7 +480,7 @@ class WorkflowContractTests(unittest.TestCase):
         )
         self.assertIn("solution: ArchLinterNet.slnx", config)
         self.assertIn("name: qodana.recommended", config)
-        self.assertIn("groupId: moderate_maintainability_findings", config)
+        self.assertIn("    - groupId: moderate_maintainability_findings\n      inspections:\n", config)
         self.assertIn("severity: WEAK WARNING", config)
         self.assertIn("- AccessToDisposedClosure", config)
         self.assertIn("- ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract", config)

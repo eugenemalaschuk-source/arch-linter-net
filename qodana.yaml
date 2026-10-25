@@ -6,7 +6,7 @@ profile:
   name: qodana.recommended
   groups:
     - groupId: moderate_maintainability_findings
-      groups:
+      inspections:
         # High-volume style and naming conventions; useful guidance, but not high-impact defects.
         - RedundantUsingDirective
         - RedundantNameQualifier
