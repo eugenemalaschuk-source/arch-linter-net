@@ -55,15 +55,15 @@ def test_repository_metrics_badges_use_canonical_evidence_in_the_trusted_pipelin
     assert 'svg_without_namespace = logo_svg.replace(svg_namespace, "")' in workflow
 
 
-def test_reusable_workflow_runs_the_action_from_its_exact_checked_out_revision() -> None:
+def test_privileged_reusable_workflow_uses_the_trusted_local_action_without_checkout() -> None:
     workflow = read_workflow("architecture-health-badge-promotion.yml")
-    assert "name: Check out the exact trusted workflow revision" in workflow
-    assert "ref: ${{ github.sha }}" in workflow
-    assert "persist-credentials: false" in workflow
-    assert f"uses: $/{STAGE_B_ACTION_PATH}" in workflow
+    promote = workflow.split("  promote:", 1)[1]
+    assert "actions/checkout@" not in promote
+    assert "github.sha" not in promote
+    assert f"uses: $/{STAGE_B_ACTION_PATH}" in promote
 
 
-def test_reusable_workflow_action_and_registry_are_present_at_the_run_revision() -> None:
+def test_reusable_workflow_action_and_registry_are_present_in_repository() -> None:
     workflow = read_workflow("architecture-health-badge-promotion.yml")
     assert f"uses: $/{STAGE_B_ACTION_PATH}" in workflow
     assert (ROOT / STAGE_B_ACTION_PATH / "action.yml").is_file()
@@ -87,10 +87,6 @@ def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_bounda
     workflow_call = workflow.split("workflow_call:", 1)[1]
     assert workflow_call.index("inputs:") < workflow_call.index("secrets:")
     assert "secrets: inherit" not in workflow
-    assert "name: Check out the exact trusted workflow revision" in workflow
-    assert "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" in workflow
-    assert "ref: ${{ github.sha }}" in workflow
-    assert "persist-credentials: false" in workflow
     assert "run-url" not in workflow
     assert "artifact-url" not in workflow
 

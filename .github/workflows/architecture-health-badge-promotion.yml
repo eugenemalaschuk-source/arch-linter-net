@@ -342,11 +342,6 @@ jobs:
       packages: read
       pull-requests: read
     steps:
-      - name: Check out the exact trusted workflow revision
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
       - name: Set up .NET for trusted temporal revalidation
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:

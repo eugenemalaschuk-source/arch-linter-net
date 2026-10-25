@@ -79,8 +79,6 @@ resharper_condition_is_always_true_or_false_according_to_nullable_api_contract_h
 resharper_null_coalescing_condition_is_always_not_null_according_to_api_contract_highlighting=suggestion
 resharper_conditional_access_qualifier_is_non_nullable_according_to_api_contract_highlighting=suggestion
 resharper_constant_null_coalescing_condition_highlighting=suggestion
-resharper_access_to_disposed_closure_highlighting=suggestion
-resharper_access_to_modified_closure_highlighting=suggestion
 resharper_variable_can_be_not_nullable_highlighting=suggestion
 resharper_member_hides_static_from_outer_class_highlighting=suggestion
 
@@ -169,3 +167,9 @@ trim_trailing_whitespace = unset
 
 [Makefile]
 indent_style = tab
+
+# Qodana's reviewed lifecycle-closure findings are confined to test scenarios.
+# Keep the recommended warning severity for production and other C# source paths.
+[tests/**/*.cs]
+resharper_access_to_disposed_closure_highlighting=suggestion
+resharper_access_to_modified_closure_highlighting=suggestion
