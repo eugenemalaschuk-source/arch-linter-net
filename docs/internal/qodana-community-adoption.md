@@ -12,7 +12,7 @@ The Qodana integration does not replace or redefine SonarCloud, CodeQL, ArchLint
 
 ## Configuration and trust boundary
 
-`qodana.yaml` selects the free `jetbrains/qodana-cdnet:2026.2` Community engine, `qodana.recommended`, `ArchLinterNet.slnx` and Release configuration. There is no Qodana Cloud token, paid dependency, repository baseline, blanket exclusion or broad inspection suppression.
+`qodana.yaml` selects the free `jetbrains/qodana-cdnet:2026.2` Community engine, `qodana.recommended`, `ArchLinterNet.slnx` and Release configuration. As of 2026-10-25, the image is also pinned to manifest digest `sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2`, resolved by the canonical main scan (Community 2026.2.699 / Inspect Code 2026.2.3.1). Keep the same-revision tag plus digest together when refreshing the pin. There is no Qodana Cloud token, paid dependency, repository baseline, blanket exclusion or broad inspection suppression.
 
 The workflow uses the ordinary `pull_request` event, an ephemeral GitHub-hosted Ubuntu runner, `contents: read`, and checkout with `persist-credentials: false`. It does not reference repository/Qodana secrets, does not use `pull_request_target`, does not grant PR/security-event write permissions, and uploads scanner output only as inert artifacts. The scanner container is not privileged, does not receive the Docker socket or host credentials, and runs with dropped capabilities and `no-new-privileges`.
 

@@ -474,7 +474,10 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_canonical_configuration_has_no_baseline_or_suppression(self):
         config = (ROOT / "qodana.yaml").read_text()
-        self.assertEqual("jetbrains/qodana-cdnet:2026.2", ci.configured_image(ROOT))
+        self.assertEqual(
+            "jetbrains/qodana-cdnet:2026.2@sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2",
+            ci.configured_image(ROOT),
+        )
         self.assertIn("solution: ArchLinterNet.slnx", config)
         self.assertIn("name: qodana.recommended", config)
         for forbidden in (r"(?m)^exclude:", r"(?m)^baseline:", r"(?m)^failThreshold:",

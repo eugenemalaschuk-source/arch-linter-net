@@ -214,9 +214,11 @@ public static class ArchitectureApplicabilityEvaluator
     private static ArchitectureApplicabilityReason[] CollectReasons(
         IEnumerable<ArchitectureApplicabilityAssessment> assessments)
     {
-        return assessments
+        ArchitectureApplicabilityAssessment[] assessmentList = assessments as ArchitectureApplicabilityAssessment[]
+            ?? assessments.ToArray();
+        return assessmentList
             .SelectMany(assessment => assessment.IntegrityReasons)
-            .Concat(assessments
+            .Concat(assessmentList
                 .Where(assessment => assessment.IsIntegrityValid
                     && assessment.Record?.State == ArchitectureApplicabilityRecordState.Unassessable)
                 .SelectMany(assessment => assessment.Record!.Reasons))

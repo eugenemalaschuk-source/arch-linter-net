@@ -68,7 +68,8 @@ internal abstract class CliIntegrationTestBase
             startInfo.ArgumentList.Add(argument);
         }
 
-        using var process = new Process { StartInfo = startInfo };
+        using var process = new Process();
+        process.StartInfo = startInfo;
         process.Start();
 
         Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();

@@ -1,0 +1,83 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.10.0-stable-semantic-annotations",
+  "release_target": "0.10.0",
+  "story": 565,
+  "_comment": [
+    "This authorizes exactly the stable 0.10.0 pre-1.0 capability release. Preview declarations, including 0.10.0-preview.3, are separate and unchanged.",
+    "The required product/release scope is the source-only package (#567), canonical classifier/catalog parity (#568), infrastructure/UI/Unity annotations (#571), adoption guidance (#573), and packed external-consumer release gate (#574).",
+    "The candidate also carries the reviewed dependency refresh in PR #1100, including System.CommandLine, Microsoft.Extensions.DependencyInjection, and System.Security.Cryptography.Xml updates.",
+    "The annotation contract (#566), layered/DDD annotations (#569), CQRS/messaging/web/API annotations (#570), bounded context metadata (#572), repository metrics badge depth (#1057), audit-only applicability correction (#1061), and read-only diagnostics correctness fix (#1084) are delivered context from prior previews.",
+    "PR #1093 corrected preview release metadata after preview.3 and does not add stable product scope. The candidate quality-preparation PR contains CI/Sonar/Qodana verification and targeted single-pass input-validation and process-disposal corrections; it is not an additional capability claim.",
+    "Release notes were audited: #1094 and #1101 are Features, #1100 is Dependencies, #1103 is Documentation, and #1093, #1104, and the preparation PR are excluded from generated notes.",
+    "Publication requires a maintainer dry run with release_type=minor, version_override=0.10.0, and publish=false after the final cleanup PR is merged and main is green, followed by separate reviewed publication. This declaration does not publish anything."
+  ],
+  "required_items": [
+    {
+      "issue": 567,
+      "finding": "source-only-annotation-package",
+      "summary": "Ship the optional source-only ArchLinterNet.Annotations package with no runtime annotation assembly"
+    },
+    {
+      "issue": 568,
+      "finding": "canonical-annotation-classifier-parity",
+      "summary": "Recognize canonical annotations through the existing role classifier and preserve catalog parity"
+    },
+    {
+      "issue": 571,
+      "finding": "infrastructure-ui-unity-annotation-families",
+      "summary": "Deliver the reviewed infrastructure, UI, and Unity annotation families"
+    },
+    {
+      "issue": 573,
+      "finding": "annotation-first-adoption-guidance",
+      "summary": "Document annotation-first adoption, migration, compatibility, and custom attribute mappings"
+    },
+    {
+      "issue": 574,
+      "finding": "packed-external-consumer-release-gate",
+      "summary": "Prove stable 0.10.0 behavior from packed artifacts in representative external consumers"
+    },
+    {
+      "issue": 1100,
+      "finding": "candidate-dependency-refresh",
+      "summary": "Include the reviewed runtime and tooling dependency updates already merged into the 0.10.0 candidate"
+    }
+  ],
+  "excluded_items": [
+    {
+      "issue": 1093,
+      "reason": "PR #1093 corrected prerelease metadata for the already published preview.3; it changes no stable package behavior and is intentionally excluded from release notes."
+    }
+  ],
+  "delivered_items": [
+    {
+      "issue": 566,
+      "reason": "The reviewed annotation identity, package, and role-vs-context contract was delivered in an earlier preview."
+    },
+    {
+      "issue": 569,
+      "reason": "The layered and DDD annotation family was delivered in an earlier preview."
+    },
+    {
+      "issue": 570,
+      "reason": "The CQRS, messaging, and web/API annotation family was delivered in preview.3."
+    },
+    {
+      "issue": 572,
+      "reason": "Bounded context metadata composition was delivered in preview.3."
+    },
+    {
+      "issue": 1057,
+      "reason": "Repository metrics and Structure badge depth are carried-forward preview context."
+    },
+    {
+      "issue": 1061,
+      "reason": "The audit-only applicability correction was delivered in preview.2."
+    },
+    {
+      "issue": 1084,
+      "reason": "The read-only diagnostics correctness correction was delivered in preview.3."
+    }
+  ]
+}

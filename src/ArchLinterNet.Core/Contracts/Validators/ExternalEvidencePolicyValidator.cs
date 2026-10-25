@@ -153,16 +153,22 @@ internal sealed class ExternalEvidencePolicyValidator : IArchitecturePolicyDocum
                 $"external_evidence entry '{id}' diagnostic_filter.{key} must not be null.");
         }
 
-        if (values.Count() > ExternalDiagnosticFilterRules.MaxValuesPerSelector)
+        List<string?> valueSnapshot = [];
+        foreach (string? value in values)
         {
-            throw new InvalidOperationException(
-                $"external_evidence entry '{id}' diagnostic_filter.{key} must contain no more than " +
-                $"{ExternalDiagnosticFilterRules.MaxValuesPerSelector} values.");
+            if (valueSnapshot.Count == ExternalDiagnosticFilterRules.MaxValuesPerSelector)
+            {
+                throw new InvalidOperationException(
+                    $"external_evidence entry '{id}' diagnostic_filter.{key} must contain no more than " +
+                    $"{ExternalDiagnosticFilterRules.MaxValuesPerSelector} values.");
+            }
+
+            valueSnapshot.Add(value);
         }
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         int index = 0;
-        foreach (string? value in values)
+        foreach (string? value in valueSnapshot)
         {
             document.Provenance.SetValidationSubject(
                 ArchitecturePolicyProvenancePath.AppendIndex(fieldPath, index));

@@ -18,7 +18,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         fileSystem ??= ArchitectureFileSystem.Real;
         XDocument document = XDocument.Parse(fileSystem.ReadAllText(projectPath));
 
-        IEnumerable<XElement> propertyGroups = document.Descendants("PropertyGroup");
+        XElement[] propertyGroups = document.Descendants("PropertyGroup").ToArray();
 
         string resolvedAssemblyName = ResolveAssemblyName(propertyGroups, projectPath);
         List<string> frameworks = ResolveTargetFrameworks(propertyGroups);
@@ -42,7 +42,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             projectReferences);
     }
 
-    private static string ResolveAssemblyName(IEnumerable<XElement> propertyGroups, string projectPath)
+    private static string ResolveAssemblyName(XElement[] propertyGroups, string projectPath)
     {
         string? assemblyName = propertyGroups
             .Select(group => group.Element("AssemblyName")?.Value)
@@ -53,7 +53,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             : assemblyName.Trim();
     }
 
-    private static List<string> ResolveTargetFrameworks(IEnumerable<XElement> propertyGroups)
+    private static List<string> ResolveTargetFrameworks(XElement[] propertyGroups)
     {
         string? targetFrameworks = propertyGroups
             .Select(group => group.Element("TargetFrameworks")?.Value)

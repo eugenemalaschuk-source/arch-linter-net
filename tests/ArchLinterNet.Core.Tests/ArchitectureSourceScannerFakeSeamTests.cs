@@ -153,15 +153,19 @@ public sealed class ArchitectureSourceScannerFakeSeamTests
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => new ArchitectureSourceScanner().FindMethodBodyViolations(
-            repoRoot,
-            "Fake.Forbidden.Namespace",
-            _consoleWriteLine,
-            executionContext,
-            sourceRoots: _srcRoot,
-            fileSystem: fileSystem,
-            compilationFactory: compilationFactory,
-            cancellationToken: cts.Token).ToList());
+        Assert.Throws<OperationCanceledException>(() =>
+        {
+            var violations = new ArchitectureSourceScanner().FindMethodBodyViolations(
+                repoRoot,
+                "Fake.Forbidden.Namespace",
+                _consoleWriteLine,
+                executionContext,
+                sourceRoots: _srcRoot,
+                fileSystem: fileSystem,
+                compilationFactory: compilationFactory,
+                cancellationToken: cts.Token).ToList();
+            Assert.That(violations, Is.Empty);
+        });
 
         Assert.That(compilationFactory.WasCalled, Is.False,
             "a pre-cancelled token must stop the scan before the Roslyn compilation is ever built");
@@ -187,15 +191,19 @@ public sealed class ArchitectureSourceScannerFakeSeamTests
         using CancellationTokenSource cts = new();
         var cancelOnFirstFile = new CancelOnFirstEnumeratedFile(fileSystem, cts);
 
-        Assert.Throws<OperationCanceledException>(() => new ArchitectureSourceScanner().FindMethodBodyViolations(
-            repoRoot,
-            "Fake.Forbidden.Namespace",
-            _consoleWriteLine,
-            executionContext,
-            sourceRoots: _srcRoot,
-            fileSystem: cancelOnFirstFile,
-            compilationFactory: compilationFactory,
-            cancellationToken: cts.Token).ToList());
+        Assert.Throws<OperationCanceledException>(() =>
+        {
+            var violations = new ArchitectureSourceScanner().FindMethodBodyViolations(
+                repoRoot,
+                "Fake.Forbidden.Namespace",
+                _consoleWriteLine,
+                executionContext,
+                sourceRoots: _srcRoot,
+                fileSystem: cancelOnFirstFile,
+                compilationFactory: compilationFactory,
+                cancellationToken: cts.Token).ToList();
+            Assert.That(violations, Is.Empty);
+        });
 
         Assert.That(cancelOnFirstFile.FetchedCount, Is.EqualTo(1),
             "the second file must never be fetched once cancellation is observed while the first is being processed");

@@ -147,7 +147,8 @@ internal static class BuildStateRuntimeBuildProcessExecutor
         BuildStatePreflightRequest request, List<string> arguments, string commandLabel, BuildStatePreflightState failureState)
     {
         ProcessStartInfo startInfo = CreateDotnetProcessStartInfo(request, arguments);
-        using Process process = new() { StartInfo = startInfo };
+        using Process process = new();
+        process.StartInfo = startInfo;
         StringBuilder stdOut = new();
         StringBuilder stdErr = new();
         object outputGate = new();

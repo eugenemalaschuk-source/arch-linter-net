@@ -153,6 +153,8 @@ namespace PublicApiSurfaceContractTestFixtures
     public readonly struct ReadOnlyStructType
     {
         public readonly int Value;
+
+        public ReadOnlyStructType() => Value = 0;
     }
 
     public interface IConstrainedInterface<T>

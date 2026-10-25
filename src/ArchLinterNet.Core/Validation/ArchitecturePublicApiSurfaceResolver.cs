@@ -33,13 +33,14 @@ internal sealed class ArchitecturePublicApiSurfaceResolver(
 
         if (contract == null)
         {
-            IEnumerable<string> available = document.Contracts.StrictPublicApiSurface
+            string[] available = document.Contracts.StrictPublicApiSurface
                 .Concat(document.Contracts.AuditPublicApiSurface)
                 .Select(candidate => candidate.Id)
                 .Where(id => id != null)
-                .OrderBy(id => id, StringComparer.Ordinal)!;
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray()!;
 
-            string availableText = available.Any() ? string.Join(", ", available) : "(none)";
+            string availableText = available.Length != 0 ? string.Join(", ", available) : "(none)";
             return ArchitecturePublicApiSurfaceResolution.Failed(
                 $"Unknown public API surface contract '{contractId}'. Available contract ids: {availableText}.");
         }

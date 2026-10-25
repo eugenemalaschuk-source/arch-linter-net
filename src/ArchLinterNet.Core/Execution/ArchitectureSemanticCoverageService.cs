@@ -241,16 +241,17 @@ internal sealed class ArchitectureSemanticCoverageService
             return _semanticStaleItems;
         }
 
+        Type[] scannedTypes = types as Type[] ?? types.ToArray();
         List<ArchitectureCoverageSummaryEvidenceItem> items = new();
         foreach (ArchitectureLayer layer in Document.Layers.Values
                      .Where(layer => layer.Selector != null && !layer.External)
                      .OrderBy(ArchitectureLayerResolver.DescribeLayer, StringComparer.Ordinal))
         {
-            if (!types.Any(type => RoleIndex.TryGetRole(type, out _) && Facts.MatchesLayer(layer, type)))
+            if (!scannedTypes.Any(type => RoleIndex.TryGetRole(type, out _) && Facts.MatchesLayer(layer, type)))
                 items.Add(new ArchitectureCoverageSummaryEvidenceItem(ArchitectureLayerResolver.DescribeLayer(layer), "semantic selector matched no classified type"));
         }
         foreach (ArchitectureContextualConsumerReference consumer in RegisteredContextualConsumers
-                     .Where(consumer => !types.Any(type => MatchesContextualConsumer(consumer, type)))
+                     .Where(consumer => !scannedTypes.Any(type => MatchesContextualConsumer(consumer, type)))
                      .OrderBy(consumer => consumer.Description, StringComparer.Ordinal))
         {
             items.Add(new ArchitectureCoverageSummaryEvidenceItem(DescribeConsumer(consumer), "contextual semantic selector matched no classified type"));

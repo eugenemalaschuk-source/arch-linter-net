@@ -55,6 +55,7 @@ public sealed class ArchitecturePublicApiMemberScannerTests
             }));
             Assert.That(members.Select(entry => entry.Signature), Has.None.Contains("InternalOnly"));
             Assert.That(members.Select(entry => entry.Signature), Has.None.Contains("PrivateOnly"));
+            Assert.That(new ExportedMembers().InternalField, Is.Zero);
         });
     }
 

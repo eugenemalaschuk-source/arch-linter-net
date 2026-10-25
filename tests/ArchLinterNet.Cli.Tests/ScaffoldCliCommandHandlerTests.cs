@@ -389,7 +389,7 @@ public sealed class ScaffoldCliCommandHandlerTests
             .Where(assembly => !assembly.IsDynamic
                 && !string.IsNullOrEmpty(assembly.Location)
                 && !ReferenceEquals(assembly, typeof(ScaffoldCliCommandHandlerTests).Assembly))
-            .Select(assembly => MetadataReference.CreateFromFile(assembly.Location))
+            .Select(assembly => (MetadataReference)MetadataReference.CreateFromFile(assembly.Location))
             .DistinctBy(reference => reference.Display, StringComparer.Ordinal)
             .ToArray();
         CSharpCompilation compilation = CSharpCompilation.Create(

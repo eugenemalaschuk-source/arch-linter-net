@@ -96,7 +96,7 @@ internal sealed class SarifEvidenceArtifactReader
     {
         using MemoryStream buffer = new();
         long bytesRead = 0;
-        bool exceeded = false;
+        bool exceeded;
         try
         {
             if (!IsStillSafe(path))

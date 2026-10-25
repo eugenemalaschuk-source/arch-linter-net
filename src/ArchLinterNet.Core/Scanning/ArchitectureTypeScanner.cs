@@ -104,7 +104,7 @@ internal static class ArchitectureTypeScanner
             isComplete = false;
         }
 
-        foreach (Type type in types)
+        for (int index = 0; index < types.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
         }
