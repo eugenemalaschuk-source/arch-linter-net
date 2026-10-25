@@ -150,7 +150,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
         return message;
     }
 
-    private static string? GetUsageHint(ParseResult parseResult)
+    private static string GetUsageHint(ParseResult parseResult)
     {
         List<string> commandPath = GetCommandPath(parseResult);
         if (commandPath.Contains("topology", StringComparer.Ordinal))
