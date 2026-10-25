@@ -121,6 +121,10 @@ public sealed partial class CheckpointBReleaseGateTests
                 .Where(item => item.GetProperty("Item").GetString() == itemName)
                 .ToArray();
             Assert.That(facts, Has.Length.EqualTo(1), $"Expected exactly one semantic fact for {itemName}.");
+            if (facts.Length != 1)
+            {
+                return;
+            }
 
             string evidence = facts[0].GetProperty("Evidence").GetString()!;
             string rolePrefix = $"role={expectedRole}";

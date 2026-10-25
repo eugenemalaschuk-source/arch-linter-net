@@ -284,7 +284,7 @@ public sealed partial class CheckpointBReleaseGateTests
                       name: Semantic entity coverage
                       scope: semantic_role
                       roots:
-                        - namespace: SemanticConsumer.Domain
+                        - namespace: SemanticConsumer
                         - namespace: PlainLibrary
                         - namespace: Modular
                         - namespace: Ddd
