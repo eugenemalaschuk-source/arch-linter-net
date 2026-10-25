@@ -38,6 +38,7 @@ profile:
         - UnusedParameter.Local
         - ValueParameterNotUsed
         - UnusedVariable
+        - UnusedTupleComponentInReturnValue
         - UnusedMethodReturnValue.Local
         - CollectionNeverUpdated.Global
         - CollectionNeverUpdated.Local
@@ -55,9 +56,9 @@ profile:
         # These inspections describe defensive or naming choices, not demonstrated incorrect behavior.
         - VariableCanBeNotNullable
         - MemberHidesStaticFromOuterClass
-    inspections:
-      - group: moderate_maintainability_findings
-        severity: WEAK WARNING
+  inspections:
+    - group: moderate_maintainability_findings
+      severity: WEAK WARNING
 dotnet:
   solution: ArchLinterNet.slnx
   configuration: Release
