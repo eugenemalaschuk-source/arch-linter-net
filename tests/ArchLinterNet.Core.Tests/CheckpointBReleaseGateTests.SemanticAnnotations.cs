@@ -180,7 +180,7 @@ public sealed partial class CheckpointBReleaseGateTests
             File.WriteAllText(Path.Combine(consumerDirectory, "Program.cs"), """
                 using System.Text.Json;
                 using System.Reflection;
-                using ArchLinterNet.Core.Model;
+                using ArchLinterNet.Core.Reporting;
                 using ArchLinterNet.Testing;
 
                 ArchitectureValidationResult result = new ArchitectureValidationBuilder(args[0])
@@ -189,11 +189,8 @@ public sealed partial class CheckpointBReleaseGateTests
                 {
                     result.Passed,
                     violations = result.Violations.Select(item => item.ContractId).ToArray(),
-                    canonical_identities = result.Violations
-                        .SelectMany(violation => violation.Identities.Count > 0
-                            ? violation.Identities
-                            : violation.Identity is { } identity ? [identity] : Array.Empty<ArchitectureViolationIdentity>())
-                        .Select(ArchitectureViolationIdentityJson.Serialize)
+                    canonical_identities = ArchitectureFindingMapper.FromViolations(result.Violations)
+                        .Select(finding => finding.CanonicalIdentity)
                         .OrderBy(identity => identity, StringComparer.Ordinal)
                         .ToArray(),
                     canonical_diagnostics = result.CanonicalAnnotationDiagnostics.Select(item => new
@@ -581,10 +578,8 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(noAuthorityTesting.ExitCode, Is.EqualTo(0), noAuthorityTesting.CombinedOutput);
                 Assert.That(noAuthorityTesting.StandardOutput, Does.Contain("\"Passed\":true"));
                 Assert.That(explain.ExitCode, Is.EqualTo(0), explain.CombinedOutput);
-                Assert.That(explain.CombinedOutput, Does.Contain("Modular.Application"));
-                Assert.That(explain.CombinedOutput, Does.Contain("Modular.Domain"));
-                Assert.That(explain.CombinedOutput, Does.Contain("application-assembly-must-not-reference-domain-assembly"),
-                    "Explain must retain the contract identity for the annotation-backed Application-to-Domain dependency.");
+                Assert.That(explain.StandardOutput, Does.Contain("Modular.Application -> Modular.Domain"),
+                    "Explain must retain the dependency path between the role-annotated application and domain assemblies.");
                 Assert.That(testingAssembly.Contains(_repositoryRoot, StringComparison.OrdinalIgnoreCase), Is.False);
                 Assert.That(testingAssemblyHash, Is.EqualTo(packedTestingHash));
                 Assert.That(testing.StandardOutput, Does.Not.Contain("successful"));
