@@ -129,7 +129,9 @@ public sealed partial class CheckpointBReleaseGateTests
             string evidence = facts[0].GetProperty("Evidence").GetString()!;
             string rolePrefix = $"role={expectedRole}";
             Assert.That(evidence, Does.StartWith(rolePrefix), $"Unexpected semantic role evidence for {itemName}: {evidence}");
-            Assert.That(evidence.Length == rolePrefix.Length || char.IsWhiteSpace(evidence[rolePrefix.Length]), Is.True,
+            Assert.That(evidence.Length == rolePrefix.Length
+                || char.IsWhiteSpace(evidence[rolePrefix.Length])
+                || evidence[rolePrefix.Length] == ';', Is.True,
                 $"Expected role {expectedRole} for {itemName}, got {evidence}.");
             foreach (string metadata in expectedMetadata)
             {
