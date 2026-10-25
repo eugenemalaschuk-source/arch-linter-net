@@ -480,11 +480,17 @@ class WorkflowContractTests(unittest.TestCase):
         )
         self.assertIn("solution: ArchLinterNet.slnx", config)
         self.assertIn("name: qodana.recommended", config)
-        self.assertIn("    - groupId: moderate_maintainability_findings\n      inspections:\n", config)
-        self.assertIn("\n  inspections:\n    - group: moderate_maintainability_findings\n      severity: WEAK WARNING\n", config)
-        self.assertIn("- AccessToDisposedClosure", config)
-        self.assertIn("- ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract", config)
-        self.assertIn("- UnusedTupleComponentInReturnValue", config)
+        overrides = re.findall(
+            r"(?m)^    - inspection: ([A-Za-z0-9_.]+)\n      severity: WEAK WARNING$", config
+        )
+        self.assertEqual(45, len(overrides))
+        self.assertEqual(len(overrides), len(set(overrides)))
+        self.assertIn("    - inspection: AccessToDisposedClosure\n      severity: WEAK WARNING", config)
+        self.assertIn("    - inspection: ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract\n"
+                      "      severity: WEAK WARNING", config)
+        self.assertIn("    - inspection: UnusedTupleComponentInReturnValue\n"
+                      "      severity: WEAK WARNING", config)
+        self.assertNotIn("groupId:", config)
         self.assertNotRegex(config, r"(?m)^\s+enabled:\s*false")
         for forbidden in (r"(?m)^exclude:", r"(?m)^baseline:", r"(?m)^failThreshold:",
                           r"(?m)^bootstrap:", r"(?m)^fixesStrategy:"):

@@ -4,60 +4,100 @@ version: "1.0"
 linter: jetbrains/qodana-cdnet:2026.2@sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2
 profile:
   name: qodana.recommended
-  groups:
-    - groupId: moderate_maintainability_findings
-      inspections:
-        # High-volume style and naming conventions; useful guidance, but not high-impact defects.
-        - RedundantUsingDirective
-        - RedundantNameQualifier
-        - CheckNamespace
-        - EmptyConstructor
-        - RedundantArgumentDefaultValue
-        - ConvertTypeCheckPatternToNullCheck
-        - RedundantSuppressNullableWarningExpression
-        - RedundantCast
-        - RedundantDefaultMemberInitializer
-        - RedundantSwitchExpressionArms
-        - RedundantEnumerableCastCall
-        - RedundantEmptySwitchSection
-        - RedundantNullableDirective
-        - RedundantTypeArgumentsOfMethod
-        - DuplicatedStatements
-        - WithExpressionModifiesAllMembers
-        - PartialTypeWithSinglePart
-        - ParameterHidesMember
-        - ParameterHidesPrimaryConstructorParameter
-        - VariableHidesOuterVariable
-        # Static analysis cannot see external consumers, serialization, reflection, or test fixtures.
-        - UnusedAutoPropertyAccessor.Global
-        - NotAccessedPositionalProperty.Global
-        - NotAccessedPositionalProperty.Local
-        - UnusedMember.Local
-        - UnusedAutoPropertyAccessor.Local
-        - UnusedTypeParameter
-        - UnusedParameter.Local
-        - ValueParameterNotUsed
-        - UnusedVariable
-        - UnusedTupleComponentInReturnValue
-        - UnusedMethodReturnValue.Local
-        - CollectionNeverUpdated.Global
-        - CollectionNeverUpdated.Local
-        - CollectionNeverQueried.Global
-        - CollectionNeverQueried.Local
-        - NotAccessedField.Local
-        - ParameterOnlyUsedForPreconditionCheck.Local
-        # Runtime JSON can violate nullable annotations; NUnit executes these assertion delegates in scope.
-        - ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-        - NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
-        - ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
-        - ConstantNullCoalescingCondition
-        - AccessToDisposedClosure
-        - AccessToModifiedClosure
-        # These inspections describe defensive or naming choices, not demonstrated incorrect behavior.
-        - VariableCanBeNotNullable
-        - MemberHidesStaticFromOuterClass
   inspections:
-    - group: moderate_maintainability_findings
+    # Low-risk style and naming findings stay visible at Moderate severity.
+    - inspection: RedundantUsingDirective
+      severity: WEAK WARNING
+    - inspection: RedundantNameQualifier
+      severity: WEAK WARNING
+    - inspection: CheckNamespace
+      severity: WEAK WARNING
+    - inspection: EmptyConstructor
+      severity: WEAK WARNING
+    - inspection: RedundantArgumentDefaultValue
+      severity: WEAK WARNING
+    - inspection: ConvertTypeCheckPatternToNullCheck
+      severity: WEAK WARNING
+    - inspection: RedundantSuppressNullableWarningExpression
+      severity: WEAK WARNING
+    - inspection: RedundantCast
+      severity: WEAK WARNING
+    - inspection: RedundantDefaultMemberInitializer
+      severity: WEAK WARNING
+    - inspection: RedundantSwitchExpressionArms
+      severity: WEAK WARNING
+    - inspection: RedundantEnumerableCastCall
+      severity: WEAK WARNING
+    - inspection: RedundantEmptySwitchSection
+      severity: WEAK WARNING
+    - inspection: RedundantNullableDirective
+      severity: WEAK WARNING
+    - inspection: RedundantTypeArgumentsOfMethod
+      severity: WEAK WARNING
+    - inspection: DuplicatedStatements
+      severity: WEAK WARNING
+    - inspection: WithExpressionModifiesAllMembers
+      severity: WEAK WARNING
+    - inspection: PartialTypeWithSinglePart
+      severity: WEAK WARNING
+    - inspection: ParameterHidesMember
+      severity: WEAK WARNING
+    - inspection: ParameterHidesPrimaryConstructorParameter
+      severity: WEAK WARNING
+    - inspection: VariableHidesOuterVariable
+      severity: WEAK WARNING
+    # Static analysis cannot see external consumers, serialization, reflection, or test fixtures.
+    - inspection: UnusedAutoPropertyAccessor.Global
+      severity: WEAK WARNING
+    - inspection: NotAccessedPositionalProperty.Global
+      severity: WEAK WARNING
+    - inspection: NotAccessedPositionalProperty.Local
+      severity: WEAK WARNING
+    - inspection: UnusedMember.Local
+      severity: WEAK WARNING
+    - inspection: UnusedAutoPropertyAccessor.Local
+      severity: WEAK WARNING
+    - inspection: UnusedTypeParameter
+      severity: WEAK WARNING
+    - inspection: UnusedParameter.Local
+      severity: WEAK WARNING
+    - inspection: ValueParameterNotUsed
+      severity: WEAK WARNING
+    - inspection: UnusedVariable
+      severity: WEAK WARNING
+    - inspection: UnusedTupleComponentInReturnValue
+      severity: WEAK WARNING
+    - inspection: UnusedMethodReturnValue.Local
+      severity: WEAK WARNING
+    - inspection: CollectionNeverUpdated.Global
+      severity: WEAK WARNING
+    - inspection: CollectionNeverUpdated.Local
+      severity: WEAK WARNING
+    - inspection: CollectionNeverQueried.Global
+      severity: WEAK WARNING
+    - inspection: CollectionNeverQueried.Local
+      severity: WEAK WARNING
+    - inspection: NotAccessedField.Local
+      severity: WEAK WARNING
+    - inspection: ParameterOnlyUsedForPreconditionCheck.Local
+      severity: WEAK WARNING
+    # External JSON payloads can violate nullable annotations. NUnit runs these assertion delegates in scope.
+    - inspection: ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+      severity: WEAK WARNING
+    - inspection: NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
+      severity: WEAK WARNING
+    - inspection: ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
+      severity: WEAK WARNING
+    - inspection: ConstantNullCoalescingCondition
+      severity: WEAK WARNING
+    - inspection: AccessToDisposedClosure
+      severity: WEAK WARNING
+    - inspection: AccessToModifiedClosure
+      severity: WEAK WARNING
+    # These inspections describe defensive or naming choices, not demonstrated incorrect behavior.
+    - inspection: VariableCanBeNotNullable
+      severity: WEAK WARNING
+    - inspection: MemberHidesStaticFromOuterClass
       severity: WEAK WARNING
 dotnet:
   solution: ArchLinterNet.slnx
