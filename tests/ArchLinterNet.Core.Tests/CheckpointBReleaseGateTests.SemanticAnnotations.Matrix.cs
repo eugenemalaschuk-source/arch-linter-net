@@ -110,6 +110,79 @@ public sealed partial class CheckpointBReleaseGateTests
             }
         }
 
+        private static string[] CanonicalAnnotationDiagnosticFactKeys(
+            JsonElement diagnostics,
+            string subjectProperty,
+            string codeProperty,
+            string evidenceProperty) => diagnostics.EnumerateArray()
+                .Select(diagnostic => CanonicalAnnotationDiagnosticFactKey(
+                    diagnostic.GetProperty(subjectProperty).GetString()!,
+                    diagnostic.GetProperty(codeProperty).GetString()!,
+                    diagnostic.GetProperty(evidenceProperty).EnumerateArray()
+                        .Select(evidence => evidence.GetString()!).ToArray()))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+        private static string[] SarifCanonicalAnnotationDiagnosticFactKeys(JsonElement results) => results
+            .EnumerateArray()
+            .Where(result => result.TryGetProperty("properties", out JsonElement properties)
+                && properties.TryGetProperty("category", out JsonElement category)
+                && category.GetString() == "canonical-annotation")
+            .Select(result =>
+            {
+                JsonElement properties = result.GetProperty("properties");
+                return CanonicalAnnotationDiagnosticFactKey(
+                    properties.GetProperty("subject").GetString()!,
+                    properties.GetProperty("diagnosticCode").GetString()!,
+                    properties.GetProperty("evidenceSources").EnumerateArray()
+                        .Select(evidence => evidence.GetString()!).ToArray());
+            })
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        private static string CanonicalAnnotationDiagnosticFactKey(
+            string subject,
+            string code,
+            IEnumerable<string> evidenceSources) => JsonSerializer.Serialize(new
+            {
+                subject,
+                code,
+                evidence_sources = evidenceSources.Order(StringComparer.Ordinal).ToArray()
+            });
+
+        private static void AssertCanonicalAnnotationFactsEqual(
+            string[] expected,
+            string[] actual,
+            string message) => Assert.That(actual, Is.EqualTo(expected), message);
+
+        private static string CanonicalAnnotationCoverageDiagnosticLine(JsonElement diagnostic)
+        {
+            string code = diagnostic.GetProperty("Code").GetString()!;
+            string subject = diagnostic.GetProperty("Subject").GetString()!;
+            string message = diagnostic.GetProperty("Message").GetString()!;
+            string[] evidence = diagnostic.GetProperty("EvidenceSources").EnumerateArray()
+                .Select(item => item.GetString()!).Order(StringComparer.Ordinal).ToArray();
+            string evidenceText = evidence.Length == 0
+                ? string.Empty
+                : $" (evidence: `{string.Join("`, `", evidence)}`)";
+            return $"- **`{code}`** `{subject}` — {message}{evidenceText}";
+        }
+
+        private static string[] SemanticCoverageFactKeys(
+            JsonElement summary,
+            string coveredItemsProperty,
+            string uncoveredItemsProperty,
+            string itemProperty,
+            string evidenceProperty) => new[] { coveredItemsProperty, uncoveredItemsProperty }
+                .SelectMany(property => summary.GetProperty(property).EnumerateArray())
+                .Select(item => JsonSerializer.Serialize(new
+                {
+                    item = item.GetProperty(itemProperty).GetString(),
+                    evidence = item.GetProperty(evidenceProperty).GetString()
+                }))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
         private static void AssertSemanticRoleFact(
             JsonElement summary,
             string itemName,

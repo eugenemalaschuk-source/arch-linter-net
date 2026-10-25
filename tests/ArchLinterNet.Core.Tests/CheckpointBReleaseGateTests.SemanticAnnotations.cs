@@ -180,6 +180,7 @@ public sealed partial class CheckpointBReleaseGateTests
             File.WriteAllText(Path.Combine(consumerDirectory, "Program.cs"), """
                 using System.Text.Json;
                 using System.Reflection;
+                using ArchLinterNet.Core.Model;
                 using ArchLinterNet.Testing;
 
                 ArchitectureValidationResult result = new ArchitectureValidationBuilder(args[0])
@@ -188,8 +189,16 @@ public sealed partial class CheckpointBReleaseGateTests
                 {
                     result.Passed,
                     violations = result.Violations.Select(item => item.ContractId).ToArray(),
+                    canonical_identities = result.Violations
+                        .SelectMany(violation => violation.Identities.Count > 0
+                            ? violation.Identities
+                            : violation.Identity is { } identity ? [identity] : Array.Empty<ArchitectureViolationIdentity>())
+                        .Select(ArchitectureViolationIdentityJson.Serialize)
+                        .OrderBy(identity => identity, StringComparer.Ordinal)
+                        .ToArray(),
                     canonical_diagnostics = result.CanonicalAnnotationDiagnostics.Select(item => new
                     {
+                        item.Subject,
                         item.Code,
                         item.Message,
                         item.EvidenceSources
@@ -417,6 +426,13 @@ public sealed partial class CheckpointBReleaseGateTests
                 .EnumerateArray().Select(item => item.GetString()!).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
             JsonElement semanticCoverage = testingDocument.RootElement.GetProperty("coverage").EnumerateArray()
                 .Single(item => item.GetProperty("ContractId").GetString() == "semantic-entity-coverage");
+            JsonElement cliCoverage = FindJsonProperty(cliDocument.RootElement, "coverage_summary");
+            JsonElement cliSemanticCoverage = cliCoverage.EnumerateArray()
+                .Single(item => item.GetProperty("contract_id").GetString() == "semantic-entity-coverage");
+            string[] testingCoverageRoleFacts = SemanticCoverageFactKeys(
+                semanticCoverage, "CoveredItems", "UncoveredItems", "Item", "Evidence");
+            string[] cliCoverageRoleFacts = SemanticCoverageFactKeys(
+                cliSemanticCoverage, "covered_items", "uncovered_items", "item", "evidence");
             bool contextOnlyRemainsUnclassified = semanticCoverage.GetProperty("UncoveredItems").EnumerateArray()
                 .Any(item => item.GetProperty("Item").GetString() == "SemanticConsumer.Domain.Sales.ContextOnlySubject"
                     && item.GetProperty("Evidence").GetString() == "unclassified semantic fact");
@@ -432,11 +448,43 @@ public sealed partial class CheckpointBReleaseGateTests
                 .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
             string[] cliDiagnosticCodes = CollectJsonStrings(cliCanonicalDiagnostics, "code")
                 .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+            string[] testingCanonicalIdentities = testingDocument.RootElement.GetProperty("canonical_identities")
+                .EnumerateArray().Select(identity => identity.GetString()!).Order(StringComparer.Ordinal).ToArray();
+            string[] cliCanonicalIdentities = CollectJsonStrings(cliViolations, "canonical_identity")
+                .Order(StringComparer.Ordinal).ToArray();
+            using JsonDocument sarifDocument = JsonDocument.Parse(sarif.StandardOutput);
+            JsonElement sarifResults = sarifDocument.RootElement.GetProperty("runs")[0].GetProperty("results");
+            string[] sarifCanonicalIdentities = CollectJsonStrings(sarifResults, "canonical_identity")
+                .Order(StringComparer.Ordinal).ToArray();
+            string[] testingCanonicalDiagnosticFacts = CanonicalAnnotationDiagnosticFactKeys(
+                testingDocument.RootElement.GetProperty("canonical_diagnostics"), "Subject", "Code", "EvidenceSources");
+            string[] cliCanonicalDiagnosticFacts = CanonicalAnnotationDiagnosticFactKeys(
+                cliCanonicalDiagnostics, "subject", "code", "evidence_sources");
+            string[] sarifCanonicalDiagnosticFacts = SarifCanonicalAnnotationDiagnosticFactKeys(sarifResults);
+            string[] expectedCanonicalDiagnosticFacts = new[]
+            {
+                CanonicalAnnotationDiagnosticFactKey(
+                    "SemanticConsumer.Domain.Sales.ConflictingSubject", "CanonicalRoleConflict",
+                    ["ArchLinterNet.Annotations.AggregateRootAttribute", "ArchLinterNet.Annotations.EntityAttribute"]),
+                CanonicalAnnotationDiagnosticFactKey(
+                    "SemanticConsumer.Domain.Sales.ReversedConflictingSubject", "CanonicalRoleConflict",
+                    ["ArchLinterNet.Annotations.AggregateRootAttribute", "ArchLinterNet.Annotations.EntityAttribute"]),
+                CanonicalAnnotationDiagnosticFactKey(
+                    "SemanticConsumer.Domain.Sales.UnsupportedMarkerSubject", "UnknownReservedAnnotation",
+                    ["ArchLinterNet.Annotations.FutureUnsupportedRoleAttribute"])
+            }.Order(StringComparer.Ordinal).ToArray();
+            string[] expectedHumanDiagnosticLines = testingDocument.RootElement.GetProperty("canonical_diagnostics")
+                .EnumerateArray()
+                .Select(diagnostic => $"{diagnostic.GetProperty("Code").GetString()}: {diagnostic.GetProperty("Subject").GetString()}: {diagnostic.GetProperty("Message").GetString()}")
+                .ToArray();
+            string[] expectedCoverageDiagnosticLines = testingDocument.RootElement.GetProperty("canonical_diagnostics")
+                .EnumerateArray().Select(CanonicalAnnotationCoverageDiagnosticLine).ToArray();
             using ZipArchive testingPackage = ZipFile.OpenRead(PackagePath("ArchLinterNet.Testing"));
             ZipArchiveEntry packedTestingAssembly = testingPackage.Entries.Single(entry =>
                 entry.FullName.EndsWith("/ArchLinterNet.Testing.dll", StringComparison.OrdinalIgnoreCase));
             using Stream packedAssembly = packedTestingAssembly.Open();
             string packedTestingHash = Convert.ToHexStringLower(SHA256.HashData(packedAssembly));
+            string coverageMarkdown = File.ReadAllText(coverageMarkdownPath);
 
             Assert.Multiple(() =>
             {
@@ -448,13 +496,41 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(json.StandardOutput, Does.Contain("sales-no-inventory"));
                 Assert.That(cliContractIds, Is.EqualTo(testingContractIds), "Packed CLI and Testing must project the same contract violations.");
                 Assert.That(cliDiagnosticCodes, Is.EqualTo(testingDiagnosticCodes), "Packed CLI and Testing must project the same canonical diagnostic codes.");
+                Assert.That(testingCanonicalDiagnosticFacts, Is.EqualTo(expectedCanonicalDiagnosticFacts),
+                    "The packed consumer must retain every expected canonical diagnostic subject, code, and evidence set.");
+                Assert.That(cliCanonicalDiagnosticFacts, Is.EqualTo(testingCanonicalDiagnosticFacts),
+                    "Packed CLI JSON and Testing must project the same canonical diagnostic subjects, codes, and evidence.");
+                Assert.That(sarifCanonicalDiagnosticFacts, Is.EqualTo(testingCanonicalDiagnosticFacts),
+                    "Packed CLI SARIF and Testing must project the same canonical diagnostic subjects, codes, and evidence.");
+                Assert.That(cliCanonicalIdentities, Is.Not.Empty, "Packed CLI JSON must expose canonical finding identities.");
+                Assert.That(cliCanonicalIdentities, Is.EqualTo(testingCanonicalIdentities),
+                    "Packed CLI JSON and Testing must project the same canonical finding identities.");
+                Assert.That(sarifCanonicalIdentities, Is.EqualTo(testingCanonicalIdentities),
+                    "Packed CLI SARIF and Testing must project the same canonical finding identities.");
+                Assert.That(cliCoverageRoleFacts, Is.EqualTo(testingCoverageRoleFacts),
+                    "Packed CLI JSON and Testing must project the same semantic-role coverage facts.");
+                string missingDiagnosticFact = CanonicalAnnotationDiagnosticFactKey(
+                    "SemanticConsumer.Domain.Sales.ReversedConflictingSubject", "CanonicalRoleConflict",
+                    ["ArchLinterNet.Annotations.AggregateRootAttribute", "ArchLinterNet.Annotations.EntityAttribute"]);
+                Assert.Throws<AssertionException>(() => AssertCanonicalAnnotationFactsEqual(
+                    testingCanonicalDiagnosticFacts,
+                    testingCanonicalDiagnosticFacts.Where(fact => fact != missingDiagnosticFact).ToArray(),
+                    "Negative control with one conflicting subject dropped"));
                 Assert.That(sarif.ExitCode, Is.EqualTo(1), sarif.CombinedOutput);
                 Assert.That(sarif.StandardOutput, Does.Contain("sales-no-inventory"));
                 Assert.That(sarif.StandardOutput, Does.Contain("application-assembly-must-not-reference-domain-assembly"));
                 Assert.That(sarif.StandardOutput, Does.Contain("CanonicalRoleConflict"));
                 Assert.That(coverageReport.ExitCode, Is.EqualTo(0), coverageReport.CombinedOutput);
-                Assert.That(File.ReadAllText(coverageMarkdownPath), Does.Contain("semantic-entity-coverage"));
-                Assert.That(File.ReadAllText(coverageMarkdownPath), Does.Contain("SemanticConsumer.Domain.Sales.Order"));
+                Assert.That(coverageMarkdown, Does.Contain("semantic-entity-coverage"));
+                Assert.That(coverageMarkdown, Does.Contain("SemanticConsumer.Domain.Sales.Order"));
+                foreach (string diagnosticLine in expectedHumanDiagnosticLines)
+                {
+                    Assert.That(human.StandardOutput, Does.Contain(diagnosticLine), diagnosticLine);
+                }
+                foreach (string diagnosticLine in expectedCoverageDiagnosticLines)
+                {
+                    Assert.That(coverageMarkdown, Does.Contain(diagnosticLine), diagnosticLine);
+                }
                 Assert.That(testing.ExitCode, Is.EqualTo(0), testing.CombinedOutput);
                 Assert.That(testing.StandardOutput, Does.Contain("sales-no-inventory"));
                 Assert.That(testing.StandardOutput, Does.Contain("application-assembly-must-not-reference-domain-assembly"));
@@ -507,6 +583,8 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(explain.ExitCode, Is.EqualTo(0), explain.CombinedOutput);
                 Assert.That(explain.CombinedOutput, Does.Contain("Modular.Application"));
                 Assert.That(explain.CombinedOutput, Does.Contain("Modular.Domain"));
+                Assert.That(explain.CombinedOutput, Does.Contain("application-assembly-must-not-reference-domain-assembly"),
+                    "Explain must retain the contract identity for the annotation-backed Application-to-Domain dependency.");
                 Assert.That(testingAssembly.Contains(_repositoryRoot, StringComparison.OrdinalIgnoreCase), Is.False);
                 Assert.That(testingAssemblyHash, Is.EqualTo(packedTestingHash));
                 Assert.That(testing.StandardOutput, Does.Not.Contain("successful"));
