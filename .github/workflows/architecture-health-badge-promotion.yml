@@ -163,7 +163,7 @@ jobs:
       - name: Setup .NET for trusted bootstrap setup
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
       - name: Install exact bootstrap CLI
         shell: bash
         env:
@@ -345,7 +345,7 @@ jobs:
       - name: Set up .NET for trusted temporal revalidation
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
       - name: Run pinned trusted promotion contract
         id: promotion
         uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@79a84e1dc03e9fc38b773c75f8f6be7a6495d79b
