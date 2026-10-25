@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".github" / "workflows"
 STAGE_B_ACTION_REF = (
     "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion"
-    "@d73a8c46156b514ca0df54083d793e0e9fdf7928"
+    "@591a3834fd36496ff2c83872519cd60e386bd490"
 )
 
 

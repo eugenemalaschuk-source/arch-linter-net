@@ -1085,6 +1085,11 @@ jobs:
       - name: Test test-coverage badge Markdown generator
         run: make test-coverage-badge-script
 
+      - name: Shut down .NET build servers
+        if: always()
+        run: dotnet build-server shutdown
+        continue-on-error: true
+
   unit_tests:
     name: Unit Test Suite (${{ matrix.name }})
     if: github.event_name == 'pull_request'
@@ -1183,7 +1188,8 @@ jobs:
       contents: read
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
-      CHECKPOINT_B_CANDIDATE_VERSION: 0.6.1-ci.${{ github.run_id }}
+      # Validate the final v0.10.0 inventory, including the source-only annotation package.
+      CHECKPOINT_B_CANDIDATE_VERSION: 0.10.0
 
     steps:
       - name: Checkout
@@ -1328,7 +1334,7 @@ jobs:
       contents: read
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
-      CHECKPOINT_B_CANDIDATE_VERSION: 0.6.1-ci.${{ github.run_id }}
+      CHECKPOINT_B_CANDIDATE_VERSION: 0.10.0
       CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
       CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
       CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b-shard
@@ -1374,6 +1380,11 @@ jobs:
       - name: Run ${{ matrix.shard_name }} shard
         shell: bash
         run: make ${{ matrix.target }}
+
+      - name: Shut down .NET build servers
+        if: always()
+        run: dotnet build-server shutdown
+        continue-on-error: true
 
       - name: Upload shard evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -1436,7 +1447,7 @@ jobs:
       contents: read
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
-      CHECKPOINT_B_CANDIDATE_VERSION: 0.6.1-ci.${{ github.run_id }}
+      CHECKPOINT_B_CANDIDATE_VERSION: 0.10.0
       CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
       CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
       CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b-shard
@@ -1481,6 +1492,11 @@ jobs:
       - name: Run ${{ matrix.shard_name }} shard
         shell: bash
         run: make ${{ matrix.target }}
+
+      - name: Shut down .NET build servers
+        if: always()
+        run: dotnet build-server shutdown
+        continue-on-error: true
 
       - name: Upload shard evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

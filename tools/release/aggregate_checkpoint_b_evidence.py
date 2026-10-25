@@ -111,6 +111,7 @@ _V08_FULL_CYCLE_SCENARIOS = {
     "v08-unity-editor-exposure-rejection",
     "v08-unity-health-report-routing",
 }
+_SEMANTIC_ANNOTATIONS_SCENARIOS = {"semantic-annotations-packed-consumer"}
 _REQUIRED_SCENARIOS = (
     _PLATFORM_SCENARIOS
     | _CONSUMER_CLEANUP_SCENARIOS
@@ -166,6 +167,18 @@ def _read_manifest(path: Path) -> dict[str, Any]:
     return _load_candidate_manifest(path)
 
 
+def _required_scenarios(manifest: dict[str, Any]) -> set[str]:
+    """Derive the required scenario inventory from the immutable package subjects."""
+    package_ids = {
+        package.get("id")
+        for package in manifest.get("packages", [])
+        if isinstance(package, dict)
+    }
+    if "ArchLinterNet.Annotations" in package_ids:
+        return _REQUIRED_SCENARIOS | _SEMANTIC_ANNOTATIONS_SCENARIOS
+    return _REQUIRED_SCENARIOS
+
+
 def _read_policy_shape(path: Path, record: dict[str, Any]) -> dict[str, Any]:
     shape = record.get("policy_shape")
     if not isinstance(shape, dict) or set(shape) != _POLICY_SHAPE_FIELDS:
@@ -177,6 +190,7 @@ def _read_policy_shape(path: Path, record: dict[str, Any]) -> dict[str, Any]:
 
 def _read_records(input_directory: Path, manifest: dict[str, Any], manifest_digest: str) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
+    required_scenarios = _required_scenarios(manifest)
     for path in sorted(input_directory.rglob("*.json")):
         record = _load_json(path, "platform evidence")
         if record.get("schema") != _EVIDENCE_SCHEMA:
@@ -194,10 +208,10 @@ def _read_records(input_directory: Path, manifest: dict[str, Any], manifest_dige
         if record.get("packages") != manifest["packages"]:
             raise ValueError(f"{path} package inventory differs from the candidate manifest.")
         scenarios = record.get("scenarios")
-        if not isinstance(scenarios, list) or len(scenarios) != len(_REQUIRED_SCENARIOS):
+        if not isinstance(scenarios, list) or len(scenarios) != len(required_scenarios):
             raise ValueError(f"{path} has an incomplete scenario inventory.")
         scenario_ids = [scenario.get("id") for scenario in scenarios if isinstance(scenario, dict)]
-        if len(scenario_ids) != len(scenarios) or set(scenario_ids) != _REQUIRED_SCENARIOS:
+        if len(scenario_ids) != len(scenarios) or set(scenario_ids) != required_scenarios:
             raise ValueError(f"{path} has missing, unexpected, or duplicate scenario IDs.")
         for scenario in scenarios:
             if not isinstance(scenario, dict) or scenario.get("result") not in _SCENARIO_RESULTS:
@@ -235,8 +249,11 @@ def _validate_platforms(records: list[dict[str, Any]]) -> None:
             raise ValueError(f"{platform} evidence reports a wrong shell adapter.")
 
 
-def _failed_scenarios(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Every scenario that failed anywhere, plus every scenario no platform ever passed."""
+def _failed_scenarios(
+    records: list[dict[str, Any]],
+    required_scenarios: set[str],
+) -> list[dict[str, Any]]:
+    """Return failures, requiring the annotation consumer to pass on every platform."""
     failures: dict[str, dict[str, Any]] = {}
     for record in records:
         for scenario in record["scenarios"]:
@@ -246,8 +263,37 @@ def _failed_scenarios(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "platform_id": record["platform_id"],
                     "reason": scenario["reason"],
                 })
-    for scenario_id in sorted(_REQUIRED_SCENARIOS):
+    for scenario_id in sorted(required_scenarios):
         if scenario_id in failures:
+            continue
+        if scenario_id in _SEMANTIC_ANNOTATIONS_SCENARIOS:
+            records_by_platform = {record["platform_id"]: record for record in records}
+            for platform_id in _REQUIRED_PLATFORMS:
+                record = records_by_platform.get(platform_id)
+                scenario = next(
+                    (item for item in record["scenarios"] if item["id"] == scenario_id),
+                    None,
+                ) if record is not None else None
+                if scenario is None:
+                    reason = (
+                        "Required scenario must pass on every required platform; "
+                        f"{platform_id} did not report the scenario."
+                    )
+                elif scenario["result"] != "passed":
+                    detail = scenario.get("reason")
+                    suffix = f": {detail}" if detail else "."
+                    reason = (
+                        "Required scenario must pass on every required platform; "
+                        f"{platform_id} reported {scenario['result']}{suffix}"
+                    )
+                else:
+                    continue
+                failures[scenario_id] = {
+                    "id": scenario_id,
+                    "platform_id": platform_id,
+                    "reason": reason,
+                }
+                break
             continue
         if not any(
             scenario["id"] == scenario_id and scenario["result"] == "passed"
@@ -483,13 +529,28 @@ def _summary(
     manifest_digest: str,
 ) -> dict[str, Any]:
     _validate_platforms(records)
-    failures = _failed_scenarios(records)
+    required_scenarios = _required_scenarios(manifest)
+    failures = _failed_scenarios(records, required_scenarios)
     defects = _policy_shape_defects(records)
     is_publication_candidate = scope["schema"] == _RELEASE_SCOPE_SCHEMA
     open_scope = _release_scope_defects(scope) if is_publication_candidate else []
     version = manifest["version"]
     passed = not failures and not defects and not open_scope
     authorization = _authorization(version, passed, is_publication_candidate)
+    annotation_gate = None
+    if "ArchLinterNet.Annotations" in {
+        package.get("id") for package in manifest.get("packages", []) if isinstance(package, dict)
+    }:
+        annotation_gate = [
+            {
+                "platform_id": record["platform_id"],
+                **next(
+                    scenario for scenario in record["scenarios"]
+                    if scenario["id"] == "semantic-annotations-packed-consumer"
+                ),
+            }
+            for record in records
+        ]
     return {
         "schema": "checkpoint-b-release-evidence/v1" if is_publication_candidate
         else "checkpoint-b-prepublication-evidence/v1",
@@ -502,7 +563,8 @@ def _summary(
         "candidate_manifest_sha256": manifest_digest,
         "synthetic_identities_only": True,
         "packages": manifest["packages"],
-        "required_scenarios": sorted(_REQUIRED_SCENARIOS),
+        "required_scenarios": sorted(required_scenarios),
+        "semantic_annotation_gate": annotation_gate,
         "consumer_cleanup_scenarios": sorted(_CONSUMER_CLEANUP_SCENARIOS),
         "failed_scenarios": failures,
         "policy_shape_defects": defects,
@@ -575,6 +637,20 @@ def _markdown(summary: dict[str, Any]) -> str:
         "",
     ] if summary["policy_shape_defects"] else []
     scope_section = _scope_section(summary["candidate_authorization"])
+    annotation_gate = summary.get("semantic_annotation_gate")
+    annotation_section = []
+    if annotation_gate is not None:
+        annotation_section = [
+            "## Semantic annotation packed-consumer gate",
+            "",
+            "| Platform | Result | Reason |",
+            "| --- | --- | --- |",
+            *[
+                f"| {item['platform_id']} | {item['result']} | {item.get('reason') or ''} |"
+                for item in sorted(annotation_gate, key=lambda value: value["platform_id"])
+            ],
+            "",
+        ]
     return "\n".join([
         "# Packed-artifact release evidence",
         "",
@@ -598,6 +674,7 @@ def _markdown(summary: dict[str, Any]) -> str:
         "",
         *failure_section,
         *defect_section,
+        *annotation_section,
         *scope_section,
         "| Platform | Runtime | Shell | Result |",
         "| --- | --- | --- | --- |",

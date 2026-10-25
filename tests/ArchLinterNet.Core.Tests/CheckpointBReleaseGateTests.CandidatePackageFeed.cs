@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
@@ -26,6 +27,7 @@ public sealed partial class CheckpointBReleaseGateTests
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
 
         private CandidatePackageFeed(string root, string candidateVersion, string repositoryRoot, string feed,
@@ -73,22 +75,47 @@ public sealed partial class CheckpointBReleaseGateTests
             string[] packagePaths = Directory.GetFiles(_feed, "*.nupkg")
                 .OrderBy(static path => path, StringComparer.Ordinal)
                 .ToArray();
-            Assert.That(packagePaths, Has.Length.EqualTo(4));
+            Assert.That(packagePaths, Has.Length.EqualTo(_packages.Count));
 
-            foreach (string packageId in _packageIds)
+            foreach (PackagePairEvidence packageEvidence in _packages)
             {
+                string packageId = packageEvidence.Id;
                 string packagePath = PackagePath(packageId);
                 using ZipArchive package = ZipFile.OpenRead(packagePath);
                 string nuspec = ReadEntry(package, $"{packageId}.nuspec");
                 Assert.Multiple(() =>
                 {
-                    Assert.That(nuspec, Does.Contain($"<id>{packageId}</id>"));
-                    Assert.That(nuspec, Does.Contain($"<version>{_candidateVersion}</version>"));
-                    Assert.That(Sha256(packagePath), Has.Length.EqualTo(64));
+                    Assert.That(nuspec, Does.Contain($"<id>{packageId}</id>"), packageId);
+                    Assert.That(nuspec, Does.Contain($"<version>{packageEvidence.Version}</version>"), packageId);
+                    Assert.That(Sha256(packagePath), Is.EqualTo(packageEvidence.Package.Sha256), packageId);
                 });
+
+                if (packageEvidence.Symbols is PackageSubjectEvidence symbols)
+                {
+                    string symbolsPath = Path.Combine(_feed, symbols.File);
+                    Assert.Multiple(() =>
+                    {
+                        Assert.That(File.Exists(symbolsPath), Is.True, symbols.File);
+                        Assert.That(new FileInfo(symbolsPath).Length, Is.EqualTo(symbols.Size), symbols.File);
+                        Assert.That(Sha256(symbolsPath), Is.EqualTo(symbols.Sha256), symbols.File);
+                    });
+                }
             }
 
-            Assert.That(_packages.Select(package => package.Id), Is.EqualTo(_packageIds));
+            string[] expectedPackageIds = ExpectedPackageIds(_candidateVersion);
+            Assert.That(_packages.Select(package => package.Id), Is.EqualTo(expectedPackageIds));
+            Assert.That(packagePaths.Select(path => Path.GetFileName(path)),
+                Is.EquivalentTo(_packages.Select(package => package.Package.File)));
+            Assert.That(Directory.GetFiles(_feed, "*.snupkg").Select(static path => Path.GetFileName(path)),
+                Is.EquivalentTo(_packages
+                    .Where(package => package.Symbols is not null)
+                    .Select(package => package.Symbols!.File)),
+                "The immutable feed symbol inventory must exactly match the manifest, including the annotation package's package-only shape.");
+
+            if (HasPackage(AnnotationsPackageId))
+            {
+                AssertPackedAnnotationsPackage(PackagePath(AnnotationsPackageId), _candidateVersion);
+            }
 
             using ZipArchive core = ZipFile.OpenRead(PackagePath("ArchLinterNet.Core"));
             Assert.That(ReadEntry(core, "ArchLinterNet.Core.nuspec"), Does.Contain("ArchLinterNet.CEL"));
@@ -128,6 +155,9 @@ public sealed partial class CheckpointBReleaseGateTests
 
             return Passed("packed-package-provenance");
         }
+
+        public bool HasPackage(string packageId) =>
+            _packages.Any(package => string.Equals(package.Id, packageId, StringComparison.Ordinal));
 
         public void InstallTool()
         {
@@ -694,71 +724,6 @@ public sealed partial class CheckpointBReleaseGateTests
             Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
         }
 
-        private static (IReadOnlyList<PackagePairEvidence> Packages, string ManifestSha256) LoadManifest(
-            string feed, string candidateVersion, bool createdLocally)
-        {
-            string? manifestPath = Environment.GetEnvironmentVariable("CHECKPOINT_B_PACKAGE_MANIFEST");
-            if (!createdLocally && string.IsNullOrWhiteSpace(manifestPath))
-            {
-                throw new InvalidOperationException("Checkpoint B requires CHECKPOINT_B_PACKAGE_MANIFEST for supplied packages.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(manifestPath))
-            {
-                string path = Path.GetFullPath(manifestPath);
-                using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
-                JsonElement root = document.RootElement;
-                Assert.That(root.GetProperty("schema").GetString(), Is.EqualTo("checkpoint-b-candidate-manifest/v2"));
-                Assert.That(root.GetProperty("version").GetString(), Is.EqualTo(candidateVersion));
-                PackagePairEvidence[] packages = root.GetProperty("packages").EnumerateArray()
-                    .Select(package => new PackagePairEvidence(
-                        package.GetProperty("id").GetString()!,
-                        package.GetProperty("version").GetString()!,
-                        ReadSubject(package.GetProperty("package")),
-                        ReadSubject(package.GetProperty("symbols"))))
-                    .ToArray();
-                foreach (PackagePairEvidence package in packages)
-                {
-                    foreach (PackageSubjectEvidence subject in new[] { package.Package, package.Symbols })
-                    {
-                        string packagePath = Path.Combine(feed, subject.File);
-                        Assert.Multiple(() =>
-                        {
-                            Assert.That(new FileInfo(packagePath).Length, Is.EqualTo(subject.Size), subject.File);
-                            Assert.That(Sha256(packagePath), Is.EqualTo(subject.Sha256), subject.File);
-                        });
-                    }
-                }
-
-                return (packages, Sha256(path));
-            }
-
-            PackagePairEvidence[] localPackages = _packageIds.Select(packageId =>
-            {
-                string packagePath = Path.Combine(feed, $"{packageId}.{candidateVersion}.nupkg");
-                string symbolsPath = Path.Combine(feed, $"{packageId}.{candidateVersion}.snupkg");
-                return new PackagePairEvidence(
-                    packageId,
-                    candidateVersion,
-                    CreateSubject("package", packagePath),
-                    CreateSubject("symbols", symbolsPath));
-            }).ToArray();
-            string localManifest = JsonSerializer.Serialize(localPackages);
-            return (localPackages, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(localManifest))));
-        }
-
-        private static PackageSubjectEvidence ReadSubject(JsonElement subject) => new(
-            subject.GetProperty("kind").GetString()!,
-            subject.GetProperty("file").GetString()!,
-            subject.GetProperty("size").GetInt64(),
-            subject.GetProperty("sha256").GetString()!);
-
-        private static PackageSubjectEvidence CreateSubject(string kind, string path) => new(
-            kind,
-            Path.GetFileName(path),
-            new FileInfo(path).Length,
-            Sha256(path));
-
         private static string NativeShell() => OperatingSystem.IsWindows() ? "pwsh" : "bash";
 
         private static void SendTermination(int processId)
@@ -775,7 +740,7 @@ public sealed partial class CheckpointBReleaseGateTests
 
         private string PackagePath(string packageId)
         {
-            string packagePath = Path.Combine(_feed, $"{packageId}.{_candidateVersion}.nupkg");
+            string packagePath = Path.Combine(_feed, $"{packageId}.{NormalizedPackageVersion(_candidateVersion)}.nupkg");
             Assert.That(File.Exists(packagePath), Is.True, packagePath);
             return packagePath;
         }
