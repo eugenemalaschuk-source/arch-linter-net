@@ -176,7 +176,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
         return GetUsageHint(parseResult.CommandResult.Command.Name);
     }
 
-    private static string? GetUsageHint(string commandName)
+    private static string GetUsageHint(string commandName)
     {
         return commandName switch
         {

@@ -5,7 +5,7 @@ namespace ArchLinterNet.Core.IO.Abstractions;
 /// </summary>
 /// <remarks>
 /// Implementations are a trusted host capability. They must atomically resolve
-/// <paramref name="repositoryRelativePath"/> beneath <paramref name="repositoryRoot"/>, reject
+/// <c>repositoryRelativePath</c> beneath <c>repositoryRoot</c>, reject
 /// redirects and non-regular files, and return the artifact's exact bytes.
 /// </remarks>
 public interface IArchitectureEvidenceFileSystem

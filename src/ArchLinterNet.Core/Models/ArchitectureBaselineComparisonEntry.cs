@@ -2,12 +2,12 @@ namespace ArchLinterNet.Core.Model;
 
 /// <summary>
 /// One baseline entry (or one current violation candidate) as seen by baseline comparison.
-/// <paramref name="Issue"/> is informational tracking metadata carried verbatim through update,
+/// <c>Issue</c> is informational tracking metadata carried verbatim through update,
 /// prune, and migrate; it never participates in identity, matching, or deduplication.
-/// <paramref name="CurrentForbiddenReference"/> is set only for entries whose identity matched a
+/// <c>CurrentForbiddenReference</c> is set only for entries whose identity matched a
 /// live candidate, and records the display text that candidate produces now — that is what lets a
 /// write report an entry as <see cref="BaselineEntryLifecycle.Changed"/> rather than
-/// <see cref="BaselineEntryLifecycle.Kept"/> when only the display text drifted.
+/// `Kept` when only the display text drifted.
 /// </summary>
 public sealed record ArchitectureBaselineComparisonEntry(
     string ContractGroup,

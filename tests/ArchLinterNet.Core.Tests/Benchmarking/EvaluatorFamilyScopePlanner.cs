@@ -5,7 +5,7 @@ namespace ArchLinterNet.Core.Tests;
 /// direction is sufficient for all contracts" requirement. Grounded in the actual checker
 /// implementations under <c>src/ArchLinterNet.Core/Execution/</c>, not assumed:
 /// <list type="bullet">
-/// <item><see cref="ReferenceGraphLocal"/> — <c>LayerChecker</c>, <c>ExternalDependencyChecker</c>
+/// <item><see cref="EvaluatorFamily.ReferenceGraphLocal"/> — <c>LayerChecker</c>, <c>ExternalDependencyChecker</c>
 /// (`external`/`external_allow_only`), and <c>AllowOnlyChecker</c> (`allow_only`) each scan only the
 /// changed project's own layer's own outgoing references
 /// (<c>context.FindTypesInLayer(sourceLayer)</c>). But the violation verdict for each reference is
@@ -18,7 +18,7 @@ namespace ArchLinterNet.Core.Tests;
 /// <see cref="ChangedProjectScopePlanner"/> already computes — not the changed project alone; a
 /// per-type target-fact invalidation model could narrow this further, but this evidence task does not
 /// build one.</item>
-/// <item><see cref="CyclesGlobal"/> — <c>CycleChecker</c> builds one shared inter-layer edge graph
+/// <item><see cref="EvaluatorFamily.CyclesGlobal"/> — <c>CycleChecker</c> builds one shared inter-layer edge graph
 /// across every layer named by the contract (<c>CollectCycleEdgesForLayer</c> populates one
 /// <c>state.Graph</c>) and runs global cycle detection once over it
 /// (<c>ArchitectureCycleDetector.FindCycles(state.Graph)</c>). A reference edge changed by any project
@@ -26,14 +26,14 @@ namespace ArchLinterNet.Core.Tests;
 /// safe superset — the safe bound is every project whose layer participates in the same cycle
 /// contract, which this evidence task approximates conservatively as the full project population
 /// absent a modeled layer-membership graph.</item>
-/// <item><see cref="ContractCoListing"/> — <c>PublicApiSurfaceChecker</c> only scans assemblies
+/// <item><see cref="EvaluatorFamily.ContractCoListing"/> — <c>PublicApiSurfaceChecker</c> only scans assemblies
 /// explicitly named in one contract's <c>Assemblies</c> list; a downstream consumer not co-listed in
 /// that same contract is unaffected even if it depends on the changed project through the ordinary
 /// project-reference graph. This is why <c>ChangedProjectScopePlanner</c> treats
 /// <see cref="ChangedInputKind.ApiSnapshotOrBaselineChange"/> as <see cref="ScopeDisposition.UnmappableFallback"/>
 /// rather than a reference-graph closure: the real relationship is contract membership, not
 /// reachability, and this task does not model contract-to-assemblies membership.</item>
-/// <item><see cref="AggregatedGlobalScan"/> — architecture-coverage's `project` and `assembly` scopes
+/// <item><see cref="EvaluatorFamily.AggregatedGlobalScan"/> — architecture-coverage's `project` and `assembly` scopes
 /// (<c>schema/dependencies.arch.schema.json</c> coverage `scope` enum) classify each item
 /// independently from only that item's own namespaces against policy-declared layers
 /// (<c>CheckProjectCoverageContract</c>/<c>CheckAssemblyCoverageContract</c>), and each item is by
@@ -41,9 +41,9 @@ namespace ArchLinterNet.Core.Tests;
 /// project alone. Today's execution re-scans the whole solution and returns one combined findings list
 /// regardless, which is a separate execution-model limitation this evidence task records but does not
 /// resolve. `namespace` does **not** belong in this family — see
-/// <see cref="CoverageGraphOrCatalogWide"/>.</item>
-/// <item><see cref="CoverageGraphOrCatalogWide"/> — the coverage scope enum's remaining four values do
-/// not share <see cref="AggregatedGlobalScan"/>'s per-item-local shape. `namespace`
+/// <see cref="EvaluatorFamily.CoverageGraphOrCatalogWide"/>.</item>
+/// <item><see cref="EvaluatorFamily.CoverageGraphOrCatalogWide"/> — the coverage scope enum's remaining four values do
+/// not share <see cref="EvaluatorFamily.AggregatedGlobalScan"/>'s per-item-local shape. `namespace`
 /// (<c>ArchitectureCoverageInventory.Build</c>) groups <c>session.TypeIndex.AllTypes()</c> — the
 /// *whole solution's* types — by namespace string and picks one representative type; a C# namespace is
 /// not tied to one assembly, so a shared namespace entry can legitimately span types owned by several
@@ -55,13 +55,13 @@ namespace ArchLinterNet.Core.Tests;
 /// touching either layer's namespace membership can change the result; `semantic_role`
 /// (<c>ArchitectureSemanticCoverageService.BuildSummary</c>) iterates every type from
 /// <c>TypeIndex.AllTypes()</c> and classifies each via the shared role catalog, which — like the
-/// <see cref="ReferenceGraphLocal"/> case — is not proven free of cross-project classification
+/// <see cref="EvaluatorFamily.ReferenceGraphLocal"/> case — is not proven free of cross-project classification
 /// dependencies; `rule_input` operates over contract ids from policy, not project code, so it is
 /// policy-level rather than project-scoped. This evidence task does not have a graph/catalog model
 /// precise enough to bound any of the four below the full project population.</item>
 /// </list>
 /// The detailed checker models intentionally cover a representative subset of the contract families
-/// in <c>schema/dependencies.arch.schema.json</c>. <see cref="PlanContractFamily"/> maps schema
+/// in <c>schema/dependencies.arch.schema.json</c>. <see cref="EvaluatorFamilyScopePlanner.PlanContractFamily"/> maps schema
 /// family names to these reviewed models and assigns every other family an explicit
 /// <see cref="EvaluatorFamily.UnanalyzedSafeFallback"/> over the full project population.
 /// </summary>
@@ -88,10 +88,10 @@ internal sealed record EvaluatorScope
 /// Computes the per-evaluator-family required re-evaluation scope for a set of changed projects,
 /// given both the changed projects themselves and the reference-graph transitive dependents closure
 /// <see cref="ChangedProjectScopePlanner"/> already produces. It demonstrates that no single closure
-/// model is sufficient across families: <see cref="AggregatedGlobalScan"/> needs strictly less than
-/// the dependents closure, while <see cref="CyclesGlobal"/>, <see cref="ContractCoListing"/>, and
-/// <see cref="CoverageGraphOrCatalogWide"/> need a bound the dependents closure does not safely
-/// provide at all — and, after review, <see cref="ReferenceGraphLocal"/> turned out to need the full
+/// model is sufficient across families: <see cref="EvaluatorFamily.AggregatedGlobalScan"/> needs strictly less than
+/// the dependents closure, while <see cref="EvaluatorFamily.CyclesGlobal"/>, <see cref="EvaluatorFamily.ContractCoListing"/>, and
+/// <see cref="EvaluatorFamily.CoverageGraphOrCatalogWide"/> need a bound the dependents closure does not safely
+/// provide at all — and, after review, <see cref="EvaluatorFamily.ReferenceGraphLocal"/> turned out to need the full
 /// dependents closure too, not the changed project alone as an earlier revision of this evidence
 /// claimed.
 /// </summary>

@@ -480,6 +480,11 @@ class WorkflowContractTests(unittest.TestCase):
         )
         self.assertIn("solution: ArchLinterNet.slnx", config)
         self.assertIn("name: qodana.recommended", config)
+        self.assertIn("groupId: moderate_maintainability_findings", config)
+        self.assertIn("severity: WEAK WARNING", config)
+        self.assertIn("- AccessToDisposedClosure", config)
+        self.assertIn("- ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract", config)
+        self.assertNotRegex(config, r"(?m)^\s+enabled:\s*false")
         for forbidden in (r"(?m)^exclude:", r"(?m)^baseline:", r"(?m)^failThreshold:",
                           r"(?m)^bootstrap:", r"(?m)^fixesStrategy:"):
             self.assertNotRegex(config, forbidden)

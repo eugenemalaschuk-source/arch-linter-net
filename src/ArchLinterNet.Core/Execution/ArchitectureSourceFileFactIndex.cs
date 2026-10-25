@@ -455,7 +455,7 @@ public sealed class ArchitectureSourceFileFactIndex
         return normalized.Length == 0 ? "." : normalized;
     }
 
-    private static string? GetFileNameWithoutExtension(string normalizedRelativePath)
+    private static string GetFileNameWithoutExtension(string normalizedRelativePath)
     {
         int lastSlash = normalizedRelativePath.LastIndexOf('/');
         string fileName = lastSlash >= 0

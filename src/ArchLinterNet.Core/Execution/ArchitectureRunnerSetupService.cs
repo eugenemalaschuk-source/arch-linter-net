@@ -257,7 +257,7 @@ public sealed class ArchitectureRunnerSetupService(
         }
     }
 
-    private IReadOnlyList<string>? ResolveSymbols(
+    private IReadOnlyList<string> ResolveSymbols(
         ArchitectureContractDocument document, string? conditionSetName, IReadOnlyList<string>? preprocessorSymbols)
     {
         if (preprocessorSymbols != null)

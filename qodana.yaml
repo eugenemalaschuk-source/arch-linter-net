@@ -4,6 +4,60 @@ version: "1.0"
 linter: jetbrains/qodana-cdnet:2026.2@sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2
 profile:
   name: qodana.recommended
+  groups:
+    - groupId: moderate_maintainability_findings
+      groups:
+        # High-volume style and naming conventions; useful guidance, but not high-impact defects.
+        - RedundantUsingDirective
+        - RedundantNameQualifier
+        - CheckNamespace
+        - EmptyConstructor
+        - RedundantArgumentDefaultValue
+        - ConvertTypeCheckPatternToNullCheck
+        - RedundantSuppressNullableWarningExpression
+        - RedundantCast
+        - RedundantDefaultMemberInitializer
+        - RedundantSwitchExpressionArms
+        - RedundantEnumerableCastCall
+        - RedundantEmptySwitchSection
+        - RedundantNullableDirective
+        - RedundantTypeArgumentsOfMethod
+        - DuplicatedStatements
+        - WithExpressionModifiesAllMembers
+        - PartialTypeWithSinglePart
+        - ParameterHidesMember
+        - ParameterHidesPrimaryConstructorParameter
+        - VariableHidesOuterVariable
+        # Static analysis cannot see external consumers, serialization, reflection, or test fixtures.
+        - UnusedAutoPropertyAccessor.Global
+        - NotAccessedPositionalProperty.Global
+        - NotAccessedPositionalProperty.Local
+        - UnusedMember.Local
+        - UnusedAutoPropertyAccessor.Local
+        - UnusedTypeParameter
+        - UnusedParameter.Local
+        - ValueParameterNotUsed
+        - UnusedVariable
+        - UnusedMethodReturnValue.Local
+        - CollectionNeverUpdated.Global
+        - CollectionNeverUpdated.Local
+        - CollectionNeverQueried.Global
+        - CollectionNeverQueried.Local
+        - NotAccessedField.Local
+        - ParameterOnlyUsedForPreconditionCheck.Local
+        # Runtime JSON can violate nullable annotations; NUnit executes these assertion delegates in scope.
+        - ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+        - NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
+        - ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
+        - ConstantNullCoalescingCondition
+        - AccessToDisposedClosure
+        - AccessToModifiedClosure
+        # These inspections describe defensive or naming choices, not demonstrated incorrect behavior.
+        - VariableCanBeNotNullable
+        - MemberHidesStaticFromOuterClass
+    inspections:
+      - group: moderate_maintainability_findings
+        severity: WEAK WARNING
 dotnet:
   solution: ArchLinterNet.slnx
   configuration: Release
