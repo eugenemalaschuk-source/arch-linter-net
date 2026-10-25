@@ -37,8 +37,7 @@ internal sealed class ArchitecturePublicApiSurfaceResolver(
                 .Concat(document.Contracts.AuditPublicApiSurface)
                 .Select(candidate => candidate.Id)
                 .Where(id => id != null)
-                .OrderBy(id => id, StringComparer.Ordinal)
-                .ToArray()!;
+                .OrderBy(id => id, StringComparer.Ordinal).ToArray()!;
 
             string availableText = available.Length != 0 ? string.Join(", ", available) : "(none)";
             return ArchitecturePublicApiSurfaceResolution.Failed(

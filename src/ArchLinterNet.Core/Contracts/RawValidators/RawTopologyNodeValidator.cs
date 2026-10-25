@@ -189,7 +189,7 @@ internal sealed class RawTopologyNodeValidator : IArchitecturePolicyRawDocumentV
         HashSet<string> allowedKeys = new(allowed, StringComparer.Ordinal);
         foreach ((YamlNode key, _) in node.Children)
         {
-            if (key is YamlScalarNode scalar && (scalar.Value is null || !allowedKeys.Contains(scalar.Value)))
+            if (key is YamlScalarNode scalar && !allowedKeys.Contains(scalar.Value!))
             {
                 throw new InvalidOperationException($"{location} contains unknown property '{scalar.Value}'.");
             }

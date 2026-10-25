@@ -132,6 +132,31 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
     }
 
     [Test]
+    public void Capture_UnknownContractIdWithoutAvailableContracts_ListsNone()
+    {
+        ArchitectureContractDocument document = new()
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { AssemblyName },
+            },
+            Contracts = new ArchitectureContractGroups(),
+        };
+
+        PublicApiCaptureOutcome outcome = Service(document, new FakePublicApiSnapshotStore()).Capture(
+            new PublicApiCaptureRequest { PolicyPath = PolicyPath, ContractId = "absent", OutputPath = SnapshotPath });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.False);
+            Assert.That(outcome.Error, Does.Contain("Unknown public API surface contract 'absent'"));
+            Assert.That(outcome.Error, Does.Contain("Available contract ids: (none)"));
+        });
+    }
+
+    [Test]
     public void Capture_AuditContractIsAlsoResolvable()
     {
         ArchitecturePublicApiSurfaceContract contract = Contract();

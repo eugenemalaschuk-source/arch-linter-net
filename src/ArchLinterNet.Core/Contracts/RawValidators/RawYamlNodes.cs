@@ -117,7 +117,7 @@ internal static class RawYamlNodes
         HashSet<string> allowedKeys = new(allowed, StringComparer.Ordinal);
         foreach ((YamlNode keyNode, _) in node.Children)
         {
-            if (keyNode is YamlScalarNode scalar && (scalar.Value is null || !allowedKeys.Contains(scalar.Value)))
+            if (keyNode is YamlScalarNode scalar && !allowedKeys.Contains(scalar.Value!))
             {
                 throw new InvalidOperationException(
                     $"Contextual contract '{contractName}' declares an unknown property '{scalar.Value}' on {location}.");

@@ -282,7 +282,7 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
         HashSet<string> allowedKeys = new(allowed, StringComparer.Ordinal);
         foreach ((YamlNode key, _) in mapping.Children)
         {
-            if (key is not YamlScalarNode scalar || scalar.Value is null || !allowedKeys.Contains(scalar.Value))
+            if (key is not YamlScalarNode scalar || !allowedKeys.Contains(scalar.Value!))
             {
                 throw new InvalidOperationException($"{location} contains an unknown property '{(key as YamlScalarNode)?.Value}'.");
             }

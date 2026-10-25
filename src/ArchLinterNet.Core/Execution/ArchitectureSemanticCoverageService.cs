@@ -234,14 +234,13 @@ internal sealed class ArchitectureSemanticCoverageService
         return contextualGovernance;
     }
 
-    private List<ArchitectureCoverageSummaryEvidenceItem> GetSemanticStaleItems(IEnumerable<Type> types)
+    private List<ArchitectureCoverageSummaryEvidenceItem> GetSemanticStaleItems(Type[] scannedTypes)
     {
         if (_semanticStaleItems != null)
         {
             return _semanticStaleItems;
         }
 
-        Type[] scannedTypes = types as Type[] ?? types.ToArray();
         List<ArchitectureCoverageSummaryEvidenceItem> items = new();
         foreach (ArchitectureLayer layer in Document.Layers.Values
                      .Where(layer => layer.Selector != null && !layer.External)

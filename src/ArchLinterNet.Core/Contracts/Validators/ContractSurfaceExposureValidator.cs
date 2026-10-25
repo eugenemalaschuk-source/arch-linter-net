@@ -143,33 +143,16 @@ internal sealed class ContractSurfaceExposureValidator : IArchitecturePolicyDocu
         }
     }
 
-    private static void ValidateSourceList(
-        IEnumerable<string>? values, string contractName, string fieldName)
+    private static void ValidateSourceList(IEnumerable<string> values, string contractName, string fieldName)
     {
-        if (values is null)
-        {
-            throw new InvalidOperationException(
-                $"Contract-surface exposure contract '{contractName}' declares an empty '{fieldName}' list. " +
-                "Every populated source list must contain at least one non-blank entry.");
-        }
-
-        bool hasAnyValue = false;
         foreach (string value in values)
         {
-            hasAnyValue = true;
             if (string.IsNullOrWhiteSpace(value))
             {
                 throw new InvalidOperationException(
                     $"Contract-surface exposure contract '{contractName}' declares a blank entry in '{fieldName}'. " +
                     "Every entry must be non-blank.");
             }
-        }
-
-        if (!hasAnyValue)
-        {
-            throw new InvalidOperationException(
-                $"Contract-surface exposure contract '{contractName}' declares an empty '{fieldName}' list. " +
-                "Every populated source list must contain at least one non-blank entry.");
         }
     }
 
