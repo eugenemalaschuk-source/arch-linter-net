@@ -253,7 +253,7 @@ def _failed_scenarios(
     records: list[dict[str, Any]],
     required_scenarios: set[str],
 ) -> list[dict[str, Any]]:
-    """Every scenario that failed anywhere, plus every scenario no platform ever passed."""
+    """Return failures, requiring the annotation consumer to pass on every platform."""
     failures: dict[str, dict[str, Any]] = {}
     for record in records:
         for scenario in record["scenarios"]:
@@ -265,6 +265,35 @@ def _failed_scenarios(
                 })
     for scenario_id in sorted(required_scenarios):
         if scenario_id in failures:
+            continue
+        if scenario_id in _SEMANTIC_ANNOTATIONS_SCENARIOS:
+            records_by_platform = {record["platform_id"]: record for record in records}
+            for platform_id in _REQUIRED_PLATFORMS:
+                record = records_by_platform.get(platform_id)
+                scenario = next(
+                    (item for item in record["scenarios"] if item["id"] == scenario_id),
+                    None,
+                ) if record is not None else None
+                if scenario is None:
+                    reason = (
+                        "Required scenario must pass on every required platform; "
+                        f"{platform_id} did not report the scenario."
+                    )
+                elif scenario["result"] != "passed":
+                    detail = scenario.get("reason")
+                    suffix = f": {detail}" if detail else "."
+                    reason = (
+                        "Required scenario must pass on every required platform; "
+                        f"{platform_id} reported {scenario['result']}{suffix}"
+                    )
+                else:
+                    continue
+                failures[scenario_id] = {
+                    "id": scenario_id,
+                    "platform_id": platform_id,
+                    "reason": reason,
+                }
+                break
             continue
         if not any(
             scenario["id"] == scenario_id and scenario["result"] == "passed"

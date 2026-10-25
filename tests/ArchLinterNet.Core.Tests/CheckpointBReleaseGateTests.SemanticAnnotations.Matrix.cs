@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
@@ -106,6 +107,29 @@ public sealed partial class CheckpointBReleaseGateTests
                         Collect(item, destination);
                     }
                 }
+            }
+        }
+
+        private static void AssertSemanticRoleFact(
+            JsonElement summary,
+            string itemName,
+            string expectedRole,
+            params string[] expectedMetadata)
+        {
+            JsonElement[] facts = new[] { "CoveredItems", "UncoveredItems" }
+                .SelectMany(propertyName => summary.GetProperty(propertyName).EnumerateArray())
+                .Where(item => item.GetProperty("Item").GetString() == itemName)
+                .ToArray();
+            Assert.That(facts, Has.Length.EqualTo(1), $"Expected exactly one semantic fact for {itemName}.");
+
+            string evidence = facts[0].GetProperty("Evidence").GetString()!;
+            string rolePrefix = $"role={expectedRole}";
+            Assert.That(evidence, Does.StartWith(rolePrefix), $"Unexpected semantic role evidence for {itemName}: {evidence}");
+            Assert.That(evidence.Length == rolePrefix.Length || char.IsWhiteSpace(evidence[rolePrefix.Length]), Is.True,
+                $"Expected role {expectedRole} for {itemName}, got {evidence}.");
+            foreach (string metadata in expectedMetadata)
+            {
+                Assert.That(evidence, Does.Contain(metadata), $"Expected metadata {metadata} for {itemName}, got {evidence}.");
             }
         }
     }

@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -114,8 +115,6 @@ public sealed partial class CheckpointBReleaseGateTests
                 <?xml version="1.0" encoding="utf-8"?>
                 <configuration><packageSources><clear />
                   <add key="skew" value="{mirror}" />
-                  <add key="candidate" value="{_feed}" />
-                  <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
                 </packageSources></configuration>
                 """);
             File.WriteAllText(Path.Combine(root, "SkewConsumer.csproj"), $"""
@@ -124,7 +123,7 @@ public sealed partial class CheckpointBReleaseGateTests
                   <ItemGroup><PackageReference Include="ArchLinterNet.Annotations" Version="{_candidateVersion}" /></ItemGroup>
                 </Project>
                 """);
-            File.WriteAllText(Path.Combine(root, "SkewSubject.cs"), "using ArchLinterNet.Annotations; [Entity] public sealed class SkewSubject { }");
+            File.WriteAllText(Path.Combine(root, "SkewSubject.cs"), "using ArchLinterNet.Annotations; namespace SkewConsumer; [Entity] public sealed class SkewSubject { }");
             string policy = Path.Combine(root, "dependencies.arch.yml");
             File.WriteAllText(policy, """
                 version: 1
@@ -132,6 +131,14 @@ public sealed partial class CheckpointBReleaseGateTests
                 analysis:
                   target_assemblies: [SkewConsumer]
                   assembly_search_paths: [bin/Debug/net10.0]
+                contracts:
+                  strict_coverage:
+                    - id: skew-role-coverage
+                      name: Unsupported annotation role remains unclassified
+                      scope: semantic_role
+                      roots:
+                        - namespace: SkewConsumer
+                      reason: Unsupported catalog identities must not create canonical role facts.
                 """);
 
             // Keep the NuGet cache outside the project tree. SDK default compile globs can
@@ -142,14 +149,25 @@ public sealed partial class CheckpointBReleaseGateTests
             CommandResult build = RunWithNugetPackages(root, packageCache,
                 "build", "SkewConsumer.csproj", "--no-restore", "--nologo", "--verbosity", "quiet");
             CommandResult result = RunTool(root, "--policy", policy, "--strict", "--format", "json");
+            using JsonDocument resultDocument = JsonDocument.Parse(result.StandardOutput);
+            JsonElement coverageSummaries = FindJsonProperty(resultDocument.RootElement, "coverage_summary");
+            JsonElement skewCoverage = coverageSummaries.EnumerateArray()
+                .Single(item => item.GetProperty("contract_id").GetString() == "skew-role-coverage");
+            JsonElement skewFacts = FindJsonProperty(skewCoverage, "uncovered_items");
+            JsonElement[] skewSubjectFacts = skewFacts.EnumerateArray()
+                .Where(item => item.GetProperty("item").GetString() == "SkewConsumer.SkewSubject")
+                .ToArray();
             Assert.Multiple(() =>
             {
                 Assert.That(restore.ExitCode, Is.EqualTo(0), restore.CombinedOutput);
                 Assert.That(build.ExitCode, Is.EqualTo(0), build.CombinedOutput);
-                Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput,
-                    "An unsupported marker is an explicit fail-safe diagnostic; it does not silently classify as a canonical role.");
+                Assert.That(result.ExitCode, Is.EqualTo(1), result.CombinedOutput,
+                    "Strict semantic coverage reports the unsupported marker as unclassified.");
                 Assert.That(result.StandardOutput, Does.Contain("UnsupportedAnnotationPackageVersion"));
                 Assert.That(result.StandardOutput, Does.Contain("0.11.0"));
+                Assert.That(skewSubjectFacts, Has.Length.EqualTo(1));
+                Assert.That(skewSubjectFacts[0].GetProperty("evidence").GetString(), Is.EqualTo("unclassified semantic fact"),
+                    "The mismatched catalog identity must not assign the canonical Entity role.");
             });
         }
 

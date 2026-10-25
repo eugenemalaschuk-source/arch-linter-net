@@ -420,6 +420,9 @@ public sealed partial class CheckpointBReleaseGateTests
             bool contextOnlyRemainsUnclassified = semanticCoverage.GetProperty("UncoveredItems").EnumerateArray()
                 .Any(item => item.GetProperty("Item").GetString() == "SemanticConsumer.Domain.Sales.ContextOnlySubject"
                     && item.GetProperty("Evidence").GetString() == "unclassified semantic fact");
+            bool plainLibraryEntityIsUncovered = semanticCoverage.GetProperty("UncoveredItems").EnumerateArray()
+                .Any(item => item.GetProperty("Item").GetString() == "PlainLibrary.PlainRecord"
+                    && item.GetProperty("Evidence").GetString() == "role=Entity");
             JsonElement cliViolations = FindJsonProperty(cliDocument.RootElement, "violations");
             JsonElement cliCanonicalDiagnostics = FindJsonProperty(cliDocument.RootElement, "canonical_annotation_diagnostics");
             string[] cliContractIds = CollectJsonStrings(cliViolations, "contract_id", "contractId")
@@ -467,13 +470,34 @@ public sealed partial class CheckpointBReleaseGateTests
                 }));
                 Assert.That(salesContractViolations, Is.GreaterThanOrEqualTo(2),
                     "Canonical and equivalent custom mappings must both feed the existing context selector contract.");
-                Assert.That(testing.StandardOutput, Does.Contain("PlainLibrary"));
-                Assert.That(testing.StandardOutput, Does.Contain("Modular.Domain"));
-                Assert.That(testing.StandardOutput, Does.Contain("Ddd.Domain"));
-                Assert.That(testing.StandardOutput, Does.Contain("Cqrs.Api"));
-                Assert.That(testing.StandardOutput, Does.Contain("Infrastructure.Adapters"));
-                Assert.That(testing.StandardOutput, Does.Contain("Public.Library"));
-                Assert.That(testing.StandardOutput, Does.Contain("Unity.Client"));
+                Assert.That(plainLibraryEntityIsUncovered, Is.True,
+                    "A classified role remains visible as a role fact even when no policy governs its coverage.");
+                AssertSemanticRoleFact(semanticCoverage, "PlainLibrary.PlainRecord", "Entity");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Domain.Sales.Order", "Entity",
+                    "domain=Commerce", "boundedContext=Sales", "module=Orders");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Domain.Inventory.Stock", "Entity",
+                    "domain=Commerce", "boundedContext=Inventory");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Application.PlaceOrder", "Command");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Application.PlaceOrderHandler", "CommandHandler");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Application.FindOrder", "Query");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Application.FindOrderHandler", "QueryHandler");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Api.OrdersEndpoint", "Endpoint");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Api.OrdersContract", "ApiContract");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Infrastructure.InventoryAdapter", "Adapter");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Infrastructure.OrderRepository", "RepositoryImplementation");
+                AssertSemanticRoleFact(semanticCoverage, "SemanticConsumer.Domain.Sales.MixedOrder", "Entity",
+                    "domain=Commerce", "boundedContext=Sales");
+                AssertSemanticRoleFact(semanticCoverage, "Modular.Domain.Order", "DomainLayer");
+                AssertSemanticRoleFact(semanticCoverage, "Modular.Application.OrderService", "ApplicationLayer");
+                AssertSemanticRoleFact(semanticCoverage, "Ddd.Domain.Order", "AggregateRoot", "boundedContext=Sales");
+                AssertSemanticRoleFact(semanticCoverage, "Cqrs.Api.PlaceOrder", "Command");
+                AssertSemanticRoleFact(semanticCoverage, "Cqrs.Api.PlaceOrderHandler", "CommandHandler");
+                AssertSemanticRoleFact(semanticCoverage, "Cqrs.Api.FindOrder", "Query");
+                AssertSemanticRoleFact(semanticCoverage, "Cqrs.Api.OrdersEndpoint", "Endpoint");
+                AssertSemanticRoleFact(semanticCoverage, "Infrastructure.Adapters.InventoryAdapter", "Adapter");
+                AssertSemanticRoleFact(semanticCoverage, "Infrastructure.Adapters.OrderRepository", "RepositoryImplementation");
+                AssertSemanticRoleFact(semanticCoverage, "Public.Library.ApiContractRole", "ApiContract");
+                AssertSemanticRoleFact(semanticCoverage, "Unity.Client.Bootstrap", "UnityRuntime");
                 Assert.That(testing.StandardOutput, Does.Contain("injected_annotation_exports\":[]"));
                 Assert.That(contextOnlyRemainsUnclassified, Is.True,
                     "BoundedContext metadata alone must not infer a semantic role.");

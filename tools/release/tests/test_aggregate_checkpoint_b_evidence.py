@@ -294,8 +294,39 @@ def test_v3_annotation_scenario_cannot_be_not_applicable_everywhere(tmp_path: Pa
     assert summary["result"] == "failed"
     assert summary["failed_scenarios"] == [{
         "id": "semantic-annotations-packed-consumer",
-        "platform_id": None,
-        "reason": "No platform executed this required scenario to a passing result.",
+        "platform_id": "linux-x64",
+        "reason": "Required scenario must pass on every required platform; linux-x64 reported not_applicable: Skipped.",
+    }]
+
+
+def test_v3_annotation_scenario_mixed_pass_and_not_applicable_blocks_candidate(tmp_path: Path) -> None:
+    manifest_path, platforms, gates_path, authorization_path = _write_corpus(
+        tmp_path, annotations=True, prepublication=True
+    )
+    record_path = platforms / "macos-arm64.json"
+    record = json.loads(record_path.read_text())
+    scenario = next(
+        item for item in record["scenarios"]
+        if item["id"] == "semantic-annotations-packed-consumer"
+    )
+    scenario.update(result="not_applicable", reason="Skipped.")
+    record_path.write_text(json.dumps(record))
+
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    summary = _summary(
+        _read_records(platforms, manifest, digest),
+        manifest,
+        _read_gates(gates_path, manifest, digest),
+        _read_candidate_authorization(authorization_path, manifest, digest),
+        digest,
+    )
+
+    assert summary["result"] == "failed"
+    assert summary["failed_scenarios"] == [{
+        "id": "semantic-annotations-packed-consumer",
+        "platform_id": "macos-arm64",
+        "reason": "Required scenario must pass on every required platform; macos-arm64 reported not_applicable: Skipped.",
     }]
 
 
