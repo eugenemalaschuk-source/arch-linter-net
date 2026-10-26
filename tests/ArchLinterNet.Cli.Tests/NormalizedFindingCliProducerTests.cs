@@ -55,6 +55,6 @@ public sealed class NormalizedFindingCliProducerTests
     {
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
-        return JsonSchema.FromText(schemaText);
+        return JsonSchema.FromText(schemaText, new BuildOptions { SchemaRegistry = new SchemaRegistry() });
     }
 }
