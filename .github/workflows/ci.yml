@@ -19,13 +19,31 @@ jobs:
   badge_promotion_runtime:
     name: Badge Promotion Action Runtime
     if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
-    uses: $/.github/workflows/architecture-health-badge-promotion.yml
-    with:
-      configuration-id: reference-none
-      adapter: none
-      operation: integration-test
+    steps:
+      - name: Set up .NET for trusted temporal revalidation
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.402
+      - name: Run the trusted badge promotion action in safe runtime mode
+        id: promotion
+        uses: $/.github/actions/architecture-health-badge-promotion
+        with:
+          configuration_id: reference-none
+          adapter: none
+          operation: integration-test
+      - name: Verify the safe runtime integration result
+        env:
+          PROMOTION_STATUS: ${{ steps.promotion.outputs.status }}
+          PROMOTION_REASON: ${{ steps.promotion.outputs.reason }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PROMOTION_STATUS" = "ready"
+          test "$PROMOTION_REASON" = "runtime_integration_test"
 
   # Pull-request validation is decomposed along real dependency boundaries. Workflow quality,
   # repository lint, architecture coverage, tooling/support tests, cross-platform correctness and
