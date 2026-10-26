@@ -222,7 +222,7 @@ public static class ArchitectureApplicabilityEvaluator
             if (assessment.IsIntegrityValid
                 && assessment.Record?.State == ArchitectureApplicabilityRecordState.Unassessable)
             {
-                unassessableRecordReasons.AddRange(assessment.Record!.Reasons);
+                unassessableRecordReasons.AddRange(assessment.Record.Reasons);
             }
         }
 

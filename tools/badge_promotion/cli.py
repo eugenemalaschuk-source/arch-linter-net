@@ -46,6 +46,7 @@ class ProviderFailure(RuntimeError):
 
 _MAX_RAW_PUBLICATION_ATTEMPTS = 5
 _DEFAULT_BRANCH = "~DEFAULT_BRANCH"
+GITHUB_DIRECTORY = ".github"
 
 
 class _ArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -681,7 +682,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
 
 
 def _load_config(configuration_id: str):
-    path = Path(__file__).resolve().parents[2] / ".github" / "badge-promotion" / "registry.json"
+    path = Path(__file__).resolve().parents[2] / GITHUB_DIRECTORY / "badge-promotion" / "registry.json"
     try:
         if configuration_id == "setup_generated":
             return load_setup_registry(GitHubApi().request, os.environ)
@@ -860,12 +861,12 @@ def _run_runtime_integration_test(configuration_id: str, adapter: str, config) -
     except (OSError, IndexError) as error:
         raise ProviderFailure("runtime_test_action_path_invalid") from error
 
-    expected_action_path = action_root / ".github" / "actions" / "architecture-health-badge-promotion"
+    expected_action_path = action_root / GITHUB_DIRECTORY / "actions" / "architecture-health-badge-promotion"
     if (
         action_root != module_root
         or action_path != expected_action_path.resolve()
         or not (action_path / "action.yml").is_file()
-        or not (module_root / ".github" / "badge-promotion" / "registry.json").is_file()
+        or not (module_root / GITHUB_DIRECTORY / "badge-promotion" / "registry.json").is_file()
     ):
         raise ProviderFailure("runtime_test_action_path_invalid")
 
@@ -905,21 +906,30 @@ def _prepare_relay_publication(config, decision, evidence: EvidenceContext, requ
     return client, digest, horizon, token, challenge_id, generation, revocation_epoch
 
 
+def _run_runtime_integration_from_cli(configuration_id: str, adapter: str) -> int:
+    try:
+        if configuration_id != "reference-none" or adapter != "none":
+            raise ProviderFailure("runtime_test_configuration_invalid")
+        config = _load_config(configuration_id)
+        return _run_runtime_integration_test(configuration_id, adapter, config)
+    except (ProviderFailure, AdapterError) as error:
+        _write_outputs({"status": "unavailable", "reason": error.reason})
+        print(json.dumps({"status": "unavailable", "reason": error.reason}, separators=(",", ":")), file=sys.stderr)
+        return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configuration-id", required=True)
     parser.add_argument("--adapter", required=True)
     parser.add_argument("--operation", choices=("publish", "renew", "integration-test"), default="publish")
     args = parser.parse_args()
+    if args.operation == "integration-test":
+        return _run_runtime_integration_from_cli(args.configuration_id, args.adapter)
+
     config = None
     api = None
     try:
-        if args.operation == "integration-test":
-            if args.configuration_id != "reference-none" or args.adapter != "none":
-                raise ProviderFailure("runtime_test_configuration_invalid")
-            config = _load_config(args.configuration_id)
-            return _run_runtime_integration_test(args.configuration_id, args.adapter, config)
-
         config = _load_config(args.configuration_id)
         if config.destination.adapter.value != args.adapter:
             raise ProviderFailure("adapter_configuration_mismatch")
@@ -947,10 +957,6 @@ def main() -> int:
         _publish_raw(api, config, decision.payload or b"", evidence=evidence, status="ready", reason=decision.reason.value)
         return 0
     except (ProviderFailure, AdapterError) as error:
-        if args.operation == "integration-test":
-            _write_outputs({"status": "unavailable", "reason": error.reason})
-            print(json.dumps({"status": "unavailable", "reason": error.reason}, separators=(",", ":")), file=sys.stderr)
-            return 1
         _handle_failure(error, config, api)
         return 1
 

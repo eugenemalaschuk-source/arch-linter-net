@@ -145,14 +145,11 @@ internal sealed class ContractSurfaceExposureValidator : IArchitecturePolicyDocu
 
     private static void ValidateSourceList(IEnumerable<string> values, string contractName, string fieldName)
     {
-        foreach (string value in values)
+        if (values.Any(string.IsNullOrWhiteSpace))
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                throw new InvalidOperationException(
-                    $"Contract-surface exposure contract '{contractName}' declares a blank entry in '{fieldName}'. " +
-                    "Every entry must be non-blank.");
-            }
+            throw new InvalidOperationException(
+                $"Contract-surface exposure contract '{contractName}' declares a blank entry in '{fieldName}'. " +
+                "Every entry must be non-blank.");
         }
     }
 
