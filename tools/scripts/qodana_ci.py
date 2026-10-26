@@ -31,6 +31,24 @@ def configured_image(project: Path) -> str:
     return declarations[0]
 
 
+def locked_dotnet_sdk_root(project: Path) -> tuple[Path, str]:
+    """Resolve the host-installed SDK that the scanner container will use."""
+    root_value = os.environ.get("QODANA_DOTNET_ROOT", "").strip()
+    if not root_value:
+        raise ValueError("QODANA_DOTNET_ROOT is required for the pinned scanner SDK")
+    root = Path(root_value).resolve()
+    try:
+        global_config = json.loads((project / "global.json").read_text(encoding="utf-8"))
+        version = global_config["sdk"]["version"]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError("global.json does not declare a usable .NET SDK version") from error
+    if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ValueError("global.json does not declare a pinned .NET SDK version")
+    if not (root / "sdk" / version).is_dir():
+        raise ValueError(f"QODANA_DOTNET_ROOT does not contain the pinned .NET SDK {version}")
+    return root, version
+
+
 def _check_invocations(run: dict) -> None:
     for invocation in run.get("invocations", []):
         if invocation.get("executionSuccessful") is False:
@@ -173,7 +191,8 @@ def copy_bounded_tree(source: Path, destination: Path, max_file_bytes: int,
 
 
 def scan(project: Path, work: Path, artifacts: Path, image_id: str,
-         label: str, cache: Path, timeout: int = 1200) -> dict:
+         label: str, cache: Path, timeout: int = 1200,
+         dotnet_root: Path | None = None) -> dict:
     results = work / label / "results"
     results.mkdir(parents=True)
     cache.mkdir(parents=True, exist_ok=True)
@@ -181,11 +200,19 @@ def scan(project: Path, work: Path, artifacts: Path, image_id: str,
     log = artifacts / f"{label}.log"
     args = ["docker", "run", "--rm", "--name", name, "--pull", "never",
             "--user", f"{os.getuid()}:{os.getgid()}",
-            "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-            "--volume", f"{project}:/data/project",
-            "--volume", f"{results}:/data/results",
-            "--volume", f"{cache}:/data/cache", image_id,
-            "--results-dir", "/data/results", "--cache-dir", "/data/cache"]
+            "--cap-drop", "ALL", "--security-opt", "no-new-privileges"]
+    if dotnet_root is not None:
+        args.extend([
+            "--volume", f"{dotnet_root.resolve()}:/usr/share/dotnet:ro",
+            "--env", "DOTNET_ROOT=/usr/share/dotnet",
+            "--env", "DOTNET_ROOT_X64=/usr/share/dotnet",
+        ])
+    args.extend([
+        "--volume", f"{project}:/data/project",
+        "--volume", f"{results}:/data/results",
+        "--volume", f"{cache}:/data/cache", image_id,
+        "--results-dir", "/data/results", "--cache-dir", "/data/cache",
+    ])
     started = time.monotonic()
     try:
         exit_code = command(args, log, timeout)
@@ -306,6 +333,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if not (project / "ArchLinterNet.slnx").is_file():
             raise ValueError("The canonical ArchLinterNet.slnx solution is missing")
+        dotnet_root, sdk_version = locked_dotnet_sdk_root(project)
+        evidence["dotnet_sdk_version"] = sdk_version
         image = configured_image(project)
         evidence["configured_image"] = image
         pull_start = time.monotonic()
@@ -321,21 +350,24 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("Docker did not return an immutable image identity")
         evidence["image_id"] = identity
         cache = work / "repository-cache"
-        cold = scan(project, work, artifacts, identity, "cold", cache)
+        cold = scan(project, work, artifacts, identity, "cold", cache,
+                    dotnet_root=dotnet_root)
         evidence["scans"].append(cold)
         # Persist completed phases even if a later validation phase is interrupted.
         write_evidence(artifacts, evidence, publish_summary=False)
         if cold["status"] != "completed":
             raise ValueError("Canonical analysis failed; inspect cold.log and cold.sarif.json")
         if args.burn_in:
-            warm = scan(project, work, artifacts, identity, "warm", cache)
+            warm = scan(project, work, artifacts, identity, "warm", cache,
+                        dotnet_root=dotnet_root)
             evidence["scans"].append(warm)
             write_evidence(artifacts, evidence, publish_summary=False)
             for label, defective in (("positive", True), ("negative", False)):
                 probe = work / f"{label}-project"
                 create_probe(probe, image, defective)
                 evidence["scans"].append(scan(probe, work, artifacts, identity, label,
-                                              work / f"{label}-cache", timeout=180))
+                                              work / f"{label}-cache", timeout=180,
+                                              dotnet_root=dotnet_root))
                 write_evidence(artifacts, evidence, publish_summary=False)
             evidence["burn_in_checks_passed"] = burn_in_passed(evidence["scans"])
             if not evidence["burn_in_checks_passed"]:

@@ -422,7 +422,7 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
             Assert.That(read.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), read.Detail);
             Assert.That(read.SourceDiagnostics.Single().PrimaryLocation, Is.Null);
             Assert.That(finding.SourceLocation, Is.Null);
-            Assert.That(JsonSchema.FromText(schemaText).Evaluate(
+            Assert.That(JsonSchemaTextFactory.FromText(schemaText).Evaluate(
                 System.Text.Json.JsonSerializer.SerializeToElement(
                     ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding))).IsValid,
                 Is.True);

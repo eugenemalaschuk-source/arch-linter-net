@@ -1,6 +1,8 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Schema;
 using Json.Schema;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
@@ -12,7 +14,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
     private const string SchemaResourceName = "ArchLinterNet.Core.Schema.dependencies.arch.schema.json";
 
     private static readonly Lazy<JsonNode> _schemaDocument = new(LoadSchemaDocument);
-    private static readonly Lazy<JsonSchema> _schema = new(() => JsonSchema.FromText(_schemaDocument.Value.ToJsonString()));
+    private static readonly Lazy<JsonSchema> _schema = new(() => JsonSchemaTextFactory.FromText(_schemaDocument.Value.ToJsonString()));
 
     public static void Validate(string yaml, ArchitecturePolicyProvenanceIndex provenance)
     {
@@ -20,8 +22,9 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         stream.Load(new StringReader(yaml));
         JsonNode? instance = ConvertNode(stream.Documents[0].RootNode);
         RemoveValidatedContractIds(instance, provenance);
+        JsonElement instanceElement = JsonSerializer.SerializeToElement(instance);
         EvaluationResults results = _schema.Value.Evaluate(
-            instance,
+            instanceElement,
             new EvaluationOptions { OutputFormat = OutputFormat.List });
         if (results.IsValid)
         {
@@ -65,7 +68,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             return;
         }
 
-        EvaluationResults[] invalidDetails = result.Details.Where(detail => !detail.IsValid).ToArray();
+        EvaluationResults[] invalidDetails = result.Details?.Where(detail => !detail.IsValid).ToArray() ?? [];
         if (invalidDetails.Length > 0)
         {
             foreach (EvaluationResults detail in invalidDetails)
@@ -86,7 +89,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         {
             failures.Add(new SchemaFailure(
                 result.InstanceLocation.ToString(),
-                result.EvaluationPath.ToString(),
+                result.SchemaLocation.ToString(),
                 message,
                 failures.Count));
         }
@@ -115,7 +118,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
 
     private static IEnumerable<SchemaAlternative> FindAlternatives(SchemaFailure failure, JsonNode? instance)
     {
-        string[] segments = SplitSchemaPointer(failure.EvaluationPath);
+        string[] segments = SplitSchemaPointer(failure.SchemaLocation);
         for (int index = 0; index < segments.Length - 1; index++)
         {
             if ((segments[index] != "anyOf" && segments[index] != "oneOf")
@@ -527,7 +530,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         return instanceLocation.Count(character => character == '/');
     }
 
-    private sealed record SchemaFailure(string InstanceLocation, string EvaluationPath, string Message, int Order);
+    private sealed record SchemaFailure(string InstanceLocation, string SchemaLocation, string Message, int Order);
 
     private sealed record SchemaAlternative(
         int FailureOrder,

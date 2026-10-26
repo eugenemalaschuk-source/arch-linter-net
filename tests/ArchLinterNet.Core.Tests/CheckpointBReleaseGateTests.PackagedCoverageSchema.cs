@@ -19,7 +19,7 @@ public sealed partial class CheckpointBReleaseGateTests
             ["$defs"] = JsonNode.Parse(document.RootElement.GetProperty("$defs").GetRawText()),
             ["$ref"] = "#/$defs/coverageContract",
         };
-        JsonSchema schema = JsonSchema.FromText(wrapper.ToJsonString());
+        JsonSchema schema = JsonSchemaTextFactory.FromText(wrapper.ToJsonString());
 
         foreach (string scope in new[] { "project", "assembly" })
         {

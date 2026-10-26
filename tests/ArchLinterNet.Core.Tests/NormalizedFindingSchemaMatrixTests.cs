@@ -16,7 +16,7 @@ public sealed class NormalizedFindingSchemaMatrixTests
     {
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
-        JsonSchema schema = JsonSchema.FromText(schemaText);
+        JsonSchema schema = JsonSchemaTextFactory.FromText(schemaText);
 
         ArchitectureFinding[] findings = OrdinaryViolations()
             .Select(violation => ArchitectureFindingMapper.FromViolation(violation, "strict"))
@@ -38,8 +38,8 @@ public sealed class NormalizedFindingSchemaMatrixTests
                 new EvaluationOptions { OutputFormat = OutputFormat.List });
             Assert.That(result.IsValid, Is.True,
                 $"Schema rejected generated '{finding.Kind}' finding:{Environment.NewLine}" +
-                string.Join(Environment.NewLine, result.Details.Where(detail => !detail.IsValid)
-                    .Select(detail => detail.EvaluationPath + ": " + string.Join(",", detail.Errors?.Values ?? []))));
+                string.Join(Environment.NewLine, result.Details?.Where(detail => !detail.IsValid)
+                    .Select(detail => detail.EvaluationPath + ": " + string.Join(",", detail.Errors?.Values.ToArray() ?? [])).ToArray() ?? []));
         }
     }
 
@@ -48,7 +48,7 @@ public sealed class NormalizedFindingSchemaMatrixTests
     {
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
-        JsonSchema schema = JsonSchema.FromText(schemaText);
+        JsonSchema schema = JsonSchemaTextFactory.FromText(schemaText);
         ArchitectureFinding imported = SpecialFindings()
             .Single(finding => finding.Kind == "imported_external_diagnostic");
         JsonObject malformed = JsonNode.Parse(JsonSerializer.Serialize(
@@ -70,7 +70,7 @@ public sealed class NormalizedFindingSchemaMatrixTests
     {
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
-        JsonSchema schema = JsonSchema.FromText(schemaText);
+        JsonSchema schema = JsonSchemaTextFactory.FromText(schemaText);
         ArchitectureFinding imported = SpecialFindings()
             .Single(finding => finding.Kind == "imported_external_diagnostic");
         JsonObject normalized = JsonNode.Parse(JsonSerializer.Serialize(

@@ -15,7 +15,7 @@ public sealed class AnalysisProfileSchemaValidationTests
     {
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("analysis-profile", out string schemaText), Is.True);
-        return JsonSchema.FromText(schemaText);
+        return JsonSchemaTextFactory.FromText(schemaText);
     }
 
     private static string WriteHarmlessPolicy()
@@ -50,7 +50,8 @@ public sealed class AnalysisProfileSchemaValidationTests
             System.Text.Json.Nodes.JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
 
         Assert.That(evaluation.IsValid, Is.True,
-            string.Join(Environment.NewLine, evaluation.Details.Where(d => !d.IsValid).Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values ?? []))));
+            string.Join(Environment.NewLine, evaluation.Details?.Where(d => !d.IsValid)
+                .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values.ToArray() ?? [])).ToArray() ?? []));
     }
 
     [Test]

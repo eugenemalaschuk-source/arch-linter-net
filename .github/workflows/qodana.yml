@@ -32,6 +32,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install the locked .NET SDK for the scanner container
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          global-json-file: global.json
+
+      - name: Export the SDK root for a read-only scanner mount
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet_root="$(dirname "$(readlink -f "$(command -v dotnet)")")"
+          sdk_version="$(jq -r '.sdk.version' global.json)"
+          if [[ ! -d "$dotnet_root/sdk/$sdk_version" ]]; then
+            echo "The locked SDK $sdk_version is missing from $dotnet_root." >&2
+            exit 1
+          fi
+          printf 'QODANA_DOTNET_ROOT=%s\n' "$dotnet_root" >> "$GITHUB_ENV"
+
       - name: Test Qodana evidence and workflow contracts
         run: python3 -m unittest discover -s tests/qodana -v
 

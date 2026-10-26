@@ -79,8 +79,9 @@ public sealed class PackagedSchemaRegistry
                 return false;
             }
 
-            JsonSchema schema = JsonSchema.FromText(schemaText);
-            if (!schema.Evaluate(ToApiSnapshotInstance(snapshot)).IsValid)
+            JsonSchema schema = JsonSchemaTextFactory.FromText(schemaText);
+            JsonElement instance = JsonSerializer.SerializeToElement(ToApiSnapshotInstance(snapshot));
+            if (!schema.Evaluate(instance).IsValid)
             {
                 diagnostic = "The public API snapshot does not satisfy the packaged API snapshot contract.";
                 return false;
