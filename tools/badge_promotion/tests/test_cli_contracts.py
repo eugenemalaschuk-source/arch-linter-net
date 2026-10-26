@@ -158,6 +158,7 @@ def test_adapter_error_becomes_fixed_cli_output(
         run_id=1,
         run_attempt=1,
         semantic_horizon=datetime(2026, 9, 12, 11, tzinfo=timezone.utc),
+        temporal_receipt=None,
     )
     decision = PromotionDecision(
         PromotionStatus.READY,
@@ -172,7 +173,7 @@ def test_adapter_error_becomes_fixed_cli_output(
     output = tmp_path / "github-output"
     monkeypatch.setattr(cli, "_load_config", lambda _: config)
     monkeypatch.setattr(cli, "GitHubApi", lambda: object())
-    monkeypatch.setattr(cli, "resolve_evidence", lambda *_: (evidence, b"archive"))
+    monkeypatch.setattr(cli, "resolve_evidence", lambda *_args, **_kwargs: (evidence, b"archive"))
     monkeypatch.setattr(cli, "decide_promotion", lambda *_: decision)
     monkeypatch.setattr(cli, "issue_github_oidc_token", lambda *_: "token")
     def fail_prepare(*_: object, **__: object) -> object:
