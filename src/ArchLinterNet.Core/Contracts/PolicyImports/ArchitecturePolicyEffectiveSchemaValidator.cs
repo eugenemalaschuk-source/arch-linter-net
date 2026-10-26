@@ -89,7 +89,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         {
             failures.Add(new SchemaFailure(
                 result.InstanceLocation.ToString(),
-                result.EvaluationPath.ToString(),
+                result.SchemaLocation.ToString(),
                 message,
                 failures.Count));
         }
@@ -118,7 +118,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
 
     private static IEnumerable<SchemaAlternative> FindAlternatives(SchemaFailure failure, JsonNode? instance)
     {
-        string[] segments = SplitSchemaPointer(failure.EvaluationPath);
+        string[] segments = SplitSchemaPointer(failure.SchemaLocation);
         for (int index = 0; index < segments.Length - 1; index++)
         {
             if ((segments[index] != "anyOf" && segments[index] != "oneOf")
@@ -530,7 +530,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         return instanceLocation.Count(character => character == '/');
     }
 
-    private sealed record SchemaFailure(string InstanceLocation, string EvaluationPath, string Message, int Order);
+    private sealed record SchemaFailure(string InstanceLocation, string SchemaLocation, string Message, int Order);
 
     private sealed record SchemaAlternative(
         int FailureOrder,
