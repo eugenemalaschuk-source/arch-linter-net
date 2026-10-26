@@ -118,8 +118,8 @@ public sealed class AnalysisCacheSchemaValidationTests
                 JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
 
             Assert.That(evaluation.IsValid, Is.True,
-                string.Join(Environment.NewLine, evaluation.Details.Where(d => !d.IsValid)
-                    .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values ?? []))));
+                string.Join(Environment.NewLine, evaluation.Details?.Where(d => !d.IsValid)
+                    .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values.ToArray() ?? [])).ToArray() ?? []));
         }
         finally
         {
@@ -150,8 +150,8 @@ public sealed class AnalysisCacheSchemaValidationTests
                 JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
 
             Assert.That(evaluation.IsValid, Is.True,
-                string.Join(Environment.NewLine, evaluation.Details.Where(d => !d.IsValid)
-                    .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values ?? []))));
+                string.Join(Environment.NewLine, evaluation.Details?.Where(d => !d.IsValid)
+                    .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values.ToArray() ?? [])).ToArray() ?? []));
         }
         finally
         {
@@ -177,8 +177,8 @@ public sealed class AnalysisCacheSchemaValidationTests
                 json, new EvaluationOptions { OutputFormat = OutputFormat.List });
 
             Assert.That(evaluation.IsValid, Is.True,
-                string.Join(Environment.NewLine, evaluation.Details.Where(d => !d.IsValid)
-                    .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values ?? []))));
+                string.Join(Environment.NewLine, evaluation.Details?.Where(d => !d.IsValid)
+                    .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values.ToArray() ?? [])).ToArray() ?? []));
         }
         finally
         {

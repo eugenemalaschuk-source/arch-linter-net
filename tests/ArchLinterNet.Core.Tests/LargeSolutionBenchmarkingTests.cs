@@ -647,6 +647,6 @@ public sealed class LargeSolutionBenchmarkingTests
     }
 
     private static string Describe(EvaluationResults results) =>
-        string.Join(Environment.NewLine, results.Details.Where(detail => !detail.IsValid).Select(detail =>
-            $"{detail.EvaluationPath}: {string.Join(",", detail.Errors?.Values ?? [])}"));
+        string.Join(Environment.NewLine, results.Details?.Where(detail => !detail.IsValid).Select(detail =>
+            $"{detail.EvaluationPath}: {string.Join(",", detail.Errors?.Values.ToArray() ?? [])}").ToArray() ?? []);
 }

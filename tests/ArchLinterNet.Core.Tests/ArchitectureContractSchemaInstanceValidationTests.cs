@@ -400,7 +400,8 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         EvaluationResults results = schema.Evaluate(instance, new EvaluationOptions { OutputFormat = OutputFormat.List });
 
         Assert.That(results.IsValid, Is.True,
-            string.Join(Environment.NewLine, results.Details.Where(d => !d.IsValid).Select(d => $"{d.InstanceLocation}: {string.Join(';', d.Errors?.Values ?? [])}")));
+            string.Join(Environment.NewLine, results.Details?.Where(d => !d.IsValid)
+                .Select(d => $"{d.InstanceLocation}: {string.Join(';', d.Errors?.Values.ToArray() ?? [])}").ToArray() ?? []));
     }
 
     // A review round found that design.md's/the docs page's illustrative ```yaml Markdown code
@@ -709,7 +710,8 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
 
         if (!results.IsValid)
         {
-            string errors = string.Join(';', results.Details.Where(d => !d.IsValid).SelectMany(d => d.Errors?.Values ?? []));
+            string errors = string.Join(';', results.Details?.Where(d => !d.IsValid)
+                .SelectMany(d => d.Errors?.Values.ToArray() ?? []).ToArray() ?? []);
             failures.Add($"{location} ($defs/{defName}): {errors}");
         }
     }

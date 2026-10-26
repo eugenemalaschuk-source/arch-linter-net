@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
 using Json.Schema;
@@ -20,8 +21,9 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         stream.Load(new StringReader(yaml));
         JsonNode? instance = ConvertNode(stream.Documents[0].RootNode);
         RemoveValidatedContractIds(instance, provenance);
+        JsonElement instanceElement = JsonSerializer.SerializeToElement(instance);
         EvaluationResults results = _schema.Value.Evaluate(
-            instance,
+            instanceElement,
             new EvaluationOptions { OutputFormat = OutputFormat.List });
         if (results.IsValid)
         {
@@ -65,7 +67,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             return;
         }
 
-        EvaluationResults[] invalidDetails = result.Details.Where(detail => !detail.IsValid).ToArray();
+        EvaluationResults[] invalidDetails = result.Details?.Where(detail => !detail.IsValid).ToArray() ?? [];
         if (invalidDetails.Length > 0)
         {
             foreach (EvaluationResults detail in invalidDetails)

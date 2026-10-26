@@ -38,8 +38,8 @@ public sealed class NormalizedFindingSchemaMatrixTests
                 new EvaluationOptions { OutputFormat = OutputFormat.List });
             Assert.That(result.IsValid, Is.True,
                 $"Schema rejected generated '{finding.Kind}' finding:{Environment.NewLine}" +
-                string.Join(Environment.NewLine, result.Details.Where(detail => !detail.IsValid)
-                    .Select(detail => detail.EvaluationPath + ": " + string.Join(",", detail.Errors?.Values ?? []))));
+                string.Join(Environment.NewLine, result.Details?.Where(detail => !detail.IsValid)
+                    .Select(detail => detail.EvaluationPath + ": " + string.Join(",", detail.Errors?.Values.ToArray() ?? [])).ToArray() ?? []));
         }
     }
 
