@@ -30,6 +30,9 @@ outputs:
   run-attempt:
     description: Validated producer run attempt when available.
     value: ${{ steps.promote.outputs.run_attempt }}
+  temporal-revalidated:
+    description: Whether temporal evidence was explicitly revalidated during this operation.
+    value: ${{ steps.promote.outputs.temporal_revalidated }}
 runs:
   using: composite
   steps:
@@ -50,9 +53,8 @@ runs:
           echo "::error::Trusted temporal revalidator project is unavailable."
           exit 1
         fi
-        # The Python resolver invokes restore/build only after it has established
-        # that the existing semantic horizon has expired. Fresh publications
-        # remain metadata-only and do not depend on NuGet availability.
+        # Normal publication invokes restore/build only after the semantic horizon
+        # expires. The read-only preflight operation explicitly forces revalidation.
         export ARCHLINTERNET_REVALIDATOR_PROJECT="$revalidator_project"
         python -m tools.badge_promotion.cli \
           --configuration-id "$CONFIGURATION_ID" \

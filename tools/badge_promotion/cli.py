@@ -280,6 +280,64 @@ def _read_bounded_zip_member(opened: zipfile.ZipFile, name: str, max_bytes: int)
     return data
 
 
+def _is_exact_merged_pull_request(pull: Any, repository: str, base_ref: str, main_sha: str) -> bool:
+    base = pull.get("base", {}) if isinstance(pull, dict) else {}
+    base_repository = base.get("repo", {}) if isinstance(base, dict) else {}
+    return (
+        base_repository.get("full_name") == repository
+        and base.get("ref") == base_ref
+        and pull.get("merged") is True
+        and pull.get("merge_commit_sha") == main_sha
+    )
+
+
+def _resolve_merged_pull_request(api: GitHubApi, repository_path: str, repository: str, main_sha: str, base_ref: str) -> tuple[int, dict[str, Any]]:
+    associated = api.request(f"/repos/{repository_path}/commits/{main_sha}/pulls")
+    if isinstance(associated, list) and len(associated) == 1:
+        candidate = associated[0]
+        pr_number = candidate.get("number") if isinstance(candidate, dict) else None
+        if isinstance(pr_number, int) and not isinstance(pr_number, bool) and pr_number > 0:
+            pull = api.request(f"/repos/{repository_path}/pulls/{pr_number}")
+            if _is_exact_merged_pull_request(pull, repository, base_ref, main_sha):
+                return pr_number, pull
+
+    # GitHub's commit-associated PR endpoint can be empty for a squash merge.
+    # Resolve by exact merge_commit_sha from recent closed PRs, then re-read the
+    # selected PR and apply the same full trust checks before accepting it.
+    base_query = urllib.parse.quote(base_ref, safe="")
+    matches: dict[int, dict[str, Any]] = {}
+    for page in range(1, 51):
+        pulls = api.request(
+            f"/repos/{repository_path}/pulls?state=closed&base={base_query}&sort=created&direction=desc&per_page=100&page={page}"
+        )
+        if not isinstance(pulls, list):
+            raise ProviderFailure("merged_pull_request_ambiguous")
+        for pull in pulls:
+            base = pull.get("base", {}) if isinstance(pull, dict) else {}
+            base_repository = base.get("repo", {}) if isinstance(base, dict) else {}
+            number = pull.get("number") if isinstance(pull, dict) else None
+            if (
+                base_repository.get("full_name") == repository
+                and base.get("ref") == base_ref
+                and pull.get("merge_commit_sha") == main_sha
+                and isinstance(pull.get("merged_at"), str)
+                and isinstance(number, int)
+                and not isinstance(number, bool)
+                and number > 0
+            ):
+                matches[number] = pull
+        if len(pulls) < 100 or len(matches) > 1:
+            break
+
+    if len(matches) != 1:
+        raise ProviderFailure("merged_pull_request_ambiguous")
+    pr_number = next(iter(matches))
+    pull = api.request(f"/repos/{repository_path}/pulls/{pr_number}")
+    if not _is_exact_merged_pull_request(pull, repository, base_ref, main_sha):
+        raise ProviderFailure("merged_pull_request_invalid")
+    return pr_number, pull
+
+
 def _merged_pull_request(api: GitHubApi, repository: str, main_sha: str, base_ref: str) -> tuple[str, str, str, str, int]:
     repository_path = _repository_path(repository)
     commit = api.request(f"/repos/{repository_path}/commits/{main_sha}")
@@ -288,14 +346,7 @@ def _merged_pull_request(api: GitHubApi, repository: str, main_sha: str, base_re
     if len(parents) != 1:
         raise ProviderFailure("main_commit_shape_invalid")
     base_sha = _sha(parents[0].get("sha"))
-    associated = api.request(f"/repos/{repository_path}/commits/{main_sha}/pulls")
-    if not isinstance(associated, list) or len(associated) != 1 or not isinstance(associated[0].get("number"), int):
-        raise ProviderFailure("merged_pull_request_ambiguous")
-    pr_number = associated[0]["number"]
-    pull = api.request(f"/repos/{repository_path}/pulls/{pr_number}")
-    base = pull.get("base", {})
-    if base.get("repo", {}).get("full_name") != repository or base.get("ref") != base_ref or pull.get("merged") is not True or pull.get("merge_commit_sha") != main_sha:
-        raise ProviderFailure("merged_pull_request_invalid")
+    pr_number, pull = _resolve_merged_pull_request(api, repository_path, repository, main_sha, base_ref)
     head_sha = _sha(pull.get("head", {}).get("sha"))
     head_commit = api.request(f"/repos/{repository_path}/commits/{head_sha}")
     head_tree = _sha(head_commit.get("commit", {}).get("tree", {}).get("sha"))
@@ -595,7 +646,7 @@ def _run_temporal_revalidation_with_midnight_retry(
     return receipt, horizon, temporal_verified_at
 
 
-def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
+def resolve_evidence(api: GitHubApi, config, *, force_temporal_revalidation: bool = False) -> tuple[EvidenceContext, bytes]:
     repository = os.environ.get("GITHUB_REPOSITORY", "")
     base_ref = config.base_ref
     main_sha = _sha(os.environ.get("GITHUB_SHA"))
@@ -654,7 +705,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
     revalidation_check_at = datetime.now(timezone.utc)
     producer_lease_horizon = verified_at + timedelta(seconds=config.limits.max_lease_seconds)
     # Match the earliest boundary enforced by the pure promotion decision.
-    if revalidation_check_at >= min(semantic_horizon, producer_lease_horizon):
+    if force_temporal_revalidation or revalidation_check_at >= min(semantic_horizon, producer_lease_horizon):
         try:
             validated = validate_artifact(archive, config, evidence)
         except ArtifactValidationError as error:
@@ -806,7 +857,7 @@ def _publish_raw(api: GitHubApi, config, payload: bytes, *, evidence: EvidenceCo
 
 
 def _validate_invocation(config, operation: str) -> None:
-    expected_event = "push" if operation == "publish" else "schedule"
+    expected_event = "push" if operation in {"publish", "preflight"} else "schedule"
     expected_ref = f"refs/heads/{config.base_ref}"
     if os.environ.get("GITHUB_EVENT_NAME") != expected_event or os.environ.get("GITHUB_REF") != expected_ref:
         raise ProviderFailure("event_or_ref_mismatch")
@@ -876,8 +927,8 @@ def _run_runtime_integration_test(configuration_id: str, adapter: str, config) -
     return 0
 
 
-def _handle_failure(error, config, api: GitHubApi | None) -> None:
-    if config is not None and config.destination.adapter.value == "github-raw":
+def _handle_failure(error, config, api: GitHubApi | None, *, publish_unavailable_snapshot: bool = True) -> None:
+    if publish_unavailable_snapshot and config is not None and config.destination.adapter.value == "github-raw":
         try:
             api = api or GitHubApi()
             _publish_raw(api, config, _unavailable_snapshot_path().read_bytes(), evidence=None, status="unassessable", reason=error.reason)
@@ -922,7 +973,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configuration-id", required=True)
     parser.add_argument("--adapter", required=True)
-    parser.add_argument("--operation", choices=("publish", "renew", "integration-test"), default="publish")
+    parser.add_argument("--operation", choices=("publish", "preflight", "renew", "integration-test"), default="publish")
     args = parser.parse_args()
     if args.operation == "integration-test":
         return _run_runtime_integration_from_cli(args.configuration_id, args.adapter)
@@ -935,14 +986,32 @@ def main() -> int:
             raise ProviderFailure("adapter_configuration_mismatch")
         _validate_invocation(config, args.operation)
         api = GitHubApi()
-        evidence, archive = resolve_evidence(api, config)
+        evidence, archive = resolve_evidence(
+            api,
+            config,
+            force_temporal_revalidation=args.operation == "preflight",
+        )
         request = _promotion_request(evidence, archive, args.operation)
         # The Relay challenge is the deadline authority. A raw publication uses
         # the same pure decision and remains a fixed snapshot adapter.
         decision = decide_promotion(config, request)
         output_metadata = {"reason": decision.reason.value, "head_sha": evidence.head_sha, "head_tree_sha": evidence.head_tree_sha, "run_id": evidence.run_id, "run_attempt": evidence.run_attempt}
+        temporal_revalidated = evidence.temporal_receipt is not None
+        temporal_revalidated_output = "true" if temporal_revalidated else "false"
         if decision.status is PromotionStatus.UNAVAILABLE:
+            if args.operation == "preflight":
+                _write_outputs({**output_metadata, "status": "unavailable", "temporal_revalidated": temporal_revalidated_output})
+                print(json.dumps({"status": "unavailable", "reason": decision.reason.value}, separators=(",", ":")), file=sys.stderr)
+                return 1
             return _report_unavailable(config, api, evidence, decision, output_metadata)
+        if args.operation == "preflight":
+            if config.destination.adapter.value != "github-raw":
+                raise ProviderFailure("preflight_adapter_invalid")
+            if not temporal_revalidated:
+                raise ProviderFailure("preflight_temporal_revalidation_missing")
+            _write_outputs({**output_metadata, "status": "ready", "temporal_revalidated": temporal_revalidated_output})
+            print(json.dumps({"status": "ready", "reason": decision.reason.value, "temporal_revalidated": temporal_revalidated}, separators=(",", ":")))
+            return 0
         if config.destination.adapter.value == "none":
             return _commit_private(decision, output_metadata)
         if config.destination.adapter.value == "relay":
@@ -957,7 +1026,7 @@ def main() -> int:
         _publish_raw(api, config, decision.payload or b"", evidence=evidence, status="ready", reason=decision.reason.value)
         return 0
     except (ProviderFailure, AdapterError) as error:
-        _handle_failure(error, config, api)
+        _handle_failure(error, config, api, publish_unavailable_snapshot=args.operation != "preflight")
         return 1
 
 

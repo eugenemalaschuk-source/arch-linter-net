@@ -329,12 +329,18 @@ def test_temporal_revalidation_fails_closed_if_one_midnight_retry_is_still_unsaf
         )
 
 
-def test_resolve_evidence_revalidates_expired_producer_lease_and_uses_post_receipt_anchor(monkeypatch) -> None:
+@pytest.mark.parametrize(("force_temporal_revalidation", "expire_lease"), [(False, True), (True, False)])
+def test_resolve_evidence_revalidates_expired_or_forced_fresh_lease_and_uses_post_receipt_anchor(
+    monkeypatch,
+    force_temporal_revalidation: bool,
+    expire_lease: bool,
+) -> None:
     config = parse_config(json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text()))
     repository = config.repository
     main_sha = "a" * 40
     now = datetime.now(timezone.utc).replace(microsecond=0)
-    verified_at = now - timedelta(seconds=config.limits.max_lease_seconds + 60)
+    lease_age = config.limits.max_lease_seconds + 60 if expire_lease else 60
+    verified_at = now - timedelta(seconds=lease_age)
     old_horizon = now + timedelta(days=1)
     refreshed_horizon = now + timedelta(days=2)
     archive = b"exact-badge-archive"
@@ -361,7 +367,13 @@ def test_resolve_evidence_revalidates_expired_producer_lease_and_uses_post_recei
     )
     monkeypatch.setattr(cli, "_read_semantic_evidence", lambda *_: (old_horizon, health, 9002))
     monkeypatch.setattr(cli, "_required_gate", lambda *_: True)
-    monkeypatch.setattr(cli, "_run_temporal_revalidation", lambda *_args, **_kwargs: ({"state": "ready"}, refreshed_horizon))
+    revalidation_calls: list[bool] = []
+
+    def temporal_revalidation(*_args, **_kwargs):
+        revalidation_calls.append(True)
+        return {"state": "ready"}, refreshed_horizon
+
+    monkeypatch.setattr(cli, "_run_temporal_revalidation", temporal_revalidation)
     monkeypatch.setattr(cli, "validate_artifact", lambda *_: SimpleNamespace(payload_sha256="b" * 64))
     monkeypatch.setattr(decision, "validate_artifact", lambda *_: SimpleNamespace(payload=b"payload", payload_sha256="b" * 64))
 
@@ -369,9 +381,14 @@ def test_resolve_evidence_revalidates_expired_producer_lease_and_uses_post_recei
         def download(self, _url: str) -> bytes:
             return archive
 
-    resolved, resolved_archive = cli.resolve_evidence(StubApi(), config)
+    resolved, resolved_archive = cli.resolve_evidence(
+        StubApi(),
+        config,
+        force_temporal_revalidation=force_temporal_revalidation,
+    )
     assert resolved.verified_at == verified_at
     assert resolved.temporal_verified_at is not None
+    assert revalidation_calls == [True]
 
     now = resolved.temporal_verified_at + timedelta(seconds=1)
     result = decide_promotion(

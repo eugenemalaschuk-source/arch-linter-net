@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       operation:
-        description: Bootstrap setup, publish, metadata-only renew, or safe runtime integration test.
+        description: Bootstrap setup, publish, read-only preflight, metadata-only renew, or safe runtime integration test.
         required: false
         default: publish
         type: string
@@ -330,8 +330,47 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
+  preflight:
+    if: inputs.operation == 'publish' || inputs.operation == 'preflight'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      packages: read
+      pull-requests: read
+    steps:
+      - name: Set up .NET for trusted temporal revalidation
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.402
+      - name: Run read-only trusted publisher preflight
+        id: preflight
+        # The trusted self-repository action resolves at this workflow SHA and
+        # receives no contents-write or OIDC permission in this job.
+        uses: $/.github/actions/architecture-health-badge-promotion
+        with:
+          configuration_id: ${{ inputs['configuration-id'] }}
+          adapter: ${{ inputs.adapter }}
+          operation: preflight
+      - name: Require fresh temporal evidence before promotion
+        env:
+          PROMOTION_STATUS: ${{ steps.preflight.outputs.status }}
+          TEMPORAL_REVALIDATED: ${{ steps.preflight.outputs.temporal-revalidated }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PROMOTION_STATUS" = "ready"
+          test "$TEMPORAL_REVALIDATED" = "true"
+
   promote:
-    if: inputs.operation != 'bootstrap'
+    needs: preflight
+    if: >-
+      !cancelled() &&
+      inputs.operation != 'bootstrap' &&
+      inputs.operation != 'preflight' &&
+      (inputs.operation != 'publish' || needs.preflight.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -366,7 +405,7 @@ jobs:
           test "$PROMOTION_STATUS" = "ready"
           test "$PROMOTION_REASON" = "runtime_integration_test"
       - name: Publish repository metrics badges from canonical evidence
-        if: steps.promotion.outputs.status == 'ready' && inputs.adapter == 'github-raw'
+        if: steps.promotion.outputs.status == 'ready' && inputs.adapter == 'github-raw' && inputs.operation != 'preflight'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PRODUCER_RUN_ID: ${{ steps.promotion.outputs.run-id }}

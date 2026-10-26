@@ -84,6 +84,23 @@ def test_ci_runs_the_trusted_action_for_a_read_only_runtime_smoke() -> None:
     assert 'test "$PROMOTION_REASON" = "runtime_integration_test"' in smoke
 
 
+def test_publication_runs_a_read_only_temporal_preflight_before_write_permissions() -> None:
+    workflow = read_workflow("architecture-health-badge-promotion.yml")
+    preflight = workflow.split("  preflight:", 1)[1].split("\n  promote:", 1)[0]
+    promote = workflow.split("  promote:", 1)[1]
+
+    assert "if: inputs.operation == 'publish' || inputs.operation == 'preflight'" in preflight
+    assert "contents: read" in preflight
+    assert "contents: write" not in preflight
+    assert "id-token: write" not in preflight
+    assert "operation: preflight" in preflight
+    assert 'test "$TEMPORAL_REVALIDATED" = "true"' in preflight
+    assert "needs: preflight" in promote
+    assert "needs.preflight.result == 'success'" in promote
+    assert "inputs.operation != 'preflight'" in promote
+    assert "temporal-revalidated:" in (ROOT / ".github/actions/architecture-health-badge-promotion/action.yml").read_text()
+
+
 def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_boundary() -> None:
     workflow = read_workflow("architecture-health-badge-promotion.yml")
     assert "workflow_call:" in workflow
