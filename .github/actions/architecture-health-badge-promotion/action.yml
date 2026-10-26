@@ -8,7 +8,7 @@ inputs:
     description: Approved adapter; github-raw, relay, or none.
     required: true
   operation:
-    description: Publish, metadata-only renew, or safe runtime integration test.
+    description: Publish or metadata-only renew.
     required: false
     default: publish
 outputs:
