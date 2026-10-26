@@ -172,3 +172,43 @@ def test_preflight_error_does_not_publish_an_unavailable_snapshot(monkeypatch: p
     assert cli.main() == 1
 
 
+def test_preflight_fails_closed_when_temporal_receipt_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text())
+    raw["destination"] = {
+        "adapter": "github-raw",
+        "branch": "architecture-health-badge",
+        "endpoint_path": "architecture-health.json",
+    }
+    config = parse_config(raw)
+    evidence = SimpleNamespace(
+        head_sha="b" * 40,
+        head_tree_sha="c" * 40,
+        run_id=7001,
+        run_attempt=1,
+        temporal_receipt=None,
+    )
+    decision = PromotionDecision(
+        PromotionStatus.READY,
+        ReasonCode.READY,
+        DecisionDisposition.COMMIT,
+        1,
+        0,
+        b"{}",
+        "a" * 64,
+        None,
+    )
+
+    def fail_publish(*_: object, **__: object) -> None:
+        pytest.fail("preflight without a temporal receipt must leave the public badge untouched")
+
+    monkeypatch.setattr(cli, "_load_config", lambda _: config)
+    monkeypatch.setattr(cli, "GitHubApi", lambda: object())
+    monkeypatch.setattr(cli, "resolve_evidence", lambda *_args, **_kwargs: (evidence, b"archive"))
+    monkeypatch.setattr(cli, "_promotion_request", lambda *_: object())
+    monkeypatch.setattr(cli, "decide_promotion", lambda *_: decision)
+    monkeypatch.setattr(cli, "_publish_raw", fail_publish)
+    monkeypatch.setattr(sys, "argv", ["cli", "--configuration-id", "fixture", "--adapter", "github-raw", "--operation", "preflight"])
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+
+    assert cli.main() == 1

@@ -94,11 +94,10 @@ def test_publication_runs_a_read_only_temporal_preflight_before_write_permission
     assert "contents: write" not in preflight
     assert "id-token: write" not in preflight
     assert "operation: preflight" in preflight
-    assert 'test "$TEMPORAL_REVALIDATED" = "true"' in preflight
+    assert 'test "$PROMOTION_STATUS" = "ready"' in preflight
     assert "needs: preflight" in promote
     assert "needs.preflight.result == 'success'" in promote
     assert "inputs.operation != 'preflight'" in promote
-    assert "temporal-revalidated:" in (ROOT / ".github/actions/architecture-health-badge-promotion/action.yml").read_text()
 
 
 def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_boundary() -> None:

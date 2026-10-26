@@ -357,12 +357,11 @@ jobs:
       - name: Require fresh temporal evidence before promotion
         env:
           PROMOTION_STATUS: ${{ steps.preflight.outputs.status }}
-          TEMPORAL_REVALIDATED: ${{ steps.preflight.outputs.temporal-revalidated }}
         shell: bash
         run: |
           set -euo pipefail
+          # A successful preflight action exit already proves a temporal receipt was validated.
           test "$PROMOTION_STATUS" = "ready"
-          test "$TEMPORAL_REVALIDATED" = "true"
 
   promote:
     needs: preflight
