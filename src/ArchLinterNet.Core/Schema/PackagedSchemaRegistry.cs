@@ -79,7 +79,7 @@ public sealed class PackagedSchemaRegistry
                 return false;
             }
 
-            JsonSchema schema = JsonSchema.FromText(schemaText);
+            JsonSchema schema = JsonSchemaTextFactory.FromText(schemaText);
             JsonElement instance = JsonSerializer.SerializeToElement(ToApiSnapshotInstance(snapshot));
             if (!schema.Evaluate(instance).IsValid)
             {

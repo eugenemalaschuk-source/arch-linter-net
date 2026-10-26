@@ -141,7 +141,7 @@ public sealed class PackagedSchemaRegistryTests
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("analysis-build-state", out string schemaText), Is.True);
 
-        JsonSchema schema = JsonSchema.FromText(schemaText);
+        JsonSchema schema = JsonSchemaTextFactory.FromText(schemaText);
         using JsonDocument document = JsonDocument.Parse(receiptJson);
         Assert.That(schema.Evaluate(document.RootElement).IsValid, Is.True);
     }
@@ -163,7 +163,7 @@ public sealed class PackagedSchemaRegistryTests
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
 
-        JsonSchema schema = JsonSchema.FromText(schemaText);
+        JsonSchema schema = JsonSchemaTextFactory.FromText(schemaText);
         Assert.That(schema.Evaluate(finding).IsValid, Is.True);
         Assert.That(finding.GetProperty("schema_version").GetInt32(), Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
 
@@ -278,7 +278,7 @@ public sealed class PackagedSchemaRegistryTests
             }
             """;
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
-        JsonSchema frozenV2Schema = JsonSchema.FromText(File.ReadAllText(Path.Combine(
+        JsonSchema frozenV2Schema = JsonSchemaTextFactory.FromText(File.ReadAllText(Path.Combine(
             repositoryRoot,
             "schema",
             "0.6.1",
@@ -310,7 +310,7 @@ public sealed class PackagedSchemaRegistryTests
 
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("api-snapshot", out string schemaText), Is.True);
-        JsonSchema schema = JsonSchema.FromText(schemaText);
+        JsonSchema schema = JsonSchemaTextFactory.FromText(schemaText);
         using JsonDocument arbitraryJson = JsonDocument.Parse("\"not a public API snapshot\"");
 
         Assert.Multiple(() =>

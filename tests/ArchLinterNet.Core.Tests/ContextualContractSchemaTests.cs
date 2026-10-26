@@ -31,7 +31,7 @@ public sealed class ContextualContractSchemaTests
             ["$ref"] = $"#/$defs/{defName}"
         };
 
-        return JsonSchema.FromText(wrapper.ToJsonString());
+        return JsonSchemaTextFactory.FromText(wrapper.ToJsonString());
     }
 
     private static JsonNode? ToJsonNode(string yaml)

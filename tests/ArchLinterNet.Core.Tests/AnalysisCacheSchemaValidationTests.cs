@@ -22,7 +22,7 @@ public sealed class AnalysisCacheSchemaValidationTests
     {
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("analysis-cache", out string schemaText), Is.True);
-        return JsonSchema.FromText(schemaText);
+        return JsonSchemaTextFactory.FromText(schemaText);
     }
 
     private static AnalysisCacheEntryV1 BuildSampleEntry(string cacheRootPath)

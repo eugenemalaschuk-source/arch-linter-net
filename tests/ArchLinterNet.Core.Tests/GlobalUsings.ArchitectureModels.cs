@@ -3,3 +3,4 @@
 global using ArchLinterNet.Core.Contracts.PolicyImports.Models;
 global using ArchLinterNet.Core.Execution.Contracts;
 global using ArchLinterNet.Core.Execution.Results;
+global using ArchLinterNet.Core.Schema;

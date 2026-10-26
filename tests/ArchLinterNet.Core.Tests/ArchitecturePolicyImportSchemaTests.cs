@@ -123,7 +123,7 @@ public sealed class ArchitecturePolicyImportSchemaTests
         JsonObject fragment = (JsonObject)JsonNode.Parse(fragmentDocument.RootElement.GetRawText())!;
         fragment["$defs"] = JsonNode.Parse(rootDocument.RootElement.GetProperty("$defs").GetRawText());
         RewriteRootReferences(fragment);
-        return JsonSchema.FromText(fragment.ToJsonString());
+        return JsonSchemaTextFactory.FromText(fragment.ToJsonString());
     }
 
     private static JsonSchema LoadSelfContainedImportsSchema()
@@ -134,7 +134,7 @@ public sealed class ArchitecturePolicyImportSchemaTests
             ["$defs"] = JsonNode.Parse(rootDocument.RootElement.GetProperty("$defs").GetRawText()),
             ["$ref"] = "#/$defs/imports"
         };
-        return JsonSchema.FromText(schema.ToJsonString());
+        return JsonSchemaTextFactory.FromText(schema.ToJsonString());
     }
 
     private static void RewriteRootReferences(JsonNode? node)
@@ -177,6 +177,6 @@ public sealed class ArchitecturePolicyImportSchemaTests
     {
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
         string path = Path.Combine(repositoryRoot, "schema", "0.8.0", fileName);
-        return JsonSchema.FromText(File.ReadAllText(path));
+        return JsonSchemaTextFactory.FromText(File.ReadAllText(path));
     }
 }

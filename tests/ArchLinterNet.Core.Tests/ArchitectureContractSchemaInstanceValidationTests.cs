@@ -23,7 +23,7 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         return File.ReadAllText(schemaPath);
     }
 
-    private static JsonSchema LoadSchema() => JsonSchema.FromText(SchemaText());
+    private static JsonSchema LoadSchema() => JsonSchemaTextFactory.FromText(SchemaText());
 
     // Wraps a single named $def in a standalone schema that carries the full document's $defs
     // alongside it, so cross-references between $defs (e.g. classification -> selector) still
@@ -39,7 +39,7 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
             ["$ref"] = $"#/$defs/{defName}"
         };
 
-        return JsonSchema.FromText(wrapper.ToJsonString());
+        return JsonSchemaTextFactory.FromText(wrapper.ToJsonString());
     }
 
     // YamlDotNet's Deserialize<object> returns every scalar as a string (no YAML-1.1-core-schema

@@ -63,7 +63,7 @@ public sealed class ContractSurfaceExposureSchemaTests
         using JsonDocument cache = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(schemaDirectory, "analysis-cache.schema.json")));
         string baselineText = File.ReadAllText(Path.Combine(schemaDirectory, "baseline.schema.json"));
-        JsonSchema baseline = JsonSchema.FromText(baselineText);
+        JsonSchema baseline = JsonSchemaTextFactory.FromText(baselineText);
         var baselineDocument = new JsonObject
         {
             ["version"] = 3,
@@ -113,7 +113,7 @@ public sealed class ContractSurfaceExposureSchemaTests
             ["$defs"] = JsonNode.Parse(document.RootElement.GetProperty("$defs").GetRawText()),
             ["$ref"] = $"#/$defs/{definition}"
         };
-        return JsonSchema.FromText(wrapper.ToJsonString());
+        return JsonSchemaTextFactory.FromText(wrapper.ToJsonString());
     }
 
     private static bool Validate(string yaml, string definition)

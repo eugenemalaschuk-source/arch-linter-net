@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Schema;
 using Json.Schema;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
@@ -13,7 +14,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
     private const string SchemaResourceName = "ArchLinterNet.Core.Schema.dependencies.arch.schema.json";
 
     private static readonly Lazy<JsonNode> _schemaDocument = new(LoadSchemaDocument);
-    private static readonly Lazy<JsonSchema> _schema = new(() => JsonSchema.FromText(_schemaDocument.Value.ToJsonString()));
+    private static readonly Lazy<JsonSchema> _schema = new(() => JsonSchemaTextFactory.FromText(_schemaDocument.Value.ToJsonString()));
 
     public static void Validate(string yaml, ArchitecturePolicyProvenanceIndex provenance)
     {

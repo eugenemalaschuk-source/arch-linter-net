@@ -420,7 +420,7 @@ public sealed class LargeSolutionBenchmarkingTests
             "synthetic-manifest-contract", BenchmarkTopologyShape.Dense,
             new BenchmarkDimensionSet { ProjectCount = 5, SourceRootCount = 2 });
         string json = BenchmarkJson.Serialize(workload.ToManifest());
-        JsonSchema schema = JsonSchema.FromText(LoadWorkloadSchema());
+        JsonSchema schema = JsonSchemaTextFactory.FromText(LoadWorkloadSchema());
         EvaluationResults validation = schema.Evaluate(
             JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
 
@@ -458,7 +458,7 @@ public sealed class LargeSolutionBenchmarkingTests
         };
         string json = BenchmarkEvidenceJson.Serialize(evidence);
         BenchmarkEvidenceDocument roundTrip = BenchmarkEvidenceJson.Deserialize(json);
-        JsonSchema schema = JsonSchema.FromText(LoadEvidenceSchema());
+        JsonSchema schema = JsonSchemaTextFactory.FromText(LoadEvidenceSchema());
         EvaluationResults validation = schema.Evaluate(
             JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
 
@@ -566,7 +566,7 @@ public sealed class LargeSolutionBenchmarkingTests
             ["unit"] = null,
             ["reason"] = null,
         };
-        JsonSchema schema = JsonSchema.FromText(LoadEvidenceSchema());
+        JsonSchema schema = JsonSchemaTextFactory.FromText(LoadEvidenceSchema());
         EvaluationResults validation = schema.Evaluate(
             invalidJson, new EvaluationOptions { OutputFormat = OutputFormat.List });
 

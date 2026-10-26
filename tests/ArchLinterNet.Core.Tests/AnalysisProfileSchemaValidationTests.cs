@@ -15,7 +15,7 @@ public sealed class AnalysisProfileSchemaValidationTests
     {
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("analysis-profile", out string schemaText), Is.True);
-        return JsonSchema.FromText(schemaText);
+        return JsonSchemaTextFactory.FromText(schemaText);
     }
 
     private static string WriteHarmlessPolicy()
