@@ -137,12 +137,5 @@ public sealed class ArchitectureRoleIndex
         Dictionary<Type, ArchitectureTypeClassificationResult> RolesByType,
         IReadOnlyList<ArchitectureClassificationConflict> Conflicts,
         IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures,
-        IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics)
-    {
-        public static readonly RoleIndexData Empty = new(
-            new Dictionary<Type, ArchitectureTypeClassificationResult>(),
-            Array.Empty<ArchitectureClassificationConflict>(),
-            Array.Empty<ArchitectureClassificationMetadataFailure>(),
-            Array.Empty<ArchitectureCanonicalAnnotationDiagnostic>());
-    }
+        IReadOnlyList<ArchitectureCanonicalAnnotationDiagnostic> CanonicalAnnotationDiagnostics);
 }

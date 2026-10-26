@@ -186,9 +186,10 @@ internal sealed class RawTopologyNodeValidator : IArchitecturePolicyRawDocumentV
 
     private static void ValidateKnownKeys(YamlMappingNode node, string location, IEnumerable<string> allowed)
     {
+        HashSet<string> allowedKeys = new(allowed, StringComparer.Ordinal);
         foreach ((YamlNode key, _) in node.Children)
         {
-            if (key is YamlScalarNode scalar && !allowed.Contains(scalar.Value, StringComparer.Ordinal))
+            if (key is YamlScalarNode scalar && !allowedKeys.Contains(scalar.Value!))
             {
                 throw new InvalidOperationException($"{location} contains unknown property '{scalar.Value}'.");
             }

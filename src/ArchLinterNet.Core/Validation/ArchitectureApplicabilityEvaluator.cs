@@ -212,14 +212,22 @@ public static class ArchitectureApplicabilityEvaluator
     }
 
     private static ArchitectureApplicabilityReason[] CollectReasons(
-        IEnumerable<ArchitectureApplicabilityAssessment> assessments)
+        IReadOnlyList<ArchitectureApplicabilityAssessment> assessments)
     {
-        return assessments
-            .SelectMany(assessment => assessment.IntegrityReasons)
-            .Concat(assessments
-                .Where(assessment => assessment.IsIntegrityValid
-                    && assessment.Record?.State == ArchitectureApplicabilityRecordState.Unassessable)
-                .SelectMany(assessment => assessment.Record!.Reasons))
+        List<ArchitectureApplicabilityReason> integrityReasons = new();
+        List<ArchitectureApplicabilityReason> unassessableRecordReasons = new();
+        foreach (ArchitectureApplicabilityAssessment assessment in assessments)
+        {
+            integrityReasons.AddRange(assessment.IntegrityReasons);
+            if (assessment.IsIntegrityValid
+                && assessment.Record?.State == ArchitectureApplicabilityRecordState.Unassessable)
+            {
+                unassessableRecordReasons.AddRange(assessment.Record.Reasons);
+            }
+        }
+
+        integrityReasons.AddRange(unassessableRecordReasons);
+        return integrityReasons
             .OrderBy(reason => reason.Provenance.ControlIdentity, StringComparer.Ordinal)
             .ThenBy(reason => reason.Code, StringComparer.Ordinal)
             .ThenBy(reason => reason.Provenance.Family, StringComparer.Ordinal)

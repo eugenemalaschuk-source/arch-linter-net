@@ -215,7 +215,7 @@ internal sealed class HealthCommandHandler(
     internal int ExecuteRevalidatePublication(HealthRevalidatePublicationCommandOptions options) =>
         new HealthRevalidatePublicationCommandHandler(console, fileSystem).Execute(options);
 
-    private ArchitectureHealthOutcome? EvaluateWithChangeSnapshot(
+    private ArchitectureHealthOutcome EvaluateWithChangeSnapshot(
         ArchitectureAnalysisCommandOptions options,
         ArchitectureHealthRequest healthRequest,
         string changeSnapshotOutput,

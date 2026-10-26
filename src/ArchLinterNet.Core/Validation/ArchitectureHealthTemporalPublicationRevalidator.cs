@@ -20,7 +20,6 @@ internal sealed record ArchitectureHealthTemporalPublicationBinding(
 /// </summary>
 internal static class ArchitectureHealthTemporalPublicationRevalidator
 {
-    private const string MissingEvidence = "missing_report_evidence";
     private const string MalformedEvidence = "malformed_report_evidence";
     private const string InvalidBinding = "invalid_publication_binding";
     private const string SourceDigestMismatch = "source_health_sha256_mismatch";

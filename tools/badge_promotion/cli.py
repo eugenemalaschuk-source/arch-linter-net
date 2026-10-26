@@ -46,6 +46,7 @@ class ProviderFailure(RuntimeError):
 
 _MAX_RAW_PUBLICATION_ATTEMPTS = 5
 _DEFAULT_BRANCH = "~DEFAULT_BRANCH"
+GITHUB_DIRECTORY = ".github"
 
 
 class _ArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -681,7 +682,7 @@ def resolve_evidence(api: GitHubApi, config) -> tuple[EvidenceContext, bytes]:
 
 
 def _load_config(configuration_id: str):
-    path = Path(__file__).resolve().parents[2] / ".github" / "badge-promotion" / "registry.json"
+    path = Path(__file__).resolve().parents[2] / GITHUB_DIRECTORY / "badge-promotion" / "registry.json"
     try:
         if configuration_id == "setup_generated":
             return load_setup_registry(GitHubApi().request, os.environ)
@@ -840,6 +841,41 @@ def _commit_private(decision, output_metadata: dict[str, object]) -> int:
     return 0
 
 
+def _run_runtime_integration_test(configuration_id: str, adapter: str, config) -> int:
+    if (
+        configuration_id != "reference-none"
+        or adapter != "none"
+        or config.destination.adapter.value != "none"
+    ):
+        raise ProviderFailure("runtime_test_configuration_invalid")
+    if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
+        raise ProviderFailure("runtime_test_event_invalid")
+    if os.environ.get("GITHUB_REPOSITORY") != config.repository:
+        raise ProviderFailure("runtime_test_repository_invalid")
+
+    action_path_value = os.environ.get("GITHUB_ACTION_PATH", "")
+    try:
+        action_path = Path(action_path_value).resolve(strict=True)
+        action_root = action_path.parents[2]
+        module_root = Path(__file__).resolve().parents[2]
+    except (OSError, IndexError) as error:
+        raise ProviderFailure("runtime_test_action_path_invalid") from error
+
+    expected_action_path = action_root / GITHUB_DIRECTORY / "actions" / "architecture-health-badge-promotion"
+    if (
+        action_root != module_root
+        or action_path != expected_action_path.resolve()
+        or not (action_path / "action.yml").is_file()
+        or not (module_root / GITHUB_DIRECTORY / "badge-promotion" / "registry.json").is_file()
+    ):
+        raise ProviderFailure("runtime_test_action_path_invalid")
+
+    output = {"status": "ready", "reason": "runtime_integration_test"}
+    _write_outputs(output)
+    print(json.dumps(output, separators=(",", ":")))
+    return 0
+
+
 def _handle_failure(error, config, api: GitHubApi | None) -> None:
     if config is not None and config.destination.adapter.value == "github-raw":
         try:
@@ -870,12 +906,27 @@ def _prepare_relay_publication(config, decision, evidence: EvidenceContext, requ
     return client, digest, horizon, token, challenge_id, generation, revocation_epoch
 
 
+def _run_runtime_integration_from_cli(configuration_id: str, adapter: str) -> int:
+    try:
+        if configuration_id != "reference-none" or adapter != "none":
+            raise ProviderFailure("runtime_test_configuration_invalid")
+        config = _load_config(configuration_id)
+        return _run_runtime_integration_test(configuration_id, adapter, config)
+    except (ProviderFailure, AdapterError) as error:
+        _write_outputs({"status": "unavailable", "reason": error.reason})
+        print(json.dumps({"status": "unavailable", "reason": error.reason}, separators=(",", ":")), file=sys.stderr)
+        return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configuration-id", required=True)
     parser.add_argument("--adapter", required=True)
-    parser.add_argument("--operation", choices=("publish", "renew"), default="publish")
+    parser.add_argument("--operation", choices=("publish", "renew", "integration-test"), default="publish")
     args = parser.parse_args()
+    if args.operation == "integration-test":
+        return _run_runtime_integration_from_cli(args.configuration_id, args.adapter)
+
     config = None
     api = None
     try:

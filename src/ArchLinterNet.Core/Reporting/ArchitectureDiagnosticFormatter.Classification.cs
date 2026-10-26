@@ -44,7 +44,7 @@ internal static class ArchitectureClassificationCiArtifactsRenderer
     }
 
     /// <summary>
-    /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
+    /// Additive overload — see the matching declaration on <see cref="ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the original overload instead of extending it.
     /// </summary>
     internal static string FormatResultForCiArtifacts( // NOSONAR: preserves the reviewed compatibility overload's payload contract
@@ -87,7 +87,7 @@ internal static class ArchitectureClassificationCiArtifactsRenderer
     }
 
     /// <summary>
-    /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
+    /// Additive overload — see the matching declaration on <see cref="ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the roles overload instead of extending it.
     /// </summary>
     internal static string FormatResultForCiArtifacts( // NOSONAR: preserves the reviewed compatibility overload's payload contract
@@ -132,7 +132,7 @@ internal static class ArchitectureClassificationCiArtifactsRenderer
     }
 
     /// <summary>
-    /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
+    /// Additive overload — see the matching declaration on <see cref="ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the classificationPathDeferred overload instead of extending it.
     /// </summary>
     internal static string FormatResultForCiArtifacts( // NOSONAR: preserves the reviewed compatibility overload's payload contract
@@ -326,7 +326,7 @@ internal static class ArchitectureClassificationCiArtifactsRenderer
     }
 
     /// <summary>
-    /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
+    /// Additive overload — see the matching declaration on <see cref="ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticFormatter"/>
     /// for why this exists alongside the original overload instead of extending it.
     /// </summary>
     internal static string FormatClassificationFactsForHumans(

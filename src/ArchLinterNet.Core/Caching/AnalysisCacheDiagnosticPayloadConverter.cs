@@ -24,7 +24,7 @@ internal sealed class AnalysisCacheDiagnosticPayloadConverter : JsonConverter<IA
     private const string KindProperty = "$kind";
     private const string ValueProperty = "value";
 
-    public override IArchitectureDiagnosticPayload? Read(
+    public override IArchitectureDiagnosticPayload Read(
         ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         using JsonDocument document = JsonDocument.ParseValue(ref reader);

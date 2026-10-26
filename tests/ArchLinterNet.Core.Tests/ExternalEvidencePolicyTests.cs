@@ -246,6 +246,25 @@ public sealed class ExternalEvidencePolicyTests
         Assert.DoesNotThrow(() => new ExternalEvidencePolicyValidator().Validate(document));
     }
 
+    [Test]
+    public void Validate_DiagnosticSelectorBeyondBound_IsRejectedByTypedValidator()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement("scan");
+        requirement.DiagnosticFilter = new ArchitectureExternalEvidenceDiagnosticFilter
+        {
+            RuleIds = Enumerable.Range(0, 129).Select(index => $"SEC{index}").ToList(),
+        };
+        var document = new ArchitectureContractDocument
+        {
+            ExternalEvidence = [requirement],
+        };
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => new ExternalEvidencePolicyValidator().Validate(document))!;
+
+        Assert.That(exception.Message, Does.Contain("rule_ids must contain no more than 128 values"));
+    }
+
     [TestCase("", "non-blank")]
     [TestCase("xml", "exactly 'sarif'")]
     public void Load_InvalidFormat_IsRejected(string format, string expectedMessage)

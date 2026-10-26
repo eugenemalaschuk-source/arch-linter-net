@@ -234,7 +234,7 @@ internal sealed class ArchitectureSemanticCoverageService
         return contextualGovernance;
     }
 
-    private List<ArchitectureCoverageSummaryEvidenceItem> GetSemanticStaleItems(IEnumerable<Type> types)
+    private List<ArchitectureCoverageSummaryEvidenceItem> GetSemanticStaleItems(Type[] scannedTypes)
     {
         if (_semanticStaleItems != null)
         {
@@ -246,11 +246,11 @@ internal sealed class ArchitectureSemanticCoverageService
                      .Where(layer => layer.Selector != null && !layer.External)
                      .OrderBy(ArchitectureLayerResolver.DescribeLayer, StringComparer.Ordinal))
         {
-            if (!types.Any(type => RoleIndex.TryGetRole(type, out _) && Facts.MatchesLayer(layer, type)))
+            if (!scannedTypes.Any(type => RoleIndex.TryGetRole(type, out _) && Facts.MatchesLayer(layer, type)))
                 items.Add(new ArchitectureCoverageSummaryEvidenceItem(ArchitectureLayerResolver.DescribeLayer(layer), "semantic selector matched no classified type"));
         }
         foreach (ArchitectureContextualConsumerReference consumer in RegisteredContextualConsumers
-                     .Where(consumer => !types.Any(type => MatchesContextualConsumer(consumer, type)))
+                     .Where(consumer => !scannedTypes.Any(type => MatchesContextualConsumer(consumer, type)))
                      .OrderBy(consumer => consumer.Description, StringComparer.Ordinal))
         {
             items.Add(new ArchitectureCoverageSummaryEvidenceItem(DescribeConsumer(consumer), "contextual semantic selector matched no classified type"));

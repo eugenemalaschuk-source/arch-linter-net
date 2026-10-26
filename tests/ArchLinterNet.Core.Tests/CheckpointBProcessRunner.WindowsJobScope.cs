@@ -369,7 +369,7 @@ internal static partial class CheckpointBProcessRunner
                 return fullPath;
             }
 
-            IEnumerable<string> extensions = Path.HasExtension(fileName) ? [string.Empty] : PathExtensions;
+            string[] extensions = Path.HasExtension(fileName) ? [string.Empty] : PathExtensions;
             IEnumerable<string> directories = [Environment.CurrentDirectory, .. PathDirectories];
             foreach (string directory in directories)
             {
@@ -386,10 +386,11 @@ internal static partial class CheckpointBProcessRunner
             throw new InvalidOperationException($"Could not resolve executable '{fileName}' on PATH.");
         }
 
-        private static IEnumerable<string> PathExtensions =>
+        private static string[] PathExtensions =>
             (Environment.GetEnvironmentVariable("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD")
                 .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Prepend(string.Empty);
+                .Prepend(string.Empty)
+                .ToArray();
 
         private static IEnumerable<string> PathDirectories =>
             (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)

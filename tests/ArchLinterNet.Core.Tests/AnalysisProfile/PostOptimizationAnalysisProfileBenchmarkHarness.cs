@@ -397,13 +397,17 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         return sorted[(int)Math.Ceiling(sorted.Count * 0.95) - 1];
     }
 
-    private static double? MedianOptional(IEnumerable<double?> values) =>
-        values.Where(static value => value.HasValue).Select(static value => value!.Value).DefaultIfEmpty().Any()
-            ? Median(values.Where(static value => value.HasValue).Select(static value => value!.Value)) : null;
+    private static double? MedianOptional(IEnumerable<double?> values)
+    {
+        double[] availableValues = values.OfType<double>().ToArray();
+        return availableValues.Length == 0 ? null : Median(availableValues);
+    }
 
-    private static double? Percentile95Optional(IEnumerable<double?> values) =>
-        values.Where(static value => value.HasValue).Select(static value => value!.Value).DefaultIfEmpty().Any()
-            ? Percentile95(values.Where(static value => value.HasValue).Select(static value => value!.Value)) : null;
+    private static double? Percentile95Optional(IEnumerable<double?> values)
+    {
+        double[] availableValues = values.OfType<double>().ToArray();
+        return availableValues.Length == 0 ? null : Percentile95(availableValues);
+    }
 
     private static string CliDllPath() => Path.Combine(new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
 

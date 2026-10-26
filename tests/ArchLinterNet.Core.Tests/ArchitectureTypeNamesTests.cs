@@ -60,6 +60,6 @@ public sealed class ArchitectureTypeNamesTests
         {
         }
 
-        public override string? FullName => throw new TypeLoadException();
+        public override string FullName => throw new TypeLoadException();
     }
 }

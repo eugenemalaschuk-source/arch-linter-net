@@ -41,12 +41,16 @@ public sealed class ArchitectureIlMethodBodyScannerTests
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => scanner.FindMethodBodyViolations(
-            _fixtureAssembly,
-            typeof(MethodBodyFixture).Namespace!,
-            _consoleWriteLinePattern,
-            context,
-            cancellationToken: cts.Token).ToList());
+        Assert.Throws<OperationCanceledException>(() =>
+        {
+            var violations = scanner.FindMethodBodyViolations(
+                _fixtureAssembly,
+                typeof(MethodBodyFixture).Namespace!,
+                _consoleWriteLinePattern,
+                context,
+                cancellationToken: cts.Token).ToList();
+            Assert.That(violations, Is.Empty);
+        });
     }
 
     [Test]

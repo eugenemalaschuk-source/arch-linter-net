@@ -114,9 +114,10 @@ internal static class RawYamlNodes
     public static void ValidateKnownKeys(
         YamlMappingNode node, string contractName, string location, IEnumerable<string> allowed)
     {
+        HashSet<string> allowedKeys = new(allowed, StringComparer.Ordinal);
         foreach ((YamlNode keyNode, _) in node.Children)
         {
-            if (keyNode is YamlScalarNode scalar && !allowed.Contains(scalar.Value, StringComparer.Ordinal))
+            if (keyNode is YamlScalarNode scalar && !allowedKeys.Contains(scalar.Value!))
             {
                 throw new InvalidOperationException(
                     $"Contextual contract '{contractName}' declares an unknown property '{scalar.Value}' on {location}.");

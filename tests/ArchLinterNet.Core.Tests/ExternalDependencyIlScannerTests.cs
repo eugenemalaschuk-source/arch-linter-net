@@ -107,12 +107,16 @@ public sealed class ExternalDependencyIlScannerTests
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
-            sourceTypes,
-            "vendor_sdk",
-            group,
-            executionContext,
-            cts.Token).ToList());
+        Assert.Throws<OperationCanceledException>(() =>
+        {
+            var violations = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
+                sourceTypes,
+                "vendor_sdk",
+                group,
+                executionContext,
+                cts.Token).ToList();
+            Assert.That(violations, Is.Empty);
+        });
     }
 
     [Test]

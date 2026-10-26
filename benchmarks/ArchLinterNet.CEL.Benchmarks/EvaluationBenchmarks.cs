@@ -6,7 +6,7 @@ namespace ArchLinterNet.CEL.Benchmarks;
 
 /// <summary>
 /// Compile-once/evaluate-many: every benchmark here reuses one <see cref="OperationFixtures"/>
-/// instance built in <see cref="GlobalSetup"/>, so only repeated <c>Evaluate</c> cost is measured —
+/// instance built in <see cref="GlobalSetupAttribute"/>, so only repeated <c>Evaluate</c> cost is measured —
 /// no parsing, binding, or type-checking occurs on this path (the internal bound plan is never
 /// re-derived; see <c>CelCompiledPredicate.Evaluate</c>/<c>CelCompiledExpression.Evaluate</c>).
 /// Each benchmark isolates one Profile v1 operator/built-in category.

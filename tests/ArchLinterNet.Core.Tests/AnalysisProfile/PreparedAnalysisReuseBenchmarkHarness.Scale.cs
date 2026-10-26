@@ -139,7 +139,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 measurements.Sum(measurement => measurement.ProjectionWork),
                 independentPreparationMilliseconds,
                 independentProjectionMilliseconds,
-                measurements.Sum(measurement => measurement.LoadAuthorizationWork) / measurements.Count,
+                measurements.Sum(measurement => measurement.LoadAuthorizationWork) / (decimal)measurements.Count,
                 scaleTiming.LoadAuthorizationMilliseconds,
                 missingTimingEvidenceFamilies));
         }

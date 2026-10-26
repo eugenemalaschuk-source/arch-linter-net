@@ -68,6 +68,25 @@ public sealed class BadgeSetupConfigurationParserTests
     }
 
     [Test]
+    public void ParserRejectsDuplicateProperties()
+    {
+        string valid = JsonSerializer.Serialize(ValidConfiguration());
+        string duplicateSchemaId = valid[..^1]
+            + $",\"schema_id\":\"{BadgeSetupContract.SchemaId}\"}}";
+
+        BadgeSetupConfigurationParseResult result = BadgeSetupConfigurationParser.Parse(duplicateSchemaId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsValid, Is.False);
+            Assert.That(
+                result.Diagnostics.Any(diagnostic => diagnostic.PrivateDetail?.Contains(
+                    "unknown or duplicate property", StringComparison.Ordinal) == true),
+                Is.True);
+        });
+    }
+
+    [Test]
     public void ParserAcceptsNullableOptionalObjectsButRequiresCoreObjects()
     {
         BadgeSetupConfiguration configuration = ValidConfiguration() with

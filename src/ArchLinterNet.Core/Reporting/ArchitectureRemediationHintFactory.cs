@@ -82,7 +82,7 @@ internal static class ArchitectureRemediationHintFactory
         return provider(diagnostic, identity);
     }
 
-    internal static ArchitectureRemediationHint? ForDependency(DependencyDiagnostic diagnostic, ArchitectureViolationIdentity identity)
+    internal static ArchitectureRemediationHint ForDependency(DependencyDiagnostic diagnostic, ArchitectureViolationIdentity identity)
     {
         if (IsCoverageDiagnostic(diagnostic.ForbiddenNamespace))
         {

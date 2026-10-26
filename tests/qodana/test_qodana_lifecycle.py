@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("qodana_lifecycle_runner", ROOT / "tools/scripts/qodana_ci.py")
 qodana = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(qodana)
-IMAGE = "jetbrains/qodana-cdnet:2026.2"
+IMAGE = "jetbrains/qodana-cdnet:2026.2@sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2"
 IMAGE_ID = "sha256:" + "a" * 64
 
 

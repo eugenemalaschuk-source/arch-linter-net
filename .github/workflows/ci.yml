@@ -16,6 +16,35 @@ env:
   SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'eugenemalaschuk-source' }}
 
 jobs:
+  badge_promotion_runtime:
+    name: Badge Promotion Action Runtime
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Set up .NET for trusted temporal revalidation
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.402
+      - name: Run the trusted badge promotion action in safe runtime mode
+        id: promotion
+        uses: $/.github/actions/architecture-health-badge-promotion
+        with:
+          configuration_id: reference-none
+          adapter: none
+          operation: integration-test
+      - name: Verify the safe runtime integration result
+        env:
+          PROMOTION_STATUS: ${{ steps.promotion.outputs.status }}
+          PROMOTION_REASON: ${{ steps.promotion.outputs.reason }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PROMOTION_STATUS" = "ready"
+          test "$PROMOTION_REASON" = "runtime_integration_test"
+
   # Pull-request validation is decomposed along real dependency boundaries. Workflow quality,
   # repository lint, architecture coverage, tooling/support tests, cross-platform correctness and
   # the .NET coverage shards all start independently. Coverage + Sonar is the one intentional
@@ -76,7 +105,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -121,7 +150,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -182,7 +211,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
 
       - name: Setup Java
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
@@ -368,7 +397,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -1087,6 +1116,7 @@ jobs:
 
       - name: Shut down .NET build servers
         if: always()
+        timeout-minutes: 1
         run: dotnet build-server shutdown
         continue-on-error: true
 
@@ -1127,7 +1157,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
 
       - name: Restore
         run: make restore
@@ -1170,7 +1200,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
 
       - name: Restore
         run: make restore
@@ -1200,7 +1230,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -1354,7 +1384,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -1383,6 +1413,7 @@ jobs:
 
       - name: Shut down .NET build servers
         if: always()
+        timeout-minutes: 1
         run: dotnet build-server shutdown
         continue-on-error: true
 
@@ -1466,7 +1497,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
 
       - name: Cache NuGet packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -1495,6 +1526,7 @@ jobs:
 
       - name: Shut down .NET build servers
         if: always()
+        timeout-minutes: 1
         run: dotnet build-server shutdown
         continue-on-error: true
 

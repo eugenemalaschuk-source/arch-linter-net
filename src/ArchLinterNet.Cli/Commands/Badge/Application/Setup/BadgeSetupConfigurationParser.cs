@@ -359,8 +359,10 @@ internal static class BadgeSetupConfigurationParser
         IEnumerable<string> allowed,
         List<BadgeSetupDiagnostic> diagnostics)
     {
+        HashSet<string> allowedProperties = new(allowed, StringComparer.Ordinal);
         HashSet<string> seen = new(StringComparer.Ordinal);
-        foreach (JsonProperty property in objectElement.EnumerateObject().Where(property => !seen.Add(property.Name) || !allowed.Contains(property.Name)))
+        foreach (JsonProperty _ in objectElement.EnumerateObject().Where(
+                     property => !seen.Add(property.Name) || !allowedProperties.Contains(property.Name)))
         {
             AddInvalid(diagnostics, "The configuration contains an unknown or duplicate property.");
         }

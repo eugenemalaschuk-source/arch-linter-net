@@ -356,7 +356,7 @@ internal static class ContractSurfaceExposureChecker
         string code,
         ArchitectureApplicabilityProvenance provenance) => new(code, provenance);
 
-    private static string? SourceSite(ArchitectureContractExposurePath path)
+    private static string SourceSite(ArchitectureContractExposurePath path)
     {
         ArchitectureContractExposurePathSegment member = path.Segments
             .FirstOrDefault(segment => segment.Kind is "member" or "attribute" or "attribute_argument");

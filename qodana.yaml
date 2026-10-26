@@ -1,7 +1,7 @@
 # Community .NET only: no cloud token or paid license is required.
 # Keep the version explicit; every run records the resolved immutable image ID.
 version: "1.0"
-linter: jetbrains/qodana-cdnet:2026.2
+linter: jetbrains/qodana-cdnet:2026.2@sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2
 profile:
   name: qodana.recommended
 dotnet:

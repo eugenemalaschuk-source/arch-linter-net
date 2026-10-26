@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       operation:
-        description: Bootstrap setup, publish, or metadata-only renew.
+        description: Bootstrap setup, publish, metadata-only renew, or safe runtime integration test.
         required: false
         default: publish
         type: string
@@ -163,7 +163,7 @@ jobs:
       - name: Setup .NET for trusted bootstrap setup
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.402
       - name: Install exact bootstrap CLI
         shell: bash
         env:
@@ -345,14 +345,26 @@ jobs:
       - name: Set up .NET for trusted temporal revalidation
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          dotnet-version: 10.0.x
-      - name: Run pinned trusted promotion contract
+          dotnet-version: 10.0.402
+      - name: Run trusted promotion contract at the workflow SHA
         id: promotion
-        uses: eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@591a3834fd36496ff2c83872519cd60e386bd490
+        # GitHub.com self-repository syntax resolves this action from this reusable workflow's
+        # repository and running commit, independent of the caller's checked-out workspace.
+        uses: $/.github/actions/architecture-health-badge-promotion
         with:
           configuration_id: ${{ inputs['configuration-id'] }}
           adapter: ${{ inputs.adapter }}
           operation: ${{ inputs.operation }}
+      - name: Verify the safe runtime integration result
+        if: inputs.operation == 'integration-test'
+        env:
+          PROMOTION_STATUS: ${{ steps.promotion.outputs.status }}
+          PROMOTION_REASON: ${{ steps.promotion.outputs.reason }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PROMOTION_STATUS" = "ready"
+          test "$PROMOTION_REASON" = "runtime_integration_test"
       - name: Publish repository metrics badges from canonical evidence
         if: steps.promotion.outputs.status == 'ready' && inputs.adapter == 'github-raw'
         env:
