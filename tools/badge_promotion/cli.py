@@ -840,6 +840,41 @@ def _commit_private(decision, output_metadata: dict[str, object]) -> int:
     return 0
 
 
+def _run_runtime_integration_test(configuration_id: str, adapter: str, config) -> int:
+    if (
+        configuration_id != "reference-none"
+        or adapter != "none"
+        or config.destination.adapter.value != "none"
+    ):
+        raise ProviderFailure("runtime_test_configuration_invalid")
+    if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
+        raise ProviderFailure("runtime_test_event_invalid")
+    if os.environ.get("GITHUB_REPOSITORY") != config.repository:
+        raise ProviderFailure("runtime_test_repository_invalid")
+
+    action_path_value = os.environ.get("GITHUB_ACTION_PATH", "")
+    try:
+        action_path = Path(action_path_value).resolve(strict=True)
+        action_root = action_path.parents[2]
+        module_root = Path(__file__).resolve().parents[2]
+    except (OSError, IndexError) as error:
+        raise ProviderFailure("runtime_test_action_path_invalid") from error
+
+    expected_action_path = action_root / ".github" / "actions" / "architecture-health-badge-promotion"
+    if (
+        action_root != module_root
+        or action_path != expected_action_path.resolve()
+        or not (action_path / "action.yml").is_file()
+        or not (module_root / ".github" / "badge-promotion" / "registry.json").is_file()
+    ):
+        raise ProviderFailure("runtime_test_action_path_invalid")
+
+    output = {"status": "ready", "reason": "runtime_integration_test"}
+    _write_outputs(output)
+    print(json.dumps(output, separators=(",", ":")))
+    return 0
+
+
 def _handle_failure(error, config, api: GitHubApi | None) -> None:
     if config is not None and config.destination.adapter.value == "github-raw":
         try:
@@ -874,11 +909,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--configuration-id", required=True)
     parser.add_argument("--adapter", required=True)
-    parser.add_argument("--operation", choices=("publish", "renew"), default="publish")
+    parser.add_argument("--operation", choices=("publish", "renew", "integration-test"), default="publish")
     args = parser.parse_args()
     config = None
     api = None
     try:
+        if args.operation == "integration-test":
+            if args.configuration_id != "reference-none" or args.adapter != "none":
+                raise ProviderFailure("runtime_test_configuration_invalid")
+            config = _load_config(args.configuration_id)
+            return _run_runtime_integration_test(args.configuration_id, args.adapter, config)
+
         config = _load_config(args.configuration_id)
         if config.destination.adapter.value != args.adapter:
             raise ProviderFailure("adapter_configuration_mismatch")
@@ -906,6 +947,10 @@ def main() -> int:
         _publish_raw(api, config, decision.payload or b"", evidence=evidence, status="ready", reason=decision.reason.value)
         return 0
     except (ProviderFailure, AdapterError) as error:
+        if args.operation == "integration-test":
+            _write_outputs({"status": "unavailable", "reason": error.reason})
+            print(json.dumps({"status": "unavailable", "reason": error.reason}, separators=(",", ":")), file=sys.stderr)
+            return 1
         _handle_failure(error, config, api)
         return 1
 

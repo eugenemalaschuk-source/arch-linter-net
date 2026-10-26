@@ -61,6 +61,7 @@ def test_privileged_reusable_workflow_uses_the_trusted_local_action_without_chec
     assert "actions/checkout@" not in promote
     assert "github.sha" not in promote
     assert f"uses: $/{STAGE_B_ACTION_PATH}" in promote
+    assert "GitHub.com self-repository syntax" in promote
 
 
 def test_reusable_workflow_action_and_registry_are_present_in_repository() -> None:
@@ -68,6 +69,16 @@ def test_reusable_workflow_action_and_registry_are_present_in_repository() -> No
     assert f"uses: $/{STAGE_B_ACTION_PATH}" in workflow
     assert (ROOT / STAGE_B_ACTION_PATH / "action.yml").is_file()
     assert (ROOT / ".github" / "badge-promotion" / "registry.json").is_file()
+
+
+def test_ci_calls_the_reusable_workflow_for_a_read_only_action_runtime_smoke() -> None:
+    ci = read_workflow("ci.yml")
+    smoke = ci.split("  badge_promotion_runtime:", 1)[1].split("\n  workflow_quality:", 1)[0]
+    assert "uses: $/.github/workflows/architecture-health-badge-promotion.yml" in smoke
+    assert "contents: read" in smoke
+    assert "configuration-id: reference-none" in smoke
+    assert "adapter: none" in smoke
+    assert "operation: integration-test" in smoke
 
 
 def test_reusable_workflow_exposes_only_approved_inputs_and_minimal_trust_boundary() -> None:

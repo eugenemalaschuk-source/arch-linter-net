@@ -16,6 +16,17 @@ env:
   SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'eugenemalaschuk-source' }}
 
 jobs:
+  badge_promotion_runtime:
+    name: Badge Promotion Action Runtime
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    uses: $/.github/workflows/architecture-health-badge-promotion.yml
+    with:
+      configuration-id: reference-none
+      adapter: none
+      operation: integration-test
+
   # Pull-request validation is decomposed along real dependency boundaries. Workflow quality,
   # repository lint, architecture coverage, tooling/support tests, cross-platform correctness and
   # the .NET coverage shards all start independently. Coverage + Sonar is the one intentional
