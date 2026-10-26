@@ -1116,6 +1116,7 @@ jobs:
 
       - name: Shut down .NET build servers
         if: always()
+        timeout-minutes: 1
         run: dotnet build-server shutdown
         continue-on-error: true
 
@@ -1412,6 +1413,7 @@ jobs:
 
       - name: Shut down .NET build servers
         if: always()
+        timeout-minutes: 1
         run: dotnet build-server shutdown
         continue-on-error: true
 
@@ -1524,6 +1526,7 @@ jobs:
 
       - name: Shut down .NET build servers
         if: always()
+        timeout-minutes: 1
         run: dotnet build-server shutdown
         continue-on-error: true
 
