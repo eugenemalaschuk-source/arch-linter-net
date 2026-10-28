@@ -503,6 +503,12 @@ jobs:
           # Keep its historical architecture snapshot buildable while retaining audit warnings;
           # the candidate restore above remains strict.
           dotnet restore "$BASE_WORKTREE/ArchLinterNet.slnx" --nologo -m:1 --disable-parallel '-p:WarningsNotAsErrors=NU1902%3BNU1903'
+          # Project discovery needs this pack-only project's output even though it is excluded
+          # from the policy-selected graph. Build it before publishing prepared receipts.
+          annotations_project="$BASE_WORKTREE/src/ArchLinterNet.Annotations/ArchLinterNet.Annotations.csproj"
+          if [ -f "$annotations_project" ]; then
+            dotnet build "$annotations_project" --nologo --no-restore -m:1
+          fi
           pushd "$BASE_WORKTREE"
           dotnet run --no-build --no-restore --project "$GITHUB_WORKSPACE/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" -- \
             --policy architecture/dependencies.arch.yml \
