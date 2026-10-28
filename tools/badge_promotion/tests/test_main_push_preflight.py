@@ -161,15 +161,90 @@ def test_preflight_error_does_not_publish_an_unavailable_snapshot(monkeypatch: p
     def fail_publish(*_: object, **__: object) -> None:
         pytest.fail("a failed preflight must leave the public badge branch untouched")
 
+    def fail_publisher_failure_handler(*_: object, **__: object) -> None:
+        pytest.fail("read-only preflight failures must not enter publishing failure handling")
+
     monkeypatch.setattr(cli, "_load_config", lambda _: config)
     monkeypatch.setattr(cli, "GitHubApi", lambda: object())
     monkeypatch.setattr(cli, "resolve_evidence", lambda *_args, **_kwargs: (_ for _ in ()).throw(ProviderFailure("evidence_unavailable")))
     monkeypatch.setattr(cli, "_publish_raw", fail_publish)
+    monkeypatch.setattr(cli, "_handle_failure", fail_publisher_failure_handler)
     monkeypatch.setattr(sys, "argv", ["cli", "--configuration-id", "fixture", "--adapter", "github-raw", "--operation", "preflight"])
     monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
     monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
 
     assert cli.main() == 1
+
+
+def test_preflight_unavailable_decision_preserves_metadata_and_never_publishes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    raw = json.loads((Path(__file__).parent / "fixtures" / "approved-config.json").read_text())
+    raw["destination"] = {
+        "adapter": "github-raw",
+        "branch": "architecture-health-badge",
+        "endpoint_path": "architecture-health.json",
+    }
+    config = parse_config(raw)
+    evidence = SimpleNamespace(
+        head_sha="b" * 40,
+        head_tree_sha="c" * 40,
+        run_id=7001,
+        run_attempt=2,
+        temporal_receipt=None,
+    )
+    decision = PromotionDecision(
+        PromotionStatus.UNAVAILABLE,
+        ReasonCode.DIRECT_PUSH,
+        DecisionDisposition.NOOP,
+        1,
+        0,
+        None,
+        None,
+        None,
+    )
+    output = tmp_path / "github-output"
+    resolve_calls: list[bool] = []
+
+    def resolve(_api, _config, *, force_temporal_revalidation: bool = False):
+        resolve_calls.append(force_temporal_revalidation)
+        return evidence, b"archive"
+
+    def fail_publication(*_: object, **__: object) -> None:
+        pytest.fail("unavailable preflight decisions must not use raw or Relay publication")
+
+    def fail_publisher_failure_handler(*_: object, **__: object) -> None:
+        pytest.fail("unavailable preflight decisions must stay out of publishing failure handling")
+
+    monkeypatch.setattr(cli, "_load_config", lambda _: config)
+    monkeypatch.setattr(cli, "GitHubApi", lambda: object())
+    monkeypatch.setattr(cli, "resolve_evidence", resolve)
+    monkeypatch.setattr(cli, "_promotion_request", lambda *_: object())
+    monkeypatch.setattr(cli, "decide_promotion", lambda *_: decision)
+    monkeypatch.setattr(cli, "_publish_raw", fail_publication)
+    monkeypatch.setattr(cli, "_prepare_relay_publication", fail_publication)
+    monkeypatch.setattr(cli, "_handle_failure", fail_publisher_failure_handler)
+    monkeypatch.setattr(sys, "argv", ["cli", "--configuration-id", "fixture", "--adapter", "github-raw", "--operation", "preflight"])
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+
+    assert cli.main() == 1
+    assert resolve_calls == [True]
+    assert output.read_text() == (
+        "reason=direct_push\n"
+        f"head_sha={'b' * 40}\n"
+        f"head_tree_sha={'c' * 40}\n"
+        "run_id=7001\n"
+        "run_attempt=2\n"
+        "status=unavailable\n"
+        "temporal_revalidated=false\n"
+    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == '{"status":"unavailable","reason":"direct_push"}\n'
 
 
 def test_preflight_fails_closed_when_temporal_receipt_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:

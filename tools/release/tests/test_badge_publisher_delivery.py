@@ -54,8 +54,7 @@ def test_inventory_pins_match_the_release_workflow_fetch() -> None:
 
     assert compatibility["publisher_commit"] == PUBLISHER_WORKFLOW_COMMIT
     assert compatibility["action_commit"] == PUBLISHER_ACTION_COMMIT
-    fetch_command = f"git fetch --no-tags --depth=1 origin {PUBLISHER_WORKFLOW_COMMIT} {PUBLISHER_ACTION_COMMIT}"
-    assert fetch_command in RELEASE_WORKFLOW.read_text()
+    assert RELEASE_WORKFLOW.read_text().count("python3 tools/release/acquire_publisher_sources.py") == 6
 
 
 def test_rotated_schema_and_bundle_have_exact_installer_digests() -> None:

@@ -35,14 +35,9 @@ from .decision import PromotionRequest, decide_promotion
 from .adapters import AdapterError, HttpRelayClient, NoneAdapter, issue_github_oidc_token
 from .artifact import ArtifactValidationError, validate_artifact
 from .model import EvidenceContext, PromotionStatus, ReasonCode
-
-
-class ProviderFailure(RuntimeError):
-    def __init__(self, reason: str, *, status_code: int | None = None) -> None:
-        self.reason = reason
-        self.status_code = status_code
-        super().__init__(reason)
-
+from .errors import ProviderFailure, write_outputs
+from .preflight import run_preflight
+from .runtime_integration import run_runtime_integration_test
 
 _MAX_RAW_PUBLICATION_ATTEMPTS = 5
 _DEFAULT_BRANCH = "~DEFAULT_BRANCH"
@@ -745,12 +740,7 @@ def _load_config(configuration_id: str):
 
 
 def _write_outputs(values: dict[str, object]) -> None:
-    target = os.environ.get("GITHUB_OUTPUT")
-    if not target:
-        return
-    with open(target, "a", encoding="utf-8") as output:
-        for key, value in values.items():
-            output.write(f"{key}={value}\n")
+    write_outputs(values)
 
 
 def _current_raw_ref(api: GitHubApi, ref_path: str) -> Any:
@@ -892,43 +882,8 @@ def _commit_private(decision, output_metadata: dict[str, object]) -> int:
     return 0
 
 
-def _run_runtime_integration_test(configuration_id: str, adapter: str, config) -> int:
-    if (
-        configuration_id != "reference-none"
-        or adapter != "none"
-        or config.destination.adapter.value != "none"
-    ):
-        raise ProviderFailure("runtime_test_configuration_invalid")
-    if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
-        raise ProviderFailure("runtime_test_event_invalid")
-    if os.environ.get("GITHUB_REPOSITORY") != config.repository:
-        raise ProviderFailure("runtime_test_repository_invalid")
-
-    action_path_value = os.environ.get("GITHUB_ACTION_PATH", "")
-    try:
-        action_path = Path(action_path_value).resolve(strict=True)
-        action_root = action_path.parents[2]
-        module_root = Path(__file__).resolve().parents[2]
-    except (OSError, IndexError) as error:
-        raise ProviderFailure("runtime_test_action_path_invalid") from error
-
-    expected_action_path = action_root / GITHUB_DIRECTORY / "actions" / "architecture-health-badge-promotion"
-    if (
-        action_root != module_root
-        or action_path != expected_action_path.resolve()
-        or not (action_path / "action.yml").is_file()
-        or not (module_root / GITHUB_DIRECTORY / "badge-promotion" / "registry.json").is_file()
-    ):
-        raise ProviderFailure("runtime_test_action_path_invalid")
-
-    output = {"status": "ready", "reason": "runtime_integration_test"}
-    _write_outputs(output)
-    print(json.dumps(output, separators=(",", ":")))
-    return 0
-
-
-def _handle_failure(error, config, api: GitHubApi | None, *, publish_unavailable_snapshot: bool = True) -> None:
-    if publish_unavailable_snapshot and config is not None and config.destination.adapter.value == "github-raw":
+def _handle_failure(error, config, api: GitHubApi | None) -> None:
+    if config is not None and config.destination.adapter.value == "github-raw":
         try:
             api = api or GitHubApi()
             _publish_raw(api, config, _unavailable_snapshot_path().read_bytes(), evidence=None, status="unassessable", reason=error.reason)
@@ -958,15 +913,12 @@ def _prepare_relay_publication(config, decision, evidence: EvidenceContext, requ
 
 
 def _run_runtime_integration_from_cli(configuration_id: str, adapter: str) -> int:
-    try:
-        if configuration_id != "reference-none" or adapter != "none":
-            raise ProviderFailure("runtime_test_configuration_invalid")
-        config = _load_config(configuration_id)
-        return _run_runtime_integration_test(configuration_id, adapter, config)
-    except (ProviderFailure, AdapterError) as error:
-        _write_outputs({"status": "unavailable", "reason": error.reason})
-        print(json.dumps({"status": "unavailable", "reason": error.reason}, separators=(",", ":")), file=sys.stderr)
-        return 1
+    return run_runtime_integration_test(
+        configuration_id,
+        adapter,
+        load_config=_load_config,
+        write=_write_outputs,
+    )
 
 
 def main() -> int:
@@ -977,6 +929,19 @@ def main() -> int:
     args = parser.parse_args()
     if args.operation == "integration-test":
         return _run_runtime_integration_from_cli(args.configuration_id, args.adapter)
+    if args.operation == "preflight":
+        return run_preflight(
+            args.configuration_id,
+            args.adapter,
+            load_config=_load_config,
+            validate_invocation=_validate_invocation,
+            resolve_evidence=lambda config, *, force_temporal_revalidation: resolve_evidence(
+                GitHubApi(), config, force_temporal_revalidation=force_temporal_revalidation
+            ),
+            promotion_request=_promotion_request,
+            decide=decide_promotion,
+            write=_write_outputs,
+        )
 
     config = None
     api = None
@@ -986,32 +951,14 @@ def main() -> int:
             raise ProviderFailure("adapter_configuration_mismatch")
         _validate_invocation(config, args.operation)
         api = GitHubApi()
-        evidence, archive = resolve_evidence(
-            api,
-            config,
-            force_temporal_revalidation=args.operation == "preflight",
-        )
+        evidence, archive = resolve_evidence(api, config)
         request = _promotion_request(evidence, archive, args.operation)
         # The Relay challenge is the deadline authority. A raw publication uses
         # the same pure decision and remains a fixed snapshot adapter.
         decision = decide_promotion(config, request)
         output_metadata = {"reason": decision.reason.value, "head_sha": evidence.head_sha, "head_tree_sha": evidence.head_tree_sha, "run_id": evidence.run_id, "run_attempt": evidence.run_attempt}
-        temporal_revalidated = evidence.temporal_receipt is not None
-        temporal_revalidated_output = "true" if temporal_revalidated else "false"
         if decision.status is PromotionStatus.UNAVAILABLE:
-            if args.operation == "preflight":
-                _write_outputs({**output_metadata, "status": "unavailable", "temporal_revalidated": temporal_revalidated_output})
-                print(json.dumps({"status": "unavailable", "reason": decision.reason.value}, separators=(",", ":")), file=sys.stderr)
-                return 1
             return _report_unavailable(config, api, evidence, decision, output_metadata)
-        if args.operation == "preflight":
-            if config.destination.adapter.value != "github-raw":
-                raise ProviderFailure("preflight_adapter_invalid")
-            if not temporal_revalidated:
-                raise ProviderFailure("preflight_temporal_revalidation_missing")
-            _write_outputs({**output_metadata, "status": "ready", "temporal_revalidated": temporal_revalidated_output})
-            print(json.dumps({"status": "ready", "reason": decision.reason.value, "temporal_revalidated": temporal_revalidated}, separators=(",", ":")))
-            return 0
         if config.destination.adapter.value == "none":
             return _commit_private(decision, output_metadata)
         if config.destination.adapter.value == "relay":
@@ -1026,7 +973,7 @@ def main() -> int:
         _publish_raw(api, config, decision.payload or b"", evidence=evidence, status="ready", reason=decision.reason.value)
         return 0
     except (ProviderFailure, AdapterError) as error:
-        _handle_failure(error, config, api, publish_unavailable_snapshot=args.operation != "preflight")
+        _handle_failure(error, config, api)
         return 1
 
 
