@@ -114,7 +114,10 @@ def test_runtime_integration_reports_adapter_error_from_config_without_publishin
     def fail_publishing(*_: object, **__: object) -> None:
         pytest.fail("runtime integration configuration failures must never publish")
 
-    monkeypatch.setattr(cli, "_load_config", lambda _: (_ for _ in ()).throw(AdapterError("relay_transport_unavailable")))
+    def fail_load_config(_: str) -> None:
+        raise AdapterError("relay_transport_unavailable")
+
+    monkeypatch.setattr(cli, "_load_config", fail_load_config)
     monkeypatch.setattr(cli, "_publish_raw", fail_publishing)
     monkeypatch.setattr(cli, "_prepare_relay_publication", fail_publishing)
     monkeypatch.setattr(cli, "_handle_failure", fail_publishing)
