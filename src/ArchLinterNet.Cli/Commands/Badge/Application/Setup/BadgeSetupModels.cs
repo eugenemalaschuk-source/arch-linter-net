@@ -46,7 +46,7 @@ internal static class BadgeSetupContract
     internal const string DefaultPublisherWorkflowSha = "4f8bf1af16fdb681cdf751a9e318da767ce28d62";
     internal const string DefaultActionRef = "eugenemalaschuk-source/arch-linter-net/.github/actions/architecture-health-badge-promotion@8efe4b6e840f05c28aa70e76b1b41b50dba86e79";
     internal const string DefaultPublisherActionSha = "8efe4b6e840f05c28aa70e76b1b41b50dba86e79";
-    internal const string ShippedRelayBundleManifestSha256 = "4f67839853dfc8f2145c4a2d26c3b5db5145e085d58838ae88e01fbae78242bb";
+    internal const string ShippedRelayBundleManifestSha256 = "0af5c21568fbe708acc36ae02ddd4d6263e2dfffd02397eca4ca6f3c4b95cb9e";
     internal const string DefaultProducerWorkflowPath = ".github/workflows/architecture-health-badge-producer.yml";
     internal const string DefaultRenewalWorkflowPath = ".github/workflows/architecture-health-badge-renewal.yml";
     internal const string DefaultCheckName = "Architecture Coverage";
