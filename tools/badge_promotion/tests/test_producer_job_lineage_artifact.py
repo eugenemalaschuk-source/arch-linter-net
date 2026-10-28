@@ -61,29 +61,23 @@ def test_resolve_evidence_accepts_original_manifest_for_selected_copied_job(
         b'"color":"brightgreen"}'
     )
 
-    def badge_archive(*, run_attempt: int, job_id: int) -> bytes:
+    def badge_archive(*, run_attempt: int, job_id: int | None = None) -> bytes:
+        context = {
+            "repository": repository,
+            "base_ref": config.base_ref,
+            "base_sha": base_sha,
+            "head_sha": head_sha,
+            "head_tree_sha": tree_sha,
+            "pr_number": "42",
+            "run_id": str(run_id),
+            "run_attempt": str(run_attempt),
+        }
+        if job_id is not None:
+            context["job_id"] = job_id
         manifest = {
             "schema": config.schema_id,
             "kind": "architecture-health-badge",
-            "context": {
-                "repository": repository,
-                "base_ref": config.base_ref,
-                "base_sha": base_sha,
-                "head_sha": head_sha,
-                "head_tree_sha": tree_sha,
-                "pr_number": 42,
-                "run_id": run_id,
-                "run_attempt": run_attempt,
-                "main_tree_sha": tree_sha,
-                "workflow_path": config.producer.workflow_path,
-                "workflow_sha": config.producer.workflow_sha,
-                "check_name": config.producer.check_name,
-                "check_app": config.producer.check_app,
-                "job_id": job_id,
-                "job_name": config.producer.job_name,
-                "artifact_id": 9001,
-                "artifact_name": config.producer.artifact_name,
-            },
+            "context": context,
             "payload": {
                 "path": config.producer.payload_path,
                 "bytes": len(payload),
@@ -99,7 +93,7 @@ def test_resolve_evidence_accepts_original_manifest_for_selected_copied_job(
             )
         return stream.getvalue()
 
-    valid_archive = badge_archive(run_attempt=1, job_id=original_job_id)
+    valid_archive = badge_archive(run_attempt=1)
     evidence_stream = io.BytesIO()
     with zipfile.ZipFile(evidence_stream, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(
@@ -204,7 +198,7 @@ def test_resolve_evidence_accepts_original_manifest_for_selected_copied_job(
 
     with pytest.raises(ArtifactValidationError):
         validate_artifact(
-            badge_archive(run_attempt=2, job_id=original_job_id), config, resolved
+            badge_archive(run_attempt=2), config, resolved
         )
     with pytest.raises(ArtifactValidationError):
         validate_artifact(
