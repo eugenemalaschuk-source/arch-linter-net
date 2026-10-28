@@ -66,12 +66,19 @@ jobs:
               'producer-run-attempt': workflowRun.run_attempt,
             };
 
-            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+            if (!Number.isSafeInteger(workflowRun.run_attempt) || workflowRun.run_attempt < 1) {
+              setResult('producer_attempt_unresolved', values);
+              return;
+            }
+
+            const jobsForAttempt = (attempt) => github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id: workflowRun.id,
+              attempt_number: attempt,
               per_page: 100,
             });
+            const jobs = await jobsForAttempt(workflowRun.run_attempt);
             const producerJobs = jobs.filter((job) => job.name === 'Architecture Coverage');
             if (producerJobs.length === 0) {
               setResult('producer_missing', values);
@@ -82,20 +89,41 @@ jobs:
               return;
             }
 
-            // The manifest the "Architecture Coverage" job uploads embeds github.run_attempt as of
-            // THAT job's own execution -- if only some other, unrelated job in this run was rerun
-            // (e.g. re-running a failed lint job after a transient network flake), the overall
-            // workflow_run.run_attempt advances to the new attempt even though this producer job
-            // never re-executed and its artifact is still exactly correct for the current head SHA.
-            // Bind to the producer job's own run_attempt, not the run's current one, or a rerun of
-            // any unrelated job would make every already-valid PR report look unbound and get
-            // rejected as manifest_binding_invalid.
-            values['producer-run-attempt'] = producerJobs[0].run_attempt;
-
             if (producerJobs[0].conclusion !== 'success') {
               setResult('producer_not_success', values);
               return;
             }
+
+            // GitHub copies successful jobs into partial reruns with a new job ID and run_attempt,
+            // but retains the original execution timestamps. Find the first consecutive attempt
+            // containing that same execution rather than trusting the copied job's run_attempt.
+            const producer = producerJobs[0];
+            const validTimes = (job) =>
+              typeof job.started_at === 'string' && typeof job.completed_at === 'string'
+              && Number.isFinite(Date.parse(job.started_at)) && Number.isFinite(Date.parse(job.completed_at))
+              && Date.parse(job.started_at) < Date.parse(job.completed_at);
+            if (workflowRun.run_attempt > 1 && !validTimes(producer)) {
+              setResult('producer_attempt_unresolved', values);
+              return;
+            }
+            let producerAttempt = workflowRun.run_attempt;
+            for (let attempt = producerAttempt - 1; attempt >= 1; attempt--) {
+              const earlierJobs = (await jobsForAttempt(attempt)).filter((job) => job.name === producer.name);
+              if (earlierJobs.length !== 1 || !validTimes(earlierJobs[0])) {
+                setResult('producer_attempt_unresolved', values);
+                return;
+              }
+              const earlier = earlierJobs[0];
+              if (earlier.started_at !== producer.started_at || earlier.completed_at !== producer.completed_at) {
+                break;
+              }
+              if (earlier.conclusion !== 'success') {
+                setResult('producer_attempt_unresolved', values);
+                return;
+              }
+              producerAttempt = attempt;
+            }
+            values['producer-run-attempt'] = producerAttempt;
 
             if (pullRequest.head.sha !== workflowRun.head_sha) {
               setResult('stale_head', values);
@@ -270,7 +298,7 @@ jobs:
               'ambiguous_pull_request', 'artifact_ambiguous', 'artifact_download_failed', 'artifact_expired',
               'artifact_missing', 'artifact_oversized', 'artifact_parse_failed', 'artifact_shape_invalid',
               'artifact_size_or_type_invalid', 'manifest_binding_invalid', 'manifest_shape_invalid',
-              'producer_ambiguous', 'producer_missing', 'producer_not_success', 'report_encoding_invalid',
+              'producer_ambiguous', 'producer_attempt_unresolved', 'producer_missing', 'producer_not_success', 'report_encoding_invalid',
               'report_integrity_invalid', 'stale_head', 'unexpected_producer',
             ]);
             const isReady = process.env.VALIDATION_STATUS === 'ready';
