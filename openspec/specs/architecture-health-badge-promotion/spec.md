@@ -6,7 +6,7 @@ Provides one versioned, reusable trusted-promotion contract for private and publ
 ## Requirements
 
 ### Requirement: Promotion uses approved configuration and exact producer provenance
-The reusable promotion capability SHALL obtain repository, workflow, job, check, artifact, branch, event, and adapter selection from an approved configuration or registry that is independent of consumer-controlled pull-request artifacts. It SHALL prove the exact merged commit, base/head/tree relation, required check identity, workflow run and attempt, producer job, artifact identity, size, schema, digest, and canonical bytes before a ready publication. The resolver SHALL obtain the workflow file SHA from the provider's immutable content response at the verified producer revision and compare it with the approved pin; it SHALL not populate evidence by copying the expected pin. Names, conclusions, arbitrary URLs, or a generic workflow success SHALL not establish those facts.
+The reusable promotion capability SHALL obtain repository, workflow, job, check, artifact, branch, event, and adapter selection from an approved configuration or registry that is independent of consumer-controlled pull-request artifacts. It SHALL prove the exact merged commit, base/head/tree relation, required check identity, workflow run and attempt, producer job, artifact identity, size, schema, digest, and canonical bytes before a ready publication. The resolver SHALL obtain the workflow file SHA from the provider's immutable content response at the verified producer revision and compare it with the approved pin; it SHALL not populate evidence by copying the expected pin. Names, conclusions, arbitrary URLs, or a generic workflow success SHALL not establish those facts. When a selected check points to a copied successful job, the resolver SHALL determine the effective execution and producer job identity from the selected check's exact run/job binding and complete bounded attempt history. Matching valid execution timestamps across consecutive attempts SHALL identify copies; a distinct valid timestamp pair in chronological order SHALL identify a later execution. Missing, invalid, ambiguous, misordered, or contradictory lineage SHALL fail closed. The effective attempt and job identity SHALL be used consistently for artifact validation, producer identity, and temporal receipts; artifact contents SHALL not authorize the expected producer.
 
 #### Scenario: Mismatched producer evidence fails closed
 - **WHEN** a producer run, check, artifact, tree, attempt, job, repository, or merge relation differs from approved configuration or the merged commit
@@ -17,6 +17,21 @@ The reusable promotion capability SHALL obtain repository, workflow, job, check,
 - **WHEN** a consumer-controlled input supplies a workflow name, artifact name, run URL, repository URL, or source checkout path that is not the approved configuration
 - **THEN** promotion rejects the input before any publication write
 - **AND** no consumer source, script, action, or generated artifact is executed
+
+#### Scenario: Copied successful producer jobs retain original execution provenance
+- **WHEN** the selected successful check points to a later copied producer job and preceding attempts contain the same unique producer execution with matching valid timestamps
+- **THEN** promotion uses the earliest matching attempt and job identity to validate the original artifact
+- **AND** the same effective attempt and job identity bind the producer identity and any required temporal receipt
+
+#### Scenario: A genuine producer rerun establishes a new execution
+- **WHEN** the selected producer job has valid timestamps that differ from the preceding attempt's unique producer job and are chronologically consistent
+- **THEN** promotion retains the selected job's attempt and identity
+- **AND** it does not select an older attempt or artifact solely because it is older
+
+#### Scenario: Missing or contradictory producer lineage is unavailable
+- **WHEN** attempt history is missing, ambiguous, malformed, timestamp-invalid, misordered, or inconsistent with the selected run, head, attempt, or job
+- **THEN** promotion rejects the evidence before publication
+- **AND** artifact contents do not supply replacement provenance
 
 ### Requirement: Promotion validates untrusted artifact bytes safely
 The privileged promotion path SHALL treat downloaded artifacts and manifests as untrusted data. It SHALL enforce bounded archive and file sizes, safe relative paths, regular-file and UTF-8 constraints, duplicate/path-traversal/symlink rejection, exact manifest binding, and closed canonical disclosure validation before publishing bytes. It SHALL not repair, regenerate, reserialize, or calculate Architecture Health facts from rejected input. When temporal revalidation is required, promotion SHALL consume only a trusted Core/CLI receipt and SHALL not calculate or reinterpret its temporal facts.
