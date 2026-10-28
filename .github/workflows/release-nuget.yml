@@ -130,7 +130,7 @@ jobs:
 
       - name: Fetch pinned badge publisher source
         shell: bash
-        run: git fetch --no-tags --depth=1 origin 4f8bf1af16fdb681cdf751a9e318da767ce28d62 8efe4b6e840f05c28aa70e76b1b41b50dba86e79
+        run: python3 tools/release/acquire_publisher_sources.py
 
       - name: Verify immutable transport candidate
         shell: bash
@@ -194,7 +194,7 @@ jobs:
 
       - name: Fetch pinned badge publisher source
         shell: bash
-        run: git fetch --no-tags --depth=1 origin 4f8bf1af16fdb681cdf751a9e318da767ce28d62 8efe4b6e840f05c28aa70e76b1b41b50dba86e79
+        run: python3 tools/release/acquire_publisher_sources.py
 
       - name: Verify immutable transport candidate
         shell: bash
@@ -259,7 +259,7 @@ jobs:
 
       - name: Fetch pinned badge publisher source
         shell: bash
-        run: git fetch --no-tags --depth=1 origin 4f8bf1af16fdb681cdf751a9e318da767ce28d62 8efe4b6e840f05c28aa70e76b1b41b50dba86e79
+        run: python3 tools/release/acquire_publisher_sources.py
 
       - name: Verify immutable transport candidate
         shell: bash
@@ -548,7 +548,7 @@ jobs:
 
       - name: Fetch pinned badge publisher source
         shell: bash
-        run: git fetch --no-tags --depth=1 origin 4f8bf1af16fdb681cdf751a9e318da767ce28d62 8efe4b6e840f05c28aa70e76b1b41b50dba86e79
+        run: python3 tools/release/acquire_publisher_sources.py
 
       - name: Verify frozen transport distribution
         shell: bash
@@ -761,7 +761,7 @@ jobs:
 
       - name: Fetch pinned badge publisher source
         shell: bash
-        run: git fetch --no-tags --depth=1 origin 4f8bf1af16fdb681cdf751a9e318da767ce28d62 8efe4b6e840f05c28aa70e76b1b41b50dba86e79
+        run: python3 tools/release/acquire_publisher_sources.py
 
       - name: Verify frozen transport before publication
         shell: bash
@@ -854,7 +854,7 @@ jobs:
 
       - name: Fetch pinned badge publisher source
         shell: bash
-        run: git fetch --no-tags --depth=1 origin 4f8bf1af16fdb681cdf751a9e318da767ce28d62 8efe4b6e840f05c28aa70e76b1b41b50dba86e79
+        run: python3 tools/release/acquire_publisher_sources.py
 
       - name: Verify frozen transport release attachment subjects
         shell: bash

@@ -39,8 +39,11 @@ const core = {
 const github = {
   paginate: async (method, parameters) => {
     calls.push({ type: 'paginate', method: method.name, parameters });
-    if (method === github.rest.actions.listJobsForWorkflowRun) {
-      return fixture.jobs ?? [];
+    if (method === github.rest.actions.listJobsForWorkflowRunAttempt) {
+      if (parameters.attempt_number === fixture.workflowRun.run_attempt) {
+        return fixture.jobs ?? [];
+      }
+      return fixture.jobsByAttempt?.[parameters.attempt_number] ?? [];
     }
     if (method === github.rest.actions.listWorkflowRunArtifacts) {
       return fixture.artifacts ?? [];
@@ -60,7 +63,7 @@ const github = {
       },
     },
     actions: {
-      listJobsForWorkflowRun: async () => undefined,
+      listJobsForWorkflowRunAttempt: async () => undefined,
       listWorkflowRunArtifacts: async () => undefined,
     },
     issues: {
@@ -182,8 +185,20 @@ def _resolve_fixture(
             {
                 "name": "Architecture Coverage",
                 "conclusion": producer_conclusion,
+                "started_at": "2026-10-28T09:26:02Z",
+                "completed_at": "2026-10-28T09:29:22Z",
             }
         ],
+        "jobsByAttempt": {
+            "1": [
+                {
+                    "name": "Architecture Coverage",
+                    "conclusion": "success",
+                    "started_at": "2026-10-28T09:20:02Z",
+                    "completed_at": "2026-10-28T09:23:22Z",
+                }
+            ]
+        },
         "artifacts": [
             {
                 "id": 42,
@@ -367,6 +382,94 @@ def test_resolve_accepts_a_successful_producer_when_overall_ci_failed() -> None:
 
     assert result["outputs"]["reason"] == "ready"
     assert result["outputs"]["artifact-id"] == "42"
+
+
+def test_resolve_binds_partial_reruns_to_the_original_producer_attempt() -> None:
+    fixture = _resolve_fixture(conclusion="success")
+    fixture["workflowRun"]["run_attempt"] = 3
+    job = fixture["jobs"][0]
+    job["run_attempt"] = 3
+    fixture["jobsByAttempt"] = {
+        "1": [job | {"run_attempt": 1}],
+        "2": [job | {"run_attempt": 2}],
+    }
+
+    resolved = _run_script("Resolve current PR and bound report artifact", fixture)
+
+    assert resolved["outputs"]["reason"] == "ready"
+    assert resolved["outputs"]["producer-run-attempt"] == "1"
+    attempts = [
+        call["parameters"]["attempt_number"]
+        for call in resolved["calls"]
+        if call["type"] == "paginate" and call["method"] == "listJobsForWorkflowRunAttempt"
+    ]
+    assert attempts == [3, 2, 1]
+
+    report = b"# Architecture PR report\n"
+    environment = _validate_environment() | {"EXPECTED_RUN_ATTEMPT": resolved["outputs"]["producer-run-attempt"]}
+    valid = _run_script(
+        "Validate inert report bytes and manifest", {}, environment=environment,
+        files=_artifact_files(report, context={"run_attempt": "1"}),
+    )
+    invalid = _run_script(
+        "Validate inert report bytes and manifest", {}, environment=environment,
+        files=_artifact_files(report, context={"run_attempt": "3"}),
+    )
+    assert valid["outputs"]["status"] == "ready"
+    assert invalid["outputs"]["reason"] == "manifest_binding_invalid"
+
+
+def test_resolve_stops_at_a_new_producer_execution() -> None:
+    fixture = _resolve_fixture(conclusion="success")
+    fixture["workflowRun"]["run_attempt"] = 3
+    fixture["jobsByAttempt"]["2"] = [fixture["jobs"][0] | {"run_attempt": 2}]
+
+    resolved = _run_script("Resolve current PR and bound report artifact", fixture)
+
+    assert resolved["outputs"]["reason"] == "ready"
+    assert resolved["outputs"]["producer-run-attempt"] == "2"
+
+
+@pytest.mark.parametrize(
+    "earlier_jobs",
+    [
+        [],
+        [{"name": "Architecture Coverage", "conclusion": "success"}],
+        [
+            {"name": "Architecture Coverage", "conclusion": "success"},
+            {"name": "Architecture Coverage", "conclusion": "success"},
+        ],
+    ],
+    ids=("missing", "missing-timestamps", "ambiguous"),
+)
+def test_resolve_rejects_unverifiable_earlier_producer_attempt(earlier_jobs: list[dict[str, object]]) -> None:
+    fixture = _resolve_fixture(conclusion="success")
+    fixture["jobsByAttempt"]["1"] = earlier_jobs
+
+    resolved = _run_script("Resolve current PR and bound report artifact", fixture)
+
+    assert resolved["outputs"]["reason"] == "producer_attempt_unresolved"
+    assert "artifact-id" not in resolved["outputs"]
+
+
+def test_resolve_rejects_conflicting_results_for_the_same_execution() -> None:
+    fixture = _resolve_fixture(conclusion="success")
+    fixture["jobsByAttempt"]["1"] = [fixture["jobs"][0] | {"conclusion": "failure"}]
+
+    resolved = _run_script("Resolve current PR and bound report artifact", fixture)
+
+    assert resolved["outputs"]["reason"] == "producer_attempt_unresolved"
+    assert "artifact-id" not in resolved["outputs"]
+
+
+def test_resolve_rejects_missing_current_execution_timestamps_on_rerun() -> None:
+    fixture = _resolve_fixture(conclusion="success")
+    del fixture["jobs"][0]["started_at"]
+
+    resolved = _run_script("Resolve current PR and bound report artifact", fixture)
+
+    assert resolved["outputs"]["reason"] == "producer_attempt_unresolved"
+    assert "artifact-id" not in resolved["outputs"]
 
 
 @pytest.mark.parametrize("producer_conclusion", ["failure", "cancelled"])
