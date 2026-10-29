@@ -234,6 +234,7 @@ class EvidenceValidationTests(unittest.TestCase):
             ".gitignore",
             "src/Nested/.gitignore",
             "src/Nested/ArchLinterNet.sln.DotSettings",
+            "src/Nested/ArchLinterNet.sln.DotSettings.user",
             "src/Nested/other.DOTSETTINGS",
             "src/Nested/.editorconfig",
             "src/Nested/Directory.Build.rsp",
@@ -246,6 +247,20 @@ class EvidenceValidationTests(unittest.TestCase):
         files = [{"filename": path, "patch": "@@\n+changed"} for path in protected_paths]
         changes, baseline_updated, baseline_mixed = gate._governance_changes(files)
         self.assertEqual(list(protected_paths), changes)
+        self.assertFalse(baseline_updated)
+        self.assertFalse(baseline_mixed)
+
+    def test_dotsettings_user_is_protected_without_overmatching_user_suffixes(self):
+        protected = "src/Nested/ArchLinterNet.sln.DotSettings.user"
+        self.assertTrue(gate._is_protected_scan_path(protected))
+        self.assertTrue(gate._is_protected_scan_path("src/Nested/ARCHLINTERNET.SLN.DOTSETTINGS.USER"))
+        self.assertFalse(gate._is_protected_scan_path("src/Nested/ArchLinterNet.sln.user"))
+        self.assertFalse(gate._is_protected_scan_path("src/Nested/ArchLinterNet.sln.DotSettings.userx"))
+
+        changes, baseline_updated, baseline_mixed = gate._governance_changes([
+            {"filename": protected, "patch": "@@\n+changed"},
+        ])
+        self.assertEqual([protected], changes)
         self.assertFalse(baseline_updated)
         self.assertFalse(baseline_mixed)
 

@@ -515,6 +515,7 @@ def _is_protected_scan_path(path: str) -> bool:
             or fnmatch.fnmatch(name, "*.globalconfig")
             or fnmatch.fnmatch(name, "*.ruleset")
             or name.endswith(EDITORCONFIG)
+            or name.endswith(".dotsettings.user")
             or name.endswith(".dotsettings")
             or name in {
                 "global.json", "nuget.config", "packages.lock.json", "qodana.yml", "qodana.yaml",
