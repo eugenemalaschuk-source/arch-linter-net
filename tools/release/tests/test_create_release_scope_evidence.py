@@ -504,7 +504,7 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     historical_targets = {
         "0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4",
         "0.8.0", "0.8.1", "0.8.2", "0.9.0-preview.1", "0.9.0", "0.9.1",
-        "0.10.0-preview.1", "0.10.0-preview.2",
+        "0.10.0-preview.1", "0.10.0-preview.2", "0.10.0-preview.3", "0.10.0", "0.10.1",
     }
     assert historical_targets <= set(by_target)
     assert by_target["0.6.4"]["story"] == 527
@@ -643,6 +643,26 @@ def test_shipped_declarations_preserve_reviewed_release_authorities() -> None:
     assert "exactly 0.10.0-preview.2" in " ".join(next_preview["_comment"])
     assert "without version_override" in " ".join(next_preview["_comment"])
 
+    stable_010 = by_target["0.10.0"]
+    assert stable_010["declaration_id"] == "v0.10.0-stable-semantic-annotations"
+    assert stable_010["story"] == 565
+    assert {item["issue"] for item in stable_010["required_items"]} == {
+        567, 568, 571, 573, 574, 1100,
+    }
+
+    maintenance_010 = by_target["0.10.1"]
+    assert maintenance_010["declaration_id"] == "v0.10.1-badge-producer-attempt-correction"
+    assert maintenance_010["story"] == 1120
+    assert {item["issue"] for item in maintenance_010["required_items"]} == {
+        1105, 1116, 1117,
+    }
+    assert maintenance_010["excluded_items"] == []
+    assert {item["issue"] for item in maintenance_010["delivered_items"]} == {1112, 1119}
+    maintenance_comment = " ".join(maintenance_010["_comment"])
+    assert "five commits after v0.10.0" in maintenance_comment
+    assert "no unrelated v0.11 product capability" in maintenance_comment
+    assert "no version_override is needed" in maintenance_comment
+
 
 def test_shipped_patch_resolves_prerequisites_without_requiring_deferred_adoption(
     tmp_path: Path, monkeypatch
@@ -684,3 +704,26 @@ def test_shipped_v082_patch_requires_temporal_fix_and_merged_publisher_pins(
     assert {int(argv[3]) for argv in invocations} == {979, 982}
     assert [(item["issue"], item["state"]) for item in evidence["required_items"]] == [(979, "closed"), (982, "closed")]
     assert {item["issue"] for item in evidence["excluded_items"]} == {922, 834, 836, 825, 650, 787}
+
+
+def test_shipped_v0101_patch_requires_badge_producer_attempt_correction(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    invocations = _stub_gh(monkeypatch, {1105: "MERGED", 1116: "MERGED", 1117: "CLOSED"})
+    manifest = _manifest(tmp_path, "0.10.1")
+
+    evidence = build_evidence(generator._declarations_directory(), manifest, _COMMIT, _REPOSITORY)
+
+    assert evidence["story"] == 1120
+    assert evidence["release_target"] == evidence["candidate_version"] == "0.10.1"
+    assert evidence["source_commit"] == _COMMIT
+    assert evidence["declaration_sha256"] == hashlib.sha256(
+        (generator._declarations_directory() / "0.10.1.json").read_bytes()
+    ).hexdigest()
+    assert [int(argv[3]) for argv in invocations] == [1105, 1116, 1117]
+    assert [(item["issue"], item["state"]) for item in evidence["required_items"]] == [
+        (1105, "closed"),
+        (1116, "closed"),
+        (1117, "closed"),
+    ]

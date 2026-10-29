@@ -1,0 +1,43 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.10.1-badge-producer-attempt-correction",
+  "release_target": "0.10.1",
+  "story": 1120,
+  "_comment": [
+    "This is the exact v0.10.1 maintenance authority for the already-published v0.10 capability line. The previous stable release is v0.10.0 at 3e939a1f6a8dd1ff405751e0e20aa3f3bb6b055c; preview and stable declarations remain independent.",
+    "The candidate base reviewed for this scope is main at 8214d2338ccd8126542a04468ce4e95f2e1c48b0, five commits after v0.10.0: PRs #1105, #1115, #1116, #1118, and #1119. The preparation PR adds only this authority and its regression inventory; no candidate bytes are narrowed away.",
+    "Required correction #1117 is implemented by merged PR #1118. Main badge run 40782135565 executed on merge SHA dbc49a544ab8f39bc635a0628d769704945dfca5; preflight returned ready with temporal_revalidated=true and downstream promotion completed ready.",
+    "Completed story #1112 and PR #1115 are delivered post-v0.10 behavior-preserving badge-operation and publisher-acquisition refactoring, recorded as context rather than an open prerequisite.",
+    "The candidate also includes PR #1105's .NET SDK/runtime/tooling dependency updates, PR #1116's Vite/Zod updates, and PR #1119's Qodana quality gate and behavior-preserving analyzer cleanup. These are maintenance and quality work; no unrelated v0.11 product capability is present.",
+    "Release-note audit: #1105 and #1116 are categorized as Dependencies; #1118 is categorized as Fixes; #1115 and #1119 are excluded because their refactoring/quality-gate changes are internal maintenance rather than package-user changes. Generated release notes are not committed.",
+    "Publication handoff: after this declaration is reviewed and merged, a maintainer should run the manual workflow with release_type=patch and publish=false, review its candidate-bound evidence, and make any publish=true run separately. The latest tag v0.10.0 makes automatic calculation yield 0.10.1, so no version_override is needed. This declaration does not publish packages or create a tag/release."
+  ],
+  "required_items": [
+    {
+      "issue": 1105,
+      "finding": "candidate-dotnet-sdk-and-runtime-dependency-refresh",
+      "summary": "Include the reviewed .NET SDK 10.0.402 and runtime/tooling dependency updates already merged into the v0.10.1 candidate"
+    },
+    {
+      "issue": 1116,
+      "finding": "candidate-relay-and-tooling-dependency-refresh",
+      "summary": "Include the reviewed Vite and Zod dependency updates already merged into the v0.10.1 candidate"
+    },
+    {
+      "issue": 1117,
+      "finding": "badge-producer-attempt-resolution",
+      "summary": "Resolve the trusted Architecture Health producer execution after partial CI reruns without weakening artifact provenance validation"
+    }
+  ],
+  "excluded_items": [],
+  "delivered_items": [
+    {
+      "issue": 1112,
+      "reason": "Post-v0.10 behavior-preserving badge-operation and publisher-source acquisition refactoring was completed by PR #1115; it is already present on the candidate and is not a publication blocker."
+    },
+    {
+      "issue": 1119,
+      "reason": "The Qodana quality gate and behavior-preserving analyzer cleanup were completed in merged PR #1119; they are already present on the candidate and are not an open product prerequisite."
+    }
+  ]
+}
