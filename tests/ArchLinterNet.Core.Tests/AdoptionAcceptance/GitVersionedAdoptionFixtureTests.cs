@@ -6,6 +6,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class GitVersionedAdoptionFixtureTests
 {
     [Test]
+    [CancelAfter(60_000)]
     public void TwoCommitsAreIndependentlyCheckoutableAndCurrentIsNotSharedStateWithBase()
     {
         using GitVersionedAdoptionFixture fixture = GitVersionedAdoptionFixture.Create("modular-consumer");
