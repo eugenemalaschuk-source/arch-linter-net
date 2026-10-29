@@ -47,9 +47,9 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
             }
         }
 
-        IReadOnlyDictionary<string, ArchitecturePolicyContextSourceExpansion> baseExpansions = ExpansionMap(baseline, "base");
-        IReadOnlyDictionary<string, ArchitecturePolicyContextSourceExpansion> currentExpansions = ExpansionMap(current, "current");
-        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> currentContracts = ContractMap(current, null, "current");
+        IReadOnlyDictionary<string, ArchitecturePolicyContextSourceExpansion> baseExpansions = ExpansionMap(baseline);
+        IReadOnlyDictionary<string, ArchitecturePolicyContextSourceExpansion> currentExpansions = ExpansionMap(current);
+        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> currentContracts = ContractMap(current, null);
         foreach ((string key, ArchitecturePolicyContextSourceExpansion baseExpansion) in baseExpansions)
         {
             if (!currentExpansions.TryGetValue(key, out ArchitecturePolicyContextSourceExpansion? currentExpansion))

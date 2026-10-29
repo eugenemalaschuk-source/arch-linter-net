@@ -1,4 +1,3 @@
-using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Results;
@@ -33,7 +32,6 @@ internal static class ArchitectureAnalysisSnapshotApplicabilityProjector
 
     internal static ArchitectureSnapshotBaselineCandidateReceipt CollectBaselineCandidates(
         ArchitectureContractDocument document,
-        BuildStatePreflightResult preflight,
         string mode,
         IReadOnlyDictionary<string, ValidationOutcome> evaluatedModes,
         IArchitectureContractRunner runner)

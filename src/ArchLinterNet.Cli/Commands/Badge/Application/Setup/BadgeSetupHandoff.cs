@@ -62,7 +62,7 @@ internal static class BadgeSetupHandoff
         ".github/badge-promotion/registry.json",
         "schema/0.8.0/badge-relay-config.schema.json",
         ".github/workflows/architecture-health-badge-publisher.yml",
-        ".github/workflows/architecture-health-badge-renewal.yml",
+        BadgeSetupContract.DefaultRenewalWorkflowPath,
         "relay/package.json",
         "relay/package-lock.json",
         "relay/tsconfig.json",

@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
-import subprocess
 import sys
 import tarfile
 from pathlib import Path
@@ -28,9 +27,10 @@ def _release_source_path(bundle_path: str) -> str:
 def _candidate(tmp_path: Path, version: str = "0.8.7-preview.1") -> tuple[Path, str]:
     packages = tmp_path / "candidate"
     packages.mkdir(parents=True)
-    source_commit = subprocess.check_output(
-        ["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
-    ).strip()
+    # The synthetic package manifest is a unit fixture. Bind it to no real
+    # checkout commit so working-tree byte validation remains meaningful when
+    # unrelated source files have intentional, uncommitted changes.
+    source_commit = "0" * 40
     for package_id in package_manifest._PACKAGE_IDS:
         for kind in package_manifest._SUBJECT_KINDS:
             path = packages / package_manifest._expected_filename(package_id, version, kind)

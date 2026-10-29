@@ -79,10 +79,11 @@ def test_temporal_receipt_validator_rejects_contract_and_state_failures(change, 
     receipt = _valid_receipt()
     change(receipt)
     return_code = 1 if reason == "semantic_evidence_unavailable" and receipt["state"] == "ready" else 0
+    serialized_receipt = json.dumps(receipt)
 
     with pytest.raises(cli.ProviderFailure, match=reason):
         _validate_temporal_receipt(
-            json.dumps(receipt),
+            serialized_receipt,
             return_code=return_code,
             evaluation_date="2026-09-19",
             source_health_sha256="a" * 64,
@@ -180,15 +181,20 @@ def test_temporal_revalidation_fails_closed_when_restore_fails(monkeypatch, tmp_
     monkeypatch.delenv("ARCHLINTERNET_REVALIDATOR", raising=False)
     monkeypatch.setenv("ARCHLINTERNET_REVALIDATOR_PROJECT", str(tmp_path / "ArchLinterNet.Cli.csproj"))
     monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    evaluation_date = datetime(2026, 9, 19, tzinfo=timezone.utc)
+    source_health_sha256 = "a" * 64
+    badge_payload_sha256 = "b" * 64
+    merged_tree_sha = "c" * 40
+    producer_identity_sha256 = "d" * 64
 
     with pytest.raises(cli.ProviderFailure, match="semantic_revalidation_unavailable"):
         _run_temporal_revalidation(
             b"health",
-            evaluation_date=datetime(2026, 9, 19, tzinfo=timezone.utc),
-            source_health_sha256="a" * 64,
-            badge_payload_sha256="b" * 64,
-            merged_tree_sha="c" * 40,
-            producer_identity_sha256="d" * 64,
+            evaluation_date=evaluation_date,
+            source_health_sha256=source_health_sha256,
+            badge_payload_sha256=badge_payload_sha256,
+            merged_tree_sha=merged_tree_sha,
+            producer_identity_sha256=producer_identity_sha256,
         )
 
     assert calls == [["dotnet", "restore", str(tmp_path / "ArchLinterNet.Cli.csproj"), "--nologo"]]
@@ -201,15 +207,20 @@ def test_temporal_revalidation_fails_closed_on_subprocess_error(monkeypatch, tmp
     monkeypatch.delenv("ARCHLINTERNET_REVALIDATOR", raising=False)
     monkeypatch.setenv("ARCHLINTERNET_REVALIDATOR_PROJECT", str(tmp_path / "ArchLinterNet.Cli.csproj"))
     monkeypatch.setattr(cli.subprocess, "run", fail_run)
+    evaluation_date = datetime(2026, 9, 19, tzinfo=timezone.utc)
+    source_health_sha256 = "a" * 64
+    badge_payload_sha256 = "b" * 64
+    merged_tree_sha = "c" * 40
+    producer_identity_sha256 = "d" * 64
 
     with pytest.raises(cli.ProviderFailure, match="semantic_revalidation_unavailable"):
         _run_temporal_revalidation(
             b"health",
-            evaluation_date=datetime(2026, 9, 19, tzinfo=timezone.utc),
-            source_health_sha256="a" * 64,
-            badge_payload_sha256="b" * 64,
-            merged_tree_sha="c" * 40,
-            producer_identity_sha256="d" * 64,
+            evaluation_date=evaluation_date,
+            source_health_sha256=source_health_sha256,
+            badge_payload_sha256=badge_payload_sha256,
+            merged_tree_sha=merged_tree_sha,
+            producer_identity_sha256=producer_identity_sha256,
         )
 
 
@@ -220,15 +231,20 @@ def test_temporal_revalidation_requires_a_nonempty_command(monkeypatch, configur
     else:
         monkeypatch.setenv("ARCHLINTERNET_REVALIDATOR", configured)
     monkeypatch.delenv("ARCHLINTERNET_REVALIDATOR_PROJECT", raising=False)
+    evaluation_date = datetime(2026, 9, 19, tzinfo=timezone.utc)
+    source_health_sha256 = "a" * 64
+    badge_payload_sha256 = "b" * 64
+    merged_tree_sha = "c" * 40
+    producer_identity_sha256 = "d" * 64
 
     with pytest.raises(cli.ProviderFailure, match="semantic_revalidation_unavailable"):
         _run_temporal_revalidation(
             b"health",
-            evaluation_date=datetime(2026, 9, 19, tzinfo=timezone.utc),
-            source_health_sha256="a" * 64,
-            badge_payload_sha256="b" * 64,
-            merged_tree_sha="c" * 40,
-            producer_identity_sha256="d" * 64,
+            evaluation_date=evaluation_date,
+            source_health_sha256=source_health_sha256,
+            badge_payload_sha256=badge_payload_sha256,
+            merged_tree_sha=merged_tree_sha,
+            producer_identity_sha256=producer_identity_sha256,
         )
 
 
@@ -241,15 +257,20 @@ def test_temporal_revalidation_fails_closed_when_revalidator_execution_times_out
     monkeypatch.delenv("ARCHLINTERNET_REVALIDATOR", raising=False)
     monkeypatch.setenv("ARCHLINTERNET_REVALIDATOR_PROJECT", str(tmp_path / "ArchLinterNet.Cli.csproj"))
     monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    evaluation_date = datetime(2026, 9, 19, tzinfo=timezone.utc)
+    source_health_sha256 = "a" * 64
+    badge_payload_sha256 = "b" * 64
+    merged_tree_sha = "c" * 40
+    producer_identity_sha256 = "d" * 64
 
     with pytest.raises(cli.ProviderFailure, match="semantic_revalidation_unavailable"):
         _run_temporal_revalidation(
             b"health",
-            evaluation_date=datetime(2026, 9, 19, tzinfo=timezone.utc),
-            source_health_sha256="a" * 64,
-            badge_payload_sha256="b" * 64,
-            merged_tree_sha="c" * 40,
-            producer_identity_sha256="d" * 64,
+            evaluation_date=evaluation_date,
+            source_health_sha256=source_health_sha256,
+            badge_payload_sha256=badge_payload_sha256,
+            merged_tree_sha=merged_tree_sha,
+            producer_identity_sha256=producer_identity_sha256,
         )
 
 
@@ -317,15 +338,20 @@ def test_temporal_revalidation_fails_closed_if_one_midnight_retry_is_still_unsaf
 
     monkeypatch.setattr(cli, "datetime", Clock)
     monkeypatch.setattr(cli, "_run_temporal_revalidation", fake_revalidation)
+    evaluation_date = datetime(2026, 9, 19, 23, 59, 55, tzinfo=timezone.utc)
+    source_health_sha256 = "a" * 64
+    badge_payload_sha256 = "b" * 64
+    merged_tree_sha = "c" * 40
+    producer_identity_sha256 = "d" * 64
 
     with pytest.raises(cli.ProviderFailure, match="semantic_revalidation_unavailable"):
         cli._run_temporal_revalidation_with_midnight_retry(
             b"health",
-            evaluation_date=datetime(2026, 9, 19, 23, 59, 55, tzinfo=timezone.utc),
-            source_health_sha256="a" * 64,
-            badge_payload_sha256="b" * 64,
-            merged_tree_sha="c" * 40,
-            producer_identity_sha256="d" * 64,
+            evaluation_date=evaluation_date,
+            source_health_sha256=source_health_sha256,
+            badge_payload_sha256=badge_payload_sha256,
+            merged_tree_sha=merged_tree_sha,
+            producer_identity_sha256=producer_identity_sha256,
         )
 
 

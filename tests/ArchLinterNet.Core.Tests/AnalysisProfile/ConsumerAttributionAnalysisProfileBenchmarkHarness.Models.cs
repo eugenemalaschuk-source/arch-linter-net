@@ -75,17 +75,17 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         {
             JsonElement counters = profile.GetProperty("Counters");
             return new CounterTotals(
-                counters.GetProperty("PolicyCompositions").GetInt32(),
-                counters.GetProperty("ProjectGraphEvaluations").GetInt32(),
-                counters.GetProperty("AssemblyLoads").GetInt32(),
-                counters.GetProperty("DiscoveredProjectCount").GetInt32(),
-                counters.GetProperty("RetainedAssemblyCount").GetInt32(),
-                counters.GetProperty("SelectedAssemblyCount").GetInt32(),
-                counters.GetProperty("ModesEvaluated").GetInt32(),
-                counters.GetProperty("SnapshotMaterializations").GetInt32(),
-                counters.GetProperty("FactIndexMaterializations").GetInt32(),
-                counters.GetProperty("SourceScanPasses").GetInt32(),
-                counters.GetProperty("SourceFilesScanned").GetInt32(),
+                counters.GetProperty(nameof(PolicyCompositions)).GetInt32(),
+                counters.GetProperty(nameof(ProjectGraphEvaluations)).GetInt32(),
+                counters.GetProperty(nameof(AssemblyLoads)).GetInt32(),
+                counters.GetProperty(nameof(DiscoveredProjectCount)).GetInt32(),
+                counters.GetProperty(nameof(RetainedAssemblyCount)).GetInt32(),
+                counters.GetProperty(nameof(SelectedAssemblyCount)).GetInt32(),
+                counters.GetProperty(nameof(ModesEvaluated)).GetInt32(),
+                counters.GetProperty(nameof(SnapshotMaterializations)).GetInt32(),
+                counters.GetProperty(nameof(FactIndexMaterializations)).GetInt32(),
+                counters.GetProperty(nameof(SourceScanPasses)).GetInt32(),
+                counters.GetProperty(nameof(SourceFilesScanned)).GetInt32(),
                 SumObject(counters.GetProperty("ContractFamilyCounts")),
                 SumObject(counters.GetProperty("ContractFamilyResultCounts")));
         }

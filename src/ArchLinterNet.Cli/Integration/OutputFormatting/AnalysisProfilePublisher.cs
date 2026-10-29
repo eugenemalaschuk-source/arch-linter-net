@@ -46,8 +46,7 @@ internal static class AnalysisProfilePublisher
             fileSystem,
             counters,
             completionStatus,
-            timing: null,
-            measurements: null,
+            new AnalysisProfilePublicationOptions(null, null),
             protectedPaths: protectedPaths);
     }
 
@@ -57,8 +56,7 @@ internal static class AnalysisProfilePublisher
         IFileSystem fileSystem,
         ArchitectureAnalysisSnapshotCounters counters,
         AnalysisProfileCompletionStatus completionStatus,
-        ValidationTiming? timing,
-        AnalysisProfileMeasurements? measurements,
+        AnalysisProfilePublicationOptions publicationOptions,
         params (string Name, string? Path)[] protectedPaths)
     {
         if (destination is null)
@@ -73,14 +71,14 @@ internal static class AnalysisProfilePublisher
 
         AnalysisProfile profile = AnalysisProfileBuilder.Build(
             counters,
-            timing,
+            publicationOptions.Timing,
             renderedSinkCount: 1,
             outputSinkCount: 1,
             completionStatus,
             cancellationObserved: false,
             new AnalysisProfileBuildOptions
             {
-                Measurements = measurements,
+                Measurements = publicationOptions.Measurements,
             });
         string json = AnalysisProfileJsonWriter.Write(profile);
         switch (destination)
@@ -146,3 +144,7 @@ internal static class AnalysisProfilePublisher
         return true;
     }
 }
+
+internal sealed record AnalysisProfilePublicationOptions(
+    ValidationTiming? Timing,
+    AnalysisProfileMeasurements? Measurements);

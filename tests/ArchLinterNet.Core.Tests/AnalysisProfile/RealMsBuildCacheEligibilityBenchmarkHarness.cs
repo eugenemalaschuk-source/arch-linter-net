@@ -172,11 +172,11 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
         Stopwatch stopwatch = Stopwatch.StartNew();
         try
         {
-            using Process process = Process.Start(startInfo)!;
-            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
-            Task<string> stderrTask = process.StandardError.ReadToEndAsync();
+            using var process = Process.Start(startInfo)!;
             using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(180));
-            using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(linked.Token);
+            Task<string> stderrTask = process.StandardError.ReadToEndAsync(linked.Token);
             try
             {
                 await process.WaitForExitAsync(linked.Token);

@@ -98,9 +98,10 @@ internal sealed class HistoryIngestCommandHandler(
                 options.To,
                 options.RequestDotNetEnrichment),
             options.PolicyPath,
-            _cancellationToken,
-            timing);
-        if (outcome.Result is not HistoryIngestionResult result)
+            timing,
+            _cancellationToken);
+        HistoryIngestionResult? result = outcome.Result;
+        if (result is null)
         {
             console.Error.Write(HistoryDiagnosticJsonWriter.Write(outcome.Diagnostic!));
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -123,7 +124,7 @@ internal sealed class HistoryIngestCommandHandler(
         _cancellationToken.ThrowIfCancellationRequested();
         if (format == "markdown")
         {
-            Stopwatch? markdownClock = timing?.Start();
+            Stopwatch? markdownClock = timing is null ? null : HistoryIngestionTiming.Start();
             string content = HistoryIngestionTextWriter.Write(result);
             timing?.Record("markdown_render", markdownClock);
             _cancellationToken.ThrowIfCancellationRequested();
@@ -133,7 +134,7 @@ internal sealed class HistoryIngestCommandHandler(
 
         bool written = HistoryReportOutputWriter.TryWriteJson(console, () =>
         {
-            Stopwatch? jsonClock = timing?.Start();
+            Stopwatch? jsonClock = timing is null ? null : HistoryIngestionTiming.Start();
             _cancellationToken.ThrowIfCancellationRequested();
             string content = HistoryIngestionJsonWriter.Write(result, releaseSummaryJson);
             timing?.Record("json_render", jsonClock);
@@ -156,7 +157,7 @@ internal sealed class HistoryIngestCommandHandler(
 
         if (sinks.Any(sink => sink.Format == "json"))
         {
-            Stopwatch? jsonClock = timing?.Start();
+            Stopwatch? jsonClock = timing is null ? null : HistoryIngestionTiming.Start();
             if (!HistoryReportOutputWriter.TryRenderJson(
                     console,
                     () =>
@@ -175,12 +176,12 @@ internal sealed class HistoryIngestCommandHandler(
 
         if (sinks.Any(sink => sink.Format == "markdown"))
         {
-            Stopwatch? markdownClock = timing?.Start();
+            Stopwatch? markdownClock = timing is null ? null : HistoryIngestionTiming.Start();
             markdownContent = HistoryIngestionTextWriter.Write(result);
             timing?.Record("markdown_render", markdownClock);
         }
 
-        Stopwatch? outputClock = timing?.Start();
+        Stopwatch? outputClock = timing is null ? null : HistoryIngestionTiming.Start();
         HistoryReportRouteResult route = RouteReportSinks(sinks, jsonContent, markdownContent);
         timing?.Record("output", outputClock);
         if (route.Status != HistoryReportRouteStatus.AllSucceeded || route.Cancelled)
@@ -197,198 +198,241 @@ internal sealed class HistoryIngestCommandHandler(
         string? jsonContent,
         string? markdownContent)
     {
-        List<(string TempPath, string TargetPath)> pendingRenames = new();
-        List<string> failedPaths = new();
-        List<string> committedPaths = new();
-        List<string> stagedPaths = new();
-        List<string> errorDetails = new();
-        List<string> deliveredStreamPaths = new();
-
-        foreach (HistoryReportSink sink in sinks.Where(sink => sink.DestinationType == HistoryReportDestinationType.File))
+        RouteState state = new(sinks);
+        HistoryReportRouteResult? stagingFailure = StageFileSinks(state, jsonContent, markdownContent);
+        if (stagingFailure is not null)
         {
-            if (_cancellationToken.IsCancellationRequested)
-            {
-                DeletePendingTemps(pendingRenames);
-                return BuildRouteResult(
-                    sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths,
-                    cancelled: true);
-            }
-
-            string content = sink.Format == "json" ? jsonContent! : markdownContent!;
-            string? tempPath = null;
-            try
-            {
-                tempPath = fileSystem.WriteAllTextToTemp(sink.FilePath!, content);
-                ValidateWrittenTempFile(tempPath, sink.Format);
-                pendingRenames.Add((tempPath, sink.FilePath!));
-                stagedPaths.Add(sink.FilePath!);
-            }
-            catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
-            {
-                if (tempPath is not null)
-                {
-                    DeleteTempFileBestEffort(tempPath);
-                }
-
-                DeletePendingTemps(pendingRenames);
-                return BuildRouteResult(
-                    sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths,
-                    cancelled: true);
-            }
-            catch (Exception ex)
-            {
-                if (tempPath is not null)
-                {
-                    DeleteTempFileBestEffort(tempPath);
-                }
-
-                failedPaths.Add(sink.FilePath!);
-                errorDetails.Add(ex.Message);
-            }
+            return stagingFailure.Value;
         }
 
-        if (failedPaths.Count > 0)
+        HistoryReportRouteResult? commitFailure = CommitFileSinks(state);
+        if (commitFailure is not null)
         {
-            DeletePendingTemps(pendingRenames);
-            return BuildRouteResult(
-                sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths);
+            return commitFailure.Value;
         }
 
-        // Commit staged files before publishing streams. A later rename failure can leave an
-        // explicitly reported partial file set, but it cannot send stdout/stderr reports first.
-        for (int index = 0; index < pendingRenames.Count; index++)
-        {
-            if (_cancellationToken.IsCancellationRequested)
-            {
-                DeletePendingTemps(pendingRenames.Skip(index));
-                return BuildRouteResult(
-                    sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths,
-                    cancelled: true);
-            }
-
-            (string tempPath, string targetPath) = pendingRenames[index];
-            try
-            {
-                fileSystem.RenameTempToTarget(tempPath, targetPath);
-                committedPaths.Add(targetPath);
-            }
-            catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
-            {
-                DeleteTempFileBestEffort(tempPath);
-                DeletePendingTemps(pendingRenames.Skip(index + 1));
-                return BuildRouteResult(
-                    sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths,
-                    cancelled: true);
-            }
-            catch (Exception ex)
-            {
-                failedPaths.Add(targetPath);
-                errorDetails.Add(ex.Message);
-                DeleteTempFileBestEffort(tempPath);
-                DeletePendingTemps(pendingRenames.Skip(index + 1));
-                return BuildRouteResult(
-                    sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths);
-            }
-        }
-
-        // A stream cannot be rolled back. Keep the deterministic stdout-before-stderr ordering,
-        // record each successful delivery, and report PartialOutput if a later stream fails.
-        foreach (HistoryReportSink sink in sinks
-            .Where(sink => sink.DestinationType != HistoryReportDestinationType.File)
-            .OrderBy(sink => sink.DestinationType == HistoryReportDestinationType.Stdout ? 0 : 1))
-        {
-            if (_cancellationToken.IsCancellationRequested)
-            {
-                return BuildRouteResult(
-                    sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths,
-                    cancelled: true);
-            }
-
-            string content = sink.Format == "json" ? jsonContent! : markdownContent!;
-            string destination = StreamPath(sink.DestinationType);
-            try
-            {
-                if (sink.DestinationType == HistoryReportDestinationType.Stdout)
-                {
-                    if (sink.Format == "json")
-                    {
-                        console.WriteCanonicalJson(content);
-                    }
-                    else
-                    {
-                        console.Out.Write(content);
-                    }
-                }
-                else
-                {
-                    console.Error.Write(content);
-                }
-
-                deliveredStreamPaths.Add(destination);
-            }
-            catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
-            {
-                return BuildRouteResult(
-                    sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths,
-                    cancelled: true);
-            }
-            catch (Exception ex)
-            {
-                failedPaths.Add(destination);
-                errorDetails.Add(ex.Message);
-                break;
-            }
-        }
-
-        if (failedPaths.Count > 0)
-        {
-            return BuildRouteResult(
-                sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths);
-        }
-
-        return BuildRouteResult(
-            sinks, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths);
+        return PublishStreamSinks(state, jsonContent, markdownContent);
     }
 
-    private HistoryReportRouteResult BuildRouteResult(
-        IReadOnlyList<HistoryReportSink> sinks,
-        IReadOnlyList<string> failedPaths,
-        IReadOnlyList<string> committedPaths,
-        IReadOnlyList<string> stagedPaths,
-        IReadOnlyList<string> errorDetails,
-        IReadOnlyList<string> deliveredStreamPaths,
-        bool cancelled = false)
+    private HistoryReportRouteResult? StageFileSinks(RouteState state, string? jsonContent, string? markdownContent)
     {
-        if (failedPaths.Count == 0 && !cancelled)
+        foreach (HistoryReportSink sink in state.Sinks.Where(item => item.DestinationType == HistoryReportDestinationType.File))
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                DeletePendingTemps(state.PendingRenames);
+                return BuildRouteResult(state, cancelled: true);
+            }
+
+            HistoryReportRouteResult? failure = StageFileSink(state, sink, ContentFor(sink, jsonContent, markdownContent));
+            if (failure is not null)
+            {
+                return failure.Value;
+            }
+        }
+
+        if (state.FailedPaths.Count == 0)
+        {
+            return null;
+        }
+
+        DeletePendingTemps(state.PendingRenames);
+        return BuildRouteResult(state);
+    }
+
+    private HistoryReportRouteResult? StageFileSink(RouteState state, HistoryReportSink sink, string content)
+    {
+        string? tempPath = null;
+        try
+        {
+            tempPath = fileSystem.WriteAllTextToTemp(sink.FilePath!, content);
+            ValidateWrittenTempFile(tempPath, sink.Format);
+            state.PendingRenames.Add((tempPath, sink.FilePath!));
+            state.StagedPaths.Add(sink.FilePath!);
+            return null;
+        }
+        catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
+        {
+            CleanupTempAndPending(tempPath, state.PendingRenames);
+            return BuildRouteResult(state, cancelled: true);
+        }
+        catch (Exception exception)
+        {
+            if (tempPath is not null)
+            {
+                DeleteTempFileBestEffort(tempPath);
+            }
+
+            state.FailedPaths.Add(sink.FilePath!);
+            state.ErrorDetails.Add(exception.Message);
+            return null;
+        }
+    }
+
+    // Commit staged files before publishing streams. A later rename failure can leave an
+    // explicitly reported partial file set, but it cannot send stdout/stderr reports first.
+    private HistoryReportRouteResult? CommitFileSinks(RouteState state)
+    {
+        for (int index = 0; index < state.PendingRenames.Count; index++)
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                DeletePendingTemps(state.PendingRenames.Skip(index));
+                return BuildRouteResult(state, cancelled: true);
+            }
+
+            HistoryReportRouteResult? failure = CommitFileSink(state, index);
+            if (failure is not null)
+            {
+                return failure.Value;
+            }
+        }
+
+        return null;
+    }
+
+    private HistoryReportRouteResult? CommitFileSink(RouteState state, int index)
+    {
+        (string tempPath, string targetPath) = state.PendingRenames[index];
+        try
+        {
+            fileSystem.RenameTempToTarget(tempPath, targetPath);
+            state.CommittedPaths.Add(targetPath);
+            return null;
+        }
+        catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
+        {
+            DeleteTempFileBestEffort(tempPath);
+            DeletePendingTemps(state.PendingRenames.Skip(index + 1));
+            return BuildRouteResult(state, cancelled: true);
+        }
+        catch (Exception exception)
+        {
+            state.FailedPaths.Add(targetPath);
+            state.ErrorDetails.Add(exception.Message);
+            DeleteTempFileBestEffort(tempPath);
+            DeletePendingTemps(state.PendingRenames.Skip(index + 1));
+            return BuildRouteResult(state);
+        }
+    }
+
+    // A stream cannot be rolled back. Preserve stdout-before-stderr ordering and record each
+    // successful delivery so later failures are reported as partial output.
+    private HistoryReportRouteResult PublishStreamSinks(RouteState state, string? jsonContent, string? markdownContent)
+    {
+        foreach (HistoryReportSink sink in OrderedStreamSinks(state.Sinks))
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                return BuildRouteResult(state, cancelled: true);
+            }
+
+            HistoryReportRouteResult? failure = PublishStreamSink(
+                state, sink, ContentFor(sink, jsonContent, markdownContent));
+            if (failure is not null)
+            {
+                return failure.Value;
+            }
+        }
+
+        return BuildRouteResult(state);
+    }
+
+    private HistoryReportRouteResult? PublishStreamSink(RouteState state, HistoryReportSink sink, string content)
+    {
+        string destination = StreamPath(sink.DestinationType);
+        try
+        {
+            if (sink.DestinationType == HistoryReportDestinationType.Stdout)
+            {
+                WriteStdout(sink.Format, content);
+            }
+            else
+            {
+                console.Error.Write(content);
+            }
+
+            state.DeliveredStreamPaths.Add(destination);
+            return null;
+        }
+        catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
+        {
+            return BuildRouteResult(state, cancelled: true);
+        }
+        catch (Exception exception)
+        {
+            state.FailedPaths.Add(destination);
+            state.ErrorDetails.Add(exception.Message);
+            return BuildRouteResult(state);
+        }
+    }
+
+    private void WriteStdout(string format, string content)
+    {
+        if (format == "json")
+        {
+            console.WriteCanonicalJson(content);
+            return;
+        }
+
+        console.Out.Write(content);
+    }
+
+    private static string ContentFor(HistoryReportSink sink, string? jsonContent, string? markdownContent)
+    {
+        return sink.Format == "json" ? jsonContent! : markdownContent!;
+    }
+
+    private static IEnumerable<HistoryReportSink> OrderedStreamSinks(IReadOnlyList<HistoryReportSink> sinks)
+    {
+        return sinks.Where(sink => sink.DestinationType != HistoryReportDestinationType.File)
+            .OrderBy(sink => sink.DestinationType == HistoryReportDestinationType.Stdout ? 0 : 1);
+    }
+
+    private void CleanupTempAndPending(
+        string? tempPath,
+        IEnumerable<(string TempPath, string TargetPath)> pendingRenames)
+    {
+        if (tempPath is not null)
+        {
+            DeleteTempFileBestEffort(tempPath);
+        }
+
+        DeletePendingTemps(pendingRenames);
+    }
+
+    private static HistoryReportRouteResult BuildRouteResult(RouteState state, bool cancelled = false)
+    {
+        if (state.FailedPaths.Count == 0 && !cancelled)
         {
             return new HistoryReportRouteResult(
                 HistoryReportRouteStatus.AllSucceeded,
                 Array.Empty<string>(),
-                committedPaths,
-                stagedPaths,
+                state.CommittedPaths,
+                state.StagedPaths,
                 Array.Empty<string>(),
                 Array.Empty<string>(),
-                deliveredStreamPaths);
+                state.DeliveredStreamPaths);
         }
 
-        HashSet<string> completedPaths = committedPaths
-            .Concat(deliveredStreamPaths)
+        var completedPaths = state.CommittedPaths
+            .Concat(state.DeliveredStreamPaths)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        IReadOnlyList<string> uncommittedPaths = sinks
+        IReadOnlyList<string> uncommittedPaths = state.Sinks
             .Select(SinkPath)
             .Where(path => !completedPaths.Contains(path))
             .ToArray();
-        HistoryReportRouteStatus status = committedPaths.Count > 0 || deliveredStreamPaths.Count > 0
+        HistoryReportRouteStatus status = state.CommittedPaths.Count > 0 || state.DeliveredStreamPaths.Count > 0
             ? HistoryReportRouteStatus.PartialOutput
             : HistoryReportRouteStatus.OutputFailed;
         return new HistoryReportRouteResult(
             status,
-            failedPaths,
-            committedPaths,
-            stagedPaths,
+            state.FailedPaths,
+            state.CommittedPaths,
+            state.StagedPaths,
             uncommittedPaths,
-            errorDetails,
-            deliveredStreamPaths)
+            state.ErrorDetails,
+            state.DeliveredStreamPaths)
         {
             Cancelled = cancelled,
         };
@@ -402,13 +446,14 @@ internal sealed class HistoryIngestCommandHandler(
         console.Error.Write(HistoryDiagnosticJsonWriter.Write(new HistoryDiagnostic(
             HistoryDiagnosticKind.ReportPublicationFailed,
             "History report publication did not complete.",
-            publicationStatus: publicationStatus,
-            publicationCancelled: route.Cancelled,
-            failedDestinations: route.FailedPaths,
-            committedDestinations: route.CommittedPaths,
-            deliveredDestinations: route.DeliveredStreamPaths,
-            uncommittedDestinations: route.UncommittedPaths,
-            publicationDetails: route.ErrorDetails)));
+            publication: new HistoryDiagnosticPublication(
+                Status: publicationStatus,
+                Cancelled: route.Cancelled,
+                FailedDestinations: route.FailedPaths,
+                CommittedDestinations: route.CommittedPaths,
+                DeliveredDestinations: route.DeliveredStreamPaths,
+                UncommittedDestinations: route.UncommittedPaths,
+                Details: route.ErrorDetails))));
     }
 
     private static string SinkPath(HistoryReportSink sink) =>
@@ -451,6 +496,23 @@ internal sealed class HistoryIngestCommandHandler(
         {
             // Best-effort cleanup only — a stray temp file doesn't change the failure already being reported.
         }
+    }
+
+    private sealed class RouteState(IReadOnlyList<HistoryReportSink> sinks)
+    {
+        public IReadOnlyList<HistoryReportSink> Sinks { get; } = sinks;
+
+        public List<(string TempPath, string TargetPath)> PendingRenames { get; } = new();
+
+        public List<string> FailedPaths { get; } = new();
+
+        public List<string> CommittedPaths { get; } = new();
+
+        public List<string> StagedPaths { get; } = new();
+
+        public List<string> ErrorDetails { get; } = new();
+
+        public List<string> DeliveredStreamPaths { get; } = new();
     }
 
     private string? FindReportSinkCollision(IReadOnlyList<HistoryReportSink> sinks, string? policyPath)

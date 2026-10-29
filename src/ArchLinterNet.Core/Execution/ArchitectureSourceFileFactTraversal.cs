@@ -163,7 +163,6 @@ internal sealed class ArchitectureSourceFileFactTraversal
             list.Add(new BaseFact(
                 assemblyName,
                 ns,
-                fullName,
                 GetSimpleTypeName(type),
                 GetTypeKindFromReflection(type),
                 type.IsAbstract));
@@ -299,15 +298,7 @@ internal sealed class ArchitectureSourceFileFactTraversal
             return 0;
         }
 
-        int count = 0;
-        foreach (char character in sourceText)
-        {
-            if (character == '\n')
-            {
-                count++;
-            }
-        }
-
+        int count = sourceText.Count(static character => character == '\n');
         return sourceText[^1] == '\n' ? count : count + 1;
     }
 
@@ -534,7 +525,6 @@ internal sealed class ArchitectureSourceFileFactTraversal
     internal sealed record BaseFact(
         string AssemblyName,
         string Namespace,
-        string FullTypeName,
         string SimpleTypeName,
         ArchitectureTypeKind TypeKind,
         bool IsAbstract);

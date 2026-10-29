@@ -54,17 +54,17 @@ internal sealed class ValidateCommandExecution
     {
         return _runtime.PublishPreparedBuildReceipts(new BuildStatePreparedCandidateRequest(
             options.PolicyPath,
-            options.ConditionSetName,
-            options.Configuration,
-            options.TargetFramework,
-            options.Platform,
-            options.RuntimeIdentifier,
-            options.NoRestore,
-            _cancellationToken,
-            options.PreparedBuildProofDirectory,
-            options.PreparedBuildProofNonce,
+            ConditionSetName: options.ConditionSetName,
+            RequestedConfiguration: options.Configuration,
+            RequestedTargetFramework: options.TargetFramework,
+            RequestedPlatform: options.Platform,
+            RequestedRuntimeIdentifier: options.RuntimeIdentifier,
+            NoRestore: options.NoRestore,
+            PreparedBuildProofDirectory: options.PreparedBuildProofDirectory,
+            PreparedBuildProofNonce: options.PreparedBuildProofNonce,
             BuildAlreadyCompleted: options.PreparedBuildProofDirectory is not null
-                || options.PreparedBuildProofNonce is not null));
+                || options.PreparedBuildProofNonce is not null,
+            CancellationToken: _cancellationToken));
     }
 
     internal void WritePreparedReceiptDiagnostics(

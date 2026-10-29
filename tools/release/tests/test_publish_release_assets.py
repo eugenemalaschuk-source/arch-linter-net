@@ -235,9 +235,10 @@ def test_publisher_refuses_untagged_draft_with_a_different_target(
     asset.write_bytes(b"candidate report")
     notes = tmp_path / "notes.md"
     notes.write_text("Release notes\n", encoding="utf-8")
+    arguments = _arguments(asset, notes, candidate_sha)
 
     with pytest.raises(publish_release_assets.ReleaseAssetError, match="matching draft target"):
-        publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
+        publish_release_assets.publish(arguments)
 
     assert _state(state_path)["release"]["assets"] == {}
 
@@ -260,9 +261,10 @@ def test_publisher_fails_closed_when_github_lists_duplicate_drafts_for_tag(
     asset.write_bytes(b"candidate report")
     notes = tmp_path / "notes.md"
     notes.write_text("Release notes\n", encoding="utf-8")
+    arguments = _arguments(asset, notes, candidate_sha)
 
     with pytest.raises(publish_release_assets.ReleaseAssetError, match="duplicate releases"):
-        publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
+        publish_release_assets.publish(arguments)
 
     assert _state(state_path).get("events", []) == []
 
@@ -286,9 +288,10 @@ def test_publisher_fails_before_upload_for_incomplete_immutable_release(
     asset.write_bytes(b"candidate report")
     notes = tmp_path / "notes.md"
     notes.write_text("Release notes\n", encoding="utf-8")
+    arguments = _arguments(asset, notes, candidate_sha)
 
     with pytest.raises(publish_release_assets.ReleaseAssetError, match="new release version"):
-        publish_release_assets.publish(_arguments(asset, notes, candidate_sha))
+        publish_release_assets.publish(arguments)
 
     state = _state(state_path)
     assert state["release"]["assets"] == {}

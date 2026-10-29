@@ -151,6 +151,9 @@ public sealed record RepositoryMetricsDelta(
 
 public static class RepositoryMetricsDeltaFactory
 {
+    private const string CountUnit = "count";
+    private const string RatioUnit = "ratio";
+
     public static RepositoryMetricsDelta Create(
         RepositoryMetricsSnapshot? baseline,
         RepositoryMetricsSnapshot? current)
@@ -176,22 +179,22 @@ public static class RepositoryMetricsDeltaFactory
         }
 
         List<RepositoryMetricDelta> metrics = [];
-        Add(metrics, "source_lines", "count", baseline.Size.SourceLines, current.Size.SourceLines);
-        Add(metrics, "source_files", "count", baseline.Size.SourceFiles, current.Size.SourceFiles);
-        Add(metrics, "projects", "count", baseline.Size.Projects, current.Size.Projects);
-        Add(metrics, "types", "count", baseline.Size.Types, current.Size.Types);
-        Add(metrics, "public_types", "count", baseline.Size.PublicTypes, current.Size.PublicTypes);
-        Add(metrics, "dependency_count", "count", baseline.Coupling.DependencyCount, current.Coupling.DependencyCount);
-        Add(metrics, "dependencies_per_project", "ratio", baseline.Coupling.DependenciesPerProject, current.Coupling.DependenciesPerProject);
-        Add(metrics, "dependency_density", "ratio", baseline.Coupling.DependencyDensity, current.Coupling.DependencyDensity);
-        Add(metrics, "max_fan_in", "count", baseline.Coupling.MaxFanIn, current.Coupling.MaxFanIn);
-        Add(metrics, "max_fan_out", "count", baseline.Coupling.MaxFanOut, current.Coupling.MaxFanOut);
-        Add(metrics, "max_dependency_depth", "count", baseline.Structure.MaxDependencyDepth, current.Structure.MaxDependencyDepth);
-        Add(metrics, "cyclic_component_count", "count", baseline.Structure.CyclicComponentCount, current.Structure.CyclicComponentCount);
-        Add(metrics, "cyclic_project_count", "count", baseline.Structure.CyclicProjectCount, current.Structure.CyclicProjectCount);
-        Add(metrics, "cyclic_project_ratio", "ratio", baseline.Structure.CyclicProjectRatio, current.Structure.CyclicProjectRatio);
-        Add(metrics, "largest_scc_size", "count", baseline.Structure.LargestSccSize, current.Structure.LargestSccSize);
-        Add(metrics, "largest_scc_ratio", "ratio", baseline.Structure.LargestSccRatio, current.Structure.LargestSccRatio);
+        Add(metrics, "source_lines", CountUnit, baseline.Size.SourceLines, current.Size.SourceLines);
+        Add(metrics, "source_files", CountUnit, baseline.Size.SourceFiles, current.Size.SourceFiles);
+        Add(metrics, "projects", CountUnit, baseline.Size.Projects, current.Size.Projects);
+        Add(metrics, "types", CountUnit, baseline.Size.Types, current.Size.Types);
+        Add(metrics, "public_types", CountUnit, baseline.Size.PublicTypes, current.Size.PublicTypes);
+        Add(metrics, "dependency_count", CountUnit, baseline.Coupling.DependencyCount, current.Coupling.DependencyCount);
+        Add(metrics, "dependencies_per_project", RatioUnit, baseline.Coupling.DependenciesPerProject, current.Coupling.DependenciesPerProject);
+        Add(metrics, "dependency_density", RatioUnit, baseline.Coupling.DependencyDensity, current.Coupling.DependencyDensity);
+        Add(metrics, "max_fan_in", CountUnit, baseline.Coupling.MaxFanIn, current.Coupling.MaxFanIn);
+        Add(metrics, "max_fan_out", CountUnit, baseline.Coupling.MaxFanOut, current.Coupling.MaxFanOut);
+        Add(metrics, "max_dependency_depth", CountUnit, baseline.Structure.MaxDependencyDepth, current.Structure.MaxDependencyDepth);
+        Add(metrics, "cyclic_component_count", CountUnit, baseline.Structure.CyclicComponentCount, current.Structure.CyclicComponentCount);
+        Add(metrics, "cyclic_project_count", CountUnit, baseline.Structure.CyclicProjectCount, current.Structure.CyclicProjectCount);
+        Add(metrics, "cyclic_project_ratio", RatioUnit, baseline.Structure.CyclicProjectRatio, current.Structure.CyclicProjectRatio);
+        Add(metrics, "largest_scc_size", CountUnit, baseline.Structure.LargestSccSize, current.Structure.LargestSccSize);
+        Add(metrics, "largest_scc_ratio", RatioUnit, baseline.Structure.LargestSccRatio, current.Structure.LargestSccRatio);
         return new(
             RepositoryMetricsDelta.CurrentSchemaVersion,
             RepositoryMetricsDelta.CurrentKind,

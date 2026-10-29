@@ -48,7 +48,7 @@
     },
     {
       "path": "src/relay-do.ts",
-      "sha256": "849fbdf837ac92910055dbfeb6a9cbbc97d9e5a661aa1f4e6f209184b81f4a68"
+      "sha256": "072c66d9e02fc2e42b4ea6987dbd6793fc71d9c430236d4ef234357bdb0597c6"
     },
     {
       "path": "src/security.ts",

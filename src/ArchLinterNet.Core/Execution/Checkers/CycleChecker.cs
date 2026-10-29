@@ -15,19 +15,15 @@ internal sealed record CycleCandidateEvidence(
 
 internal static class CycleChecker
 {
-    // The graph and candidate evidence are returned rather than published here: appending baseline
-    // candidates is session-owned mutable state, so the session wrapper does it once the cycle set
-    // is known.
+    // Candidate evidence and the full graph are returned rather than published here: appending
+    // baseline candidates is session-owned mutable state, so the session wrapper does it once the
+    // cycle set is known.
     //
-    // FullGraph carries every observed edge regardless of ignore/suppression status, unlike Graph
-    // (live edges only, used for actual cycle detection/reporting). A baseline-suppressed edge is
-    // correctly excluded from Graph -- it is not live -- but ArchitectureCycleBaselineCandidateRecorder
-    // still needs to know whether that suppressed edge, together with the rest of the true reference
-    // structure, still closes a cycle; checking reachability against Graph alone would find nothing
-    // once every edge of a fully-suppressed cycle is excluded from it.
+    // FullGraph carries every observed edge regardless of ignore/suppression status, unlike the
+    // live graph used for cycle detection. ArchitectureCycleBaselineCandidateRecorder needs the
+    // full graph to tell whether a suppressed edge still closes a cycle.
     internal sealed record Result(
         IReadOnlyCollection<string> Cycles,
-        IReadOnlyDictionary<string, HashSet<string>> Graph,
         IReadOnlyDictionary<string, HashSet<string>> FullGraph,
         IReadOnlyCollection<CycleCandidateEvidence> CandidateEvidence);
 
@@ -61,7 +57,7 @@ internal static class CycleChecker
         }
 
         IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(state.Graph);
-        return new Result(cycles, state.Graph, state.FullGraph, state.CandidateEvidence);
+        return new Result(cycles, state.FullGraph, state.CandidateEvidence);
     }
 
     private static void CollectCycleEdgesForLayer(

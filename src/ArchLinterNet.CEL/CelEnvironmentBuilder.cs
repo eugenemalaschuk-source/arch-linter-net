@@ -56,11 +56,10 @@ public sealed class CelEnvironmentBuilder
     public CelEnvironmentBuilder WithObjectSchema(CelObjectSchema objectSchema)
     {
         ArgumentNullException.ThrowIfNull(objectSchema);
-        if (_objectSchemas.ContainsKey(objectSchema.ObjectTypeId))
+        if (!_objectSchemas.TryAdd(objectSchema.ObjectTypeId, objectSchema))
             throw new ArgumentException(
                 $"An object schema for type '{objectSchema.ObjectTypeId}' has already been registered.",
                 nameof(objectSchema));
-        _objectSchemas[objectSchema.ObjectTypeId] = objectSchema;
         return this;
     }
 

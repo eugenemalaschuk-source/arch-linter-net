@@ -47,8 +47,8 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
     public void Build(
         string? configuration = null,
         string? targetFramework = null,
-        CancellationToken cancellationToken = default,
-        int timeoutMilliseconds = 300_000)
+        int timeoutMilliseconds = 300_000,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         string buildTarget = Directory.GetFiles(Root, "*.slnx", SearchOption.TopDirectoryOnly).SingleOrDefault()
@@ -78,9 +78,9 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
             startInfo.ArgumentList.Add(targetFramework);
         }
 
-        using Process process = Process.Start(startInfo)!;
-        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
-        Task<string> errorTask = process.StandardError.ReadToEndAsync();
+        using var process = Process.Start(startInfo)!;
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        Task<string> errorTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
         using CancellationTokenSource timeoutSource = new(TimeSpan.FromMilliseconds(timeoutMilliseconds));
         using CancellationTokenSource linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, timeoutSource.Token);

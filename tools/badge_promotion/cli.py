@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import base64
-from dataclasses import replace
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta, timezone
 import fnmatch
 import hashlib
@@ -43,6 +43,8 @@ from .runtime_integration import run_runtime_integration_test
 _MAX_RAW_PUBLICATION_ATTEMPTS = 5
 _DEFAULT_BRANCH = "~DEFAULT_BRANCH"
 GITHUB_DIRECTORY = ".github"
+_UTC_OFFSET = "+00:00"
+_HEALTH_REPORT_FILENAME = "architecture-health.json"
 
 
 class _ArtifactRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -133,7 +135,7 @@ def _parse_time(value: Any) -> datetime:
     if not isinstance(value, str):
         raise ProviderFailure("semantic_evidence_unavailable")
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+        return datetime.fromisoformat(value.replace("Z", _UTC_OFFSET)).astimezone(timezone.utc)
     except ValueError as error:
         raise ProviderFailure("semantic_evidence_unavailable") from error
 
@@ -288,15 +290,51 @@ def _is_exact_merged_pull_request(pull: Any, repository: str, base_ref: str, mai
 
 
 def _resolve_merged_pull_request(api: GitHubApi, repository_path: str, repository: str, main_sha: str, base_ref: str) -> tuple[int, dict[str, Any]]:
-    associated = api.request(f"/repos/{repository_path}/commits/{main_sha}/pulls")
-    if isinstance(associated, list) and len(associated) == 1:
-        candidate = associated[0]
-        pr_number = candidate.get("number") if isinstance(candidate, dict) else None
-        if isinstance(pr_number, int) and not isinstance(pr_number, bool) and pr_number > 0:
-            pull = api.request(f"/repos/{repository_path}/pulls/{pr_number}")
-            if _is_exact_merged_pull_request(pull, repository, base_ref, main_sha):
-                return pr_number, pull
+    associated = _associated_merged_pull_request(api, repository_path, repository, main_sha, base_ref)
+    if associated is not None:
+        return associated
+    return _find_recent_merged_pull_request(api, repository_path, repository, main_sha, base_ref)
 
+
+def _associated_merged_pull_request(
+    api: GitHubApi, repository_path: str, repository: str, main_sha: str, base_ref: str
+) -> tuple[int, dict[str, Any]] | None:
+    associated = api.request(f"/repos/{repository_path}/commits/{main_sha}/pulls")
+    if not isinstance(associated, list) or len(associated) != 1:
+        return None
+    candidate = associated[0]
+    pr_number = candidate.get("number") if isinstance(candidate, dict) else None
+    if not isinstance(pr_number, int) or isinstance(pr_number, bool) or pr_number <= 0:
+        return None
+    pull = api.request(f"/repos/{repository_path}/pulls/{pr_number}")
+    if _is_exact_merged_pull_request(pull, repository, base_ref, main_sha):
+        return pr_number, pull
+    return None
+
+
+def _is_recent_merge_candidate(pull: Any, repository: str, main_sha: str, base_ref: str) -> bool:
+    if not isinstance(pull, dict):
+        return False
+    base = pull.get("base", {})
+    if not isinstance(base, dict):
+        return False
+    base_repository = base.get("repo", {})
+    if not isinstance(base_repository, dict):
+        return False
+    number = pull.get("number")
+    return (
+        base_repository.get("full_name") == repository
+        and base.get("ref") == base_ref
+        and pull.get("merge_commit_sha") == main_sha
+        and isinstance(pull.get("merged_at"), str)
+        and type(number) is int
+        and number > 0
+    )
+
+
+def _find_recent_merged_pull_request(
+    api: GitHubApi, repository_path: str, repository: str, main_sha: str, base_ref: str
+) -> tuple[int, dict[str, Any]]:
     # GitHub's commit-associated PR endpoint can be empty for a squash merge.
     # Resolve by exact merge_commit_sha from recent closed PRs, then re-read the
     # selected PR and apply the same full trust checks before accepting it.
@@ -309,19 +347,8 @@ def _resolve_merged_pull_request(api: GitHubApi, repository_path: str, repositor
         if not isinstance(pulls, list):
             raise ProviderFailure("merged_pull_request_ambiguous")
         for pull in pulls:
-            base = pull.get("base", {}) if isinstance(pull, dict) else {}
-            base_repository = base.get("repo", {}) if isinstance(base, dict) else {}
-            number = pull.get("number") if isinstance(pull, dict) else None
-            if (
-                base_repository.get("full_name") == repository
-                and base.get("ref") == base_ref
-                and pull.get("merge_commit_sha") == main_sha
-                and isinstance(pull.get("merged_at"), str)
-                and isinstance(number, int)
-                and not isinstance(number, bool)
-                and number > 0
-            ):
-                matches[number] = pull
+            if _is_recent_merge_candidate(pull, repository, main_sha, base_ref):
+                matches[pull["number"]] = pull
         if len(pulls) < 100 or len(matches) > 1:
             break
 
@@ -382,7 +409,7 @@ def _read_semantic_evidence(api: GitHubApi, artifacts: list[Any], config) -> tup
     evidence_archive = api.download(str(evidence_artifact.get("archive_download_url", "")))
     try:
         with zipfile.ZipFile(io.BytesIO(evidence_archive)) as opened:
-            health_bytes = _read_bounded_zip_member(opened, "architecture-health.json", config.limits.max_member_bytes)
+            health_bytes = _read_bounded_zip_member(opened, _HEALTH_REPORT_FILENAME, config.limits.max_member_bytes)
             health = json.loads(health_bytes.decode("utf-8"))
         return _parse_time(health["report_evidence"]["publication_evidence"]["semantic_horizon"]), health_bytes, evidence_artifact_id
     except (KeyError, TypeError, ValueError, zipfile.BadZipFile) as error:
@@ -393,48 +420,33 @@ def _read_semantic_horizon(api: GitHubApi, artifacts: list[Any], config) -> date
     return _read_semantic_evidence(api, artifacts, config)[0]
 
 
-def _producer_identity_sha256(
-    *,
-    repository: str,
-    base_ref: str,
-    base_sha: str,
-    main_tree_sha: str,
-    head_sha: str,
-    head_tree_sha: str,
-    pr_number: int,
-    workflow_path: str,
-    workflow_sha: str,
-    check_name: str,
-    check_app: str,
-    run_id: int,
-    run_attempt: int,
-    job_id: int,
-    job_name: str,
-    artifact_id: int,
-    artifact_name: str,
-    evidence_artifact_id: int,
-) -> str:
-    identity = {
-        "artifact_id": artifact_id,
-        "artifact_name": artifact_name,
-        "base_ref": base_ref,
-        "base_sha": base_sha,
-        "check_app": check_app,
-        "check_name": check_name,
-        "evidence_artifact_id": evidence_artifact_id,
-        "head_sha": head_sha,
-        "head_tree_sha": head_tree_sha,
-        "job_id": job_id,
-        "job_name": job_name,
-        "main_tree_sha": main_tree_sha,
-        "pr_number": pr_number,
-        "repository": repository,
-        "run_attempt": run_attempt,
-        "run_id": run_id,
-        "workflow_path": workflow_path,
-        "workflow_sha": workflow_sha,
-    }
-    return hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+@dataclass(frozen=True, slots=True)
+class ProducerIdentity:
+    repository: str
+    base_ref: str
+    base_sha: str
+    main_tree_sha: str
+    head_sha: str
+    head_tree_sha: str
+    pr_number: int
+    workflow_path: str
+    workflow_sha: str
+    check_name: str
+    check_app: str
+    run_id: int
+    run_attempt: int
+    job_id: int
+    job_name: str
+    artifact_id: int
+    artifact_name: str
+    evidence_artifact_id: int
+
+
+def _producer_identity_sha256(identity: ProducerIdentity) -> str:
+    canonical_identity = asdict(identity)
+    return hashlib.sha256(
+        json.dumps(canonical_identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
 
 
 _TEMPORAL_RECEIPT_FIELDS = {
@@ -471,7 +483,7 @@ def _validate_temporal_receipt(
 ) -> tuple[dict[str, Any], datetime]:
     try:
         receipt = json.loads(output, object_pairs_hook=_reject_duplicate_json_keys)
-    except (TypeError, ValueError, json.JSONDecodeError) as error:
+    except (TypeError, ValueError) as error:
         raise ProviderFailure("semantic_revalidation_unavailable") from error
     if not isinstance(receipt, dict) or set(receipt) != _TEMPORAL_RECEIPT_FIELDS:
         raise ProviderFailure("semantic_revalidation_unavailable")
@@ -503,34 +515,9 @@ def _run_temporal_revalidation(
 ) -> tuple[dict[str, Any], datetime]:
     configured = os.environ.get("ARCHLINTERNET_REVALIDATOR")
     project = os.environ.get("ARCHLINTERNET_REVALIDATOR_PROJECT")
-    if configured:
-        command = shlex.split(configured)
-    elif project:
-        command = [
-            "dotnet", "run", "--project", project,
-            "--configuration", "Release", "--no-build", "--no-restore",
-        ]
-    else:
-        raise ProviderFailure("semantic_revalidation_unavailable")
-    if not command:
-        raise ProviderFailure("semantic_revalidation_unavailable")
+    command = _revalidator_command(configured, project)
     if project and not configured:
-        try:
-            for preparation in (
-                ["dotnet", "restore", project, "--nologo"],
-                ["dotnet", "build", project, "--configuration", "Release", "--no-restore", "--nologo"],
-            ):
-                prepared = subprocess.run(
-                    preparation,
-                    capture_output=True,
-                    check=False,
-                    text=True,
-                    timeout=120,
-                )
-                if prepared.returncode != 0:
-                    raise ProviderFailure("semantic_revalidation_unavailable")
-        except (OSError, subprocess.SubprocessError) as error:
-            raise ProviderFailure("semantic_revalidation_unavailable") from error
+        _prepare_revalidator(project)
     if command[-1] != "--":
         command.append("--")
     date_text = evaluation_date.astimezone(timezone.utc).date().isoformat()
@@ -545,7 +532,7 @@ def _run_temporal_revalidation(
     ]
     try:
         with tempfile.TemporaryDirectory(prefix="archlinternet-temporal-") as temporary:
-            input_path = Path(temporary) / "architecture-health.json"
+            input_path = Path(temporary) / _HEALTH_REPORT_FILENAME
             input_path.write_bytes(health_bytes)
             completed = subprocess.run(
                 command + [item if item != "{input}" else str(input_path) for item in arguments],
@@ -565,6 +552,41 @@ def _run_temporal_revalidation(
         merged_tree_sha=merged_tree_sha,
         producer_identity_sha256=producer_identity_sha256,
     )
+
+
+def _revalidator_command(configured: str | None, project: str | None) -> list[str]:
+    if configured:
+        command = shlex.split(configured)
+    elif project:
+        command = [
+            "dotnet", "run", "--project", project,
+            "--configuration", "Release", "--no-build", "--no-restore",
+        ]
+    else:
+        raise ProviderFailure("semantic_revalidation_unavailable")
+    if not command:
+        raise ProviderFailure("semantic_revalidation_unavailable")
+    return command
+
+
+def _prepare_revalidator(project: str) -> None:
+    preparations = (
+        ["dotnet", "restore", project, "--nologo"],
+        ["dotnet", "build", project, "--configuration", "Release", "--no-restore", "--nologo"],
+    )
+    try:
+        for preparation in preparations:
+            completed = subprocess.run(
+                preparation,
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=120,
+            )
+            if completed.returncode != 0:
+                raise ProviderFailure("semantic_revalidation_unavailable")
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ProviderFailure("semantic_revalidation_unavailable") from error
 
 
 def _run_temporal_revalidation_with_midnight_retry(
@@ -625,7 +647,7 @@ def resolve_evidence(api: GitHubApi, config, *, force_temporal_revalidation: boo
     job_id = int(job.get("id", 0))
     artifact_id = int(artifact.get("id", 0))
     artifact_name = artifact.get("name", "")
-    producer_identity_sha256 = _producer_identity_sha256(
+    producer_identity_sha256 = _producer_identity_sha256(ProducerIdentity(
         repository=repository,
         base_ref=base_ref,
         base_sha=base_sha,
@@ -644,7 +666,7 @@ def resolve_evidence(api: GitHubApi, config, *, force_temporal_revalidation: boo
         artifact_id=artifact_id,
         artifact_name=artifact_name,
         evidence_artifact_id=evidence_artifact_id,
-    )
+    ))
     evidence = EvidenceContext(
         repository=repository, base_ref=base_ref, base_sha=base_sha, main_tree_sha=main_tree,
         head_sha=head_sha, head_tree_sha=head_tree, pr_number=pr_number, event=config.producer.event,
@@ -696,7 +718,7 @@ def _load_config(configuration_id: str):
         registry = json.loads(path.read_text(encoding="utf-8"))
         raw = registry["configurations"][configuration_id]
         return parse_config(raw)
-    except (OSError, KeyError, TypeError, json.JSONDecodeError, ConfigValidationError) as error:
+    except (OSError, KeyError, TypeError, ValueError) as error:
         raise ProviderFailure("approved_configuration_invalid") from error
 
 
@@ -728,12 +750,12 @@ def _publication_receipt(config, payload: bytes, evidence: EvidenceContext | Non
         "source_health_sha256": evidence.source_health_sha256 if evidence else None,
         "producer_identity_sha256": evidence.producer_identity_sha256 if evidence else None,
         "temporal_verified_at": (
-            evidence.temporal_verified_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            evidence.temporal_verified_at.astimezone(timezone.utc).isoformat().replace(_UTC_OFFSET, "Z")
             if evidence and evidence.temporal_verified_at
             else None
         ),
         "temporal_receipt": evidence.temporal_receipt if evidence else None,
-        "published_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "published_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(_UTC_OFFSET, "Z"),
     }
 
 
@@ -742,7 +764,7 @@ def _publication_commit_sha(api: GitHubApi, repository: str, parent: str, base_t
     for content in (payload, (json.dumps(receipt, indent=2) + "\n").encode("utf-8")):
         blob = api.request(f"/repos/{repository}/git/blobs", method="POST", value={"content": base64.b64encode(content).decode("ascii"), "encoding": "base64"})
         blob_shas.append(blob["sha"])
-    tree = api.request(f"/repos/{repository}/git/trees", method="POST", value={"base_tree": base_tree, "tree": [{"path": "architecture-health.json", "mode": "100644", "type": "blob", "sha": blob_shas[0]}, {"path": "architecture-health-publication.json", "mode": "100644", "type": "blob", "sha": blob_shas[1]}]})
+    tree = api.request(f"/repos/{repository}/git/trees", method="POST", value={"base_tree": base_tree, "tree": [{"path": _HEALTH_REPORT_FILENAME, "mode": "100644", "type": "blob", "sha": blob_shas[0]}, {"path": "architecture-health-publication.json", "mode": "100644", "type": "blob", "sha": blob_shas[1]}]})
     commit = api.request(f"/repos/{repository}/git/commits", method="POST", value={"message": "chore: publish architecture health badge", "tree": tree["sha"], "parents": [parent]})
     return commit["sha"]
 

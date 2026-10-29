@@ -1,0 +1,59 @@
+name: Qodana Gate Publisher
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers] — trusted default-branch code validates inert exact-run evidence and never executes PR code.
+    workflows: [Qodana Community]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: qodana-publisher-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish trusted Qodana verdict
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: write
+      statuses: write
+    steps:
+      - name: Load trusted publisher at the workflow revision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api -H 'Accept: application/vnd.github.raw+json' \
+            "repos/eugenemalaschuk-source/arch-linter-net/contents/tools/scripts/qodana_gate.py?ref=$GITHUB_SHA" \
+            > "$RUNNER_TEMP/qodana_gate.py"
+
+      - name: Download the exact scanner-run artifact
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: qodana-evidence-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          path: ${{ runner.temp }}/qodana-evidence
+
+      - name: Validate evidence, evaluate findings, publish PR report and status
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          QODANA_ARTIFACT_DIR: ${{ runner.temp }}/qodana-evidence
+          QODANA_ARTIFACT_DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
+        run: python3 "$RUNNER_TEMP/qodana_gate.py"

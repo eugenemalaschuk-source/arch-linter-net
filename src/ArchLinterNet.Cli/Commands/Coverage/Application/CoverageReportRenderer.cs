@@ -12,6 +12,7 @@ internal static class CoverageReportRenderer
     private const string StateKey = "state";
     private const string ContractKey = "contract";
     private const string EvidenceKey = "evidence";
+    private const string SubjectKey = "subject";
 
     private static readonly string[] _states = [CoveredState, "excluded", UncoveredState, StaleState, UnknownState];
 
@@ -67,14 +68,14 @@ internal static class CoverageReportRenderer
     private static void RenderCanonicalAnnotationDiagnostics(List<string> lines, JsonElement diagnostics)
     {
         JsonElement[] ordered = diagnostics.EnumerateArray()
-            .OrderBy(diagnostic => String(diagnostic, "subject"), StringComparer.Ordinal)
+            .OrderBy(diagnostic => String(diagnostic, SubjectKey), StringComparer.Ordinal)
             .ThenBy(diagnostic => String(diagnostic, "code"), StringComparer.Ordinal)
             .ToArray();
         lines.Add($"### Canonical annotation diagnostics ({ordered.Length})");
         lines.Add(string.Empty);
         foreach (JsonElement diagnostic in ordered)
         {
-            string subject = String(diagnostic, "subject") ?? "<unknown subject>";
+            string subject = String(diagnostic, SubjectKey) ?? "<unknown subject>";
             string code = String(diagnostic, "code") ?? "canonical-annotation";
             string message = String(diagnostic, "message") ?? "No diagnostic detail was provided.";
             string[] evidence = ArrayElement(diagnostic, "evidence_sources").EnumerateArray()
@@ -310,8 +311,24 @@ internal static class CoverageReportRenderer
         string column = String(value, "column") is { } columnValue ? ":" + columnValue : string.Empty;
         return path + line + column;
     }
-    private static string Summary(IReadOnlyDictionary<string, string?> values) => string.Join("; ", new[] { ("code", "message_code"), ("source", "source"), ("subject", "subject"), ("state", StateKey), ("item", "item"), ("forbidden namespace", "forbidden_namespace"), ("forbidden references", "forbidden_references"), ("evidence", EvidenceKey), ("reason", "reason"), ("detail", "detail"), ("source", "source_location"), ("policy", "policy_origin"), ("policy", "policy_location") }.Where(pair => values.GetValueOrDefault(pair.Item2) is not null).Select(pair => $"{pair.Item1} `{Code(values[pair.Item2]!)}`"));
-    private static string Code(string value) => Compact(value).Replace("`", "'", StringComparison.Ordinal);
+    private static string Summary(IReadOnlyDictionary<string, string?> values)
+    {
+        (string Label, string Key)[] fields =
+        [
+            ("code", "message_code"), ("source", "source"), ("subject", SubjectKey),
+            ("state", StateKey), ("item", "item"), ("forbidden namespace", "forbidden_namespace"),
+            ("forbidden references", "forbidden_references"), ("evidence", EvidenceKey),
+            ("reason", "reason"), ("detail", "detail"), ("source", "source_location"),
+            ("policy", "policy_origin"), ("policy", "policy_location"),
+        ];
+        return string.Join("; ", fields
+            .Where(field => values.GetValueOrDefault(field.Key) is not null)
+            .Select(field => $"{field.Label} `{Code(values[field.Key]!)}`"));
+    }
+    private static string Code(string value)
+    {
+        return Compact(value).Replace("`", "'", StringComparison.Ordinal);
+    }
     private static string Compact(string value) { string text = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)); return text.Length <= 240 ? text : text[..237] + "..."; }
 
     private sealed class FailureRuleBuilder(string identifier, string name) { private readonly SortedSet<FailureDiagnostic> _diagnostics = []; public void Add(string category, string summary) => _diagnostics.Add(new(category, string.IsNullOrEmpty(summary) ? "structured diagnostic emitted without detail fields" : summary)); public FailureRule Build() => new(identifier, name, _diagnostics.ToArray()); }

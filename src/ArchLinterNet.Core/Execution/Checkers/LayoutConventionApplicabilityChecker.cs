@@ -148,7 +148,6 @@ internal static class LayoutConventionApplicabilityChecker
                 reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
                 subjectIssues.Add(new SubjectIssue(
                     subject.Identity,
-                    subject.Fact.SourceFilePath!,
                     ArchitectureApplicabilityReasonCodes.UnmappedSubject));
             }
             else if (distinctConventionMappings > 1)
@@ -156,7 +155,6 @@ internal static class LayoutConventionApplicabilityChecker
                 reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
                 subjectIssues.Add(new SubjectIssue(
                     subject.Identity,
-                    subject.Fact.SourceFilePath!,
                     ArchitectureApplicabilityReasonCodes.AmbiguousSubject));
             }
         }
@@ -351,7 +349,6 @@ internal static class LayoutConventionApplicabilityChecker
 
     internal sealed record SubjectIssue(
         string SubjectIdentity,
-        string SourceFilePath,
         string ReasonCode);
 
     internal sealed record Result(

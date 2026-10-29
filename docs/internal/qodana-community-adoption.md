@@ -1,101 +1,71 @@
-# Qodana Community .NET adoption
+# Qodana Community .NET quality gate
 
-Owner: issue #864. Lifecycle: post-v0.8.0 engineering-health stabilization.
+The Qodana pull-request gate is designed to be required alongside the existing Sonar and CI checks. The scan runs independently in `.github/workflows/qodana.yml` with read-only permissions and no secrets. A separate `.github/workflows/qodana-publisher.yml` runs from the default branch after the scan completes, validates the exact-run evidence, evaluates the finding delta, updates one bounded PR report, and publishes the commit status context `qodana`. The versioned Main ruleset payload now requires that context; apply it after the publisher is present on the default branch, as described in [required status checks inventory](required-status-checks-inventory.md).
 
-## Final state
+The Qodana scanner uses the free Community .NET image `jetbrains/qodana-cdnet:2026.2`, pinned by tag and manifest digest in [qodana.yaml](../../qodana.yaml). This is the current documented Community .NET release at the time of this change. The scanner analyzes `ArchLinterNet.slnx` with `qodana.recommended` and the locked .NET SDK. The scan workflow has no write permission, no Qodana Cloud token, no privileged container, no Docker socket mount, and no automatic fixes. PR-supplied contract tests run in a separate job; the scan job runs its stdlib-only harness with Python isolated mode, preventing PR files from shadowing its imports.
 
-Phase A implementation is complete and PR #906 is merged. Phase B is complete with the reviewed decision **KEEP ADVISORY**.
+## Gate policy
 
-`Qodana Community .NET (advisory)` remains a separate, non-required PR check. It is intentionally not added to branch protection or a ruleset. The scanner has shown stable execution and useful independent JetBrains/ReSharper diagnostics, but the current recommended profile produces a large repository-wide historical/style inventory and has no reviewed new-code/differential baseline. Making this configuration required would primarily gate scanner execution rather than a trustworthy finding-level regression policy.
+The scanner analyzes the exact pull-request base and head in separate checkouts and caches. The trusted publisher compares their SARIF reports, so a previously fixed finding cannot be reintroduced simply because an older committed baseline still lists it. Findings first match by exact identity, then by Qodana's fingerprint, rule, path, message and severity. If a neighboring edit changes the fingerprint, they can also match by the same rule, path, line, column, message, severity and a hash of the complete unchanged diagnostic line. Occurrences are counted separately in every phase. The publisher also reads the reviewed policy in `tools/qodana/baseline.json` from the exact base SHA. That historical inventory was generated from main revision `dbc49a544ab8f39bc635a0628d769704945dfca5` (workflow run [40782711991](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40782711991)); it recorded 13,280 Moderate diagnostics and no High or Critical findings. It is not a Qodana configuration suppression.
 
-The Qodana integration does not replace or redefine SonarCloud, CodeQL, ArchLinterNet self-governance, compiler/analyzer checks, package validation, architecture coverage or release authority.
+The verdict rules are:
 
-## Configuration and trust boundary
+- Every High or Critical finding fails, including a severity increase on an existing finding.
+- Every new Moderate finding fails, covering all Qodana inspections that report ordinary code-quality or maintainability issues.
+- New Low and Info findings are included in the report and remain visible but do not block.
+- Findings removed since the base scan are reported as remediated.
+- A missing, malformed, failed, stale, or identity-mismatched scan fails closed as `UNASSESSABLE`.
+- The comparison uses the freshly scanned PR base; the reviewed policy comes from the base revision, so a PR cannot approve its own changes.
+- A baseline refresh must be the only changed path in its PR. The candidate must exactly match the successful base SARIF inventory, stamped with the base SHA because the source under analysis is unchanged from that base. The current verdict compares fresh head and base scans; the refreshed inventory becomes a reviewed record after merge. Mixing a baseline refresh with source or policy changes fails closed.
+- Changes to scanner, profile, suppression, or build inputs are not assessed by the scan they modify. The publisher reports these paths and fails closed. Once `qodana` is required, merging an approved change to those inputs requires an authorized ruleset bypass after a separate trusted review; splitting such a change into another PR does not by itself make the check pass.
+- Root and nested `.gitignore` files and any file ending in `.DotSettings` or `.DotSettings.user` are protected scan-scope inputs. The gate also treats deletion of a ReSharper or compiler-warning `restore` directive as a suppression change because it can widen the scope of an existing disable directive.
 
-`qodana.yaml` selects the free `jetbrains/qodana-cdnet:2026.2` Community engine, `qodana.recommended`, `ArchLinterNet.slnx` and Release configuration. As of 2026-10-25, the image is also pinned to manifest digest `sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2`, resolved by the canonical main scan (Community 2026.2.699 / Inspect Code 2026.2.3.1). Keep the same-revision tag plus digest together when refreshing the pin. There is no Qodana Cloud token, paid dependency, repository baseline, blanket exclusion or broad inspection suppression.
+The comment is identified by `<!-- archlinternet-qodana-report -->` and updated in place. It shows the verdict, severity totals, new and remediated findings, rule IDs, source locations, exact head/base identities, scan attempt and artifact link. It lists at most 25 entries per delta and has a hard 60 KB size limit. Untrusted diagnostic text is escaped to one line with mentions neutralized. The compact commit status is published to the scanned PR head under exactly `qodana`.
 
-The `qodana.recommended` profile maps ReSharper `Warning` inspections to Qodana `High`. The initial inventory contained 2,400 such findings, dominated by mechanical style rules, project namespace layout, public/serialized contract members, test fixtures, and defensive checks at JSON boundaries. Code fixes on this branch removed 21 findings, leaving 2,379 before severity calibration. Qodana Community for .NET uses ReSharper InspectCode, so `.editorconfig` assigns each of 45 reviewed low-risk inspection properties the `suggestion` severity while keeping the rules enabled and visible. A pinned-image probe confirmed that `RedundantUsingDirective` is emitted in SARIF as `note` / Qodana `Moderate`; direct YAML severity overrides were loaded but did not affect InspectCode's output. The lifecycle inspections `AccessToDisposedClosure` and `AccessToModifiedClosure` are scoped to `tests/**/*.cs`: all 432 findings in the reviewed scan were located under `tests/**`, including synchronous NUnit assertion callbacks and a deferred LINQ sequence consumed synchronously before its captured loop value changes. Production and other source paths retain the recommended warning severity for these inspections. Nullable API contract findings are also reduced because malformed JSON can still produce null values for non-nullable C# properties, and the affected code deliberately validates those external payloads. The default-High families (`InvalidXmlDocComment` and `ReturnTypeCanBeNotNullable`) are repaired in the current quality PR. No path exclusions or finding suppressions are added.
+## Historical finding triage
 
-The workflow uses the ordinary `pull_request` event, an ephemeral GitHub-hosted Ubuntu runner, `contents: read`, and checkout with `persist-credentials: false`. It does not reference repository/Qodana secrets, does not use `pull_request_target`, does not grant PR/security-event write permissions, and uploads scanner output only as inert artifacts. The scanner container is not privileged, does not receive the Docker socket or host credentials, and runs with dropped capabilities and `no-new-privileges`.
+The head scan in [run 40808531817](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40808531817) recorded 13,245 Moderate findings, 4,203 in `src/`. These counts are a starting point, not a list of approved suppressions. Review findings in context and rescan after each batch. Qodana can change a finding's fingerprint when neighboring lines change, even if its diagnostic line did not; the unchanged-line fallback above handles that case when both SARIF reports contain the complete line.
 
-At closure on 2026-09-17, GitHub repository metadata reports `pull_request_creation_policy: collaborators_only` and zero forks. Under GitHub's repository policy, non-collaborators cannot create pull requests, so a literal untrusted-fork execution is not an available contribution path for this repository. The original implementation follow-up had strengthened the acceptance wording to require an actual fork run; that requirement is treated as **not applicable under the current repository policy**, rather than keeping #864 open for an unsupported path.
+Examples reviewed during the first batches:
 
-The security objective is still satisfied structurally: even a collaborator-originated fork PR would execute the same tokenless, read-only `pull_request` workflow without repository secrets. Static workflow/runner contract tests cover these invariants. If `pull_request_creation_policy` is later changed to `all`, a real untrusted-fork run should be recorded before any future attempt to promote Qodana to a required gate.
+| Finding | Decision and evidence |
+| --- | --- |
+| Unused comparison parameters and intermediate fields | Remove values that no caller reads, after checking their use and preserving the behavior of policy comparisons, schema diagnostics and API-surface checks. |
+| Unused fields in internal analysis results | The reflected type name and layout subject path are already carried by their dictionary key or subject identity. The live cycle graph is consumed during cycle detection; only the full graph is needed by the later baseline-candidate pass. |
+| Duplicate checks before inserting into a set or dictionary | Use the collection's insertion result when it preserves traversal order and duplicate handling. |
+| `NotAccessedPositionalProperty.Local` | Review each record's role. The SARIF records in `ArchitecturePolicyWeakeningFormatter` are serialized, and `CoChangePairKey` relies on record equality; their properties are used even without explicit getters. |
+| `OutParameterValueIsAlwaysDiscarded.Global` | Preserve the public `ValidationOutcome.Deconstruct` shape, which external consumers can use even when this repository discards its outputs. |
+| `UnusedType.Global` | Check dynamic discovery. For example, `CapturePublicApiSubcommandModule` is instantiated by `PublicApiSubcommandCatalog` via reflection, and annotation types are shipped to consumers. |
+| `AccessToDisposedClosure` | Inspect lifetime and execution order rather than suppressing the rule. For example, the `JsonDocument` in `BadgeCommandHandlerTests` is used by synchronous `Assert.Multiple` before disposal, while concurrent snapshot calls in `ArchitectureAnalysisSnapshotTests` are awaited before disposal. Other occurrences still need review. |
+| Formatting suggestions such as `ArrangeMethodOrOperatorBody` and `SuggestVarOrType_*` | Prioritize correctness and maintainability changes; avoid mass rewrites made solely to reduce the count. |
 
-## Scanner and determinism evidence
+Public members, serialization models and interface seams require particular care because Qodana's repository-local usage analysis cannot establish whether external callers, reflection or serializers rely on them.
 
-Implementation burn-in run [35072109010](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35072109010), artifact [10437360502](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35072109010/artifacts/10437360502), used Community `2026.2.672` / Inspect Code `2026.2.1`, .NET SDK `10.0.301`, runtime `10.0.9`.
+## Trust boundary
 
-| Phase | Exit | Seconds | Findings | Control rule findings |
-| --- | ---: | ---: | ---: | ---: |
-| Canonical cold | 0 | 370.614 | 12162 | n/a |
-| Canonical warm | 0 | 355.057 | 12162 | n/a |
-| Positive probe | 0 | 34.528 | 4 | 1 |
-| Corrected negative probe | 0 | 33.515 | 3 | 0 |
+The scanner checks out the PR head and exact base only in a tokenless, read-only job, and scans the base first with a separate cache. Its evidence artifact is untrusted input to the publisher. The publisher fetches its script from this repository at the default-branch workflow revision; it never checks out or executes the PR head, and it does not trust the artifact's computed verdict. It validates workflow path, repository, run ID and attempt, open PR identity, current head/base, artifact name and contents, both evidence digests, scanner image/profile/solution and SARIF structure, then recomputes the verdict from both raw SARIF reports. PR paths that could alter analysis or suppress findings are treated as governance changes and require separate review.
 
-Cold and warm inventories had the identical fingerprint `dc802b1bbb9cbc823bb90f91cf3cd4ca7667155a369d5bce5257646d4d12abc5`. A separate clean-worktree run on macOS/Rancher Desktop reproduced the same fingerprint and 12162 findings from an independently pulled image, providing cross-machine repeatability evidence.
+These constraints follow GitHub's guidance to avoid running pull-request code in privileged `workflow_run` jobs and to treat artifacts from earlier untrusted workflows as untrusted data ([secure use of GitHub Actions](https://docs.github.com/en/actions/reference/security/secure-use), [workflow events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)).
 
-The runner checkpoints completed phases, treats missing/malformed/failed SARIF as failure rather than zero findings, bounds scanner/probe/container-cleanup time, rejects oversized/symlink report publication, and preserves failure evidence where possible.
+## Required-check rollout
 
-## Post-merge reliability and Actions cost evidence
+The versioned [Main ruleset payload](main-ruleset-required-status-checks.json) contains all existing required contexts plus `qodana`, increasing the required list from 15 to 16. The active Main ruleset must be updated only after this `workflow_run` publisher is present on the default branch, because GitHub only triggers `workflow_run` workflows that exist on the default branch. The repository ruleset change remains a maintainer operation; after applying the payload, verify the active ruleset contains `qodana` and that a missing or failed status blocks merge.
 
-After #906 merged, the committed advisory workflow completed successfully on multiple independent same-repository PR heads:
+The scanner check itself is intentionally not the required context: it proves Qodana could run and preserve evidence. The default-branch publisher's `qodana` status is the finding-level gate.
 
-| Run | Date (UTC) | Result | Whole-run duration | GitHub timing API: billable Ubuntu |
-| --- | --- | --- | ---: | ---: |
-| [35153454405](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35153454405) | 2026-09-16 | success | 416 s | 0 ms |
-| [35181806506](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35181806506) | 2026-09-17 | success | 418 s | 0 ms |
-| [35182465418](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/35182465418) | 2026-09-17 | success | 426 s | 0 ms |
+## Updating Qodana or its baseline
 
-This establishes a representative normal-PR runtime band of about 6:56–7:06. The zero billable value is the observed GitHub Actions timing response for these public-repository runs; it is not a claim about private-repository pricing. Superseded attempts cancelled by a newer push are not counted as scanner reliability failures.
+The current image pin is `2026.2` with manifest digest `sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2`. Review the official [Qodana .NET documentation](https://www.jetbrains.com/help/qodana/dotnet.html) before updating it. Run a full canonical scan, inspect the SARIF, and build a new baseline only from a successful, exact-revision scan:
 
-Run `35182465418` analyzed head `81bf2378c003d6d6f9a9ea13601d7670e603fb65` and published artifact `10480863073` with digest `sha256:1b7be742e7385d29a50620d78bf53aaa63763d515324f9cc5103630fb10386fe`.
+```bash
+python3 tools/scripts/qodana_gate.py \
+  --build-baseline /path/to/cold.sarif.json \
+  --analyzed-sha <full-scan-sha> \
+  --output tools/qodana/baseline.json
+```
 
-## Inventory and signal review
+Baseline generation refuses High/Critical findings. The differential gate blocks every new Moderate finding and does not use a per-rule allowlist. A baseline refresh PR must change only `tools/qodana/baseline.json`; its candidate is verified against a successful scan of the unchanged base source and stamped with that base SHA. The gate compares fresh base and head reports, so the update cannot hide new findings in its own PR. The refreshed inventory is a reviewed record after merge. Do not add blanket exclusions or unreviewed suppressions.
 
-The original canonical scan reported 120 rule IDs: 10132 notes, 2029 warnings and 1 error; 8139 findings were under tests, 3891 under `src`, 116 under benchmarks and 16 under tools. These are scanner diagnostics, not 12162 confirmed defects.
+## Current Sonar inventory
 
-The later normal PR run `35182465418` reported 12164 diagnostics: 10143 notes, 2020 warnings and 1 error; 8147 were under tests, 3885 under `src`, 116 under benchmarks and 16 under tools. The small count drift is explained by a different source revision.
-
-The 832 production-source warnings from that run group as follows:
-
-| Review bucket | Count | Interpretation |
-| --- | ---: | --- |
-| Style / mechanical | 488 | High-volume cleanup/profile signal; unsuitable as an unreviewed blocking baseline |
-| Dead / API-shape | 243 | Potentially useful, but reflection/serialization/public-contract context makes blanket action unsafe |
-| Nullable / dataflow | 83 | Independent contract/dataflow signal, often cleanup rather than demonstrated defects |
-| Performance | 17 | `PossibleMultipleEnumeration`; targeted review candidates |
-| Resource safety | 1 | `UsingStatementResourceInitialization`; targeted review candidate |
-
-Representative evidence includes a resource-initialization warning in `BuildStateRuntimeBuildProcessExecutor.cs`, 17 production `PossibleMultipleEnumeration` findings, and low-value/noise-prone families such as high-volume collection-expression/style suggestions and test-only `AccessToDisposedClosure` observations.
-
-On the exact same head `81bf2378c003d6d6f9a9ea13601d7670e603fb65`, normal CI, CodeQL and Package Validation passed and SonarCloud reported **Quality Gate passed** with **0 new issues**. Qodana therefore contributes genuinely independent analysis, but its current full-repository signal is not equivalent to a reviewed PR regression gate.
-
-## Phase B decision — KEEP ADVISORY
-
-Decision recorded 2026-09-17: **KEEP ADVISORY**.
-
-Reasons:
-
-1. Runtime/reliability is sufficient for continued advisory operation: cold/warm evidence, cross-machine reproduction and multiple post-merge PR runs are stable.
-2. Qodana adds real independent signal, including targeted performance, nullable/dataflow and resource-safety observations.
-3. The current recommended profile mixes useful findings with substantial historical/style debt and has no reviewed baseline/new-code policy.
-4. Promoting the current configuration would create a required scanner-execution check without a trustworthy finding-level regression definition.
-
-No required checks or rulesets are changed. A future dedicated change may define a reviewed differential/baseline policy and reconsider promotion after the Community .NET engine matures.
-
-## Acceptance closure
-
-The implementation, controlled inspection proof, deterministic rerun evidence, representative runtime/reliability evidence, public-repository billing evidence, signal/noise review and explicit Phase B decision are complete.
-
-Fork/untrusted behavior is resolved as policy-N/A for the current repository: non-collaborators cannot create PRs under `pull_request_creation_policy: collaborators_only`, while the committed Qodana workflow itself is tokenless/read-only and references no secrets. This is narrower and more accurate than preserving the post-#906 self-imposed requirement for an actual untrusted fork execution.
-
-The OpenSpec change `add-qodana-community-ci` is archived as `2026-09-17-add-qodana-community-ci`, with the capability synchronized to `openspec/specs/qodana-community-ci/spec.md`. Issue #864 can close after PR validation/merge.
-
-## Upstream references
-
-- [GitHub repository pull-request creation policy](https://docs.github.com/en/rest/repos/repos)
-- [JetBrains: .NET engines, Community licensing and configuration](https://www.jetbrains.com/help/qodana/dotnet.html)
-- [JetBrains: Docker image options](https://www.jetbrains.com/help/qodana/docker-image-configuration.html)
-- [JetBrains: running and configuring Qodana](https://www.jetbrains.com/help/qodana/configure-qodana.html)
-- [JetBrains: ConditionIsAlwaysTrueOrFalse inspection](https://www.jetbrains.com/help/inspectopedia/ConditionIsAlwaysTrueOrFalse.html)
+The exact-main Sonar analysis used during this quality pass is [workflow run 40782135609](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40782135609), on the same revision as the Qodana inventory above. It passed Sonar's Quality Gate with zero bugs, vulnerabilities, and security hotspots. The maintainability inventory contained 214 untriaged code smells, including 1 Blocker, 22 Critical, and 38 Major findings; the implementation change records the fixes and remaining accepted API compatibility cases separately. Re-run the repository's Sonar inventory after remediation before closing this work.

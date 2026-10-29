@@ -21,163 +21,221 @@ internal sealed class CanonicalAnnotationRoleResolver
         }
 
         CanonicalAnnotationCatalog catalog = CanonicalAnnotationCatalog.Current;
-        List<ArchitectureCanonicalAnnotationDiagnostic> diagnostics = new();
-        List<ArchitectureClassificationMetadataFailure> metadataFailures = new();
-        List<(CanonicalAnnotationCatalog.CanonicalRole Role, IReadOnlyDictionary<string, object> Metadata)> matches = new();
-        List<ContextEvidence> contextEvidence = new();
-        HashSet<string> invalidContextMetadataKeys = new(StringComparer.Ordinal);
-        List<string> canonicalEvidenceNames = new();
-        bool canonicalEvidenceSeen = false;
-
-        foreach (CustomAttributeData data in attributeData)
+        ResolutionEvidence evidence = CollectEvidence(attributeData, catalog, source, scope, subject);
+        if (!evidence.CanonicalEvidenceSeen)
         {
-            string? attributeName = TryGetAttributeName(data);
-            if (attributeName is null)
-            {
-                continue;
-            }
-
-            if (catalog.IsReservedAttribute(attributeName) && !catalog.IsKnownAttribute(attributeName))
-            {
-                diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
-                    subject,
-                    "UnknownReservedAnnotation",
-                    $"'{attributeName}' is in the reserved '{catalog.ReservedNamespace}' namespace but is not present in the semantic annotation catalog.",
-                    attributeName));
-                continue;
-            }
-
-            if (!catalog.TryGetRole(attributeName, out CanonicalAnnotationCatalog.CanonicalRole role))
-            {
-                if (!catalog.TryGetContext(attributeName, out CanonicalAnnotationCatalog.CanonicalContext context))
-                {
-                    continue;
-                }
-
-                if (!context.Scopes.Contains(scope, StringComparer.Ordinal))
-                {
-                    diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
-                        subject,
-                        "AnnotationScopeMismatch",
-                        $"'{attributeName}' is catalogued for {string.Join(" and ", context.Scopes)} scope, not {scope} scope.",
-                        attributeName));
-                    continue;
-                }
-
-                canonicalEvidenceSeen = true;
-                canonicalEvidenceNames.Add(attributeName);
-                if (TryReadContextValue(
-                    data, context, source, subject, metadataFailures, diagnostics,
-                    invalidContextMetadataKeys, out string value))
-                {
-                    contextEvidence.Add(new ContextEvidence(context.Key, attributeName, value));
-                }
-
-                continue;
-            }
-
-            if (!role.Scopes.Contains(scope, StringComparer.Ordinal))
-            {
-                diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
-                    subject,
-                    "AnnotationScopeMismatch",
-                    $"'{attributeName}' is catalogued for {string.Join(" and ", role.Scopes)} scope, not {scope} scope.",
-                    attributeName));
-                continue;
-            }
-
-            canonicalEvidenceSeen = true;
-            canonicalEvidenceNames.Add(attributeName);
-            IReadOnlyDictionary<string, object> metadata = ReadMetadata(
-                data, catalog, source, subject, metadataFailures, diagnostics);
-            matches.Add((role, metadata));
-        }
-
-        if (!canonicalEvidenceSeen)
-        {
-            if (diagnostics.Count == 0 && metadataFailures.Count == 0)
-            {
-                return ArchitectureAttributeClassificationCandidate.Empty;
-            }
-
-            return new ArchitectureAttributeClassificationCandidate(
-                null, new Dictionary<string, object>(), null,
-                Array.Empty<ArchitectureClassificationConflict>(),
-                metadataFailures)
-            {
-                CanonicalAnnotationDiagnostics = diagnostics
-            };
+            return CreateNoCanonicalEvidenceCandidate(evidence);
         }
 
         CatalogIdentityValidation identity = GetIdentityValidation(assembly, catalog);
-        if (identity.Diagnostic is not null)
-        {
-            string subjectKind = string.Equals(scope, "assembly", StringComparison.Ordinal) ? "assembly" : "type";
-            string[] annotationEvidence = canonicalEvidenceNames
-                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
-            diagnostics.Add(identity.Diagnostic with
-            {
-                Subject = subject,
-                Message = $"{identity.Diagnostic.Message} The affected {subjectKind} is '{subject}' and carries canonical annotation(s): "
-                    + $"{string.Join(", ", annotationEvidence)}.",
-                EvidenceSources = identity.Diagnostic.EvidenceSources.Concat(annotationEvidence)
-                    .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray()
-            });
-        }
-
+        AddIdentityDiagnostic(identity, scope, subject, evidence);
         if (!identity.IsCompatible)
         {
-            return new ArchitectureAttributeClassificationCandidate(
-                null, new Dictionary<string, object>(), null,
-                Array.Empty<ArchitectureClassificationConflict>(),
-                metadataFailures)
-            {
-                CanonicalAnnotationDiagnostics = diagnostics
-            };
+            return CreateUnassignedCandidate(evidence);
         }
 
         (Dictionary<string, object> resolvedContextMetadata, IReadOnlySet<string> blockedContextMetadataKeys) =
-            ResolveContextMetadata(contextEvidence, invalidContextMetadataKeys, scope, subject, diagnostics);
-
-        if (matches.Count == 0)
+            ResolveContextMetadata(
+                evidence.ContextEntries,
+                evidence.InvalidContextMetadataKeys,
+                scope,
+                subject,
+                evidence.Diagnostics);
+        if (evidence.Matches.Count == 0)
         {
-            return new ArchitectureAttributeClassificationCandidate(
-                null, new Dictionary<string, object>(), null,
-                Array.Empty<ArchitectureClassificationConflict>(),
-                metadataFailures)
-            {
-                ContextMetadata = resolvedContextMetadata,
-                ContextMetadataBlockedKeys = blockedContextMetadataKeys,
-                CanonicalAnnotationDiagnostics = diagnostics
-            };
+            return CreateContextOnlyCandidate(evidence, resolvedContextMetadata, blockedContextMetadataKeys);
         }
 
-        string[] evidenceSources = matches.Select(match => match.Role.AttributeFullName)
+        return ResolveRoleMatches(evidence, resolvedContextMetadata, blockedContextMetadataKeys, scope, subject);
+    }
+
+    private static ResolutionEvidence CollectEvidence(
+        IReadOnlyList<CustomAttributeData> attributeData,
+        CanonicalAnnotationCatalog catalog,
+        ArchitectureClassificationSource source,
+        string scope,
+        string subject)
+    {
+        ResolutionEvidence evidence = new(source, subject);
+        foreach (CustomAttributeData data in attributeData)
+        {
+            ProcessAttribute(data, catalog, source, scope, subject, evidence);
+        }
+
+        return evidence;
+    }
+
+    private static void ProcessAttribute(
+        CustomAttributeData data,
+        CanonicalAnnotationCatalog catalog,
+        ArchitectureClassificationSource source,
+        string scope,
+        string subject,
+        ResolutionEvidence evidence)
+    {
+        string? attributeName = TryGetAttributeName(data);
+        if (attributeName is null)
+        {
+            return;
+        }
+
+        if (catalog.IsReservedAttribute(attributeName) && !catalog.IsKnownAttribute(attributeName))
+        {
+            evidence.Diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
+                subject,
+                "UnknownReservedAnnotation",
+                $"'{attributeName}' is in the reserved '{catalog.ReservedNamespace}' namespace but is not present in the semantic annotation catalog.",
+                attributeName));
+            return;
+        }
+
+        if (catalog.TryGetRole(attributeName, out CanonicalAnnotationCatalog.CanonicalRole role))
+        {
+            ProcessRoleAttribute(data, role, catalog, source, scope, subject, evidence);
+            return;
+        }
+
+        if (catalog.TryGetContext(attributeName, out CanonicalAnnotationCatalog.CanonicalContext context))
+        {
+            ProcessContextAttribute(data, context, scope, subject, evidence);
+        }
+    }
+
+    private static void ProcessRoleAttribute(
+        CustomAttributeData data,
+        CanonicalAnnotationCatalog.CanonicalRole role,
+        CanonicalAnnotationCatalog catalog,
+        ArchitectureClassificationSource source,
+        string scope,
+        string subject,
+        ResolutionEvidence evidence)
+    {
+        if (!role.Scopes.Contains(scope, StringComparer.Ordinal))
+        {
+            evidence.Diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
+                subject,
+                "AnnotationScopeMismatch",
+                $"'{role.AttributeFullName}' is catalogued for {string.Join(" and ", role.Scopes)} scope, not {scope} scope.",
+                role.AttributeFullName));
+            return;
+        }
+
+        evidence.CanonicalEvidenceSeen = true;
+        evidence.CanonicalEvidenceNames.Add(role.AttributeFullName);
+        IReadOnlyDictionary<string, object> metadata = ReadMetadata(
+            data, catalog, source, subject, evidence.MetadataFailures, evidence.Diagnostics);
+        evidence.Matches.Add((role, metadata));
+    }
+
+    private static void ProcessContextAttribute(
+        CustomAttributeData data,
+        CanonicalAnnotationCatalog.CanonicalContext context,
+        string scope,
+        string subject,
+        ResolutionEvidence evidence)
+    {
+        if (!context.Scopes.Contains(scope, StringComparer.Ordinal))
+        {
+            evidence.Diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
+                subject,
+                "AnnotationScopeMismatch",
+                $"'{context.AttributeFullName}' is catalogued for {string.Join(" and ", context.Scopes)} scope, not {scope} scope.",
+                context.AttributeFullName));
+            return;
+        }
+
+        evidence.CanonicalEvidenceSeen = true;
+        evidence.CanonicalEvidenceNames.Add(context.AttributeFullName);
+        if (TryReadContextValue(data, context, evidence.ContextValueReadContext, out string value))
+        {
+            evidence.ContextEntries.Add(new ContextEvidence(context.Key, context.AttributeFullName, value));
+        }
+    }
+
+    private static ArchitectureAttributeClassificationCandidate CreateNoCanonicalEvidenceCandidate(
+        ResolutionEvidence evidence)
+    {
+        if (evidence.Diagnostics.Count == 0 && evidence.MetadataFailures.Count == 0)
+        {
+            return ArchitectureAttributeClassificationCandidate.Empty;
+        }
+
+        return CreateUnassignedCandidate(evidence);
+    }
+
+    private static ArchitectureAttributeClassificationCandidate CreateUnassignedCandidate(ResolutionEvidence evidence)
+    {
+        return new(null, new Dictionary<string, object>(), null,
+            Array.Empty<ArchitectureClassificationConflict>(), evidence.MetadataFailures)
+        {
+            CanonicalAnnotationDiagnostics = evidence.Diagnostics,
+        };
+    }
+
+    private static void AddIdentityDiagnostic(
+        CatalogIdentityValidation identity,
+        string scope,
+        string subject,
+        ResolutionEvidence evidence)
+    {
+        if (identity.Diagnostic is null)
+        {
+            return;
+        }
+
+        string subjectKind = string.Equals(scope, "assembly", StringComparison.Ordinal) ? "assembly" : "type";
+        string[] annotationEvidence = evidence.CanonicalEvidenceNames
             .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
-        (CanonicalAnnotationCatalog.CanonicalRole Role, IReadOnlyDictionary<string, object> Metadata) first = matches[0];
-        bool coherent = matches.All(match => string.Equals(match.Role.Name, first.Role.Name, StringComparison.Ordinal)
+        evidence.Diagnostics.Add(identity.Diagnostic with
+        {
+            Subject = subject,
+            Message = $"{identity.Diagnostic.Message} The affected {subjectKind} is '{subject}' and carries canonical annotation(s): "
+                + $"{string.Join(", ", annotationEvidence)}.",
+            EvidenceSources = identity.Diagnostic.EvidenceSources.Concat(annotationEvidence)
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray()
+        });
+    }
+
+    private static ArchitectureAttributeClassificationCandidate CreateContextOnlyCandidate(
+        ResolutionEvidence evidence,
+        Dictionary<string, object> resolvedContextMetadata,
+        IReadOnlySet<string> blockedContextMetadataKeys)
+    {
+        return new(null, new Dictionary<string, object>(), null,
+            Array.Empty<ArchitectureClassificationConflict>(), evidence.MetadataFailures)
+        {
+            ContextMetadata = resolvedContextMetadata,
+            ContextMetadataBlockedKeys = blockedContextMetadataKeys,
+            CanonicalAnnotationDiagnostics = evidence.Diagnostics,
+        };
+    }
+
+    private static ArchitectureAttributeClassificationCandidate ResolveRoleMatches(
+        ResolutionEvidence evidence,
+        Dictionary<string, object> resolvedContextMetadata,
+        IReadOnlySet<string> blockedContextMetadataKeys,
+        string scope,
+        string subject)
+    {
+        string[] evidenceSources = evidence.Matches.Select(match => match.Role.AttributeFullName)
+            .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        (CanonicalAnnotationCatalog.CanonicalRole Role, IReadOnlyDictionary<string, object> Metadata) first =
+            evidence.Matches[0];
+        bool coherent = evidence.Matches.All(match =>
+            string.Equals(match.Role.Name, first.Role.Name, StringComparison.Ordinal)
             && MetadataEqual(match.Metadata, first.Metadata));
         if (!coherent)
         {
-            string details = string.Join(
-                "; ",
-                matches.Select(match => $"{match.Role.AttributeFullName} => {match.Role.Name} ({FormatMetadata(match.Metadata)})")
-                    .OrderBy(value => value, StringComparer.Ordinal));
-            diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
-                subject,
-                "CanonicalRoleConflict",
-                $"Canonical annotations at {scope} specificity disagree: {details}. No role is assigned at this specificity.",
-                evidenceSources));
+            AddRoleConflict(evidence, evidenceSources, scope, subject);
             return new ArchitectureAttributeClassificationCandidate(
                 null, new Dictionary<string, object>(), null,
-                Array.Empty<ArchitectureClassificationConflict>(),
-                metadataFailures)
+                Array.Empty<ArchitectureClassificationConflict>(), evidence.MetadataFailures)
             {
                 EvidenceSources = evidenceSources,
-                CanonicalAnnotationDiagnostics = diagnostics,
+                CanonicalAnnotationDiagnostics = evidence.Diagnostics,
                 ContextMetadata = resolvedContextMetadata,
                 ContextMetadataBlockedKeys = blockedContextMetadataKeys,
-                Blocked = true
+                Blocked = true,
             };
         }
 
@@ -186,15 +244,33 @@ internal sealed class CanonicalAnnotationRoleResolver
             first.Metadata,
             evidenceSources.FirstOrDefault(),
             Array.Empty<ArchitectureClassificationConflict>(),
-            metadataFailures)
+            evidence.MetadataFailures)
         {
             EvidenceSources = evidenceSources,
-            ObservedEvidence = matches.Select(match => new ArchitectureAttributeRoleEvidence(
+            ObservedEvidence = evidence.Matches.Select(match => new ArchitectureAttributeRoleEvidence(
                 match.Role.Name, match.Metadata, match.Role.AttributeFullName)).ToArray(),
-            CanonicalAnnotationDiagnostics = diagnostics,
+            CanonicalAnnotationDiagnostics = evidence.Diagnostics,
             ContextMetadata = resolvedContextMetadata,
-            ContextMetadataBlockedKeys = blockedContextMetadataKeys
+            ContextMetadataBlockedKeys = blockedContextMetadataKeys,
         };
+    }
+
+    private static void AddRoleConflict(
+        ResolutionEvidence evidence,
+        string[] evidenceSources,
+        string scope,
+        string subject)
+    {
+        string details = string.Join(
+            "; ",
+            evidence.Matches.Select(match =>
+                    $"{match.Role.AttributeFullName} => {match.Role.Name} ({FormatMetadata(match.Metadata)})")
+                .OrderBy(value => value, StringComparer.Ordinal));
+        evidence.Diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
+            subject,
+            "CanonicalRoleConflict",
+            $"Canonical annotations at {scope} specificity disagree: {details}. No role is assigned at this specificity.",
+            evidenceSources));
     }
 
     private CatalogIdentityValidation GetIdentityValidation(Assembly assembly, CanonicalAnnotationCatalog catalog)
@@ -290,11 +366,7 @@ internal sealed class CanonicalAnnotationRoleResolver
     private static bool TryReadContextValue(
         CustomAttributeData data,
         CanonicalAnnotationCatalog.CanonicalContext context,
-        ArchitectureClassificationSource source,
-        string subject,
-        List<ArchitectureClassificationMetadataFailure> metadataFailures,
-        List<ArchitectureCanonicalAnnotationDiagnostic> diagnostics,
-        HashSet<string> invalidContextMetadataKeys,
+        ContextValueReadContext readContext,
         out string value)
     {
         value = string.Empty;
@@ -308,11 +380,11 @@ internal sealed class CanonicalAnnotationRoleResolver
         }
 
         const string FailureReason = "must contain an exact non-empty compile-time string value.";
-        invalidContextMetadataKeys.Add(context.Key);
-        metadataFailures.Add(new ArchitectureClassificationMetadataFailure(
-            subject, source, context.Key, FailureReason));
-        diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
-            subject,
+        readContext.InvalidMetadataKeys.Add(context.Key);
+        readContext.MetadataFailures.Add(new ArchitectureClassificationMetadataFailure(
+            readContext.Subject, readContext.Source, context.Key, FailureReason));
+        readContext.Diagnostics.Add(ArchitectureCanonicalAnnotationDiagnostic.Create(
+            readContext.Subject,
             "InvalidCanonicalMetadata",
             $"'{context.AttributeFullName}' {FailureReason}",
             context.AttributeFullName));
@@ -404,7 +476,39 @@ internal sealed class CanonicalAnnotationRoleResolver
         metadata.Count == 0 ? "no metadata" : string.Join(", ", metadata.OrderBy(entry => entry.Key, StringComparer.Ordinal)
             .Select(entry => $"{entry.Key}='{entry.Value}'"));
 
+    private sealed class ResolutionEvidence
+    {
+        public ResolutionEvidence(ArchitectureClassificationSource source, string subject)
+        {
+            ContextValueReadContext = new ContextValueReadContext(
+                source, subject, MetadataFailures, Diagnostics, InvalidContextMetadataKeys);
+        }
+
+        public List<ArchitectureCanonicalAnnotationDiagnostic> Diagnostics { get; } = new();
+
+        public List<ArchitectureClassificationMetadataFailure> MetadataFailures { get; } = new();
+
+        public List<(CanonicalAnnotationCatalog.CanonicalRole Role, IReadOnlyDictionary<string, object> Metadata)> Matches { get; } = new();
+
+        public List<ContextEvidence> ContextEntries { get; } = new();
+
+        public HashSet<string> InvalidContextMetadataKeys { get; } = new(StringComparer.Ordinal);
+
+        public List<string> CanonicalEvidenceNames { get; } = new();
+
+        public bool CanonicalEvidenceSeen { get; set; }
+
+        public ContextValueReadContext ContextValueReadContext { get; }
+    }
+
     private sealed record ContextEvidence(string Key, string AttributeFullName, string Value);
+
+    private sealed record ContextValueReadContext(
+        ArchitectureClassificationSource Source,
+        string Subject,
+        List<ArchitectureClassificationMetadataFailure> MetadataFailures,
+        List<ArchitectureCanonicalAnnotationDiagnostic> Diagnostics,
+        HashSet<string> InvalidMetadataKeys);
 
     private sealed record CatalogIdentityValidation(bool IsCompatible, ArchitectureCanonicalAnnotationDiagnostic? Diagnostic);
 }

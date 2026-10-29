@@ -136,7 +136,6 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             yield return new SchemaAlternative(
                 failure.Order,
                 compositePath,
-                branchPath,
                 IsApplicableBranch(branch, siblingBranches, branchInstance, exactInstance),
                 branchInstance,
                 exactInstance);
@@ -535,7 +534,6 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
     private sealed record SchemaAlternative(
         int FailureOrder,
         string CompositePath,
-        string BranchPath,
         bool IsApplicable,
         JsonNode? Instance,
         JsonNode? ExactInstance);

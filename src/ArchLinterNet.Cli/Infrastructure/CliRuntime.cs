@@ -327,6 +327,13 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.VerifyBaseline(request);
     }
 
+    public BaselineVerifyOutcome VerifyBaseline(
+        BaselineVerifyRequest request,
+        ArchitectureAnalysisSnapshot snapshot)
+    {
+        return _engine.VerifyBaseline(request, snapshot);
+    }
+
     public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request)
     {
         return _engine.MigrateBaseline(request);
@@ -370,13 +377,6 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.EvaluateHealth(request, snapshot, timing);
     }
 
-    public BaselineVerifyOutcome VerifyBaseline(
-        BaselineVerifyRequest request,
-        ArchitectureAnalysisSnapshot snapshot)
-    {
-        return _engine.VerifyBaseline(request, snapshot);
-    }
-
     public ArchitectureChangeSnapshot CreateChangeSnapshot(
         ArchitectureAnalysisSnapshot snapshot,
         string mode,
@@ -384,7 +384,7 @@ internal sealed class CliRuntime : ICliRuntime
         BaselineVerifyOutcome baseline,
         string? conditionSetName)
     {
-        return _engine.CreateChangeSnapshot(snapshot, mode, validation, baseline, conditionSetName);
+        return ArchitectureEngine.CreateChangeSnapshot(snapshot, mode, validation, baseline, conditionSetName);
     }
 
     public string FormatHealthAsHuman(ArchitectureHealthOutcome outcome)

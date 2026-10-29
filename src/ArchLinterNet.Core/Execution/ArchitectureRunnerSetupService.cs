@@ -218,7 +218,6 @@ public sealed class ArchitectureRunnerSetupService(
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        ArchitectureContractRunner runner;
         using (timing?.Measure("assembly_resolution", indent: 1))
         {
             bool resolveAssemblyOutputs = string.Equals(mode, PublicApiResolutionMode, StringComparison.Ordinal)
@@ -251,7 +250,8 @@ public sealed class ArchitectureRunnerSetupService(
 
             ArchitectureAnalysisContext context = CreateAnalysisContext(
                 repositoryRoot, resolution, discovery, attemptedDiscovery, cancellationToken, maxParallelism, timing);
-            runner = CreateRunner(context, document, selectedContractIds, enableUnmatchedIgnoreTracking, symbols);
+            ArchitectureContractRunner runner = CreateRunner(
+                context, document, selectedContractIds, enableUnmatchedIgnoreTracking, symbols);
 
             return new ArchitectureRunnerSetup(repositoryRoot, runner) { AssemblyLoads = resolution.AssemblyLoads };
         }

@@ -14,7 +14,10 @@ internal static class HistoryFailures
         int? spanStart = null,
         int? spanEnd = null)
     {
-        HistoryDiagnostic diagnostic = new(kind, message, objectId, path, spanStart, spanEnd);
+        HistoryDiagnostic diagnostic = new(
+            kind,
+            message,
+            new HistoryDiagnosticSubject(objectId, path, spanStart, spanEnd));
         return new HistoryFailureException(message, diagnostic);
     }
 

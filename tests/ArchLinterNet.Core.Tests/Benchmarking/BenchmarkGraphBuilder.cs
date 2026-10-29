@@ -177,14 +177,14 @@ internal static class BenchmarkGraphBuilder
             onStack.Add(node);
             foreach (string target in adjacency[node])
             {
-                if (!indexes.ContainsKey(target))
+                if (!indexes.TryGetValue(target, out int targetIndex))
                 {
                     Visit(target);
                     lowLinks[node] = Math.Min(lowLinks[node], lowLinks[target]);
                 }
                 else if (onStack.Contains(target))
                 {
-                    lowLinks[node] = Math.Min(lowLinks[node], indexes[target]);
+                    lowLinks[node] = Math.Min(lowLinks[node], targetIndex);
                 }
             }
 

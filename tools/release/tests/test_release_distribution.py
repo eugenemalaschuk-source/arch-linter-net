@@ -29,7 +29,10 @@ def _release_workspace(tmp_path: Path, monkeypatch) -> None:
 
 
 def _source_commit() -> str:
-    return subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
+    # This fixture packages the live working tree, which may contain reviewed edits. Keep its
+    # identity synthetic so the production check does not compare those bytes with the test runner's
+    # unrelated checkout HEAD. Dedicated verification cases exercise commit-backed source binding.
+    return "e" * 40
 
 
 def _candidate(tmp_path: Path, version: str = "0.8.7-preview.1") -> tuple[Path, str]:
@@ -207,7 +210,7 @@ def test_metadata_binds_candidate_packages_and_exact_publisher_bytes(tmp_path: P
 
 
 def test_v09_preview_manifest_records_review_origin_not_legacy_current_authority(tmp_path: Path) -> None:
-    arguments, transport = _arguments(tmp_path, "0.9.0-preview.1")
+    _, transport = _arguments(tmp_path, "0.9.0-preview.1")
     manifest = json.loads((transport / distribution._MANIFEST_FILE).read_text(encoding="utf-8"))
 
     assert manifest["schema"] == "architecture-health-badge-release-distribution/v2"
@@ -463,15 +466,17 @@ def test_archive_has_sorted_regular_members_and_fixed_metadata(tmp_path: Path) -
 
 def _malicious_archive(name: str, symlink: bool = False) -> bytes:
     output = io.BytesIO()
-    with gzip.GzipFile(fileobj=output, mode="wb", filename="", mtime=0) as compressed:
-        with tarfile.open(fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT) as archive:
-            info = tarfile.TarInfo(name)
-            if symlink:
-                info.type = tarfile.SYMTYPE
-                info.linkname = "outside"
-            else:
-                info.size = 1
-            archive.addfile(info, None if symlink else io.BytesIO(b"x"))
+    with (
+        gzip.GzipFile(fileobj=output, mode="wb", filename="", mtime=0) as compressed,
+        tarfile.open(fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT) as archive,
+    ):
+        info = tarfile.TarInfo(name)
+        if symlink:
+            info.type = tarfile.SYMTYPE
+            info.linkname = "outside"
+        else:
+            info.size = 1
+        archive.addfile(info, None if symlink else io.BytesIO(b"x"))
     return output.getvalue()
 
 
@@ -536,9 +541,10 @@ def test_distribution_manifest_rejects_header_authority_drift(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest[field] = value
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    verification_arguments = _verify_arguments(arguments, transport)
 
     with pytest.raises(ValueError, match=message):
-        distribution._verify(_verify_arguments(arguments, transport))
+        distribution._verify(verification_arguments)
 
 
 @pytest.mark.parametrize(

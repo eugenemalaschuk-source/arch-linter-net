@@ -300,7 +300,6 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
             return ArchitectureAnalysisSnapshotApplicabilityProjector.CollectBaselineCandidates(
                 _document,
-                _preflight,
                 mode,
                 _evaluatedModes,
                 EnsureSetup().Runner);

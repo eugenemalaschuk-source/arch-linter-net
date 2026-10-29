@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-29
+goal: Reject changes to nested .DotSettings.user files in the trusted Qodana
+  publisher while keeping suffix matching precise.

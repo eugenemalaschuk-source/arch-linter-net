@@ -522,7 +522,7 @@ export class RelayDurableObject {
     return this.state.storage.transactionSync(() => this.commitPublish(body, profile, payload, publisher, operation, { horizon, horizonSeconds, idempotencyHash }));
   }
 
-  private async lifecycle(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "invalidate" | "revoke"): Promise<Response> {
+  private lifecycle(body: Record<string, unknown>, entry: RegistryEntry, publisher: import("./types").ValidatedPublisher, operation: "invalidate" | "revoke"): Response {
     this.validateOperationBasics(body, operation);
     if (safeInteger(body.expected_generation) === false || safeInteger(body.expected_revocation_epoch) === false) throw new PayloadError();
     return this.state.storage.transactionSync(() => {
@@ -823,8 +823,8 @@ export class RelayDurableObject {
       case "prepare": return await this.prepare(body, entry, publisher, "prepare");
       case "publish": return await this.publish(body, entry, publisher, "publish");
       case "renew": return "challenge_id" in body ? await this.publish(body, entry, publisher, "renew") : await this.prepare(body, entry, publisher, "renew");
-      case "invalidate": return await this.lifecycle(body, entry, publisher, "invalidate");
-      case "revoke": return await this.lifecycle(body, entry, publisher, "revoke");
+      case "invalidate": return this.lifecycle(body, entry, publisher, "invalidate");
+      case "revoke": return this.lifecycle(body, entry, publisher, "revoke");
       case "recover": return await this.publish(body, entry, publisher, "recover");
       default: return genericError(404);
     }

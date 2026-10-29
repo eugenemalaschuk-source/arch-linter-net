@@ -14,7 +14,7 @@ HANDOFF_ROOT = "${{ runner.temp }}/arch-linter-net-bootstrap-handoff"
 def _assert_upload_contract(workflow: str) -> None:
     bootstrap = workflow.split("\n  promote:\n", 1)[0]
     upload = bootstrap.split("      - name: Upload private trusted bootstrap handoff\n", 1)[1]
-    settings = dict(re.findall(r"^          ([\w-]+): (.+)$", upload, re.MULTILINE))
+    settings = dict(re.findall(r"^ {10}([\w-]+): (.+)$", upload, re.MULTILINE))
     assert settings["name"] == "architecture-health-bootstrap-handoff"
     assert settings["path"] == HANDOFF_ROOT, "Only validated handoff staging may be uploaded"
     assert settings.get("include-hidden-files") == "true", "Managed .github files must survive upload"

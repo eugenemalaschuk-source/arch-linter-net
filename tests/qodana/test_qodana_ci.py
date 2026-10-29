@@ -173,9 +173,11 @@ class RunnerTests(unittest.TestCase):
                 self.assertEqual((sdk_root.resolve(), "10.0.402"),
                                  ci.locked_dotnet_sdk_root(project))
 
-            with patch.dict(os.environ, {"QODANA_DOTNET_ROOT": str(root / "missing")}):
-                with self.assertRaisesRegex(ValueError, "does not contain the pinned"):
-                    ci.locked_dotnet_sdk_root(project)
+            with (
+                patch.dict(os.environ, {"QODANA_DOTNET_ROOT": str(root / "missing")}),
+                self.assertRaisesRegex(ValueError, "does not contain the pinned"),
+            ):
+                ci.locked_dotnet_sdk_root(project)
 
     def exercise_scan(self, exit_code=0, document=None, produce=True, internal_log=False):
         with tempfile.TemporaryDirectory() as tmp:
@@ -452,7 +454,11 @@ class RunnerTests(unittest.TestCase):
             project = root / "project"
             project.mkdir()
             (project / "ArchLinterNet.slnx").write_text("<Solution />")
-            (project / "qodana.yaml").write_text("linter: jetbrains/qodana-cdnet:2026.2\n")
+            (project / "qodana.yaml").write_text(
+                "linter: jetbrains/qodana-cdnet:2026.2\n"
+                "profile:\n  name: qodana.recommended\n"
+                "dotnet:\n  solution: ArchLinterNet.slnx\n"
+            )
             dotnet_root = root / "dotnet"
             (dotnet_root / "sdk" / "10.0.402").mkdir(parents=True)
             (project / "global.json").write_text(
@@ -487,11 +493,13 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("  pull_request:", workflow)
         self.assertIn("runs-on: ubuntu-24.04", workflow)
         self.assertIn("persist-credentials: false", workflow)
-        self.assertIn("name: Qodana Community .NET (advisory)", workflow)
+        self.assertIn("name: Qodana Community .NET (scan)", workflow)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
         self.assertIn("actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68", workflow)
-        self.assertIn("global-json-file: global.json", workflow)
+        self.assertIn("global-json-file: source/global.json", workflow)
         self.assertIn("QODANA_DOTNET_ROOT", workflow)
-        for forbidden in (r"secrets[.\[]", r"pull_request_target", r"\bneeds:",
+        self.assertEqual(["contracts"], re.findall(r"(?m)^\s*needs:\s*(\S+)\s*$", workflow))
+        for forbidden in (r"secrets[.\[]", r"pull_request_target",
                           r"\b(?:contents|checks|pull-requests|security-events|id-token): write",
                           r"(?m)^\s+continue-on-error:", r"self-hosted"):
             self.assertNotRegex(workflow, forbidden)
@@ -514,6 +522,8 @@ class WorkflowContractTests(unittest.TestCase):
             "jetbrains/qodana-cdnet:2026.2@sha256:138560f97271952d6a9511866db99ac63b45673416e7938442a807202e3ce4f2",
             ci.configured_image(ROOT),
         )
+        self.assertEqual("qodana.recommended", ci.configured_profile(ROOT))
+        self.assertEqual("ArchLinterNet.slnx", ci.configured_solution(ROOT))
         self.assertIn("solution: ArchLinterNet.slnx", config)
         self.assertIn("name: qodana.recommended", config)
         self.assertNotIn("inspections:", config)

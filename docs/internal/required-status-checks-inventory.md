@@ -1,126 +1,46 @@
-# Required status checks inventory (issue #479)
+# Required status checks inventory
 
-Prepared for the manual `Main` branch ruleset change that issue #479 depends on. Local
-validation only becomes safe to relax (see
-[feature-implementation-workflow.md](../ai/feature-implementation-workflow.md)) once PR CI is
-the enforced, authoritative merge gate. As of this writing the active `Main` ruleset
-(`gh api repos/eugenemalaschuk-source/arch-linter-net/rulesets/18790669`) has **no
-`required_status_checks` rule at all**, so applying one is a real quality precondition, not a
-formality.
+The active `Main` ruleset (`18790669`) has 15 required status contexts, verified on 2026-10-29. This quality change adds the trusted Qodana publisher context `qodana` to the versioned payload, for a total of 16. The active ruleset is not updated by this repository change: first merge the publisher workflow so GitHub can run the `workflow_run` workflow from the default branch, then apply the payload and verify enforcement.
 
-Applying this change to the `Main` ruleset is a **manual step** (repository settings, not a
-file in this repo) — this document exists so that step can be taken from an exact, verified
-list instead of guesswork.
-
-**This is a blocker, not a follow-up.** Issue #479 makes CI enforcement an explicit acceptance
-criterion for relaxing mandatory local `make acceptance`, not an optional next step: *"The
-final stabilized authoritative CI checks are required by the active `Main` ruleset, so relaxing
-local validation does not weaken merge quality."* Until this step is applied, a red or missing
-exhaustive CI check does not technically block a merge — the risk-based local-validation policy
-in this PR should be treated as incomplete/not-yet-safe-to-rely-on until it is. Confirmed on
-review of PR #490 (2026-08-12): the active ruleset still has no `required_status_checks` rule.
-
-A ready-to-apply payload for this exact ruleset is at
-[`main-ruleset-required-status-checks.json`](main-ruleset-required-status-checks.json)
-(preserves every existing `Main` ruleset rule and adds the 15 contexts below). To apply it
-(requires repository admin access):
+The payload at [main-ruleset-required-status-checks.json](main-ruleset-required-status-checks.json) records the `Main` rules and adds the `qodana` context, bound to GitHub Actions. After the publisher workflow is present on the default branch, compare the payload with the current live ruleset and reconcile any intervening changes before applying it with repository ruleset administration access:
 
 ```bash
 gh api --method PUT repos/eugenemalaschuk-source/arch-linter-net/rulesets/18790669 \
   --input docs/internal/main-ruleset-required-status-checks.json
 ```
 
-After applying, verify enforcement by confirming a PR with a red or missing required check is
-blocked from merging (e.g. via the merge button's state on an open PR, or `gh pr view --json mergeStateStatus`).
+Then verify that the active ruleset contains all 16 contexts and confirm that a missing or failed `qodana` status blocks a test pull request. The report publisher must be present on the default branch before this setting is applied; otherwise GitHub cannot trigger it and the required status would remain missing.
 
-## Source
+## Required contexts
 
-Check names (`context` values, from the GitHub check-runs API) captured from the head commit of
-PR [#489](https://github.com/eugenemalaschuk-source/arch-linter-net/pull/489)
-(`c772f102b7f31a294331efa8020fac6f3748eb70`), the most recently merged PR after the full CI
-topology from #475 (E2E/packed-artifact isolation), #477 (parallel PR validation jobs), and #478
-(Core unit sharding) stabilized in `.github/workflows/ci.yml`. Cross-checked against PR #484 and
-the workflow source directly.
-
-```
-gh api repos/eugenemalaschuk-source/arch-linter-net/commits/<sha>/check-runs \
-  -q '.check_runs[] | {name, app: .app.slug, conclusion}'
-```
-
-## Classification
-
-### Authoritative merge blockers — required, run on every PR, no secrets needed
-
-These come from jobs gated only on `if: github.event_name == 'pull_request'` with no
-`TRUSTED_PR`/secret condition on their pass/fail outcome, plus the two non-`ci.yml` workflows
-that don't touch secrets:
-
-| Check (context) | Workflow | Notes |
+| Context | Workflow | Purpose |
 |---|---|---|
-| `Workflow Quality` | CI | actionlint/zizmor/Prettier on `.github/workflows` |
-| `Repository Lint` | CI | `make lint` |
-| `Coverage + Sonar` | CI | Always runs `make test-coverage` + `make test-tooling-coverage`; only the Sonar/Codecov *upload* steps inside this job are skipped for untrusted PRs (see `TRUSTED_PR` gate), so the job's own pass/fail is secret-independent |
-| `Architecture Coverage` | CI | strict/audit self-architecture coverage gate |
-| `Tooling / Support Tests` | CI | Python tooling test suites |
-| `Unit Test Suite (Windows / Core Shard 1)` | CI | |
-| `Unit Test Suite (Windows / Core Shard 2)` | CI | |
-| `Unit Test Suite (Apple Silicon macOS / Core Shard 1)` | CI | |
-| `Unit Test Suite (Apple Silicon macOS / Core Shard 2)` | CI | |
-| `E2E Test Suite (Windows)` | CI | |
-| `E2E Test Suite (Apple Silicon macOS)` | CI | |
-| `Packed Artifact Test Suite (Windows)` | CI | |
-| `Packed Artifact Test Suite (Apple Silicon macOS)` | CI | |
-| `Analyze C#` | CodeQL | `github-actions` app, no secrets, `security-extended` queries |
-| `Validate NuGet Packages` | Package Validation | `make pack` + package-set assertions, no secrets |
+| `Workflow Quality` | CI | actionlint, zizmor and workflow formatting |
+| `Repository Lint` | CI | repository lint gates |
+| `Coverage + Sonar` | CI | coverage collection plus trusted Sonar/Codecov upload where credentials are available |
+| `qodana` | Qodana Gate Publisher | trusted differential Qodana result on the exact PR head |
+| `Architecture Coverage` | CI | architecture coverage gate |
+| `Tooling / Support Tests` | CI | Python tooling suites |
+| `Unit Test Suite (Windows / Core Shard 1)` | CI | Windows Core test shard 1 |
+| `Unit Test Suite (Windows / Core Shard 2)` | CI | Windows Core test shard 2 |
+| `Unit Test Suite (Apple Silicon macOS / Core Shard 1)` | CI | macOS Core test shard 1 |
+| `Unit Test Suite (Apple Silicon macOS / Core Shard 2)` | CI | macOS Core test shard 2 |
+| `E2E Test Suite (Windows)` | CI | Windows end-to-end tests |
+| `E2E Test Suite (Apple Silicon macOS)` | CI | macOS end-to-end tests |
+| `Packed Artifact Test Suite (Windows)` | CI | Windows packed-artifact tests |
+| `Packed Artifact Test Suite (Apple Silicon macOS)` | CI | macOS packed-artifact tests |
+| `Analyze C#` | CodeQL | security-extended C# analysis |
+| `Validate NuGet Packages` | Package Validation | package set and packed-artifact validation |
 
-These 15 contexts are the recommended `required_status_checks` list.
+`qodana` is the exact commit-status context published by the trusted default-branch reporter. The scanner job is separately named `Qodana Community .NET (scan)`; its success only means evidence collection completed and is not the finding-level gate.
 
-### Informational / upload-only — should NOT be required
+## Informational or unavailable contexts
 
-| Check (context) | App | Why not |
+| Check | Treatment | Reason |
 |---|---|---|
-| `Main Badge Refresh` | github-actions | `if: github.event_name == 'push'` — only runs on pushes to `main`, never appears as a PR check |
-| `CodeQL` | github-advanced-security | Summary/alerting check for the code-scanning results already produced by the `Analyze C#` job; alert-level enforcement for this is already handled by the ruleset's existing `code_scanning` rule (`security_alerts_threshold: medium_or_higher`), not by `required_status_checks` |
+| `Main Badge Refresh` | Not required | Push-only job; it does not run for PRs. |
+| `CodeQL` summary check | Not separately required | Alert-level enforcement is already provided by the ruleset `code_scanning` rule and the required `Analyze C#` job. |
+| SonarCloud app check | Not separately required | The SonarCloud app report depends on a secret-backed upload. `Coverage + Sonar` remains required and runs its coverage work independently. |
+| `codecov/patch` | Not required | External upload depends on a token unavailable to untrusted PR workflows. |
 
-### Cannot be required — secret-backed, unavailable on fork/Dependabot PRs
-
-| Check (context) | App | Why it can't be required |
-|---|---|---|
-| `SonarCloud Code Analysis` | sonarqubecloud | Posted by the SonarCloud GitHub App from the `coverage_sonar` job's Sonar begin/end steps, which run only when `TRUSTED_PR == 'true'` (i.e. `SONAR_TOKEN` is available). Fork and Dependabot PRs never get this check at all, so requiring it would permanently block them. |
-| `codecov/patch` | codecov | Posted by the Codecov GitHub App from the `Upload test coverage to Codecov` step, also gated on `TRUSTED_PR == 'true'` (`CODECOV_TOKEN`). Same fork/Dependabot exposure problem. |
-
-Per issue #479's non-goals, these are intentionally **not** substituted with a
-secret-independent equivalent beyond what's already covered: the `Coverage + Sonar` job itself
-(required above) already proves coverage collection succeeds without needing the external
-Sonar/Codecov apps to report back.
-
-Note the ruleset also already has `code_coverage` (`minimum_coverage: 80`) and `code_quality`
-(`severity: warnings`) rule entries independent of `required_status_checks` — those existing
-rule types are out of scope for this inventory and were not changed.
-
-## Recommended `required_status_checks` contexts
-
-```
-Workflow Quality
-Repository Lint
-Coverage + Sonar
-Architecture Coverage
-Tooling / Support Tests
-Unit Test Suite (Windows / Core Shard 1)
-Unit Test Suite (Windows / Core Shard 2)
-Unit Test Suite (Apple Silicon macOS / Core Shard 1)
-Unit Test Suite (Apple Silicon macOS / Core Shard 2)
-E2E Test Suite (Windows)
-E2E Test Suite (Apple Silicon macOS)
-Packed Artifact Test Suite (Windows)
-Packed Artifact Test Suite (Apple Silicon macOS)
-Analyze C#
-Validate NuGet Packages
-```
-
-## Manual application step (not automated by this change)
-
-See the blocker note near the top of this document for the exact `gh api` command and the
-`main-ruleset-required-status-checks.json` payload. Applying it requires `admin`/ruleset-write
-access on the repository and is intentionally left for a maintainer to run — mutating a
-repository security setting is not something this workflow performs automatically.
+The existing ruleset also enforces minimum code coverage and code quality independently of this required-status list. Keep those rules unchanged when applying the payload.

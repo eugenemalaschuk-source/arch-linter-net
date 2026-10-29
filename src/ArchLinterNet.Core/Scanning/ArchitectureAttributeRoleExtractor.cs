@@ -403,12 +403,11 @@ public sealed class ArchitectureAttributeRoleExtractor
         IReadOnlyDictionary<string, object> contextMetadata,
         IReadOnlySet<string>? blockedKeys = null)
     {
-        foreach (KeyValuePair<string, object> entry in contextMetadata.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        foreach (KeyValuePair<string, object> entry in contextMetadata
+            .Where(entry => blockedKeys is null || !blockedKeys.Contains(entry.Key))
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal))
         {
-            if (blockedKeys is null || !blockedKeys.Contains(entry.Key))
-            {
-                metadata.TryAdd(entry.Key, entry.Value);
-            }
+            metadata.TryAdd(entry.Key, entry.Value);
         }
     }
 

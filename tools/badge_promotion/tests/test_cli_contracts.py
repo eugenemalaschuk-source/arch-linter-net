@@ -280,9 +280,11 @@ def test_semantic_evidence_member_is_bounded_before_decompression() -> None:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("architecture-health.json", b"0" * 32_769)
-    with zipfile.ZipFile(io.BytesIO(stream.getvalue())) as opened:
-        with pytest.raises(ProviderFailure, match="semantic_evidence_oversized"):
-            _read_bounded_zip_member(opened, "architecture-health.json", 32_768)
+    with (
+        zipfile.ZipFile(io.BytesIO(stream.getvalue())) as opened,
+        pytest.raises(ProviderFailure, match="semantic_evidence_oversized"),
+    ):
+        _read_bounded_zip_member(opened, "architecture-health.json", 32_768)
 
 
 def test_semantic_evidence_member_accepts_repository_metrics_evidence_size() -> None:

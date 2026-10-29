@@ -71,7 +71,7 @@ internal static class PublicApiSurfaceChecker
             return selectorSafetyViolations;
         }
 
-        Evaluation evaluation = BuildEvaluation(contract, scannedByAssembly, governedByAssembly);
+        Evaluation evaluation = BuildEvaluation(contract, governedByAssembly);
 
         List<ArchitectureViolation> violations = CollectSurfaceViolations(contract, evaluation, executionContext);
         violations.AddRange(selectorSafetyViolations);
@@ -165,7 +165,6 @@ internal static class PublicApiSurfaceChecker
 
     private static Evaluation BuildEvaluation(
         ArchitecturePublicApiSurfaceContract contract,
-        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
         Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly)
     {
         // The reviewed snapshot records the exact grammar (base signature plus the detail suffix
@@ -189,7 +188,6 @@ internal static class PublicApiSurfaceChecker
 
         return new Evaluation(
             governedByAssembly,
-            scannedByAssembly,
             exactGrammar,
             exact,
             delta,
@@ -564,7 +562,6 @@ internal static class PublicApiSurfaceChecker
 
     private sealed record Evaluation(
         Dictionary<string, List<ArchitectureExportedApiEntry>> GovernedByAssembly,
-        Dictionary<string, List<ArchitectureExportedApiEntry>> ScannedByAssembly,
         bool ExactGrammar,
         bool Exact,
         PublicApiDelta Delta,

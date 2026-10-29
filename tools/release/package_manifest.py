@@ -18,13 +18,17 @@ _PACKAGE_IDS = (
     "ArchLinterNet.Core",
     "ArchLinterNet.Testing",
 )
-_PACKAGE_IDS_WITH_ANNOTATIONS = (*_PACKAGE_IDS, "ArchLinterNet.Annotations")
+_ANNOTATIONS_PACKAGE_ID = "ArchLinterNet.Annotations"
+_PACKAGE_IDS_WITH_ANNOTATIONS = (*_PACKAGE_IDS, _ANNOTATIONS_PACKAGE_ID)
 _SCHEMA_V1 = "checkpoint-b-candidate-manifest/v1"
 _SCHEMA_V2 = "checkpoint-b-candidate-manifest/v2"
 _SCHEMA_V3 = "checkpoint-b-candidate-manifest/v3"
 _SUBJECT_KINDS = ("package", "symbols")
 _CANONICAL_MANIFEST_FILE = "package-manifest.json"
 _CANONICAL_CHECKSUM_FILE = "package-checksums.txt"
+_CANDIDATE_MANIFEST_LABEL = "candidate manifest"
+_CANDIDATE_CHECKSUM_EVIDENCE_LABEL = "candidate checksum evidence"
+_INVALID_PACKAGE_INVENTORY_MESSAGE = "Candidate manifest package inventory is invalid."
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
 _UNSUPPORTED_SCHEMA = "Unsupported candidate manifest schema."
@@ -73,7 +77,7 @@ def _subject(path: Path, kind: str) -> dict[str, Any]:
 
 
 def _read_manifest(path: Path) -> dict[str, Any]:
-    path = _safe_path(path, "candidate manifest")
+    path = _safe_path(path, _CANDIDATE_MANIFEST_LABEL)
     try:
         # _safe_path confines this read to the release workspace or repository root.
         value = json.loads(path.read_text(encoding="utf-8"))  # NOSONAR
@@ -118,7 +122,7 @@ def _validate_v2(manifest: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Candidate manifest schema is incompatible with its package version.")
     packages = manifest.get("packages")
     if not isinstance(packages, list) or len(packages) != len(_PACKAGE_IDS):
-        raise ValueError("Candidate manifest package inventory is invalid.")
+        raise ValueError(_INVALID_PACKAGE_INVENTORY_MESSAGE)
 
     subject_files: set[str] = set()
     for package_id, record in zip(_PACKAGE_IDS, packages, strict=True):
@@ -138,7 +142,7 @@ def _validate_v3(manifest: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Candidate manifest schema is incompatible with its package version.")
     packages = manifest.get("packages")
     if not isinstance(packages, list) or len(packages) != len(package_ids):
-        raise ValueError("Candidate manifest package inventory is invalid.")
+        raise ValueError(_INVALID_PACKAGE_INVENTORY_MESSAGE)
 
     subject_files: set[str] = set()
     for package_id, record in zip(package_ids, packages, strict=True):
@@ -147,7 +151,7 @@ def _validate_v3(manifest: dict[str, Any]) -> dict[str, Any]:
             package_id,
             version,
             subject_files,
-            require_symbols=package_id != "ArchLinterNet.Annotations",
+            require_symbols=package_id != _ANNOTATIONS_PACKAGE_ID,
         )
     return manifest
 
@@ -179,7 +183,7 @@ def _validate_v1(manifest: dict[str, Any]) -> dict[str, Any]:
     _validate_identity(manifest)
     packages = manifest.get("packages")
     if not isinstance(packages, list) or len(packages) != len(_PACKAGE_IDS):
-        raise ValueError("Candidate manifest package inventory is invalid.")
+        raise ValueError(_INVALID_PACKAGE_INVENTORY_MESSAGE)
     for package_id, record in zip(_PACKAGE_IDS, packages, strict=True):
         if not isinstance(record, dict) or set(record) != {"id", "version", "file", "size", "sha256"}:
             raise ValueError("Candidate manifest package record is invalid.")
@@ -256,7 +260,7 @@ def _create(arguments: argparse.Namespace) -> None:
     records = []
     for package_id in package_ids:
         subjects: dict[str, dict[str, Any]] = {}
-        subject_kinds = _SUBJECT_KINDS if package_id != "ArchLinterNet.Annotations" else ("package",)
+        subject_kinds = _SUBJECT_KINDS if package_id != _ANNOTATIONS_PACKAGE_ID else ("package",)
         for kind in subject_kinds:
             path = arguments.packages_dir / _expected_filename(package_id, arguments.version, kind)
             if not path.is_file():
@@ -313,8 +317,8 @@ def _canonical_evidence_paths(
     manifest_path: Path,
     checksums_path: Path,
 ) -> tuple[Path, Path, Path]:
-    manifest_path = _safe_path(manifest_path, "candidate manifest")
-    checksums_path = _safe_path(checksums_path, "candidate checksum evidence")
+    manifest_path = _safe_path(manifest_path, _CANDIDATE_MANIFEST_LABEL)
+    checksums_path = _safe_path(checksums_path, _CANDIDATE_CHECKSUM_EVIDENCE_LABEL)
     packages_directory = _safe_path(packages_directory, "candidate packages directory")
     if manifest_path.parent != packages_directory or manifest_path.name != _CANONICAL_MANIFEST_FILE:
         raise ValueError("Canonical candidate manifest path is invalid.")
@@ -342,7 +346,7 @@ def _verify_release_evidence(
     if expected_source_commit is not None and manifest["source_commit"] != expected_source_commit:
         raise ValueError("Candidate manifest source commit does not match the expected source commit.")
     _verify_inventory(packages_directory, manifest)
-    checksums_path = _safe_path(checksums_path, "candidate checksum evidence")
+    checksums_path = _safe_path(checksums_path, _CANDIDATE_CHECKSUM_EVIDENCE_LABEL)
     # The checksum evidence path is confined by _safe_path above before it is read.
     if not checksums_path.is_file() or checksums_path.read_text(encoding="utf-8") != _checksum_text(manifest):  # NOSONAR(S2083,S8707)
         raise ValueError("Canonical candidate checksum evidence differs from the manifest rendering.")
@@ -365,7 +369,7 @@ def _verify_release_evidence(
 def _render_checksums(arguments: argparse.Namespace) -> None:
     manifest = _load_manifest(arguments.manifest)
     output = _safe_path(arguments.output, "candidate checksum output")
-    if output == _safe_path(arguments.manifest, "candidate manifest"):
+    if output == _safe_path(arguments.manifest, _CANDIDATE_MANIFEST_LABEL):
         raise ValueError("Candidate checksum output cannot overwrite its manifest.")
     output.parent.mkdir(parents=True, exist_ok=True)
     # The output is confined by _safe_path above before it is written.
@@ -382,8 +386,8 @@ def _render_attestation_subject_checksums(arguments: argparse.Namespace) -> None
         lines = [f"{_sha256(path)}  {path.name}" for path in evidence_subjects]
     output = _safe_path(arguments.output, "attestation subject checksum output")
     protected_paths = {
-        _safe_path(arguments.manifest, "candidate manifest"),
-        _safe_path(arguments.checksums, "candidate checksum evidence"),
+        _safe_path(arguments.manifest, _CANDIDATE_MANIFEST_LABEL),
+        _safe_path(arguments.checksums, _CANDIDATE_CHECKSUM_EVIDENCE_LABEL),
         *(_safe_path(arguments.packages_dir / subject["file"], "package subject") for subject in _subjects(manifest)),
     }
     if output in protected_paths:

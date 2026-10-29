@@ -11,6 +11,10 @@ namespace ArchLinterNet.Cli.Commands.Change.Application;
 
 internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
 {
+    private const string PolicyOptionName = "--policy";
+    private const string BaselineOptionName = "--baseline";
+    private const string OutputOptionName = "--output";
+
     public int CreateSnapshot(ChangeSnapshotCommandOptions options)
     {
         if (options.ShowHelp)
@@ -19,18 +23,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
             return CliExitCodes.Success;
         }
 
-        if (options.Mode is not ("strict" or "audit") || string.IsNullOrWhiteSpace(options.OutputPath))
-        {
-            console.Error.WriteLine("Change snapshot requires --output and a strict or audit --mode.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!AnalysisProfilePublisher.TryValidateDestination(
-                options.ProfileDestination,
-                console,
-                ("--policy", options.PolicyPath),
-                ("--baseline", options.BaselinePath),
-                ("--output", options.OutputPath)))
+        if (!TryValidateSnapshotOptions(options))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
@@ -67,9 +60,9 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                     fileSystem,
                     counters,
                     AnalysisProfileCompletionStatus.PreparationFailure,
-                    ("--policy", options.PolicyPath),
-                    ("--baseline", options.BaselinePath),
-                    ("--output", options.OutputPath));
+                    (PolicyOptionName, options.PolicyPath),
+                    (BaselineOptionName, options.BaselinePath),
+                    (OutputOptionName, options.OutputPath));
                 return FailIncompleteSnapshot("validation", validation.PreflightDiagnostics);
             }
 
@@ -80,55 +73,11 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
 
             ArchitectureGraphOutcome namespaces = runtime.BuildGraph(Request(options, validation, ArchitectureGraphLevel.Namespace));
             ArchitectureGraphOutcome assemblies = runtime.BuildGraph(Request(options, validation, ArchitectureGraphLevel.Assembly));
-            IReadOnlyList<ArchitectureBaselineComparisonEntry> baselineDebt = Array.Empty<ArchitectureBaselineComparisonEntry>();
-            if (options.BaselinePath is not null)
+            if (!TryResolveBaselineDebt(options, validation, out IReadOnlyList<ArchitectureBaselineComparisonEntry> baselineDebt))
             {
-                BaselineDiffOutcome baseline = runtime.DiffBaseline(new BaselineDiffRequest
-                {
-                    PolicyPath = options.PolicyPath,
-                    BaselinePath = options.BaselinePath,
-                    Mode = options.Mode,
-                    ConditionSetName = options.ConditionSetName,
-                    PreparationMode = BuildPreparationMode.Ordinary,
-                    NoRestore = options.NoRestore,
-                    RequestedConfiguration = options.Configuration,
-                    RequestedTargetFramework = options.TargetFramework,
-                    RequestedPlatform = options.Platform,
-                    RequestedRuntimeIdentifier = options.RuntimeIdentifier,
-                    UsePreparedPostBuildState = options.EnsureBuilt || options.UsePreparedArtifacts,
-                    PreparedPostBuildRunner = validation.PreparedPostBuildRunner,
-                });
-                if (!baseline.Succeeded)
-                {
-                    return FailIncompleteSnapshot("baseline debt", baseline.PreflightDiagnostics);
-                }
-
-                baselineDebt = baseline.Frozen;
-            }
-            string? consumedInputCollision = FindSnapshotConsumedInputCollision(options.OutputPath, validation);
-            if (consumedInputCollision is not null)
-            {
-                console.Error.WriteLine(consumedInputCollision);
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
-
-            if (!AnalysisProfilePublisher.TryValidateDestination(
-                    options.ProfileDestination,
-                    console,
-                    ("--policy", options.PolicyPath),
-                    ("--baseline", options.BaselinePath),
-                    ("--output", options.OutputPath)) ||
-                !AnalysisProfilePublisher.TryValidateDestination(
-                    options.ProfileDestination,
-                    console,
-                    validation.PolicyImportPaths.Select(path => ("imported policy", (string?)path))
-                        .Concat(validation.ResolvedAssemblyPaths.SelectMany(path => new[]
-                        {
-                            ("a build artifact", (string?)path),
-                            ("a build receipt", (string?)BuildReceiptStore.ReceiptPathFor(path)),
-                        }))
-                        .Concat(validation.DiscoveredProjectPaths.Select(path => ("a project file", (string?)path)))
-                        .ToArray()))
+            if (!TryValidateSnapshotDestinations(options, validation))
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
@@ -142,9 +91,9 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 fileSystem,
                 counters,
                 AnalysisProfileCompletionStatus.Success,
-                ("--policy", options.PolicyPath),
-                ("--baseline", options.BaselinePath),
-                ("--output", options.OutputPath));
+                (PolicyOptionName, options.PolicyPath),
+                (BaselineOptionName, options.BaselinePath),
+                (OutputOptionName, options.OutputPath));
             return CliExitCodes.Success;
         }
         catch (Exception exception)
@@ -152,6 +101,88 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
             console.Error.WriteLine($"Could not create architecture change snapshot: {exception.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private bool TryValidateSnapshotOptions(ChangeSnapshotCommandOptions options)
+    {
+        if (options.Mode is not ("strict" or "audit") || string.IsNullOrWhiteSpace(options.OutputPath))
+        {
+            console.Error.WriteLine("Change snapshot requires --output and a strict or audit --mode.");
+            return false;
+        }
+
+        return AnalysisProfilePublisher.TryValidateDestination(
+            options.ProfileDestination,
+            console,
+            (PolicyOptionName, options.PolicyPath),
+            (BaselineOptionName, options.BaselinePath),
+            (OutputOptionName, options.OutputPath));
+    }
+
+    private bool TryResolveBaselineDebt(
+        ChangeSnapshotCommandOptions options,
+        ValidationOutcome validation,
+        out IReadOnlyList<ArchitectureBaselineComparisonEntry> baselineDebt)
+    {
+        baselineDebt = Array.Empty<ArchitectureBaselineComparisonEntry>();
+        if (options.BaselinePath is null)
+        {
+            return true;
+        }
+
+        BaselineDiffOutcome baseline = runtime.DiffBaseline(new BaselineDiffRequest
+        {
+            PolicyPath = options.PolicyPath,
+            BaselinePath = options.BaselinePath,
+            Mode = options.Mode,
+            ConditionSetName = options.ConditionSetName,
+            PreparationMode = BuildPreparationMode.Ordinary,
+            NoRestore = options.NoRestore,
+            RequestedConfiguration = options.Configuration,
+            RequestedTargetFramework = options.TargetFramework,
+            RequestedPlatform = options.Platform,
+            RequestedRuntimeIdentifier = options.RuntimeIdentifier,
+            UsePreparedPostBuildState = options.EnsureBuilt || options.UsePreparedArtifacts,
+            PreparedPostBuildRunner = validation.PreparedPostBuildRunner,
+        });
+        if (!baseline.Succeeded)
+        {
+            FailIncompleteSnapshot("baseline debt", baseline.PreflightDiagnostics);
+            return false;
+        }
+
+        baselineDebt = baseline.Frozen;
+        return true;
+    }
+
+    private bool TryValidateSnapshotDestinations(
+        ChangeSnapshotCommandOptions options,
+        ValidationOutcome validation)
+    {
+        string? collision = FindSnapshotConsumedInputCollision(options.OutputPath, validation);
+        if (collision is not null)
+        {
+            console.Error.WriteLine(collision);
+            return false;
+        }
+
+        (string Name, string? Path)[] trustedInputs =
+        [
+            .. validation.PolicyImportPaths.Select(path => ("imported policy", (string?)path)),
+            .. validation.ResolvedAssemblyPaths.SelectMany(path => new[]
+            {
+                ("a build artifact", (string?)path),
+                ("a build receipt", (string?)BuildReceiptStore.ReceiptPathFor(path)),
+            }),
+            .. validation.DiscoveredProjectPaths.Select(path => ("a project file", (string?)path)),
+        ];
+        return AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination, console,
+                (PolicyOptionName, options.PolicyPath),
+                (BaselineOptionName, options.BaselinePath),
+                (OutputOptionName, options.OutputPath))
+            && AnalysisProfilePublisher.TryValidateDestination(
+                options.ProfileDestination, console, trustedInputs);
     }
 
     public int CreateReport(ChangeReportCommandOptions options)
@@ -236,8 +267,8 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
 
     internal static string? FindSnapshotOutputCollision(ChangeSnapshotCommandOptions options) =>
         FindOutputCollision(options.OutputPath,
-            ("--policy", options.PolicyPath),
-            ("--baseline", options.BaselinePath));
+            (PolicyOptionName, options.PolicyPath),
+            (BaselineOptionName, options.BaselinePath));
 
     internal static string? FindReportOutputCollision(ChangeReportCommandOptions options) => options.OutputPath is null
         ? null

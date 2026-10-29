@@ -59,7 +59,7 @@ internal sealed record PreparedEffectScalePoint
 
         if (WorkloadIdentity.Length != 64 ||
             WorkloadIdentity.Any(character => !Uri.IsHexDigit(character)) ||
-            WorkloadIdentity != WorkloadIdentity.ToLowerInvariant())
+            !string.Equals(WorkloadIdentity, WorkloadIdentity.ToLowerInvariant(), StringComparison.Ordinal))
         {
             throw new InvalidOperationException($"Scale evidence '{fieldName}' must retain a lowercase workload SHA-256 identity.");
         }

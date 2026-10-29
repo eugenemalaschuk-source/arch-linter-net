@@ -169,13 +169,12 @@ internal static class ArchitectureReferenceScanner
 
             foreach (Type directRef in GetReferencedTypes(current))
             {
-                if (visited.Contains(directRef))
+                if (!visited.Add(directRef))
                 {
                     continue;
                 }
 
-                visited.Add(directRef);
-                List<Type> refPath = new(path) { directRef };
+                List<Type> refPath = [.. path, directRef];
                 yield return (directRef, refPath);
 
                 if (traversePredicate == null || traversePredicate(directRef))

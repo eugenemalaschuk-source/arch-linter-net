@@ -313,8 +313,8 @@ public static class EvaluatedBuildInputManifestCollector
 
     private sealed class ManifestCollectionBudget
     {
-        public int OptionalInputCount { get; private set; }
-        public long CollectedBytes { get; private set; }
+        private int OptionalInputCount { get; set; }
+        private long CollectedBytes { get; set; }
         public bool IsExhausted { get; private set; }
 
         public bool TryAddOptionalValue(SortedSet<string> reasons)

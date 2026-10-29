@@ -247,6 +247,15 @@ internal interface ICliRuntime
 
     BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request);
 
+    /// <summary>
+    /// Verifies baseline candidates already retained by a caller-owned snapshot. The default keeps
+    /// existing CLI test doubles source-compatible.
+    /// </summary>
+    BaselineVerifyOutcome VerifyBaseline(
+        BaselineVerifyRequest request,
+        ArchitectureAnalysisSnapshot snapshot) =>
+        throw new NotSupportedException("Shared-snapshot baseline verification is not configured for this CLI runtime.");
+
     BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request);
 
     ArchitectureDebtGateOutcome EvaluateDebtGate(ArchitectureDebtGateRequest request) =>
@@ -295,15 +304,6 @@ internal interface ICliRuntime
         ArchitectureAnalysisSnapshot snapshot,
         ValidationTiming? timing) =>
         EvaluateHealth(request, snapshot);
-
-    /// <summary>
-    /// Verifies baseline candidates already retained by a caller-owned snapshot. The default keeps
-    /// existing CLI test doubles source-compatible.
-    /// </summary>
-    BaselineVerifyOutcome VerifyBaseline(
-        BaselineVerifyRequest request,
-        ArchitectureAnalysisSnapshot snapshot) =>
-        throw new NotSupportedException("Shared-snapshot baseline verification is not configured for this CLI runtime.");
 
     /// <summary>
     /// Projects the canonical change snapshot from one retained analysis session. The default

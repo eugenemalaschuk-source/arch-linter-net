@@ -268,32 +268,9 @@ def _failed_scenarios(
             continue
         if scenario_id in _SEMANTIC_ANNOTATIONS_SCENARIOS:
             records_by_platform = {record["platform_id"]: record for record in records}
-            for platform_id in _REQUIRED_PLATFORMS:
-                record = records_by_platform.get(platform_id)
-                scenario = next(
-                    (item for item in record["scenarios"] if item["id"] == scenario_id),
-                    None,
-                ) if record is not None else None
-                if scenario is None:
-                    reason = (
-                        "Required scenario must pass on every required platform; "
-                        f"{platform_id} did not report the scenario."
-                    )
-                elif scenario["result"] != "passed":
-                    detail = scenario.get("reason")
-                    suffix = f": {detail}" if detail else "."
-                    reason = (
-                        "Required scenario must pass on every required platform; "
-                        f"{platform_id} reported {scenario['result']}{suffix}"
-                    )
-                else:
-                    continue
-                failures[scenario_id] = {
-                    "id": scenario_id,
-                    "platform_id": platform_id,
-                    "reason": reason,
-                }
-                break
+            failure = _required_platform_scenario_failure(records_by_platform, scenario_id)
+            if failure is not None:
+                failures[scenario_id] = failure
             continue
         if not any(
             scenario["id"] == scenario_id and scenario["result"] == "passed"
@@ -306,6 +283,31 @@ def _failed_scenarios(
                 "reason": "No platform executed this required scenario to a passing result.",
             }
     return [failures[key] for key in sorted(failures)]
+
+
+def _required_platform_scenario_failure(
+    records_by_platform: dict[str, dict[str, Any]],
+    scenario_id: str,
+) -> dict[str, Any] | None:
+    for platform_id in _REQUIRED_PLATFORMS:
+        record = records_by_platform.get(platform_id)
+        scenario = next(
+            (item for item in record["scenarios"] if item["id"] == scenario_id),
+            None,
+        ) if record is not None else None
+        if scenario is None:
+            reason = f"Required scenario must pass on every required platform; {platform_id} did not report the scenario."
+        elif scenario["result"] != "passed":
+            detail = scenario.get("reason")
+            suffix = f": {detail}" if detail else "."
+            reason = (
+                "Required scenario must pass on every required platform; "
+                f"{platform_id} reported {scenario['result']}{suffix}"
+            )
+        else:
+            continue
+        return {"id": scenario_id, "platform_id": platform_id, "reason": reason}
+    return None
 
 
 def _policy_shape_defects(records: list[dict[str, Any]]) -> list[str]:

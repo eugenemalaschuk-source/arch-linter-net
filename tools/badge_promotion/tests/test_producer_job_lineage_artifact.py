@@ -148,46 +148,31 @@ def test_resolve_evidence_accepts_original_manifest_for_selected_copied_job(
     assert resolved.run_attempt == 1
     assert resolved.job_id == original_job_id
     assert resolved.producer_identity_sha256 is not None
-    expected_identity = cli._producer_identity_sha256(
-        repository=repository,
-        base_ref=config.base_ref,
-        base_sha=base_sha,
-        main_tree_sha=tree_sha,
-        head_sha=head_sha,
-        head_tree_sha=tree_sha,
-        pr_number=42,
-        workflow_path=config.producer.workflow_path,
-        workflow_sha=config.producer.workflow_sha,
-        check_name=config.producer.check_name,
-        check_app=config.producer.check_app,
-        run_id=run_id,
-        run_attempt=1,
-        job_id=original_job_id,
-        job_name=config.producer.job_name,
-        artifact_id=9001,
-        artifact_name=config.producer.artifact_name,
-        evidence_artifact_id=9002,
-    )
-    copied_identity = cli._producer_identity_sha256(
-        repository=repository,
-        base_ref=config.base_ref,
-        base_sha=base_sha,
-        main_tree_sha=tree_sha,
-        head_sha=head_sha,
-        head_tree_sha=tree_sha,
-        pr_number=42,
-        workflow_path=config.producer.workflow_path,
-        workflow_sha=config.producer.workflow_sha,
-        check_name=config.producer.check_name,
-        check_app=config.producer.check_app,
-        run_id=run_id,
-        run_attempt=2,
-        job_id=copied_job_id,
-        job_name=config.producer.job_name,
-        artifact_id=9001,
-        artifact_name=config.producer.artifact_name,
-        evidence_artifact_id=9002,
-    )
+
+    def producer_identity(run_attempt: int, job_id: int) -> cli.ProducerIdentity:
+        return cli.ProducerIdentity(
+            repository=repository,
+            base_ref=config.base_ref,
+            base_sha=base_sha,
+            main_tree_sha=tree_sha,
+            head_sha=head_sha,
+            head_tree_sha=tree_sha,
+            pr_number=42,
+            workflow_path=config.producer.workflow_path,
+            workflow_sha=config.producer.workflow_sha,
+            check_name=config.producer.check_name,
+            check_app=config.producer.check_app,
+            run_id=run_id,
+            run_attempt=run_attempt,
+            job_id=job_id,
+            job_name=config.producer.job_name,
+            artifact_id=9001,
+            artifact_name=config.producer.artifact_name,
+            evidence_artifact_id=9002,
+        )
+
+    expected_identity = cli._producer_identity_sha256(producer_identity(1, original_job_id))
+    copied_identity = cli._producer_identity_sha256(producer_identity(2, copied_job_id))
     assert resolved.producer_identity_sha256 == expected_identity
     assert temporal_identity_inputs == [expected_identity]
     assert expected_identity != copied_identity
@@ -196,11 +181,9 @@ def test_resolve_evidence_accepts_original_manifest_for_selected_copied_job(
     }
     assert validate_artifact(downloaded_archive, config, resolved).payload == payload
 
+    wrong_attempt_archive = badge_archive(run_attempt=2)
     with pytest.raises(ArtifactValidationError):
-        validate_artifact(
-            badge_archive(run_attempt=2), config, resolved
-        )
+        validate_artifact(wrong_attempt_archive, config, resolved)
+    copied_job_archive = badge_archive(run_attempt=1, job_id=copied_job_id)
     with pytest.raises(ArtifactValidationError):
-        validate_artifact(
-            badge_archive(run_attempt=1, job_id=copied_job_id), config, resolved
-        )
+        validate_artifact(copied_job_archive, config, resolved)

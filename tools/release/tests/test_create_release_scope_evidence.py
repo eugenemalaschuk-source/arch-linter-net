@@ -205,8 +205,9 @@ def test_exact_preview_target_selects_reviewed_authority_without_authorizing_sta
     assert evidence["declaration_sha256"] == hashlib.sha256(preview.read_bytes()).hexdigest()
     assert [item["state"] for item in evidence["required_items"]] == ["closed", "closed"]
 
+    stable_manifest = _manifest(tmp_path, "0.9.0")
     with pytest.raises(ValueError, match="No reviewed release-scope declaration matches candidate target 0.9.0"):
-        build_evidence(scopes, _manifest(tmp_path, "0.9.0"), _COMMIT, _REPOSITORY)
+        build_evidence(scopes, stable_manifest, _COMMIT, _REPOSITORY)
 
 
 def test_unsupported_prerelease_shape_fails_closed(tmp_path: Path, monkeypatch) -> None:
@@ -215,8 +216,9 @@ def test_unsupported_prerelease_shape_fails_closed(tmp_path: Path, monkeypatch) 
     _declaration(scopes)
     _stub_gh(monkeypatch, {})
 
+    unsupported_manifest = _manifest(tmp_path, "0.9.0-rc.1")
     with pytest.raises(ValueError, match="exact stable or preview release target"):
-        build_evidence(scopes, _manifest(tmp_path, "0.9.0-rc.1"), _COMMIT, _REPOSITORY)
+        build_evidence(scopes, unsupported_manifest, _COMMIT, _REPOSITORY)
 
 
 def test_prepublication_candidate_is_bound_without_selecting_stable_release_authority(

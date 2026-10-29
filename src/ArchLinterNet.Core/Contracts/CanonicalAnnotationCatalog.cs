@@ -14,23 +14,18 @@ internal sealed class CanonicalAnnotationCatalog
     private readonly Dictionary<string, string> _metadataKeysByProperty;
 
     private CanonicalAnnotationCatalog(
-        int generation,
-        string packageId,
-        string minimumToolVersion,
-        string supportedPackageRange,
-        string reservedNamespace,
-        string catalogIdentityMarker,
+        CatalogMetadata metadata,
         Dictionary<string, CanonicalRole> rolesByAttribute,
         Dictionary<string, CanonicalContext> contextsByAttribute,
         HashSet<string> knownAttributes,
         Dictionary<string, string> metadataKeysByProperty)
     {
-        Generation = generation;
-        PackageId = packageId;
-        MinimumToolVersion = minimumToolVersion;
-        SupportedPackageRange = supportedPackageRange;
-        ReservedNamespace = reservedNamespace;
-        CatalogIdentityMarker = catalogIdentityMarker;
+        Generation = metadata.Generation;
+        PackageId = metadata.PackageId;
+        MinimumToolVersion = metadata.MinimumToolVersion;
+        SupportedPackageRange = metadata.SupportedPackageRange;
+        ReservedNamespace = metadata.ReservedNamespace;
+        CatalogIdentityMarker = metadata.CatalogIdentityMarker;
         _rolesByAttribute = rolesByAttribute;
         _contextsByAttribute = contextsByAttribute;
         _knownAttributes = knownAttributes;
@@ -129,13 +124,15 @@ internal sealed class CanonicalAnnotationCatalog
             known.Add(fqn);
         }
 
-        return new CanonicalAnnotationCatalog(
+        CatalogMetadata metadata = new(
             root.GetProperty("catalogGeneration").GetInt32(),
             package.GetProperty("id").GetString()!,
             package.GetProperty("minimumAnnotationAwareToolVersion").GetString()!,
             package.GetProperty("compatiblePackageRangeForGeneration1").GetString()!,
             reservedNamespace,
-            identityMarker,
+            identityMarker);
+        return new CanonicalAnnotationCatalog(
+            metadata,
             roles,
             contexts,
             known,
@@ -175,6 +172,14 @@ internal sealed class CanonicalAnnotationCatalog
 
     internal sealed record CanonicalContext(string Key, string AttributeFullName, IReadOnlyList<string> Scopes);
 
+    private sealed record CatalogMetadata(
+        int Generation,
+        string PackageId,
+        string MinimumToolVersion,
+        string SupportedPackageRange,
+        string ReservedNamespace,
+        string CatalogIdentityMarker);
+
     internal readonly record struct SemanticVersion(BigInteger Major, BigInteger Minor, BigInteger Patch, string? PreRelease)
         : IComparable<SemanticVersion>
     {
@@ -212,27 +217,71 @@ internal sealed class CanonicalAnnotationCatalog
 
         public int CompareTo(SemanticVersion other)
         {
+            int coreComparison = CompareCore(other);
+            return coreComparison != 0 ? coreComparison : ComparePreRelease(other);
+        }
+
+        private int CompareCore(SemanticVersion other)
+        {
             int comparison = Major.CompareTo(other.Major);
             if (comparison == 0) comparison = Minor.CompareTo(other.Minor);
-            if (comparison == 0) comparison = Patch.CompareTo(other.Patch);
-            if (comparison != 0) return comparison;
-            if (PreRelease is null) return other.PreRelease is null ? 0 : 1;
-            if (other.PreRelease is null) return -1;
+            return comparison == 0 ? Patch.CompareTo(other.Patch) : comparison;
+        }
 
-            string[] left = PreRelease.Split('.');
-            string[] right = other.PreRelease.Split('.');
+        private int ComparePreRelease(SemanticVersion other)
+        {
+            if (PreRelease is null)
+            {
+                return other.PreRelease is null ? 0 : 1;
+            }
+
+            return other.PreRelease is null
+                ? -1
+                : ComparePreReleaseSequences(PreRelease, other.PreRelease);
+        }
+
+        private static int ComparePreReleaseSequences(string leftValue, string rightValue)
+        {
+            string[] left = leftValue.Split('.');
+            string[] right = rightValue.Split('.');
             for (int index = 0; index < Math.Min(left.Length, right.Length); index++)
             {
-                bool leftNumeric = IsNumericIdentifier(left[index]);
-                bool rightNumeric = IsNumericIdentifier(right[index]);
-                comparison = leftNumeric && rightNumeric
-                    ? CompareNumericIdentifiers(left[index], right[index])
-                    : leftNumeric ? -1 : rightNumeric ? 1 : string.CompareOrdinal(left[index], right[index]);
+                int comparison = ComparePreReleaseIdentifiers(left[index], right[index]);
                 if (comparison != 0) return comparison;
             }
 
             return left.Length.CompareTo(right.Length);
         }
+
+        private static int ComparePreReleaseIdentifiers(string left, string right)
+        {
+            bool leftNumeric = IsNumericIdentifier(left);
+            bool rightNumeric = IsNumericIdentifier(right);
+            if (leftNumeric && rightNumeric)
+            {
+                return CompareNumericIdentifiers(left, right);
+            }
+
+            if (leftNumeric)
+            {
+                return -1;
+            }
+
+            if (rightNumeric)
+            {
+                return 1;
+            }
+
+            return string.CompareOrdinal(left, right);
+        }
+
+        public static bool operator <(SemanticVersion left, SemanticVersion right) { return left.CompareTo(right) < 0; }
+
+        public static bool operator <=(SemanticVersion left, SemanticVersion right) { return left.CompareTo(right) <= 0; }
+
+        public static bool operator >(SemanticVersion left, SemanticVersion right) { return left.CompareTo(right) > 0; }
+
+        public static bool operator >=(SemanticVersion left, SemanticVersion right) { return left.CompareTo(right) >= 0; }
 
         private static bool TryParseNumeric(string text, out BigInteger value)
         {

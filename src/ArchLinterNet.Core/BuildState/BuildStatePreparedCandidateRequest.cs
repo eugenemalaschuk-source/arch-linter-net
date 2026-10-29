@@ -12,7 +12,7 @@ internal sealed record BuildStatePreparedCandidateRequest(
     string? RequestedPlatform = null,
     string? RequestedRuntimeIdentifier = null,
     bool NoRestore = false,
-    CancellationToken CancellationToken = default,
     string? PreparedBuildProofDirectory = null,
     string? PreparedBuildProofNonce = null,
-    bool BuildAlreadyCompleted = false);
+    bool BuildAlreadyCompleted = false,
+    CancellationToken CancellationToken = default);

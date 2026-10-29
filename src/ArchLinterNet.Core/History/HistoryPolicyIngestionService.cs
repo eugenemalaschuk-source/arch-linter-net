@@ -14,13 +14,13 @@ internal static class HistoryPolicyIngestionService
     public static HistoryIngestionOutcome Ingest(
         HistoryIngestionRequest request,
         string? policyPath,
-        CancellationToken cancellationToken = default,
-        HistoryIngestionTiming? timing = null)
+        HistoryIngestionTiming? timing = null,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         TaskKeyExtraction taskExtraction;
         HistoryAnalysisConfiguration configuration;
-        Stopwatch? policyClock = timing?.Start();
+        Stopwatch? policyClock = timing is null ? null : HistoryIngestionTiming.Start();
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -40,11 +40,14 @@ internal static class HistoryPolicyIngestionService
         timing?.Record("policy", policyClock);
 
         HistoryIngestionOutcome outcome = new HistoryIngestionService(taskExtraction, configuration).Ingest(
-            request, cancellationToken, timing);
-        if (outcome.Result is HistoryIngestionResult result)
+            request, timing, cancellationToken);
+        HistoryIngestionResult? result = outcome.Result;
+        if (result is not null)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Stopwatch? enrichmentClock = request.RequestDotNetEnrichment ? timing?.Start() : null;
+            Stopwatch? enrichmentClock = request.RequestDotNetEnrichment && timing is not null
+                ? HistoryIngestionTiming.Start()
+                : null;
             HistoryDotNetEnrichment dotNetEnrichment = new HistoryDotNetEnricher().Enrich(result, request, policyPath);
             cancellationToken.ThrowIfCancellationRequested();
             result.ApplyEnrichment(dotNetEnrichment.ToReportProjection(result.ResolvedTo));

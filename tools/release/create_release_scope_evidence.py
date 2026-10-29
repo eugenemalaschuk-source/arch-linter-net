@@ -164,41 +164,35 @@ def _select_declaration(declarations_directory: Path, candidate_version: str) ->
 
 def _resolve_states(repository: str, numbers: list[int]) -> dict[int, dict[str, Any]]:
     """Read issue state from GitHub. Any failure is fatal: an unverifiable scope must not pass."""
-    resolved: dict[int, dict[str, Any]] = {}
-    for number in numbers:
-        # Fixed argv, no shell, and both interpolated values re-validated at the call site.
-        completed = subprocess.run(
-            ["gh", "issue", "view", str(_issue_number(number)), "--repo", _repository(repository),
-             "--json", "number,state,title"],
-            capture_output=True, text=True, check=False, shell=False)
-        if completed.returncode != 0:
-            raise ValueError(f"Cannot resolve issue #{number}: {completed.stderr.strip()}")
-        try:
-            issue = json.loads(completed.stdout)
-        except json.JSONDecodeError as error:
-            raise ValueError(f"Cannot resolve issue #{number}: invalid GitHub response.") from error
-        state = issue.get("state") if isinstance(issue, dict) else None
-        title = issue.get("title") if isinstance(issue, dict) else None
-        if (
-            not isinstance(issue, dict)
-            or issue.get("number") != number
-            or not isinstance(state, str)
-            or not isinstance(title, str)
-        ):
-            raise ValueError(f"Cannot resolve issue #{number}: invalid GitHub response.")
-        state = state.lower()
-        # `gh issue view` reports merged pull requests as MERGED, even though the
-        # issue-tracker state relevant to release scope is closed.
-        if state == "merged":
-            state = "closed"
-        if state not in {"open", "closed"}:
-            raise ValueError(f"Cannot resolve issue #{number}: invalid GitHub response.")
-        resolved[number] = {
-            "issue": number,
-            "state": state,
-            "title": title,
-        }
-    return resolved
+    return {number: _resolve_issue_state(repository, number) for number in numbers}
+
+
+def _resolve_issue_state(repository: str, number: int) -> dict[str, Any]:
+    # Fixed argv, no shell, and both interpolated values re-validated at the call site.
+    completed = subprocess.run(
+        ["gh", "issue", "view", str(_issue_number(number)), "--repo", _repository(repository),
+         "--json", "number,state,title"],
+        capture_output=True, text=True, check=False, shell=False)
+    if completed.returncode != 0:
+        raise ValueError(f"Cannot resolve issue #{number}: {completed.stderr.strip()}")
+    try:
+        issue = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Cannot resolve issue #{number}: invalid GitHub response.") from error
+    if not isinstance(issue, dict) or issue.get("number") != number:
+        raise ValueError(f"Cannot resolve issue #{number}: invalid GitHub response.")
+
+    title = issue.get("title")
+    state = issue.get("state")
+    if not isinstance(state, str) or not isinstance(title, str):
+        raise ValueError(f"Cannot resolve issue #{number}: invalid GitHub response.")
+
+    # `gh issue view` reports merged pull requests as MERGED, even though the
+    # issue-tracker state relevant to release scope is closed.
+    state = "closed" if state.lower() == "merged" else state.lower()
+    if state not in {"open", "closed"}:
+        raise ValueError(f"Cannot resolve issue #{number}: invalid GitHub response.")
+    return {"issue": number, "state": state, "title": title}
 
 
 def build_evidence(

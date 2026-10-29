@@ -7,6 +7,7 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
 {
     private const string InputOptionName = "--input";
     private const string HelpOptionName = "--help";
+    private const string OutputOptionName = "--output";
 
     public Command Create()
     {
@@ -20,7 +21,7 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
         policy.Options.Add(help);
         policy.SetAction(result => handler.Execute(new BadgeCommandOptions(result.GetValue(input) ?? string.Empty, result.GetValue(help))));
         Option<string> healthInput = new(InputOptionName);
-        Option<string> output = new("--output");
+        Option<string> output = new(OutputOptionName);
         Option<string> disclosureProfile = new("--disclosure-profile");
         Option<string> verifiedAt = new("--verified-at");
         Option<bool> verifyDisclosureProfile = new("--verify-disclosure-profile");
@@ -41,7 +42,7 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
             result.GetValue(verifyDisclosureProfile))));
         Command repositoryMetrics = new("repository-metrics", "Write Shields endpoint JSON from repository metrics.");
         Option<string> repositoryMetricsInput = new(InputOptionName);
-        Option<string> repositoryMetricsOutput = new("--output");
+        Option<string> repositoryMetricsOutput = new(OutputOptionName);
         Option<string> repositoryMetricsOutputDirectory = new("--output-directory");
         Option<bool> repositoryMetricsHelp = new(HelpOptionName);
         repositoryMetricsHelp.Aliases.Add("-h");
@@ -56,7 +57,7 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
             result.GetValue(repositoryMetricsOutputDirectory))));
         Command setup = new("setup", "Preview or generate a versioned consumer badge setup.");
         Option<string> setupInput = new(InputOptionName);
-        Option<string> setupOutput = new("--output");
+        Option<string> setupOutput = new(OutputOptionName);
         Option<string> setupRepository = new("--repository");
         Option<string> setupVisibility = new("--visibility");
         Option<string> setupMode = new("--mode");
@@ -125,7 +126,7 @@ internal sealed class BadgeCommandDefinition(BadgeCommandHandler handler)
         Command applyHandoff = new("apply-handoff", "Verify and apply a trusted bootstrap handoff to a normal review branch.");
         Option<string> handoffInput = new(InputOptionName);
         Option<string> handoffPayload = new("--payload");
-        Option<string> handoffOutput = new("--output");
+        Option<string> handoffOutput = new(OutputOptionName);
         Option<string> expectedBaseSha = new("--expected-base-sha");
         Option<string> expectedBaseTreeSha = new("--expected-base-tree-sha");
         Option<string> expectedRepository = new("--repository");

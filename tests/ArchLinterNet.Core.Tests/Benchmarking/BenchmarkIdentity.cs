@@ -6,8 +6,15 @@ namespace ArchLinterNet.Core.Tests;
 
 internal static class BenchmarkIdentity
 {
-    public static string Sha256(string content) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
+    private static readonly JsonSerializerOptions _normalizedJsonOptions = new()
+    {
+        WriteIndented = false,
+    };
+
+    public static string Sha256(string content)
+    {
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
+    }
 
     public static BenchmarkCanonicalResultIdentity CreateCanonicalResult(
         string completionStatus,
@@ -74,11 +81,8 @@ internal static class BenchmarkIdentity
 
     public static string NormalizeJson(string json)
     {
-        using JsonDocument document = JsonDocument.Parse(json);
-        return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions
-        {
-            WriteIndented = false,
-        });
+        using var document = JsonDocument.Parse(json);
+        return JsonSerializer.Serialize(document.RootElement, _normalizedJsonOptions);
     }
 }
 

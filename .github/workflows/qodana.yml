@@ -17,10 +17,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  qodana:
-    name: Qodana Community .NET (advisory)
+  contracts:
+    name: Qodana evidence and workflow contracts
     runs-on: ubuntu-24.04
-    # A normal PR does one bounded scan. Opt-in burn-in adds a warm run and tiny probes.
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Test Qodana evidence and workflow contracts
+        run: python3 -m unittest discover -s tests/qodana -v
+
+  qodana:
+    name: Qodana Community .NET (scan)
+    needs: contracts
+    runs-on: ubuntu-24.04
+    # A PR compares bounded base/head scans. Opt-in burn-in uses a warm run and tiny probes.
     timeout-minutes: 55
     permissions:
       contents: read
@@ -30,40 +47,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: source
+          persist-credentials: false
+
+      - name: Checkout exact pull request base
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
           persist-credentials: false
 
       - name: Install the locked .NET SDK for the scanner container
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
-          global-json-file: global.json
+          global-json-file: source/global.json
 
       - name: Export the SDK root for a read-only scanner mount
         shell: bash
         run: |
           set -euo pipefail
           dotnet_root="$(dirname "$(readlink -f "$(command -v dotnet)")")"
-          sdk_version="$(jq -r '.sdk.version' global.json)"
+          sdk_version="$(jq -r '.sdk.version' source/global.json)"
           if [[ ! -d "$dotnet_root/sdk/$sdk_version" ]]; then
             echo "The locked SDK $sdk_version is missing from $dotnet_root." >&2
             exit 1
           fi
           printf 'QODANA_DOTNET_ROOT=%s\n' "$dotnet_root" >> "$GITHUB_ENV"
 
-      - name: Test Qodana evidence and workflow contracts
-        run: python3 -m unittest discover -s tests/qodana -v
-
       - name: Analyze canonical solution without secrets
+        working-directory: source
         env:
           BURN_IN: ${{ inputs.burn_in || false }}
         shell: bash
         run: |
           export QODANA_ANALYZED_SHA
           QODANA_ANALYZED_SHA="$(git rev-parse HEAD)"
+          export QODANA_PULL_REQUEST_NUMBER='${{ github.event.pull_request.number || '' }}'
+          export QODANA_HEAD_SHA='${{ github.event.pull_request.head.sha || '' }}'
+          export QODANA_BASE_SHA='${{ github.event.pull_request.base.sha || '' }}'
           args=()
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            export QODANA_BASE_ANALYZED_SHA
+            QODANA_BASE_ANALYZED_SHA="$(git -C "$GITHUB_WORKSPACE/base" rev-parse HEAD)"
+            args+=(--base-project "$GITHUB_WORKSPACE/base")
+          fi
           if [[ "$BURN_IN" == "true" ]]; then
             args+=(--burn-in)
           fi
-          python3 tools/scripts/qodana_ci.py \
+          python3 -I tools/scripts/qodana_ci.py \
             --output "$RUNNER_TEMP/qodana" "${args[@]}"
 
       - name: Upload Qodana evidence (including failures)

@@ -17,6 +17,30 @@ public static class AnalysisProfileBuilder
         bool cancellationObserved,
         AnalysisProfileBuildOptions? options = null)
     {
+        List<AnalysisProfilePhaseMeasurement> phases = BuildPhases(snapshotCounters, timing);
+        Dictionary<string, int> contractFamilyCounts = BuildContractFamilyCounts(timing);
+        var counters = AnalysisProfileCounters.From(
+            snapshotCounters, contractFamilyCounts, renderedSinkCount, outputSinkCount);
+        if (options?.Cache is not null)
+        {
+            counters = counters with { Cache = options.Cache };
+        }
+
+        return new AnalysisProfile
+        {
+            CompletionStatus = completionStatus,
+            CancellationObserved = cancellationObserved,
+            Counters = counters,
+            Phases = phases,
+            Output = options?.Output ?? CreateEmptyOutput(),
+            Measurements = options?.Measurements,
+        };
+    }
+
+    private static List<AnalysisProfilePhaseMeasurement> BuildPhases(
+        ArchitectureAnalysisSnapshotCounters snapshotCounters,
+        ValidationTiming? timing)
+    {
         List<AnalysisProfilePhaseMeasurement> phases = new();
         bool selectorPhaseMeasured = false;
         if (timing is not null)
@@ -47,6 +71,11 @@ public static class AnalysisProfileBuilder
                 null));
         }
 
+        return phases;
+    }
+
+    private static Dictionary<string, int> BuildContractFamilyCounts(ValidationTiming? timing)
+    {
         // Contract-family entries carry execution counts; ordinary timing entries do not.
         Dictionary<string, int> contractFamilyCounts = new(StringComparer.Ordinal);
         if (timing is not null)
@@ -61,28 +90,18 @@ public static class AnalysisProfileBuilder
             }
         }
 
-        AnalysisProfileCounters counters = AnalysisProfileCounters.From(
-            snapshotCounters, contractFamilyCounts, renderedSinkCount, outputSinkCount);
-        if (options?.Cache is not null)
-        {
-            counters = counters with { Cache = options.Cache };
-        }
+        return contractFamilyCounts;
+    }
 
-        return new AnalysisProfile
+    private static AnalysisProfileOutput CreateEmptyOutput()
+    {
+        return new()
         {
-            CompletionStatus = completionStatus,
-            CancellationObserved = cancellationObserved,
-            Counters = counters,
-            Phases = phases,
-            Output = options?.Output ?? new AnalysisProfileOutput
-            {
-                CommittedSinkCount = 0,
-                FailedSinkCount = 0,
-                StagedSinkCount = 0,
-                UncommittedSinkCount = 0,
-                OutputFailed = false,
-            },
-            Measurements = options?.Measurements,
+            CommittedSinkCount = 0,
+            FailedSinkCount = 0,
+            StagedSinkCount = 0,
+            UncommittedSinkCount = 0,
+            OutputFailed = false,
         };
     }
 }

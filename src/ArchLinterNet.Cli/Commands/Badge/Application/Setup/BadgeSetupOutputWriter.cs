@@ -185,7 +185,7 @@ internal static class BadgeSetupOutputWriter
         {
             if (configuration.Renewal.Enabled)
             {
-                files.Add(new(".github/workflows/architecture-health-badge-renewal.yml", RenderRenewalWorkflow(configuration)));
+                files.Add(new(BadgeSetupContract.DefaultRenewalWorkflowPath, RenderRenewalWorkflow(configuration)));
             }
             files.AddRange(relayFiles);
         }
@@ -285,7 +285,7 @@ internal static class BadgeSetupOutputWriter
         {
             if (configuration.Renewal.Enabled)
             {
-                paths.Add(".github/workflows/architecture-health-badge-renewal.yml");
+                paths.Add(BadgeSetupContract.DefaultRenewalWorkflowPath);
             }
             paths.AddRange(relayFiles.Select(static file => file.Path));
         }
