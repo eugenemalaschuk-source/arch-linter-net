@@ -15,6 +15,11 @@ The repository SHALL run tokenless Qodana Community for .NET against ArchLinterN
 - **AND** the head report is compared to a separate scan of the exact base revision
 - **AND** a trusted reporter publishes the validated result and a required status for the exact PR head
 
+#### Scenario: Pull request changes contract tests
+- **WHEN** contract tests from the pull request execute
+- **THEN** they run in a separate job from the scan and cannot alter its evidence
+- **AND** the scan harness isolates its Python imports from the pull request checkout
+
 #### Scenario: Pull request changes Qodana configuration
 - **WHEN** a pull request changes scanner configuration or reporting code
 - **THEN** those changes cannot weaken the gate evaluating that pull request

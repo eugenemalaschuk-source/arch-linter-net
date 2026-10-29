@@ -442,6 +442,7 @@ def _is_protected_scan_path(path: str) -> bool:
     return (fnmatch.fnmatch(name, "*.csproj")
             or fnmatch.fnmatch(name, "*.props")
             or fnmatch.fnmatch(name, "*.targets")
+            or fnmatch.fnmatch(name, "*.rsp")
             or fnmatch.fnmatch(name, "*.globalconfig")
             or fnmatch.fnmatch(name, "*.ruleset")
             or name.endswith(EDITORCONFIG)

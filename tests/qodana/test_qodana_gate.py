@@ -239,6 +239,7 @@ class EvidenceValidationTests(unittest.TestCase):
         self.assertEqual(3, len(gate._added_suppressions(files)))
         self.assertFalse(gate._is_protected_scan_path(gate.BASELINE_PATH))
         self.assertTrue(gate._is_protected_scan_path("src/Nested/.editorconfig"))
+        self.assertTrue(gate._is_protected_scan_path("src/Nested/Directory.Build.rsp"))
         self.assertEqual([], gate._added_suppressions([
             {"filename": "src/Example.cs", "patch": "@@\n+public class Example {}"}
         ]))
@@ -297,6 +298,8 @@ class WorkflowContractTests(unittest.TestCase):
         scanner = (ROOT / ".github/workflows/qodana.yml").read_text()
         publisher = (ROOT / ".github/workflows/qodana-publisher.yml").read_text()
         self.assertIn("name: Qodana Community .NET (scan)", scanner)
+        self.assertIn("name: Qodana evidence and workflow contracts", scanner)
+        self.assertIn("python3 -I tools/scripts/qodana_ci.py", scanner)
         self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", scanner)
         self.assertIn("pull_request:", scanner)
         self.assertIn("workflow_run:", publisher)

@@ -17,6 +17,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  contracts:
+    name: Qodana evidence and workflow contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Test Qodana evidence and workflow contracts
+        run: python3 -m unittest discover -s tests/qodana -v
+
   qodana:
     name: Qodana Community .NET (scan)
     runs-on: ubuntu-24.04
@@ -59,10 +75,6 @@ jobs:
           fi
           printf 'QODANA_DOTNET_ROOT=%s\n' "$dotnet_root" >> "$GITHUB_ENV"
 
-      - name: Test Qodana evidence and workflow contracts
-        working-directory: source
-        run: python3 -m unittest discover -s tests/qodana -v
-
       - name: Analyze canonical solution without secrets
         working-directory: source
         env:
@@ -83,7 +95,7 @@ jobs:
           if [[ "$BURN_IN" == "true" ]]; then
             args+=(--burn-in)
           fi
-          python3 tools/scripts/qodana_ci.py \
+          python3 -I tools/scripts/qodana_ci.py \
             --output "$RUNNER_TEMP/qodana" "${args[@]}"
 
       - name: Upload Qodana evidence (including failures)
