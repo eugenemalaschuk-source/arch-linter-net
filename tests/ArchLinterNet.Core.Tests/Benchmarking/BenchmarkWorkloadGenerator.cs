@@ -27,10 +27,7 @@ internal static class BenchmarkWorkloadGenerator
                 nameof(dimensions));
         }
 
-        if (independentProcesses < 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(independentProcesses));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(independentProcesses, 1);
 
         IReadOnlyList<BenchmarkProjectNode> projects = BenchmarkGraphBuilder.CreateProjects(resolvedDimensions.ProjectCount);
         IReadOnlyList<BenchmarkProjectEdge> edges = BenchmarkGraphBuilder.CreateEdges(

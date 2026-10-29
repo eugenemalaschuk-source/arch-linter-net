@@ -6,43 +6,34 @@ namespace ArchLinterNet.Core.History;
 internal sealed class HistoryDiagnostic(
     HistoryDiagnosticKind kind,
     string message,
-    string? objectId = null,
-    string? path = null,
-    int? spanStart = null,
-    int? spanEnd = null,
-    string? publicationStatus = null,
-    bool publicationCancelled = false,
-    IReadOnlyList<string>? failedDestinations = null,
-    IReadOnlyList<string>? committedDestinations = null,
-    IReadOnlyList<string>? deliveredDestinations = null,
-    IReadOnlyList<string>? uncommittedDestinations = null,
-    IReadOnlyList<string>? publicationDetails = null)
+    HistoryDiagnosticSubject? subject = null,
+    HistoryDiagnosticPublication? publication = null)
 {
     public HistoryDiagnosticKind Kind { get; } = kind;
 
     public string Message { get; } = message;
 
-    public string? ObjectId { get; } = objectId;
+    public string? ObjectId { get; } = subject?.ObjectId;
 
-    public string? Path { get; } = path;
+    public string? Path { get; } = subject?.Path;
 
-    public int? SpanStart { get; } = spanStart;
+    public int? SpanStart { get; } = subject?.SpanStart;
 
-    public int? SpanEnd { get; } = spanEnd;
+    public int? SpanEnd { get; } = subject?.SpanEnd;
 
-    public string? PublicationStatus { get; } = publicationStatus;
+    public string? PublicationStatus { get; } = publication?.Status;
 
-    public bool PublicationCancelled { get; } = publicationCancelled;
+    public bool PublicationCancelled { get; } = publication?.Cancelled ?? false;
 
-    public IReadOnlyList<string> FailedDestinations { get; } = failedDestinations ?? Array.Empty<string>();
+    public IReadOnlyList<string> FailedDestinations { get; } = publication?.FailedDestinations ?? Array.Empty<string>();
 
-    public IReadOnlyList<string> CommittedDestinations { get; } = committedDestinations ?? Array.Empty<string>();
+    public IReadOnlyList<string> CommittedDestinations { get; } = publication?.CommittedDestinations ?? Array.Empty<string>();
 
-    public IReadOnlyList<string> DeliveredDestinations { get; } = deliveredDestinations ?? Array.Empty<string>();
+    public IReadOnlyList<string> DeliveredDestinations { get; } = publication?.DeliveredDestinations ?? Array.Empty<string>();
 
-    public IReadOnlyList<string> UncommittedDestinations { get; } = uncommittedDestinations ?? Array.Empty<string>();
+    public IReadOnlyList<string> UncommittedDestinations { get; } = publication?.UncommittedDestinations ?? Array.Empty<string>();
 
-    public IReadOnlyList<string> PublicationDetails { get; } = publicationDetails ?? Array.Empty<string>();
+    public IReadOnlyList<string> PublicationDetails { get; } = publication?.Details ?? Array.Empty<string>();
 
     public string KindText => Kind switch
     {
@@ -65,4 +56,30 @@ internal sealed class HistoryDiagnostic(
         HistoryDiagnosticKind.AnalysisCancelled => "analysis_cancelled",
         _ => "unknown",
     };
+}
+
+internal sealed record HistoryDiagnosticSubject(
+    string? ObjectId = null,
+    string? Path = null,
+    int? SpanStart = null,
+    int? SpanEnd = null);
+
+internal sealed record HistoryDiagnosticPublication(
+    string? Status = null,
+    bool Cancelled = false,
+    IReadOnlyList<string>? FailedDestinations = null,
+    IReadOnlyList<string>? CommittedDestinations = null,
+    IReadOnlyList<string>? DeliveredDestinations = null,
+    IReadOnlyList<string>? UncommittedDestinations = null,
+    IReadOnlyList<string>? Details = null)
+{
+    public IReadOnlyList<string> FailedDestinations { get; } = FailedDestinations ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> CommittedDestinations { get; } = CommittedDestinations ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> DeliveredDestinations { get; } = DeliveredDestinations ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> UncommittedDestinations { get; } = UncommittedDestinations ?? Array.Empty<string>();
+
+    public IReadOnlyList<string> Details { get; } = Details ?? Array.Empty<string>();
 }

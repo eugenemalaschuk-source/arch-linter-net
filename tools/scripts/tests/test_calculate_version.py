@@ -213,57 +213,64 @@ class TestMainCLI(unittest.TestCase):
 
     def test_override_produces_version(self):
         test_args = ["prog", "--version-override", "v0.2.0-rc.1"]
-        with patch.object(sys, "argv", test_args):
-            with patch("sys.stdout", new_callable=StringIO) as out:
-                main()
-                self.assertEqual("0.2.0-rc.1\n", out.getvalue())
+        with (
+            patch.object(sys, "argv", test_args),
+            patch("sys.stdout", new_callable=StringIO) as out,
+        ):
+            main()
+            self.assertEqual("0.2.0-rc.1\n", out.getvalue())
 
     def test_override_rejects_invalid(self):
         test_args = ["prog", "--version-override", "not-a-version"]
-        with patch.object(sys, "argv", test_args):
-            with patch("sys.stderr", new_callable=StringIO) as err:
-                with self.assertRaises(SystemExit) as ctx:
-                    main()
-                self.assertEqual(1, ctx.exception.code)
-                self.assertIn("not a valid SemVer", err.getvalue())
+        with (
+            patch.object(sys, "argv", test_args),
+            patch("sys.stderr", new_callable=StringIO) as err,
+            self.assertRaises(SystemExit) as ctx,
+        ):
+            main()
+        self.assertEqual(1, ctx.exception.code)
+        self.assertIn("not a valid SemVer", err.getvalue())
 
     def test_no_tag_no_override_release_type_required(self):
         test_args = ["prog", "--release-type", "preview"]
-        with patch.object(sys, "argv", test_args):
-            with (
-                patch(
-                    "calculate_version.detect_latest_tag",
-                    return_value=None,
-                ),
-                patch("sys.stderr", new_callable=StringIO) as err,
-            ):
-                with self.assertRaises(SystemExit) as ctx:
-                    main()
-                self.assertEqual(1, ctx.exception.code)
-                self.assertIn("No valid SemVer tag found", err.getvalue())
+        with (
+            patch.object(sys, "argv", test_args),
+            patch("calculate_version.detect_latest_tag", return_value=None),
+            patch("sys.stderr", new_callable=StringIO) as err,
+            self.assertRaises(SystemExit) as ctx,
+        ):
+            main()
+        self.assertEqual(1, ctx.exception.code)
+        self.assertIn("No valid SemVer tag found", err.getvalue())
 
     def test_no_release_type_no_override_prints_help(self):
         test_args = ["prog"]
-        with patch.object(sys, "argv", test_args):
-            with patch("sys.stderr", new_callable=StringIO) as err:
-                with self.assertRaises(SystemExit) as ctx:
-                    main()
-                self.assertEqual(1, ctx.exception.code)
-                self.assertIn("required when", err.getvalue())
+        with (
+            patch.object(sys, "argv", test_args),
+            patch("sys.stderr", new_callable=StringIO) as err,
+            self.assertRaises(SystemExit) as ctx,
+        ):
+            main()
+        self.assertEqual(1, ctx.exception.code)
+        self.assertIn("required when", err.getvalue())
 
     def test_v_prefix_stripped_from_output(self):
         test_args = ["prog", "--version-override", "v0.1.0-preview.1"]
-        with patch.object(sys, "argv", test_args):
-            with patch("sys.stdout", new_callable=StringIO) as out:
-                main()
-                self.assertEqual("0.1.0-preview.1\n", out.getvalue())
+        with (
+            patch.object(sys, "argv", test_args),
+            patch("sys.stdout", new_callable=StringIO) as out,
+        ):
+            main()
+            self.assertEqual("0.1.0-preview.1\n", out.getvalue())
 
     def test_stable_override_accepted(self):
         test_args = ["prog", "--version-override", "1.0.0"]
-        with patch.object(sys, "argv", test_args):
-            with patch("sys.stdout", new_callable=StringIO) as out:
-                main()
-                self.assertEqual("1.0.0\n", out.getvalue())
+        with (
+            patch.object(sys, "argv", test_args),
+            patch("sys.stdout", new_callable=StringIO) as out,
+        ):
+            main()
+            self.assertEqual("1.0.0\n", out.getvalue())
 
 
 class TestDetectLatestTag(unittest.TestCase):
@@ -363,16 +370,13 @@ class TestGithubEnv(unittest.TestCase):
 
         try:
             test_args = ["prog"] + args + ["--github-env", env_path]
-            with patch.object(sys, "argv", test_args):
-                with (
-                    patch(
-                        "calculate_version.detect_latest_detected_tag",
-                        return_value=detected,
-                    ),
-                    patch("sys.stdout", new_callable=StringIO) as out,
-                ):
-                    main()
-                    stdout = out.getvalue()
+            with (
+                patch.object(sys, "argv", test_args),
+                patch("calculate_version.detect_latest_detected_tag", return_value=detected),
+                patch("sys.stdout", new_callable=StringIO) as out,
+            ):
+                main()
+                stdout = out.getvalue()
 
             with open(env_path) as f:
                 content = f.read()

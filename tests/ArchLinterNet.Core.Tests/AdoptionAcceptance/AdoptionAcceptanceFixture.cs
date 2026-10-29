@@ -47,8 +47,8 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
     public void Build(
         string? configuration = null,
         string? targetFramework = null,
-        CancellationToken cancellationToken = default,
-        int timeoutMilliseconds = 300_000)
+        int timeoutMilliseconds = 300_000,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         string buildTarget = Directory.GetFiles(Root, "*.slnx", SearchOption.TopDirectoryOnly).SingleOrDefault()

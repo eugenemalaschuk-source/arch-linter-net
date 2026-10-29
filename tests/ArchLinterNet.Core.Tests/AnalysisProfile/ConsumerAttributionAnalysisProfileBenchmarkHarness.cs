@@ -150,7 +150,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         if (dispatchMode == "bounded-parallel")
         {
             Task<ProcessSample>[] tasks = Enumerable.Range(0, processCount)
-                .Select(_ => RunProcessAsync(fixture, cancellationToken, ensureBuilt))
+                .Select(_ => RunProcessAsync(fixture, ensureBuilt, cancellationToken))
                 .ToArray();
             processes = await Task.WhenAll(tasks);
         }
@@ -159,7 +159,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             List<ProcessSample> samples = new(processCount);
             for (int index = 0; index < processCount; index++)
             {
-                samples.Add(await RunProcessAsync(fixture, cancellationToken, ensureBuilt));
+                samples.Add(await RunProcessAsync(fixture, ensureBuilt, cancellationToken));
             }
 
             processes = samples;
@@ -188,7 +188,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     }
 
     private static async Task<ProcessSample> RunProcessAsync(
-        AdoptionAcceptanceFixture fixture, CancellationToken cancellationToken, bool ensureBuilt)
+        AdoptionAcceptanceFixture fixture, bool ensureBuilt, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         string profilePath = Path.Combine(Path.GetTempPath(), $"arch-linter-profile-461-{Guid.NewGuid():N}.json");

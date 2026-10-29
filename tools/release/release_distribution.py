@@ -443,20 +443,22 @@ def _member_records(source_root: Path, inventory: dict[str, Any], source_commit:
 
 def _archive_bytes(records: list[dict[str, Any]]) -> bytes:
     output = io.BytesIO()
-    with gzip.GzipFile(fileobj=output, mode="wb", filename="", mtime=0, compresslevel=9) as compressed:
-        with tarfile.open(fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT) as archive:
-            for record in sorted(records, key=lambda value: value["file"]):
-                info = tarfile.TarInfo(record["file"])
-                info.size = record["size"]
-                info.mtime = 0
-                info.uid = 0
-                info.gid = 0
-                info.uname = ""
-                info.gname = ""
-                info.mode = 0o644
-                info.type = tarfile.REGTYPE
-                info.pax_headers = {}
-                archive.addfile(info, io.BytesIO(record["_contents"]))
+    with (
+        gzip.GzipFile(fileobj=output, mode="wb", filename="", mtime=0, compresslevel=9) as compressed,
+        tarfile.open(fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT) as archive,
+    ):
+        for record in sorted(records, key=lambda value: value["file"]):
+            info = tarfile.TarInfo(record["file"])
+            info.size = record["size"]
+            info.mtime = 0
+            info.uid = 0
+            info.gid = 0
+            info.uname = ""
+            info.gname = ""
+            info.mode = 0o644
+            info.type = tarfile.REGTYPE
+            info.pax_headers = {}
+            archive.addfile(info, io.BytesIO(record["_contents"]))
     return output.getvalue()
 
 
@@ -773,30 +775,32 @@ def _regular_transport_files(transport_dir: Path, expected: set[str]) -> None:
 def _verify_archive(contents: bytes, expected_members: list[dict[str, Any]]) -> None:
     expected = {member["file"]: member for member in expected_members}
     try:
-        with gzip.GzipFile(fileobj=io.BytesIO(contents), mode="rb") as compressed:
-            with tarfile.open(fileobj=compressed, mode="r", format=tarfile.USTAR_FORMAT) as archive:
-                observed = archive.getmembers()
-                if len(observed) != len(expected) or {member.name for member in observed} != set(expected):
-                    raise ValueError("Relay archive member inventory differs from the reviewed allowlist.")
-                for member in observed:
-                    _safe_archive_path(member.name, "archive member filename")
-                    if not member.isreg() or member.issym() or member.islnk():
-                        raise ValueError(f"Relay archive member '{member.name}' is not a regular file.")
-                    if (
-                        member.mtime != 0
-                        or member.uid != 0
-                        or member.gid != 0
-                        or member.mode != 0o644
-                        or member.uname
-                        or member.gname
-                        or member.pax_headers
-                    ):
-                        raise ValueError(f"Relay archive member '{member.name}' has non-deterministic metadata.")
-                    extracted = archive.extractfile(member)
-                    data = extracted.read() if extracted is not None else b""
-                    record = expected[member.name]
-                    if len(data) != record["size"] or _sha256_bytes(data) != record["sha256"]:
-                        raise ValueError(f"Relay archive member digest mismatch: {member.name}")
+        with (
+            gzip.GzipFile(fileobj=io.BytesIO(contents), mode="rb") as compressed,
+            tarfile.open(fileobj=compressed, mode="r", format=tarfile.USTAR_FORMAT) as archive,
+        ):
+            observed = archive.getmembers()
+            if len(observed) != len(expected) or {member.name for member in observed} != set(expected):
+                raise ValueError("Relay archive member inventory differs from the reviewed allowlist.")
+            for member in observed:
+                _safe_archive_path(member.name, "archive member filename")
+                if not member.isreg() or member.issym() or member.islnk():
+                    raise ValueError(f"Relay archive member '{member.name}' is not a regular file.")
+                if (
+                    member.mtime != 0
+                    or member.uid != 0
+                    or member.gid != 0
+                    or member.mode != 0o644
+                    or member.uname
+                    or member.gname
+                    or member.pax_headers
+                ):
+                    raise ValueError(f"Relay archive member '{member.name}' has non-deterministic metadata.")
+                extracted = archive.extractfile(member)
+                data = extracted.read() if extracted is not None else b""
+                record = expected[member.name]
+                if len(data) != record["size"] or _sha256_bytes(data) != record["sha256"]:
+                    raise ValueError(f"Relay archive member digest mismatch: {member.name}")
     except (OSError, EOFError, tarfile.TarError) as error:
         raise ValueError(f"Relay archive is invalid: {error}") from error
 

@@ -55,6 +55,7 @@
           { "context": "Workflow Quality" },
           { "context": "Repository Lint" },
           { "context": "Coverage + Sonar" },
+          { "context": "qodana" },
           { "context": "Architecture Coverage" },
           { "context": "Tooling / Support Tests" },
           { "context": "Unit Test Suite (Windows / Core Shard 1)" },

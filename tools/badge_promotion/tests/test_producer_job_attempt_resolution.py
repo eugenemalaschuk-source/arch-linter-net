@@ -293,6 +293,7 @@ def test_incomplete_ambiguous_or_contradictory_history_fails_closed(
 
 def test_invalid_or_unapproved_check_job_url_fails_before_provider_lookup() -> None:
     api = FakeApi({})
+    api_client = cast(cli.GitHubApi, api)
     config = _config()
     for details_url in (
         "https://github.com/owner/repo/actions/runs/7001",
@@ -302,7 +303,7 @@ def test_invalid_or_unapproved_check_job_url_fails_before_provider_lookup() -> N
     ):
         with pytest.raises(ProviderFailure, match="producer_run_unresolved"):
             cli._producer_run(
-                cast(cli.GitHubApi, api),
+                api_client,
                 _REPOSITORY,
                 _HEAD_SHA,
                 config,
@@ -355,7 +356,7 @@ def test_job_history_paginates_before_proving_unique_selected_job() -> None:
 def test_inconsistent_history_page_counts_fail_closed() -> None:
     selected = _job(8001, 1)
     history = [selected, *[_job(9000 + index, 1, name=f"Other {index}") for index in range(100)]]
-    _, _, history_path = _paths()
+    _, _, _ = _paths()
     api = _api(
         selected_job=selected,
         history=history,

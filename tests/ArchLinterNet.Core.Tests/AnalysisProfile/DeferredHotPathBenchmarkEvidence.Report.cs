@@ -138,7 +138,7 @@ internal static class DeferredHotPathBenchmarkMarkdown
                     .Append(measurement.ObservedCounterValue?.ToString(CultureInfo.InvariantCulture) ?? "unavailable")
                     .Append(" | ")
                     .Append(measurement.DominantPhase ?? "unavailable")
-                    .Append(" ")
+                    .Append(' ')
                     .Append(measurement.DominantPhaseMilliseconds?.ToString("F1", CultureInfo.InvariantCulture) ?? "n/a")
                     .Append(" ms | ")
                     .Append(measurement.SelectorPhaseElapsedMilliseconds?.ToString("F3", CultureInfo.InvariantCulture) ?? "unavailable")

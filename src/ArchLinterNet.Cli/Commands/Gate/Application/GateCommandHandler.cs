@@ -100,16 +100,18 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            AnalysisProfileCompletionStatus completionStatus = outcome.Succeeded switch
+            {
+                false => AnalysisProfileCompletionStatus.PreparationFailure,
+                true when outcome.Passed => AnalysisProfileCompletionStatus.Success,
+                _ => AnalysisProfileCompletionStatus.ValidationFailure,
+            };
             AnalysisProfilePublisher.Write(
                 options.ProfileDestination,
                 console,
                 fileSystem,
                 counters,
-                !outcome.Succeeded
-                    ? AnalysisProfileCompletionStatus.PreparationFailure
-                    : outcome.Passed
-                        ? AnalysisProfileCompletionStatus.Success
-                        : AnalysisProfileCompletionStatus.ValidationFailure,
+                completionStatus,
                 profileTrustedInputs);
             if (!outcome.Succeeded)
             {

@@ -66,7 +66,42 @@ internal sealed class HumanReportRenderer
     private void AppendSectionSet(
         StringBuilder sb, ValidationOutcome outcome, CancellationToken cancellationToken)
     {
+        if (!AppendPreflightSection(sb, outcome, cancellationToken))
+        {
+            return;
+        }
+
+        AppendMainValidationSections(sb, outcome, cancellationToken);
+        AppendAssessmentSections(sb, outcome, cancellationToken);
+        AppendPolicySections(sb, outcome, cancellationToken);
+        AppendClassificationSection(sb, outcome);
+    }
+
+    private string FormatPreflight(ValidationOutcome outcome)
+    {
+        if (outcome.PreflightDiagnostics.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        string text = _runtime.FormatBuildStatePreflightForHumans(outcome.PreflightDiagnostics);
+        return string.IsNullOrEmpty(text) ? string.Empty : $"\n{text}";
+    }
+
+    private bool AppendPreflightSection(
+        StringBuilder sb, ValidationOutcome outcome, CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
+        if (outcome.PreflightBlocked)
+        {
+            string blocked = FormatPreflight(outcome);
+            if (!string.IsNullOrEmpty(blocked))
+            {
+                sb.AppendLine(blocked);
+            }
+
+            return false;
+        }
 
         string preflight = FormatPreflight(outcome);
         if (!string.IsNullOrEmpty(preflight))
@@ -74,11 +109,13 @@ internal sealed class HumanReportRenderer
             sb.AppendLine(preflight);
         }
 
-        if (outcome.PreflightBlocked)
-        {
-            return;
-        }
+        return true;
+    }
 
+    private void AppendMainValidationSections(
+        StringBuilder sb, ValidationOutcome outcome, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         AppendSection(sb, outcome.RepositoryMetrics is not null,
             () => FormatRepositoryMetrics(outcome.RepositoryMetrics!));
 
@@ -99,7 +136,11 @@ internal sealed class HumanReportRenderer
                 sb.AppendLine(_runtime.FormatCyclesForHumans(outcome.Cycles, outcome.CycleFindings));
             }
         }
+    }
 
+    private void AppendAssessmentSections(
+        StringBuilder sb, ValidationOutcome outcome, CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         if (outcome.ImportedDiagnosticFindings.Count > 0)
         {
@@ -115,7 +156,11 @@ internal sealed class HumanReportRenderer
         {
             sb.AppendLine(assessmentCompletion);
         }
+    }
 
+    private void AppendPolicySections(
+        StringBuilder sb, ValidationOutcome outcome, CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         AppendSection(sb, outcome.PolicyConsistencyConfig != "off" && outcome.PolicyConsistencyFindings.Count > 0,
             () => _runtime.FormatPolicyConsistencyForHumans(outcome.PolicyConsistencyFindings));
@@ -135,6 +180,10 @@ internal sealed class HumanReportRenderer
         AppendSection(sb, outcome.CoverageSummaries.Count > 0,
             () => _runtime.FormatCoverageSummaryForHumans(outcome.CoverageSummaries));
         cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private void AppendClassificationSection(StringBuilder sb, ValidationOutcome outcome)
+    {
         bool hasClassificationFindings = outcome.ClassificationConflicts.Count > 0
             || outcome.ClassificationMetadataFailures.Count > 0
             || outcome.ClassificationPathDeferred != null
@@ -153,17 +202,6 @@ internal sealed class HumanReportRenderer
 
             return classificationText;
         });
-    }
-
-    private string FormatPreflight(ValidationOutcome outcome)
-    {
-        if (outcome.PreflightDiagnostics.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        string text = _runtime.FormatBuildStatePreflightForHumans(outcome.PreflightDiagnostics);
-        return string.IsNullOrEmpty(text) ? string.Empty : $"\n{text}";
     }
 
     private static string FormatCanonicalAnnotationDiagnostics(

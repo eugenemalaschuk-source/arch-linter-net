@@ -374,11 +374,6 @@ internal sealed class ArchitectureSemanticCoverageService
                 && !ArchitectureContextSelectorMatcher.MatchesLiteral(
                     selector, targetType, owner.RoleIndex, sourceDescriptor: null))
             {
-                int nextSourceIndex = _matchingSourceIndexes.Count;
-                while (GetMatchingSourceAt(nextSourceIndex++) != null)
-                {
-                }
-
                 return false;
             }
 

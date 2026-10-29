@@ -160,7 +160,7 @@ def test_valid_artifact_returns_exact_canonical_bytes() -> None:
 
 def test_valid_artifact_after_temporal_refresh_keeps_original_manifest_horizon() -> None:
     current = evidence()
-    refreshed = replace(
+    refreshed: EvidenceContext = replace(
         current,
         original_semantic_horizon=current.semantic_horizon,
         semantic_horizon=current.semantic_horizon + timedelta(days=1),

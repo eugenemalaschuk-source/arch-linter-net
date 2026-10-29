@@ -18,14 +18,14 @@ internal sealed class HistoryIngestionService(
 
     public HistoryIngestionOutcome Ingest(
         HistoryIngestionRequest request,
-        CancellationToken cancellationToken = default,
-        HistoryIngestionTiming? timing = null)
+        HistoryIngestionTiming? timing = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             timing?.MarkIngestionInvocation();
-            return HistoryIngestionOutcome.Success(Run(request, cancellationToken, timing));
+            return HistoryIngestionOutcome.Success(Run(request, timing, cancellationToken));
         }
         catch (HistoryFailureException exception)
         {
@@ -35,10 +35,10 @@ internal sealed class HistoryIngestionService(
 
     private HistoryIngestionResult Run(
         HistoryIngestionRequest request,
-        CancellationToken cancellationToken,
-        HistoryIngestionTiming? timing)
+        HistoryIngestionTiming? timing,
+        CancellationToken cancellationToken)
     {
-        Stopwatch? ingestionClock = timing?.Start();
+        Stopwatch? ingestionClock = timing is null ? null : HistoryIngestionTiming.Start();
         cancellationToken.ThrowIfCancellationRequested();
         GitRepositoryLayout layout = GitRepositoryLayout.Discover(request.RepositoryPath);
         using GitObjectDatabase objects = new(layout);
@@ -91,7 +91,7 @@ internal sealed class HistoryIngestionService(
         IReadOnlyList<LogicalFile> files = new FileEvidenceBuilder(objects, identity).Build(deltas, components);
         cancellationToken.ThrowIfCancellationRequested();
         timing?.Record("ingestion", ingestionClock);
-        Stopwatch? scoringClock = timing?.Start();
+        Stopwatch? scoringClock = timing is null ? null : HistoryIngestionTiming.Start();
         CoChangeGraph coChangeGraph = new CoChangeGraphBuilder(configuration).Build(files, commits, components);
         cancellationToken.ThrowIfCancellationRequested();
         HistoryBottleneckAnalysis bottleneckAnalysis = HistoryBottleneckScorer.Score(commits, coChangeGraph, configuration);

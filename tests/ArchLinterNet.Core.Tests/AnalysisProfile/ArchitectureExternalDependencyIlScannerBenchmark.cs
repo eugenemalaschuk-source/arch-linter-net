@@ -40,6 +40,12 @@ public sealed class ArchitectureExternalDependencyIlScannerBenchmark
         ArchitectureContractExecutionContext executionContext = new(
             "benchmark", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
 
+        ArchitectureExternalDependencyIlScanner scanner = new();
+        ArchitectureViolation[] representativeViolations = scanner.FindMethodBodyViolations(
+            sourceTypes, "benchmark", groups[0], executionContext).ToArray();
+        Assert.That(representativeViolations, Is.Not.Empty,
+            "The benchmark fixture must exercise at least one external dependency violation.");
+
         Measurement[] uncached = Enumerable.Range(0, SampleCount)
             .Select(_ => Measure(sourceTypes, groups, executionContext))
             .ToArray();

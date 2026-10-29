@@ -130,7 +130,7 @@ public sealed class ArchitectureHealthTestingAdapterTests
             BaselinePath = baselinePath,
             Mode = "strict",
         }, snapshot);
-        ArchitectureChangeSnapshot shared = engine.CreateChangeSnapshot(
+        ArchitectureChangeSnapshot shared = ArchitectureEngine.CreateChangeSnapshot(
             snapshot,
             "strict",
             validation,

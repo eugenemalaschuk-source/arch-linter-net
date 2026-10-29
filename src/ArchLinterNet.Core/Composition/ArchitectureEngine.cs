@@ -185,7 +185,7 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
     /// Projects the canonical change snapshot from validation, graph, and baseline receipts
     /// retained by one immutable candidate analysis session.
     /// </summary>
-    internal ArchitectureChangeSnapshot CreateChangeSnapshot(
+    internal static ArchitectureChangeSnapshot CreateChangeSnapshot(
         ArchitectureAnalysisSnapshot snapshot,
         string mode,
         ValidationOutcome validation,

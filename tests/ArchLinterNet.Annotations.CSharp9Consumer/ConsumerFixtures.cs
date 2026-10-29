@@ -6,6 +6,7 @@ namespace ArchLinterNet.Annotations.CSharp9Consumer
 {
     public sealed class DomainLayerConsumerFixture
     {
+        public string Name { get; } = "Orders";
     }
 
     [AggregateRoot(BoundedContext = "Commerce", Module = "Orders")]

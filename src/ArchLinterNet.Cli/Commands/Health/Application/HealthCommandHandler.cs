@@ -81,65 +81,15 @@ internal sealed class HealthCommandHandler(
             return CliExitCodes.Success;
         }
 
-        if (changeSnapshotOutput is not null && string.IsNullOrWhiteSpace(changeSnapshotOutput))
-        {
-            CliErrorOutputWriter.Write(
-                console,
-                options.Format,
-                "invalid-change-snapshot",
-                "--change-snapshot must name a non-empty file path.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
-            || !TryValidateFormat(options.Format)
-            || !TryValidateExecutionContext(executionContext, options.Format)
-            || !TryValidateExternalEvidenceParseError(externalEvidenceParseError, options.Format)
-            || !BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "health", options.BaselinePath)
-            || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
-            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath ?? string.Empty)
-            || !ArchitectureAnalysisCommandSupport.TryValidateContexts(console, fileSystem, options))
-        {
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        (string Name, string? Path)[] profileDeclaredInputs =
-            AnalysisProfilePublisher.CreateTrustedInputManifest(
-                ArchitectureAnalysisInputPaths.Empty,
-                [
-                    ("--policy", (string?)options.PolicyPath),
-                    ("--baseline", options.BaselinePath),
-                    ("--base-context", options.BaseContextPath),
-                    ("--current-context", options.CurrentContextPath),
-                    ("--public-api-approval", options.PublicApiApprovalPath),
-                    .. (externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
-                        .Select(artifact => ("--external-evidence", (string?)artifact.Path)),
-                ]);
-        if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileDeclaredInputs))
-        {
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (changeSnapshotOutput is not null)
-        {
-            (string Name, string? Path)[] changeInputs =
-            [
-                ("--policy", options.PolicyPath),
-                ("--baseline", options.BaselinePath),
-                ("--base-context", options.BaseContextPath),
-                ("--current-context", options.CurrentContextPath),
-                ("--public-api-approval", options.PublicApiApprovalPath),
-                .. (externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
-                    .Select(artifact => ("--external-evidence", (string?)artifact.Path)),
-            ];
-            string? collision = FindOutputCollision(
+        if (!TryPrepareExecution(
+                options,
+                executionContext,
+                externalEvidenceArtifacts,
+                externalEvidenceParseError,
                 changeSnapshotOutput,
-                changeInputs);
-            if (collision is not null)
-            {
-                console.Error.WriteLine(collision);
-                return CliExitCodes.InvalidArgumentsOrRuntimeError;
-            }
+                out (string Name, string? Path)[] profileDeclaredInputs))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         ValidationTiming? timing = options.ProfileDestination is not null
@@ -188,8 +138,9 @@ internal sealed class HealthCommandHandler(
                     ArchitectureHealthGate.Fail => AnalysisProfileCompletionStatus.ValidationFailure,
                     _ => AnalysisProfileCompletionStatus.PreparationFailure,
                 },
-                timing,
-                timing is null ? null : CaptureMeasurements(allocatedBytesAtStart),
+                new AnalysisProfilePublicationOptions(
+                    timing,
+                    timing is null ? null : CaptureMeasurements(allocatedBytesAtStart)),
                 profileTrustedInputs);
 
             return outcome.Gate switch
@@ -210,6 +161,97 @@ internal sealed class HealthCommandHandler(
             CliErrorOutputWriter.Write(console, options.Format, "architecture-health-error", $"Architecture health error: {exception.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private bool TryPrepareExecution(
+        ArchitectureAnalysisCommandOptions options,
+        string? executionContext,
+        IReadOnlyList<SarifEvidenceArtifactReference>? externalEvidenceArtifacts,
+        string? externalEvidenceParseError,
+        string? changeSnapshotOutput,
+        out (string Name, string? Path)[] profileDeclaredInputs)
+    {
+        profileDeclaredInputs = Array.Empty<(string Name, string? Path)>();
+        if (changeSnapshotOutput is not null && string.IsNullOrWhiteSpace(changeSnapshotOutput))
+        {
+            CliErrorOutputWriter.Write(
+                console, options.Format, "invalid-change-snapshot",
+                "--change-snapshot must name a non-empty file path.");
+            return false;
+        }
+
+        if (!TryValidateRequest(options, executionContext, externalEvidenceParseError))
+        {
+            return false;
+        }
+
+        profileDeclaredInputs = CreateProfileDeclaredInputs(options, externalEvidenceArtifacts);
+        if (!AnalysisProfilePublisher.TryValidateDestination(options.ProfileDestination, console, profileDeclaredInputs))
+        {
+            return false;
+        }
+
+        return TryValidateChangeSnapshotOutput(
+            options, externalEvidenceArtifacts, changeSnapshotOutput);
+    }
+
+    private bool TryValidateRequest(
+        ArchitectureAnalysisCommandOptions options,
+        string? executionContext,
+        string? externalEvidenceParseError) =>
+        BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
+        && TryValidateFormat(options.Format)
+        && TryValidateExecutionContext(executionContext, options.Format)
+        && TryValidateExternalEvidenceParseError(externalEvidenceParseError, options.Format)
+        && BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "health", options.BaselinePath)
+        && BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
+        && BaselineCommandGuards.TryValidateBaselineFile(
+            console, fileSystem, options.Format, options.BaselinePath ?? string.Empty)
+        && ArchitectureAnalysisCommandSupport.TryValidateContexts(console, fileSystem, options);
+
+    private static (string Name, string? Path)[] CreateProfileDeclaredInputs(
+        ArchitectureAnalysisCommandOptions options,
+        IReadOnlyList<SarifEvidenceArtifactReference>? externalEvidenceArtifacts) =>
+        AnalysisProfilePublisher.CreateTrustedInputManifest(
+            ArchitectureAnalysisInputPaths.Empty,
+            [
+                ("--policy", (string?)options.PolicyPath),
+                ("--baseline", options.BaselinePath),
+                ("--base-context", options.BaseContextPath),
+                ("--current-context", options.CurrentContextPath),
+                ("--public-api-approval", options.PublicApiApprovalPath),
+                .. (externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
+                    .Select(artifact => ("--external-evidence", (string?)artifact.Path)),
+            ]);
+
+    private bool TryValidateChangeSnapshotOutput(
+        ArchitectureAnalysisCommandOptions options,
+        IReadOnlyList<SarifEvidenceArtifactReference>? externalEvidenceArtifacts,
+        string? changeSnapshotOutput)
+    {
+        if (changeSnapshotOutput is null)
+        {
+            return true;
+        }
+
+        (string Name, string? Path)[] changeInputs =
+        [
+            ("--policy", options.PolicyPath),
+            ("--baseline", options.BaselinePath),
+            ("--base-context", options.BaseContextPath),
+            ("--current-context", options.CurrentContextPath),
+            ("--public-api-approval", options.PublicApiApprovalPath),
+            .. (externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
+                .Select(artifact => ("--external-evidence", (string?)artifact.Path)),
+        ];
+        string? collision = FindOutputCollision(changeSnapshotOutput, changeInputs);
+        if (collision is null)
+        {
+            return true;
+        }
+
+        console.Error.WriteLine(collision);
+        return false;
     }
 
     internal int ExecuteRevalidatePublication(HealthRevalidatePublicationCommandOptions options) =>

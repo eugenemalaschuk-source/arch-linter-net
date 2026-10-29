@@ -23,6 +23,7 @@ public static class ArchitectureHealthProjector
     private const string WaiverDebt = "waiver_debt";
     private const string PolicyWeakening = "policy_weakening";
     private const string History = "history";
+    private const string StrictMode = "strict";
     private const string TopologyFamily = "declared_topology";
     private const string MetricsFamily = "metrics";
     private const string MetricBudgetsFamily = "metric_budgets";
@@ -130,7 +131,7 @@ public static class ArchitectureHealthProjector
             return Dimension(CurrentEvaluation, ArchitectureHealthDimensionState.Unassessable, "build_state_preflight");
         }
 
-        bool strictFailed = outcomes.Any(outcome => string.Equals(outcome.Mode, "strict", StringComparison.Ordinal)
+        bool strictFailed = outcomes.Any(outcome => string.Equals(outcome.Mode, StrictMode, StringComparison.Ordinal)
             && !outcome.Outcome.Passed);
         return strictFailed
             ? Dimension(CurrentEvaluation, ArchitectureHealthDimensionState.Fail, "strict_validation_failed")
@@ -141,7 +142,7 @@ public static class ArchitectureHealthProjector
         IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes)
     {
         ArchitectureAssessmentCompletionEvidence[] completion = outcomes
-            .Where(outcome => string.Equals(outcome.Mode, "strict", StringComparison.Ordinal))
+            .Where(outcome => string.Equals(outcome.Mode, StrictMode, StringComparison.Ordinal))
             .Select(outcome => outcome.Outcome.AssessmentCompletionEvidence)
             .Where(evidence => evidence is not null)
             .Cast<ArchitectureAssessmentCompletionEvidence>()
@@ -249,10 +250,10 @@ public static class ArchitectureHealthProjector
                 records.SelectMany(record => record.Reasons).Select(reason => Reason(dimensionName, reason)));
         }
 
-        if (findings.Any(finding => string.Equals(finding.AnalysisMode, "strict", StringComparison.Ordinal)))
+        if (findings.Any(finding => string.Equals(finding.AnalysisMode, StrictMode, StringComparison.Ordinal)))
         {
             return Dimension(dimensionName, ArchitectureHealthDimensionState.Fail,
-                findings.Where(finding => string.Equals(finding.AnalysisMode, "strict", StringComparison.Ordinal))
+                findings.Where(finding => string.Equals(finding.AnalysisMode, StrictMode, StringComparison.Ordinal))
                     .Select(finding => finding.Reason));
         }
 

@@ -299,15 +299,7 @@ internal sealed class ArchitectureSourceFileFactTraversal
             return 0;
         }
 
-        int count = 0;
-        foreach (char character in sourceText)
-        {
-            if (character == '\n')
-            {
-                count++;
-            }
-        }
-
+        int count = sourceText.Count(static character => character == '\n');
         return sourceText[^1] == '\n' ? count : count + 1;
     }
 

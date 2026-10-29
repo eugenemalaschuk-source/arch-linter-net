@@ -49,23 +49,31 @@ internal sealed record BenchmarkDimensionSet
     {
         if (ProjectCount < 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(ProjectCount), "A workload must contain at least one project.");
+            throw new ArgumentOutOfRangeException(
+                paramName: null,
+                message: "ProjectCount is invalid: a workload must contain at least one project.");
         }
 
         if (TypesPerProject < 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(TypesPerProject));
+            throw new ArgumentOutOfRangeException(
+                paramName: null,
+                message: "TypesPerProject must contain at least one type.");
         }
 
         if (SourceFilesPerProject < 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(SourceFilesPerProject));
+            throw new ArgumentOutOfRangeException(
+                paramName: null,
+                message: "SourceFilesPerProject must contain at least one source file.");
         }
 
         if (ReferencesPerProject < 0 || LayerCount < 1 || SelectorPredicateTermsPerLayer is < 1 or > 25 ||
             ContractsPerWorkload < 1 || FindingCandidates < 0 || SourceRootCount < 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(BenchmarkDimensionSet), "Workload dimensions cannot be negative and must contain at least one layer, contract, and source root.");
+            throw new ArgumentOutOfRangeException(
+                paramName: null,
+                message: "Workload dimensions cannot be negative and must contain at least one layer, contract, and source root.");
         }
 
         int minimumProjects = shape switch
@@ -76,7 +84,7 @@ internal sealed record BenchmarkDimensionSet
         };
         if (ProjectCount < minimumProjects)
         {
-            throw new ArgumentException($"The {shape} shape requires at least {minimumProjects} projects.", nameof(ProjectCount));
+            throw new ArgumentException($"The {shape} shape requires at least {minimumProjects} projects.");
         }
     }
 }

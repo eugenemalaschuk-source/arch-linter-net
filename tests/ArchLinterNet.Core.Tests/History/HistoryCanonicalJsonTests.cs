@@ -190,12 +190,13 @@ public sealed class HistoryCanonicalJsonTests
         HistoryDiagnostic diagnostic = new(
             HistoryDiagnosticKind.ReportPublicationFailed,
             "History report publication did not complete.",
-            publicationStatus: "partial-output",
-            failedDestinations: new[] { "report.md" },
-            committedDestinations: new[] { "report.json" },
-            deliveredDestinations: new[] { "<stdout>" },
-            uncommittedDestinations: new[] { "report.md" },
-            publicationDetails: new[] { "rename denied" });
+            publication: new HistoryDiagnosticPublication(
+                Status: "partial-output",
+                FailedDestinations: ["report.md"],
+                CommittedDestinations: ["report.json"],
+                DeliveredDestinations: ["<stdout>"],
+                UncommittedDestinations: ["report.md"],
+                Details: ["rename denied"]));
 
         string json = HistoryDiagnosticJsonWriter.Write(diagnostic);
 

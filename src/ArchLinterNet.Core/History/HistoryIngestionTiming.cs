@@ -14,7 +14,7 @@ internal sealed class HistoryIngestionTiming
 
     public void MarkIngestionInvocation() => IngestionInvocationCount++;
 
-    public Stopwatch Start() => Stopwatch.StartNew();
+    public static Stopwatch Start() => Stopwatch.StartNew();
 
     public void Record(string phase, Stopwatch? stopwatch)
     {

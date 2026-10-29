@@ -152,10 +152,11 @@ internal static class RepositoryMetricsCalculator
         List<HashSet<int>> adjacency = projects.Select(_ => new HashSet<int>()).ToList();
         for (int source = 0; source < assemblies.Length; source++)
         {
-            foreach (AssemblyName reference in assemblies[source].GetReferencedAssemblies())
+            foreach (string? referenceName in assemblies[source].GetReferencedAssemblies()
+                .Select(reference => reference.Name))
             {
-                if (reference.Name is not null
-                    && indexByName.TryGetValue(reference.Name, out int target))
+                if (referenceName is not null
+                    && indexByName.TryGetValue(referenceName, out int target))
                 {
                     adjacency[source].Add(target);
                 }
@@ -243,6 +244,28 @@ internal static class RepositoryMetricsCalculator
             return 0;
         }
 
+        ComponentDag dag = BuildComponentDag(graph, scc);
+        return CalculateMaximumDepth(dag);
+    }
+
+    private static ComponentDag BuildComponentDag(ProjectGraph graph, TarjanResult scc)
+    {
+        HashSet<(int Source, int Target)> edges = FindInterComponentEdges(graph, scc);
+        List<HashSet<int>> outgoing = Enumerable.Range(0, scc.Components.Count)
+            .Select(_ => new HashSet<int>())
+            .ToList();
+        int[] incoming = new int[scc.Components.Count];
+        foreach ((int source, int target) in edges)
+        {
+            outgoing[source].Add(target);
+            incoming[target]++;
+        }
+
+        return new ComponentDag(outgoing, incoming);
+    }
+
+    private static HashSet<(int Source, int Target)> FindInterComponentEdges(ProjectGraph graph, TarjanResult scc)
+    {
         HashSet<(int Source, int Target)> edges = [];
         foreach (IReadOnlyList<int> component in scc.Components)
         {
@@ -260,29 +283,24 @@ internal static class RepositoryMetricsCalculator
             }
         }
 
-        List<HashSet<int>> outgoing = Enumerable.Range(0, scc.Components.Count)
-            .Select(_ => new HashSet<int>())
-            .ToList();
-        int[] incoming = new int[scc.Components.Count];
-        foreach ((int source, int target) in edges)
-        {
-            outgoing[source].Add(target);
-            incoming[target]++;
-        }
+        return edges;
+    }
 
-        Queue<int> ready = new(incoming
+    private static int CalculateMaximumDepth(ComponentDag dag)
+    {
+        Queue<int> ready = new(dag.Incoming
             .Select((count, index) => (count, index))
             .Where(item => item.count == 0)
             .Select(item => item.index));
-        int[] depth = new int[scc.Components.Count];
+        int[] depth = new int[dag.Outgoing.Count];
         int maximum = 0;
         while (ready.TryDequeue(out int source))
         {
-            foreach (int target in outgoing[source])
+            foreach (int target in dag.Outgoing[source])
             {
                 depth[target] = Math.Max(depth[target], depth[source] + 1);
                 maximum = Math.Max(maximum, depth[target]);
-                if (--incoming[target] == 0)
+                if (--dag.Incoming[target] == 0)
                 {
                     ready.Enqueue(target);
                 }
@@ -291,6 +309,8 @@ internal static class RepositoryMetricsCalculator
 
         return maximum;
     }
+
+    private sealed record ComponentDag(List<HashSet<int>> Outgoing, int[] Incoming);
 
     private static bool IsPublicType(Type type)
     {

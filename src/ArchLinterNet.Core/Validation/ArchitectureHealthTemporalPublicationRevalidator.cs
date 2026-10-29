@@ -33,6 +33,7 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
     private const string ExpiredWaiver = "expired_waiver";
     private const string InconsistentWaiverReceipt = "inconsistent_waiver_receipt";
     private const string InconsistentEvaluationDate = "inconsistent_evaluation_date";
+    private const string ReadyState = "ready";
     private const string InvalidEvaluationDate = "invalid_evaluation_date";
     private const string MissingExternalEvidenceReceipt = "missing_external_evidence_receipt";
     private const string InvalidExternalEvidence = "invalid_external_evidence";
@@ -170,13 +171,13 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
         }
 
         string state = RequiredString(publication, "state");
-        if (state is not ("ready" or "unassessable"))
+        if (state is not (ReadyState or "unassessable"))
         {
             throw new ArgumentException("The publication-evidence state is unsupported.");
         }
 
         JsonElement horizon = Required(publication, "semantic_horizon");
-        if (state == "ready"
+        if (state == ReadyState
             && (horizon.ValueKind != JsonValueKind.String
                 || !DateTimeOffset.TryParseExact(
                     horizon.GetString(),
@@ -193,7 +194,7 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
         }
 
         JsonElement reasons = Required(publication, "reasons", JsonValueKind.Array);
-        if (state == "ready" && reasons.GetArrayLength() != 0)
+        if (state == ReadyState && reasons.GetArrayLength() != 0)
         {
             throw new ArgumentException("Ready publication evidence must not contain reasons.");
         }
@@ -208,7 +209,7 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
             RequiredString(reason, "detail");
         }
 
-        return state == "ready";
+        return state == ReadyState;
     }
 
     private static void ProcessReceipt(
@@ -244,7 +245,7 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
                 ref sourceEvaluationDate, ref horizon, reasons);
         }
 
-        ProcessExternalEvidence(receipt.Mode, receipt.ExternalEvidence, reasons);
+        ProcessExternalEvidence(receipt.ExternalEvidence, reasons);
     }
 
     private static void ProcessLifecycle(
@@ -349,7 +350,6 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
     }
 
     private static void ProcessExternalEvidence(
-        string mode,
         ArchitecturePrReportExternalEvidence? external,
         List<ArchitectureHealthTemporalPublicationReceiptReason> reasons)
     {
@@ -358,30 +358,31 @@ internal static class ArchitectureHealthTemporalPublicationRevalidator
             return;
         }
 
-        foreach (ArchitecturePrReportExternalRequirement requirement in external.Requirements
+        foreach (string requirementId in external.Requirements
             .Where(item => item.Required)
-            .OrderBy(item => item.Id, StringComparer.Ordinal))
+            .Select(item => item.Id)
+            .OrderBy(id => id, StringComparer.Ordinal))
         {
             ArchitecturePrReportExternalEvidenceTrustReceipt? receipt = external.TrustReceipts
-                .SingleOrDefault(item => string.Equals(item.LogicalId, requirement.Id, StringComparison.Ordinal));
+                .SingleOrDefault(item => string.Equals(item.LogicalId, requirementId, StringComparison.Ordinal));
             if (receipt is null)
             {
                 reasons.Add(new(MissingExternalEvidenceReceipt,
-                    $"Required external evidence '{requirement.Id}' has no trust receipt."));
+                    $"Required external evidence '{requirementId}' has no trust receipt."));
             }
             else if (receipt.State == ArchitecturePrReportExternalEvidenceTrustState.Stale)
             {
                 reasons.Add(new(StaleExternalEvidence,
-                    $"Required external evidence '{requirement.Id}' is stale."));
+                    $"Required external evidence '{requirementId}' is stale."));
             }
             else if (receipt.State != ArchitecturePrReportExternalEvidenceTrustState.Current)
             {
                 reasons.Add(new(InvalidExternalEvidence,
-                    $"Required external evidence '{requirement.Id}' is not current."));
+                    $"Required external evidence '{requirementId}' is not current."));
             }
 
             reasons.Add(new(RequiredExternalEvidenceHorizonUnknown,
-                $"Required external evidence '{requirement.Id}' has no finite reuse horizon."));
+                $"Required external evidence '{requirementId}' has no finite reuse horizon."));
         }
     }
 

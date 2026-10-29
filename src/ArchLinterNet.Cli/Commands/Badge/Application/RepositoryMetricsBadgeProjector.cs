@@ -101,6 +101,20 @@ internal static class RepositoryMetricsBadgeProjector
             suffix = "k";
         }
 
-        return value.ToString(value >= 100 ? "0" : value >= 10 ? "0.0" : "0.00", CultureInfo.InvariantCulture) + suffix;
+        string format;
+        if (value >= 100)
+        {
+            format = "0";
+        }
+        else if (value >= 10)
+        {
+            format = "0.0";
+        }
+        else
+        {
+            format = "0.00";
+        }
+
+        return value.ToString(format, CultureInfo.InvariantCulture) + suffix;
     }
 }

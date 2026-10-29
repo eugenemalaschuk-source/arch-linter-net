@@ -266,11 +266,13 @@ def test_generated_release_notes_render_support_boundary_before_changelog(genera
     run = _step_run("generate-release-notes", "Generate release notes after Checkpoint B")
     # Execute the existing renderer, not a second implementation or a mocked expected string.
     # GitHub's generated body is input; this never calls GitHub or creates a release.
-    match = re.search(r"\| \{\n(?P<body>.*?)\n\s*\} \\", run, re.DOTALL)
-    assert match is not None
+    lines = run.splitlines()
+    body_start = next(index for index, line in enumerate(lines) if line.strip() == "| {") + 1
+    body_end = next(index for index in range(body_start, len(lines)) if lines[index].strip() == "} \\")
+    body = "\n".join(lines[body_start:body_end])
     jq_stub = "jq() { printf '%s\\n' '* #570 — Add reviewed semantic annotation families'; }\n"
     rendered = subprocess.run(
-        [_bash_executable(), "-euo", "pipefail", "-c", jq_stub + textwrap.dedent(match.group("body"))],
+        [_bash_executable(), "-euo", "pipefail", "-c", jq_stub + textwrap.dedent(body)],
         input=generated_notes,
         env={**os.environ, "SCOPE_DECLARATION": "scope.json"},
         capture_output=True, text=True, check=True,

@@ -1,4 +1,4 @@
-"""Tokenless, advisory Qodana runner. Python stdlib only; Docker is required to scan."""
+"""Tokenless, read-only Qodana scanner. Python stdlib only; Docker is required to scan."""
 
 from __future__ import annotations
 
@@ -28,6 +28,22 @@ def configured_image(project: Path) -> str:
         r"(?:@sha256:[0-9a-f]{64})?", declarations[0]
     ):
         raise ValueError("qodana.yaml must declare one version-pinned Community .NET image")
+    return declarations[0]
+
+
+def configured_profile(project: Path) -> str:
+    text = (project / "qodana.yaml").read_text(encoding="utf-8")
+    declarations = re.findall(r"^\s+name:\s*(\S+)\s*$", text, re.MULTILINE)
+    if len(declarations) != 1:
+        raise ValueError("qodana.yaml must declare one named analysis profile")
+    return declarations[0]
+
+
+def configured_solution(project: Path) -> str:
+    text = (project / "qodana.yaml").read_text(encoding="utf-8")
+    declarations = re.findall(r"^\s+solution:\s*(\S+)\s*$", text, re.MULTILINE)
+    if len(declarations) != 1:
+        raise ValueError("qodana.yaml must declare one canonical solution")
     return declarations[0]
 
 
@@ -234,7 +250,10 @@ def scan(project: Path, work: Path, artifacts: Path, image_id: str,
         # A bounded, non-symlink regular file is safe to publish even when it later turns
         # out to describe a failed/partial analysis.
         try:
-            (artifacts / f"{label}.sarif.json").write_bytes(sarif.read_bytes())
+            sarif_bytes = sarif.read_bytes()
+            (artifacts / f"{label}.sarif.json").write_bytes(sarif_bytes)
+            evidence["sarif_sha256"] = hashlib.sha256(sarif_bytes).hexdigest()
+            evidence["sarif_bytes"] = len(sarif_bytes)
         except OSError as error:
             evidence["sarif_copy_error"] = str(error)
     log_errors = copy_bounded_tree(results / "log", artifacts / f"{label}-log",
@@ -289,8 +308,8 @@ def burn_in_passed(scans: list[dict]) -> bool:
 def write_evidence(artifacts: Path, evidence: dict, publish_summary: bool = True) -> None:
     (artifacts / "evidence.json").write_text(
         json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    lines = ["## Qodana Community .NET — advisory", "",
-             "This is not a required gate or a reviewed adoption decision.", "",
+    lines = ["## Qodana Community .NET — scan", "",
+             "Finding-level results are evaluated by the trusted `qodana` gate after this scan completes.", "",
              f"Collection status: **{evidence['status']}**. See `evidence.json` and scan logs.", "",
              "| Scan | Status | Exit | Seconds | Findings | Cache bytes |",
              "| --- | --- | --- | --- | --- | --- |"]
@@ -328,6 +347,10 @@ def main(argv: list[str] | None = None) -> int:
                 "run_id": os.environ.get("GITHUB_RUN_ID"),
                 "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
                 "analyzed_sha": os.environ.get("QODANA_ANALYZED_SHA"),
+                "repository": os.environ.get("GITHUB_REPOSITORY"),
+                "pull_request_number": _optional_positive_int(os.environ.get("QODANA_PULL_REQUEST_NUMBER")),
+                "head_sha": _optional_text(os.environ.get("QODANA_HEAD_SHA")),
+                "base_sha": _optional_text(os.environ.get("QODANA_BASE_SHA")),
                 "event": os.environ.get("GITHUB_EVENT_NAME")}
     started = time.monotonic()
     try:
@@ -337,6 +360,8 @@ def main(argv: list[str] | None = None) -> int:
         evidence["dotnet_sdk_version"] = sdk_version
         image = configured_image(project)
         evidence["configured_image"] = image
+        evidence["configured_profile"] = configured_profile(project)
+        evidence["configured_solution"] = configured_solution(project)
         pull_start = time.monotonic()
         code = command(["docker", "pull", image], artifacts / "image.log", 300)
         evidence["pull_seconds"] = round(time.monotonic() - pull_start, 3)
@@ -380,6 +405,18 @@ def main(argv: list[str] | None = None) -> int:
         write_evidence(artifacts, evidence)
     print(f"Qodana evidence collection: {evidence['status']}; inspect the qodana-evidence artifact.")
     return 0 if evidence["status"] == "completed" else 1
+
+
+def _optional_positive_int(value: str | None) -> int | None:
+    if value is None or value == "":
+        return None
+    if not re.fullmatch(r"[1-9][0-9]*", value):
+        return None
+    return int(value)
+
+
+def _optional_text(value: str | None) -> str | None:
+    return value if value else None
 
 
 if __name__ == "__main__":

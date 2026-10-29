@@ -221,7 +221,8 @@ def test_review_uses_exact_revisions_and_preserves_gate(review_environment, new_
     assert snapshots[0]["revision"] == env["BASE_SHA"]
     assert len(snapshots) == (1 if new_cli == "1" else 2)
     health = [c for c in calls if c["args"][0] == "health"]
-    assert len(health) == 1 and health[0]["revision"] == env["HEAD_SHA"]
+    assert len(health) == 1
+    assert health[0]["revision"] == env["HEAD_SHA"]
     assert ("--change-snapshot" in health[0]["args"]) == (new_cli == "1")
     assert run_git(repo, "worktree", "list", "--porcelain").count("worktree ") == 1
 

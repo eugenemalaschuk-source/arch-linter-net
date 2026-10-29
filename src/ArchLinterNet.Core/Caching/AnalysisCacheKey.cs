@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using ArchLinterNet.Core.BuildState;
@@ -106,6 +107,10 @@ public sealed record AnalysisCacheKey(
     // published 14-value shape alongside the generated 15-value overload introduced by the
     // repository-metrics projection so existing deconstruction source and binary consumers remain
     // compatible.
+    [SuppressMessage(
+        "Major Code Smell",
+        "S107:Methods should not have too many parameters",
+        Justification = "The published 14-value Deconstruct overload preserves source compatibility; changing its shape would break existing consumers.")]
     public void Deconstruct(
         out string PolicyDigest,
         out string Mode,

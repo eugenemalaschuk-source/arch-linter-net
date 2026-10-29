@@ -11,6 +11,7 @@ public static class ArchitecturePrReportReader
 {
     private const string Available = "available";
     private const string Unavailable = "unavailable";
+    private const string RepositoryMetricsKey = "repository_metrics";
     /// <summary>
     /// Parses one architecture-health/v1 artifact and one versioned architecture-change report.
     /// Analysis, policy loading, and lifecycle evaluation are deliberately outside this boundary.
@@ -170,7 +171,7 @@ public static class ArchitecturePrReportReader
         ArchitecturePrReportExternalEvidence? external = element.TryGetProperty("external_evidence", out JsonElement externalElement)
             ? ReadExternalEvidence(externalElement)
             : null;
-        RepositoryMetricsSnapshot? repositoryMetrics = element.TryGetProperty("repository_metrics", out JsonElement metricsElement)
+        RepositoryMetricsSnapshot? repositoryMetrics = element.TryGetProperty(RepositoryMetricsKey, out JsonElement metricsElement)
             ? RepositoryMetricsJson.Deserialize(metricsElement.GetRawText())
             : null;
         JsonElement findings = Required(element, "findings", JsonValueKind.Array);
@@ -242,7 +243,7 @@ public static class ArchitecturePrReportReader
             });
 
         if (!expectedKeys.All(values.ContainsKey)
-            || values.Keys.Any(key => key != "repository_metrics" && !expectedKeys.Contains(key, StringComparer.Ordinal)))
+            || values.Keys.Any(key => key != RepositoryMetricsKey && !expectedKeys.Contains(key, StringComparer.Ordinal)))
         {
             throw InvalidArtifact("The availability map must contain exactly the supported authority keys.");
         }
@@ -254,9 +255,9 @@ public static class ArchitecturePrReportReader
         ValidateAvailabilityValue(values, "topology", hasTopology, Available, "not_configured");
         ValidateAvailabilityValue(values, "external_evidence", external is not null, Available, "not_configured");
         ValidateAvailabilityValue(values, "findings", findings.ValueKind == JsonValueKind.Array, Available, Unavailable);
-        if (values.ContainsKey("repository_metrics"))
+        if (values.ContainsKey(RepositoryMetricsKey))
         {
-            ValidateAvailabilityValue(values, "repository_metrics", repositoryMetrics is not null, Available, Unavailable);
+            ValidateAvailabilityValue(values, RepositoryMetricsKey, repositoryMetrics is not null, Available, Unavailable);
         }
         return values;
     }

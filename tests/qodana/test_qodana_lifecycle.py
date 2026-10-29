@@ -36,7 +36,9 @@ class LifecycleTests(unittest.TestCase):
         self.project = self.root / "repository"
         self.project.mkdir()
         (self.project / "ArchLinterNet.slnx").write_text("<Solution />\n", encoding="utf-8")
-        (self.project / "qodana.yaml").write_text(f"linter: {IMAGE}\n", encoding="utf-8")
+        (self.project / "qodana.yaml").write_text(
+            f"linter: {IMAGE}\nprofile:\n  name: qodana.recommended\n"
+            "dotnet:\n  solution: ArchLinterNet.slnx\n", encoding="utf-8")
         (self.project / "global.json").write_text(
             json.dumps({"sdk": {"version": "10.0.402", "rollForward": "disable"}}),
             encoding="utf-8",
@@ -80,7 +82,7 @@ class LifecycleTests(unittest.TestCase):
         self.command.assert_called_once_with(["docker", "pull", IMAGE], self.output / "artifacts/image.log", 300)
         self.assertEqual(IMAGE_ID, self.scan.call_args.args[3])
 
-    def test_advisory_findings_do_not_turn_successful_scan_into_failure(self):
+    def test_scanner_records_findings_for_the_separate_trusted_gate(self):
         result = completed("cold")
         result.update(findings=10, by_rule={"ExistingDebt": 10})
         self.scan.side_effect = None

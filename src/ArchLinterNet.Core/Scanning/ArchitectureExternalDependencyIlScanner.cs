@@ -412,7 +412,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
             IlRetrievalStatus.Incomplete => MethodTokenScanResult.Incomplete,
             IlRetrievalStatus.Empty => MethodTokenScanResult.Empty,
             IlRetrievalStatus.Ready => ParseMetadataTokens(il!),
-            _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unknown IL retrieval status."),
+            _ => throw new InvalidOperationException($"Unknown IL retrieval status '{status}'."),
         };
         _metricsTokenScans[method] = scan;
         return scan;

@@ -143,11 +143,18 @@ def history_cli_documentation_violations(root: Path) -> list[str]:
 
     source = source_path.read_text(encoding="utf-8")
     documentation = read_text(root, CLI_DOC)
-    section_match = re.search(
-        r"(?ms)^### History analysis options\s*\n(?P<body>.*?)(?=(?:^## )|\Z)",
-        documentation,
-    )
-    section = section_match.group("body") if section_match is not None else ""
+    lines = documentation.splitlines()
+    try:
+        section_start = lines.index("### History analysis options") + 1
+    except ValueError:
+        section = ""
+    else:
+        section_end = next(
+            (index for index in range(section_start, len(lines))
+             if lines[index].startswith("## ")),
+            len(lines),
+        )
+        section = "\n".join(lines[section_start:section_end])
     violations: list[str] = []
 
     for option in ("--format", "--report"):

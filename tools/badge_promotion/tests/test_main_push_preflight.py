@@ -87,8 +87,9 @@ def test_merged_pull_request_fallback_fails_closed_when_merge_commit_matches_mul
         }
     )
 
+    api_client = cast(cli.GitHubApi, api)
     with pytest.raises(ProviderFailure, match="merged_pull_request_ambiguous"):
-        cli._merged_pull_request(cast(cli.GitHubApi, api), repository, main_sha, "main")
+        cli._merged_pull_request(api_client, repository, main_sha, "main")
 
 
 def test_preflight_is_read_only_and_requires_temporal_revalidation(
@@ -166,7 +167,10 @@ def test_preflight_error_does_not_publish_an_unavailable_snapshot(monkeypatch: p
 
     monkeypatch.setattr(cli, "_load_config", lambda _: config)
     monkeypatch.setattr(cli, "GitHubApi", lambda: object())
-    monkeypatch.setattr(cli, "resolve_evidence", lambda *_args, **_kwargs: (_ for _ in ()).throw(ProviderFailure("evidence_unavailable")))
+    def fail_resolve_evidence(*_: object, **__: object) -> object:
+        raise ProviderFailure("evidence_unavailable")
+
+    monkeypatch.setattr(cli, "resolve_evidence", fail_resolve_evidence)
     monkeypatch.setattr(cli, "_publish_raw", fail_publish)
     monkeypatch.setattr(cli, "_handle_failure", fail_publisher_failure_handler)
     monkeypatch.setattr(sys, "argv", ["cli", "--configuration-id", "fixture", "--adapter", "github-raw", "--operation", "preflight"])

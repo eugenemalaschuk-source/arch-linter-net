@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   qodana:
-    name: Qodana Community .NET (advisory)
+    name: Qodana Community .NET (scan)
     runs-on: ubuntu-24.04
     # A normal PR does one bounded scan. Opt-in burn-in adds a warm run and tiny probes.
     timeout-minutes: 55
@@ -30,6 +30,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Install the locked .NET SDK for the scanner container
@@ -59,6 +60,9 @@ jobs:
         run: |
           export QODANA_ANALYZED_SHA
           QODANA_ANALYZED_SHA="$(git rev-parse HEAD)"
+          export QODANA_PULL_REQUEST_NUMBER='${{ github.event.pull_request.number || '' }}'
+          export QODANA_HEAD_SHA='${{ github.event.pull_request.head.sha || '' }}'
+          export QODANA_BASE_SHA='${{ github.event.pull_request.base.sha || '' }}'
           args=()
           if [[ "$BURN_IN" == "true" ]]; then
             args+=(--burn-in)

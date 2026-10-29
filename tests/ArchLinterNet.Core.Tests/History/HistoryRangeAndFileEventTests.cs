@@ -35,7 +35,7 @@ public sealed class HistoryRangeAndFileEventTests
 
         Assert.That(
             () => HistoryIngestionService.Default.Ingest(
-                new HistoryIngestionRequest(repository.Path, commit, commit), cancellation.Token),
+                new HistoryIngestionRequest(repository.Path, commit, commit), cancellationToken: cancellation.Token),
             Throws.TypeOf<OperationCanceledException>());
     }
 
