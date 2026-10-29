@@ -13,8 +13,8 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
         string severity,
         ICollection<ArchitecturePolicyWeakeningFinding> findings)
     {
-        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> baseContracts = ContractMap(baseline, null, "base");
-        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> currentContracts = ContractMap(current, null, "current");
+        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> baseContracts = ContractMap(baseline, null);
+        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> currentContracts = ContractMap(current, null);
         foreach ((string key, ArchitecturePolicyContextContract baseContract) in baseContracts)
         {
             if (!currentContracts.TryGetValue(key, out ArchitecturePolicyContextContract? currentContract)

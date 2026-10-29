@@ -16,8 +16,8 @@ public static class ArchitecturePolicyWeakeningComparer
         ArgumentNullException.ThrowIfNull(request.CurrentContext);
         ArchitecturePolicyWeakeningContextSupport.ValidateComparableContexts(request.BaseContext, request.CurrentContext);
 
-        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> baseStrict = ContractMap(request.BaseContext, "strict", "base");
-        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> currentStrict = ContractMap(request.CurrentContext, "strict", "current");
+        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> baseStrict = ContractMap(request.BaseContext, "strict");
+        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> currentStrict = ContractMap(request.CurrentContext, "strict");
         IReadOnlyDictionary<string, ArchitecturePolicyContextContract> currentAudit = ControlMap(request.CurrentContext, "audit");
         List<ArchitecturePolicyWeakeningFinding> findings = new();
 

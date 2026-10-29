@@ -33,7 +33,6 @@ internal static class ArchitectureAnalysisSnapshotApplicabilityProjector
 
     internal static ArchitectureSnapshotBaselineCandidateReceipt CollectBaselineCandidates(
         ArchitectureContractDocument document,
-        BuildStatePreflightResult preflight,
         string mode,
         IReadOnlyDictionary<string, ValidationOutcome> evaluatedModes,
         IArchitectureContractRunner runner)

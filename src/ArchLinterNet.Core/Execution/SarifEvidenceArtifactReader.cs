@@ -96,7 +96,6 @@ internal sealed class SarifEvidenceArtifactReader
     {
         using MemoryStream buffer = new();
         long bytesRead = 0;
-        bool exceeded;
         try
         {
             if (!IsStillSafe(path))
@@ -105,7 +104,7 @@ internal sealed class SarifEvidenceArtifactReader
             }
 
             using Stream stream = _fileSystem.OpenRepositoryLocalRegularFile(path.RootPath, path.RelativePath);
-            ReadIntoBuffer(stream, buffer, maximumBytes, cancellationToken, out bytesRead, out exceeded);
+            ReadIntoBuffer(stream, buffer, maximumBytes, cancellationToken, out bytesRead, out bool exceeded);
             return CreateReadableOutcome(path.RelativePath, buffer, exceeded, bytesRead);
         }
         catch (FileNotFoundException)

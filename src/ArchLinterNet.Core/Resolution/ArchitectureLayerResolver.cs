@@ -272,14 +272,10 @@ internal static class ArchitectureLayerResolver
             return new ArchitectureNamespaceMatch(false, namespacePattern, null);
         }
 
-        if (!string.IsNullOrEmpty(namespaceSuffix))
+        if (!string.IsNullOrEmpty(namespaceSuffix)
+            && !namespaceName.EndsWith("." + namespaceSuffix, StringComparison.Ordinal))
         {
-            if (!namespaceName.EndsWith("." + namespaceSuffix, StringComparison.Ordinal))
-            {
-                return new ArchitectureNamespaceMatch(false, namespacePattern, null);
-            }
-
-            return new ArchitectureNamespaceMatch(true, namespacePattern, null);
+            return new ArchitectureNamespaceMatch(false, namespacePattern, null);
         }
 
         return new ArchitectureNamespaceMatch(true, namespacePattern, null);

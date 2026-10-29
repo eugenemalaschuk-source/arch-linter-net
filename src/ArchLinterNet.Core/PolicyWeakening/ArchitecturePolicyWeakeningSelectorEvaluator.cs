@@ -11,8 +11,8 @@ internal static class ArchitecturePolicyWeakeningSelectorEvaluator
         ArchitecturePolicyWeakeningRequest request,
         ICollection<ArchitecturePolicyWeakeningFinding> findings)
     {
-        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> baseContracts = ContractMap(request.BaseContext, null, "base");
-        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> currentContracts = ContractMap(request.CurrentContext, null, "current");
+        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> baseContracts = ContractMap(request.BaseContext, null);
+        IReadOnlyDictionary<string, ArchitecturePolicyContextContract> currentContracts = ContractMap(request.CurrentContext, null);
         foreach ((string key, ArchitecturePolicyContextContract baseContract) in baseContracts)
         {
             if (!currentContracts.TryGetValue(key, out ArchitecturePolicyContextContract? currentContract)

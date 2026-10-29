@@ -45,12 +45,11 @@ public sealed class ArchitectureReferenceGraph
 
             foreach (Type directRef in GetReferencedTypes(current))
             {
-                if (visited.Contains(directRef))
+                if (!visited.Add(directRef))
                 {
                     continue;
                 }
 
-                visited.Add(directRef);
                 List<Type> refPath = new(path) { directRef };
                 yield return (directRef, refPath);
 

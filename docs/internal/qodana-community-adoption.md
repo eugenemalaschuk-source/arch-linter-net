@@ -21,6 +21,24 @@ The verdict rules are:
 
 The comment is identified by `<!-- archlinternet-qodana-report -->` and updated in place. It shows the verdict, severity totals, new and remediated findings, rule IDs, source locations, exact head/base identities, scan attempt and artifact link. It lists at most 25 entries per delta and has a hard 60 KB size limit. Untrusted diagnostic text is escaped to one line with mentions neutralized. The compact commit status is published to the scanned PR head under exactly `qodana`.
 
+## Historical finding triage
+
+The head scan in [run 40808531817](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40808531817) recorded 13,245 Moderate findings, 4,203 in `src/`. These counts are a starting point, not a list of approved suppressions. Review findings in context and rescan after each batch: Qodana can change a finding's fingerprint when neighboring lines change, even if its diagnostic line did not.
+
+Examples reviewed during the first batches:
+
+| Finding | Decision and evidence |
+| --- | --- |
+| Unused comparison parameters and intermediate fields | Remove values that no caller reads, after checking their use and preserving the behavior of policy comparisons, schema diagnostics and API-surface checks. |
+| Duplicate checks before inserting into a set or dictionary | Use the collection's insertion result when it preserves traversal order and duplicate handling. |
+| `NotAccessedPositionalProperty.Local` | Review each record's role. The SARIF records in `ArchitecturePolicyWeakeningFormatter` are serialized, and `CoChangePairKey` relies on record equality; their properties are used even without explicit getters. |
+| `OutParameterValueIsAlwaysDiscarded.Global` | Preserve the public `ValidationOutcome.Deconstruct` shape, which external consumers can use even when this repository discards its outputs. |
+| `UnusedType.Global` | Check dynamic discovery. For example, `CapturePublicApiSubcommandModule` is instantiated by `PublicApiSubcommandCatalog` via reflection, and annotation types are shipped to consumers. |
+| `AccessToDisposedClosure` | Inspect lifetime and execution order rather than suppressing the rule. For example, the `JsonDocument` in `BadgeCommandHandlerTests` is used by synchronous `Assert.Multiple` before disposal, while concurrent snapshot calls in `ArchitectureAnalysisSnapshotTests` are awaited before disposal. Other occurrences still need review. |
+| Formatting suggestions such as `ArrangeMethodOrOperatorBody` and `SuggestVarOrType_*` | Prioritize correctness and maintainability changes; avoid mass rewrites made solely to reduce the count. |
+
+Public members, serialization models and interface seams require particular care because Qodana's repository-local usage analysis cannot establish whether external callers, reflection or serializers rely on them.
+
 ## Trust boundary
 
 The scanner checks out the PR head and exact base only in a tokenless, read-only job, and scans the base first with a separate cache. Its evidence artifact is untrusted input to the publisher. The publisher fetches its script from this repository at the default-branch workflow revision; it never checks out or executes the PR head, and it does not trust the artifact's computed verdict. It validates workflow path, repository, run ID and attempt, open PR identity, current head/base, artifact name and contents, both evidence digests, scanner image/profile/solution and SARIF structure, then recomputes the verdict from both raw SARIF reports. PR paths that could alter analysis or suppress findings are treated as governance changes and require separate review.
