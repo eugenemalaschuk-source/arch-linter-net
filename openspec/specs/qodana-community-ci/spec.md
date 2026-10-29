@@ -17,7 +17,7 @@ The repository SHALL run tokenless Qodana Community for .NET against ArchLinterN
 
 #### Scenario: Pull request changes contract tests
 - **WHEN** contract tests from the pull request execute
-- **THEN** they run in a separate job from the scan and cannot alter its evidence
+- **THEN** they finish in a separate job before the scan and cannot alter its evidence
 - **AND** the scan harness isolates its Python imports from the pull request checkout
 
 #### Scenario: Pull request changes Qodana configuration

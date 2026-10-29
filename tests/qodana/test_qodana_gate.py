@@ -299,6 +299,7 @@ class WorkflowContractTests(unittest.TestCase):
         publisher = (ROOT / ".github/workflows/qodana-publisher.yml").read_text()
         self.assertIn("name: Qodana Community .NET (scan)", scanner)
         self.assertIn("name: Qodana evidence and workflow contracts", scanner)
+        self.assertIn("needs: contracts", scanner)
         self.assertIn("python3 -I tools/scripts/qodana_ci.py", scanner)
         self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", scanner)
         self.assertIn("pull_request:", scanner)

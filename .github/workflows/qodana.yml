@@ -35,6 +35,7 @@ jobs:
 
   qodana:
     name: Qodana Community .NET (scan)
+    needs: contracts
     runs-on: ubuntu-24.04
     # A PR compares bounded base/head scans. Opt-in burn-in uses a warm run and tiny probes.
     timeout-minutes: 55
