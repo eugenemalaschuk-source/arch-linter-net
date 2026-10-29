@@ -59,6 +59,10 @@ SUPPRESSION_LINE = re.compile(
     r"#pragma\s+warning\s+disable)",
     re.IGNORECASE,
 )
+SUPPRESSION_RESTORE_LINE = re.compile(
+    r"(?://\s*(?:ReSharper|Qodana)\s+restore\b|#pragma\s+warning\s+restore\b)",
+    re.IGNORECASE,
+)
 SAFE_RULE = re.compile(r"^[A-Za-z0-9_.-]{1,160}$")
 SAFE_SHA = re.compile(r"^[0-9a-f]{40}$")
 SAFE_DIGEST = re.compile(r"[a-f0-9]{64}")
@@ -511,8 +515,10 @@ def _is_protected_scan_path(path: str) -> bool:
             or fnmatch.fnmatch(name, "*.globalconfig")
             or fnmatch.fnmatch(name, "*.ruleset")
             or name.endswith(EDITORCONFIG)
+            or name.endswith(".dotsettings")
             or name in {
                 "global.json", "nuget.config", "packages.lock.json", "qodana.yml", "qodana.yaml",
+                ".gitignore",
             })
 
 
@@ -533,13 +539,15 @@ def _inspect_pr_file(item: dict[str, Any]) -> str | None:
         }:
             raise GateError("Pull request patch is unavailable for inspection-suppression review")
         return None
-    if any(line.startswith("+") and not line.startswith("+++") and SUPPRESSION_LINE.search(line[1:])
-           for line in patch.splitlines()):
-        return f"{path}: added inspection suppression"
+    for line in patch.splitlines():
+        if line.startswith("+") and not line.startswith("+++") and SUPPRESSION_LINE.search(line[1:]):
+            return f"{path}: added inspection suppression"
+        if line.startswith("-") and not line.startswith("---") and SUPPRESSION_RESTORE_LINE.search(line[1:]):
+            return f"{path}: removed inspection restore; suppression scope expands"
     return None
 
 
-def _added_suppressions(files: list[dict[str, Any]]) -> list[str]:
+def _suppression_changes(files: list[dict[str, Any]]) -> list[str]:
     return [change for item in files if (change := _inspect_pr_file(item)) is not None]
 
 
@@ -784,7 +792,7 @@ def _pull_identity(pr: dict[str, Any]) -> tuple[int, str, str]:
 
 
 def _governance_changes(files: list[dict[str, Any]]) -> tuple[list[str], bool, bool]:
-    changes = _added_suppressions(files)
+    changes = _suppression_changes(files)
     baseline_updated = any(
         isinstance(item, dict) and item.get("filename") == BASELINE_PATH for item in files
     )

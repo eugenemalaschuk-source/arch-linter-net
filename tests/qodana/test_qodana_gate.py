@@ -229,23 +229,42 @@ class EvidenceValidationTests(unittest.TestCase):
             with self.assertRaises(gate.GateError):
                 gate._downloaded_reports(root)
 
-    def test_configuration_and_suppression_changes_are_flagged(self):
-        files = [
-            {"filename": "qodana.yaml", "patch": "@@\n+profile: changed"},
-            {"filename": "tools/qodana/baseline.json", "patch": "@@\n+{}"},
-            {"filename": "src/Nested/.editorconfig", "patch": "@@\n+resharper_unused_member_global_highlighting = none"},
-            {"filename": "src/Example.cs", "patch": "@@\n+// ReSharper disable All"},
-        ]
-        self.assertEqual(3, len(gate._added_suppressions(files)))
+    def test_protected_scan_inputs_include_dotsettings_and_gitignore(self):
+        protected_paths = (
+            ".gitignore",
+            "src/Nested/.gitignore",
+            "src/Nested/ArchLinterNet.sln.DotSettings",
+            "src/Nested/other.DOTSETTINGS",
+            "src/Nested/.editorconfig",
+            "src/Nested/Directory.Build.rsp",
+        )
+        for path in protected_paths:
+            with self.subTest(path=path):
+                self.assertTrue(gate._is_protected_scan_path(path))
+
         self.assertFalse(gate._is_protected_scan_path(gate.BASELINE_PATH))
-        self.assertTrue(gate._is_protected_scan_path("src/Nested/.editorconfig"))
-        self.assertTrue(gate._is_protected_scan_path("src/Nested/Directory.Build.rsp"))
-        self.assertEqual([], gate._added_suppressions([
-            {"filename": "src/Example.cs", "patch": "@@\n+public class Example {}"}
-        ]))
-        self.assertEqual([], gate._added_suppressions([
-            {"filename": "src/Example.cs", "patch": "+[SuppressMessage(\"Major Code Smell\", \"S107\", Justification = \"Public API compatibility\")]"}
-        ]))
+        files = [{"filename": path, "patch": "@@\n+changed"} for path in protected_paths]
+        changes, baseline_updated, baseline_mixed = gate._governance_changes(files)
+        self.assertEqual(list(protected_paths), changes)
+        self.assertFalse(baseline_updated)
+        self.assertFalse(baseline_mixed)
+
+    def test_added_suppressions_and_removed_restores_are_flagged(self):
+        files = [
+            {"filename": "src/Example.cs", "patch": "@@\n+// ReSharper disable All"},
+            {"filename": "src/Resharper.cs", "patch": "@@\n-// ReSharper restore All"},
+            {"filename": "src/Compiler.cs", "patch": "@@\n-#pragma warning restore CS0618"},
+            {"filename": "src/Ordinary.cs", "patch": "@@\n+public class Example {}\n-public class OldExample {}"},
+            {"filename": "src/Attribute.cs", "patch": "+[SuppressMessage(\"Major Code Smell\", \"S107\", Justification = \"Public API compatibility\")]"},
+        ]
+        changes, baseline_updated, baseline_mixed = gate._governance_changes(files)
+        self.assertEqual([
+            "src/Example.cs: added inspection suppression",
+            "src/Resharper.cs: removed inspection restore; suppression scope expands",
+            "src/Compiler.cs: removed inspection restore; suppression scope expands",
+        ], changes)
+        self.assertFalse(baseline_updated)
+        self.assertFalse(baseline_mixed)
 
     def test_updated_baseline_must_be_the_exact_scan_inventory(self):
         raw_sarif = sarif([finding()])
