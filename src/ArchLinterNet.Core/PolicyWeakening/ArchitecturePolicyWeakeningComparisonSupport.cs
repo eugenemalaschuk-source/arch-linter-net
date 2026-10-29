@@ -25,7 +25,10 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
         .ToDictionary(ControlKey, _comparer);
 
     internal static IReadOnlyDictionary<string, ArchitecturePolicyContextSourceExpansion> ExpansionMap(
-        ArchitecturePolicyContextExport context) => context.SourceExpansions.ToDictionary(ExpansionKey, _comparer);
+        ArchitecturePolicyContextExport context)
+    {
+        return context.SourceExpansions.ToDictionary(ExpansionKey, _comparer);
+    }
 
     internal static IReadOnlyDictionary<string, ArchitecturePolicyContextContractFact> FactMap(ArchitecturePolicyContextContract contract) => contract.Facts
         .ToDictionary(fact => fact.Name, _comparer);

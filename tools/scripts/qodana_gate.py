@@ -61,6 +61,7 @@ SUPPRESSION_LINE = re.compile(
 )
 SAFE_RULE = re.compile(r"^[A-Za-z0-9_.-]{1,160}$")
 SAFE_SHA = re.compile(r"^[0-9a-f]{40}$")
+SAFE_DIGEST = re.compile(r"[a-f0-9]{64}")
 
 
 class GateError(ValueError):
@@ -319,14 +320,14 @@ def _baseline_finding(row: Any) -> Finding:
     path, line, message = row.get("path"), row.get("line"), row.get("message")
     fingerprint = row.get("fingerprint")
     column, source_line_sha256 = row.get("column"), row.get("source_line_sha256")
-    if (not isinstance(key, str) or not re.fullmatch(r"[a-f0-9]{64}", key)
+    if (not isinstance(key, str) or not SAFE_DIGEST.fullmatch(key)
             or not isinstance(rule, str) or not SAFE_RULE.fullmatch(rule)
             or severity not in {"Critical", "High", "Moderate", "Low", "Info"}
             or not isinstance(path, str) or not isinstance(message, str)
             or (fingerprint is not None and (not isinstance(fingerprint, str)
-                or not re.fullmatch(r"[a-f0-9]{64}", fingerprint)))
+                or not SAFE_DIGEST.fullmatch(fingerprint)))
             or (source_line_sha256 is not None and (not isinstance(source_line_sha256, str)
-                or not re.fullmatch(r"[a-f0-9]{64}", source_line_sha256)))
+                or not SAFE_DIGEST.fullmatch(source_line_sha256)))
             or (column is not None and (type(column) is not int or column < 1))
             or (line is not None and (type(line) is not int or line < 1))):
         raise GateError("Qodana baseline contains an invalid finding")

@@ -174,7 +174,7 @@ internal static class ArchitectureReferenceScanner
                     continue;
                 }
 
-                List<Type> refPath = new(path) { directRef };
+                List<Type> refPath = [.. path, directRef];
                 yield return (directRef, refPath);
 
                 if (traversePredicate == null || traversePredicate(directRef))

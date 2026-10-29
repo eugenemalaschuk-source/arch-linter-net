@@ -1,4 +1,3 @@
-using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Results;

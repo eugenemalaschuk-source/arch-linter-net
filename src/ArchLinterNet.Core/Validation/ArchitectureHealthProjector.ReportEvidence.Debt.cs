@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
