@@ -2,7 +2,7 @@
 
 The active `Main` ruleset (`18790669`) has 15 required status contexts, verified on 2026-10-29. This quality change adds the trusted Qodana publisher context `qodana` to the versioned payload, for a total of 16. The active ruleset is not updated by this repository change: first merge the publisher workflow so GitHub can run the `workflow_run` workflow from the default branch, then apply the payload and verify enforcement.
 
-The payload at [main-ruleset-required-status-checks.json](main-ruleset-required-status-checks.json) preserves the existing `Main` rules and adds only the `qodana` context. After the publisher workflow is present on the default branch, apply it with repository ruleset administration access:
+The payload at [main-ruleset-required-status-checks.json](main-ruleset-required-status-checks.json) records the `Main` rules and adds the `qodana` context, bound to GitHub Actions. After the publisher workflow is present on the default branch, compare the payload with the current live ruleset and reconcile any intervening changes before applying it with repository ruleset administration access:
 
 ```bash
 gh api --method PUT repos/eugenemalaschuk-source/arch-linter-net/rulesets/18790669 \

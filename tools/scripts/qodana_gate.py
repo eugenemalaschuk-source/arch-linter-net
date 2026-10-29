@@ -562,22 +562,22 @@ def _source_sha(pull: dict[str, Any], field: str) -> str | None:
 
 def _source_pull_request_identity(workflow_run: dict[str, Any], number: int,
                                   run_head_sha: str) -> tuple[str | None, str | None]:
+    if not SAFE_SHA.fullmatch(run_head_sha):
+        return None, None
     pull_requests = workflow_run.get("pull_requests")
     if pull_requests is None or pull_requests == []:
         # GitHub can omit PR associations from workflow_run payloads. In that
         # case the run API's head is authoritative; the evidence manifest must
         # still match the live PR base before any successful verdict is posted.
-        return (run_head_sha, None) if SAFE_SHA.fullmatch(run_head_sha) else (None, None)
+        return run_head_sha, None
     if not isinstance(pull_requests, list):
         return None, None
     matches = [item for item in pull_requests if isinstance(item, dict) and item.get("number") == number]
     if len(matches) != 1:
         return None, None
-    pull = matches[0]
-    head_sha, base_sha = _source_sha(pull, "head"), _source_sha(pull, "base")
-    if head_sha is None and run_head_sha and SAFE_SHA.fullmatch(run_head_sha):
-        head_sha = run_head_sha
-    return head_sha, base_sha
+    # The associated PR's head can reflect its current state even for an old
+    # run. Only the verified run SHA identifies the commit that was scanned.
+    return run_head_sha, _source_sha(matches[0], "base")
 
 
 def _fetch_baseline(api: GitHubApi, revision_sha: str) -> bytes:

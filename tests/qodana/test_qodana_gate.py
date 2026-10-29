@@ -213,7 +213,7 @@ class EvidenceValidationTests(unittest.TestCase):
         run = {"pull_requests": [{
             "number": 7, "head": {"sha": HEAD}, "base": {"sha": BASE}
         }]}
-        self.assertEqual((HEAD, BASE), gate._source_pull_request_identity(run, 7, "f" * 40))
+        self.assertEqual(("f" * 40, BASE), gate._source_pull_request_identity(run, 7, "f" * 40))
         self.assertEqual((HEAD, None), gate._source_pull_request_identity(
             {"pull_requests": []}, 7, HEAD
         ))
@@ -314,7 +314,7 @@ class WorkflowContractTests(unittest.TestCase):
         ruleset = json.loads((ROOT / "docs/internal/main-ruleset-required-status-checks.json").read_text())
         checks = next(rule["parameters"]["required_status_checks"]
                       for rule in ruleset["rules"] if rule["type"] == "required_status_checks")
-        self.assertIn({"context": "qodana"}, checks)
+        self.assertIn({"context": "qodana", "integration_id": 15368}, checks)
 
 
 class PublisherIntegrationTests(unittest.TestCase):
@@ -356,7 +356,7 @@ class PublisherIntegrationTests(unittest.TestCase):
             "id": 123,
             "run_attempt": 2,
             "event": "pull_request",
-            "head_sha": "f" * 40,
+            "head_sha": HEAD,
             "conclusion": "success",
             "html_url": "https://github.com/owner/repository/actions/runs/123",
             "pull_requests": [{"number": 7, "head": {"sha": HEAD}, "base": {"sha": BASE}}],
@@ -451,6 +451,9 @@ class PublisherIntegrationTests(unittest.TestCase):
 
     def test_stale_scan_status_is_never_written_to_new_unscanned_head(self):
         self.api.current_head = "c" * 40
+        changed = json.loads(self.event_path.read_text())
+        changed["workflow_run"]["pull_requests"][0]["head"]["sha"] = self.api.current_head
+        self.event_path.write_text(json.dumps(changed))
 
         self.assertEqual(1, gate.publish())
         status_paths = [path for method, path, _ in self.api.calls
@@ -486,7 +489,7 @@ class _FakeGitHubApi:
         if path == "/actions/runs/123":
             return {
                 "id": 123, "run_attempt": 2, "event": "pull_request",
-                "path": gate.EXPECTED_WORKFLOW, "head_sha": "f" * 40,
+                "path": gate.EXPECTED_WORKFLOW, "head_sha": HEAD,
                 "repository": {"full_name": REPOSITORY},
             }
         if path == "/pulls/7":

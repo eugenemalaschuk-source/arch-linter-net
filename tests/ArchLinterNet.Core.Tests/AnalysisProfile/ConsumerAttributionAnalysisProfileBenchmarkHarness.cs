@@ -214,7 +214,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
 
         try
         {
-            Stopwatch wallClock = Stopwatch.StartNew();
+            var wallClock = Stopwatch.StartNew();
             using var process = Process.Start(startInfo)!;
             Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
             Task<string> stderrTask = process.StandardError.ReadToEndAsync(CancellationToken.None);

@@ -14,7 +14,7 @@
     { "type": "non_fast_forward" },
     {
       "type": "code_coverage",
-      "parameters": { "minimum_coverage": 80, "max_coverage_drop": null }
+      "parameters": { "minimum_coverage": 80 }
     },
     {
       "type": "code_quality",
@@ -43,6 +43,7 @@
         "require_code_owner_review": false,
         "require_last_push_approval": false,
         "required_review_thread_resolution": false,
+        "require_extra_approval_for_unattributed_changes": true,
         "allowed_merge_methods": ["squash"]
       }
     },
@@ -52,11 +53,11 @@
         "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          { "context": "Workflow Quality" },
-          { "context": "Repository Lint" },
+          { "context": "Workflow Quality", "integration_id": 15368 },
+          { "context": "Repository Lint", "integration_id": 15368 },
           { "context": "Coverage + Sonar" },
-          { "context": "qodana" },
-          { "context": "Architecture Coverage" },
+          { "context": "qodana", "integration_id": 15368 },
+          { "context": "Architecture Coverage", "integration_id": 15368 },
           { "context": "Tooling / Support Tests" },
           { "context": "Unit Test Suite (Windows / Core Shard 1)" },
           { "context": "Unit Test Suite (Windows / Core Shard 2)" },
