@@ -205,7 +205,7 @@ class EvidenceValidationTests(unittest.TestCase):
             "number": 7, "head": {"sha": HEAD}, "base": {"sha": BASE}
         }]}
         self.assertEqual((HEAD, BASE), gate._source_pull_request_identity(run, 7, "f" * 40))
-        self.assertEqual((None, None), gate._source_pull_request_identity(
+        self.assertEqual((HEAD, None), gate._source_pull_request_identity(
             {"pull_requests": []}, 7, HEAD
         ))
 
