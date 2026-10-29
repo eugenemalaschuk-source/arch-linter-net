@@ -6,7 +6,7 @@ The Qodana scanner uses the free Community .NET image `jetbrains/qodana-cdnet:20
 
 ## Gate policy
 
-The trusted publisher reads `tools/qodana/baseline.json` from the exact pull-request base SHA. The baseline was generated from the successful Community scan of main revision `dbc49a544ab8f39bc635a0628d769704945dfca5` (workflow run [40782711991](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40782711991)). That scan recorded 13,280 diagnostics, all Qodana `Moderate`, with no High or Critical findings. The baseline contains per-finding identities and reviewed policy metadata; it is not a Qodana configuration suppression.
+The scanner analyzes the exact pull-request base and head in separate checkouts and caches. The trusted publisher compares their SARIF reports, so a previously fixed finding cannot be reintroduced simply because an older committed baseline still lists it. Findings first match by exact identity, then by Qodana's fingerprint, rule, path, message and severity; repeated fingerprints are counted separately. The publisher also reads the reviewed policy in `tools/qodana/baseline.json` from the exact base SHA. That historical inventory was generated from main revision `dbc49a544ab8f39bc635a0628d769704945dfca5` (workflow run [40782711991](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40782711991)); it recorded 13,280 Moderate diagnostics and no High or Critical findings. It is not a Qodana configuration suppression.
 
 The verdict rules are:
 
@@ -15,15 +15,15 @@ The verdict rules are:
 - New Low and Info findings are included in the report and remain visible but do not block.
 - Findings removed since the base scan are reported as remediated.
 - A missing, malformed, failed, stale, or identity-mismatched scan fails closed as `UNASSESSABLE`.
-- The baseline and moderate-severity rule policy used for the verdict come from the PR base, so a PR cannot approve its own changes.
-- A baseline refresh must be the only changed path in its PR. The candidate must exactly match the successful SARIF inventory, stamped with the base SHA because the source under analysis is unchanged from that base. The current verdict still uses the base-revision baseline; the refreshed baseline applies only after merge. Mixing a baseline refresh with source or policy changes fails closed.
+- The comparison uses the freshly scanned PR base; the reviewed policy comes from the base revision, so a PR cannot approve its own changes.
+- A baseline refresh must be the only changed path in its PR. The candidate must exactly match the successful base SARIF inventory, stamped with the base SHA because the source under analysis is unchanged from that base. The current verdict compares fresh head and base scans; the refreshed inventory becomes a reviewed record after merge. Mixing a baseline refresh with source or policy changes fails closed.
 - Changes to scanner, profile, suppression, or build inputs are not assessed by the scan they modify. The publisher reports these paths and fails closed. Once `qodana` is required, merging an approved change to those inputs requires an authorized ruleset bypass after a separate trusted review; splitting such a change into another PR does not by itself make the check pass.
 
 The comment is identified by `<!-- archlinternet-qodana-report -->` and updated in place. It shows the verdict, severity totals, new and remediated findings, rule IDs, source locations, exact head/base identities, scan attempt and artifact link. It lists at most 25 entries per delta and has a hard 60 KB size limit. Untrusted diagnostic text is escaped to one line with mentions neutralized. The compact commit status is published to the scanned PR head under exactly `qodana`.
 
 ## Trust boundary
 
-The scanner checks out the PR head only in a tokenless, read-only job. Its evidence artifact is untrusted input to the publisher. The publisher checks out trusted default-branch code only; it never checks out or executes the PR head, and it does not trust the artifact's computed verdict. It validates workflow path, repository, run ID and attempt, open PR identity, current head/base, artifact name and contents, evidence digest, scanner image/profile/solution and SARIF structure, then recomputes the verdict from raw SARIF and the trusted base baseline. PR paths that could alter analysis or suppress findings are treated as governance changes and require separate review.
+The scanner checks out the PR head and exact base only in a tokenless, read-only job, and scans the base first with a separate cache. Its evidence artifact is untrusted input to the publisher. The publisher checks out trusted `main` code only; it never checks out or executes the PR head, and it does not trust the artifact's computed verdict. It validates workflow path, repository, run ID and attempt, open PR identity, current head/base, artifact name and contents, both evidence digests, scanner image/profile/solution and SARIF structure, then recomputes the verdict from both raw SARIF reports. PR paths that could alter analysis or suppress findings are treated as governance changes and require separate review.
 
 These constraints follow GitHub's guidance to avoid running pull-request code in privileged `workflow_run` jobs and to treat artifacts from earlier untrusted workflows as untrusted data ([secure use of GitHub Actions](https://docs.github.com/en/actions/reference/security/secure-use), [workflow events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)).
 
@@ -44,7 +44,7 @@ python3 tools/scripts/qodana_gate.py \
   --output tools/qodana/baseline.json
 ```
 
-Baseline generation refuses High/Critical findings. The differential gate blocks every new Moderate finding and does not use a per-rule allowlist. A baseline refresh PR must change only `tools/qodana/baseline.json`; its candidate is verified against a successful scan of the unchanged base source and stamped with that base SHA. The gate still evaluates the scan against the exact-base baseline, so the update cannot hide new findings in its own PR. The refreshed baseline takes effect for later PRs after merge. Do not add blanket exclusions or unreviewed suppressions.
+Baseline generation refuses High/Critical findings. The differential gate blocks every new Moderate finding and does not use a per-rule allowlist. A baseline refresh PR must change only `tools/qodana/baseline.json`; its candidate is verified against a successful scan of the unchanged base source and stamped with that base SHA. The gate compares fresh base and head reports, so the update cannot hide new findings in its own PR. The refreshed inventory is a reviewed record after merge. Do not add blanket exclusions or unreviewed suppressions.
 
 ## Current Sonar inventory
 

@@ -44,3 +44,7 @@ The ruleset payload and required-check inventory add the trusted `qodana` status
 - **A new maintainability rule can increase the blocking surface.** → Keep the lower-severity blocking set explicit and versioned; leave remaining low-severity findings visible but non-blocking.
 - **The publisher can be delayed or unavailable.** → Treat missing or invalid evidence as failed/unassessable, retain the artifact, and publish a status only for the exact live head.
 - **The trusted publisher cannot run from a PR branch before merge.** → Validate the scanner and verifier contracts in this PR, merge the workflow change through the current required checks, then require `qodana` in the active ruleset as a separate rollout step.
+
+## Post-archive refinement
+
+The implementation now scans both the exact PR base and head using isolated checkouts and caches. The publisher compares those two reports instead of treating the historical committed inventory as the current base scan; otherwise a finding removed after the initial inventory could be reintroduced without detection. The committed inventory remains an audit record and source of reviewed policy. Stable Qodana fingerprints match moved findings within a file, with duplicate counts retained.

@@ -496,7 +496,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("name: Qodana Community .NET (scan)", workflow)
         self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
         self.assertIn("actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68", workflow)
-        self.assertIn("global-json-file: global.json", workflow)
+        self.assertIn("global-json-file: source/global.json", workflow)
         self.assertIn("QODANA_DOTNET_ROOT", workflow)
         for forbidden in (r"secrets[.\[]", r"pull_request_target", r"\bneeds:",
                           r"\b(?:contents|checks|pull-requests|security-events|id-token): write",

@@ -138,7 +138,7 @@ internal sealed class HumanReportRenderer
         }
     }
 
-    private void AppendAssessmentSections(
+    private static void AppendAssessmentSections(
         StringBuilder sb, ValidationOutcome outcome, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

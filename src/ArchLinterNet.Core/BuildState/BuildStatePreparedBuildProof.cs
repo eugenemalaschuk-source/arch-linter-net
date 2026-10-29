@@ -30,10 +30,12 @@ internal static class BuildStatePreparedBuildProof
             .Any(proofPath => MatchesProof(proofPath, request, projectPath, expectedAssemblyPath, proofNonce!));
     }
 
-    private static bool HasUsableProofDirectory(string? proofDirectory, string? proofNonce) =>
-        !string.IsNullOrWhiteSpace(proofDirectory)
-        && !string.IsNullOrWhiteSpace(proofNonce)
-        && Directory.Exists(proofDirectory);
+    private static bool HasUsableProofDirectory(string? proofDirectory, string? proofNonce)
+    {
+        return !string.IsNullOrWhiteSpace(proofDirectory)
+            && !string.IsNullOrWhiteSpace(proofNonce)
+            && Directory.Exists(proofDirectory);
+    }
 
     private static bool MatchesProof(
         string proofPath,
@@ -73,14 +75,18 @@ internal static class BuildStatePreparedBuildProof
         }
     }
 
-    private static bool MatchesRequestedBuildProperties(string[] fields, BuildStatePreflightRequest request) =>
-        MatchesRequestedValue(fields[2], request.RequestedConfiguration)
-        && MatchesRequestedValue(fields[3], request.RequestedTargetFramework)
-        && MatchesRequestedValue(fields[4], request.RequestedPlatform)
-        && MatchesRequestedValue(fields[5], request.RequestedRuntimeIdentifier);
+    private static bool MatchesRequestedBuildProperties(string[] fields, BuildStatePreflightRequest request)
+    {
+        return MatchesRequestedValue(fields[2], request.RequestedConfiguration)
+            && MatchesRequestedValue(fields[3], request.RequestedTargetFramework)
+            && MatchesRequestedValue(fields[4], request.RequestedPlatform)
+            && MatchesRequestedValue(fields[5], request.RequestedRuntimeIdentifier);
+    }
 
-    private static bool MatchesRequestedValue(string actual, string? requested) =>
-        requested is null || string.Equals(actual, requested, StringComparison.OrdinalIgnoreCase);
+    private static bool MatchesRequestedValue(string actual, string? requested)
+    {
+        return requested is null || string.Equals(actual, requested, StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool PathsEqual(string left, string right) =>
         string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);

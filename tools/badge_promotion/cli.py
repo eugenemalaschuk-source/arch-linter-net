@@ -312,6 +312,26 @@ def _associated_merged_pull_request(
     return None
 
 
+def _is_recent_merge_candidate(pull: Any, repository: str, main_sha: str, base_ref: str) -> bool:
+    if not isinstance(pull, dict):
+        return False
+    base = pull.get("base", {})
+    if not isinstance(base, dict):
+        return False
+    base_repository = base.get("repo", {})
+    if not isinstance(base_repository, dict):
+        return False
+    number = pull.get("number")
+    return (
+        base_repository.get("full_name") == repository
+        and base.get("ref") == base_ref
+        and pull.get("merge_commit_sha") == main_sha
+        and isinstance(pull.get("merged_at"), str)
+        and type(number) is int
+        and number > 0
+    )
+
+
 def _find_recent_merged_pull_request(
     api: GitHubApi, repository_path: str, repository: str, main_sha: str, base_ref: str
 ) -> tuple[int, dict[str, Any]]:
@@ -327,19 +347,8 @@ def _find_recent_merged_pull_request(
         if not isinstance(pulls, list):
             raise ProviderFailure("merged_pull_request_ambiguous")
         for pull in pulls:
-            base = pull.get("base", {}) if isinstance(pull, dict) else {}
-            base_repository = base.get("repo", {}) if isinstance(base, dict) else {}
-            number = pull.get("number") if isinstance(pull, dict) else None
-            if (
-                base_repository.get("full_name") == repository
-                and base.get("ref") == base_ref
-                and pull.get("merge_commit_sha") == main_sha
-                and isinstance(pull.get("merged_at"), str)
-                and isinstance(number, int)
-                and not isinstance(number, bool)
-                and number > 0
-            ):
-                matches[number] = pull
+            if _is_recent_merge_candidate(pull, repository, main_sha, base_ref):
+                matches[pull["number"]] = pull
         if len(pulls) < 100 or len(matches) > 1:
             break
 

@@ -198,21 +198,24 @@ internal sealed class HealthCommandHandler(
     private bool TryValidateRequest(
         ArchitectureAnalysisCommandOptions options,
         string? executionContext,
-        string? externalEvidenceParseError) =>
-        BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
-        && TryValidateFormat(options.Format)
-        && TryValidateExecutionContext(executionContext, options.Format)
-        && TryValidateExternalEvidenceParseError(externalEvidenceParseError, options.Format)
-        && BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "health", options.BaselinePath)
-        && BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
-        && BaselineCommandGuards.TryValidateBaselineFile(
-            console, fileSystem, options.Format, options.BaselinePath ?? string.Empty)
-        && ArchitectureAnalysisCommandSupport.TryValidateContexts(console, fileSystem, options);
+        string? externalEvidenceParseError)
+    {
+        return BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
+            && TryValidateFormat(options.Format)
+            && TryValidateExecutionContext(executionContext, options.Format)
+            && TryValidateExternalEvidenceParseError(externalEvidenceParseError, options.Format)
+            && BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "health", options.BaselinePath)
+            && BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
+            && BaselineCommandGuards.TryValidateBaselineFile(
+                console, fileSystem, options.Format, options.BaselinePath ?? string.Empty)
+            && ArchitectureAnalysisCommandSupport.TryValidateContexts(console, fileSystem, options);
+    }
 
     private static (string Name, string? Path)[] CreateProfileDeclaredInputs(
         ArchitectureAnalysisCommandOptions options,
-        IReadOnlyList<SarifEvidenceArtifactReference>? externalEvidenceArtifacts) =>
-        AnalysisProfilePublisher.CreateTrustedInputManifest(
+        IReadOnlyList<SarifEvidenceArtifactReference>? externalEvidenceArtifacts)
+    {
+        return AnalysisProfilePublisher.CreateTrustedInputManifest(
             ArchitectureAnalysisInputPaths.Empty,
             [
                 ("--policy", (string?)options.PolicyPath),
@@ -223,6 +226,7 @@ internal sealed class HealthCommandHandler(
                 .. (externalEvidenceArtifacts ?? Array.Empty<SarifEvidenceArtifactReference>())
                     .Select(artifact => ("--external-evidence", (string?)artifact.Path)),
             ]);
+    }
 
     private bool TryValidateChangeSnapshotOutput(
         ArchitectureAnalysisCommandOptions options,

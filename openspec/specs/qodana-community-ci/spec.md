@@ -7,12 +7,12 @@ Qodana Community .NET quality gate.
 
 ### Requirement: Independent Community quality gate
 
-The repository SHALL run tokenless Qodana Community for .NET against ArchLinterNet.slnx in a separate PR workflow. Its finding-level quality gate SHALL be required independently of the other checks. The scanner SHALL have read-only permissions and no secrets; a trusted reporting step SHALL validate evidence and compare it with the trusted baseline from the exact PR base revision.
+The repository SHALL run tokenless Qodana Community for .NET against ArchLinterNet.slnx in a separate PR workflow. Its finding-level quality gate SHALL be required independently of the other checks. The scanner SHALL have read-only permissions and no secrets; a trusted reporting step SHALL validate evidence and compare the PR head with a fresh scan of its exact base revision.
 
 #### Scenario: Ordinary or fork pull request
 - **WHEN** a pull request is analyzed
 - **THEN** the scan runs on an ephemeral hosted runner without secrets or write permissions
-- **AND** the report is compared to the baseline read from the exact base revision, not the PR head
+- **AND** the head report is compared to a separate scan of the exact base revision
 - **AND** a trusted reporter publishes the validated result and a required status for the exact PR head
 
 #### Scenario: Pull request changes Qodana configuration
@@ -23,7 +23,7 @@ The repository SHALL run tokenless Qodana Community for .NET against ArchLinterN
 #### Scenario: Pull request refreshes the baseline
 - **WHEN** a pull request updates the Qodana baseline
 - **THEN** the baseline is the only changed path and the candidate exactly matches the successful SARIF inventory for the unchanged base source, stamped with the base SHA
-- **AND** the current verdict still uses the baseline from the exact PR base revision, with the candidate baseline taking effect only after merge
+- **AND** the current verdict compares the head to a fresh base scan; the candidate inventory becomes a reviewed record only after merge
 - **AND** a baseline update mixed with source or policy changes fails closed
 
 ### Requirement: Fail-visible bounded evidence collection
@@ -31,7 +31,7 @@ The repository SHALL run tokenless Qodana Community for .NET against ArchLinterN
 Each invocation SHALL be bounded and preserve exit status, duration, image identity, cache size and valid SARIF evidence. New actionable findings SHALL fail the required gate, while lower-severity diagnostics remain visible in the report. Missing, malformed or failed analysis SHALL NOT count as clean.
 
 #### Scenario: New actionable findings
-- **WHEN** validated SARIF contains findings outside the trusted baseline at Moderate, High, or Critical severity
+- **WHEN** the validated head SARIF contains Moderate, High, or Critical findings absent from the fresh base scan
 - **THEN** the required Qodana status fails
 - **AND** the PR report lists finding deltas, severity counts, rule identifiers and source locations
 
@@ -56,7 +56,7 @@ verify a positive and negative inspection probe outside the canonical solution.
 
 ### Requirement: Reviewed promotion
 
-The required Qodana gate SHALL use a reviewed differential policy and a baseline bound to the exact PR base revision. Baseline changes, rule severity changes and suppressions SHALL only take effect for subsequent pull requests after review and SHALL NOT hide findings introduced by the pull request that changes them.
+The required Qodana gate SHALL use a reviewed differential policy from the exact PR base revision and a fresh scan of that base. Baseline changes, rule severity changes and suppressions SHALL only take effect for subsequent pull requests after review and SHALL NOT hide findings introduced by the pull request that changes them.
 
 #### Scenario: Insufficient or invalid gate evidence
 - **WHEN** runtime, reliability, findings or evidence-integrity checks are incomplete
@@ -64,8 +64,8 @@ The required Qodana gate SHALL use a reviewed differential policy and a baseline
 
 #### Scenario: Baseline or rule-policy change in a pull request
 - **WHEN** a pull request updates the baseline, scanner configuration or severity policy
-- **THEN** the gate still evaluates it against the baseline and policy from its trusted base revision
-- **AND** a baseline update is accepted only in a baseline-only PR when it exactly matches the scan of unchanged base source, and is used only for later pull requests
+- **THEN** the gate evaluates it against the freshly scanned base and policy from its trusted base revision
+- **AND** a baseline update is accepted only in a baseline-only PR when it exactly matches the scan of unchanged base source, and becomes a reviewed inventory only after merge
 
 #### Scenario: Insufficient burn-in evidence
 - **WHEN** an opt-in lifecycle run lacks a successful cold/warm comparison or positive and negative inspection probes

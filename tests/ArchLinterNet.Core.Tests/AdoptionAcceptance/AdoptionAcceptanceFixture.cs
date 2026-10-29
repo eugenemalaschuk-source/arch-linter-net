@@ -79,8 +79,8 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
         }
 
         using Process process = Process.Start(startInfo)!;
-        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
-        Task<string> errorTask = process.StandardError.ReadToEndAsync();
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        Task<string> errorTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
         using CancellationTokenSource timeoutSource = new(TimeSpan.FromMilliseconds(timeoutMilliseconds));
         using CancellationTokenSource linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, timeoutSource.Token);

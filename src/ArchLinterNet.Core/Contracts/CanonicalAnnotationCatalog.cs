@@ -275,13 +275,13 @@ internal sealed class CanonicalAnnotationCatalog
             return string.CompareOrdinal(left, right);
         }
 
-        public static bool operator <(SemanticVersion left, SemanticVersion right) => left.CompareTo(right) < 0;
+        public static bool operator <(SemanticVersion left, SemanticVersion right) { return left.CompareTo(right) < 0; }
 
-        public static bool operator <=(SemanticVersion left, SemanticVersion right) => left.CompareTo(right) <= 0;
+        public static bool operator <=(SemanticVersion left, SemanticVersion right) { return left.CompareTo(right) <= 0; }
 
-        public static bool operator >(SemanticVersion left, SemanticVersion right) => left.CompareTo(right) > 0;
+        public static bool operator >(SemanticVersion left, SemanticVersion right) { return left.CompareTo(right) > 0; }
 
-        public static bool operator >=(SemanticVersion left, SemanticVersion right) => left.CompareTo(right) >= 0;
+        public static bool operator >=(SemanticVersion left, SemanticVersion right) { return left.CompareTo(right) >= 0; }
 
         private static bool TryParseNumeric(string text, out BigInteger value)
         {

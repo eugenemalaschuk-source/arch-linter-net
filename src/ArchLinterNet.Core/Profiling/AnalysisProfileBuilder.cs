@@ -93,12 +93,15 @@ public static class AnalysisProfileBuilder
         return contractFamilyCounts;
     }
 
-    private static AnalysisProfileOutput CreateEmptyOutput() => new()
+    private static AnalysisProfileOutput CreateEmptyOutput()
     {
-        CommittedSinkCount = 0,
-        FailedSinkCount = 0,
-        StagedSinkCount = 0,
-        UncommittedSinkCount = 0,
-        OutputFailed = false,
-    };
+        return new AnalysisProfileOutput
+        {
+            CommittedSinkCount = 0,
+            FailedSinkCount = 0,
+            StagedSinkCount = 0,
+            UncommittedSinkCount = 0,
+            OutputFailed = false,
+        };
+    }
 }

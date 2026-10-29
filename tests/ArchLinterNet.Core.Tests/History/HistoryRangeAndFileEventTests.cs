@@ -32,10 +32,12 @@ public sealed class HistoryRangeAndFileEventTests
         string commit = repository.Commit("first");
         using CancellationTokenSource cancellation = new();
         cancellation.Cancel();
+        string repositoryPath = repository.Path;
+        CancellationToken token = cancellation.Token;
 
         Assert.That(
             () => HistoryIngestionService.Default.Ingest(
-                new HistoryIngestionRequest(repository.Path, commit, commit), cancellationToken: cancellation.Token),
+                new HistoryIngestionRequest(repositoryPath, commit, commit), cancellationToken: token),
             Throws.TypeOf<OperationCanceledException>());
     }
 

@@ -28,7 +28,7 @@ internal sealed class CanonicalAnnotationRoleResolver
         }
 
         CatalogIdentityValidation identity = GetIdentityValidation(assembly, catalog);
-        AddIdentityDiagnostic(identity, catalog, scope, subject, evidence);
+        AddIdentityDiagnostic(identity, scope, subject, evidence);
         if (!identity.IsCompatible)
         {
             return CreateUnassignedCandidate(evidence);
@@ -36,7 +36,7 @@ internal sealed class CanonicalAnnotationRoleResolver
 
         (Dictionary<string, object> resolvedContextMetadata, IReadOnlySet<string> blockedContextMetadataKeys) =
             ResolveContextMetadata(
-                evidence.ContextEvidence,
+                evidence.ContextEntries,
                 evidence.InvalidContextMetadataKeys,
                 scope,
                 subject,
@@ -148,7 +148,7 @@ internal sealed class CanonicalAnnotationRoleResolver
         evidence.CanonicalEvidenceNames.Add(context.AttributeFullName);
         if (TryReadContextValue(data, context, evidence.ContextValueReadContext, out string value))
         {
-            evidence.ContextEvidence.Add(new ContextEvidence(context.Key, context.AttributeFullName, value));
+            evidence.ContextEntries.Add(new ContextEvidence(context.Key, context.AttributeFullName, value));
         }
     }
 
@@ -163,16 +163,17 @@ internal sealed class CanonicalAnnotationRoleResolver
         return CreateUnassignedCandidate(evidence);
     }
 
-    private static ArchitectureAttributeClassificationCandidate CreateUnassignedCandidate(ResolutionEvidence evidence) =>
-        new(null, new Dictionary<string, object>(), null,
+    private static ArchitectureAttributeClassificationCandidate CreateUnassignedCandidate(ResolutionEvidence evidence)
+    {
+        return new ArchitectureAttributeClassificationCandidate(null, new Dictionary<string, object>(), null,
             Array.Empty<ArchitectureClassificationConflict>(), evidence.MetadataFailures)
         {
             CanonicalAnnotationDiagnostics = evidence.Diagnostics,
         };
+    }
 
     private static void AddIdentityDiagnostic(
         CatalogIdentityValidation identity,
-        CanonicalAnnotationCatalog catalog,
         string scope,
         string subject,
         ResolutionEvidence evidence)
@@ -198,14 +199,16 @@ internal sealed class CanonicalAnnotationRoleResolver
     private static ArchitectureAttributeClassificationCandidate CreateContextOnlyCandidate(
         ResolutionEvidence evidence,
         Dictionary<string, object> resolvedContextMetadata,
-        IReadOnlySet<string> blockedContextMetadataKeys) =>
-        new(null, new Dictionary<string, object>(), null,
+        IReadOnlySet<string> blockedContextMetadataKeys)
+    {
+        return new ArchitectureAttributeClassificationCandidate(null, new Dictionary<string, object>(), null,
             Array.Empty<ArchitectureClassificationConflict>(), evidence.MetadataFailures)
         {
             ContextMetadata = resolvedContextMetadata,
             ContextMetadataBlockedKeys = blockedContextMetadataKeys,
             CanonicalAnnotationDiagnostics = evidence.Diagnostics,
         };
+    }
 
     private static ArchitectureAttributeClassificationCandidate ResolveRoleMatches(
         ResolutionEvidence evidence,
@@ -487,7 +490,7 @@ internal sealed class CanonicalAnnotationRoleResolver
 
         public List<(CanonicalAnnotationCatalog.CanonicalRole Role, IReadOnlyDictionary<string, object> Metadata)> Matches { get; } = new();
 
-        public List<ContextEvidence> ContextEvidence { get; } = new();
+        public List<ContextEvidence> ContextEntries { get; } = new();
 
         public HashSet<string> InvalidContextMetadataKeys { get; } = new(StringComparer.Ordinal);
 

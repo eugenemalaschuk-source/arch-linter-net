@@ -41,7 +41,8 @@ internal static class HistoryPolicyIngestionService
 
         HistoryIngestionOutcome outcome = new HistoryIngestionService(taskExtraction, configuration).Ingest(
             request, timing, cancellationToken);
-        if (outcome.Result is HistoryIngestionResult result)
+        HistoryIngestionResult? result = outcome.Result;
+        if (result is not null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Stopwatch? enrichmentClock = request.RequestDotNetEnrichment && timing is not null

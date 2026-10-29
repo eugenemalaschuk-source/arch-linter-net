@@ -311,7 +311,20 @@ internal static class CoverageReportRenderer
         string column = String(value, "column") is { } columnValue ? ":" + columnValue : string.Empty;
         return path + line + column;
     }
-    private static string Summary(IReadOnlyDictionary<string, string?> values) => string.Join("; ", new[] { ("code", "message_code"), ("source", "source"), ("subject", SubjectKey), ("state", StateKey), ("item", "item"), ("forbidden namespace", "forbidden_namespace"), ("forbidden references", "forbidden_references"), ("evidence", EvidenceKey), ("reason", "reason"), ("detail", "detail"), ("source", "source_location"), ("policy", "policy_origin"), ("policy", "policy_location") }.Where(pair => values.GetValueOrDefault(pair.Item2) is not null).Select(pair => $"{pair.Item1} `{Code(values[pair.Item2]!)}`"));
+    private static string Summary(IReadOnlyDictionary<string, string?> values)
+    {
+        (string Label, string Key)[] fields =
+        [
+            ("code", "message_code"), ("source", "source"), ("subject", SubjectKey),
+            ("state", StateKey), ("item", "item"), ("forbidden namespace", "forbidden_namespace"),
+            ("forbidden references", "forbidden_references"), ("evidence", EvidenceKey),
+            ("reason", "reason"), ("detail", "detail"), ("source", "source_location"),
+            ("policy", "policy_origin"), ("policy", "policy_location"),
+        ];
+        return string.Join("; ", fields
+            .Where(field => values.GetValueOrDefault(field.Key) is not null)
+            .Select(field => $"{field.Label} `{Code(values[field.Key]!)}`"));
+    }
     private static string Code(string value) => Compact(value).Replace("`", "'", StringComparison.Ordinal);
     private static string Compact(string value) { string text = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)); return text.Length <= 240 ? text : text[..237] + "..."; }
 

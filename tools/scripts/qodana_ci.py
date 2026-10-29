@@ -17,11 +17,12 @@ MAX_SARIF_BYTES = 64 * 1024 * 1024
 MAX_LOG_FILE_BYTES = 4 * 1024 * 1024
 MAX_LOG_TOTAL_BYTES = 8 * 1024 * 1024
 PROBE_RULE = "ConditionIsAlwaysTrueOrFalse"
+QODANA_CONFIG = "qodana.yaml"
 
 
 def configured_image(project: Path) -> str:
     """Read our deliberately plain, single root linter declaration, not arbitrary YAML."""
-    text = (project / "qodana.yaml").read_text(encoding="utf-8")
+    text = (project / QODANA_CONFIG).read_text(encoding="utf-8")
     declarations = re.findall(r"^linter:\s*(\S+)\s*$", text, re.MULTILINE)
     if len(declarations) != 1 or not re.fullmatch(
         r"jetbrains/qodana-cdnet:\d{4}\.\d+(?:\.\d+)?"
@@ -32,7 +33,7 @@ def configured_image(project: Path) -> str:
 
 
 def configured_profile(project: Path) -> str:
-    text = (project / "qodana.yaml").read_text(encoding="utf-8")
+    text = (project / QODANA_CONFIG).read_text(encoding="utf-8")
     declarations = re.findall(r"^\s+name:\s*(\S+)\s*$", text, re.MULTILINE)
     if len(declarations) != 1:
         raise ValueError("qodana.yaml must declare one named analysis profile")
@@ -40,7 +41,7 @@ def configured_profile(project: Path) -> str:
 
 
 def configured_solution(project: Path) -> str:
-    text = (project / "qodana.yaml").read_text(encoding="utf-8")
+    text = (project / QODANA_CONFIG).read_text(encoding="utf-8")
     declarations = re.findall(r"^\s+solution:\s*(\S+)\s*$", text, re.MULTILINE)
     if len(declarations) != 1:
         raise ValueError("qodana.yaml must declare one canonical solution")
@@ -290,7 +291,7 @@ def create_probe(directory: Path, image: str, defective: bool) -> None:
         '    public static bool Check(object value)\n    {\n'
         '        if (value == null)\n        {\n            return false;\n        }\n'
         f'        return {expression};\n    }}\n}}\n', encoding="utf-8")
-    (directory / "qodana.yaml").write_text(
+    (directory / QODANA_CONFIG).write_text(
         f'version: "1.0"\nlinter: {image}\nprofile:\n  name: qodana.recommended\n'
         f'include:\n  - name: {PROBE_RULE}\ndotnet:\n  project: Probe.csproj\n'
         '  configuration: Release\n', encoding="utf-8")
@@ -329,14 +330,22 @@ def write_evidence(artifacts: Path, evidence: dict, publish_summary: bool = True
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=Path.cwd())
+    parser.add_argument("--base-project", type=Path,
+                        help="Separate checkout of the exact pull request base")
     parser.add_argument("--output", type=Path, required=True,
                         help="New/empty directory outside the analyzed repository")
     parser.add_argument("--burn-in", action="store_true",
                         help="Also run same-image warm analysis and positive/negative probes")
     args = parser.parse_args(argv)
     project, output = args.project.resolve(), args.output.resolve()
+    base_project = args.base_project.resolve() if args.base_project else None
+    if base_project is not None and (base_project == project or project in base_project.parents
+                                     or base_project in project.parents or args.burn_in):
+        parser.error("--base-project must be a separate checkout and cannot be combined with --burn-in")
     if output == project or project in output.parents:
         parser.error("--output must be outside the project to avoid scanning generated evidence")
+    if base_project is not None and (output == base_project or base_project in output.parents):
+        parser.error("--output must be outside the base checkout")
     if output.exists() and any(output.iterdir()):
         parser.error("--output must be empty; refusing stale or overwritten evidence")
     artifacts, work = output / "artifacts", output / "work"
@@ -351,6 +360,7 @@ def main(argv: list[str] | None = None) -> int:
                 "pull_request_number": _optional_positive_int(os.environ.get("QODANA_PULL_REQUEST_NUMBER")),
                 "head_sha": _optional_text(os.environ.get("QODANA_HEAD_SHA")),
                 "base_sha": _optional_text(os.environ.get("QODANA_BASE_SHA")),
+                "base_analyzed_sha": _optional_text(os.environ.get("QODANA_BASE_ANALYZED_SHA")),
                 "event": os.environ.get("GITHUB_EVENT_NAME")}
     started = time.monotonic()
     try:
@@ -362,6 +372,16 @@ def main(argv: list[str] | None = None) -> int:
         evidence["configured_image"] = image
         evidence["configured_profile"] = configured_profile(project)
         evidence["configured_solution"] = configured_solution(project)
+        if base_project is not None:
+            if (evidence["base_analyzed_sha"] != evidence["base_sha"]
+                    or not re.fullmatch(r"[0-9a-f]{40}", evidence["base_sha"] or "")):
+                raise ValueError("Base checkout does not match the pull request base SHA")
+            _, base_sdk_version = locked_dotnet_sdk_root(base_project)
+            if (configured_image(base_project) != image
+                    or configured_profile(base_project) != evidence["configured_profile"]
+                    or configured_solution(base_project) != evidence["configured_solution"]
+                    or base_sdk_version != sdk_version):
+                raise ValueError("Base and head scanner configurations do not match")
         pull_start = time.monotonic()
         code = command(["docker", "pull", image], artifacts / "image.log", 300)
         evidence["pull_seconds"] = round(time.monotonic() - pull_start, 3)
@@ -374,6 +394,13 @@ def main(argv: list[str] | None = None) -> int:
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", identity):
             raise ValueError("Docker did not return an immutable image identity")
         evidence["image_id"] = identity
+        if base_project is not None:
+            base_scan = scan(base_project, work, artifacts, identity, "base", work / "base-cache",
+                             dotnet_root=dotnet_root)
+            evidence["scans"].append(base_scan)
+            write_evidence(artifacts, evidence, publish_summary=False)
+            if base_scan["status"] != "completed":
+                raise ValueError("Base analysis failed; inspect base.log and base.sarif.json")
         cache = work / "repository-cache"
         cold = scan(project, work, artifacts, identity, "cold", cache,
                     dotnet_root=dotnet_root)
@@ -410,7 +437,7 @@ def main(argv: list[str] | None = None) -> int:
 def _optional_positive_int(value: str | None) -> int | None:
     if value is None or value == "":
         return None
-    if not re.fullmatch(r"[1-9][0-9]*", value):
+    if not re.fullmatch(r"[1-9]\d*", value):
         return None
     return int(value)
 

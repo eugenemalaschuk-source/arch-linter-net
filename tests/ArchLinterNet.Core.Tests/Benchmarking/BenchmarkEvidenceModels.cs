@@ -340,7 +340,9 @@ internal sealed record BenchmarkEvidenceDocument
         }
     }
 
-    private static bool IsSha256(string value) =>
-        value.Length == 64 && value.All(character => Uri.IsHexDigit(character))
-        && string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
+    private static bool IsSha256(string value)
+    {
+        return value.Length == 64 && value.All(Uri.IsHexDigit)
+            && string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
+    }
 }

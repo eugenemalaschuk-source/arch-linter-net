@@ -91,30 +91,35 @@ class DifferentialGateTests(unittest.TestCase):
 
     def test_initial_baseline_refuses_high_or_critical_findings(self):
         for severity in ("High", "Critical"):
+            item = finding(severity=severity)
             with self.subTest(severity=severity), self.assertRaises(gate.GateError):
-                baseline([finding(severity=severity)])
+                baseline([item])
 
     def test_baseline_rejects_unreviewed_high_severity_entry_and_bad_policy(self):
         value = json.loads(baseline())
         value["findings"] = [gate.Finding(
             "1" * 64, "SomeRule", "Critical", "src/Foo.cs", 5, "bad"
         ).as_json()]
+        encoded = json.dumps(value).encode()
         with self.assertRaises(gate.GateError):
-            gate.parse_baseline(json.dumps(value).encode())
+            gate.parse_baseline(encoded)
         value = json.loads(baseline())
         value["block_new_moderate"] = False
+        encoded = json.dumps(value).encode()
         with self.assertRaises(gate.GateError):
-            gate.parse_baseline(json.dumps(value).encode())
+            gate.parse_baseline(encoded)
 
     def test_malformed_sarif_and_unrecognized_severity_fail_closed(self):
         with self.assertRaises(gate.GateError):
             gate.parse_sarif(b"not JSON")
+        unrecognized = sarif([finding(severity="Unknown")])
         with self.assertRaises(gate.GateError):
-            gate.parse_sarif(sarif([finding(severity="Unknown")]))
+            gate.parse_sarif(unrecognized)
         malformed = json.loads(sarif([finding()]))
         malformed["runs"][0]["invocations"][0]["executionSuccessful"] = False
+        encoded = json.dumps(malformed).encode()
         with self.assertRaises(gate.GateError):
-            gate.parse_sarif(json.dumps(malformed).encode())
+            gate.parse_sarif(encoded)
 
     def test_report_has_stable_marker_identity_and_bounded_actionable_locations(self):
         result = gate.evaluate(sarif([finding(rule="UnusedParameter.Global")]), baseline())
@@ -158,6 +163,7 @@ class EvidenceValidationTests(unittest.TestCase):
             "pull_request_number": 7,
             "head_sha": HEAD,
             "base_sha": BASE,
+            "base_analyzed_sha": BASE,
             "analyzed_sha": HEAD,
             "run_id": "123",
             "run_attempt": "2",
@@ -166,7 +172,8 @@ class EvidenceValidationTests(unittest.TestCase):
             "configured_profile": gate.EXPECTED_PROFILE,
             "configured_solution": gate.EXPECTED_SOLUTION,
             "image_id": "sha256:" + "c" * 64,
-            "scans": [{"label": "cold", "status": "completed", "exit_code": 0}],
+            "scans": [{"label": "base", "status": "completed", "exit_code": 0},
+                      {"label": "cold", "status": "completed", "exit_code": 0}],
         }
         result.update(updates)
         return json.dumps(result).encode()
@@ -187,8 +194,9 @@ class EvidenceValidationTests(unittest.TestCase):
                              ("base_sha", "e" * 40),
                              ("run_id", "999"),
                              ("run_attempt", "1")):
+            raw = self.evidence(**{field: wrong})
             with self.subTest(field=field), self.assertRaises(gate.GateError):
-                gate._validate_evidence(self.evidence(**{field: wrong}), **expected)
+                gate._validate_evidence(raw, **expected)
 
     def test_failed_scan_or_wrong_profile_is_unassessable(self):
         expected = {
@@ -197,8 +205,9 @@ class EvidenceValidationTests(unittest.TestCase):
         }
         for update in ({"status": "failed"}, {"configured_profile": "different"},
                        {"scans": [{"label": "cold", "status": "failed", "exit_code": 1}]}):
+            raw = self.evidence(**update)
             with self.subTest(update=update), self.assertRaises(gate.GateError):
-                gate._validate_evidence(self.evidence(**update), **expected)
+                gate._validate_evidence(raw, **expected)
 
     def test_source_run_association_requires_matching_head_and_base(self):
         run = {"pull_requests": [{
@@ -214,6 +223,7 @@ class EvidenceValidationTests(unittest.TestCase):
             root = Path(temporary)
             (root / "evidence.json").write_text("{}")
             (root / "cold.sarif.json").write_text("{}")
+            (root / "base.sarif.json").write_text("{}")
             gate._downloaded_reports(root)
             (root / "evil.txt").write_text("untrusted")
             with self.assertRaises(gate.GateError):
@@ -245,12 +255,9 @@ class EvidenceValidationTests(unittest.TestCase):
         candidate["findings"].append(gate.Finding(
             "a" * 64, "OtherInspection", "Moderate", "src/Unreported.cs", 12, "hidden debt"
         ).as_json())
+        encoded = (json.dumps(candidate, indent=2, sort_keys=True) + "\n").encode()
         with self.assertRaises(gate.GateError):
-            gate.validate_candidate_baseline(
-                (json.dumps(candidate, indent=2, sort_keys=True) + "\n").encode(),
-                raw_sarif,
-                analyzed_sha=HEAD,
-            )
+            gate.validate_candidate_baseline(encoded, raw_sarif, analyzed_sha=HEAD)
 
 
 class GitHubRawFileTests(unittest.TestCase):
@@ -281,9 +288,8 @@ class GitHubRawFileTests(unittest.TestCase):
             def read(self, size):
                 return payload[:size] + b"x"
 
-        with patch.object(gate.urllib.request, "urlopen", return_value=OversizedResponse()):
-            with self.assertRaises(gate.GateError):
-                api.request_raw("/contents/baseline.json?ref=" + BASE, limit=len(payload))
+        with patch.object(gate.urllib.request, "urlopen", return_value=OversizedResponse()), self.assertRaises(gate.GateError):
+            api.request_raw("/contents/baseline.json?ref=" + BASE, limit=len(payload))
 
 
 class WorkflowContractTests(unittest.TestCase):
@@ -294,7 +300,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", scanner)
         self.assertIn("pull_request:", scanner)
         self.assertIn("workflow_run:", publisher)
-        self.assertIn("ref: ${{ github.event.repository.default_branch }}", publisher)
+        self.assertIn("ref: main", publisher)
         self.assertIn("QODANA_ARTIFACT_DOWNLOAD_OUTCOME", publisher)
         self.assertIn("if: always()", publisher)
         for workflow in (scanner, publisher):
@@ -327,6 +333,7 @@ class PublisherIntegrationTests(unittest.TestCase):
             "pull_request_number": 7,
             "head_sha": HEAD,
             "base_sha": BASE,
+            "base_analyzed_sha": BASE,
             "analyzed_sha": HEAD,
             "run_id": "123",
             "run_attempt": "2",
@@ -336,13 +343,14 @@ class PublisherIntegrationTests(unittest.TestCase):
             "configured_solution": gate.EXPECTED_SOLUTION,
             "image_id": "sha256:" + "c" * 64,
             "scans": [{
-                "label": "cold", "status": "completed", "exit_code": 0,
+                "label": label, "status": "completed", "exit_code": 0,
                 "sarif_sha256": hashlib.sha256(self.sarif).hexdigest(),
                 "sarif_bytes": len(self.sarif),
-            }],
+            } for label in ("base", "cold")],
         }
         (self.artifacts / "evidence.json").write_text(json.dumps(evidence))
         (self.artifacts / "cold.sarif.json").write_bytes(self.sarif)
+        (self.artifacts / "base.sarif.json").write_bytes(self.sarif)
         self.event_path = self.root / "event.json"
         self.event_path.write_text(json.dumps({"workflow_run": {
             "id": 123,
@@ -423,9 +431,8 @@ class PublisherIntegrationTests(unittest.TestCase):
         self.assertEqual("failure", status["state"])
 
     def test_report_publication_error_keeps_provisional_failure_status(self):
-        with patch.object(gate, "_upsert_comment", side_effect=gate.GateError("comment unavailable")):
-            with self.assertRaises(gate.GateError):
-                gate.publish()
+        with patch.object(gate, "_upsert_comment", side_effect=gate.GateError("comment unavailable")), self.assertRaises(gate.GateError):
+            gate.publish()
         statuses = [body for method, path, body in self.api.calls
                     if method == "POST" and path.startswith("/statuses/")]
         self.assertEqual(["error"], [status["state"] for status in statuses])

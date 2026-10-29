@@ -32,7 +32,7 @@ def _source_commit() -> str:
     # This fixture packages the live working tree, which may contain reviewed edits. Keep its
     # identity synthetic so the production check does not compare those bytes with the test runner's
     # unrelated checkout HEAD. Dedicated verification cases exercise commit-backed source binding.
-    return hashlib.sha1(b"release-distribution-working-tree-fixture").hexdigest()
+    return "e" * 40
 
 
 def _candidate(tmp_path: Path, version: str = "0.8.7-preview.1") -> tuple[Path, str]:

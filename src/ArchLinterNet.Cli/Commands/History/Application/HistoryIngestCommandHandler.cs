@@ -100,7 +100,8 @@ internal sealed class HistoryIngestCommandHandler(
             options.PolicyPath,
             timing,
             _cancellationToken);
-        if (outcome.Result is not HistoryIngestionResult result)
+        HistoryIngestionResult? result = outcome.Result;
+        if (result is null)
         {
             console.Error.Write(HistoryDiagnosticJsonWriter.Write(outcome.Diagnostic!));
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -377,12 +378,16 @@ internal sealed class HistoryIngestCommandHandler(
         console.Out.Write(content);
     }
 
-    private static string ContentFor(HistoryReportSink sink, string? jsonContent, string? markdownContent) =>
-        sink.Format == "json" ? jsonContent! : markdownContent!;
+    private static string ContentFor(HistoryReportSink sink, string? jsonContent, string? markdownContent)
+    {
+        return sink.Format == "json" ? jsonContent! : markdownContent!;
+    }
 
-    private static IEnumerable<HistoryReportSink> OrderedStreamSinks(IReadOnlyList<HistoryReportSink> sinks) =>
-        sinks.Where(sink => sink.DestinationType != HistoryReportDestinationType.File)
+    private static IEnumerable<HistoryReportSink> OrderedStreamSinks(IReadOnlyList<HistoryReportSink> sinks)
+    {
+        return sinks.Where(sink => sink.DestinationType != HistoryReportDestinationType.File)
             .OrderBy(sink => sink.DestinationType == HistoryReportDestinationType.Stdout ? 0 : 1);
+    }
 
     private void CleanupTempAndPending(
         string? tempPath,

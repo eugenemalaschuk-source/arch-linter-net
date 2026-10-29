@@ -11,8 +11,10 @@ internal static class BenchmarkIdentity
         WriteIndented = false,
     };
 
-    public static string Sha256(string content) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
+    public static string Sha256(string content)
+    {
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
+    }
 
     public static BenchmarkCanonicalResultIdentity CreateCanonicalResult(
         string completionStatus,
