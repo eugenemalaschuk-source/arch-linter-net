@@ -21,7 +21,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any
+from typing import Any, Callable
 
 MAX_SARIF_BYTES = 64 * 1024 * 1024
 MAX_BASELINE_BYTES = 16 * 1024 * 1024
@@ -76,6 +76,8 @@ class Finding:
     line: int | None
     message: str
     fingerprint: str | None = None
+    column: int | None = None
+    source_line_sha256: str | None = None
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -86,6 +88,8 @@ class Finding:
             "line": self.line,
             "message": self.message,
             "fingerprint": self.fingerprint,
+            "column": self.column,
+            "source_line_sha256": self.source_line_sha256,
         }
 
 
@@ -177,6 +181,34 @@ def _stable_fingerprint(result: dict[str, Any]) -> str | None:
     return stable.lower() if isinstance(stable, str) and re.fullmatch(r"[A-Fa-f0-9]{64}", stable) else None
 
 
+def _source_line_sha256(result: dict[str, Any], line: int | None) -> str | None:
+    """Hash a complete diagnostic line when the SARIF context contains it."""
+    locations = result.get("locations", [])
+    if line is None or not isinstance(locations, list) or not locations:
+        return None
+    location = locations[0]
+    physical = location.get("physicalLocation", {}) if isinstance(location, dict) else {}
+    context = physical.get("contextRegion", {}) if isinstance(physical, dict) else {}
+    if not isinstance(context, dict):
+        return None
+    start, end = context.get("startLine"), context.get("endLine")
+    snippet = context.get("snippet")
+    text = snippet.get("text") if isinstance(snippet, dict) else None
+    start_column = context.get("startColumn")
+    if (type(start) is not int or type(end) is not int or start < 1
+            or type(start_column) is not int or start_column != 1
+            or not start <= line < end or not isinstance(text, str)):
+        return None
+    lines = text.split("\n")
+    offset = line - start
+    if offset >= len(lines) - 1:
+        return None
+    try:
+        return hashlib.sha256(lines[offset].removesuffix("\r").encode("utf-8")).hexdigest()
+    except UnicodeEncodeError:
+        return None
+
+
 def _finding_key(result: dict[str, Any], rule: str, path: str,
                  line: int | None, column: int | None, message: str) -> str:
     stable = _stable_fingerprint(result)
@@ -227,6 +259,8 @@ def _parse_finding(result: dict[str, Any], driver: dict[str, Any], run: dict[str
         line=line,
         message=message,
         fingerprint=_stable_fingerprint(result),
+        column=column,
+        source_line_sha256=_source_line_sha256(result, line),
     )
 
 
@@ -284,17 +318,21 @@ def _baseline_finding(row: Any) -> Finding:
     key, rule, severity = row.get("key"), row.get("rule"), row.get("severity")
     path, line, message = row.get("path"), row.get("line"), row.get("message")
     fingerprint = row.get("fingerprint")
+    column, source_line_sha256 = row.get("column"), row.get("source_line_sha256")
     if (not isinstance(key, str) or not re.fullmatch(r"[a-f0-9]{64}", key)
             or not isinstance(rule, str) or not SAFE_RULE.fullmatch(rule)
             or severity not in {"Critical", "High", "Moderate", "Low", "Info"}
             or not isinstance(path, str) or not isinstance(message, str)
             or (fingerprint is not None and (not isinstance(fingerprint, str)
                 or not re.fullmatch(r"[a-f0-9]{64}", fingerprint)))
+            or (source_line_sha256 is not None and (not isinstance(source_line_sha256, str)
+                or not re.fullmatch(r"[a-f0-9]{64}", source_line_sha256)))
+            or (column is not None and (type(column) is not int or column < 1))
             or (line is not None and (type(line) is not int or line < 1))):
         raise GateError("Qodana baseline contains an invalid finding")
     if severity in {"Critical", "High"}:
         raise GateError("Qodana baseline cannot accept High/Critical findings")
-    return Finding(key, rule, severity, path, line, message, fingerprint)
+    return Finding(key, rule, severity, path, line, message, fingerprint, column, source_line_sha256)
 
 
 def parse_baseline(raw: bytes) -> tuple[str, list[Finding]]:
@@ -341,6 +379,43 @@ def _consume_exact(remaining: dict[tuple[str, str], list[Finding]], identity: tu
     return True
 
 
+def _fingerprint_identity(finding: Finding) -> tuple[Any, ...] | None:
+    if not finding.fingerprint:
+        return None
+    return (finding.rule, finding.path, finding.message, finding.severity, finding.fingerprint)
+
+
+def _source_line_identity(finding: Finding) -> tuple[Any, ...] | None:
+    if not finding.path or finding.line is None or finding.column is None or not finding.source_line_sha256:
+        return None
+    return (finding.rule, finding.path, finding.line, finding.column, finding.message,
+            finding.severity, finding.source_line_sha256)
+
+
+def _consume_equivalent(remaining: dict[tuple[str, str], list[Finding]],
+                        candidates: list[Finding],
+                        identify: Callable[[Finding], tuple[Any, ...] | None]) -> list[Finding]:
+    by_identity: dict[tuple[Any, ...], list[Finding]] = defaultdict(list)
+    for item in (finding for group in remaining.values() for finding in group):
+        identity = identify(item)
+        if identity is not None:
+            by_identity[identity].append(item)
+    unmatched: list[Finding] = []
+    for finding in candidates:
+        identity = identify(finding)
+        matches = by_identity.get(identity) if identity is not None else None
+        if not matches:
+            unmatched.append(finding)
+            continue
+        matched = matches.pop()
+        exact_identity = (matched.key, matched.severity)
+        group = remaining[exact_identity]
+        group.remove(matched)
+        if not group:
+            del remaining[exact_identity]
+    return unmatched
+
+
 def _evaluate_findings(findings: list[Finding], baseline: list[Finding]) -> Verdict:
     remaining: dict[tuple[str, str], list[Finding]] = defaultdict(list)
     for item in baseline:
@@ -350,22 +425,11 @@ def _evaluate_findings(findings: list[Finding], baseline: list[Finding]) -> Verd
         if not _consume_exact(remaining, (finding.key, finding.severity)):
             candidates.append(finding)
 
-    # First consume exact matches; then match moved findings by Qodana's stable
-    # fingerprint, rule, file, message and severity. Multisets preserve duplicate
-    # counts, so an additional copy of the same finding is still new.
-    by_fingerprint: dict[tuple[str, str, str, str, str], list[Finding]] = defaultdict(list)
-    for item in (finding for group in remaining.values() for finding in group):
-        if item.fingerprint:
-            by_fingerprint[(item.rule, item.path, item.message, item.severity, item.fingerprint)].append(item)
-    new: list[Finding] = []
-    for finding in candidates:
-        identity = (finding.rule, finding.path, finding.message, finding.severity, finding.fingerprint)
-        matches = by_fingerprint.get(identity) if finding.fingerprint else None
-        if matches:
-            matched = matches.pop()
-            _consume_exact(remaining, (matched.key, matched.severity))
-        else:
-            new.append(finding)
+    # Qodana's fingerprint can change when only a neighboring line changes.
+    # First match moved findings by fingerprint; then match the same unchanged
+    # source line and location. Multisets preserve duplicate finding counts.
+    candidates = _consume_equivalent(remaining, candidates, _fingerprint_identity)
+    new = _consume_equivalent(remaining, candidates, _source_line_identity)
     blocking = [item for item in findings if item.severity in {"Critical", "High"}]
     blocking.extend(item for item in new if item.severity == "Moderate")
     remediated = [finding for group in remaining.values() for finding in group]

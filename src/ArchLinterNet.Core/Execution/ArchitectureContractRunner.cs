@@ -32,8 +32,6 @@ public sealed class ArchitectureContractRunner(
 
     public ArchitectureContractCatalog Catalog => _session.Catalog;
 
-    internal void PrepareRuleInputCoverageDeferral(string mode) => _session.PrepareRuleInputCoverageDeferral(mode);
-
     public IEnumerable<ArchitectureDependencyContract> StrictContracts() => _session.StrictContracts();
 
     public IEnumerable<ArchitectureDependencyContract> AuditContracts() => _session.AuditContracts();

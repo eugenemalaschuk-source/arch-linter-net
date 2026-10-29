@@ -6,7 +6,7 @@ The Qodana scanner uses the free Community .NET image `jetbrains/qodana-cdnet:20
 
 ## Gate policy
 
-The scanner analyzes the exact pull-request base and head in separate checkouts and caches. The trusted publisher compares their SARIF reports, so a previously fixed finding cannot be reintroduced simply because an older committed baseline still lists it. Findings first match by exact identity, then by Qodana's fingerprint, rule, path, message and severity; repeated fingerprints are counted separately. The publisher also reads the reviewed policy in `tools/qodana/baseline.json` from the exact base SHA. That historical inventory was generated from main revision `dbc49a544ab8f39bc635a0628d769704945dfca5` (workflow run [40782711991](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40782711991)); it recorded 13,280 Moderate diagnostics and no High or Critical findings. It is not a Qodana configuration suppression.
+The scanner analyzes the exact pull-request base and head in separate checkouts and caches. The trusted publisher compares their SARIF reports, so a previously fixed finding cannot be reintroduced simply because an older committed baseline still lists it. Findings first match by exact identity, then by Qodana's fingerprint, rule, path, message and severity. If a neighboring edit changes the fingerprint, they can also match by the same rule, path, line, column, message, severity and a hash of the complete unchanged diagnostic line. Occurrences are counted separately in every phase. The publisher also reads the reviewed policy in `tools/qodana/baseline.json` from the exact base SHA. That historical inventory was generated from main revision `dbc49a544ab8f39bc635a0628d769704945dfca5` (workflow run [40782711991](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40782711991)); it recorded 13,280 Moderate diagnostics and no High or Critical findings. It is not a Qodana configuration suppression.
 
 The verdict rules are:
 
@@ -23,13 +23,14 @@ The comment is identified by `<!-- archlinternet-qodana-report -->` and updated 
 
 ## Historical finding triage
 
-The head scan in [run 40808531817](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40808531817) recorded 13,245 Moderate findings, 4,203 in `src/`. These counts are a starting point, not a list of approved suppressions. Review findings in context and rescan after each batch: Qodana can change a finding's fingerprint when neighboring lines change, even if its diagnostic line did not.
+The head scan in [run 40808531817](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/40808531817) recorded 13,245 Moderate findings, 4,203 in `src/`. These counts are a starting point, not a list of approved suppressions. Review findings in context and rescan after each batch. Qodana can change a finding's fingerprint when neighboring lines change, even if its diagnostic line did not; the unchanged-line fallback above handles that case when both SARIF reports contain the complete line.
 
 Examples reviewed during the first batches:
 
 | Finding | Decision and evidence |
 | --- | --- |
 | Unused comparison parameters and intermediate fields | Remove values that no caller reads, after checking their use and preserving the behavior of policy comparisons, schema diagnostics and API-surface checks. |
+| Unused fields in internal analysis results | The reflected type name and layout subject path are already carried by their dictionary key or subject identity. The live cycle graph is consumed during cycle detection; only the full graph is needed by the later baseline-candidate pass. |
 | Duplicate checks before inserting into a set or dictionary | Use the collection's insertion result when it preserves traversal order and duplicate handling. |
 | `NotAccessedPositionalProperty.Local` | Review each record's role. The SARIF records in `ArchitecturePolicyWeakeningFormatter` are serialized, and `CoChangePairKey` relies on record equality; their properties are used even without explicit getters. |
 | `OutParameterValueIsAlwaysDiscarded.Global` | Preserve the public `ValidationOutcome.Deconstruct` shape, which external consumers can use even when this repository discards its outputs. |

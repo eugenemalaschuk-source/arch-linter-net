@@ -163,7 +163,6 @@ internal sealed class ArchitectureSourceFileFactTraversal
             list.Add(new BaseFact(
                 assemblyName,
                 ns,
-                fullName,
                 GetSimpleTypeName(type),
                 GetTypeKindFromReflection(type),
                 type.IsAbstract));
@@ -526,7 +525,6 @@ internal sealed class ArchitectureSourceFileFactTraversal
     internal sealed record BaseFact(
         string AssemblyName,
         string Namespace,
-        string FullTypeName,
         string SimpleTypeName,
         ArchitectureTypeKind TypeKind,
         bool IsAbstract);

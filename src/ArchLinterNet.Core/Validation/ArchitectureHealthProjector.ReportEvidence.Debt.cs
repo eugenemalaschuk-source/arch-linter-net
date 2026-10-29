@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
@@ -140,9 +139,6 @@ internal static class ArchitectureHealthReportDebtEvidenceWriter
             .ThenBy(item => item.Entry.ContractGroup, StringComparer.Ordinal)
             .ToArray();
     }
-
-    internal static string? FormatDate(DateOnly? date) =>
-        date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     internal static string CompletionToken(ArchitectureAssessmentCompletionState state) => state switch
     {

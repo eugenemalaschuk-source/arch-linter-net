@@ -40,6 +40,11 @@ Each invocation SHALL be bounded and preserve exit status, duration, image ident
 - **THEN** the required Qodana status fails
 - **AND** the PR report lists finding deltas, severity counts, rule identifiers and source locations
 
+#### Scenario: A neighboring edit changes a diagnostic fingerprint
+- **WHEN** a base and head finding have different Qodana fingerprints but the same rule, path, line, column, message, severity and complete diagnostic source line
+- **THEN** the reporter treats one occurrence of each as the same existing finding
+- **AND** additional occurrences remain new and blocking when their severity requires it
+
 #### Scenario: Scanner failure or missing report
 - **WHEN** the scanner fails, times out, or produces no usable SARIF
 - **THEN** the required gate fails visibly and reports that the result is unassessable
