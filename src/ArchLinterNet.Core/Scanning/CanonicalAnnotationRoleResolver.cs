@@ -165,7 +165,7 @@ internal sealed class CanonicalAnnotationRoleResolver
 
     private static ArchitectureAttributeClassificationCandidate CreateUnassignedCandidate(ResolutionEvidence evidence)
     {
-        return new ArchitectureAttributeClassificationCandidate(null, new Dictionary<string, object>(), null,
+        return new(null, new Dictionary<string, object>(), null,
             Array.Empty<ArchitectureClassificationConflict>(), evidence.MetadataFailures)
         {
             CanonicalAnnotationDiagnostics = evidence.Diagnostics,
@@ -201,7 +201,7 @@ internal sealed class CanonicalAnnotationRoleResolver
         Dictionary<string, object> resolvedContextMetadata,
         IReadOnlySet<string> blockedContextMetadataKeys)
     {
-        return new ArchitectureAttributeClassificationCandidate(null, new Dictionary<string, object>(), null,
+        return new(null, new Dictionary<string, object>(), null,
             Array.Empty<ArchitectureClassificationConflict>(), evidence.MetadataFailures)
         {
             ContextMetadata = resolvedContextMetadata,

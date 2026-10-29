@@ -251,7 +251,7 @@ internal static class RepositoryMetricsCalculator
     private static ComponentDag BuildComponentDag(ProjectGraph graph, TarjanResult scc)
     {
         HashSet<(int Source, int Target)> edges = FindInterComponentEdges(graph, scc);
-        List<HashSet<int>> outgoing = Enumerable.Range(0, scc.Components.Count)
+        var outgoing = Enumerable.Range(0, scc.Components.Count)
             .Select(_ => new HashSet<int>())
             .ToList();
         int[] incoming = new int[scc.Components.Count];

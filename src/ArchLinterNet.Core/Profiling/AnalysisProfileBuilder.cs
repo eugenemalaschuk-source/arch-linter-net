@@ -19,7 +19,7 @@ public static class AnalysisProfileBuilder
     {
         List<AnalysisProfilePhaseMeasurement> phases = BuildPhases(snapshotCounters, timing);
         Dictionary<string, int> contractFamilyCounts = BuildContractFamilyCounts(timing);
-        AnalysisProfileCounters counters = AnalysisProfileCounters.From(
+        var counters = AnalysisProfileCounters.From(
             snapshotCounters, contractFamilyCounts, renderedSinkCount, outputSinkCount);
         if (options?.Cache is not null)
         {
@@ -95,7 +95,7 @@ public static class AnalysisProfileBuilder
 
     private static AnalysisProfileOutput CreateEmptyOutput()
     {
-        return new AnalysisProfileOutput
+        return new()
         {
             CommittedSinkCount = 0,
             FailedSinkCount = 0,

@@ -185,17 +185,7 @@ def _finding_key(result: dict[str, Any], rule: str, path: str,
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _canonical_sarif_run(document: Any) -> tuple[dict[str, Any], dict[str, Any]]:
-    if not isinstance(document, dict) or document.get("version") != "2.1.0":
-        raise GateError("Expected SARIF 2.1.0")
-    runs = document.get("runs")
-    if not isinstance(runs, list) or len(runs) != 1 or not isinstance(runs[0], dict):
-        raise GateError("Expected one canonical Qodana SARIF run")
-    run = runs[0]
-    tool = run.get("tool")
-    driver = tool.get("driver", {}) if isinstance(tool, dict) else {}
-    if not isinstance(driver, dict) or driver.get("name") != "QDNETC":
-        raise GateError("SARIF scanner identity does not match Qodana Community for .NET")
+def _validate_sarif_invocation(run: dict[str, Any]) -> None:
     invocations = run.get("invocations")
     if not isinstance(invocations, list) or len(invocations) != 1:
         raise GateError("SARIF does not contain one canonical invocation")
@@ -208,6 +198,20 @@ def _canonical_sarif_run(document: Any) -> tuple[dict[str, Any], dict[str, Any]]
             isinstance(item, dict) and item.get("level") == "error" for item in notifications
         ):
             raise GateError("Qodana SARIF records a scanner error")
+
+
+def _canonical_sarif_run(document: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not isinstance(document, dict) or document.get("version") != "2.1.0":
+        raise GateError("Expected SARIF 2.1.0")
+    runs = document.get("runs")
+    if not isinstance(runs, list) or len(runs) != 1 or not isinstance(runs[0], dict):
+        raise GateError("Expected one canonical Qodana SARIF run")
+    run = runs[0]
+    tool = run.get("tool")
+    driver = tool.get("driver", {}) if isinstance(tool, dict) else {}
+    if not isinstance(driver, dict) or driver.get("name") != "QDNETC":
+        raise GateError("SARIF scanner identity does not match Qodana Community for .NET")
+    _validate_sarif_invocation(run)
     return run, driver
 
 
@@ -327,20 +331,30 @@ class Verdict:
     counts: dict[str, int]
 
 
-def evaluate(sarif: bytes, baseline_bytes: bytes) -> Verdict:
-    _, baseline = parse_baseline(baseline_bytes)
-    findings = parse_sarif(sarif)
-    remaining = {(item.key, item.severity): item for item in baseline}
+def _consume_exact(remaining: dict[tuple[str, str], list[Finding]], identity: tuple[str, str]) -> bool:
+    matches = remaining.get(identity)
+    if not matches:
+        return False
+    matches.pop()
+    if not matches:
+        del remaining[identity]
+    return True
+
+
+def _evaluate_findings(findings: list[Finding], baseline: list[Finding]) -> Verdict:
+    remaining: dict[tuple[str, str], list[Finding]] = defaultdict(list)
+    for item in baseline:
+        remaining[(item.key, item.severity)].append(item)
     candidates: list[Finding] = []
     for finding in findings:
-        if remaining.pop((finding.key, finding.severity), None) is None:
+        if not _consume_exact(remaining, (finding.key, finding.severity)):
             candidates.append(finding)
 
     # First consume exact matches; then match moved findings by Qodana's stable
     # fingerprint, rule, file, message and severity. Multisets preserve duplicate
     # counts, so an additional copy of the same finding is still new.
     by_fingerprint: dict[tuple[str, str, str, str, str], list[Finding]] = defaultdict(list)
-    for item in remaining.values():
+    for item in (finding for group in remaining.values() for finding in group):
         if item.fingerprint:
             by_fingerprint[(item.rule, item.path, item.message, item.severity, item.fingerprint)].append(item)
     new: list[Finding] = []
@@ -349,15 +363,20 @@ def evaluate(sarif: bytes, baseline_bytes: bytes) -> Verdict:
         matches = by_fingerprint.get(identity) if finding.fingerprint else None
         if matches:
             matched = matches.pop()
-            remaining.pop((matched.key, matched.severity))
+            _consume_exact(remaining, (matched.key, matched.severity))
         else:
             new.append(finding)
     blocking = [item for item in findings if item.severity in {"Critical", "High"}]
     blocking.extend(item for item in new if item.severity == "Moderate")
-    remediated = list(remaining.values())
+    remediated = [finding for group in remaining.values() for finding in group]
     counts = {severity: sum(item.severity == severity for item in findings)
               for severity in ("Critical", "High", "Moderate", "Low", "Info")}
     return Verdict(not blocking, findings, len(baseline), new, remediated, blocking, counts)
+
+
+def evaluate(sarif: bytes, baseline_bytes: bytes) -> Verdict:
+    _, baseline = parse_baseline(baseline_bytes)
+    return _evaluate_findings(parse_sarif(sarif), baseline)
 
 
 def _escape_markdown(value: str) -> str:
@@ -716,10 +735,10 @@ def _governance_changes(files: list[dict[str, Any]]) -> tuple[list[str], bool, b
 
 
 def _report_governance_changes(api: GitHubApi, number: int, head_sha: str, base_sha: str,
-                               run_url: str, changes: list[str], baseline_mixed: bool) -> int:
+                               run_url: str, changes: list[str], baseline_mixed: bool) -> None:
     if not _pr_is_current(api, number, head_sha, base_sha):
         print("Qodana scan became stale; leaving the current PR report untouched.")
-        return 1
+        return
     names = ", ".join(
         f"`{_escape_markdown(name)}`" for name in dict.fromkeys(changes[:20])
     )
@@ -741,7 +760,6 @@ def _report_governance_changes(api: GitHubApi, number: int, head_sha: str, base_
     _upsert_comment(api, number, report_text)
     _write_summary(report_text)
     _set_status(api, head_sha, "failure", "Qodana scanner policy changed in this PR", run_url)
-    return 1
 
 
 def _assess_scan(api: GitHubApi, artifact_dir: Path, run: dict[str, Any], repository: str,
@@ -778,8 +796,7 @@ def _assess_scan(api: GitHubApi, artifact_dir: Path, run: dict[str, Any], reposi
     parse_baseline(_fetch_baseline(api, base_sha))
     if run.get("conclusion") != "success":
         raise GateError("Qodana workflow reported failure")
-    fresh_base = build_baseline(base_sarif, analyzed_sha=base_sha, image=EXPECTED_IMAGE)
-    return evaluate(sarif, json.dumps(fresh_base).encode("utf-8"))
+    return _evaluate_findings(parse_sarif(sarif), parse_sarif(base_sarif))
 
 
 def _publish_assessment(api: GitHubApi, number: int, head_sha: str, base_sha: str,
@@ -819,13 +836,7 @@ def _publish_assessment(api: GitHubApi, number: int, head_sha: str, base_sha: st
     return 0 if verdict.passed else 1
 
 
-def publish() -> int:
-    repository = os.environ.get("GITHUB_REPOSITORY", "")
-    token = os.environ.get("GITHUB_TOKEN", "")
-    event_path = os.environ.get("GITHUB_EVENT_PATH", "")
-    artifact_dir = Path(os.environ.get("QODANA_ARTIFACT_DIR", ""))
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) or not token or not event_path:
-        raise GateError("Publisher is missing its GitHub identity")
+def _publisher_run(event_path: str) -> dict[str, Any]:
     try:
         event = json.loads(Path(event_path).read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -833,6 +844,17 @@ def publish() -> int:
     run = event.get("workflow_run") if isinstance(event, dict) else None
     if not isinstance(run, dict):
         raise GateError("Publisher was not triggered by a workflow_run event")
+    return run
+
+
+def publish() -> int:
+    repository = os.environ.get("GITHUB_REPOSITORY", "")
+    token = os.environ.get("GITHUB_TOKEN", "")
+    event_path = os.environ.get("GITHUB_EVENT_PATH", "")
+    artifact_dir = Path(os.environ.get("QODANA_ARTIFACT_DIR", ""))
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) or not token or not event_path:
+        raise GateError("Publisher is missing its GitHub identity")
+    run = _publisher_run(event_path)
     if run.get("event") != "pull_request":
         print("Qodana publisher ignored a non-pull-request scan.")
         return 0
@@ -875,9 +897,10 @@ def publish() -> int:
         return _publish_assessment(api, number, head_sha, base_sha, run_url,
                                    run_id, attempt, False, None, str(error))
     if governance_changes:
-        return _report_governance_changes(
+        _report_governance_changes(
             api, number, head_sha, base_sha, run_url, governance_changes, baseline_mixed
         )
+        return 1
 
     failure: str | None = None
     try:
@@ -906,6 +929,9 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--build-baseline requires --analyzed-sha and --output")
     if args.output != Path(BASELINE_PATH):
         parser.error(f"--output must be {BASELINE_PATH}")
+    if (args.build_baseline.is_symlink() or not args.build_baseline.is_file()
+            or args.build_baseline.stat().st_size > MAX_SARIF_BYTES):
+        raise GateError("Baseline input must be a bounded regular SARIF file")
     raw = args.build_baseline.read_bytes()
     baseline = build_baseline(raw, analyzed_sha=args.analyzed_sha, image=EXPECTED_IMAGE)
     Path(BASELINE_PATH).write_text(json.dumps(baseline, indent=2, sort_keys=True) + "\n", encoding="utf-8")

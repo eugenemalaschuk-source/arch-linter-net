@@ -78,7 +78,7 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
             startInfo.ArgumentList.Add(targetFramework);
         }
 
-        using Process process = Process.Start(startInfo)!;
+        using var process = Process.Start(startInfo)!;
         Task<string> outputTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
         Task<string> errorTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
         using CancellationTokenSource timeoutSource = new(TimeSpan.FromMilliseconds(timeoutMilliseconds));

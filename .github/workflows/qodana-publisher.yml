@@ -28,11 +28,16 @@ jobs:
       pull-requests: write
       statuses: write
     steps:
-      - name: Checkout trusted default-branch publisher
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: main
-          persist-credentials: false
+      - name: Load trusted publisher at the workflow revision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api -H 'Accept: application/vnd.github.raw+json' \
+            "repos/eugenemalaschuk-source/arch-linter-net/contents/tools/scripts/qodana_gate.py?ref=$GITHUB_SHA" \
+            > "$RUNNER_TEMP/qodana_gate.py"
 
       - name: Download the exact scanner-run artifact
         id: download
@@ -51,4 +56,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           QODANA_ARTIFACT_DIR: ${{ runner.temp }}/qodana-evidence
           QODANA_ARTIFACT_DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
-        run: python3 tools/scripts/qodana_gate.py
+        run: python3 "$RUNNER_TEMP/qodana_gate.py"

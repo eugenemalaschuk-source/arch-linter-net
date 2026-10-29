@@ -327,7 +327,7 @@ def write_evidence(artifacts: Path, evidence: dict, publish_summary: bool = True
             output.write(summary)
 
 
-def main(argv: list[str] | None = None) -> int:
+def _scan_arguments(argv: list[str] | None) -> tuple[argparse.Namespace, Path, Path | None, Path]:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=Path.cwd())
     parser.add_argument("--base-project", type=Path,
@@ -348,82 +348,108 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--output must be outside the base checkout")
     if output.exists() and any(output.iterdir()):
         parser.error("--output must be empty; refusing stale or overwritten evidence")
+    return args, project, base_project, output
+
+
+def _initial_evidence(burn_in: bool) -> dict:
+    return {"schema_version": 1, "status": "failed", "scans": [],
+            "burn_in_requested": burn_in, "cross_run_cache": False,
+            "run_id": os.environ.get("GITHUB_RUN_ID"),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "analyzed_sha": os.environ.get("QODANA_ANALYZED_SHA"),
+            "repository": os.environ.get("GITHUB_REPOSITORY"),
+            "pull_request_number": _optional_positive_int(os.environ.get("QODANA_PULL_REQUEST_NUMBER")),
+            "head_sha": _optional_text(os.environ.get("QODANA_HEAD_SHA")),
+            "base_sha": _optional_text(os.environ.get("QODANA_BASE_SHA")),
+            "base_analyzed_sha": _optional_text(os.environ.get("QODANA_BASE_ANALYZED_SHA")),
+            "event": os.environ.get("GITHUB_EVENT_NAME")}
+
+
+def _configure_scan(project: Path, base_project: Path | None, evidence: dict) -> tuple[Path, str]:
+    if not (project / "ArchLinterNet.slnx").is_file():
+        raise ValueError("The canonical ArchLinterNet.slnx solution is missing")
+    dotnet_root, sdk_version = locked_dotnet_sdk_root(project)
+    evidence["dotnet_sdk_version"] = sdk_version
+    image = configured_image(project)
+    evidence["configured_image"] = image
+    evidence["configured_profile"] = configured_profile(project)
+    evidence["configured_solution"] = configured_solution(project)
+    if base_project is not None:
+        if (evidence["base_analyzed_sha"] != evidence["base_sha"]
+                or not re.fullmatch(r"[0-9a-f]{40}", evidence["base_sha"] or "")):
+            raise ValueError("Base checkout does not match the pull request base SHA")
+        _, base_sdk_version = locked_dotnet_sdk_root(base_project)
+        if (configured_image(base_project) != image
+                or configured_profile(base_project) != evidence["configured_profile"]
+                or configured_solution(base_project) != evidence["configured_solution"]
+                or base_sdk_version != sdk_version):
+            raise ValueError("Base and head scanner configurations do not match")
+    return dotnet_root, image
+
+
+def _pull_image(image: str, artifacts: Path, evidence: dict) -> str:
+    pull_start = time.monotonic()
+    code = command(["docker", "pull", image], artifacts / "image.log", 300)
+    evidence["pull_seconds"] = round(time.monotonic() - pull_start, 3)
+    evidence["pull_exit_code"] = code
+    if code != 0:
+        raise ValueError("Community image pull failed; see image.log (Docker/network/registry)")
+    identity = subprocess.run(["docker", "image", "inspect", image, "--format", "{{.Id}}"],
+                              capture_output=True, text=True, check=True, timeout=30).stdout.strip()
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", identity):
+        raise ValueError("Docker did not return an immutable image identity")
+    evidence["image_id"] = identity
+    return identity
+
+
+def _run_repository_scans(project: Path, base_project: Path | None, work: Path, artifacts: Path,
+                          identity: str, dotnet_root: Path, evidence: dict) -> Path:
+    if base_project is not None:
+        base_scan = scan(base_project, work, artifacts, identity, "base", work / "base-cache",
+                         dotnet_root=dotnet_root)
+        evidence["scans"].append(base_scan)
+        write_evidence(artifacts, evidence, publish_summary=False)
+        if base_scan["status"] != "completed":
+            raise ValueError("Base analysis failed; inspect base.log and base.sarif.json")
+    cache = work / "repository-cache"
+    cold = scan(project, work, artifacts, identity, "cold", cache, dotnet_root=dotnet_root)
+    evidence["scans"].append(cold)
+    write_evidence(artifacts, evidence, publish_summary=False)
+    if cold["status"] != "completed":
+        raise ValueError("Canonical analysis failed; inspect cold.log and cold.sarif.json")
+    return cache
+
+
+def _run_burn_in(project: Path, work: Path, artifacts: Path, image: str, identity: str,
+                 dotnet_root: Path, cache: Path, evidence: dict) -> None:
+    warm = scan(project, work, artifacts, identity, "warm", cache, dotnet_root=dotnet_root)
+    evidence["scans"].append(warm)
+    write_evidence(artifacts, evidence, publish_summary=False)
+    for label, defective in (("positive", True), ("negative", False)):
+        probe = work / f"{label}-project"
+        create_probe(probe, image, defective)
+        evidence["scans"].append(scan(probe, work, artifacts, identity, label,
+                                      work / f"{label}-cache", timeout=180,
+                                      dotnet_root=dotnet_root))
+        write_evidence(artifacts, evidence, publish_summary=False)
+    evidence["burn_in_checks_passed"] = burn_in_passed(evidence["scans"])
+    if not evidence["burn_in_checks_passed"]:
+        raise ValueError("Cold/warm inventory differs or positive/negative probe failed")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args, project, base_project, output = _scan_arguments(argv)
     artifacts, work = output / "artifacts", output / "work"
     artifacts.mkdir(parents=True)
     work.mkdir()
-    evidence = {"schema_version": 1, "status": "failed", "scans": [],
-                "burn_in_requested": args.burn_in, "cross_run_cache": False,
-                "run_id": os.environ.get("GITHUB_RUN_ID"),
-                "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
-                "analyzed_sha": os.environ.get("QODANA_ANALYZED_SHA"),
-                "repository": os.environ.get("GITHUB_REPOSITORY"),
-                "pull_request_number": _optional_positive_int(os.environ.get("QODANA_PULL_REQUEST_NUMBER")),
-                "head_sha": _optional_text(os.environ.get("QODANA_HEAD_SHA")),
-                "base_sha": _optional_text(os.environ.get("QODANA_BASE_SHA")),
-                "base_analyzed_sha": _optional_text(os.environ.get("QODANA_BASE_ANALYZED_SHA")),
-                "event": os.environ.get("GITHUB_EVENT_NAME")}
+    evidence = _initial_evidence(args.burn_in)
     started = time.monotonic()
     try:
-        if not (project / "ArchLinterNet.slnx").is_file():
-            raise ValueError("The canonical ArchLinterNet.slnx solution is missing")
-        dotnet_root, sdk_version = locked_dotnet_sdk_root(project)
-        evidence["dotnet_sdk_version"] = sdk_version
-        image = configured_image(project)
-        evidence["configured_image"] = image
-        evidence["configured_profile"] = configured_profile(project)
-        evidence["configured_solution"] = configured_solution(project)
-        if base_project is not None:
-            if (evidence["base_analyzed_sha"] != evidence["base_sha"]
-                    or not re.fullmatch(r"[0-9a-f]{40}", evidence["base_sha"] or "")):
-                raise ValueError("Base checkout does not match the pull request base SHA")
-            _, base_sdk_version = locked_dotnet_sdk_root(base_project)
-            if (configured_image(base_project) != image
-                    or configured_profile(base_project) != evidence["configured_profile"]
-                    or configured_solution(base_project) != evidence["configured_solution"]
-                    or base_sdk_version != sdk_version):
-                raise ValueError("Base and head scanner configurations do not match")
-        pull_start = time.monotonic()
-        code = command(["docker", "pull", image], artifacts / "image.log", 300)
-        evidence["pull_seconds"] = round(time.monotonic() - pull_start, 3)
-        evidence["pull_exit_code"] = code
-        if code != 0:
-            raise ValueError("Community image pull failed; see image.log (Docker/network/registry)")
-        # Pin all scans in this invocation to the exact pulled image, not a mutable tag lookup.
-        identity = subprocess.run(["docker", "image", "inspect", image, "--format", "{{.Id}}"],
-                                  capture_output=True, text=True, check=True, timeout=30).stdout.strip()
-        if not re.fullmatch(r"sha256:[0-9a-f]{64}", identity):
-            raise ValueError("Docker did not return an immutable image identity")
-        evidence["image_id"] = identity
-        if base_project is not None:
-            base_scan = scan(base_project, work, artifacts, identity, "base", work / "base-cache",
-                             dotnet_root=dotnet_root)
-            evidence["scans"].append(base_scan)
-            write_evidence(artifacts, evidence, publish_summary=False)
-            if base_scan["status"] != "completed":
-                raise ValueError("Base analysis failed; inspect base.log and base.sarif.json")
-        cache = work / "repository-cache"
-        cold = scan(project, work, artifacts, identity, "cold", cache,
-                    dotnet_root=dotnet_root)
-        evidence["scans"].append(cold)
-        # Persist completed phases even if a later validation phase is interrupted.
-        write_evidence(artifacts, evidence, publish_summary=False)
-        if cold["status"] != "completed":
-            raise ValueError("Canonical analysis failed; inspect cold.log and cold.sarif.json")
+        dotnet_root, image = _configure_scan(project, base_project, evidence)
+        identity = _pull_image(image, artifacts, evidence)
+        cache = _run_repository_scans(project, base_project, work, artifacts, identity, dotnet_root, evidence)
         if args.burn_in:
-            warm = scan(project, work, artifacts, identity, "warm", cache,
-                        dotnet_root=dotnet_root)
-            evidence["scans"].append(warm)
-            write_evidence(artifacts, evidence, publish_summary=False)
-            for label, defective in (("positive", True), ("negative", False)):
-                probe = work / f"{label}-project"
-                create_probe(probe, image, defective)
-                evidence["scans"].append(scan(probe, work, artifacts, identity, label,
-                                              work / f"{label}-cache", timeout=180,
-                                              dotnet_root=dotnet_root))
-                write_evidence(artifacts, evidence, publish_summary=False)
-            evidence["burn_in_checks_passed"] = burn_in_passed(evidence["scans"])
-            if not evidence["burn_in_checks_passed"]:
-                raise ValueError("Cold/warm inventory differs or positive/negative probe failed")
+            _run_burn_in(project, work, artifacts, image, identity, dotnet_root, cache, evidence)
         evidence["status"] = "completed"
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         evidence["error"] = str(error)

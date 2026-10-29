@@ -415,7 +415,7 @@ internal sealed class HistoryIngestCommandHandler(
                 state.DeliveredStreamPaths);
         }
 
-        HashSet<string> completedPaths = state.CommittedPaths
+        var completedPaths = state.CommittedPaths
             .Concat(state.DeliveredStreamPaths)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         IReadOnlyList<string> uncommittedPaths = state.Sinks

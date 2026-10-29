@@ -166,15 +166,16 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
             return false;
         }
 
-        (string Name, string? Path)[] trustedInputs = validation.PolicyImportPaths
-            .Select(path => ("imported policy", (string?)path))
-            .Concat(validation.ResolvedAssemblyPaths.SelectMany(path => new[]
+        (string Name, string? Path)[] trustedInputs =
+        [
+            .. validation.PolicyImportPaths.Select(path => ("imported policy", (string?)path)),
+            .. validation.ResolvedAssemblyPaths.SelectMany(path => new[]
             {
                 ("a build artifact", (string?)path),
                 ("a build receipt", (string?)BuildReceiptStore.ReceiptPathFor(path)),
-            }))
-            .Concat(validation.DiscoveredProjectPaths.Select(path => ("a project file", (string?)path)))
-            .ToArray();
+            }),
+            .. validation.DiscoveredProjectPaths.Select(path => ("a project file", (string?)path)),
+        ];
         return AnalysisProfilePublisher.TryValidateDestination(
                 options.ProfileDestination, console,
                 (PolicyOptionName, options.PolicyPath),

@@ -31,7 +31,7 @@ The repository SHALL run tokenless Qodana Community for .NET against ArchLinterN
 Each invocation SHALL be bounded and preserve exit status, duration, image identity, cache size and valid SARIF evidence. New actionable findings SHALL fail the required gate, while lower-severity diagnostics remain visible in the report. Missing, malformed or failed analysis SHALL NOT count as clean.
 
 #### Scenario: New actionable findings
-- **WHEN** the validated head SARIF contains Moderate, High, or Critical findings absent from the fresh base scan
+- **WHEN** the validated head SARIF contains any High or Critical finding, or a Moderate finding absent from the fresh base scan
 - **THEN** the required Qodana status fails
 - **AND** the PR report lists finding deltas, severity counts, rule identifiers and source locations
 

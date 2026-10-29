@@ -300,7 +300,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", scanner)
         self.assertIn("pull_request:", scanner)
         self.assertIn("workflow_run:", publisher)
-        self.assertIn("ref: main", publisher)
+        self.assertIn("qodana_gate.py?ref=$GITHUB_SHA", publisher)
         self.assertIn("QODANA_ARTIFACT_DOWNLOAD_OUTCOME", publisher)
         self.assertIn("if: always()", publisher)
         for workflow in (scanner, publisher):

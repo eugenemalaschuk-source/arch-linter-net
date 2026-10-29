@@ -325,7 +325,10 @@ internal static class CoverageReportRenderer
             .Where(field => values.GetValueOrDefault(field.Key) is not null)
             .Select(field => $"{field.Label} `{Code(values[field.Key]!)}`"));
     }
-    private static string Code(string value) => Compact(value).Replace("`", "'", StringComparison.Ordinal);
+    private static string Code(string value)
+    {
+        return Compact(value).Replace("`", "'", StringComparison.Ordinal);
+    }
     private static string Compact(string value) { string text = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)); return text.Length <= 240 ? text : text[..237] + "..."; }
 
     private sealed class FailureRuleBuilder(string identifier, string name) { private readonly SortedSet<FailureDiagnostic> _diagnostics = []; public void Add(string category, string summary) => _diagnostics.Add(new(category, string.IsNullOrEmpty(summary) ? "structured diagnostic emitted without detail fields" : summary)); public FailureRule Build() => new(identifier, name, _diagnostics.ToArray()); }
