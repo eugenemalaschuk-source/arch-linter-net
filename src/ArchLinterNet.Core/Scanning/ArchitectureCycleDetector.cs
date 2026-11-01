@@ -2,14 +2,9 @@ namespace ArchLinterNet.Core.Scanning;
 
 internal static class ArchitectureCycleDetector
 {
-    public static IReadOnlyCollection<string> FindCycles(Dictionary<string, HashSet<string>> graph)
-    {
-        return FindCycles(graph, workCounter: null);
-    }
-
     internal static IReadOnlyCollection<string> FindCycles(
         Dictionary<string, HashSet<string>> graph,
-        ArchitectureCycleDetectorWorkCounter? workCounter)
+        ArchitectureCycleDetectorWorkCounter? workCounter = null)
     {
         string[] nodes = graph.Keys.OrderBy(key => key).ToArray();
         if (nodes.Length == 0)
@@ -17,7 +12,7 @@ internal static class ArchitectureCycleDetector
             return Array.Empty<string>();
         }
 
-        Dictionary<string, int> nodeIndices = nodes
+        var nodeIndices = nodes
             .Select((node, index) => (node, index))
             .ToDictionary(item => item.node, item => item.index, StringComparer.Ordinal);
         int[][] adjacency = BuildOrderedAdjacency(graph, nodes, nodeIndices, workCounter, out bool[] selfEdges);
@@ -86,9 +81,9 @@ internal static class ArchitectureCycleDetector
         ArchitectureCycleDetectorWorkCounter? workCounter)
     {
         int[] inDegree = new int[adjacency.Count];
-        for (int source = 0; source < adjacency.Count; source++)
+        foreach (int[] targets in adjacency)
         {
-            foreach (int target in adjacency[source])
+            foreach (int target in targets)
             {
                 inDegree[target]++;
                 if (workCounter is not null)

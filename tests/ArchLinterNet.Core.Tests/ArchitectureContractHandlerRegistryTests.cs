@@ -262,16 +262,14 @@ public sealed class ArchitectureContractHandlerRegistryTests
         ArchitectureHandlerResult viaHandler = CreateRegistry()
             .Execute("cycle", runner.Session, contract);
 
-        Assert.That(direct, Is.EqualTo(new[]
-        {
+        Assert.That(direct, Is.EqualTo((string[])[
             "layerA -> layerB -> layerA",
             "layerB -> layerA -> layerB",
-        }));
-        Assert.That(viaHandler.Cycles, Is.EqualTo(new[]
-        {
+        ]));
+        Assert.That(viaHandler.Cycles, Is.EqualTo((string[])[
             "[cyc] layerA -> layerB -> layerA",
             "[cyc] layerB -> layerA -> layerB",
-        }));
+        ]));
         Assert.That(viaHandler.Violations, Is.Empty);
     }
 
@@ -351,11 +349,10 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(cycles, Is.EqualTo(new[]
-            {
+            Assert.That(cycles, Is.EqualTo((string[])[
                 "layerA -> layerB -> layerA",
                 "layerB -> layerA -> layerB",
-            }));
+            ]));
             Assert.That(candidates, Has.Length.EqualTo(2));
             Assert.That(candidates.Select(candidate => candidate.ContractGroup), Is.EqualTo(["strict_cycles", "strict_cycles"]));
             Assert.That(candidates.Select(candidate => candidate.ContractId), Is.EqualTo(["cycle-check", "cycle-check"]));

@@ -486,11 +486,10 @@ contracts:
 
         IReadOnlyCollection<string> cycles = runner.CheckAcyclicSiblingContract(contract);
 
-        Assert.That(cycles, Is.EqualTo(new[]
-        {
+        Assert.That(cycles, Is.EqualTo((string[])[
             "AcyclicSiblingFixtures.TwoNode: Auth -> Payments -> Auth",
             "AcyclicSiblingFixtures.TwoNode: Payments -> Auth -> Payments",
-        }));
+        ]));
     }
 
     [Test]
@@ -500,12 +499,11 @@ contracts:
 
         IReadOnlyCollection<string> cycles = runner.CheckAcyclicSiblingContract(contract);
 
-        Assert.That(cycles, Is.EqualTo(new[]
-        {
+        Assert.That(cycles, Is.EqualTo((string[])[
             "AcyclicSiblingFixtures.ThreeNode: Auth -> Payments -> Billing -> Auth",
             "AcyclicSiblingFixtures.ThreeNode: Billing -> Auth -> Payments -> Billing",
             "AcyclicSiblingFixtures.ThreeNode: Payments -> Billing -> Auth -> Payments",
-        }));
+        ]));
     }
 
     [Test]
@@ -596,11 +594,10 @@ contracts:
         bool result = ArchitectureValidator.Validate(path, out var violations, out var cycles);
 
         Assert.That(violations, Is.Empty);
-        Assert.That(cycles, Is.EqualTo(new[]
-        {
+        Assert.That(cycles, Is.EqualTo((string[])[
             "[strict-two-node] AcyclicSiblingFixtures.TwoNode: Auth -> Payments -> Auth",
             "[strict-two-node] AcyclicSiblingFixtures.TwoNode: Payments -> Auth -> Payments",
-        }));
+        ]));
         Assert.That(result, Is.False);
     }
 
@@ -613,11 +610,10 @@ contracts:
 
         IReadOnlyCollection<string> cycles = runner.CheckAcyclicSiblingContract(contract);
 
-        Assert.That(cycles, Is.EqualTo(new[]
-        {
+        Assert.That(cycles, Is.EqualTo((string[])[
             "AcyclicSiblingFixtures.TwoNode: Auth -> Payments -> Auth",
             "AcyclicSiblingFixtures.TwoNode: Payments -> Auth -> Payments",
-        }));
+        ]));
     }
 
     [Test]
@@ -629,11 +625,10 @@ contracts:
         IReadOnlyCollection<string> cycles1 = runner1.CheckAcyclicSiblingContract(contract1);
         IReadOnlyCollection<string> cycles2 = runner2.CheckAcyclicSiblingContract(contract2);
 
-        Assert.That(cycles1, Is.EqualTo(new[]
-        {
+        Assert.That(cycles1, Is.EqualTo((string[])[
             "AcyclicSiblingFixtures.TwoNode: Auth -> Payments -> Auth",
             "AcyclicSiblingFixtures.TwoNode: Payments -> Auth -> Payments",
-        }));
+        ]));
         Assert.That(cycles2, Is.EqualTo(cycles1));
     }
 
@@ -660,10 +655,9 @@ contracts:
         ArchitectureValidator.Validate(path, out var violations, out var cycles);
 
         Assert.That(violations, Is.Empty);
-        Assert.That(cycles, Is.EqualTo(new[]
-        {
+        Assert.That(cycles, Is.EqualTo((string[])[
             $"[{contractId}] AcyclicSiblingFixtures.TwoNode: Auth -> Payments -> Auth",
             $"[{contractId}] AcyclicSiblingFixtures.TwoNode: Payments -> Auth -> Payments",
-        }));
+        ]));
     }
 }

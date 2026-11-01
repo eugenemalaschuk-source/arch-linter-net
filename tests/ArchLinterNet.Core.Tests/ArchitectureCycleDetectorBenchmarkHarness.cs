@@ -39,7 +39,7 @@ public sealed class ArchitectureCycleDetectorBenchmarkHarness
             for (int sample = 0; sample < sampleCount; sample++)
             {
                 long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-                Stopwatch stopwatch = Stopwatch.StartNew();
+                var stopwatch = Stopwatch.StartNew();
                 IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
                 stopwatch.Stop();
                 allocatedBytes.Add(GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
@@ -50,11 +50,8 @@ public sealed class ArchitectureCycleDetectorBenchmarkHarness
 
             long peakWorkingSetAfter = Process.GetCurrentProcess().PeakWorkingSet64;
             ArchitectureCycleDetectorWorkCounter work = new();
-            IReadOnlyCollection<string> observedCycles = ArchitectureCycleDetector.FindCycles(graph, work);
-            Assert.That(observedCycles, Is.Empty, $"D({size}, {size * (size - 1) / 2}) must be acyclic.");
-            int cycleCount = observedCycles.Count;
-            string cycleSha256 = Sha256(string.Join("\n", observedCycles));
-            observedCycles = Array.Empty<string>();
+            (int cycleCount, string cycleSha256) = ObserveCycles(graph, work);
+            Assert.That(cycleCount, Is.Zero, $"D({size}, {size * (size - 1) / 2}) must be acyclic.");
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
@@ -139,7 +136,7 @@ public sealed class ArchitectureCycleDetectorBenchmarkHarness
             for (int sample = 0; sample < sampleCount; sample++)
             {
                 long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-                Stopwatch stopwatch = Stopwatch.StartNew();
+                var stopwatch = Stopwatch.StartNew();
                 IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
                 stopwatch.Stop();
                 allocatedBytes.Add(GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
@@ -149,11 +146,8 @@ public sealed class ArchitectureCycleDetectorBenchmarkHarness
 
             long peakWorkingSetAfter = Process.GetCurrentProcess().PeakWorkingSet64;
             ArchitectureCycleDetectorWorkCounter work = new();
-            IReadOnlyCollection<string> observedCycles = ArchitectureCycleDetector.FindCycles(graph, work);
-            Assert.That(observedCycles, Has.Count.EqualTo(expectedCycleCount));
-            int cycleCount = observedCycles.Count;
-            string cycleSha256 = Sha256(string.Join("\n", observedCycles));
-            observedCycles = Array.Empty<string>();
+            (int cycleCount, string cycleSha256) = ObserveCycles(graph, work);
+            Assert.That(cycleCount, Is.EqualTo(expectedCycleCount));
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
@@ -266,6 +260,14 @@ public sealed class ArchitectureCycleDetectorBenchmarkHarness
 
     private static string NodeName(int index) => $"N{index:D2}";
 
+    private static (int CycleCount, string CycleSha256) ObserveCycles(
+        Dictionary<string, HashSet<string>> graph,
+        ArchitectureCycleDetectorWorkCounter work)
+    {
+        IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph, work);
+        return (cycles.Count, Sha256(string.Join("\n", cycles)));
+    }
+
     private static double Median(IReadOnlyList<double> values)
     {
         double[] ordered = values.Order().ToArray();
@@ -291,9 +293,13 @@ public sealed class ArchitectureCycleDetectorBenchmarkHarness
         return visitsPerRoot * vertexCount;
     }
 
-    private static BigInteger CompleteStrongComponentCycleCount(int vertexCount) =>
-        CompleteStrongComponentVisitCount(vertexCount) - vertexCount;
+    private static BigInteger CompleteStrongComponentCycleCount(int vertexCount)
+    {
+        return CompleteStrongComponentVisitCount(vertexCount) - vertexCount;
+    }
 
-    private static string Sha256(string value) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    private static string Sha256(string value)
+    {
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    }
 }

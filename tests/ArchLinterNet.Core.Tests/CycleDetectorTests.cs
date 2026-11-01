@@ -32,7 +32,7 @@ public sealed class CycleDetectorTests
 
         IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
 
-        Assert.That(cycles, Is.EqualTo(new[] { "A -> B -> A", "B -> A -> B" }));
+        Assert.That(cycles, Is.EqualTo((string[])["A -> B -> A", "B -> A -> B"]));
     }
 
     [Test]
@@ -47,12 +47,11 @@ public sealed class CycleDetectorTests
 
         IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
 
-        Assert.That(cycles, Is.EqualTo(new[]
-        {
+        Assert.That(cycles, Is.EqualTo((string[])[
             "A -> B -> C -> A",
             "B -> C -> A -> B",
             "C -> A -> B -> C",
-        }));
+        ]));
     }
 
     [Test]
@@ -71,15 +70,14 @@ public sealed class CycleDetectorTests
 
         IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
 
-        Assert.That(cycles, Is.EqualTo(new[]
-        {
+        Assert.That(cycles, Is.EqualTo((string[])[
             "A -> B -> A",
             "B -> A -> B",
             "C -> D -> C",
             "D -> C -> D",
-        }));
+        ]));
 
-        Dictionary<string, HashSet<string>> reordered = graph.Reverse()
+        var reordered = graph.Reverse()
             .ToDictionary(
                 entry => entry.Key,
                 entry => new HashSet<string>(entry.Value.Reverse(), StringComparer.Ordinal),
@@ -101,8 +99,7 @@ public sealed class CycleDetectorTests
 
         IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
 
-        Assert.That(cycles, Is.EqualTo(new[]
-        {
+        Assert.That(cycles, Is.EqualTo((string[])[
             "A -> B -> A",
             "A -> B -> C -> A",
             "A -> C -> A",
@@ -112,7 +109,7 @@ public sealed class CycleDetectorTests
             "C -> A -> C",
             "D -> E -> D",
             "E -> D -> E",
-        }));
+        ]));
     }
 
     [Test]
@@ -125,7 +122,7 @@ public sealed class CycleDetectorTests
 
         IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
 
-        Assert.That(cycles, Is.EqualTo(new[] { "A -> A" }));
+        Assert.That(cycles, Is.EqualTo((string[])["A -> A"]));
     }
 
     [Test]
