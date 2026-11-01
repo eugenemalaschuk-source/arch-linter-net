@@ -102,7 +102,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
             SourceIdentity = Environment.GetEnvironmentVariable("ARCHLINTER_CYCLE_RECORDER_SOURCE_IDENTITY") ?? "unreported",
             LegacyImplementation = "previous per-evidence reachability traversal, reproduced in this explicit harness",
             IndexedImplementation = "one fullGraph SCC index followed by candidate edge and component membership checks",
-            GraphShape = "fixed two-SCC graph with a three-vertex acyclic tail",
+            GraphShape = "fixed graph with two cyclic SCCs and a three-vertex acyclic tail",
             Vertices = graph.Count,
             Edges = graph.Values.Sum(targets => targets.Count),
             GraphSha256 = graphSha256,
