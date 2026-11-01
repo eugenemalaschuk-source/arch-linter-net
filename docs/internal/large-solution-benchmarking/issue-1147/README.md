@@ -47,14 +47,21 @@ alternating order, and deterministic traversal counters run outside timing.
 | Indexed Core assembly SHA-256 | `27122446fce6617e8de07ecdde967d3fe60be5a66a4830ec37ca2effb769da9b` |
 | Legacy CLI assembly SHA-256 | `2714a8392985655bd0d396d2b06f79ed71aa428216fd0ab581b338b5bb6a75ea` |
 | Legacy Core assembly SHA-256 | `e7d23ae830f3cb01c608a244a347d36fbe41ca022f468f14310475e89b907711` |
-| Full-analysis/profile source fingerprint | `46658fc7e6b9508297dfc450114ccebcbad27feecf7d8c93b4001ed3b8170c9d` |
+| Measured full-analysis/profile source fingerprint | `46658fc7e6b9508297dfc450114ccebcbad27feecf7d8c93b4001ed3b8170c9d` |
 | Direct recorder benchmark source fingerprint | `28ba9bceb8a180e3bde9d5bd5048a3cc3c3dbaf6c9cec583b4bca31c3ce1486c` |
+| Final packaged 0.10.0 profile schema SHA-256 (canonical LF) | `022aa51e2f9c73ce76727b52bae079445cc6232c63d5fdd3660ee93eb9d401ed` |
 
 The reproducible source inputs and per-file hashes for these fingerprints are in
 [`source-fingerprints.sha256`](source-fingerprints.sha256). Binary hashes identify the exact
 indexed and isolated legacy assemblies used by the full-analysis runs. The legacy build changed
 only the recorder implementation and temporary work-counter fields; its CLI assembly hash is
 retained separately because each isolated worktree produced its own CLI build output.
+
+The measured source fingerprints and binary hashes identify the inputs captured before the
+cross-platform package-validation correction. That follow-up normalized the new schema resource to
+the repository's canonical LF line endings and updated its manifest digest to the final value above;
+it did not change recorder code or the captured measurements. The listed binary hashes continue to
+identify the exact binaries that produced the evidence.
 
 The exact x64 SDK 10.0.402 and its .NET 10.0.13 runtime were installed in the per-user .NET
 directory. The repository's SDK pin was not changed. Both comparison builds and the explicit Release

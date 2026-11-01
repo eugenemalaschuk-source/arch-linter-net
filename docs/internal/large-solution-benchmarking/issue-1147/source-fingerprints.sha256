@@ -1,5 +1,10 @@
-Fingerprint rule: SHA-256 of UTF-8 text containing one line per source input in the listed order, formatted
+These are measurement-time source fingerprints. SHA-256 is computed over UTF-8 text containing one
+line per input in the listed order, formatted
 `<lowercase-file-SHA256><two spaces><repository-relative-path>` and terminated by LF.
+
+The 0.10.0 profile schema was later normalized to canonical LF for cross-platform packaging. Its
+final LF SHA-256 is `022aa51e2f9c73ce76727b52bae079445cc6232c63d5fdd3660ee93eb9d401ed`; the original
+measurement-time Windows working-tree SHA-256 below is `b4140321b73be9aa9d7fb36f2e40ecda5b7c9cebe077396d3d4c8b54e9b9f366`.
 
 Full-analysis/profile source fingerprint: 46658fc7e6b9508297dfc450114ccebcbad27feecf7d8c93b4001ed3b8170c9d
 81ae2087dbfb46027fd94748351fb4b1ab24145fbb52544a2822bf128e2e48f1  global.json
