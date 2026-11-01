@@ -132,3 +132,7 @@ its hardware-sensitive generator is the explicit
 `ChangedProjectAdvisoryEffectBenchmarkHarness` test. The deterministic graph-closure and family
 coverage evidence runs as ordinary (non-`[Explicit]`) tests under
 `tests/ArchLinterNet.Core.Tests/ChangedProjectAdvisoryScopePlanningTests.cs`.
+
+The issue-specific direct cycle-detector before/after measurements, structural work counts,
+output digests, and measurement limits for #1124 are documented in
+[`issue-1124-cycle-enumeration-evidence.md`](issue-1124-cycle-enumeration-evidence.md).
