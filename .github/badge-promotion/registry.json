@@ -8,7 +8,7 @@
       "base_ref": "main",
       "producer": {
         "workflow_path": ".github/workflows/ci.yml",
-        "workflow_sha": "43febe8297593f0f93579781edd51c298ef61702",
+        "workflow_sha": "dd08e21daad265b4bb3475326380d6fe7990b119",
         "job_name": "Architecture Coverage",
         "check_name": "Architecture Coverage",
         "check_app": "github-actions",
@@ -69,7 +69,7 @@
       "base_ref": "main",
       "producer": {
         "workflow_path": ".github/workflows/ci.yml",
-        "workflow_sha": "43febe8297593f0f93579781edd51c298ef61702",
+        "workflow_sha": "dd08e21daad265b4bb3475326380d6fe7990b119",
         "job_name": "Architecture Coverage",
         "check_name": "Architecture Coverage",
         "check_app": "github-actions",
