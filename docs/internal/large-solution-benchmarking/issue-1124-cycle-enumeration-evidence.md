@@ -33,12 +33,12 @@ counts are zero because no component is cyclic.
 | V | E | baseline visits | baseline edge candidates | baseline ms | baseline allocated bytes | candidate ms | candidate allocated bytes | candidate retained delta bytes | candidate peak WS delta bytes |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 8 | 28 | 255 | 247 | 0.1119 | 93,504 | — | — | — | — |
-| 10 | 45 | 1,023 | 1,013 | — | — | 0.0179 | 7,952 | 1,480 | 0 |
+| 10 | 45 | 1,023 | 1,013 | — | — | 0.0208 | 7,856 | 1,480 | 0 |
 | 12 | 66 | 4,095 | 4,083 | 1.7211 | 1,439,296 | — | — | — | — |
 | 16 | 120 | 65,535 | 65,519 | 21.0161 | 22,906,688 | — | — | — | — |
-| 20 | 190 | 1,048,575 | 1,048,555 | 381.7355 | 366,323,200 | 0.1694 | 17,728 | 576 | 0 |
-| 30 | 435 | 1,073,741,823 | 1,073,741,793 | model only | model only | 0.1632 | 29,040 | 816 | 0 |
-| 50 | 1,225 | 1,125,899,906,842,623 | 1,125,899,906,842,573 | model only | model only | 0.3145 | 62,920 | 1,392 | 0 |
+| 20 | 190 | 1,048,575 | 1,048,555 | 381.7355 | 366,323,200 | 0.1164 | 17,632 | 576 | 0 |
+| 30 | 435 | 1,073,741,823 | 1,073,741,793 | model only | model only | 0.2147 | 28,944 | 816 | 0 |
+| 50 | 1,225 | 1,125,899,906,842,623 | 1,125,899,906,842,573 | model only | model only | 0.3682 | 62,824 | 1,392 | 0 |
 
 Candidate samples used five calls at V=10, one at V=20, V=30, and V=50. Baseline
 used five at V=8/12, three at V=16, and one at V=20. Table timings are medians
@@ -69,9 +69,9 @@ copy pass because all edges remain inside the component.
 
 | V | E | cycle outputs | baseline ms | baseline allocated bytes | baseline retained delta bytes | baseline peak WS delta bytes | candidate ms | candidate allocated bytes | candidate retained delta bytes | candidate peak WS delta bytes | output SHA-256 |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 4 | 12 | 60 | 0.0889 | 61,632 | 9,696 | 49,152 | 0.0412 | 16,480 | -21,400 | 0 | `6c8a44983a59f64ad6b0867c95b78450bad793681993cf086228e13493cf2520` |
-| 6 | 30 | 1,950 | 4.0834 | 2,083,536 | 369,816 | 6,791,168 | 1.8375 | 478,264 | 416,680 | 0 | `4da77ca9eca9073369430a64cbf5416612e7edb0cc3755505929d0496c9fe247` |
-| 8 | 56 | 109,592 | 334.2337 | 124,920,776 | 26,593,984 | 45,703,168 | 168.091 | 31,524,936 | 29,525,656 | 17,379,328 | `7da2392138e8a87fe9590cf7407aee8a6de3342aa64aacce4fa8919c312d6bca` |
+| 4 | 12 | 60 | 0.0889 | 61,632 | 9,696 | 49,152 | 0.0406 | 17,080 | -20,080 | 0 | `6c8a44983a59f64ad6b0867c95b78450bad793681993cf086228e13493cf2520` |
+| 6 | 30 | 1,950 | 4.0834 | 2,083,536 | 369,816 | 6,791,168 | 1.5964 | 552,560 | 416,680 | 0 | `4da77ca9eca9073369430a64cbf5416612e7edb0cc3755505929d0496c9fe247` |
+| 8 | 56 | 109,592 | 334.2337 | 124,920,776 | 26,593,984 | 45,703,168 | 176.2224 | 32,865,680 | 29,525,656 | 15,659,008 | `7da2392138e8a87fe9590cf7407aee8a6de3342aa64aacce4fa8919c312d6bca` |
 
 Baseline and candidate output counts and digests match at every size. Baseline
 used five/three/one timing samples at V=4/6/8; candidate used five/five/one.
@@ -86,9 +86,20 @@ allocation grew with `V+E` preparation.
 The measured acyclic path explosion is removed: the detector returns zero
 cycles without entering cycle enumeration, and its counted work follows the
 prepared graph size. The V=20 local DAG sample changed from 381.7355 ms and
-366,323,200 allocated bytes at baseline to 0.1694 ms and 17,728 bytes in the
+366,323,200 allocated bytes at baseline to 0.1164 ms and 17,632 bytes in the
 candidate. These timings are machine-local, with one sample at V=20; work counts
 and allocations provide the stronger evidence for the structural bound.
+
+The review follow-up now collects cycle strings directly into one
+`HashSet<string>` and sorts that set for the returned array. This replaces the
+result list plus the later distinct set with one deduplication set; the final
+sorting buffer remains. Output counts and digests remain unchanged. In the V=8
+complete-SCC rerun, total allocated bytes were 32,865,680 versus 31,524,936 in
+the preceding PR revision; retained-heap delta was unchanged at 29,525,656 bytes.
+The process peak-working-set delta moved from 17,379,328 to 15,659,008 bytes,
+but that high-water measurement is noisy and does not establish a reliable peak
+memory reduction. The collector change reduces the number of live result
+containers; the local measurements do not show a total-allocation reduction.
 
 The detector still enumerates every required simple cycle within cyclic SCCs,
 so its time and output memory can remain exponential there. The existing
@@ -101,7 +112,7 @@ Reproduction command from the repository directory (with restore assets present)
 
 ```powershell
 $env:ARCHLINTER_CYCLE_BENCHMARK_SIZES = '10,20,30,50'
-$env:ARCHLINTER_CYCLE_SOURCE_IDENTITY = 'd74b4422 plus issue-1124 candidate'
+$env:ARCHLINTER_CYCLE_SOURCE_IDENTITY = 'PR 1145 remediation candidate: direct HashSet cycle collection'
 dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter 'FullyQualifiedName~ArchitectureCycleDetectorBenchmarkHarness' --logger 'console;verbosity=normal'
 ```
 

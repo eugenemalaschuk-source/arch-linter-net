@@ -88,6 +88,34 @@ public sealed class CycleDetectorTests
     }
 
     [Test]
+    public void FindCycles_OverlappingCyclesAndOneWayEdgeBetweenCyclicComponents_ReturnsExactSortedCycles()
+    {
+        var graph = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+        {
+            ["A"] = new(StringComparer.Ordinal) { "B", "C" },
+            ["B"] = new(StringComparer.Ordinal) { "A", "C" },
+            ["C"] = new(StringComparer.Ordinal) { "A", "D" },
+            ["D"] = new(StringComparer.Ordinal) { "E" },
+            ["E"] = new(StringComparer.Ordinal) { "D" },
+        };
+
+        IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
+
+        Assert.That(cycles, Is.EqualTo(new[]
+        {
+            "A -> B -> A",
+            "A -> B -> C -> A",
+            "A -> C -> A",
+            "B -> A -> B",
+            "B -> C -> A -> B",
+            "C -> A -> B -> C",
+            "C -> A -> C",
+            "D -> E -> D",
+            "E -> D -> E",
+        }));
+    }
+
+    [Test]
     public void FindCycles_SelfEdge_ReturnsSelfCycle()
     {
         var graph = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)

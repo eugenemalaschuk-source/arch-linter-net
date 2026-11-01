@@ -27,7 +27,7 @@ internal static class ArchitectureCycleDetector
         bool[] cyclicComponents = FindCyclicComponents(selfEdges, componentByNode, componentSizes);
         int[][] cycleAdjacency = BuildCycleAdjacency(adjacency, componentByNode, cyclicComponents, workCounter);
 
-        List<string> cycles = [];
+        HashSet<string> cycles = new();
         bool[] pathVisited = new bool[nodes.Length];
         List<int> path = [];
         for (int start = 0; start < nodes.Length; start++)
@@ -40,7 +40,7 @@ internal static class ArchitectureCycleDetector
             EnumerateCyclesFrom(start, start, nodes, componentByNode, cycleAdjacency, pathVisited, path, cycles, workCounter);
         }
 
-        return cycles.Distinct().OrderBy(cycle => cycle).ToArray();
+        return cycles.OrderBy(cycle => cycle).ToArray();
     }
 
     private static int[][] BuildOrderedAdjacency(
@@ -324,7 +324,7 @@ internal static class ArchitectureCycleDetector
         IReadOnlyList<int[]> cycleAdjacency,
         bool[] visited,
         List<int> path,
-        List<string> cycles,
+        HashSet<string> cycles,
         ArchitectureCycleDetectorWorkCounter? workCounter)
     {
         visited[current] = true;
@@ -343,8 +343,7 @@ internal static class ArchitectureCycleDetector
 
             if (next == start)
             {
-                cycles.Add(FormatCycle(path, start, nodes));
-                if (workCounter is not null)
+                if (cycles.Add(FormatCycle(path, start, nodes)) && workCounter is not null)
                 {
                     workCounter.EmittedCycleCount++;
                 }
