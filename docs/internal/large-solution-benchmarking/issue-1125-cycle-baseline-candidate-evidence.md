@@ -61,15 +61,15 @@ Environment: .NET SDK 10.0.403, runtime .NET 10.0.14, Windows 10.0.26300 x64, AM
 (8 cores / 16 logical processors). The repository pins SDK 10.0.402, which was unavailable for
 this run; only `rollForward` was temporarily changed to `latestPatch` for commands and the exact
 checked-in `global.json` bytes were restored afterward. Benchmark source identity:
-`80953484d2f9efc25eed974e615b84bdd0d47d06`.
+`b59086a772c93566093e3872700f4c58371c5b49`.
 
 ## Results
 
 | Evidence count | Legacy median ms | Indexed median ms | Local speedup | Legacy allocated bytes | Indexed allocated bytes | Allocation reduction | Legacy retained delta bytes | Indexed retained delta bytes | Peak WS delta bytes (legacy / indexed) |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 100 | 0.0427 | 0.0195 | 2.19x | 32,504 | 3,768 | 88.4% | 180,448 | 2,312 | 0 / 0 |
-| 1,000 | 0.3329 | 0.0827 | 4.03x | 320,544 | 11,008 | 96.6% | 464,960 | 5,896 | 0 / 0 |
-| 10,000 | 3.0821 | 0.5034 | 6.12x | 3,251,520 | 133,984 | 95.9% | 7,931,656 | 67,336 | 0 / 0 |
+| 100 | 0.0394 | 0.0199 | 1.98x | 32,504 | 3,768 | 88.4% | 131,296 | 2,312 | 0 / 0 |
+| 1,000 | 0.3430 | 0.0831 | 4.13x | 320,544 | 11,008 | 96.6% | 464,960 | 5,872 | 0 / 0 |
+| 10,000 | 2.9243 | 0.3868 | 7.56x | 3,251,520 | 133,984 | 95.9% | 7,931,656 | 67,336 | 0 / 0 |
 
 Five samples were used for each implementation and size; medians are shown. The allocation count
 includes required output storage. Retained managed deltas and process peak-working-set deltas are
@@ -100,7 +100,7 @@ paths. The canonical candidate-array SHA-256 values were:
 | 10,000 | 5,000 | `85e0d4d4ab56bbc325adc32e02228e18040a47c445ab3ca2fb6e6e35ac1ba5b5` |
 
 The indexed path passes the local gate: outputs match, exactly one index is built, reachability
-searches are zero, the 10,000-item median is 6.12x faster, and per-call allocation is 95.9% lower.
+searches are zero, the 10,000-item median is 7.56x faster, and per-call allocation is 95.9% lower.
 The table is the paired run from the cited source identity. Local timing is sensitive to warm-up and
 runtime scheduling. Deterministic work counts and matching output hashes are the stronger evidence.
 
@@ -112,10 +112,10 @@ the legacy and indexed implementations.
 
 | Graph | Evidence / candidates | Legacy median ms / allocated bytes | Indexed median ms / allocated bytes | Recorder-only comparison |
 |---|---:|---:|---:|---|
-| Sparse cycle, 10,000 vertices / 10,000 edges | 1 / 1 | 0.3786 / 673,384 | 1.7734 / 2,204,104 | Indexed 4.69x slower; 227% more allocation |
-| Sparse cycle, 10,000 vertices / 10,000 edges | 10 / 10 | 3.9275 / 6,731,848 | 1.9122 / 2,204,344 | Indexed 2.05x faster; 67.3% less allocation |
-| Dense cycle, 500 vertices / 124,751 edges | 1 / 1 | 0.0067 / 8,808 | 2.4729 / 1,105,848 | Indexed about 369x slower; about 126x the allocation |
-| Dense cycle, 500 vertices / 124,751 edges | 10 / 10 | 12.0491 / 468,768 | 4.4047 / 1,106,088 | Indexed 2.74x faster; 136% more allocation |
+| Sparse cycle, 10,000 vertices / 10,000 edges | 1 / 1 | 0.3692 / 673,384 | 1.8384 / 2,204,104 | Indexed 4.98x slower; 227% more allocation |
+| Sparse cycle, 10,000 vertices / 10,000 edges | 10 / 10 | 4.1556 / 6,731,848 | 1.4523 / 2,204,344 | Indexed 2.86x faster; 67.3% less allocation |
+| Dense cycle, 500 vertices / 124,751 edges | 1 / 1 | 0.0072 / 8,808 | 3.8972 / 1,105,848 | Indexed about 541x slower; about 126x the allocation |
+| Dense cycle, 500 vertices / 124,751 edges | 10 / 10 | 16.0409 / 468,768 | 2.2866 / 1,106,088 | Indexed 7.02x faster; 136% more allocation |
 
 The work counters explain the shape of these results. The sparse legacy runs performed 1 and 10
 reachability searches, with 10,000 and 100,000 node pops respectively; the dense runs performed 1
@@ -146,7 +146,7 @@ From the repository root with restore assets present, set the source identity an
 matrix:
 
 ```powershell
-$env:ARCHLINTER_CYCLE_RECORDER_SOURCE_IDENTITY = '80953484d2f9efc25eed974e615b84bdd0d47d06'
+$env:ARCHLINTER_CYCLE_RECORDER_SOURCE_IDENTITY = 'b59086a772c93566093e3872700f4c58371c5b49'
 dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter 'FullyQualifiedName~RunBaselineCandidateRecorderMatrix' --logger 'console;verbosity=detailed'
 ```
 
