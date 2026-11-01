@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ArchLinterNet.Core.Execution.Checkers;
 using NUnit.Framework;
 
@@ -19,14 +20,21 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
                 IReadOnlyCollection<CycleCandidateEvidence> evidence =
                     CreateLargeGraphEvidence(workload, evidenceCount);
                 WarmUpRecorders(workload.Graph, evidence);
+                AssertPairedOrderedCandidateOutput(workload.Graph, evidence);
+                RecorderTimingSamples timing = MeasureAlternatingRecorderSamples(
+                    workload.Graph,
+                    evidence,
+                    expectedCandidateCount: evidenceCount);
                 LegacyRecorderMeasurement legacy = MeasureLegacyRecorder(
                     workload.Graph,
                     evidence,
-                    expectedCandidateCount: evidenceCount);
+                    expectedCandidateCount: evidenceCount,
+                    timing: timing);
                 IndexedRecorderMeasurement indexed = MeasureIndexedRecorder(
                     workload.Graph,
                     evidence,
-                    expectedCandidateCount: evidenceCount);
+                    expectedCandidateCount: evidenceCount,
+                    timing: timing);
                 Assert.That(indexed.CandidateCount, Is.EqualTo(legacy.CandidateCount));
                 Assert.That(indexed.CandidateDigest, Is.EqualTo(legacy.CandidateDigest));
 
@@ -37,6 +45,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
                     Edges = workload.Graph.Values.Sum(targets => targets.Count),
                     GraphSha256 = GraphSha256(workload.Graph),
                     CandidateEvidenceCount = evidenceCount,
+                    UniqueCandidateEdgePairs = CountUniqueCandidateEdgePairs(evidence),
                     CandidateEvidenceSha256 = EvidenceSha256(evidence),
                     Legacy = ToLegacyBenchmarkResult(legacy),
                     Indexed = ToIndexedBenchmarkResult(indexed),
@@ -169,6 +178,8 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
             measurement.PeakWorkingSetDeltaBytes,
             Work = new
             {
+                ComponentIndexBuildElapsedMs = measurement.Work.ComponentIndexBuildElapsedTicks * 1000d / Stopwatch.Frequency,
+                CandidateEvaluationElapsedMs = measurement.Work.CandidateEvaluationElapsedTicks * 1000d / Stopwatch.Frequency,
                 measurement.Work.CandidateEvidenceChecks,
                 measurement.Work.CandidateEdgePresenceChecks,
                 measurement.Work.ComponentMembershipChecks,

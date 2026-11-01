@@ -5538,6 +5538,79 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCounters : System.IEqua
   property int SnapshotMaterializations {get;init;}
   property int SourceFilesScanned {get;init;}
   property int SourceScanPasses {get;init;}
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation? left, ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation? left, ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation? right)
+  property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork Work {get;init;}
+  property bool RecordingEnabled {get;init;}
+  property double CandidateEvaluationElapsedMs {get;init;}
+  property double ComponentIndexBuildElapsedMs {get;init;}
+  property double ElapsedMs {get;init;}
+  property double ObservationOverheadElapsedMs {get;init;}
+  property int CandidateEvidenceCount {get;init;}
+  property int UniqueCandidateEdgePairs {get;init;}
+  property int Vertices {get;init;}
+  property long AllocatedBytes {get;init;}
+  property long Edges {get;init;}
+  property long EmittedCandidateCount {get;init;}
+  property long ObservationOverheadAllocatedBytes {get;init;}
+  property string Mode {get;init;}
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements? left, ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements? left, ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation> Invocations {get;init;}
+  property double CandidateEvaluationElapsedMs {get;init;}
+  property double ComponentIndexBuildElapsedMs {get;init;}
+  property double ElapsedMs {get;init;}
+  property double ObservationOverheadElapsedMs {get;init;}
+  property int DisabledInvocationCount {get;init;}
+  property int EmptyEvidenceInvocationCount {get;init;}
+  property int EnabledInvocationCount {get;init;}
+  property int InvocationCount {get;init;}
+  property int NonEmptyEvidenceInvocationCount {get;init;}
+  property long AllocatedBytes {get;init;}
+  property long CandidateEvidenceCount {get;init;}
+  property long Edges {get;init;}
+  property long EmittedCandidateCount {get;init;}
+  property long ObservationOverheadAllocatedBytes {get;init;}
+  property long UniqueCandidateEdgePairs {get;init;}
+  property long Vertices {get;init;}
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork? left, ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork? left, ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork? right)
+  property int AdjacencyListsBuilt {get;init;}
+  property int ComponentIndexBuildCount {get;init;}
+  property int FirstPassVertexVisits {get;init;}
+  property int PreparedVertices {get;init;}
+  property int SecondPassVertexVisits {get;init;}
+  property long AdjacencyEdgeVisits {get;init;}
+  property long CandidateEdgePresenceChecks {get;init;}
+  property long CandidateEmissionCount {get;init;}
+  property long CandidateEvidenceChecks {get;init;}
+  property long ComponentMembershipChecks {get;init;}
+  property long FirstPassEdgeVisits {get;init;}
+  property long PreparedEdges {get;init;}
+  property long ReverseDegreeEdgeVisits {get;init;}
+  property long ReverseFillEdgeVisits {get;init;}
+  property long SecondPassEdgeVisits {get;init;}
 static class ArchLinterNet.Core.Profiling.AnalysisProfileId
   field const string V1 = "analysis-profile/v1"
 static class ArchLinterNet.Core.Profiling.AnalysisProfileJsonWriter
@@ -5551,6 +5624,7 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements : System.I
   method string ToString()
   operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? left, ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? right)
   operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? left, ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? right)
+  property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements? CycleRecorder {get;init;}
   property long? AllocatedBytesTotal {get;init;}
   property long? PeakWorkingSetBytes {get;init;}
 sealed class ArchLinterNet.Core.Profiling.AnalysisProfileOutput : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileOutput>
@@ -6425,6 +6499,7 @@ sealed class ArchLinterNet.Core.Reporting.ValidationTiming
   ctor()
   method System.IDisposable Measure(string name, int indent = 0)
   method System.IDisposable MeasureContractFamily(string name, System.Func<int> countProvider, int indent = 1)
+  method static ArchLinterNet.Core.Reporting.ValidationTiming CreateForAnalysisProfile()
   method void WriteReport(System.IO.TextWriter writer)
 interface ArchLinterNet.Core.Resolution.Abstractions.IArchitectureRepositoryRootResolver
   method string Resolve()

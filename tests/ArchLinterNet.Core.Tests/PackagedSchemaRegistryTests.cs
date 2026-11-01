@@ -20,7 +20,7 @@ public sealed class PackagedSchemaRegistryTests
                 "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
             };
     private static readonly string[] _version080SchemaIds = ["baseline", "policy-root", "policy-fragment", "normalized-finding"];
-    private static readonly string[] _version0100SchemaIds = ["analysis-cache"];
+    private static readonly string[] _version0100SchemaIds = ["analysis-cache", "analysis-profile"];
 
     [Test]
     public void List_ReturnsEveryReleaseMatchedSchemaInOrdinalOrder()
@@ -35,7 +35,8 @@ public sealed class PackagedSchemaRegistryTests
             Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v3"));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "normalized-finding").DocumentVersion, Is.EqualTo("v3"));
             // Policy root/fragment, baseline, and normalized findings remain at 0.8.0; the cache
-            // advances to 0.10.0 without changing the prior manifest or schema bytes.
+            // and additive analysis-profile schema advance to 0.10.0 without changing prior
+            // manifest entries or historical schema bytes.
             // Earlier identities remain byte-for-byte frozen per packaged-schema-registry.
             Assert.That(
                 schemas.Where(schema => !_version080SchemaIds.Contains(schema.LogicalId)

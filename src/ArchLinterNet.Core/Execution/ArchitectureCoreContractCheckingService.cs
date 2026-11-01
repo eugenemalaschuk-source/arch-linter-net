@@ -75,7 +75,8 @@ internal sealed class ArchitectureCoreContractCheckingService
         ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
         CycleChecker.Result result = CycleChecker.Check(contract, _session.CheckerContext, executionContext);
         _session.CollectUnmatchedIgnores(executionContext);
-        _session.AddCycleBaselineCandidates(result.FullGraph, result.CandidateEvidence);
+        _session.AddCycleBaselineCandidates(
+            result.FullGraph, result.CandidateEvidence, executionContext.ContractGroup);
         return result.Cycles;
     }
 

@@ -92,9 +92,9 @@ internal sealed class ValidateCommandExecution
         string errorFormat,
         ValidateProfileExecutionState profileState)
     {
-        ValidationTiming? timing = options.TimingsEnabled || options.ProfileDestination is not null
-            ? new ValidationTiming()
-            : null;
+        ValidationTiming? timing = options.ProfileDestination is not null
+            ? ValidationTiming.CreateForAnalysisProfile()
+            : options.TimingsEnabled ? new ValidationTiming() : null;
         profileState.Timing = timing;
         ValidationRequest request = BuildValidationRequest(options, mode);
 
@@ -154,9 +154,9 @@ internal sealed class ValidateCommandExecution
         string errorFormat,
         ValidateProfileExecutionState profileState)
     {
-        ValidationTiming? timing = options.TimingsEnabled || options.ProfileDestination is not null
-            ? new ValidationTiming()
-            : null;
+        ValidationTiming? timing = options.ProfileDestination is not null
+            ? ValidationTiming.CreateForAnalysisProfile()
+            : options.TimingsEnabled ? new ValidationTiming() : null;
         profileState.Timing = timing;
         AnalysisSnapshotRequest snapshotRequest = new()
         {

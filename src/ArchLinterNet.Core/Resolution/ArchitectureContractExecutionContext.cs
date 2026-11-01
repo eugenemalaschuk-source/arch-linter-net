@@ -46,6 +46,8 @@ internal sealed class ArchitectureContractExecutionContext
 
     public string? ContractId { get; }
 
+    internal string? ContractGroup => _contractGroup;
+
     public bool IsIgnored(
         string sourceType,
         string forbiddenReference,

@@ -402,6 +402,9 @@ class ArchLinterNet.Core.Profiling.AnalysisProfileBuilder [static]
 class ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters [sealed]
 class ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters [sealed]
 class ArchLinterNet.Core.Profiling.AnalysisProfileCounters [sealed]
+class ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation [sealed]
+class ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements [sealed]
+class ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork [sealed]
 class ArchLinterNet.Core.Profiling.AnalysisProfileId [static]
 class ArchLinterNet.Core.Profiling.AnalysisProfileJsonWriter [static]
 class ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements [sealed]
@@ -1222,6 +1225,9 @@ ctor ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions()
 ctor ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters()
 ctor ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters()
 ctor ArchLinterNet.Core.Profiling.AnalysisProfileCounters()
+ctor ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation()
+ctor ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements()
+ctor ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork()
 ctor ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements()
 ctor ArchLinterNet.Core.Profiling.AnalysisProfileOutput()
 ctor ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement(System.String, System.Int32, System.Int32, System.Nullable`1[System.Int32], System.Nullable`1[System.Double], System.Nullable`1[System.Double])
@@ -1928,6 +1934,7 @@ method ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter.FormatResultAsSar
 method ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter.FormatResultAsSarif(System.String, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary], System.String): System.String
 method ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter.FormatResultAsSarif(System.String, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic], System.String): System.String [virtual]
 method ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter.FormatResultAsSarif(System.String, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.String): System.String [virtual]
+method ArchLinterNet.Core.Reporting.ValidationTiming.CreateForAnalysisProfile(): ArchLinterNet.Core.Reporting.ValidationTiming [static]
 method ArchLinterNet.Core.Reporting.ValidationTiming.Measure(System.String, System.Int32): System.IDisposable
 method ArchLinterNet.Core.Reporting.ValidationTiming.MeasureContractFamily(System.String, System.Func`1[System.Int32], System.Int32): System.IDisposable
 method ArchLinterNet.Core.Reporting.ValidationTiming.WriteReport(System.IO.TextWriter): System.Void
@@ -4236,7 +4243,54 @@ property ArchLinterNet.Core.Profiling.AnalysisProfileCounters.SelectedAssemblyCo
 property ArchLinterNet.Core.Profiling.AnalysisProfileCounters.SnapshotMaterializations: System.Int32 [get, init]
 property ArchLinterNet.Core.Profiling.AnalysisProfileCounters.SourceFilesScanned: System.Int32 [get, init]
 property ArchLinterNet.Core.Profiling.AnalysisProfileCounters.SourceScanPasses: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.AllocatedBytes: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.CandidateEvaluationElapsedMs: System.Double [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.CandidateEvidenceCount: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.ComponentIndexBuildElapsedMs: System.Double [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.Edges: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.ElapsedMs: System.Double [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.EmittedCandidateCount: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.Mode: System.String [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.ObservationOverheadAllocatedBytes: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.ObservationOverheadElapsedMs: System.Double [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.RecordingEnabled: System.Boolean [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.UniqueCandidateEdgePairs: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.Vertices: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation.Work: ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.AllocatedBytes: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.CandidateEvaluationElapsedMs: System.Double [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.CandidateEvidenceCount: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.ComponentIndexBuildElapsedMs: System.Double [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.DisabledInvocationCount: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.Edges: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.ElapsedMs: System.Double [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.EmittedCandidateCount: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.EmptyEvidenceInvocationCount: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.EnabledInvocationCount: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.InvocationCount: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.Invocations: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderInvocation] [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.NonEmptyEvidenceInvocationCount: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.ObservationOverheadAllocatedBytes: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.ObservationOverheadElapsedMs: System.Double [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.UniqueCandidateEdgePairs: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements.Vertices: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.AdjacencyEdgeVisits: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.AdjacencyListsBuilt: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.CandidateEdgePresenceChecks: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.CandidateEmissionCount: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.CandidateEvidenceChecks: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.ComponentIndexBuildCount: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.ComponentMembershipChecks: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.FirstPassEdgeVisits: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.FirstPassVertexVisits: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.PreparedEdges: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.PreparedVertices: System.Int32 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.ReverseDegreeEdgeVisits: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.ReverseFillEdgeVisits: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.SecondPassEdgeVisits: System.Int64 [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderWork.SecondPassVertexVisits: System.Int32 [get, init]
 property ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements.AllocatedBytesTotal: System.Nullable`1[System.Int64] [get, init]
+property ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements.CycleRecorder: ArchLinterNet.Core.Profiling.AnalysisProfileCycleRecorderMeasurements [get, init]
 property ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements.PeakWorkingSetBytes: System.Nullable`1[System.Int64] [get, init]
 property ArchLinterNet.Core.Profiling.AnalysisProfileOutput.CommittedSinkCount: System.Int32 [get, init]
 property ArchLinterNet.Core.Profiling.AnalysisProfileOutput.FailedSinkCount: System.Int32 [get, init]

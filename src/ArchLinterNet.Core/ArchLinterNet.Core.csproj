@@ -52,13 +52,14 @@
     <EmbeddedResource Include="..\..\schema\0.8.0\analysis-cache.schema.json" Link="Schema\0.8.0\analysis-cache.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.analysis-cache.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.8.0\baseline.schema.json" Link="Schema\0.8.0\baseline.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.baseline.schema.json" />
     <!-- The 0.8.0 manifest and its listed schema bytes remain immutable and packaged for existing
-         consumers. PackagedSchemaRegistry loads the 0.10.0 manifest, which advances only the
-         analysis-cache entry to its new 0.10.0 identity while retaining the policy-root,
-         policy-fragment, baseline, and normalized-finding identities at 0.8.0 and unaffected
-         entries at 0.5.1. Frozen finding/cache resources at 0.5.1, 0.6.1, and 0.8.0 remain
-         packaged as legacy contracts. -->
+         consumers. PackagedSchemaRegistry loads the 0.10.0 manifest, which advances the
+         analysis-cache and analysis-profile entries to their 0.10.0 identities while retaining
+         the policy-root, policy-fragment, baseline, and normalized-finding identities at 0.8.0
+         and unaffected entries at 0.5.1. Frozen profile/finding/cache resources at 0.5.1, 0.6.1,
+         and 0.8.0 remain packaged as legacy contracts. -->
     <EmbeddedResource Include="..\..\schema\0.8.0\compatibility-manifest.json" Link="Schema\0.8.0\compatibility-manifest.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.compatibility-manifest.json" />
     <EmbeddedResource Include="..\..\schema\0.10.0\analysis-cache.schema.json" Link="Schema\0.10.0\analysis-cache.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.10.0.analysis-cache.schema.json" />
+    <EmbeddedResource Include="..\..\schema\0.10.0\analysis-profile.schema.json" Link="Schema\0.10.0\analysis-profile.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.10.0.analysis-profile.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.10.0\compatibility-manifest.json" Link="Schema\0.10.0\compatibility-manifest.json" LogicalName="ArchLinterNet.Core.Schema.0.10.0.compatibility-manifest.json" />
     <EmbeddedResource Include="..\..\schema\0.5.1\api-snapshot.schema.json" Link="Schema\0.5.1\api-snapshot.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.5.1.api-snapshot.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.6.1\normalized-finding.schema.json" Link="Schema\0.6.1\normalized-finding.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.6.1.normalized-finding.schema.json" />
@@ -72,6 +73,7 @@
     <Content Include="..\..\schema\0.8.0\baseline.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.8.0/baseline.schema.json" />
     <Content Include="..\..\schema\0.8.0\compatibility-manifest.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.8.0/" />
     <Content Include="..\..\schema\0.10.0\analysis-cache.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.10.0/analysis-cache.schema.json" />
+    <Content Include="..\..\schema\0.10.0\analysis-profile.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.10.0/analysis-profile.schema.json" />
     <Content Include="..\..\schema\0.10.0\compatibility-manifest.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.10.0/" />
     <Content Include="..\..\schema\0.5.1\api-snapshot.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />
     <Content Include="..\..\schema\0.5.1\baseline.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />

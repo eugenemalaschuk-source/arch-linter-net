@@ -1,0 +1,68 @@
+{
+  "Mode": "audit",
+  "Pair": 1,
+  "Order": "indexed-then-legacy",
+  "OutputParity": true,
+  "Results": [
+    {
+      "Variant": "indexed",
+      "ExitCode": 1,
+      "CompletionStatus": "ValidationFailure",
+      "AnalysisTotalMilliseconds": 4049,
+      "AnalysisTotalProcessorTimeMs": 4859.375,
+      "DiagnosticAndCycleOutputSha256": "4bcf1140d2a05f6c19909930d802233bb91964d7c8e0ca088b882ccaf3204a7e",
+      "OuterWallMilliseconds": 4336.12,
+      "AllocatedBytesTotal": 662884272,
+      "PeakWorkingSetBytes": 188477440,
+      "CycleRecorder": {
+        "InvocationCount": 0,
+        "EnabledInvocationCount": 0,
+        "DisabledInvocationCount": 0,
+        "EmptyEvidenceInvocationCount": 0,
+        "NonEmptyEvidenceInvocationCount": 0,
+        "Vertices": 0,
+        "Edges": 0,
+        "CandidateEvidenceCount": 0,
+        "UniqueCandidateEdgePairs": 0,
+        "EmittedCandidateCount": 0,
+        "ElapsedMs": 0,
+        "ComponentIndexBuildElapsedMs": 0,
+        "CandidateEvaluationElapsedMs": 0,
+        "AllocatedBytes": 0,
+        "ObservationOverheadElapsedMs": 0,
+        "ObservationOverheadAllocatedBytes": 0,
+        "Invocations": []
+      }
+    },
+    {
+      "Variant": "legacy",
+      "ExitCode": 1,
+      "CompletionStatus": "ValidationFailure",
+      "AnalysisTotalMilliseconds": 3941,
+      "AnalysisTotalProcessorTimeMs": 4625,
+      "DiagnosticAndCycleOutputSha256": "4bcf1140d2a05f6c19909930d802233bb91964d7c8e0ca088b882ccaf3204a7e",
+      "OuterWallMilliseconds": 4238.86,
+      "AllocatedBytesTotal": 662985328,
+      "PeakWorkingSetBytes": 193122304,
+      "CycleRecorder": {
+        "InvocationCount": 0,
+        "EnabledInvocationCount": 0,
+        "DisabledInvocationCount": 0,
+        "EmptyEvidenceInvocationCount": 0,
+        "NonEmptyEvidenceInvocationCount": 0,
+        "Vertices": 0,
+        "Edges": 0,
+        "CandidateEvidenceCount": 0,
+        "UniqueCandidateEdgePairs": 0,
+        "EmittedCandidateCount": 0,
+        "ElapsedMs": 0,
+        "ComponentIndexBuildElapsedMs": 0,
+        "CandidateEvaluationElapsedMs": 0,
+        "AllocatedBytes": 0,
+        "ObservationOverheadElapsedMs": 0,
+        "ObservationOverheadAllocatedBytes": 0,
+        "Invocations": []
+      }
+    }
+  ]
+}
