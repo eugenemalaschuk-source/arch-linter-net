@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution.Checkers;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -15,52 +16,79 @@ internal sealed class ArchitectureCycleBaselineCandidateRecorder
     public void Record(
         bool enabled,
         IReadOnlyDictionary<string, HashSet<string>> fullGraph,
-        IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence)
+        IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence,
+        ArchitectureCycleBaselineCandidateRecorderWorkCounter? workCounter = null)
     {
-        if (!enabled)
+        if (!enabled || candidateEvidence.Count == 0)
         {
             return;
         }
 
         // fullGraph carries every observed edge, live or suppressed (see CycleChecker.Result):
-        // reachability must be evaluated against the true reference structure, not the live-only
-        // graph, or a baseline-suppressed edge whose cycle partner is also suppressed could never
-        // prove the cycle still exists once neither edge remains in a live-only graph.
-        foreach (CycleCandidateEvidence evidence in candidateEvidence.Where(
-            evidence => EdgeParticipatesInCycle(fullGraph, evidence.SourceLayerName, evidence.TargetLayerName)))
+        // component membership must be evaluated against the true reference structure, not the
+        // live-only graph, or a baseline-suppressed edge whose cycle partner is also suppressed
+        // could never prove the cycle still exists once neither edge remains in a live-only graph.
+        if (workCounter is not null)
         {
-            _candidates.Add(evidence.Candidate);
+            workCounter.ComponentIndexBuildCount++;
         }
-    }
 
-    private static bool EdgeParticipatesInCycle(
-        IReadOnlyDictionary<string, HashSet<string>> graph,
-        string sourceLayerName,
-        string targetLayerName)
-    {
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Stack<string>();
-        pending.Push(targetLayerName);
+        ArchitectureStronglyConnectedComponentIndex componentIndex =
+            ArchitectureStronglyConnectedComponentIndex.CreateFromGraph(fullGraph, workCounter);
 
-        while (pending.Count > 0)
+        foreach (CycleCandidateEvidence evidence in candidateEvidence)
         {
-            string current = pending.Pop();
-            if (!visited.Add(current))
+            if (workCounter is not null)
+            {
+                workCounter.CandidateEvidenceChecks++;
+                workCounter.CandidateEdgePresenceChecks++;
+            }
+
+            if (!fullGraph.TryGetValue(evidence.SourceLayerName, out HashSet<string>? targets)
+                || !targets.Contains(evidence.TargetLayerName))
             {
                 continue;
             }
 
-            if (current == sourceLayerName)
+            if (workCounter is not null)
             {
-                return true;
+                workCounter.ComponentMembershipChecks++;
             }
 
-            foreach (string next in graph[current])
+            if (!componentIndex.AreInSameComponent(evidence.SourceLayerName, evidence.TargetLayerName))
             {
-                pending.Push(next);
+                continue;
             }
+
+            if (workCounter is not null)
+            {
+                workCounter.CandidateEmissionCount++;
+            }
+
+            _candidates.Add(evidence.Candidate);
         }
-
-        return false;
     }
+}
+
+internal sealed class ArchitectureCycleBaselineCandidateRecorderWorkCounter
+    : ArchitectureStronglyConnectedComponentIndexWorkCounter
+{
+    internal long CandidateEvidenceChecks { get; set; }
+
+    internal long CandidateEdgePresenceChecks { get; set; }
+
+    internal long ComponentMembershipChecks { get; set; }
+
+    internal long CandidateEmissionCount { get; set; }
+
+    internal long ReachabilitySearches { get; set; }
+
+    internal long ReachabilityNodePops { get; set; }
+
+    internal long ReachabilityVisitedVertices { get; set; }
+
+    internal long ReachabilityEdgeVisits { get; set; }
+
+    internal int ComponentIndexBuildCount { get; set; }
+
 }

@@ -11,9 +11,9 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-[Explicit("Environment-labelled detector-local evidence for issue #1124; select this test explicitly.")]
+[Explicit("Environment-labelled cycle-path evidence for issues #1124 and #1125; select explicitly.")]
 [Category("Benchmark")]
-public sealed class ArchitectureCycleDetectorBenchmarkHarness
+public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
 {
     private static readonly int[] _defaultSizes = [8, 12, 16, 20];
 
