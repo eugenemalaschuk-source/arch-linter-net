@@ -1140,10 +1140,10 @@ jobs:
           - os: windows-latest
             name: Windows / Core Shard 2
             shard: 2
-          - os: macos-14
+          - os: macos-15
             name: Apple Silicon macOS / Core Shard 1
             shard: 1
-          - os: macos-14
+          - os: macos-15
             name: Apple Silicon macOS / Core Shard 2
             shard: 2
     permissions:
@@ -1156,7 +1156,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify Apple Silicon macOS runner
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         run: test "$(uname -m)" = arm64
 
       - name: Setup .NET
@@ -1187,7 +1187,7 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-          - os: macos-14
+          - os: macos-15
             name: Apple Silicon macOS
     permissions:
       contents: read
@@ -1199,7 +1199,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify Apple Silicon macOS runner
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         run: test "$(uname -m)" = arm64
 
       - name: Setup .NET
@@ -1383,7 +1383,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify Apple Silicon macOS runner
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         run: test "$(uname -m)" = arm64
 
       - name: Setup .NET
@@ -1434,7 +1434,7 @@ jobs:
     name: Packed Artifact Shard (Apple Silicon macOS / ${{ matrix.shard_name }})
     needs: packed_artifact_candidate
     if: github.event_name == 'pull_request'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 12
     strategy:
       fail-fast: false
