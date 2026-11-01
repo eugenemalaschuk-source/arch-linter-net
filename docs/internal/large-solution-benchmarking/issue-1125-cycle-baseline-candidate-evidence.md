@@ -46,19 +46,30 @@ warmed before five Release samples. Allocations use
 managed deltas are forced-GC observations around one retained output recorder; peak working set is
 the process high-water delta.
 
+The explicit matrix also measures a sparse 10,000-vertex directed cycle (10,000 edges) and a dense
+500-vertex graph with all forward edges plus one closing edge (124,751 edges). Both are strongly
+connected, and the first 1 or 10 edges in the fixed evidence sequence are cycle participants. These
+cases isolate index construction cost when the recorder receives only 1 or 10 evidence items while
+still emitting ordinary baseline candidates.
+
+For the sparse cycle, a legacy search from the first edge visits the full graph. In the dense graph,
+the legacy traversal can find a return path after visiting only a few nodes for the first evidence
+item, depending on `HashSet` iteration order. That makes the dense one-item case a useful example of
+where unconditional index construction costs more than one favorable reachability search.
+
 Environment: .NET SDK 10.0.403, runtime .NET 10.0.14, Windows 10.0.26300 x64, AMD Ryzen 7 255
 (8 cores / 16 logical processors). The repository pins SDK 10.0.402, which was unavailable for
 this run; only `rollForward` was temporarily changed to `latestPatch` for commands and the exact
 checked-in `global.json` bytes were restored afterward. Benchmark source identity:
-`fb965ecd69980b560377c13850f78967dad30846`.
+`b76b5c75135cf0c6f0b992894a5aa73067b43469`.
 
 ## Results
 
 | Evidence count | Legacy median ms | Indexed median ms | Local speedup | Legacy allocated bytes | Indexed allocated bytes | Allocation reduction | Legacy retained delta bytes | Indexed retained delta bytes | Peak WS delta bytes (legacy / indexed) |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 100 | 0.0379 | 0.0186 | 2.04x | 32,504 | 3,768 | 88.4% | 178,736 | 2,648 | 0 / 0 |
-| 1,000 | 0.3715 | 0.0809 | 4.59x | 320,544 | 11,008 | 96.6% | 468,848 | 9,816 | 0 / 0 |
-| 10,000 | 3.1349 | 0.3866 | 8.11x | 3,251,520 | 133,984 | 95.9% | 7,996,984 | 132,696 | 2,146,304 / 0 |
+| 100 | 0.0398 | 0.0195 | 2.04x | 32,504 | 3,768 | 88.4% | 131,296 | 2,312 | 0 / 0 |
+| 1,000 | 0.3357 | 0.0851 | 3.95x | 320,544 | 11,008 | 96.6% | 464,960 | 5,896 | 0 / 0 |
+| 10,000 | 2.8422 | 0.3794 | 7.49x | 3,251,520 | 133,984 | 95.9% | 7,931,656 | 67,336 | 0 / 0 |
 
 Five samples were used for each implementation and size; medians are shown. The allocation count
 includes required output storage. Retained managed deltas and process peak-working-set deltas are
@@ -89,13 +100,45 @@ paths. The canonical candidate-array SHA-256 values were:
 | 10,000 | 5,000 | `85e0d4d4ab56bbc325adc32e02228e18040a47c445ab3ca2fb6e6e35ac1ba5b5` |
 
 The indexed path passes the local gate: outputs match, exactly one index is built, reachability
-searches are zero, the 10,000-item median is 8.11x faster, and per-call allocation is 95.9% lower.
-An earlier before-only capture measured 4.0956 ms and 3,251,400 allocated bytes at 10,000 items;
-the checked-in warmed legacy control measured 3.1349 ms and 3,251,520 bytes. This is a 23% timing
-difference and 120-byte allocation difference across two measurement harness revisions. The
-paired run above is the canonical comparison; the earlier run should not be compared directly to
-the indexed values. Local timing is sensitive to warm-up and runtime scheduling. Deterministic
-work counts and matching output hashes are the stronger evidence.
+searches are zero, the 10,000-item median is 7.49x faster, and per-call allocation is 95.9% lower.
+The table is the paired run from the cited source identity. Local timing is sensitive to warm-up and
+runtime scheduling. Deterministic work counts and matching output hashes are the stronger evidence.
+
+### Large graphs with 1 or 10 evidence items
+
+Each value is the median of five warmed direct `Record` calls. Graph, evidence, and recorder
+construction are outside the timed boundary. All four cases emitted the same candidate sequence in
+the legacy and indexed implementations.
+
+| Graph | Evidence / candidates | Legacy median ms / allocated bytes | Indexed median ms / allocated bytes | Recorder-only comparison |
+|---|---:|---:|---:|---|
+| Sparse cycle, 10,000 vertices / 10,000 edges | 1 / 1 | 0.4029 / 673,384 | 2.0085 / 2,204,104 | Indexed 4.99x slower; 227% more allocation |
+| Sparse cycle, 10,000 vertices / 10,000 edges | 10 / 10 | 3.9284 / 6,731,848 | 1.5061 / 2,204,344 | Indexed 2.61x faster; 67.3% less allocation |
+| Dense cycle, 500 vertices / 124,751 edges | 1 / 1 | 0.0109 / 8,808 | 4.3577 / 1,105,848 | Indexed about 400x slower; about 126x the allocation |
+| Dense cycle, 500 vertices / 124,751 edges | 10 / 10 | 13.6270 / 468,768 | 2.9554 / 1,106,088 | Indexed 4.61x faster; 136% more allocation |
+
+The work counters explain the shape of these results. The sparse legacy runs performed 1 and 10
+reachability searches, with 10,000 and 100,000 node pops respectively; the dense runs performed 1
+and 10 searches, with 3 and 1,096,017 node pops. In both graphs, every indexed call built exactly
+one SCC index, prepared all vertices and edges, and performed zero reachability searches. Each
+graph edge was visited once in each index-preparation pass (adjacency, reverse degree, reverse fill,
+first SCC pass, and second SCC pass).
+
+The dense one-item case shows that SCC construction can dominate when one favorable legacy search
+finds a short return path. At 10 items, indexing was faster on both graphs, although it allocated
+more in the dense case. These are synthetic recorder-only measurements: they do not estimate the
+frequency of these shapes in consumer projects or imply whole-analysis performance. The production
+algorithm still builds the index for every enabled non-empty evidence set; the measurements document
+that small-input tradeoff without changing the issue's indexed implementation.
+
+Deterministic identities for the added cases:
+
+| Graph | Graph SHA-256 | Evidence count | Evidence SHA-256 | Candidate-array SHA-256 (legacy = indexed) |
+|---|---|---:|---|---|
+| Sparse cycle, 10,000 vertices / 10,000 edges | `34e29e2eff778aed93c9ee3e7a61e4861a65bf703becd903b67669393b2e59e8` | 1 | `3cddb4f7db53ae820a6f8d8f885cfe7874f93aee95367e456a3fe2471fc680a6` | `bea70851e5645c5100849981f4adc7b9cb7c197c662424202acf1220b42dca3e` |
+| Sparse cycle, 10,000 vertices / 10,000 edges | `34e29e2eff778aed93c9ee3e7a61e4861a65bf703becd903b67669393b2e59e8` | 10 | `b1ed5ec9c017e16b79739d2c61fdbd1410fc3b43e6f09e6c042f4eb78b3ad274` | `e7a0713e458b1592397cad6d8ae77669d2b33ef3bdbda0df0dd0aa52b227d6da` |
+| Dense cycle, 500 vertices / 124,751 edges | `ee7bacf65a74b0bc16bfb78c45353f3d6566fd286956cad24404d3549750ea7d` | 1 | `835a35d418b084dac1c2a1f54c3a59cf9cfbca97e0929335d45c62b66e30f9a5` | `6b3289ce6e40eeaa608f73aa8627d8668c74f0240be59b921d44f0c94aa39fdb` |
+| Dense cycle, 500 vertices / 124,751 edges | `ee7bacf65a74b0bc16bfb78c45353f3d6566fd286956cad24404d3549750ea7d` | 10 | `bdc333fdc4e2634ba02f3132b67ec30598698624810be499aaeb49a1aa5b7741` | `c56b37b7cf820ffbbcd647bc07234915037cd92bcec6cd291193fee29930cdc3` |
 
 ## Reproduction
 
@@ -103,7 +146,7 @@ From the repository root with restore assets present, set the source identity an
 matrix:
 
 ```powershell
-$env:ARCHLINTER_CYCLE_RECORDER_SOURCE_IDENTITY = 'fb965ecd69980b560377c13850f78967dad30846'
+$env:ARCHLINTER_CYCLE_RECORDER_SOURCE_IDENTITY = 'b76b5c75135cf0c6f0b992894a5aa73067b43469'
 dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter 'FullyQualifiedName~RunBaselineCandidateRecorderMatrix' --logger 'console;verbosity=detailed'
 ```
 
