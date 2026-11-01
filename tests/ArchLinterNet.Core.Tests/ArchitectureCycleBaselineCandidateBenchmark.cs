@@ -129,14 +129,14 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
         IReadOnlyCollection<CycleCandidateEvidence> evidence,
         int evidenceCount)
     {
-        const int sampleCount = 5;
+        const int SampleCount = 5;
         List<double> elapsedMilliseconds = [];
         List<long> allocatedBytes = [];
         LegacyArchitectureCycleBaselineCandidateRecorder? retainedRecorder = null;
         long retainedBefore = GC.GetTotalMemory(forceFullCollection: true);
         long peakWorkingSetBefore = Process.GetCurrentProcess().PeakWorkingSet64;
 
-        for (int sample = 0; sample < sampleCount; sample++)
+        for (int sample = 0; sample < SampleCount; sample++)
         {
             LegacyArchitectureCycleBaselineCandidateRecorder recorder = new();
             long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
@@ -164,7 +164,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
         LegacyRecorderMeasurement measurement = new(
             candidateCount,
             candidateSha256,
-            sampleCount,
+            SampleCount,
             elapsedMilliseconds,
             Median(elapsedMilliseconds),
             allocatedBytes,
@@ -181,14 +181,14 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
         IReadOnlyCollection<CycleCandidateEvidence> evidence,
         int evidenceCount)
     {
-        const int sampleCount = 5;
+        const int SampleCount = 5;
         List<double> elapsedMilliseconds = [];
         List<long> allocatedBytes = [];
         ArchitectureCycleBaselineCandidateRecorder? retainedRecorder = null;
         long retainedBefore = GC.GetTotalMemory(forceFullCollection: true);
         long peakWorkingSetBefore = Process.GetCurrentProcess().PeakWorkingSet64;
 
-        for (int sample = 0; sample < sampleCount; sample++)
+        for (int sample = 0; sample < SampleCount; sample++)
         {
             ArchitectureCycleBaselineCandidateRecorder recorder = new();
             long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
@@ -216,7 +216,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
         IndexedRecorderMeasurement measurement = new(
             candidateCount,
             candidateSha256,
-            sampleCount,
+            SampleCount,
             elapsedMilliseconds,
             Median(elapsedMilliseconds),
             allocatedBytes,
