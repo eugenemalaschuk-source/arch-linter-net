@@ -85,7 +85,7 @@ internal sealed class ArchitectureStronglyConnectedComponentIndex
         for (int source = 0; source < nodes.Length; source++)
         {
             HashSet<string> targets = graph[nodes[source]];
-            int[] targetIndices = new int[targets.Count];
+            var targetIndices = new int[targets.Count];
             int targetIndex = 0;
             foreach (string target in targets)
             {

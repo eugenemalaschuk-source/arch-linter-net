@@ -17,81 +17,28 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
     public void RunBaselineCandidateRecorderMatrix()
     {
         Dictionary<string, HashSet<string>> graph = CreateBaselineCandidateGraph();
-        string graphSha256 = Sha256(string.Join(
-            "\n",
-            graph.OrderBy(entry => entry.Key, StringComparer.Ordinal)
-                .Select(entry => $"{entry.Key}:{string.Join(",", entry.Value.Order(StringComparer.Ordinal))}")));
+        string graphSha256 = GraphSha256(graph);
         List<object> measurements = [];
 
         foreach (int evidenceCount in _baselineCandidateSizes)
         {
             IReadOnlyCollection<CycleCandidateEvidence> evidence = CreateBaselineCandidateEvidence(evidenceCount);
             WarmUpRecorders(graph, evidence);
-            LegacyRecorderMeasurement legacy = MeasureLegacyRecorder(graph, evidence, evidenceCount);
-            IndexedRecorderMeasurement indexed = MeasureIndexedRecorder(graph, evidence, evidenceCount);
+            LegacyRecorderMeasurement legacy = MeasureLegacyRecorder(graph, evidence, evidenceCount / 2);
+            IndexedRecorderMeasurement indexed = MeasureIndexedRecorder(graph, evidence, evidenceCount / 2);
             Assert.That(indexed.CandidateCount, Is.EqualTo(legacy.CandidateCount));
-            Assert.That(indexed.CandidateSha256, Is.EqualTo(legacy.CandidateSha256));
+            Assert.That(indexed.CandidateDigest, Is.EqualTo(legacy.CandidateDigest));
 
             measurements.Add(new
             {
                 CandidateEvidenceCount = evidenceCount,
                 CandidateEvidenceSha256 = EvidenceSha256(evidence),
-                Legacy = new
-                {
-                    legacy.CandidateCount,
-                    legacy.CandidateSha256,
-                    legacy.Samples,
-                    legacy.ElapsedMilliseconds,
-                    legacy.MedianElapsedMilliseconds,
-                    legacy.AllocatedBytes,
-                    legacy.MedianAllocatedBytes,
-                    legacy.RetainedManagedBytesDelta,
-                    legacy.PeakWorkingSetDeltaBytes,
-                    Work = new
-                    {
-                        legacy.Work.ReachabilitySearches,
-                        legacy.Work.ReachabilityNodePops,
-                        legacy.Work.ReachabilityVisitedVertices,
-                        legacy.Work.ReachabilityEdgeVisits,
-                        legacy.Work.CandidateEmissionCount,
-                    },
-                },
-                Indexed = new
-                {
-                    indexed.CandidateCount,
-                    indexed.CandidateSha256,
-                    indexed.Samples,
-                    indexed.ElapsedMilliseconds,
-                    indexed.MedianElapsedMilliseconds,
-                    indexed.AllocatedBytes,
-                    indexed.MedianAllocatedBytes,
-                    indexed.RetainedManagedBytesDelta,
-                    indexed.PeakWorkingSetDeltaBytes,
-                    Work = new
-                    {
-                        indexed.Work.CandidateEvidenceChecks,
-                        indexed.Work.CandidateEdgePresenceChecks,
-                        indexed.Work.ComponentMembershipChecks,
-                        indexed.Work.CandidateEmissionCount,
-                        indexed.Work.ReachabilitySearches,
-                        indexed.Work.ReachabilityNodePops,
-                        indexed.Work.ReachabilityVisitedVertices,
-                        indexed.Work.ReachabilityEdgeVisits,
-                        indexed.Work.ComponentIndexBuildCount,
-                        IndexPreparedVertexCount = indexed.Work.PreparedVertexCount,
-                        IndexPreparedEdgeCount = indexed.Work.PreparedEdgeCount,
-                        IndexAdjacencyListsBuilt = indexed.Work.AdjacencyListsBuilt,
-                        IndexAdjacencyEdgeVisits = indexed.Work.AdjacencyEdgeVisits,
-                        IndexReverseDegreeEdgeVisits = indexed.Work.ReverseDegreeEdgeVisits,
-                        IndexReverseFillEdgeVisits = indexed.Work.ReverseFillEdgeVisits,
-                        IndexFirstPassVertexVisits = indexed.Work.FirstPassVertexVisits,
-                        IndexFirstPassEdgeVisits = indexed.Work.FirstPassEdgeVisits,
-                        IndexSecondPassVertexVisits = indexed.Work.SecondPassVertexVisits,
-                        IndexSecondPassEdgeVisits = indexed.Work.SecondPassEdgeVisits,
-                    },
-                },
+                Legacy = ToLegacyBenchmarkResult(legacy),
+                Indexed = ToIndexedBenchmarkResult(indexed),
             });
         }
+
+        List<object> largeGraphMeasurements = MeasureLargeGraphSmallEvidenceMatrix();
 
         TestContext.Progress.WriteLine(JsonSerializer.Serialize(new
         {
@@ -109,6 +56,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
             CandidatePattern = "A->B, G->H, C->D, E->F repeated in that order",
             TimingBoundary = "direct Record call; output recorder/evidence/graph construction excluded",
             Measurements = measurements,
+            LargeGraphSmallEvidenceMeasurements = largeGraphMeasurements,
         }, new JsonSerializerOptions { WriteIndented = true }));
     }
 
@@ -127,7 +75,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
     private static LegacyRecorderMeasurement MeasureLegacyRecorder(
         Dictionary<string, HashSet<string>> graph,
         IReadOnlyCollection<CycleCandidateEvidence> evidence,
-        int evidenceCount)
+        int expectedCandidateCount)
     {
         const int SampleCount = 5;
         List<double> elapsedMilliseconds = [];
@@ -145,25 +93,21 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
             stopwatch.Stop();
             allocatedBytes.Add(GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
             elapsedMilliseconds.Add(stopwatch.Elapsed.TotalMilliseconds);
-            Assert.That(recorder.Candidates, Has.Count.EqualTo(evidenceCount / 2));
+            Assert.That(recorder.Candidates, Has.Count.EqualTo(expectedCandidateCount));
             retainedRecorder = recorder;
         }
 
         long peakWorkingSetAfter = Process.GetCurrentProcess().PeakWorkingSet64;
-        LegacyRecorderWorkCounter workCounter = new();
-        LegacyArchitectureCycleBaselineCandidateRecorder? countedRecorder = new();
-        countedRecorder.Record(graph, evidence, workCounter);
-        string candidateSha256 = CandidateSha256(countedRecorder.Candidates);
-        Assert.That(candidateSha256, Is.EqualTo(CandidateSha256(retainedRecorder!.Candidates)));
-        int candidateCount = countedRecorder.Candidates.Count;
-        countedRecorder = null;
+        LegacyRecorderObservation observation = ObserveLegacyRecorder(graph, evidence);
+        Assert.That(observation.CandidateCount, Is.EqualTo(expectedCandidateCount));
+        Assert.That(observation.CandidateDigest, Is.EqualTo(CandidateSha256(retainedRecorder!.Candidates)));
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
         long retainedAfter = GC.GetTotalMemory(forceFullCollection: true);
         LegacyRecorderMeasurement measurement = new(
-            candidateCount,
-            candidateSha256,
+            observation.CandidateCount,
+            observation.CandidateDigest,
             SampleCount,
             elapsedMilliseconds,
             Median(elapsedMilliseconds),
@@ -171,7 +115,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
             Median(allocatedBytes),
             retainedAfter - retainedBefore,
             Math.Max(0, peakWorkingSetAfter - peakWorkingSetBefore),
-            workCounter);
+            observation.Work);
         GC.KeepAlive(retainedRecorder);
         return measurement;
     }
@@ -179,7 +123,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
     private static IndexedRecorderMeasurement MeasureIndexedRecorder(
         Dictionary<string, HashSet<string>> graph,
         IReadOnlyCollection<CycleCandidateEvidence> evidence,
-        int evidenceCount)
+        int expectedCandidateCount)
     {
         const int SampleCount = 5;
         List<double> elapsedMilliseconds = [];
@@ -197,25 +141,21 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
             stopwatch.Stop();
             allocatedBytes.Add(GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
             elapsedMilliseconds.Add(stopwatch.Elapsed.TotalMilliseconds);
-            Assert.That(recorder.Candidates, Has.Count.EqualTo(evidenceCount / 2));
+            Assert.That(recorder.Candidates, Has.Count.EqualTo(expectedCandidateCount));
             retainedRecorder = recorder;
         }
 
         long peakWorkingSetAfter = Process.GetCurrentProcess().PeakWorkingSet64;
-        ArchitectureCycleBaselineCandidateRecorderWorkCounter workCounter = new();
-        ArchitectureCycleBaselineCandidateRecorder? countedRecorder = new();
-        countedRecorder.Record(enabled: true, graph, evidence, workCounter);
-        string candidateSha256 = CandidateSha256(countedRecorder.Candidates);
-        Assert.That(candidateSha256, Is.EqualTo(CandidateSha256(retainedRecorder!.Candidates)));
-        int candidateCount = countedRecorder.Candidates.Count;
-        countedRecorder = null;
+        IndexedRecorderObservation observation = ObserveIndexedRecorder(graph, evidence);
+        Assert.That(observation.CandidateCount, Is.EqualTo(expectedCandidateCount));
+        Assert.That(observation.CandidateDigest, Is.EqualTo(CandidateSha256(retainedRecorder!.Candidates)));
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
         long retainedAfter = GC.GetTotalMemory(forceFullCollection: true);
         IndexedRecorderMeasurement measurement = new(
-            candidateCount,
-            candidateSha256,
+            observation.CandidateCount,
+            observation.CandidateDigest,
             SampleCount,
             elapsedMilliseconds,
             Median(elapsedMilliseconds),
@@ -223,9 +163,29 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
             Median(allocatedBytes),
             retainedAfter - retainedBefore,
             Math.Max(0, peakWorkingSetAfter - peakWorkingSetBefore),
-            workCounter);
+            observation.Work);
         GC.KeepAlive(retainedRecorder);
         return measurement;
+    }
+
+    private static LegacyRecorderObservation ObserveLegacyRecorder(
+        Dictionary<string, HashSet<string>> graph,
+        IReadOnlyCollection<CycleCandidateEvidence> evidence)
+    {
+        LegacyRecorderWorkCounter workCounter = new();
+        LegacyArchitectureCycleBaselineCandidateRecorder recorder = new();
+        recorder.Record(graph, evidence, workCounter);
+        return new(recorder.Candidates.Count, CandidateSha256(recorder.Candidates), workCounter);
+    }
+
+    private static IndexedRecorderObservation ObserveIndexedRecorder(
+        Dictionary<string, HashSet<string>> graph,
+        IReadOnlyCollection<CycleCandidateEvidence> evidence)
+    {
+        ArchitectureCycleBaselineCandidateRecorderWorkCounter workCounter = new();
+        ArchitectureCycleBaselineCandidateRecorder recorder = new();
+        recorder.Record(enabled: true, graph, evidence, workCounter);
+        return new(recorder.Candidates.Count, CandidateSha256(recorder.Candidates), workCounter);
     }
 
     private static Dictionary<string, HashSet<string>> CreateBaselineCandidateGraph()
@@ -311,7 +271,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
 
     private sealed record LegacyRecorderMeasurement(
         int CandidateCount,
-        string CandidateSha256,
+        string CandidateDigest,
         int Samples,
         IReadOnlyList<double> ElapsedMilliseconds,
         double MedianElapsedMilliseconds,
@@ -323,7 +283,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
 
     private sealed record IndexedRecorderMeasurement(
         int CandidateCount,
-        string CandidateSha256,
+        string CandidateDigest,
         int Samples,
         IReadOnlyList<double> ElapsedMilliseconds,
         double MedianElapsedMilliseconds,
@@ -331,6 +291,16 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
         long MedianAllocatedBytes,
         long RetainedManagedBytesDelta,
         long PeakWorkingSetDeltaBytes,
+        ArchitectureCycleBaselineCandidateRecorderWorkCounter Work);
+
+    private sealed record LegacyRecorderObservation(
+        int CandidateCount,
+        string CandidateDigest,
+        LegacyRecorderWorkCounter Work);
+
+    private sealed record IndexedRecorderObservation(
+        int CandidateCount,
+        string CandidateDigest,
         ArchitectureCycleBaselineCandidateRecorderWorkCounter Work);
 
     private sealed class LegacyRecorderWorkCounter

@@ -33,7 +33,10 @@ internal sealed class ArchitectureCycleBaselineCandidateRecorder
             workCounter.ComponentIndexBuildCount++;
         }
 
-        ArchitectureStronglyConnectedComponentIndex componentIndex =
+        // CycleChecker adds each edge to FullGraph before invoking observeCandidate. Production
+        // evidence therefore always has a matching full-graph edge; this guard fails closed for
+        // inconsistent evidence supplied by another caller.
+        var componentIndex =
             ArchitectureStronglyConnectedComponentIndex.CreateFromGraph(fullGraph, workCounter);
 
         foreach (CycleCandidateEvidence evidence in candidateEvidence)
@@ -81,13 +84,13 @@ internal sealed class ArchitectureCycleBaselineCandidateRecorderWorkCounter
 
     internal long CandidateEmissionCount { get; set; }
 
-    internal long ReachabilitySearches { get; set; }
+    internal long ReachabilitySearches => 0;
 
-    internal long ReachabilityNodePops { get; set; }
+    internal long ReachabilityNodePops => 0;
 
-    internal long ReachabilityVisitedVertices { get; set; }
+    internal long ReachabilityVisitedVertices => 0;
 
-    internal long ReachabilityEdgeVisits { get; set; }
+    internal long ReachabilityEdgeVisits => 0;
 
     internal int ComponentIndexBuildCount { get; set; }
 

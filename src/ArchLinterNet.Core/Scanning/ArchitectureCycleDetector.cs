@@ -22,7 +22,7 @@ internal static class ArchitectureCycleDetector
             workCounter,
             out bool[] selfEdges,
             out long edgeCount);
-        ArchitectureStronglyConnectedComponentIndex componentIndex =
+        var componentIndex =
             ArchitectureStronglyConnectedComponentIndex.Create(
                 nodes,
                 nodeIndices,

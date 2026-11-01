@@ -33,13 +33,14 @@ public sealed class ArchitectureCycleBaselineCandidateRecorderTests
 
         recorder.Record(enabled: true, fullGraph, evidence, workCounter);
 
-        Assert.That(recorder.Candidates, Is.EqualTo(new[]
-        {
+        ArchitectureBaselineCandidate[] expectedCandidates =
+        [
             cycleCandidate,
             cycleCandidate,
             secondCycleCandidate,
             evidence[5].Candidate,
-        }));
+        ];
+        Assert.That(recorder.Candidates, Is.EqualTo(expectedCandidates));
         Assert.That(recorder.Candidates[0], Is.SameAs(recorder.Candidates[1]));
         Assert.That(recorder.Candidates[0].Identity, Is.EqualTo(cycleCandidate.Identity));
         Assert.That(workCounter.ComponentIndexBuildCount, Is.EqualTo(1));
