@@ -76,7 +76,7 @@ internal sealed class ArchitectureStronglyConnectedComponentIndex
         ArchitectureStronglyConnectedComponentIndexWorkCounter? workCounter = null)
     {
         string[] nodes = graph.Keys.ToArray();
-        Dictionary<string, int> nodeIndices = nodes
+        var nodeIndices = nodes
             .Select((node, index) => (node, index))
             .ToDictionary(item => item.node, item => item.index, StringComparer.Ordinal);
         int[][] adjacency = new int[nodes.Length][];
@@ -85,7 +85,7 @@ internal sealed class ArchitectureStronglyConnectedComponentIndex
         for (int source = 0; source < nodes.Length; source++)
         {
             HashSet<string> targets = graph[nodes[source]];
-            var targetIndices = new int[targets.Count];
+            int[] targetIndices = new int[targets.Count];
             int targetIndex = 0;
             foreach (string target in targets)
             {

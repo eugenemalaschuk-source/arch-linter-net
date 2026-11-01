@@ -1,7 +1,5 @@
 using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Checkers;
-using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -58,14 +56,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
         for (int source = 0; source < VertexCount; source++)
         {
             HashSet<string> targets = new(StringComparer.Ordinal);
-            if (source + 1 < VertexCount)
-            {
-                targets.Add(LargeGraphNodeName(source + 1));
-            }
-            else
-            {
-                targets.Add(LargeGraphNodeName(0));
-            }
+            targets.Add(LargeGraphNodeName(source + 1 < VertexCount ? source + 1 : 0));
 
             graph.Add(LargeGraphNodeName(source), targets);
         }
@@ -107,7 +98,7 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
         LargeGraphWorkload workload,
         int evidenceCount)
     {
-        foreach (var edge in workload.CandidateEdges.Take(evidenceCount))
+        foreach ((string Source, string Target) edge in workload.CandidateEdges.Take(evidenceCount))
         {
             Assert.That(workload.Graph[edge.Source].Contains(edge.Target), Is.True);
         }

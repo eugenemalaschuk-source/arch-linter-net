@@ -1,6 +1,5 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution.Checkers;
-using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
