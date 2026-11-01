@@ -136,3 +136,7 @@ coverage evidence runs as ordinary (non-`[Explicit]`) tests under
 The issue-specific direct cycle-detector before/after measurements, structural work counts,
 output digests, and measurement limits for #1124 are documented in
 [`issue-1124-cycle-enumeration-evidence.md`](issue-1124-cycle-enumeration-evidence.md).
+
+The indexed cycle baseline candidate comparison, including reproducible legacy/candidate timing,
+allocation, work-count, and output-digest evidence for #1125, is documented in
+[`issue-1125-cycle-baseline-candidate-evidence.md`](issue-1125-cycle-baseline-candidate-evidence.md).

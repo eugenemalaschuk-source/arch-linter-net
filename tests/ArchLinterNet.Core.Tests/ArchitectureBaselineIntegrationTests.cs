@@ -302,6 +302,8 @@ public sealed class ArchitectureBaselineIntegrationTests
             Assert.That(finalRunner.BaselineCandidates, Is.Not.Empty,
                 "the still-present cycle, now suppressed by the loaded baseline, must still be collected as a "
                 + "baseline candidate -- otherwise baseline comparison classifies it Resolved instead of Frozen.");
+            Assert.That(finalRunner.BaselineCandidates, Is.EqualTo(generateRunner.BaselineCandidates),
+                "when every edge of the cycle is suppressed, full-graph candidate identity and order must remain unchanged.");
         }
         finally
         {
