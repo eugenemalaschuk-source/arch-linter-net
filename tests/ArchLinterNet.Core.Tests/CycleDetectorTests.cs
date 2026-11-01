@@ -230,7 +230,13 @@ public sealed class CycleDetectorTests
         return graph;
     }
 
-    private static string NodeName(int index) => $"N{index:D2}";
+    private static string NodeName(int index)
+    {
+        return $"N{index:D2}";
+    }
 
-    private static string LayerNodeName(int layer, int index) => $"L{layer:D2}N{index:D2}";
+    private static string LayerNodeName(int layer, int index)
+    {
+        return $"L{layer:D2}N{index:D2}";
+    }
 }

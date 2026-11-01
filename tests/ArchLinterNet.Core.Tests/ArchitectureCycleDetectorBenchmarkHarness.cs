@@ -258,7 +258,10 @@ public sealed class ArchitectureCycleDetectorBenchmarkHarness
         return graph;
     }
 
-    private static string NodeName(int index) => $"N{index:D2}";
+    private static string NodeName(int index)
+    {
+        return $"N{index:D2}";
+    }
 
     private static (int CycleCount, string CycleSha256) ObserveCycles(
         Dictionary<string, HashSet<string>> graph,
