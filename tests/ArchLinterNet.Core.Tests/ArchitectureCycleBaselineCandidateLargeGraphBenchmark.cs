@@ -1,4 +1,3 @@
-using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution.Checkers;
 using NUnit.Framework;
 
@@ -55,8 +54,10 @@ public sealed partial class ArchitectureCycleDetectorBenchmarkHarness
 
         for (int source = 0; source < VertexCount; source++)
         {
-            HashSet<string> targets = new(StringComparer.Ordinal);
-            targets.Add(LargeGraphNodeName(source + 1 < VertexCount ? source + 1 : 0));
+            HashSet<string> targets = new(StringComparer.Ordinal)
+            {
+                LargeGraphNodeName(source + 1 < VertexCount ? source + 1 : 0),
+            };
 
             graph.Add(LargeGraphNodeName(source), targets);
         }
