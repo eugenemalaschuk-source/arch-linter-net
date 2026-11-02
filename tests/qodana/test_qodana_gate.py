@@ -269,6 +269,34 @@ class EvidenceValidationTests(unittest.TestCase):
         self.assertFalse(baseline_updated)
         self.assertFalse(baseline_mixed)
 
+        multiple_package_updates = package_update | {
+            "additions": 2,
+            "deletions": 2,
+            "patch": (
+                "@@ -1,2 +1,2 @@\n"
+                '-    <PackageReference Include="JsonSchema.Net" Version="9.5.0" />\n'
+                '-    <PackageReference Include="Other.Package" Version="2.0.0" />\n'
+                '+    <PackageReference Include="JsonSchema.Net" Version="9.6.0" />\n'
+                '+    <PackageReference Include="Other.Package" Version="2.1.0" />'
+            ),
+        }
+        changes, _, _ = gate._governance_changes([multiple_package_updates])
+        self.assertEqual([], changes)
+
+        moved_between_conditions = package_update | {
+            "patch": (
+                "@@ -1,5 +1,5 @@\n"
+                " <ItemGroup Condition=\"'$(TargetFramework)' == 'net10.0'\">\n"
+                '-    <PackageReference Include="JsonSchema.Net" Version="9.5.0" />\n'
+                " </ItemGroup>\n"
+                " <ItemGroup Condition=\"'$(TargetFramework)' == 'net8.0'\">\n"
+                '+    <PackageReference Include="JsonSchema.Net" Version="9.6.0" />\n'
+                " </ItemGroup>"
+            ),
+        }
+        changes, _, _ = gate._governance_changes([moved_between_conditions])
+        self.assertEqual([package_update["filename"]], changes)
+
         unsafe_patches = (
             package_update | {"patch": "+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>"},
             package_update | {"patch": (
@@ -282,6 +310,21 @@ class EvidenceValidationTests(unittest.TestCase):
             )},
             package_update | {"patch": (
                 '+<!-- comment --><PackageReference Include="JsonSchema.Net" Version="9.6.0" />'
+            )},
+            package_update | {"patch": (
+                '@@ -1 +1 @@\n'
+                '-    <PackageReference Include="JsonSchema.Net" Version="9.5.0" />\n'
+                '+    <PackageReference Include="JsonSchema.Net" Version="$(SafeVersion)" />'
+            )},
+            package_update | {"patch": (
+                '@@ -1 +1 @@\n'
+                '-    <PackageReference Include="JsonSchema.Net" Version="9.5.0" />\n'
+                '+    <PackageReference Include="JsonSchema.Net" Version="@(SafeVersion)" />'
+            )},
+            package_update | {"patch": (
+                '@@ -1 +1 @@\n'
+                '-    <PackageReference Include="JsonSchema.Net" Version="9.5.0" />\n'
+                '+    <PackageReference Include="JsonSchema.Net" Version="%(SafeVersion)" />'
             )},
             package_update | {"patch": None},
             package_update | {"additions": None},

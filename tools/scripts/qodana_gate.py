@@ -539,7 +539,8 @@ def _package_reference_version(line: str) -> tuple[str, str] | None:
             or element.text is not None or list(element) or element.tail is not None):
         return None
     include, version = element.attrib["Include"], element.attrib["Version"]
-    if not include.strip() or not version.strip():
+    if (not include.strip() or not version.strip()
+            or any(marker in version for marker in "$@%")):
         return None
     return include, version
 
@@ -551,25 +552,57 @@ def _package_reference_version_only_change(item: dict[str, Any]) -> bool:
     if not isinstance(patch, str) or len(patch) > 64 * 1024:
         return False
 
-    removed: dict[str, str] = {}
-    added: dict[str, str] = {}
+    removed: list[str] = []
+    added: list[str] = []
     removed_lines = added_lines = 0
+
+    def flush_edit_block() -> bool:
+        if not removed and not added:
+            return True
+        if not removed or len(removed) != len(added):
+            return False
+
+        removed_references = [_package_reference_version(line) for line in removed]
+        added_references = [_package_reference_version(line) for line in added]
+        if any(reference is None for reference in removed_references + added_references):
+            return False
+
+        old = [reference for reference in removed_references if reference is not None]
+        new = [reference for reference in added_references if reference is not None]
+        if ([include for include, _ in old] != [include for include, _ in new]
+                or len({include for include, _ in old}) != len(old)
+                or any(old_version == new_version
+                       for (_, old_version), (_, new_version) in zip(old, new, strict=True))):
+            return False
+
+        removed.clear()
+        added.clear()
+        return True
+
+    hunks = 0
     for line in patch.splitlines():
+        if line.startswith("@@"):
+            if not flush_edit_block() or not re.fullmatch(
+                r"@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@(?: .*)?", line
+            ):
+                return False
+            hunks += 1
+            continue
         if line.startswith("+") and not line.startswith("+++"):
             added_lines += 1
-            reference = _package_reference_version(line[1:])
-            if reference is None or reference[0] in added:
-                return False
-            added[reference[0]] = reference[1]
+            added.append(line[1:])
         elif line.startswith("-") and not line.startswith("---"):
             removed_lines += 1
-            reference = _package_reference_version(line[1:])
-            if reference is None or reference[0] in removed:
+            removed.append(line[1:])
+        elif line.startswith(" "):
+            if not flush_edit_block():
                 return False
-            removed[reference[0]] = reference[1]
+        elif line == r"\ No newline at end of file":
+            continue
+        else:
+            return False
 
-    if (not removed or removed.keys() != added.keys()
-            or any(removed[include] == added[include] for include in removed)):
+    if not flush_edit_block() or hunks == 0:
         return False
     if (type(item.get("additions")) is not int or item["additions"] != added_lines
             or type(item.get("deletions")) is not int or item["deletions"] != removed_lines):
