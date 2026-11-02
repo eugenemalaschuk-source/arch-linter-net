@@ -140,3 +140,6 @@ output digests, and measurement limits for #1124 are documented in
 The indexed cycle baseline candidate comparison, including reproducible legacy/candidate timing,
 allocation, work-count, and output-digest evidence for #1125, is documented in
 [`issue-1125-cycle-baseline-candidate-evidence.md`](issue-1125-cycle-baseline-candidate-evidence.md).
+
+The issue #1147 recorder workload attribution, paired full-analysis comparisons, and evidence-gated
+fallback disposition are documented in [`issue-1147/README.md`](issue-1147/README.md).

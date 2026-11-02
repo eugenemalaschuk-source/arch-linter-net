@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution.Checkers;
 using ArchLinterNet.Core.Scanning;
@@ -35,8 +36,15 @@ internal sealed class ArchitectureCycleBaselineCandidateRecorder
         // CycleChecker adds each edge to FullGraph before invoking observeCandidate. Production
         // evidence therefore always has a matching full-graph edge; this guard fails closed for
         // inconsistent evidence supplied by another caller.
+        long componentIndexBuildStartTicks = workCounter is null ? 0 : Stopwatch.GetTimestamp();
         var componentIndex =
             ArchitectureStronglyConnectedComponentIndex.CreateFromGraph(fullGraph, workCounter);
+        if (workCounter is not null)
+        {
+            workCounter.ComponentIndexBuildElapsedTicks = Stopwatch.GetTimestamp() - componentIndexBuildStartTicks;
+        }
+
+        long candidateEvaluationStartTicks = workCounter is null ? 0 : Stopwatch.GetTimestamp();
 
         foreach (CycleCandidateEvidence evidence in candidateEvidence)
         {
@@ -69,6 +77,11 @@ internal sealed class ArchitectureCycleBaselineCandidateRecorder
 
             _candidates.Add(evidence.Candidate);
         }
+
+        if (workCounter is not null)
+        {
+            workCounter.CandidateEvaluationElapsedTicks = Stopwatch.GetTimestamp() - candidateEvaluationStartTicks;
+        }
     }
 }
 
@@ -92,5 +105,9 @@ internal sealed class ArchitectureCycleBaselineCandidateRecorderWorkCounter
     internal long ReachabilityEdgeVisits => 0;
 
     internal int ComponentIndexBuildCount { get; set; }
+
+    internal long ComponentIndexBuildElapsedTicks { get; set; }
+
+    internal long CandidateEvaluationElapsedTicks { get; set; }
 
 }

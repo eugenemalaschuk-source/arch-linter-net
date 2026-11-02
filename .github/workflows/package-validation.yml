@@ -111,7 +111,8 @@ jobs:
 
           # Policy root/fragment, baseline, and normalized findings retain their 0.8.0 identities.
           # The 0.8.0 compatibility manifest and analysis-cache schema remain packaged byte-for-byte
-          # for existing consumers; the current 0.10.0 manifest advances only analysis-cache.
+          # for existing consumers; the current 0.10.0 manifest advances analysis-cache and
+          # analysis-profile while preserving their 0.5.1 profile resource for older consumers.
           for required_schema in \
             compatibility-manifest.json \
             dependencies.arch.fragment.schema.json \
@@ -128,7 +129,8 @@ jobs:
 
           for required_schema in \
             compatibility-manifest.json \
-            analysis-cache.schema.json; do
+            analysis-cache.schema.json \
+            analysis-profile.schema.json; do
             required_entry="contentFiles/any/any/schema/0.10.0/$required_schema"
             if ! grep -Fxq -- "$required_entry" <<< "$core_listing"; then
               echo "Core package is missing release-matched schema '$required_entry'." >&2
@@ -189,7 +191,7 @@ jobs:
           grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.8.0/dependencies.arch.schema.json\tschema/0.8.0/dependencies.arch.schema.json' schemas.txt
           grep -qx $'normalized-finding\tv3\thttps://archlinternet.dev/schema/0.8.0/normalized-finding.schema.json\tschema/0.8.0/normalized-finding.schema.json' schemas.txt
           grep -qx $'analysis-cache\tv1\thttps://archlinternet.dev/schema/0.10.0/analysis-cache.schema.json\tschema/0.10.0/analysis-cache.schema.json' schemas.txt
-          grep -qx $'analysis-profile\tv1\thttps://archlinternet.dev/schema/0.5.1/analysis-profile.schema.json\tschema/0.5.1/analysis-profile.schema.json' schemas.txt
+          grep -qx $'analysis-profile\tv1\thttps://archlinternet.dev/schema/0.10.0/analysis-profile.schema.json\tschema/0.10.0/analysis-profile.schema.json' schemas.txt
           ./tool/arch-linter-net schema print policy-root > printed-schema.json
           ./tool/arch-linter-net schema print normalized-finding > printed-normalized-finding-schema.json
           ./tool/arch-linter-net schema print analysis-cache > printed-analysis-cache-schema.json
@@ -201,7 +203,8 @@ jobs:
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.10.0/analysis-cache.schema.json > packaged-analysis-cache-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.8.0/analysis-cache.schema.json > frozen-080-analysis-cache-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.8.0/compatibility-manifest.json > frozen-080-compatibility-manifest.json
-          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/analysis-profile.schema.json > packaged-analysis-profile-schema.json
+          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.10.0/analysis-profile.schema.json > packaged-analysis-profile-schema.json
+          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/analysis-profile.schema.json > frozen-analysis-profile-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/normalized-finding.schema.json > frozen-normalized-finding-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/analysis-cache.schema.json > frozen-analysis-cache-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.6.1/normalized-finding.schema.json > legacy-normalized-finding-schema.json
@@ -210,6 +213,7 @@ jobs:
           cmp printed-normalized-finding-schema.json packaged-normalized-finding-schema.json
           cmp printed-analysis-cache-schema.json packaged-analysis-cache-schema.json
           cmp printed-analysis-profile-schema.json packaged-analysis-profile-schema.json
+          cmp "$GITHUB_WORKSPACE/schema/0.5.1/analysis-profile.schema.json" frozen-analysis-profile-schema.json
           cmp "$GITHUB_WORKSPACE/schema/0.8.0/analysis-cache.schema.json" frozen-080-analysis-cache-schema.json
           cmp "$GITHUB_WORKSPACE/schema/0.8.0/compatibility-manifest.json" frozen-080-compatibility-manifest.json
           cmp "$GITHUB_WORKSPACE/schema/0.5.1/normalized-finding.schema.json" frozen-normalized-finding-schema.json

@@ -528,8 +528,17 @@ public sealed class ArchitectureAnalysisSession
 
     internal void AddCycleBaselineCandidates(
         IReadOnlyDictionary<string, HashSet<string>> fullGraph,
-        IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence) =>
-        _cycleBaselineCandidateRecorder.Record(EnableUnmatchedIgnoreTracking, fullGraph, candidateEvidence);
+        IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence,
+        string? contractGroup)
+    {
+        ArchitectureCycleBaselineCandidateRecorderProfileObserver.Record(
+            _cycleBaselineCandidateRecorder,
+            EnableUnmatchedIgnoreTracking,
+            fullGraph,
+            candidateEvidence,
+            contractGroup,
+            Context.Timing);
+    }
 
     internal void AddMetricBaselineCandidate(ArchitectureMetricBaselineEntry candidate)
     {

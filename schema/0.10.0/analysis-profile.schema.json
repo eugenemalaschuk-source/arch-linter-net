@@ -1,0 +1,626 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/0.10.0/analysis-profile.schema.json",
+  "title": "ArchLinterNet analysis profile v1",
+  "description": "Machine-readable analysis-profile/v1 document: deterministic counters plus optional environment-dependent measurements.",
+  "type": "object",
+  "required": [
+    "SchemaId",
+    "CompletionStatus",
+    "CancellationObserved",
+    "Counters",
+    "Phases",
+    "Output"
+  ],
+  "properties": {
+    "SchemaId": {
+      "const": "analysis-profile/v1"
+    },
+    "CompletionStatus": {
+      "enum": [
+        "Success",
+        "ValidationFailure",
+        "PreparationFailure",
+        "Cancelled"
+      ]
+    },
+    "CancellationObserved": {
+      "type": "boolean"
+    },
+    "Counters": {
+      "type": "object",
+      "required": [
+        "PolicyCompositions",
+        "ProjectGraphEvaluations",
+        "AssemblyLoads",
+        "DiscoveredProjectCount",
+        "RetainedAssemblyCount",
+        "SelectedAssemblyCount",
+        "ModesEvaluated",
+        "SnapshotMaterializations",
+        "FactIndexMaterializations",
+        "SourceScanPasses",
+        "SourceFilesScanned",
+        "ContractFamilyCounts",
+        "ContractFamilyResultCounts",
+        "RenderedSinkCount",
+        "OutputSinkCount",
+        "Cache",
+        "Concurrency"
+      ],
+      "properties": {
+        "PolicyCompositions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ProjectGraphEvaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "AssemblyLoads": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "DiscoveredProjectCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "RetainedAssemblyCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "SelectedAssemblyCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ModesEvaluated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "SnapshotMaterializations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "FactIndexMaterializations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "SourceScanPasses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "SourceFilesScanned": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ContractFamilyCounts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "ContractFamilyResultCounts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "RenderedSinkCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "OutputSinkCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "Cache": {
+          "type": "object",
+          "required": [
+            "Status",
+            "Lookups",
+            "Hits",
+            "Misses",
+            "Rejects",
+            "Writes",
+            "BytesRead",
+            "BytesWritten",
+            "IneligibleUnitCount",
+            "CorruptionEvents",
+            "CancelledBeforePublish",
+            "AvoidedAssemblyLoads",
+            "AvoidedFactIndexMaterializations",
+            "AvoidedSourceScanPasses",
+            "AvoidedContractExecutions",
+            "AvoidedArtifactBytesLoaded",
+            "Mode",
+            "RejectReasonCounts"
+          ],
+          "properties": {
+            "Status": {
+              "enum": [
+                "NotApplicable",
+                "Active"
+              ]
+            },
+            "Lookups": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Hits": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Misses": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Rejects": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Writes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "BytesRead": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "BytesWritten": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "IneligibleUnitCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "CorruptionEvents": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "CancelledBeforePublish": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "AvoidedAssemblyLoads": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "AvoidedFactIndexMaterializations": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "AvoidedSourceScanPasses": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "AvoidedContractExecutions": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "AvoidedArtifactBytesLoaded": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Mode": {
+              "enum": [
+                "disabled",
+                "auto",
+                "path"
+              ]
+            },
+            "RejectReasonCounts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "Concurrency": {
+          "type": "object",
+          "required": [
+            "Status",
+            "MaxParallelism",
+            "ScheduledWorkItems",
+            "CompletedWorkItems",
+            "ObservedMaxConcurrency",
+            "MergeOperations"
+          ],
+          "properties": {
+            "Status": {
+              "enum": [
+                "NotApplicable",
+                "Active"
+              ]
+            },
+            "MaxParallelism": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ScheduledWorkItems": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "CompletedWorkItems": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ObservedMaxConcurrency": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "MergeOperations": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "Phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "Name",
+          "Indent",
+          "Ordinal"
+        ],
+        "properties": {
+          "Name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "Indent": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "Ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "Count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "ElapsedMs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "ProcessorTimeMs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "Output": {
+      "type": "object",
+      "required": [
+        "CommittedSinkCount",
+        "FailedSinkCount",
+        "StagedSinkCount",
+        "UncommittedSinkCount",
+        "OutputFailed"
+      ],
+      "properties": {
+        "CommittedSinkCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "FailedSinkCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "StagedSinkCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "UncommittedSinkCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "OutputFailed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Measurements": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "PeakWorkingSetBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "AllocatedBytesTotal": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "CycleRecorder": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "InvocationCount",
+            "EnabledInvocationCount",
+            "DisabledInvocationCount",
+            "EmptyEvidenceInvocationCount",
+            "NonEmptyEvidenceInvocationCount",
+            "Vertices",
+            "Edges",
+            "CandidateEvidenceCount",
+            "UniqueCandidateEdgePairs",
+            "EmittedCandidateCount",
+            "ElapsedMs",
+            "ComponentIndexBuildElapsedMs",
+            "CandidateEvaluationElapsedMs",
+            "AllocatedBytes",
+            "ObservationOverheadElapsedMs",
+            "ObservationOverheadAllocatedBytes",
+            "Invocations"
+          ],
+          "properties": {
+            "InvocationCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "EnabledInvocationCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "DisabledInvocationCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "EmptyEvidenceInvocationCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "NonEmptyEvidenceInvocationCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Vertices": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Edges": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "CandidateEvidenceCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "UniqueCandidateEdgePairs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "EmittedCandidateCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ElapsedMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "ComponentIndexBuildElapsedMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "CandidateEvaluationElapsedMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "AllocatedBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ObservationOverheadElapsedMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "ObservationOverheadAllocatedBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Invocations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "Mode",
+                  "RecordingEnabled",
+                  "Vertices",
+                  "Edges",
+                  "CandidateEvidenceCount",
+                  "UniqueCandidateEdgePairs",
+                  "EmittedCandidateCount",
+                  "ElapsedMs",
+                  "ComponentIndexBuildElapsedMs",
+                  "CandidateEvaluationElapsedMs",
+                  "AllocatedBytes",
+                  "ObservationOverheadElapsedMs",
+                  "ObservationOverheadAllocatedBytes",
+                  "Work"
+                ],
+                "properties": {
+                  "Mode": {
+                    "enum": [
+                      "strict",
+                      "audit",
+                      "other"
+                    ]
+                  },
+                  "RecordingEnabled": {
+                    "type": "boolean"
+                  },
+                  "Vertices": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "Edges": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "CandidateEvidenceCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "UniqueCandidateEdgePairs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "EmittedCandidateCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "ElapsedMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "ComponentIndexBuildElapsedMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "CandidateEvaluationElapsedMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "AllocatedBytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "ObservationOverheadElapsedMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "ObservationOverheadAllocatedBytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "Work": {
+                    "type": "object",
+                    "required": [
+                      "ComponentIndexBuildCount",
+                      "PreparedVertices",
+                      "PreparedEdges",
+                      "AdjacencyListsBuilt",
+                      "AdjacencyEdgeVisits",
+                      "ReverseDegreeEdgeVisits",
+                      "ReverseFillEdgeVisits",
+                      "FirstPassVertexVisits",
+                      "FirstPassEdgeVisits",
+                      "SecondPassVertexVisits",
+                      "SecondPassEdgeVisits",
+                      "CandidateEvidenceChecks",
+                      "CandidateEdgePresenceChecks",
+                      "ComponentMembershipChecks",
+                      "CandidateEmissionCount"
+                    ],
+                    "properties": {
+                      "ComponentIndexBuildCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "PreparedVertices": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "PreparedEdges": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "AdjacencyListsBuilt": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "AdjacencyEdgeVisits": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "ReverseDegreeEdgeVisits": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "ReverseFillEdgeVisits": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "FirstPassVertexVisits": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "FirstPassEdgeVisits": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "SecondPassVertexVisits": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "SecondPassEdgeVisits": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "CandidateEvidenceChecks": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "CandidateEdgePresenceChecks": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "ComponentMembershipChecks": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "CandidateEmissionCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "x-archlinternet-envelope": "analysis-profile/v1"
+}

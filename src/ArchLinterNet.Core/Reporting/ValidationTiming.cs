@@ -5,9 +5,24 @@ namespace ArchLinterNet.Core.Reporting;
 public sealed class ValidationTiming
 {
     private readonly List<Entry> _entries = new();
+    private List<CycleRecorderObservation>? _cycleRecorderObservations;
     private int _nextOrdinal;
     private long _selectorElapsedStopwatchTicks;
     private int _selectorMeasurementCount;
+
+    public ValidationTiming()
+    {
+    }
+
+    private ValidationTiming(bool collectCycleRecorderMeasurements)
+    {
+        CycleRecorderMeasurementsEnabled = collectCycleRecorderMeasurements;
+    }
+
+    /// <summary>Creates a timing observer that also collects opt-in cycle recorder profile data.</summary>
+    public static ValidationTiming CreateForAnalysisProfile() => new(collectCycleRecorderMeasurements: true);
+
+    internal bool CycleRecorderMeasurementsEnabled { get; }
 
     public IDisposable Measure(string name, int indent = 0)
     {
@@ -78,6 +93,16 @@ public sealed class ValidationTiming
     // Read-only view for AnalysisProfileBuilder (ArchLinterNet.Core.Profiling) to derive deterministic
     // phase/count data without changing WriteReport's own human-text rendering.
     internal IReadOnlyList<Entry> Entries => SnapshotEntries();
+
+    // Cycle recorder data is retained only for runs that already created this opt-in timing
+    // observer. The profile builder projects these anonymized observations into its public model.
+    internal IReadOnlyList<CycleRecorderObservation> CycleRecorderObservations =>
+        _cycleRecorderObservations ?? (IReadOnlyList<CycleRecorderObservation>)Array.Empty<CycleRecorderObservation>();
+
+    internal void RecordCycleRecorderObservation(CycleRecorderObservation observation)
+    {
+        (_cycleRecorderObservations ??= new List<CycleRecorderObservation>()).Add(observation);
+    }
 
     // Selector predicates are counted independently from timing so ordinary validation keeps the
     // low-overhead deterministic counter. When profiling is enabled, callers add high-resolution
@@ -166,3 +191,36 @@ public sealed class ValidationTiming
         }
     }
 }
+
+internal sealed record CycleRecorderObservation(
+    string Mode,
+    bool RecordingEnabled,
+    int Vertices,
+    long Edges,
+    int CandidateEvidenceCount,
+    int UniqueCandidateEdgePairs,
+    long EmittedCandidateCount,
+    double ElapsedMs,
+    double ComponentIndexBuildElapsedMs,
+    double CandidateEvaluationElapsedMs,
+    long AllocatedBytes,
+    double ObservationOverheadElapsedMs,
+    long ObservationOverheadAllocatedBytes,
+    CycleRecorderWorkObservation Work);
+
+internal sealed record CycleRecorderWorkObservation(
+    int ComponentIndexBuildCount,
+    int PreparedVertices,
+    long PreparedEdges,
+    int AdjacencyListsBuilt,
+    long AdjacencyEdgeVisits,
+    long ReverseDegreeEdgeVisits,
+    long ReverseFillEdgeVisits,
+    int FirstPassVertexVisits,
+    long FirstPassEdgeVisits,
+    int SecondPassVertexVisits,
+    long SecondPassEdgeVisits,
+    long CandidateEvidenceChecks,
+    long CandidateEdgePresenceChecks,
+    long ComponentMembershipChecks,
+    long CandidateEmissionCount);

@@ -305,7 +305,9 @@ public sealed class ArchitectureValidationBuilder
             CancellationToken = _cancellationToken,
         };
 
-        ValidationTiming? timing = _collectTimings || _collectProfile ? new ValidationTiming() : null;
+        ValidationTiming? timing = _collectProfile
+            ? ValidationTiming.CreateForAnalysisProfile()
+            : _collectTimings ? new ValidationTiming() : null;
         ArchitectureAnalysisSnapshot snapshot = _engine.Value.CreateSnapshot(request, timing);
         return new ArchitectureValidationSnapshotSession(
             snapshot, timing, _collectProfile, allocatedBytesAtStart, BuildCacheContext());
@@ -354,7 +356,9 @@ public sealed class ArchitectureValidationBuilder
             CancellationToken = _cancellationToken,
         };
 
-        ValidationTiming? timing = _collectTimings || _collectProfile ? new ValidationTiming() : null;
+        ValidationTiming? timing = _collectProfile
+            ? ValidationTiming.CreateForAnalysisProfile()
+            : _collectTimings ? new ValidationTiming() : null;
         _validationEntryBarrier?.Invoke();
         _cancellationToken.ThrowIfCancellationRequested();
         (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =

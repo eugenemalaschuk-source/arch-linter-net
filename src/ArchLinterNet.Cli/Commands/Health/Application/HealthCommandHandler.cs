@@ -93,7 +93,7 @@ internal sealed class HealthCommandHandler(
         }
 
         ValidationTiming? timing = options.ProfileDestination is not null
-            ? new ValidationTiming()
+            ? ValidationTiming.CreateForAnalysisProfile()
             : null;
         long allocatedBytesAtStart = timing is null
             ? 0

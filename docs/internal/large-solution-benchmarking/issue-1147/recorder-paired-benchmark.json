@@ -1,0 +1,604 @@
+{
+  "Runtime": ".NET 10.0.13",
+  "OperatingSystem": "Microsoft Windows 10.0.26300",
+  "Architecture": "X64",
+  "Configuration": "Release",
+  "Sdk": "10.0.402",
+  "SourceIdentity": "issue-1147-direct-source-sha256-28ba9bceb8a180e3bde9d5bd5048a3cc3c3dbaf6c9cec583b4bca31c3ce1486c",
+  "LegacyImplementation": "previous per-evidence reachability traversal, reproduced in this explicit harness",
+  "IndexedImplementation": "one fullGraph SCC index followed by candidate edge and component membership checks",
+  "TimingSampleOrder": "5 interleaved pairs: legacy then SCC, SCC then legacy, alternating",
+  "GraphShape": "fixed graph with two cyclic SCCs and a three-vertex acyclic tail",
+  "Vertices": 8,
+  "Edges": 8,
+  "GraphSha256": "50b3740ea349839b68b2ab1404ae465a8d6a095d92e3d390b3d4cfd07aab6fd6",
+  "CandidatePattern": "A-\u003EB, G-\u003EH, C-\u003ED, E-\u003EF repeated in that order",
+  "TimingBoundary": "direct Record call; output recorder/evidence/graph construction excluded",
+  "Measurements": [
+    {
+      "CandidateEvidenceCount": 100,
+      "UniqueCandidateEdgePairs": 4,
+      "CandidateEvidenceSha256": "dcaf33e193aed31d77f47adbb6cfc78c6ab692ed12193764de4d8cdc0a96be35",
+      "Legacy": {
+        "CandidateCount": 50,
+        "CandidateSha256": "94c14c807c0fb86e62152e0d8b350617bf6fc9ab84caa238f691f1aeab310f54",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          0.0357,
+          0.0263,
+          0.0226,
+          0.0232,
+          0.0223
+        ],
+        "MedianElapsedMilliseconds": 0.0232,
+        "AllocatedBytes": [
+          32504,
+          32504,
+          32504,
+          32504,
+          32504
+        ],
+        "MedianAllocatedBytes": 32504,
+        "RetainedManagedBytesDelta": 1808,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ReachabilitySearches": 100,
+          "ReachabilityNodePops": 300,
+          "ReachabilityVisitedVertices": 300,
+          "ReachabilityEdgeVisits": 200,
+          "CandidateEmissionCount": 50
+        }
+      },
+      "Indexed": {
+        "CandidateCount": 50,
+        "CandidateSha256": "94c14c807c0fb86e62152e0d8b350617bf6fc9ab84caa238f691f1aeab310f54",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          0.0368,
+          0.0192,
+          0.0132,
+          0.0124,
+          0.0125
+        ],
+        "MedianElapsedMilliseconds": 0.0132,
+        "AllocatedBytes": [
+          3768,
+          3768,
+          3768,
+          3768,
+          3768
+        ],
+        "MedianAllocatedBytes": 3768,
+        "RetainedManagedBytesDelta": 2112,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ComponentIndexBuildElapsedMs": 0.522,
+          "CandidateEvaluationElapsedMs": 0.3574,
+          "CandidateEvidenceChecks": 100,
+          "CandidateEdgePresenceChecks": 100,
+          "ComponentMembershipChecks": 100,
+          "CandidateEmissionCount": 50,
+          "ReachabilitySearches": 0,
+          "ReachabilityNodePops": 0,
+          "ReachabilityVisitedVertices": 0,
+          "ReachabilityEdgeVisits": 0,
+          "ComponentIndexBuildCount": 1,
+          "IndexPreparedVertexCount": 8,
+          "IndexPreparedEdgeCount": 8,
+          "IndexAdjacencyListsBuilt": 8,
+          "IndexAdjacencyEdgeVisits": 8,
+          "IndexReverseDegreeEdgeVisits": 8,
+          "IndexReverseFillEdgeVisits": 8,
+          "IndexFirstPassVertexVisits": 8,
+          "IndexFirstPassEdgeVisits": 8,
+          "IndexSecondPassVertexVisits": 8,
+          "IndexSecondPassEdgeVisits": 8
+        }
+      }
+    },
+    {
+      "CandidateEvidenceCount": 1000,
+      "UniqueCandidateEdgePairs": 4,
+      "CandidateEvidenceSha256": "0d6beaa33abbee404fbc18207636077ff759aed927739493244f582307c83ebb",
+      "Legacy": {
+        "CandidateCount": 500,
+        "CandidateSha256": "a3781b230bf11888b558b2e00a753f798d2067c69d30a65b0b1c7f9e79b519a0",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          0.5512,
+          0.5685,
+          0.5682,
+          0.5743,
+          0.6691
+        ],
+        "MedianElapsedMilliseconds": 0.5685,
+        "AllocatedBytes": [
+          320544,
+          320544,
+          320544,
+          320544,
+          320544
+        ],
+        "MedianAllocatedBytes": 320544,
+        "RetainedManagedBytesDelta": 5584,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ReachabilitySearches": 1000,
+          "ReachabilityNodePops": 3000,
+          "ReachabilityVisitedVertices": 3000,
+          "ReachabilityEdgeVisits": 2000,
+          "CandidateEmissionCount": 500
+        }
+      },
+      "Indexed": {
+        "CandidateCount": 500,
+        "CandidateSha256": "a3781b230bf11888b558b2e00a753f798d2067c69d30a65b0b1c7f9e79b519a0",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          0.124,
+          0.1149,
+          0.1534,
+          0.1268,
+          0.1596
+        ],
+        "MedianElapsedMilliseconds": 0.1268,
+        "AllocatedBytes": [
+          11008,
+          11008,
+          11008,
+          11008,
+          11008
+        ],
+        "MedianAllocatedBytes": 11008,
+        "RetainedManagedBytesDelta": 5696,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ComponentIndexBuildElapsedMs": 0.0365,
+          "CandidateEvaluationElapsedMs": 0.1547,
+          "CandidateEvidenceChecks": 1000,
+          "CandidateEdgePresenceChecks": 1000,
+          "ComponentMembershipChecks": 1000,
+          "CandidateEmissionCount": 500,
+          "ReachabilitySearches": 0,
+          "ReachabilityNodePops": 0,
+          "ReachabilityVisitedVertices": 0,
+          "ReachabilityEdgeVisits": 0,
+          "ComponentIndexBuildCount": 1,
+          "IndexPreparedVertexCount": 8,
+          "IndexPreparedEdgeCount": 8,
+          "IndexAdjacencyListsBuilt": 8,
+          "IndexAdjacencyEdgeVisits": 8,
+          "IndexReverseDegreeEdgeVisits": 8,
+          "IndexReverseFillEdgeVisits": 8,
+          "IndexFirstPassVertexVisits": 8,
+          "IndexFirstPassEdgeVisits": 8,
+          "IndexSecondPassVertexVisits": 8,
+          "IndexSecondPassEdgeVisits": 8
+        }
+      }
+    },
+    {
+      "CandidateEvidenceCount": 10000,
+      "UniqueCandidateEdgePairs": 4,
+      "CandidateEvidenceSha256": "9b3428fbe986346b89b863d157c9f112857a84e8d4790921d25d5875362d3e3b",
+      "Legacy": {
+        "CandidateCount": 5000,
+        "CandidateSha256": "85e0d4d4ab56bbc325adc32e02228e18040a47c445ab3ca2fb6e6e35ac1ba5b5",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          3.9958,
+          4.0102,
+          4.8265,
+          3.8211,
+          3.9937
+        ],
+        "MedianElapsedMilliseconds": 3.9958,
+        "AllocatedBytes": [
+          3251520,
+          3251520,
+          3251520,
+          3251520,
+          3251520
+        ],
+        "MedianAllocatedBytes": 3251520,
+        "RetainedManagedBytesDelta": 67024,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ReachabilitySearches": 10000,
+          "ReachabilityNodePops": 30000,
+          "ReachabilityVisitedVertices": 30000,
+          "ReachabilityEdgeVisits": 20000,
+          "CandidateEmissionCount": 5000
+        }
+      },
+      "Indexed": {
+        "CandidateCount": 5000,
+        "CandidateSha256": "85e0d4d4ab56bbc325adc32e02228e18040a47c445ab3ca2fb6e6e35ac1ba5b5",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          0.7323,
+          0.6665,
+          0.5671,
+          0.493,
+          0.6456
+        ],
+        "MedianElapsedMilliseconds": 0.6456,
+        "AllocatedBytes": [
+          133984,
+          133984,
+          133984,
+          133984,
+          133984
+        ],
+        "MedianAllocatedBytes": 133984,
+        "RetainedManagedBytesDelta": 67136,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ComponentIndexBuildElapsedMs": 0.032,
+          "CandidateEvaluationElapsedMs": 0.413,
+          "CandidateEvidenceChecks": 10000,
+          "CandidateEdgePresenceChecks": 10000,
+          "ComponentMembershipChecks": 10000,
+          "CandidateEmissionCount": 5000,
+          "ReachabilitySearches": 0,
+          "ReachabilityNodePops": 0,
+          "ReachabilityVisitedVertices": 0,
+          "ReachabilityEdgeVisits": 0,
+          "ComponentIndexBuildCount": 1,
+          "IndexPreparedVertexCount": 8,
+          "IndexPreparedEdgeCount": 8,
+          "IndexAdjacencyListsBuilt": 8,
+          "IndexAdjacencyEdgeVisits": 8,
+          "IndexReverseDegreeEdgeVisits": 8,
+          "IndexReverseFillEdgeVisits": 8,
+          "IndexFirstPassVertexVisits": 8,
+          "IndexFirstPassEdgeVisits": 8,
+          "IndexSecondPassVertexVisits": 8,
+          "IndexSecondPassEdgeVisits": 8
+        }
+      }
+    }
+  ],
+  "LargeGraphSmallEvidenceMeasurements": [
+    {
+      "Workload": "sparse-cycle-v10000-e10000",
+      "Vertices": 10000,
+      "Edges": 10000,
+      "GraphSha256": "34e29e2eff778aed93c9ee3e7a61e4861a65bf703becd903b67669393b2e59e8",
+      "CandidateEvidenceCount": 1,
+      "UniqueCandidateEdgePairs": 1,
+      "CandidateEvidenceSha256": "3cddb4f7db53ae820a6f8d8f885cfe7874f93aee95367e456a3fe2471fc680a6",
+      "Legacy": {
+        "CandidateCount": 1,
+        "CandidateSha256": "bea70851e5645c5100849981f4adc7b9cb7c197c662424202acf1220b42dca3e",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          0.5683,
+          0.6048,
+          0.5531,
+          4.5803,
+          0.6557
+        ],
+        "MedianElapsedMilliseconds": 0.6048,
+        "AllocatedBytes": [
+          673384,
+          673384,
+          673384,
+          673384,
+          673384
+        ],
+        "MedianAllocatedBytes": 673384,
+        "RetainedManagedBytesDelta": 1520,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ReachabilitySearches": 1,
+          "ReachabilityNodePops": 10000,
+          "ReachabilityVisitedVertices": 10000,
+          "ReachabilityEdgeVisits": 9999,
+          "CandidateEmissionCount": 1
+        }
+      },
+      "Indexed": {
+        "CandidateCount": 1,
+        "CandidateSha256": "bea70851e5645c5100849981f4adc7b9cb7c197c662424202acf1220b42dca3e",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          1.8935,
+          1.9412,
+          3.294,
+          6.7784,
+          3.0504
+        ],
+        "MedianElapsedMilliseconds": 3.0504,
+        "AllocatedBytes": [
+          2204104,
+          2204104,
+          2204104,
+          2204104,
+          2204104
+        ],
+        "MedianAllocatedBytes": 2204104,
+        "RetainedManagedBytesDelta": 1632,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ComponentIndexBuildElapsedMs": 1.8805,
+          "CandidateEvaluationElapsedMs": 0.0046,
+          "CandidateEvidenceChecks": 1,
+          "CandidateEdgePresenceChecks": 1,
+          "ComponentMembershipChecks": 1,
+          "CandidateEmissionCount": 1,
+          "ReachabilitySearches": 0,
+          "ReachabilityNodePops": 0,
+          "ReachabilityVisitedVertices": 0,
+          "ReachabilityEdgeVisits": 0,
+          "ComponentIndexBuildCount": 1,
+          "IndexPreparedVertexCount": 10000,
+          "IndexPreparedEdgeCount": 10000,
+          "IndexAdjacencyListsBuilt": 10000,
+          "IndexAdjacencyEdgeVisits": 10000,
+          "IndexReverseDegreeEdgeVisits": 10000,
+          "IndexReverseFillEdgeVisits": 10000,
+          "IndexFirstPassVertexVisits": 10000,
+          "IndexFirstPassEdgeVisits": 10000,
+          "IndexSecondPassVertexVisits": 10000,
+          "IndexSecondPassEdgeVisits": 10000
+        }
+      }
+    },
+    {
+      "Workload": "sparse-cycle-v10000-e10000",
+      "Vertices": 10000,
+      "Edges": 10000,
+      "GraphSha256": "34e29e2eff778aed93c9ee3e7a61e4861a65bf703becd903b67669393b2e59e8",
+      "CandidateEvidenceCount": 10,
+      "UniqueCandidateEdgePairs": 10,
+      "CandidateEvidenceSha256": "b1ed5ec9c017e16b79739d2c61fdbd1410fc3b43e6f09e6c042f4eb78b3ad274",
+      "Legacy": {
+        "CandidateCount": 10,
+        "CandidateSha256": "e7a0713e458b1592397cad6d8ae77669d2b33ef3bdbda0df0dd0aa52b227d6da",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          4.3908,
+          4.8056,
+          4.4537,
+          4.6212,
+          4.6472
+        ],
+        "MedianElapsedMilliseconds": 4.6212,
+        "AllocatedBytes": [
+          6731848,
+          6731848,
+          6731848,
+          6731848,
+          6731848
+        ],
+        "MedianAllocatedBytes": 6731848,
+        "RetainedManagedBytesDelta": 1616,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ReachabilitySearches": 10,
+          "ReachabilityNodePops": 100000,
+          "ReachabilityVisitedVertices": 100000,
+          "ReachabilityEdgeVisits": 99990,
+          "CandidateEmissionCount": 10
+        }
+      },
+      "Indexed": {
+        "CandidateCount": 10,
+        "CandidateSha256": "e7a0713e458b1592397cad6d8ae77669d2b33ef3bdbda0df0dd0aa52b227d6da",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          1.4509,
+          3.0616,
+          1.7283,
+          3.1391,
+          1.5011
+        ],
+        "MedianElapsedMilliseconds": 1.7283,
+        "AllocatedBytes": [
+          2204344,
+          2204344,
+          2204344,
+          2204344,
+          2204344
+        ],
+        "MedianAllocatedBytes": 2204344,
+        "RetainedManagedBytesDelta": 1728,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ComponentIndexBuildElapsedMs": 1.7619,
+          "CandidateEvaluationElapsedMs": 0.0076,
+          "CandidateEvidenceChecks": 10,
+          "CandidateEdgePresenceChecks": 10,
+          "ComponentMembershipChecks": 10,
+          "CandidateEmissionCount": 10,
+          "ReachabilitySearches": 0,
+          "ReachabilityNodePops": 0,
+          "ReachabilityVisitedVertices": 0,
+          "ReachabilityEdgeVisits": 0,
+          "ComponentIndexBuildCount": 1,
+          "IndexPreparedVertexCount": 10000,
+          "IndexPreparedEdgeCount": 10000,
+          "IndexAdjacencyListsBuilt": 10000,
+          "IndexAdjacencyEdgeVisits": 10000,
+          "IndexReverseDegreeEdgeVisits": 10000,
+          "IndexReverseFillEdgeVisits": 10000,
+          "IndexFirstPassVertexVisits": 10000,
+          "IndexFirstPassEdgeVisits": 10000,
+          "IndexSecondPassVertexVisits": 10000,
+          "IndexSecondPassEdgeVisits": 10000
+        }
+      }
+    },
+    {
+      "Workload": "dense-cycle-v500-e124751",
+      "Vertices": 500,
+      "Edges": 124751,
+      "GraphSha256": "ee7bacf65a74b0bc16bfb78c45353f3d6566fd286956cad24404d3549750ea7d",
+      "CandidateEvidenceCount": 1,
+      "UniqueCandidateEdgePairs": 1,
+      "CandidateEvidenceSha256": "835a35d418b084dac1c2a1f54c3a59cf9cfbca97e0929335d45c62b66e30f9a5",
+      "Legacy": {
+        "CandidateCount": 1,
+        "CandidateSha256": "6b3289ce6e40eeaa608f73aa8627d8668c74f0240be59b921d44f0c94aa39fdb",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          0.0101,
+          0.0129,
+          0.014,
+          0.0305,
+          0.0072
+        ],
+        "MedianElapsedMilliseconds": 0.0129,
+        "AllocatedBytes": [
+          8808,
+          8808,
+          8808,
+          8808,
+          8808
+        ],
+        "MedianAllocatedBytes": 8808,
+        "RetainedManagedBytesDelta": 1520,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ReachabilitySearches": 1,
+          "ReachabilityNodePops": 3,
+          "ReachabilityVisitedVertices": 3,
+          "ReachabilityEdgeVisits": 499,
+          "CandidateEmissionCount": 1
+        }
+      },
+      "Indexed": {
+        "CandidateCount": 1,
+        "CandidateSha256": "6b3289ce6e40eeaa608f73aa8627d8668c74f0240be59b921d44f0c94aa39fdb",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          2.5632,
+          3.3042,
+          3.0703,
+          2.7238,
+          3.3762
+        ],
+        "MedianElapsedMilliseconds": 3.0703,
+        "AllocatedBytes": [
+          1105848,
+          1105848,
+          1105848,
+          1105848,
+          1105848
+        ],
+        "MedianAllocatedBytes": 1105848,
+        "RetainedManagedBytesDelta": 1632,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ComponentIndexBuildElapsedMs": 4.4671,
+          "CandidateEvaluationElapsedMs": 0.0072,
+          "CandidateEvidenceChecks": 1,
+          "CandidateEdgePresenceChecks": 1,
+          "ComponentMembershipChecks": 1,
+          "CandidateEmissionCount": 1,
+          "ReachabilitySearches": 0,
+          "ReachabilityNodePops": 0,
+          "ReachabilityVisitedVertices": 0,
+          "ReachabilityEdgeVisits": 0,
+          "ComponentIndexBuildCount": 1,
+          "IndexPreparedVertexCount": 500,
+          "IndexPreparedEdgeCount": 124751,
+          "IndexAdjacencyListsBuilt": 500,
+          "IndexAdjacencyEdgeVisits": 124751,
+          "IndexReverseDegreeEdgeVisits": 124751,
+          "IndexReverseFillEdgeVisits": 124751,
+          "IndexFirstPassVertexVisits": 500,
+          "IndexFirstPassEdgeVisits": 124751,
+          "IndexSecondPassVertexVisits": 500,
+          "IndexSecondPassEdgeVisits": 124751
+        }
+      }
+    },
+    {
+      "Workload": "dense-cycle-v500-e124751",
+      "Vertices": 500,
+      "Edges": 124751,
+      "GraphSha256": "ee7bacf65a74b0bc16bfb78c45353f3d6566fd286956cad24404d3549750ea7d",
+      "CandidateEvidenceCount": 10,
+      "UniqueCandidateEdgePairs": 10,
+      "CandidateEvidenceSha256": "bdc333fdc4e2634ba02f3132b67ec30598698624810be499aaeb49a1aa5b7741",
+      "Legacy": {
+        "CandidateCount": 10,
+        "CandidateSha256": "c56b37b7cf820ffbbcd647bc07234915037cd92bcec6cd291193fee29930cdc3",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          23.0211,
+          12.5793,
+          13.0252,
+          12.3763,
+          16.9194
+        ],
+        "MedianElapsedMilliseconds": 13.0252,
+        "AllocatedBytes": [
+          468768,
+          468768,
+          468768,
+          468768,
+          468768
+        ],
+        "MedianAllocatedBytes": 468768,
+        "RetainedManagedBytesDelta": 41520,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ReachabilitySearches": 10,
+          "ReachabilityNodePops": 1096017,
+          "ReachabilityVisitedVertices": 4467,
+          "ReachabilityEdgeVisits": 1100968,
+          "CandidateEmissionCount": 10
+        }
+      },
+      "Indexed": {
+        "CandidateCount": 10,
+        "CandidateSha256": "c56b37b7cf820ffbbcd647bc07234915037cd92bcec6cd291193fee29930cdc3",
+        "Samples": 5,
+        "ElapsedMilliseconds": [
+          2.4674,
+          2.6236,
+          2.2103,
+          2.0583,
+          2.5098
+        ],
+        "MedianElapsedMilliseconds": 2.4674,
+        "AllocatedBytes": [
+          1106088,
+          1106088,
+          1106088,
+          1106088,
+          1106088
+        ],
+        "MedianAllocatedBytes": 1106088,
+        "RetainedManagedBytesDelta": 1728,
+        "PeakWorkingSetDeltaBytes": 0,
+        "Work": {
+          "ComponentIndexBuildElapsedMs": 2.7343,
+          "CandidateEvaluationElapsedMs": 0.0138,
+          "CandidateEvidenceChecks": 10,
+          "CandidateEdgePresenceChecks": 10,
+          "ComponentMembershipChecks": 10,
+          "CandidateEmissionCount": 10,
+          "ReachabilitySearches": 0,
+          "ReachabilityNodePops": 0,
+          "ReachabilityVisitedVertices": 0,
+          "ReachabilityEdgeVisits": 0,
+          "ComponentIndexBuildCount": 1,
+          "IndexPreparedVertexCount": 500,
+          "IndexPreparedEdgeCount": 124751,
+          "IndexAdjacencyListsBuilt": 500,
+          "IndexAdjacencyEdgeVisits": 124751,
+          "IndexReverseDegreeEdgeVisits": 124751,
+          "IndexReverseFillEdgeVisits": 124751,
+          "IndexFirstPassVertexVisits": 500,
+          "IndexFirstPassEdgeVisits": 124751,
+          "IndexSecondPassVertexVisits": 500,
+          "IndexSecondPassEdgeVisits": 124751
+        }
+      }
+    }
+  ]
+}

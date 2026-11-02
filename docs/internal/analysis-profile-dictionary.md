@@ -12,7 +12,15 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 | `Counters` | object | deterministic | See below. |
 | `Phases` | array | mixed | `Name`/`Indent`/`Ordinal`/`Count` are deterministic; `ElapsedMs` and `ProcessorTimeMs` are environment-dependent measurements, `null` when no `ValidationTiming` instance backed the run. |
 | `Output` | object | host-dependent | Actual report-publication result: committed, failed, staged, and uncommitted sink counts plus `OutputFailed`. |
-| `Measurements` | object or null | environment-dependent | `null` when no `ValidationTiming` instance backed the run. |
+| `Measurements` | object or null | environment-dependent | Process values retain their existing host-defined boundaries. `CycleRecorder` is present only for an explicit profile observer and contains anonymized per-invocation recorder workload/cost data. |
+
+### `Measurements.CycleRecorder` (profile-opt-in)
+
+The aggregate fields sum the invocations in order. `InvocationCount` is the denominator; the enabled/disabled and empty/nonempty counts partition that denominator. Each item in `Invocations` preserves the joint `(V,E,B,U,K)` tuple: vertices in `fullGraph`, directed edges in `fullGraph` (including suppressed edges), evidence items with multiplicity, distinct evidence endpoint pairs, and emitted baseline candidates. `Mode` is `strict`, `audit`, or `other`; no contract ID is recorded.
+
+`ElapsedMs` and `AllocatedBytes` measure the recorder call with its deterministic work counter enabled. `ComponentIndexBuildElapsedMs` and `CandidateEvaluationElapsedMs` split the recorder interval. `ObservationOverheadElapsedMs` and `ObservationOverheadAllocatedBytes` cover the wrapper work needed to count graph dimensions and unique evidence pairs, excluding the recorder call. Work values are deterministic counts, not timing estimates. The elapsed and allocated values are environment-dependent; paired profiled/unprofiled full-analysis samples quantify total instrumentation impact.
+
+Disabled or empty invocations remain in the denominator and have zero SCC-index and candidate-evaluation work. If the profile observer sees no cycle recorder calls, `InvocationCount` is zero and `Invocations` is an empty array. The section contains no names, topology, repository paths, or diagnostic identities and is never uploaded automatically. Process-level `PeakWorkingSetBytes` and `AllocatedBytesTotal` keep their existing whole-process meanings.
 
 ## `Counters` (deterministic)
 

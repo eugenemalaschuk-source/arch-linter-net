@@ -26,6 +26,15 @@ public static class AnalysisProfileBuilder
             counters = counters with { Cache = options.Cache };
         }
 
+        AnalysisProfileMeasurements? measurements = options?.Measurements;
+        if (timing?.CycleRecorderMeasurementsEnabled == true)
+        {
+            measurements = (measurements ?? new AnalysisProfileMeasurements()) with
+            {
+                CycleRecorder = BuildCycleRecorderMeasurements(timing),
+            };
+        }
+
         return new AnalysisProfile
         {
             CompletionStatus = completionStatus,
@@ -33,7 +42,68 @@ public static class AnalysisProfileBuilder
             Counters = counters,
             Phases = phases,
             Output = options?.Output ?? CreateEmptyOutput(),
-            Measurements = options?.Measurements,
+            Measurements = measurements,
+        };
+    }
+
+    private static AnalysisProfileCycleRecorderMeasurements BuildCycleRecorderMeasurements(ValidationTiming timing)
+    {
+        AnalysisProfileCycleRecorderInvocation[] invocations = timing.CycleRecorderObservations
+            .Select(observation => new AnalysisProfileCycleRecorderInvocation
+            {
+                Mode = observation.Mode,
+                RecordingEnabled = observation.RecordingEnabled,
+                Vertices = observation.Vertices,
+                Edges = observation.Edges,
+                CandidateEvidenceCount = observation.CandidateEvidenceCount,
+                UniqueCandidateEdgePairs = observation.UniqueCandidateEdgePairs,
+                EmittedCandidateCount = observation.EmittedCandidateCount,
+                ElapsedMs = observation.ElapsedMs,
+                ComponentIndexBuildElapsedMs = observation.ComponentIndexBuildElapsedMs,
+                CandidateEvaluationElapsedMs = observation.CandidateEvaluationElapsedMs,
+                AllocatedBytes = observation.AllocatedBytes,
+                ObservationOverheadElapsedMs = observation.ObservationOverheadElapsedMs,
+                ObservationOverheadAllocatedBytes = observation.ObservationOverheadAllocatedBytes,
+                Work = new AnalysisProfileCycleRecorderWork
+                {
+                    ComponentIndexBuildCount = observation.Work.ComponentIndexBuildCount,
+                    PreparedVertices = observation.Work.PreparedVertices,
+                    PreparedEdges = observation.Work.PreparedEdges,
+                    AdjacencyListsBuilt = observation.Work.AdjacencyListsBuilt,
+                    AdjacencyEdgeVisits = observation.Work.AdjacencyEdgeVisits,
+                    ReverseDegreeEdgeVisits = observation.Work.ReverseDegreeEdgeVisits,
+                    ReverseFillEdgeVisits = observation.Work.ReverseFillEdgeVisits,
+                    FirstPassVertexVisits = observation.Work.FirstPassVertexVisits,
+                    FirstPassEdgeVisits = observation.Work.FirstPassEdgeVisits,
+                    SecondPassVertexVisits = observation.Work.SecondPassVertexVisits,
+                    SecondPassEdgeVisits = observation.Work.SecondPassEdgeVisits,
+                    CandidateEvidenceChecks = observation.Work.CandidateEvidenceChecks,
+                    CandidateEdgePresenceChecks = observation.Work.CandidateEdgePresenceChecks,
+                    ComponentMembershipChecks = observation.Work.ComponentMembershipChecks,
+                    CandidateEmissionCount = observation.Work.CandidateEmissionCount,
+                },
+            })
+            .ToArray();
+
+        return new AnalysisProfileCycleRecorderMeasurements
+        {
+            InvocationCount = invocations.Length,
+            EnabledInvocationCount = invocations.Count(invocation => invocation.RecordingEnabled),
+            DisabledInvocationCount = invocations.Count(invocation => !invocation.RecordingEnabled),
+            EmptyEvidenceInvocationCount = invocations.Count(invocation => invocation.CandidateEvidenceCount == 0),
+            NonEmptyEvidenceInvocationCount = invocations.Count(invocation => invocation.CandidateEvidenceCount > 0),
+            Vertices = invocations.Sum(invocation => (long)invocation.Vertices),
+            Edges = invocations.Sum(invocation => invocation.Edges),
+            CandidateEvidenceCount = invocations.Sum(invocation => (long)invocation.CandidateEvidenceCount),
+            UniqueCandidateEdgePairs = invocations.Sum(invocation => (long)invocation.UniqueCandidateEdgePairs),
+            EmittedCandidateCount = invocations.Sum(invocation => invocation.EmittedCandidateCount),
+            ElapsedMs = invocations.Sum(invocation => invocation.ElapsedMs),
+            ComponentIndexBuildElapsedMs = invocations.Sum(invocation => invocation.ComponentIndexBuildElapsedMs),
+            CandidateEvaluationElapsedMs = invocations.Sum(invocation => invocation.CandidateEvaluationElapsedMs),
+            AllocatedBytes = invocations.Sum(invocation => invocation.AllocatedBytes),
+            ObservationOverheadElapsedMs = invocations.Sum(invocation => invocation.ObservationOverheadElapsedMs),
+            ObservationOverheadAllocatedBytes = invocations.Sum(invocation => invocation.ObservationOverheadAllocatedBytes),
+            Invocations = invocations,
         };
     }
 

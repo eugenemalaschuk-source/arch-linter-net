@@ -264,6 +264,68 @@ public sealed class AnalysisProfileBuilderTests
     }
 
     [Test]
+    public void Build_CycleRecorderMeasurements_PreservesJointTuplesAndSummarizesDenominators()
+    {
+        ValidationTiming timing = ValidationTiming.CreateForAnalysisProfile();
+        timing.RecordCycleRecorderObservation(new CycleRecorderObservation(
+            "strict", true, 3, 4, 5, 2, 3, 1.5, 1.1, 0.4, 256, 0.2, 64,
+            new CycleRecorderWorkObservation(1, 3, 4, 3, 4, 4, 4, 3, 4, 3, 4, 5, 5, 4, 3)));
+        timing.RecordCycleRecorderObservation(new CycleRecorderObservation(
+            "audit", false, 2, 0, 0, 0, 0, 0.01, 0, 0, 0, 0.02, 8,
+            new CycleRecorderWorkObservation(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)));
+
+        AnalysisProfile profile = AnalysisProfileBuilder.Build(
+            Counters(), timing, renderedSinkCount: 0, outputSinkCount: 0,
+            AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
+
+        AnalysisProfileCycleRecorderMeasurements recorder = profile.Measurements!.CycleRecorder!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(recorder.InvocationCount, Is.EqualTo(2));
+            Assert.That(recorder.EnabledInvocationCount, Is.EqualTo(1));
+            Assert.That(recorder.DisabledInvocationCount, Is.EqualTo(1));
+            Assert.That(recorder.EmptyEvidenceInvocationCount, Is.EqualTo(1));
+            Assert.That(recorder.NonEmptyEvidenceInvocationCount, Is.EqualTo(1));
+            Assert.That(recorder.Vertices, Is.EqualTo(5));
+            Assert.That(recorder.Edges, Is.EqualTo(4));
+            Assert.That(recorder.CandidateEvidenceCount, Is.EqualTo(5));
+            Assert.That(recorder.UniqueCandidateEdgePairs, Is.EqualTo(2));
+            Assert.That(recorder.EmittedCandidateCount, Is.EqualTo(3));
+            Assert.That(recorder.ElapsedMs, Is.EqualTo(1.51).Within(0.0001));
+            Assert.That(recorder.ComponentIndexBuildElapsedMs, Is.EqualTo(1.1));
+            Assert.That(recorder.CandidateEvaluationElapsedMs, Is.EqualTo(0.4));
+            Assert.That(recorder.AllocatedBytes, Is.EqualTo(256));
+            Assert.That(recorder.Invocations[0].Mode, Is.EqualTo("strict"));
+            Assert.That(recorder.Invocations[0].Vertices, Is.EqualTo(3));
+            Assert.That(recorder.Invocations[0].Edges, Is.EqualTo(4));
+            Assert.That(recorder.Invocations[0].CandidateEvidenceCount, Is.EqualTo(5));
+            Assert.That(recorder.Invocations[0].UniqueCandidateEdgePairs, Is.EqualTo(2));
+            Assert.That(recorder.Invocations[0].EmittedCandidateCount, Is.EqualTo(3));
+            Assert.That(recorder.Invocations[1].Mode, Is.EqualTo("audit"));
+            Assert.That(recorder.Invocations[1].Work.ComponentIndexBuildCount, Is.Zero);
+            Assert.That(recorder.Invocations[1].Work.CandidateEvidenceChecks, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void Build_CycleRecorderMeasurements_AreOnlyPresentForExplicitProfileObserver()
+    {
+        AnalysisProfile profileObserver = AnalysisProfileBuilder.Build(
+            Counters(), ValidationTiming.CreateForAnalysisProfile(), renderedSinkCount: 0, outputSinkCount: 0,
+            AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
+        AnalysisProfile timingOnly = AnalysisProfileBuilder.Build(
+            Counters(), new ValidationTiming(), renderedSinkCount: 0, outputSinkCount: 0,
+            AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(profileObserver.Measurements!.CycleRecorder!.InvocationCount, Is.Zero);
+            Assert.That(profileObserver.Measurements.CycleRecorder.Invocations, Is.Empty);
+            Assert.That(timingOnly.Measurements, Is.Null);
+        });
+    }
+
+    [Test]
     public void Build_OutputAndProcessorTime_ArePreserved()
     {
         AnalysisProfileOutput output = new()
