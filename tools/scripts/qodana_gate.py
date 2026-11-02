@@ -21,6 +21,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from typing import Any, Callable
 
 MAX_SARIF_BYTES = 64 * 1024 * 1024
@@ -480,6 +481,7 @@ def render_report(verdict: Verdict, *, run_url: str, run_id: str,
         "",
         f"Analysis: [`{head_sha[:12]}`]({run_url}) · base `{base_sha[:12]}` · run {run_id} attempt {attempt}.",
         f"Profile: `{EXPECTED_PROFILE}` · image: `{EXPECTED_IMAGE.split('@')[0]}`.",
+        "Head source is analyzed with project files from the exact base revision; dependency-version edits are checked by build/test CI.",
         f"Findings: {len(verdict.findings)} total; {len(verdict.new)} new; {len(verdict.remediated)} remediated.",
         "",
     ]
@@ -523,11 +525,66 @@ def _is_protected_scan_path(path: str) -> bool:
             })
 
 
+def _package_reference_version(line: str) -> tuple[str, str] | None:
+    if len(line) > 4096:
+        return None
+    line = line.strip()
+    if not line.startswith("<PackageReference") or not line.endswith("/>"):
+        return None
+    try:
+        element = ET.fromstring(line)
+    except ET.ParseError:
+        return None
+    if (element.tag != "PackageReference" or set(element.attrib) != {"Include", "Version"}
+            or element.text is not None or list(element) or element.tail is not None):
+        return None
+    include, version = element.attrib["Include"], element.attrib["Version"]
+    if not include.strip() or not version.strip():
+        return None
+    return include, version
+
+
+def _package_reference_version_only_change(item: dict[str, Any]) -> bool:
+    if item.get("status") != "modified":
+        return False
+    patch = item.get("patch")
+    if not isinstance(patch, str) or len(patch) > 64 * 1024:
+        return False
+
+    removed: dict[str, str] = {}
+    added: dict[str, str] = {}
+    removed_lines = added_lines = 0
+    for line in patch.splitlines():
+        if line.startswith("+") and not line.startswith("+++"):
+            added_lines += 1
+            reference = _package_reference_version(line[1:])
+            if reference is None or reference[0] in added:
+                return False
+            added[reference[0]] = reference[1]
+        elif line.startswith("-") and not line.startswith("---"):
+            removed_lines += 1
+            reference = _package_reference_version(line[1:])
+            if reference is None or reference[0] in removed:
+                return False
+            removed[reference[0]] = reference[1]
+
+    if (not removed or removed.keys() != added.keys()
+            or any(removed[include] == added[include] for include in removed)):
+        return False
+    if (type(item.get("additions")) is not int or item["additions"] != added_lines
+            or type(item.get("deletions")) is not int or item["deletions"] != removed_lines):
+        return False
+    return True
+
+
 def _inspect_pr_file(item: dict[str, Any]) -> str | None:
     path = item.get("filename") if isinstance(item, dict) else None
     if not isinstance(path, str):
         raise GateError("Pull request file path is malformed")
     if _is_protected_scan_path(path):
+        if (PurePosixPath(path).suffix.lower() == ".csproj"
+                and _package_reference_version_only_change(item)):
+            return None
         return path
     if path == BASELINE_PATH:
         # The candidate baseline is validated against the exact SARIF inventory later.
@@ -700,6 +757,7 @@ def _validate_evidence(raw: bytes, *, repository: str, pr_number: int,
         "base_sha": base_sha,
         "base_analyzed_sha": base_sha,
         "analyzed_sha": head_sha,
+        "head_project_files_source": "base",
         "run_id": str(run_id),
         "run_attempt": str(attempt),
         "event": "pull_request",

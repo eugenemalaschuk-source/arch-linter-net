@@ -179,6 +179,57 @@ class RunnerTests(unittest.TestCase):
             ):
                 ci.locked_dotnet_sdk_root(project)
 
+    def test_pr_head_scan_uses_base_project_files_and_preserves_head_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project, base = root / "head", root / "base"
+            project_src, base_src = project / "src", base / "src"
+            project_src.mkdir(parents=True)
+            base_src.mkdir(parents=True)
+            (project_src / "Example.csproj").write_text(
+                '<Project><PackageReference Include="Example" Version="2.0" /></Project>'
+            )
+            (base_src / "Example.csproj").write_text(
+                '<Project><PackageReference Include="Example" Version="1.0" /></Project>'
+            )
+            (project_src / "Example.cs").write_text("// PR source")
+            work, artifacts = root / "work", root / "artifacts"
+            work.mkdir()
+            artifacts.mkdir()
+            evidence = {"status": "completed", "scans": []}
+            scanned_project_files = []
+
+            def fake_scan(scan_project, _work, _artifacts, _identity, label, _cache,
+                          dotnet_root=None):
+                if label == "cold":
+                    scanned_project_files.append(
+                        (scan_project / "src/Example.csproj").read_text()
+                    )
+                return {"label": label, "status": "completed", "exit_code": 0,
+                        "seconds": 0, "findings": 0, "cache_bytes": 0}
+
+            with patch.object(ci, "scan", side_effect=fake_scan):
+                ci._run_repository_scans(
+                    project, base, work, artifacts, IMAGE_ID, root, evidence
+                )
+
+            self.assertEqual(1, len(scanned_project_files))
+            self.assertIn('Version="1.0"', scanned_project_files[0])
+            self.assertEqual("// PR source", (project_src / "Example.cs").read_text())
+            self.assertEqual("base", evidence["head_project_files_source"])
+            self.assertIn('Version="1.0"', (project_src / "Example.csproj").read_text())
+
+    def test_base_project_overlay_rejects_different_project_file_inventory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project, base = root / "head", root / "base"
+            project.mkdir()
+            base.mkdir()
+            (project / "HeadOnly.csproj").write_text("<Project />")
+            (base / "BaseOnly.csproj").write_text("<Project />")
+            with self.assertRaisesRegex(ValueError, "inventories do not match"):
+                ci.overlay_base_project_files(project, base)
+
     def exercise_scan(self, exit_code=0, document=None, produce=True, internal_log=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

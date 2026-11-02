@@ -165,6 +165,7 @@ class EvidenceValidationTests(unittest.TestCase):
             "base_sha": BASE,
             "base_analyzed_sha": BASE,
             "analyzed_sha": HEAD,
+            "head_project_files_source": "base",
             "run_id": "123",
             "run_attempt": "2",
             "event": "pull_request",
@@ -192,6 +193,7 @@ class EvidenceValidationTests(unittest.TestCase):
                              ("pull_request_number", 8),
                              ("head_sha", "d" * 40),
                              ("base_sha", "e" * 40),
+                             ("head_project_files_source", "head"),
                              ("run_id", "999"),
                              ("run_attempt", "1")):
             raw = self.evidence(**{field: wrong})
@@ -249,6 +251,45 @@ class EvidenceValidationTests(unittest.TestCase):
         self.assertEqual(list(protected_paths), changes)
         self.assertFalse(baseline_updated)
         self.assertFalse(baseline_mixed)
+
+    def test_only_package_reference_version_changes_are_allowed_in_project_files(self):
+        package_update = {
+            "filename": "src/ArchLinterNet.Core/ArchLinterNet.Core.csproj",
+            "status": "modified",
+            "additions": 1,
+            "deletions": 1,
+            "patch": (
+                "@@ -1 +1 @@\n"
+                '-    <PackageReference Include="JsonSchema.Net" Version="9.5.0" />\n'
+                '+    <PackageReference Include="JsonSchema.Net" Version="9.6.0" />'
+            ),
+        }
+        changes, baseline_updated, baseline_mixed = gate._governance_changes([package_update])
+        self.assertEqual([], changes)
+        self.assertFalse(baseline_updated)
+        self.assertFalse(baseline_mixed)
+
+        unsafe_patches = (
+            package_update | {"patch": "+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>"},
+            package_update | {"patch": (
+                '-    <PackageReference Include="JsonSchema.Net" Version="9.5.0" />\n'
+                '+    <PackageReference Include="Other.Package" Version="9.6.0" />'
+            )},
+            package_update | {"patch": (
+                '-    <PackageReference Include="JsonSchema.Net" Version="9.5.0" />\n'
+                '+    <PackageReference Include="JsonSchema.Net" Version="9.6.0" >'
+                '<PrivateAssets>All</PrivateAssets></PackageReference>'
+            )},
+            package_update | {"patch": (
+                '+<!-- comment --><PackageReference Include="JsonSchema.Net" Version="9.6.0" />'
+            )},
+            package_update | {"patch": None},
+            package_update | {"additions": None},
+        )
+        for item in unsafe_patches:
+            with self.subTest(patch=item["patch"]):
+                changes, _, _ = gate._governance_changes([item])
+                self.assertEqual([package_update["filename"]], changes)
 
     def test_dotsettings_user_is_protected_without_overmatching_user_suffixes(self):
         protected = "src/Nested/ArchLinterNet.sln.DotSettings.user"
@@ -373,6 +414,7 @@ class PublisherIntegrationTests(unittest.TestCase):
             "base_sha": BASE,
             "base_analyzed_sha": BASE,
             "analyzed_sha": HEAD,
+            "head_project_files_source": "base",
             "run_id": "123",
             "run_attempt": "2",
             "event": "pull_request",
