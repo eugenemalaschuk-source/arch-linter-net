@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import time
 import uuid
@@ -354,6 +355,7 @@ def _scan_arguments(argv: list[str] | None) -> tuple[argparse.Namespace, Path, P
 def _initial_evidence(burn_in: bool) -> dict:
     return {"schema_version": 1, "status": "failed", "scans": [],
             "burn_in_requested": burn_in, "cross_run_cache": False,
+            "head_project_files_source": None,
             "run_id": os.environ.get("GITHUB_RUN_ID"),
             "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
             "analyzed_sha": os.environ.get("QODANA_ANALYZED_SHA"),
@@ -387,6 +389,67 @@ def _configure_scan(project: Path, base_project: Path | None, evidence: dict) ->
     return dotnet_root, image
 
 
+def _project_file_map(root: Path) -> dict[Path, Path]:
+    """Return the regular project files under a checkout, rejecting symlink paths."""
+    if root.is_symlink():
+        raise ValueError("Qodana project checkout cannot be a symlink")
+    resolved_root = root.resolve(strict=True)
+    projects = {}
+    ignored_directories = {".git", "bin", "obj"}
+    for path in resolved_root.rglob("*.csproj"):
+        relative = path.relative_to(resolved_root)
+        if any(part.casefold() in ignored_directories for part in relative.parts):
+            continue
+        current = path
+        while current != resolved_root:
+            if current.is_symlink():
+                raise ValueError("Qodana project files cannot use symlink paths")
+            current = current.parent
+        if not path.is_file():
+            raise ValueError("Qodana project files must be regular files")
+        try:
+            path.resolve(strict=True).relative_to(resolved_root)
+        except ValueError as error:
+            raise ValueError("Qodana project file escapes its checkout") from error
+        projects[relative] = path
+    return projects
+
+
+def overlay_base_project_files(project: Path, base_project: Path) -> int:
+    """Scan PR sources using the exact base's MSBuild project files.
+
+    This prevents changed PackageReference versions from loading untrusted build
+    assets into the scanner. The publisher separately limits which project-file
+    diffs may receive a Qodana verdict.
+    """
+    project_root = project.resolve(strict=True)
+    base_projects = _project_file_map(base_project)
+    head_projects = _project_file_map(project)
+    if head_projects.keys() != base_projects.keys():
+        raise ValueError("Head and base Qodana project file inventories do not match")
+
+    for relative, base_file in base_projects.items():
+        destination = project_root / relative
+        current = destination.parent
+        while current != project_root:
+            if current.is_symlink():
+                raise ValueError("Head Qodana project path cannot use symlink directories")
+            current = current.parent
+        if destination.is_symlink() or (destination.exists() and not destination.is_file()):
+            raise ValueError("Head Qodana project file is not a regular file")
+        if destination.read_bytes() == base_file.read_bytes():
+            continue
+
+        temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            with base_file.open("rb") as source, temporary.open("xb") as target:
+                shutil.copyfileobj(source, target)
+            os.replace(temporary, destination)
+        finally:
+            temporary.unlink(missing_ok=True)
+    return len(base_projects)
+
+
 def _pull_image(image: str, artifacts: Path, evidence: dict) -> str:
     pull_start = time.monotonic()
     code = command(["docker", "pull", image], artifacts / "image.log", 300)
@@ -411,6 +474,10 @@ def _run_repository_scans(project: Path, base_project: Path | None, work: Path, 
         write_evidence(artifacts, evidence, publish_summary=False)
         if base_scan["status"] != "completed":
             raise ValueError("Base analysis failed; inspect base.log and base.sarif.json")
+        overlay_base_project_files(project, base_project)
+        evidence["head_project_files_source"] = "base"
+    else:
+        evidence["head_project_files_source"] = "head"
     cache = work / "repository-cache"
     cold = scan(project, work, artifacts, identity, "cold", cache, dotnet_root=dotnet_root)
     evidence["scans"].append(cold)

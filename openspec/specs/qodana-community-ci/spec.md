@@ -25,6 +25,24 @@ The repository SHALL run tokenless Qodana Community for .NET against ArchLinterN
 - **THEN** those changes cannot weaken the gate evaluating that pull request
 - **AND** the trusted reporter uses its default-branch implementation and trusted base-revision configuration
 
+### Requirement: Trusted MSBuild project inputs
+
+For every PR scan, the scanner SHALL analyze head source with the exact base revision's `.csproj` files. The trusted publisher SHALL allow a `.csproj` diff to receive a Qodana verdict only when each contiguous patch edit block pairs existing single-line `PackageReference` entries in the same order and changes only a literal `Version` value. Changes across patch context, project structure, or MSBuild expressions SHALL fail closed as unassessable.
+
+#### Scenario: Pull request updates an existing package version
+- **WHEN** all `.csproj` changes are paired version-attribute updates for existing `PackageReference` entries
+- **THEN** the head scan uses the base revision's project files and does not load the PR's package versions
+- **AND** the trusted publisher validates the complete patch before publishing the differential Qodana verdict
+- **AND** build/test CI remains responsible for validating the updated package versions
+
+#### Scenario: Pull request moves a package reference between conditional item groups
+- **WHEN** a `.csproj` patch removes a `PackageReference` from one context and adds it under another context
+- **THEN** the trusted publisher reports the project file as unassessable
+
+#### Scenario: Pull request changes other project-file inputs
+- **WHEN** a `.csproj` patch changes project structure, package identity or metadata, build properties, or cannot be completely inspected
+- **THEN** the trusted publisher reports the changed project path and fails the Qodana status closed
+
 #### Scenario: Pull request refreshes the baseline
 - **WHEN** a pull request updates the Qodana baseline
 - **THEN** the baseline is the only changed path and the candidate exactly matches the successful SARIF inventory for the unchanged base source, stamped with the base SHA
