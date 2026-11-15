@@ -202,7 +202,7 @@ internal sealed record BenchmarkWorkloadDefinition
 {
     public const string ManifestSchemaId = "large-solution-benchmark/v1";
 
-    public const string GeneratorVersion = "1";
+    public const string GeneratorVersion = "2";
 
     public required string WorkloadId { get; init; }
 

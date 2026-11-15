@@ -50,11 +50,11 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         ArchitectureContractDocument document,
         string repositoryRoot,
         bool resolveAssemblyOutputs,
-        CancellationToken cancellationToken,
-        BenchmarkWorkObserver benchmarkWorkObserver)
+        BenchmarkWorkObserver benchmarkWorkObserver,
+        CancellationToken cancellationToken)
     {
         ProjectDiscoveryResult discovery = ResolveFromDocument(
-            document, repositoryRoot, resolveAssemblyOutputs, cancellationToken, benchmarkWorkObserver);
+            document, repositoryRoot, resolveAssemblyOutputs, benchmarkWorkObserver, cancellationToken);
         ApplyDiscoveryResult(document.Analysis, discovery);
         return discovery;
     }
@@ -65,16 +65,16 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         bool resolveAssemblyOutputs = true,
         CancellationToken cancellationToken = default)
     {
-        return ResolveFromDocument(document, repositoryRoot, resolveAssemblyOutputs, cancellationToken,
-            benchmarkWorkObserver: null);
+        return ResolveFromDocument(document, repositoryRoot, resolveAssemblyOutputs,
+            benchmarkWorkObserver: null, cancellationToken: cancellationToken);
     }
 
     internal ProjectDiscoveryResult ResolveFromDocument(
         ArchitectureContractDocument document,
         string repositoryRoot,
         bool resolveAssemblyOutputs,
-        CancellationToken cancellationToken,
-        BenchmarkWorkObserver? benchmarkWorkObserver)
+        BenchmarkWorkObserver? benchmarkWorkObserver,
+        CancellationToken cancellationToken)
     {
         ArchitectureAnalysisConfiguration analysis = document.Analysis;
         bool hasSolution = !string.IsNullOrWhiteSpace(analysis.Solution);
@@ -204,7 +204,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         {
             projectFile = benchmarkWorkObserver is not null
                 && _projectFileParser is ArchitectureProjectFileParser parser
-                ? parser.Parse(projectPath, _fileSystem, benchmarkWorkObserver)
+                ? ArchitectureProjectFileParser.Parse(projectPath, _fileSystem, benchmarkWorkObserver)
                 : _projectFileParser.Parse(projectPath, _fileSystem);
         }
         catch (Exception ex)

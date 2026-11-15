@@ -1,6 +1,6 @@
 {
   "schema": "large-solution-benchmark/v1",
-  "generator_version": "1",
+  "generator_version": "2",
   "synthetic_only": true,
   "workloads": [
     { "id": "synthetic-linear-small", "shape": "linear", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "types", "source_files", "references", "layers", "selector_predicate_terms", "contracts", "findings", "source_roots"] },
@@ -183,11 +183,11 @@
     {
       "owner_issue": "#1141",
       "family": "ancestry_query_long_rename_chain",
-      "dimensions": ["reachable_commit_count", "query_endpoint_count", "retained_ancestor_entry_count"],
+      "dimensions": ["reachable_commit_count", "rename_event_count", "query_endpoint_count", "retained_ancestor_entry_count"],
       "workloads": [
-        { "id": "synthetic-history-ancestry-chain-small", "reachable_commit_count": 1000, "query_endpoint_count": 10, "retained_ancestor_entry_count": 10000 },
-        { "id": "synthetic-history-ancestry-chain-medium", "reachable_commit_count": 5000, "query_endpoint_count": 50, "retained_ancestor_entry_count": 250000 },
-        { "id": "synthetic-history-ancestry-chain-large", "reachable_commit_count": 10000, "query_endpoint_count": 100, "retained_ancestor_entry_count": 1000000 }
+        { "id": "synthetic-history-ancestry-chain-small", "reachable_commit_count": 1000, "rename_event_count": 999, "query_endpoint_count": 10, "retained_ancestor_entry_count": 10000 },
+        { "id": "synthetic-history-ancestry-chain-medium", "reachable_commit_count": 5000, "rename_event_count": 4999, "query_endpoint_count": 50, "retained_ancestor_entry_count": 250000 },
+        { "id": "synthetic-history-ancestry-chain-large", "reachable_commit_count": 10000, "rename_event_count": 9999, "query_endpoint_count": 100, "retained_ancestor_entry_count": 1000000 }
       ]
     },
     {

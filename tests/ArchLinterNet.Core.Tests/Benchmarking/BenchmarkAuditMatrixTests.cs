@@ -197,6 +197,31 @@ public sealed class BenchmarkAuditMatrixTests
         }
 
         Assert.That(samples, Has.Count.EqualTo(8), $"Unexpected sample count for {workload.WorkloadId}.");
+        if (workload.Dimensions.MetricRuleCount > 0)
+        {
+            Assert.That(samples.All(sample => sample.MetricWork?.MetricCount == workload.Dimensions.MetricRuleCount), Is.True,
+                $"Metric execution count did not match the declared scale for {workload.WorkloadId}.");
+            Assert.That(samples.Select(sample => sample.MetricWork!.ResultsSha256)
+                    .Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(1),
+                $"Metric result identity changed across samples for {workload.WorkloadId}.");
+        }
+
+        if (workload.Dimensions.MethodBodyRuleCount > 0)
+        {
+            foreach (BenchmarkProfileSample sample in samples)
+            {
+                JsonElement contractCounts = sample.RawAnalysisProfile
+                    .GetProperty("Counters")
+                    .GetProperty("ContractFamilyCounts");
+                Assert.That(contractCounts.GetProperty("dependency").GetInt32(),
+                    Is.EqualTo(workload.Dimensions.ContractsPerWorkload),
+                    $"Ordinary contracts changed with method-body scale for {workload.WorkloadId}.");
+                Assert.That(contractCounts.GetProperty("method_body").GetInt32(),
+                    Is.EqualTo(workload.Dimensions.MethodBodyRuleCount),
+                    $"Method-body work did not match the declared scale for {workload.WorkloadId}.");
+            }
+        }
+
         string[] reportChecksums = samples
             .Where(sample => sample.ReportOutputSha256 is not null)
             .Select(sample => sample.ReportOutputSha256!)
@@ -214,7 +239,7 @@ public sealed class BenchmarkAuditMatrixTests
             profile.RootElement.Clone(),
             canonicalResult!,
             samples[0]);
-        return template with
+        BenchmarkEvidenceDocument evidence = template with
         {
             Samples = samples,
             Environment = template.Environment with
@@ -234,6 +259,8 @@ public sealed class BenchmarkAuditMatrixTests
                     "The evidence retains each isolated Core analysis allocation sample rather than aggregating unrelated test-host allocations."),
             },
         };
+        evidence.Validate();
+        return evidence;
     }
 
     private static BenchmarkAuditAnalysisRun RunAnalysis(

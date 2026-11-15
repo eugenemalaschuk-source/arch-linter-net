@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ArchLinterNet.Core.Tests;
 
@@ -61,7 +62,7 @@ internal static class BenchmarkHistoryInputFactory
         var inputPayload = new
         {
             schema = "benchmark-history-input/v1",
-            generator_version = "1",
+            generator_version = "2",
             owner_issue = ownerIssue,
             family,
             workload_id = id,
@@ -87,7 +88,7 @@ internal static class BenchmarkHistoryInputFactory
     }
 
     private static BenchmarkHistoryExpectedOutput CreateLineChurn(
-        IReadOnlyDictionary<string, int> dimensions,
+        SortedDictionary<string, int> dimensions,
         List<BenchmarkHistoryInputRecord> records,
         out string beforeText,
         out string afterText)
@@ -116,7 +117,7 @@ internal static class BenchmarkHistoryInputFactory
 
     private static BenchmarkHistoryExpectedOutput CreateTaskOccurrences(
         string family,
-        IReadOnlyDictionary<string, int> dimensions,
+        SortedDictionary<string, int> dimensions,
         List<BenchmarkHistoryInputRecord> records)
     {
         int taskCount = dimensions["task_count"];
@@ -153,7 +154,7 @@ internal static class BenchmarkHistoryInputFactory
 
     private static BenchmarkHistoryExpectedOutput CreateCoChangeGraph(
         string family,
-        IReadOnlyDictionary<string, int> dimensions,
+        SortedDictionary<string, int> dimensions,
         List<BenchmarkHistoryInputRecord> records)
     {
         int vertexCount = dimensions["vertex_count"];
@@ -192,41 +193,132 @@ internal static class BenchmarkHistoryInputFactory
 
     private static BenchmarkHistoryExpectedOutput CreateAncestryGraph(
         string family,
-        IReadOnlyDictionary<string, int> dimensions,
+        SortedDictionary<string, int> dimensions,
         List<BenchmarkHistoryInputRecord> records)
     {
         int commitCount = dimensions["reachable_commit_count"];
         int queryCount = dimensions["query_endpoint_count"];
         int mergeCount = dimensions.TryGetValue("merge_count", out int merges) ? merges : 0;
+        int renameEventCount = dimensions.TryGetValue("rename_event_count", out int renameEvents) ? renameEvents : 0;
         long retainedEntries = dimensions["retained_ancestor_entry_count"];
-        for (int commit = 0; commit < commitCount; commit++)
+        int mainlineCommitCount = commitCount - mergeCount;
+        int availableQueryAncestors = mergeCount > 0 ? mergeCount : mainlineCommitCount;
+        if (mainlineCommitCount < 3 || queryCount > availableQueryAncestors ||
+            renameEventCount > mainlineCommitCount - 1)
         {
-            records.Add(new BenchmarkHistoryInputRecord("commit", commit, null, null));
-            if (commit > 0)
+            throw new InvalidOperationException("Ancestry workload dimensions cannot produce the declared graph and query shapes.");
+        }
+
+        HashSet<int> mergeOrdinals = [];
+        for (int merge = 0; merge < mergeCount; merge++)
+        {
+            int mainlineOrdinal = 2 + (int)(((long)(merge + 1) * (mainlineCommitCount - 3)) / (mergeCount + 1));
+            if (!mergeOrdinals.Add(mainlineOrdinal))
             {
-                records.Add(new BenchmarkHistoryInputRecord("parent_edge", commit, commit - 1, null));
+                throw new InvalidOperationException("Merged-DAG scale points must have distinct merge positions.");
             }
         }
 
-        for (int merge = 0; merge < mergeCount; merge++)
+        List<int> mainlineCommits = new(mainlineCommitCount);
+        List<int> sideBranchCommits = new(mergeCount);
+        int nextCommitId = 0;
+        for (int mainlineOrdinal = 0; mainlineOrdinal < mainlineCommitCount; mainlineOrdinal++)
         {
-            int commit = 2 + (int)(((long)(merge + 1) * (commitCount - 3)) / (mergeCount + 1));
-            records.Add(new BenchmarkHistoryInputRecord("parent_edge", commit, commit - 2, "merge"));
+            int? sideBranchCommit = null;
+            if (mergeOrdinals.Contains(mainlineOrdinal))
+            {
+                int branchCommit = nextCommitId++;
+                sideBranchCommit = branchCommit;
+                sideBranchCommits.Add(branchCommit);
+                records.Add(new BenchmarkHistoryInputRecord("commit", branchCommit, null, null));
+                records.Add(new BenchmarkHistoryInputRecord(
+                    "parent_edge", branchCommit, mainlineCommits[mainlineOrdinal - 2], "branch"));
+            }
+
+            int mainlineCommit = nextCommitId++;
+            mainlineCommits.Add(mainlineCommit);
+            records.Add(new BenchmarkHistoryInputRecord("commit", mainlineCommit, null, null));
+            if (mainlineOrdinal > 0)
+            {
+                records.Add(new BenchmarkHistoryInputRecord(
+                    "parent_edge", mainlineCommit, mainlineCommits[mainlineOrdinal - 1], null));
+            }
+
+            if (sideBranchCommit.HasValue)
+            {
+                records.Add(new BenchmarkHistoryInputRecord(
+                    "parent_edge", mainlineCommit, sideBranchCommit.Value, "merge"));
+            }
+        }
+
+        if (family == "ancestry_query_long_rename_chain")
+        {
+            for (int rename = 0; rename < renameEventCount; rename++)
+            {
+                records.Add(new BenchmarkHistoryInputRecord(
+                    "rename_event", mainlineCommits[rename + 1], null, null)
+                {
+                    SourcePath = $"src/history/path-{rename:000000}.cs",
+                    TargetPath = $"src/history/path-{rename + 1:000000}.cs",
+                });
+            }
         }
 
         for (int query = 0; query < queryCount; query++)
         {
-            records.Add(new BenchmarkHistoryInputRecord("ancestry_query", query, commitCount - 1, null));
+            int ancestor = mergeCount > 0 ? sideBranchCommits[query] : mainlineCommits[query];
+            records.Add(new BenchmarkHistoryInputRecord("ancestry_query", ancestor, mainlineCommits[^1], null));
         }
 
+        int satisfiedQueries = CountSatisfiedAncestryQueries(records);
         return new BenchmarkHistoryExpectedOutput(new SortedDictionary<string, long>(StringComparer.Ordinal)
         {
-            ["merge_count"] = mergeCount,
-            ["query_endpoint_count"] = queryCount,
-            ["reachable_commit_count"] = commitCount,
+            ["merge_count"] = records.Count(record => record.Kind == "parent_edge" && record.Value == "merge"),
+            ["parent_edge_count"] = records.Count(record => record.Kind == "parent_edge"),
+            ["query_endpoint_count"] = records.Count(record => record.Kind == "ancestry_query"),
+            ["reachable_commit_count"] = records.Count(record => record.Kind == "commit"),
+            ["rename_event_count"] = records.Count(record => record.Kind == "rename_event"),
             ["retained_ancestor_entry_count"] = retainedEntries,
-            ["strict_ancestor_query_count"] = queryCount,
+            ["strict_ancestor_query_count"] = satisfiedQueries,
         });
+    }
+
+    private static int CountSatisfiedAncestryQueries(IReadOnlyList<BenchmarkHistoryInputRecord> records)
+    {
+        Dictionary<int, List<int>> parents = records
+            .Where(record => record.Kind == "commit")
+            .ToDictionary(record => record.First, _ => new List<int>());
+        foreach (BenchmarkHistoryInputRecord edge in records.Where(record => record.Kind == "parent_edge"))
+        {
+            parents[edge.First].Add(edge.Second!.Value);
+        }
+
+        int satisfied = 0;
+        foreach (BenchmarkHistoryInputRecord query in records.Where(record => record.Kind == "ancestry_query"))
+        {
+            HashSet<int> visited = [];
+            Stack<int> pending = new();
+            pending.Push(query.Second!.Value);
+            while (pending.TryPop(out int current))
+            {
+                if (!visited.Add(current))
+                {
+                    continue;
+                }
+
+                foreach (int parent in parents[current])
+                {
+                    pending.Push(parent);
+                }
+            }
+
+            if (query.First != query.Second.Value && visited.Contains(query.First))
+            {
+                satisfied++;
+            }
+        }
+
+        return satisfied;
     }
 }
 
@@ -243,6 +335,13 @@ internal sealed record BenchmarkHistoryWorkloadInput(
     string ExpectedOutputJson,
     string ExpectedOutputSha256);
 
-internal sealed record BenchmarkHistoryInputRecord(string Kind, int First, int? Second, string? Value);
+internal sealed record BenchmarkHistoryInputRecord(string Kind, int First, int? Second, string? Value)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SourcePath { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TargetPath { get; init; }
+}
 
 internal sealed record BenchmarkHistoryExpectedOutput(IReadOnlyDictionary<string, long> Values);

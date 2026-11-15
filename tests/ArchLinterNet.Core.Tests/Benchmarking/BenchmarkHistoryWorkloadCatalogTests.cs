@@ -57,9 +57,11 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
 
         foreach (BenchmarkHistoryWorkloadInput input in workloads)
         {
+            using JsonDocument inputDocument = JsonDocument.Parse(input.CanonicalInputJson);
             BenchmarkHistoryWorkloadInput replay = replayById[input.WorkloadId];
             Assert.Multiple(() =>
             {
+                Assert.That(inputDocument.RootElement.GetProperty("generator_version").GetString(), Is.EqualTo("2"));
                 Assert.That(ids.Add(input.WorkloadId), Is.True);
                 Assert.That(replay.CanonicalInputJson, Is.EqualTo(input.CanonicalInputJson));
                 Assert.That(replay.InputSha256, Is.EqualTo(input.InputSha256));
@@ -179,12 +181,17 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
     {
         BenchmarkHistoryInputRecord[] edges = records.Where(record => record.Kind == "parent_edge").ToArray();
         BenchmarkHistoryInputRecord[] queries = records.Where(record => record.Kind == "ancestry_query").ToArray();
-        Dictionary<int, List<int>> parents = Enumerable.Range(0, input.Dimensions["reachable_commit_count"])
-            .ToDictionary(commit => commit, _ => new List<int>());
+        BenchmarkHistoryInputRecord[] commits = records.Where(record => record.Kind == "commit").ToArray();
+        Dictionary<int, List<int>> parents = commits
+            .ToDictionary(commit => commit.First, _ => new List<int>());
         foreach (BenchmarkHistoryInputRecord edge in edges)
         {
+            Assert.That(parents.ContainsKey(edge.First), Is.True, input.WorkloadId);
+            Assert.That(parents.ContainsKey(edge.Second!.Value), Is.True, input.WorkloadId);
             parents[edge.First].Add(edge.Second!.Value);
         }
+
+        ValidateAncestryStructure(input, commits, edges, queries, parents);
 
         int satisfied = 0;
         foreach (BenchmarkHistoryInputRecord query in queries)
@@ -211,13 +218,113 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
             }
         }
 
+        Assert.That(satisfied, Is.EqualTo(queries.Length), input.WorkloadId);
         return new SortedDictionary<string, long>(StringComparer.Ordinal)
         {
-            ["merge_count"] = input.Dimensions.TryGetValue("merge_count", out int mergeCount) ? mergeCount : 0,
+            ["merge_count"] = edges.Count(edge => edge.Value == "merge"),
+            ["parent_edge_count"] = edges.Length,
             ["query_endpoint_count"] = queries.Length,
-            ["reachable_commit_count"] = input.Dimensions["reachable_commit_count"],
+            ["reachable_commit_count"] = commits.Length,
+            ["rename_event_count"] = records.Count(record => record.Kind == "rename_event"),
             ["retained_ancestor_entry_count"] = input.Dimensions["retained_ancestor_entry_count"],
             ["strict_ancestor_query_count"] = satisfied,
         };
+    }
+
+    private static void ValidateAncestryStructure(
+        BenchmarkHistoryWorkloadInput input,
+        IReadOnlyList<BenchmarkHistoryInputRecord> commits,
+        IReadOnlyList<BenchmarkHistoryInputRecord> edges,
+        IReadOnlyList<BenchmarkHistoryInputRecord> queries,
+        IReadOnlyDictionary<int, List<int>> parents)
+    {
+        Assert.That(commits.Select(commit => commit.First).Distinct().Count(), Is.EqualTo(commits.Count), input.WorkloadId);
+        Assert.That(commits.Count, Is.EqualTo(input.Dimensions["reachable_commit_count"]), input.WorkloadId);
+        Assert.That(edges.All(edge => edge.Second!.Value < edge.First), Is.True,
+            $"Parent edges must point backward through the deterministic commit order ({input.WorkloadId}).");
+
+        BenchmarkHistoryInputRecord[] renameEvents = input.Records
+            .Where(record => record.Kind == "rename_event")
+            .OrderBy(record => record.First)
+            .ToArray();
+        if (input.Family == "ancestry_query_long_rename_chain")
+        {
+            Assert.That(renameEvents.Length, Is.EqualTo(input.Dimensions["rename_event_count"]), input.WorkloadId);
+            for (int index = 0; index < renameEvents.Length; index++)
+            {
+                Assert.That(renameEvents[index].SourcePath, Is.Not.Null.And.Not.Empty, input.WorkloadId);
+                Assert.That(renameEvents[index].TargetPath, Is.Not.Null.And.Not.Empty, input.WorkloadId);
+                Assert.That(renameEvents[index].TargetPath, Is.Not.EqualTo(renameEvents[index].SourcePath), input.WorkloadId);
+                if (index > 0)
+                {
+                    Assert.That(renameEvents[index].SourcePath, Is.EqualTo(renameEvents[index - 1].TargetPath), input.WorkloadId);
+                }
+            }
+        }
+        else
+        {
+            Assert.That(renameEvents, Is.Empty, input.WorkloadId);
+        }
+
+        BenchmarkHistoryInputRecord[] mergeEdges = edges.Where(edge => edge.Value == "merge").ToArray();
+        int expectedMergeCount = input.Dimensions.TryGetValue("merge_count", out int mergeCount) ? mergeCount : 0;
+        Assert.That(mergeEdges.Length, Is.EqualTo(expectedMergeCount), input.WorkloadId);
+        if (input.Family == "ancestry_query_merged_dag")
+        {
+            HashSet<int> branchCommits = [];
+            foreach (BenchmarkHistoryInputRecord mergeEdge in mergeEdges)
+            {
+                int mergeCommit = mergeEdge.First;
+                int branchCommit = mergeEdge.Second!.Value;
+                Assert.That(parents[mergeCommit], Has.Count.EqualTo(2), input.WorkloadId);
+                Assert.That(parents[mergeCommit].Distinct().Count(), Is.EqualTo(2), input.WorkloadId);
+                Assert.That(branchCommits.Add(branchCommit), Is.True, input.WorkloadId);
+                Assert.That(parents[branchCommit], Has.Count.EqualTo(1), input.WorkloadId);
+                int forkCommit = parents[branchCommit].Single();
+                int firstParent = parents[mergeCommit].Single(parent => parent != branchCommit);
+                Assert.That(forkCommit, Is.Not.EqualTo(firstParent), input.WorkloadId);
+                Assert.That(HasAncestor(parents, firstParent, forkCommit), Is.True, input.WorkloadId);
+                Assert.That(HasAncestor(parents, branchCommit, firstParent), Is.False, input.WorkloadId);
+            }
+
+            Assert.That(queries.All(query => branchCommits.Contains(query.First)), Is.True, input.WorkloadId);
+        }
+        else
+        {
+            Assert.That(mergeEdges, Is.Empty, input.WorkloadId);
+            Assert.That(edges.All(edge => parents[edge.First].Count == 1), Is.True, input.WorkloadId);
+        }
+
+        foreach (BenchmarkHistoryInputRecord query in queries)
+        {
+            Assert.That(HasAncestor(parents, query.Second!.Value, query.First), Is.True,
+                $"Expected graph-derived ancestry query {query.First} → {query.Second} to hold for {input.WorkloadId}.");
+        }
+    }
+
+    private static bool HasAncestor(IReadOnlyDictionary<int, List<int>> parents, int descendant, int ancestor)
+    {
+        HashSet<int> visited = [];
+        Stack<int> pending = new();
+        pending.Push(descendant);
+        while (pending.TryPop(out int current))
+        {
+            if (!visited.Add(current))
+            {
+                continue;
+            }
+
+            if (current == ancestor)
+            {
+                return true;
+            }
+
+            foreach (int parent in parents[current])
+            {
+                pending.Push(parent);
+            }
+        }
+
+        return false;
     }
 }

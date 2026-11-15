@@ -28,7 +28,7 @@ public sealed class BenchmarkAuditExecutionTests
                 ContractsPerWorkload = 1,
                 FindingCandidates = 1,
                 IgnoreRuleCount = 1,
-                MetricRuleCount = 1,
+                MetricRuleCount = 3,
                 ReportRuleCount = 2,
                 MethodBodyRuleCount = 1,
             },
@@ -56,7 +56,16 @@ public sealed class BenchmarkAuditExecutionTests
             Assert.That(observed.TimedContractFamilyCounts["cycle"], Is.GreaterThan(0));
             Assert.That(observed.TimedContractFamilyCounts["acyclic_sibling"], Is.GreaterThan(0));
             Assert.That(observed.TimedContractFamilyCounts["method_body"], Is.GreaterThan(0));
+            Assert.That(observed.TimedContractFamilyCounts["dependency"], Is.EqualTo(1));
             Assert.That(observed.Outcome.Cycles.Count > 0, Is.EqualTo(expectCycleOutput));
+            Assert.That(observed.Sample.MetricWork!.MetricCount, Is.EqualTo(3));
+            Assert.That(observed.Sample.MetricWork.IsComplete, Is.True);
+            Assert.That(observed.Sample.MetricWork.Results.Select(result => result.MetricId),
+                Is.EqualTo(new[] { "synthetic-metric-001", "synthetic-metric-002", "synthetic-metric-003" }));
+            Assert.That(observed.Sample.MetricWork.Results.All(result =>
+                result.MetricKind == "topology_type_count" && result.Value > 0 &&
+                result.Value == result.ContributorCount), Is.True);
+            Assert.That(observed.Sample.MetricWork.ResultsSha256, Does.Match("^[0-9a-f]{64}$"));
             Assert.That(observed.Sample.RawAnalysisProfile.GetProperty("SchemaId").GetString(), Is.EqualTo("analysis-profile/v1"));
             Assert.That(observed.Sample.WorkCounters!.ProjectFileParses.Value, Is.GreaterThan(0));
             Assert.That(observed.Sample.WorkCounters!.SourceFactFileParses.Value, Is.GreaterThan(0));

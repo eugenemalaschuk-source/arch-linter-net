@@ -149,6 +149,9 @@ internal sealed record BenchmarkProfileSample
     public BenchmarkWorkCounterEvidence? WorkCounters { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BenchmarkMetricWorkEvidence? MetricWork { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public BenchmarkHistoryWorkCounterEvidence? HistoryWorkCounters { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -156,6 +159,84 @@ internal sealed record BenchmarkProfileSample
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ReportOutputSha256 { get; init; }
+}
+
+internal sealed record BenchmarkMetricResultEvidence
+{
+    public required string MetricId { get; init; }
+
+    public required string MetricKind { get; init; }
+
+    public required int Value { get; init; }
+
+    public required int ContributorCount { get; init; }
+}
+
+internal sealed record BenchmarkMetricWorkEvidence
+{
+    public required int MetricCount { get; init; }
+
+    public required bool IsComplete { get; init; }
+
+    public required string ResultsSha256 { get; init; }
+
+    public required IReadOnlyList<BenchmarkMetricResultEvidence> Results { get; init; }
+
+    public static BenchmarkMetricWorkEvidence FromOutcome(
+        ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome outcome,
+        int expectedMetricCount)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        if (expectedMetricCount <= 0 || outcome.Measurements.Count != expectedMetricCount || !outcome.IsComplete)
+        {
+            throw new InvalidOperationException(
+                $"Expected {expectedMetricCount} complete metric results but received " +
+                $"{outcome.Measurements.Count} (complete: {outcome.IsComplete}).");
+        }
+
+        BenchmarkMetricResultEvidence[] results = outcome.Measurements
+            .Select(measurement =>
+            {
+                if (!measurement.IsEvaluable || !measurement.Value.HasValue)
+                {
+                    throw new InvalidOperationException(
+                        $"Metric '{measurement.Id}' did not produce an evaluable value.");
+                }
+
+                return new BenchmarkMetricResultEvidence
+                {
+                    MetricId = measurement.Id,
+                    MetricKind = measurement.Kind,
+                    Value = measurement.Value.Value,
+                    ContributorCount = measurement.ContributorCount ?? throw new InvalidOperationException(
+                        $"Metric '{measurement.Id}' did not produce contributor evidence."),
+                };
+            })
+            .OrderBy(result => result.MetricId, StringComparer.Ordinal)
+            .ToArray();
+
+        var evidence = new BenchmarkMetricWorkEvidence
+        {
+            MetricCount = results.Length,
+            IsComplete = true,
+            ResultsSha256 = BenchmarkIdentity.Sha256(BenchmarkJson.Serialize(results)),
+            Results = results,
+        };
+        evidence.Validate();
+        return evidence;
+    }
+
+    public void Validate()
+    {
+        if (MetricCount <= 0 || !IsComplete || Results.Count != MetricCount ||
+            Results.Any(result => string.IsNullOrWhiteSpace(result.MetricId) ||
+                string.IsNullOrWhiteSpace(result.MetricKind) || result.Value < 0 || result.ContributorCount < 0) ||
+            Results.Select(result => result.MetricId).Distinct(StringComparer.Ordinal).Count() != MetricCount ||
+            !string.Equals(ResultsSha256, BenchmarkIdentity.Sha256(BenchmarkJson.Serialize(Results)), StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Metric-work evidence must contain complete, unique, reproducible metric results.");
+        }
+    }
 }
 
 internal sealed record BenchmarkCanonicalResultIdentity
@@ -331,6 +412,14 @@ internal sealed record BenchmarkEvidenceDocument
             sample.AllocatedBytes.Validate("samples.allocated_bytes");
             sample.PeakManagedMemory.Validate("samples.peak_managed_memory");
             sample.WorkCounters?.Validate();
+            sample.MetricWork?.Validate();
+            if ((Workload.Dimensions.MetricRuleCount > 0) != (sample.MetricWork is not null) ||
+                sample.MetricWork is { } metricWork && metricWork.MetricCount != Workload.Dimensions.MetricRuleCount)
+            {
+                throw new InvalidOperationException(
+                    "Metric-work evidence must be present exactly when the workload declares metric rules and match their count.");
+            }
+
             sample.HistoryWorkCounters?.Validate();
             sample.TimingBoundaries?.Validate();
 

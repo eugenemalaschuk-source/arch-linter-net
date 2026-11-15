@@ -6,6 +6,8 @@ namespace ArchLinterNet.Core.Tests;
 
 internal static class BenchmarkSarifWorkloadFactory
 {
+    private const int FixedFindingCount = 32;
+
     public static string FormatResult(BenchmarkMaterializedFixture fixture)
     {
         BenchmarkDimensionSet dimensions = fixture.Definition.Dimensions;
@@ -25,11 +27,9 @@ internal static class BenchmarkSarifWorkloadFactory
                 $"Expected {dimensions.ReportRuleCount} synthetic SARIF rules but found {ruleIds.Length}.");
         }
 
-        // SARIF only includes rules referenced by findings. Emit at least one finding per declared
-        // rule so a report-rule workload measures its full declared scale, even when the analysis
-        // finding-candidate dimension is smaller.
-        int findingCount = Math.Max(dimensions.FindingCandidates, dimensions.ReportRuleCount);
-        ArchitectureViolation[] findings = Enumerable.Range(0, findingCount)
+        // SARIF only includes rules referenced by findings. Keep result volume fixed while cycling
+        // through every declared rule so rule-table scale remains an independent dimension.
+        ArchitectureViolation[] findings = Enumerable.Range(0, FixedFindingCount)
             .Select(index => new ArchitectureViolation(
                 $"Synthetic report contract {index % ruleIds.Length + 1:000}",
                 ruleIds[index % ruleIds.Length],

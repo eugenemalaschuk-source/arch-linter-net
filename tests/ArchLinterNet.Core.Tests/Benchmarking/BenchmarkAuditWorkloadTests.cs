@@ -24,7 +24,7 @@ public sealed class BenchmarkAuditWorkloadTests
             Assert.That(workload.Inventory.ReportRuleCount, Is.Zero);
             Assert.That(workload.ContractLayerGraph, Is.Null);
         });
-        Assert.That(workload.WorkloadIdentity, Is.EqualTo("bbc7e7a001c76e0363dd0f068fed74eac34726a3b5242c4df002e9ec0b24badf"));
+        Assert.That(workload.WorkloadIdentity, Is.EqualTo("8b72dd51975208e1f5aac7da0ac266ec391dec4d13438e34e9a1ec963078b229"));
     }
 
     [Test]
@@ -111,6 +111,39 @@ public sealed class BenchmarkAuditWorkloadTests
             Assert.That(policy, Does.Contain("strict_method_body:"));
             Assert.That(policy, Does.Contain("synthetic-method-body-002"));
             Assert.That(source, Does.Contain("System.Console.WriteLine(Identity)"));
+        });
+    }
+
+    [TestCase(1, 5)]
+    [TestCase(16, 20)]
+    public void MethodBodyRuleScale_DoesNotIncreaseOrdinaryContractCount(int methodBodyRuleCount, int totalContractCount)
+    {
+        BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
+            $"synthetic-method-body-contract-independence-{methodBodyRuleCount}",
+            BenchmarkTopologyShape.Linear,
+            new BenchmarkDimensionSet
+            {
+                ContractsPerWorkload = 4,
+                MethodBodyRuleCount = methodBodyRuleCount,
+            });
+        using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
+        string policy = File.ReadAllText(fixture.PolicyPath);
+        string strictContracts = policy.Split("  strict:\n", StringSplitOptions.None)[1]
+            .Split("  strict_method_body:", StringSplitOptions.None)[0]
+            .Split("  strict_layers:", StringSplitOptions.None)[0];
+        string methodBodyContracts = policy.Split("  strict_method_body:\n", StringSplitOptions.None)[1]
+            .Split("  strict_layers:", StringSplitOptions.None)[0];
+
+        int ordinaryContractCount = strictContracts.Split('\n')
+            .Count(line => line.TrimStart().StartsWith("- id: synthetic-contract-", StringComparison.Ordinal));
+        int methodBodyContractCount = methodBodyContracts.Split('\n')
+            .Count(line => line.TrimStart().StartsWith("- id: synthetic-method-body-", StringComparison.Ordinal));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ordinaryContractCount, Is.EqualTo(4));
+            Assert.That(methodBodyContractCount, Is.EqualTo(methodBodyRuleCount));
+            Assert.That(workload.Inventory.ContractCount, Is.EqualTo(totalContractCount));
         });
     }
 

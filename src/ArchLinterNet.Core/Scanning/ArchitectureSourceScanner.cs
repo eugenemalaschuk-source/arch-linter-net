@@ -28,27 +28,41 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         IReadOnlyList<string>? explicitReferenceAssemblyPaths = null,
         string? sourceAssemblyHint = null,
         CancellationToken cancellationToken = default)
-        => FindMethodBodyViolationsWithObserver(repositoryRoot, sourceNamespacePrefix, forbiddenCallPatterns,
-            executionContext, sourceRoots, sourceLayer, preprocessorSymbols, fileSystem, compilationFactory,
-            assemblyLoader, explicitReferenceAssemblyPaths, sourceAssemblyHint, cancellationToken,
-            benchmarkWorkObserver: null);
+        => FindMethodBodyViolationsWithObserver(new ArchitectureMethodBodyScanRequest
+        {
+            RepositoryRoot = repositoryRoot,
+            SourceNamespacePrefix = sourceNamespacePrefix,
+            ForbiddenCallPatterns = forbiddenCallPatterns,
+            ExecutionContext = executionContext,
+            SourceRoots = sourceRoots,
+            SourceLayer = sourceLayer,
+            PreprocessorSymbols = preprocessorSymbols,
+            FileSystem = fileSystem,
+            CompilationFactory = compilationFactory,
+            AssemblyLoader = assemblyLoader,
+            ExplicitReferenceAssemblyPaths = explicitReferenceAssemblyPaths,
+            SourceAssemblyHint = sourceAssemblyHint,
+            CancellationToken = cancellationToken,
+        });
 
-    internal IEnumerable<ArchitectureViolation> FindMethodBodyViolationsWithObserver(
-        string repositoryRoot,
-        string sourceNamespacePrefix,
-        IReadOnlyList<string> forbiddenCallPatterns,
-        ArchitectureContractExecutionContext executionContext,
-        string[]? sourceRoots,
-        ArchitectureLayer? sourceLayer,
-        IReadOnlyList<string>? preprocessorSymbols,
-        IArchitectureFileSystem? fileSystem,
-        IRoslynCompilationFactory? compilationFactory,
-        IArchitectureAssemblyLoader? assemblyLoader,
-        IReadOnlyList<string>? explicitReferenceAssemblyPaths,
-        string? sourceAssemblyHint,
-        CancellationToken cancellationToken,
-        BenchmarkWorkObserver? benchmarkWorkObserver)
+    internal static IEnumerable<ArchitectureViolation> FindMethodBodyViolationsWithObserver(
+        ArchitectureMethodBodyScanRequest request)
     {
+        ArgumentNullException.ThrowIfNull(request);
+        string repositoryRoot = request.RepositoryRoot;
+        string sourceNamespacePrefix = request.SourceNamespacePrefix;
+        IReadOnlyList<string> forbiddenCallPatterns = request.ForbiddenCallPatterns;
+        ArchitectureContractExecutionContext executionContext = request.ExecutionContext;
+        string[]? sourceRoots = request.SourceRoots;
+        ArchitectureLayer? sourceLayer = request.SourceLayer;
+        IReadOnlyList<string>? preprocessorSymbols = request.PreprocessorSymbols;
+        IArchitectureFileSystem? fileSystem = request.FileSystem;
+        IRoslynCompilationFactory? compilationFactory = request.CompilationFactory;
+        IArchitectureAssemblyLoader? assemblyLoader = request.AssemblyLoader;
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths = request.ExplicitReferenceAssemblyPaths;
+        string? sourceAssemblyHint = request.SourceAssemblyHint;
+        CancellationToken cancellationToken = request.CancellationToken;
+        BenchmarkWorkObserver? benchmarkWorkObserver = request.BenchmarkWorkObserver;
         fileSystem ??= ArchitectureFileSystem.Real;
         compilationFactory ??= RoslynCompilationFactory.Real;
         assemblyLoader ??= ArchitectureAssemblyLoader.Real;
@@ -69,7 +83,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         CSharpCompilation compilation = compilationFactory.Create(
             "ArchitectureSourceScanner", sourceFiles, preprocessorSymbols, fileSystem, assemblyLoader,
             explicitReferenceAssemblyPaths);
-        benchmarkWorkObserver?.RecordMethodBodyCompilation(compilation.SyntaxTrees.Count());
+        benchmarkWorkObserver?.RecordMethodBodyCompilation(compilation.SyntaxTrees.Length);
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<ForbiddenCallPattern> patterns =
             ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCallPatterns);

@@ -75,27 +75,24 @@ public sealed class ArchitectureRunnerSetupService(
         int? maxParallelism = null)
     {
         return BuildRunnerCore(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: false, cancellationToken, maxParallelism,
-            benchmarkWorkObserver: null);
+            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: false, maxParallelism: maxParallelism,
+            benchmarkWorkObserver: null, cancellationToken: cancellationToken);
     }
 
     internal ArchitectureRunnerSetup BuildRunnerWithBenchmarkObserver(
         ArchitectureContractDocument document,
         string policyPath,
         BenchmarkWorkObserver benchmarkWorkObserver,
-        string? conditionSetName = null,
-        IReadOnlyList<string>? preprocessorSymbols = null,
-        HashSet<string>? selectedContractIds = null,
-        bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
         string? mode = null,
-        CancellationToken cancellationToken = default,
-        int? maxParallelism = null)
+        int? maxParallelism = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(benchmarkWorkObserver);
-        return BuildRunnerCore(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: false, cancellationToken, maxParallelism,
-            benchmarkWorkObserver);
+        return BuildRunnerCore(document, policyPath, conditionSetName: null, preprocessorSymbols: null,
+            selectedContractIds: null, enableUnmatchedIgnoreTracking: true, timing: timing, mode: mode,
+            loadPostBuildArtifacts: false, maxParallelism: maxParallelism,
+            benchmarkWorkObserver: benchmarkWorkObserver, cancellationToken: cancellationToken);
     }
 
     public ArchitectureRunnerSetup BuildRunnerForPostBuild(
@@ -111,8 +108,8 @@ public sealed class ArchitectureRunnerSetupService(
         int? maxParallelism = null)
     {
         return BuildRunnerCore(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: true, cancellationToken, maxParallelism,
-            benchmarkWorkObserver: null);
+            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: true, maxParallelism: maxParallelism,
+            benchmarkWorkObserver: null, cancellationToken: cancellationToken);
     }
 
     public ArchitectureRunnerPreparation PrepareRunner(
@@ -208,8 +205,7 @@ public sealed class ArchitectureRunnerSetupService(
 
         ArchitectureAnalysisContext context = CreateAnalysisContext(
             preparation.RepositoryRoot, resolution, preparation.ProjectDiscovery,
-            ReferenceEquals(preparation.ProjectDiscovery, ProjectDiscoveryResult.Empty) ? null : preparation.ProjectDiscovery,
-            cancellationToken, maxParallelism, timing);
+            maxParallelism, timing, benchmarkWorkObserver: null, cancellationToken: cancellationToken);
         ArchitectureContractRunner runner = CreateRunner(
             context, document, selectedContractIds, enableUnmatchedIgnoreTracking, preparation.PreprocessorSymbols);
         return new ArchitectureRunnerSetup(preparation.RepositoryRoot, runner) { AssemblyLoads = resolution.AssemblyLoads };
@@ -225,9 +221,9 @@ public sealed class ArchitectureRunnerSetupService(
         ValidationTiming? timing,
         string? mode,
         bool loadPostBuildArtifacts,
-        CancellationToken cancellationToken,
         int? maxParallelism,
-        BenchmarkWorkObserver? benchmarkWorkObserver)
+        BenchmarkWorkObserver? benchmarkWorkObserver,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -256,7 +252,7 @@ public sealed class ArchitectureRunnerSetupService(
             ProjectDiscoveryResult discovery = benchmarkWorkObserver is not null
                 && projectDiscoveryService is ArchitectureProjectDiscoveryService discoveryService
                 ? discoveryService.ResolveAndApply(document, repositoryRoot, resolveAssemblyOutputs,
-                    cancellationToken, benchmarkWorkObserver)
+                    benchmarkWorkObserver, cancellationToken)
                 : projectDiscoveryService.ResolveAndApply(document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
             ArchitectureSourceSetExpander.BindProjectSets(document, discovery);
 
@@ -270,13 +266,9 @@ public sealed class ArchitectureRunnerSetupService(
                     document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
                     cancellationToken);
 
-            ProjectDiscoveryResult? attemptedDiscovery = ReferenceEquals(discovery, ProjectDiscoveryResult.Empty)
-                ? null
-                : discovery;
-
             ArchitectureAnalysisContext context = CreateAnalysisContext(
-                repositoryRoot, resolution, discovery, attemptedDiscovery, cancellationToken, maxParallelism, timing,
-                benchmarkWorkObserver);
+                repositoryRoot, resolution, discovery, maxParallelism, timing, benchmarkWorkObserver,
+                cancellationToken);
             ArchitectureContractRunner runner = CreateRunner(
                 context, document, selectedContractIds, enableUnmatchedIgnoreTracking, symbols);
 
@@ -364,12 +356,14 @@ public sealed class ArchitectureRunnerSetupService(
         string repositoryRoot,
         ResolutionResult resolution,
         ProjectDiscoveryResult discovery,
-        ProjectDiscoveryResult? attemptedDiscovery,
-        CancellationToken cancellationToken,
         int? maxParallelism,
         ValidationTiming? timing,
-        BenchmarkWorkObserver? benchmarkWorkObserver = null)
+        BenchmarkWorkObserver? benchmarkWorkObserver,
+        CancellationToken cancellationToken)
     {
+        ProjectDiscoveryResult? attemptedDiscovery = ReferenceEquals(discovery, ProjectDiscoveryResult.Empty)
+            ? null
+            : discovery;
         return new ArchitectureAnalysisContext(repositoryRoot, resolution.ResolvedAssemblies,
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery,
             resolution.IsolatedLoadScope, resolution.SelectedAssemblyArtifactPaths)

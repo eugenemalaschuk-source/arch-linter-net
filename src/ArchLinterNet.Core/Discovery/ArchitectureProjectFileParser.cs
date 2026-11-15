@@ -15,9 +15,9 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     private const string IncludeAttribute = "Include";
 
     public DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
-        => Parse(projectPath, fileSystem, benchmarkWorkObserver: null);
+        => ArchitectureProjectFileParser.Parse(projectPath, fileSystem, benchmarkWorkObserver: null);
 
-    internal DiscoveredProjectFile Parse(
+    internal static DiscoveredProjectFile Parse(
         string projectPath,
         IArchitectureFileSystem? fileSystem,
         BenchmarkWorkObserver? benchmarkWorkObserver)

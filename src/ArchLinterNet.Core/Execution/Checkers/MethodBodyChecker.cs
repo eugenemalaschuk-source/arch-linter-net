@@ -24,14 +24,21 @@ internal static class MethodBodyChecker
         (IReadOnlyList<string>? explicitReferenceAssemblyPaths, string? sourceAssemblyHint, ArchitectureViolation? fallbackDiagnostic) =
             ResolveProjectAwareReferenceAssemblyPaths(contract, context, sourceLayer, sourceRoots);
 
-        IReadOnlyList<ArchitectureViolation> roslynViolations = new ArchitectureSourceScanner()
-            .FindMethodBodyViolationsWithObserver(context.AnalysisContext.RepositoryRoot, sourceLayer.Namespace,
-                contract.ForbiddenCalls, executionContext, sourceRoots: sourceRoots,
-                sourceLayer: sourceLayer, preprocessorSymbols: context.PreprocessorSymbols,
-                fileSystem: null, compilationFactory: null, assemblyLoader: null,
-                explicitReferenceAssemblyPaths: explicitReferenceAssemblyPaths,
-                sourceAssemblyHint: sourceAssemblyHint, cancellationToken: context.AnalysisContext.CancellationToken,
-                benchmarkWorkObserver: context.BenchmarkWorkObserver)
+        IReadOnlyList<ArchitectureViolation> roslynViolations = ArchitectureSourceScanner.FindMethodBodyViolationsWithObserver(
+            new ArchitectureMethodBodyScanRequest
+            {
+                RepositoryRoot = context.AnalysisContext.RepositoryRoot,
+                SourceNamespacePrefix = sourceLayer.Namespace,
+                ForbiddenCallPatterns = contract.ForbiddenCalls,
+                ExecutionContext = executionContext,
+                SourceRoots = sourceRoots,
+                SourceLayer = sourceLayer,
+                PreprocessorSymbols = context.PreprocessorSymbols,
+                ExplicitReferenceAssemblyPaths = explicitReferenceAssemblyPaths,
+                SourceAssemblyHint = sourceAssemblyHint,
+                CancellationToken = context.AnalysisContext.CancellationToken,
+                BenchmarkWorkObserver = context.BenchmarkWorkObserver,
+            })
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = new ArchitectureIlMethodBodyScanner().FindMethodBodyViolations(

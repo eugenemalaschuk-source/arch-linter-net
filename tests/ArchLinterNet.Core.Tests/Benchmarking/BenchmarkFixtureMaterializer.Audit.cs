@@ -85,7 +85,7 @@ internal static partial class BenchmarkFixtureMaterializer
         }
 
         content.AppendLine("topology:")
-            .AppendLine("  subject_kind: namespace")
+            .AppendLine("  subject_kind: type")
             .AppendLine("  mode: exhaustive")
             .AppendLine("  scope:")
             .AppendLine("    selectors:")
@@ -98,7 +98,7 @@ internal static partial class BenchmarkFixtureMaterializer
         for (int metric = 1; metric <= definition.Dimensions.MetricRuleCount; metric++)
         {
             content.AppendLine($"  - id: synthetic-metric-{metric:000}")
-                .AppendLine("    kind: external_dependency_group_count")
+                .AppendLine("    kind: topology_type_count")
                 .AppendLine("    topology_node: synthetic-metric-node");
         }
     }

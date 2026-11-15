@@ -82,6 +82,15 @@ internal static class BenchmarkAuditAnalysisRunner
                 assemblyLoads: setup.AssemblyLoads);
 
             ValidationOutcome outcome = snapshot.Evaluate("strict", timing);
+            ArchitectureMetricMeasurementOutcome? metricOutcome = null;
+            if (fixture.Definition.Dimensions.MetricRuleCount > 0)
+            {
+                using (timing.Measure("metric_measurement"))
+                {
+                    metricOutcome = snapshot.Measure();
+                }
+            }
+
             elapsed.Stop();
             long allocatedBytes = Math.Max(0, GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore);
             TimeSpan processorTime = Process.GetCurrentProcess().TotalProcessorTime - processorTimeBefore;
@@ -95,6 +104,9 @@ internal static class BenchmarkAuditAnalysisRunner
                 cancellationObserved: false);
             using JsonDocument profileDocument = JsonDocument.Parse(AnalysisProfileJsonWriter.Write(profile));
             string inputIdentity = BenchmarkMaterializedInputIdentity.Compute(fixture.Root);
+            BenchmarkMetricWorkEvidence? metricWork = metricOutcome is null
+                ? null
+                : BenchmarkMetricWorkEvidence.FromOutcome(metricOutcome, fixture.Definition.Dimensions.MetricRuleCount);
             var sample = new BenchmarkProfileSample
             {
                 Run = new BenchmarkRunDescriptor
@@ -118,6 +130,7 @@ internal static class BenchmarkAuditAnalysisRunner
                 AllocatedBytes = BenchmarkResourceMeasurement.Available(allocatedBytes, "bytes"),
                 PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable(
                     "Per-invocation peak retained managed memory is not sampled by this in-process harness."),
+                MetricWork = metricWork,
                 WorkCounters = observerEnabled
                     ? BenchmarkWorkCounterEvidence.FromObserver(observer)
                     : BenchmarkWorkCounterEvidence.ObserverDisabled("The per-invocation Core work observer was disabled for this paired sample."),
@@ -272,6 +285,7 @@ internal static class BenchmarkMaterializedInputIdentity
 
         string normalized = path.Replace('\\', '/');
         return !normalized.Contains("/obj/", StringComparison.Ordinal)
+            && !normalized.Contains("/bin/", StringComparison.Ordinal)
             && !normalized.Contains("/analysis-cache/", StringComparison.Ordinal)
             && !Path.GetFileName(path).StartsWith("profile-", StringComparison.Ordinal)
             && !Path.GetFileName(path).StartsWith("output-", StringComparison.Ordinal);

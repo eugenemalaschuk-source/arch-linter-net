@@ -39,14 +39,20 @@ public sealed class BenchmarkAuditEvidenceTests
         observer.RecordLayerMembershipProbe();
         observer.RecordCelContextConstruction();
 
-        BenchmarkProfileSample sample = CreateEvidence().Samples.Single() with
+        BenchmarkWorkloadDefinition metricWorkload = BenchmarkWorkloadGenerator.Create(
+            "synthetic-audited-metric-evidence",
+            BenchmarkTopologyShape.Linear,
+            new BenchmarkDimensionSet { MetricRuleCount = 2 });
+        BenchmarkEvidenceDocument metricTemplate = CreateEvidence(metricWorkload);
+        BenchmarkProfileSample sample = metricTemplate.Samples.Single() with
         {
             WorkCounters = BenchmarkWorkCounterEvidence.FromObserver(observer),
+            MetricWork = CreateMetricWorkEvidence(2),
             HistoryWorkCounters = BenchmarkHistoryWorkCounterEvidence.NotApplicableToCoreWorkload(),
             TimingBoundaries = CreateTimingBoundaries(),
             ReportOutputSha256 = new string('b', 64),
         };
-        BenchmarkEvidenceDocument evidence = CreateEvidence() with
+        BenchmarkEvidenceDocument evidence = metricTemplate with
         {
             Samples = [sample],
             Environment = CreateEvidence().Environment with
@@ -63,6 +69,7 @@ public sealed class BenchmarkAuditEvidenceTests
         EvaluationResults validation = schema.Evaluate(
             JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
 
+        evidence.Validate();
         Assert.Multiple(() =>
         {
             Assert.That(roundTrip.Samples.Single().WorkCounters!.ProjectFileParses.Value, Is.EqualTo(1));
@@ -73,6 +80,8 @@ public sealed class BenchmarkAuditEvidenceTests
             Assert.That(roundTrip.Samples.Single().TimingBoundaries!.ProcessHostStartupAndShutdown.Status, Is.EqualTo(BenchmarkMeasurementStatus.Unavailable));
             Assert.That(roundTrip.Environment.MaterializedInputSha256, Is.EqualTo(new string('a', 64)));
             Assert.That(roundTrip.Samples.Single().ReportOutputSha256, Is.EqualTo(new string('b', 64)));
+            Assert.That(roundTrip.Samples.Single().MetricWork!.MetricCount, Is.EqualTo(2));
+            Assert.That(roundTrip.Samples.Single().MetricWork!.Results.Select(result => result.Value), Is.EqualTo(new[] { 6, 7 }));
             Assert.That(validation.IsValid, Is.True, Describe(validation));
         });
     }
@@ -130,10 +139,54 @@ public sealed class BenchmarkAuditEvidenceTests
               "Output": { "OutputFailed": false }
             }
             """);
+        BenchmarkProfileSample? sample = workload.Dimensions.MetricRuleCount == 0
+            ? null
+            : new BenchmarkProfileSample
+            {
+                Run = new BenchmarkRunDescriptor
+                {
+                    ExecutionMode = workload.Workflow.ExecutionMode,
+                    CacheMode = "disabled",
+                    PreparedStateMode = "unprepared",
+                    ParallelMode = "sequential",
+                    SampleOrdinal = 1,
+                    IsWarmSample = false,
+                },
+                RawAnalysisProfile = profile.RootElement.Clone(),
+                CompletionStatus = "Success",
+                ExitCode = 0,
+                OutputFailed = false,
+                WallClock = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no wall-clock measurement."),
+                ProcessorTime = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no processor-time measurement."),
+                AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no allocation measurement."),
+                PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no memory measurement."),
+                MetricWork = CreateMetricWorkEvidence(workload.Dimensions.MetricRuleCount),
+            };
         return BenchmarkEvidenceFactory.Create(
             workload,
             profile.RootElement.Clone(),
-            BenchmarkIdentity.CreateCanonicalResult("Success", 0, []));
+            BenchmarkIdentity.CreateCanonicalResult("Success", 0, []),
+            sample);
+    }
+
+    private static BenchmarkMetricWorkEvidence CreateMetricWorkEvidence(int metricCount)
+    {
+        BenchmarkMetricResultEvidence[] results = Enumerable.Range(1, metricCount)
+            .Select(index => new BenchmarkMetricResultEvidence
+            {
+                MetricId = $"synthetic-metric-{index:000}",
+                MetricKind = "topology_type_count",
+                Value = index + 5,
+                ContributorCount = index + 5,
+            })
+            .ToArray();
+        return new BenchmarkMetricWorkEvidence
+        {
+            MetricCount = results.Length,
+            IsComplete = true,
+            Results = results,
+            ResultsSha256 = BenchmarkIdentity.Sha256(BenchmarkJson.Serialize(results)),
+        };
     }
 
     private static BenchmarkTimingBoundaryEvidence CreateTimingBoundaries() => new()

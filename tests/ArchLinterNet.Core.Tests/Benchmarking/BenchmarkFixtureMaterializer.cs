@@ -224,7 +224,7 @@ internal static partial class BenchmarkFixtureMaterializer
         AppendMetricPolicy(content, definition);
         content.AppendLine("contracts:")
             .AppendLine("  strict:");
-        for (int contract = 1; contract <= definition.Inventory.ContractCount; contract++)
+        for (int contract = 1; contract <= definition.Dimensions.ContractsPerWorkload; contract++)
         {
             string sourceLayer = definition.ContractLayerGraph is not null
                 ? "contract_layer_01"
@@ -369,7 +369,12 @@ internal static partial class BenchmarkFixtureMaterializer
     private static void StageAssemblies(string root, BenchmarkWorkloadDefinition definition, string solutionPath)
     {
         RunDotnet(root, ["restore", solutionPath, "--nologo", "--disable-parallel"]);
-        RunDotnet(root, ["build", solutionPath, "--nologo", "--no-restore", "--verbosity", "quiet", "--maxcpucount:1"]);
+        string pathMap = $"{ResolvePhysicalDirectoryPath(root)}=/_/archlinternet-benchmark";
+        RunDotnet(root,
+        [
+            "build", solutionPath, "--nologo", "--no-restore", "--verbosity", "quiet", "--maxcpucount:1",
+            "-p:ContinuousIntegrationBuild=true", $"-p:PathMap={pathMap}",
+        ]);
 
         string stagedDirectory = Path.Combine(root, ".benchmark", "staged-assemblies");
         foreach (BenchmarkProjectNode project in definition.Projects)
@@ -389,6 +394,27 @@ internal static partial class BenchmarkFixtureMaterializer
                     BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, root),
                     BuildStateCanonicalHasher.ComputeContentDigest(stagedAssemblyPath)));
         }
+    }
+
+    private static string ResolvePhysicalDirectoryPath(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        var segments = new Stack<DirectoryInfo>();
+        DirectoryInfo? current = new(fullPath);
+        while (current?.Parent is not null)
+        {
+            segments.Push(current);
+            current = current.Parent;
+        }
+
+        string resolvedPath = Path.GetPathRoot(fullPath)!;
+        while (segments.TryPop(out DirectoryInfo? segment))
+        {
+            FileSystemInfo? target = segment.ResolveLinkTarget(returnFinalTarget: true);
+            resolvedPath = target?.FullName ?? Path.Combine(resolvedPath, segment.Name);
+        }
+
+        return Path.GetFullPath(resolvedPath);
     }
 
     internal static void RunDotnet(string workingDirectory, IReadOnlyList<string> arguments)

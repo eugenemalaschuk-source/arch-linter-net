@@ -27,7 +27,8 @@ public sealed class ArchitectureWorkObserverTests
             ArchitectureProjectFileParser parser = new();
             DiscoveredProjectFile expected = parser.Parse(projectPath);
             BenchmarkWorkObserver observer = new();
-            DiscoveredProjectFile actual = parser.Parse(projectPath, ArchitectureFileSystem.Real, observer);
+            DiscoveredProjectFile actual = ArchitectureProjectFileParser.Parse(
+                projectPath, ArchitectureFileSystem.Real, observer);
 
             Assert.Multiple(() =>
             {
@@ -49,7 +50,7 @@ public sealed class ArchitectureWorkObserverTests
                 .ResolveFromDocument(document, root, resolveAssemblyOutputs: false);
             BenchmarkWorkObserver discoveryObserver = new();
             ProjectDiscoveryResult observedDiscovery = new ArchitectureProjectDiscoveryService()
-                .ResolveAndApply(document, root, resolveAssemblyOutputs: false, default, discoveryObserver);
+                .ResolveAndApply(document, root, resolveAssemblyOutputs: false, discoveryObserver, default);
 
             Assert.That(observedDiscovery.DiscoveredProjects.Select(project => project.AssemblyName),
                 Is.EqualTo(expectedDiscovery.DiscoveredProjects.Select(project => project.AssemblyName)));
@@ -109,11 +110,18 @@ public sealed class ArchitectureWorkObserverTests
             IReadOnlyList<ArchitectureViolation> expected = scanner.FindMethodBodyViolations(
                 root, layer.Namespace, patterns, executionContext, ["src"], layer).ToArray();
             BenchmarkWorkObserver observer = new();
-            IReadOnlyList<ArchitectureViolation> actual = scanner.FindMethodBodyViolationsWithObserver(
-                root, layer.Namespace, patterns, executionContext, ["src"], layer,
-                preprocessorSymbols: null, fileSystem: ArchitectureFileSystem.Real,
-                compilationFactory: null, assemblyLoader: null, explicitReferenceAssemblyPaths: null,
-                sourceAssemblyHint: null, cancellationToken: default, benchmarkWorkObserver: observer).ToArray();
+            IReadOnlyList<ArchitectureViolation> actual = ArchitectureSourceScanner.FindMethodBodyViolationsWithObserver(
+                new ArchitectureMethodBodyScanRequest
+                {
+                    RepositoryRoot = root,
+                    SourceNamespacePrefix = layer.Namespace,
+                    ForbiddenCallPatterns = patterns,
+                    ExecutionContext = executionContext,
+                    SourceRoots = ["src"],
+                    SourceLayer = layer,
+                    FileSystem = ArchitectureFileSystem.Real,
+                    BenchmarkWorkObserver = observer,
+                }).ToArray();
 
             static string[] Describe(IEnumerable<ArchitectureViolation> violations) => violations
                 .Select(violation => string.Join("|", violation.ContractName, violation.ContractId,

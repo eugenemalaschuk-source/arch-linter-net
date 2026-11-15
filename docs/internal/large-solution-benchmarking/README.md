@@ -47,6 +47,19 @@ unset, preserving identities for existing manifests. When set, ignore entries
 and metric declarations are emitted into the synthetic policy, and report-rule
 descriptors are written to `.benchmark/report-rules.json`. Their inventory
 counts are independent of project, type, and source-root dimensions.
+The v2 workload generator keeps method-body rules outside ordinary dependency
+contracts and uses topology-type metrics so each metric declaration produces a
+deterministic, non-empty result.
+Method-body rules contribute only to `method_body` contracts; they do not add
+ordinary dependency contracts. Metric workloads execute `Measure()` on the
+prepared analysis snapshot and retain each metric ID, kind, value, contributor
+count, and canonical result digest in the optional `metric_work` evidence field.
+This output is separate from the `metric_budgets` contract-family counter in
+`analysis-profile/v1`.
+
+Report-rule workloads use exactly 32 SARIF findings at every declared rule
+scale. Findings cycle through every declared rule so serialization comparisons
+vary rule-table size without also varying result volume.
 
 An optional `contract_layer_graph` describes executable type references among
 synthetic namespaces inside a normal project fixture. `dense_dag` creates every
@@ -60,7 +73,8 @@ continues to fail closed for compilation.
 `RealMsBuild` workloads own candidate compilation through an explicit restore and
 build. `StagedAssemblies` workloads perform that external compilation before the
 analysis run, copy the resulting DLLs into `.benchmark/staged-assemblies`, and
-write an ArchLinterNet build receipt for each input. The staged policy resolves
+write an ArchLinterNet build receipt for each input. A fixed compiler path map
+keeps those staged DLLs and receipts stable across temporary fixture roots. The staged policy resolves
 those DLLs through `analysis.target_assemblies` and `assembly_search_paths`, so
 preparation cost is not attributed to the analyzer. The materializer creates only
 bounded synthetic fixtures; the very-large catalog entry is staged and does not
@@ -76,7 +90,7 @@ peak-memory, cache, or prepared-state values are represented explicitly; zero
 is never used as a substitute for unavailable data.
 
 The optional audit extension records fixed-key Core work counters, independent timer intervals,
-observer overhead, and source/runner/materialized-input provenance. Timer intervals may overlap and
+observer overhead, metric results, and source/runner/materialized-input provenance. Timer intervals may overlap and
 are never subtracted to infer process startup or analyzer time. The extension leaves
 `analysis-profile/v1` unchanged, and old evidence omits the optional fields.
 
@@ -137,6 +151,9 @@ three scale points with independently named dimensions. The test-only
 `BenchmarkHistoryInputFactory` materializes these as canonical `benchmark-history-input/v1` data
 with stable input and expected-shape-summary SHA-256 identities. Its ordinary tests check line edit
 counts, task occurrences, graph components, and ancestry answers against the generated records.
+The merged-DAG fixture has separate side branches that fork from the mainline and rejoin through
+two-parent commits; long rename-chain fixtures contain continuous path-change events. Tests verify
+both structures and derive query answers from the parent-edge graph.
 Owning History tasks remain responsible for running their production algorithm, recording its
 operation counts and resources, and hashing the canonical algorithm output.
 
