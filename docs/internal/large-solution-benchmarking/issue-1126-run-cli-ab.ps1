@@ -20,6 +20,18 @@ $cliPaths = @{
 }
 $rows = [System.Collections.Generic.List[object]]::new()
 
+function Get-Median {
+    param([double[]] $Values)
+
+    $ordered = @($Values | Sort-Object)
+    $middle = [int]($ordered.Count / 2)
+    if ($ordered.Count % 2 -eq 0) {
+        return ($ordered[$middle - 1] + $ordered[$middle]) / 2
+    }
+
+    return $ordered[$middle]
+}
+
 for ($pair = 1; $pair -le $Pairs; $pair++) {
     $order = if ($pair % 2 -eq 1) { @('base', 'current') } else { @('current', 'base') }
     foreach ($variant in $order) {
@@ -48,9 +60,9 @@ for ($pair = 1; $pair -le $Pairs; $pair++) {
 
 foreach ($variant in @('base', 'current')) {
     $variantRows = @($rows | Where-Object Variant -eq $variant)
-    $totalValues = @($variantRows | ForEach-Object TotalMilliseconds | Sort-Object)
-    $phaseValues = @($variantRows | ForEach-Object BaselineLoadingMilliseconds | Sort-Object)
-    Write-Output "$variant median total=$($totalValues[[int][Math]::Floor($Pairs / 2)])ms baseline_loading=$($phaseValues[[int][Math]::Floor($Pairs / 2)])ms"
+    $totalMedian = Get-Median -Values @($variantRows | ForEach-Object TotalMilliseconds)
+    $phaseMedian = Get-Median -Values @($variantRows | ForEach-Object BaselineLoadingMilliseconds)
+    Write-Output "$variant median total=$($totalMedian)ms baseline_loading=$($phaseMedian)ms"
 }
 
 $pairedTotalDeltas = for ($pair = 1; $pair -le $Pairs; $pair++) {
@@ -63,6 +75,6 @@ $pairedPhaseDeltas = for ($pair = 1; $pair -le $Pairs; $pair++) {
     $currentRow = $rows | Where-Object { $_.Variant -eq 'current' -and $_.Pair -eq $pair }
     $currentRow.BaselineLoadingMilliseconds - $baseRow.BaselineLoadingMilliseconds
 }
-$totalDeltaMedian = @($pairedTotalDeltas | Sort-Object)[[int][Math]::Floor($Pairs / 2)]
-$phaseDeltaMedian = @($pairedPhaseDeltas | Sort-Object)[[int][Math]::Floor($Pairs / 2)]
+$totalDeltaMedian = Get-Median -Values @($pairedTotalDeltas)
+$phaseDeltaMedian = Get-Median -Values @($pairedPhaseDeltas)
 Write-Output "paired median current-minus-base total=${totalDeltaMedian}ms baseline_loading=${phaseDeltaMedian}ms"

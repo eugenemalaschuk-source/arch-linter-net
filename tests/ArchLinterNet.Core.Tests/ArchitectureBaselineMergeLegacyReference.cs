@@ -18,10 +18,68 @@ internal static class ArchitectureBaselineMergeLegacyReference
         ArchitectureBaselineDocument baseline,
         LegacyWorkCounter? workCounter = null)
     {
-        List<ArchitectureDependencyContract> contracts = policy.Contracts.Strict.ToList();
-        bool isStructured = baseline.Version is 2 or 3;
+        var contracts = policy.Contracts.Strict.ToList();
+        MergeStrictGroup(contracts, baseline.Baseline.Strict, baseline.Version, workCounter);
+    }
 
-        foreach (ArchitectureBaselineContractEntry baselineEntry in baseline.Baseline.Strict)
+    // The performance matrix populates only strict and strict_external. Mirror the pre-index
+    // service's outer group loop and its per-group list allocations so timings compare the same
+    // public Merge path, including empty-group work.
+    internal static void MergeBenchmarkGroups(
+        ArchitectureContractDocument policy,
+        ArchitectureBaselineDocument baseline,
+        LegacyWorkCounter? workCounter = null)
+    {
+        HashSet<string> externalEvidenceIds = new(
+            policy.ExternalEvidence.Select(requirement => requirement.Id),
+            StringComparer.Ordinal);
+
+        foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
+        {
+            List<ArchitectureBaselineContractEntry> entries = baseline.Baseline.GetGroup(groupName);
+            _ = new List<(string GroupName, string ContractId)>();
+            if (groupName == "strict")
+            {
+                List<ArchitectureDependencyContract> contracts = policy.Contracts.Strict.ToList();
+                if (entries.Count > 0)
+                {
+                    MergeStrictGroup(contracts, entries, baseline.Version, workCounter);
+                }
+
+                continue;
+            }
+
+            if (groupName == "strict_external")
+            {
+                _ = policy.Contracts.StrictExternal
+                    .Select(contract => (IArchitectureContract)contract)
+                    .ToList();
+                if (entries.Count > 0)
+                {
+                    MergeImportedExternalGroup(entries, baseline.Version, externalEvidenceIds);
+                }
+
+                continue;
+            }
+
+            _ = new List<IArchitectureContract>();
+            if (entries.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"The performance matrix does not support non-empty baseline group '{groupName}'.");
+            }
+        }
+    }
+
+    private static void MergeStrictGroup(
+        List<ArchitectureDependencyContract> contracts,
+        List<ArchitectureBaselineContractEntry> entries,
+        int documentVersion,
+        LegacyWorkCounter? workCounter)
+    {
+        bool isStructured = documentVersion is 2 or 3;
+
+        foreach (ArchitectureBaselineContractEntry baselineEntry in entries)
         {
             ArchitectureDependencyContract? contract = contracts.FirstOrDefault(candidate =>
             {
@@ -72,6 +130,29 @@ internal static class ArchitectureBaselineMergeLegacyReference
         }
     }
 
+    private static void MergeImportedExternalGroup(
+        List<ArchitectureBaselineContractEntry> entries,
+        int documentVersion,
+        HashSet<string> externalEvidenceIds)
+    {
+        foreach (ArchitectureBaselineContractEntry entry in entries)
+        {
+            bool containsImportedDiagnostic = documentVersion is 2 or 3
+                && entry.IgnoredViolations.Any(ignore =>
+                    string.Equals(ignore.Kind, "external_diagnostic", StringComparison.Ordinal));
+            bool containsOnlyImportedDiagnostics = containsImportedDiagnostic
+                && entry.IgnoredViolations.All(ignore =>
+                    string.Equals(ignore.Kind, "external_diagnostic", StringComparison.Ordinal));
+            if (containsOnlyImportedDiagnostics && externalEvidenceIds.Contains(entry.Id))
+            {
+                continue;
+            }
+
+            throw new InvalidOperationException(
+                $"The performance matrix only supports known imported diagnostics in strict_external; '{entry.Id}' was not one.");
+        }
+    }
+
     internal static string StrictIgnoreDigest(ArchitectureContractDocument policy)
     {
         return IgnoreDigest(policy.Contracts.Strict.SelectMany(contract =>
@@ -84,78 +165,52 @@ internal static class ArchitectureBaselineMergeLegacyReference
             contract.IgnoredViolations.Select(ignore => Snapshot(contract.Id, ignore))));
     }
 
-    internal static void MergeImportedExternal(
-        ArchitectureContractDocument policy,
-        ArchitectureBaselineDocument baseline)
-    {
-        // The old merger materialized each group before examining its entries. Imported diagnostics
-        // then bypassed contract lookup and never became native contract ignores.
-        List<IArchitectureContract> contracts = policy.Contracts.StrictExternal
-            .Select(contract => (IArchitectureContract)contract)
-            .ToList();
-        HashSet<string> externalEvidenceIds = new(
-            policy.ExternalEvidence.Select(requirement => requirement.Id),
-            StringComparer.Ordinal);
-        var unknownIds = new List<(string GroupName, string ContractId)>();
-
-        foreach (ArchitectureBaselineContractEntry entry in baseline.Baseline.StrictExternal)
-        {
-            bool containsImportedDiagnostic = baseline.Version is 2 or 3
-                && entry.IgnoredViolations.Any(ignore =>
-                    string.Equals(ignore.Kind, "external_diagnostic", StringComparison.Ordinal));
-            bool containsOnlyImportedDiagnostics = containsImportedDiagnostic
-                && entry.IgnoredViolations.All(ignore =>
-                    string.Equals(ignore.Kind, "external_diagnostic", StringComparison.Ordinal));
-            if (containsOnlyImportedDiagnostics)
-            {
-                if (!externalEvidenceIds.Contains(entry.Id))
-                {
-                    unknownIds.Add(("strict_external", entry.Id));
-                }
-
-                continue;
-            }
-
-            IArchitectureContract? contract = contracts.FirstOrDefault(candidate =>
-            {
-                return string.Equals(candidate.Id, entry.Id, StringComparison.OrdinalIgnoreCase);
-            });
-            if (contract is null)
-            {
-                unknownIds.Add(("strict_external", entry.Id));
-            }
-            else
-            {
-                throw new InvalidOperationException("The sparse imported-diagnostic fixture contains a native contract entry.");
-            }
-        }
-    }
-
     private static string IgnoreDigest(IEnumerable<BaselineMergeIgnoreSnapshot> snapshots)
     {
         BaselineMergeIgnoreSnapshot[] orderedSnapshots = snapshots.ToArray();
 
-        byte[] json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(orderedSnapshots));
+        byte[] json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(orderedSnapshots.Select(snapshot => new
+        {
+            snapshot.ContractId,
+            snapshot.SourceType,
+            snapshot.ForbiddenReference,
+            snapshot.Reason,
+            snapshot.Issue,
+            snapshot.IdentityVersion,
+            snapshot.ContractFamily,
+            snapshot.Kind,
+            snapshot.SourceAssembly,
+            snapshot.SourceMember,
+            snapshot.TargetAssembly,
+            snapshot.TargetType,
+            snapshot.TargetMember,
+            snapshot.Occurrence,
+            snapshot.Configuration,
+            snapshot.IsFromLoadedBaseline,
+        })));
         return Convert.ToHexStringLower(SHA256.HashData(json));
     }
 
-    private static BaselineMergeIgnoreSnapshot Snapshot(string? contractId, ArchitectureIgnoredViolation ignore) => new(
-        contractId,
-        ignore.SourceType,
-        ignore.ForbiddenReference,
-        ignore.Reason,
-        ignore.Issue,
-        ignore.IdentityVersion,
-        ignore.ContractFamily,
-        ignore.Kind,
-        ignore.SourceAssembly,
-        ignore.SourceMember,
-        ignore.TargetAssembly,
-        ignore.TargetType,
-        ignore.TargetMember,
-        ignore.Occurrence,
-        ignore.Configuration,
-        ignore.IsFromLoadedBaseline);
+    private static BaselineMergeIgnoreSnapshot Snapshot(string? contractId, ArchitectureIgnoredViolation ignore)
+    {
+        return new BaselineMergeIgnoreSnapshot(
+            contractId,
+            ignore.SourceType,
+            ignore.ForbiddenReference,
+            ignore.Reason,
+            ignore.Issue,
+            ignore.IdentityVersion,
+            ignore.ContractFamily,
+            ignore.Kind,
+            ignore.SourceAssembly,
+            ignore.SourceMember,
+            ignore.TargetAssembly,
+            ignore.TargetType,
+            ignore.TargetMember,
+            ignore.Occurrence,
+            ignore.Configuration,
+            ignore.IsFromLoadedBaseline);
+    }
 
     private static bool IdentityEquals(
         ArchitectureIgnoredViolation existing,

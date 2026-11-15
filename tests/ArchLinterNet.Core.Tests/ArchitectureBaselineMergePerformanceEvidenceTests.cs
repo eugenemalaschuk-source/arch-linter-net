@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
@@ -14,7 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 [Category("Benchmark")]
 public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
 {
-    private const int SampleCount = 5;
+    private const int SampleCountPerWorkload = 5;
 
     [Test]
     [Explicit("Hardware-sensitive #1126 benchmark; run manually to refresh paired baseline-merge evidence.")]
@@ -28,15 +26,32 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
             ArchitectureBaselineDocument baseline = CreateBaseline(workload);
             ArchitectureContractDocument legacyPolicy = CreatePolicy(workload);
             ArchitectureBaselineMergeLegacyReference.LegacyWorkCounter legacyWork = new();
-            ArchitectureBaselineMergeLegacyReference.MergeStrict(legacyPolicy, baseline, legacyWork);
+            ArchitectureBaselineMergeLegacyReference.MergeBenchmarkGroups(legacyPolicy, baseline, legacyWork);
             string legacyDigest = ArchitectureBaselineMergeLegacyReference.StrictIgnoreDigest(legacyPolicy);
 
+            _ = MeasureLegacy(workload, baseline);
             _ = MeasureCurrent(workload, baseline);
-            _ = MeasureCurrent(workload, baseline);
-            Measurement[] samples = Enumerable.Range(0, SampleCount)
-                .Select(_ => MeasureCurrent(workload, baseline))
-                .ToArray();
-            Assert.That(samples.Select(sample => sample.Digest), Is.All.EqualTo(legacyDigest),
+
+            Measurement[] legacySamples = new Measurement[SampleCountPerWorkload];
+            Measurement[] currentSamples = new Measurement[SampleCountPerWorkload];
+            for (int sampleIndex = 0; sampleIndex < SampleCountPerWorkload; sampleIndex++)
+            {
+                // Alternate order so both implementations see similar process warmth and CPU load.
+                if (sampleIndex % 2 == 0)
+                {
+                    legacySamples[sampleIndex] = MeasureLegacy(workload, baseline);
+                    currentSamples[sampleIndex] = MeasureCurrent(workload, baseline);
+                }
+                else
+                {
+                    currentSamples[sampleIndex] = MeasureCurrent(workload, baseline);
+                    legacySamples[sampleIndex] = MeasureLegacy(workload, baseline);
+                }
+            }
+
+            Assert.That(legacySamples.Select(sample => sample.Digest), Is.All.EqualTo(legacyDigest),
+                $"Legacy reference output differs across samples for {workload.Name}.");
+            Assert.That(currentSamples.Select(sample => sample.Digest), Is.All.EqualTo(legacyDigest),
                 $"Current merge output differs from the prior linear behavior for {workload.Name}.");
 
             ArchitectureContractDocument indexedPolicy = CreatePolicy(workload);
@@ -53,9 +68,11 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
                 workload.BaselineEntryCount,
                 workload.InlineIgnoreCount,
                 workload.LoadedIgnoreCount,
-                SampleCount,
-                Median(samples.Select(sample => sample.ElapsedMilliseconds)),
-                Median(samples.Select(sample => sample.AllocatedBytes)),
+                SampleCountPerWorkload,
+                Median(legacySamples.Select(sample => sample.ElapsedMilliseconds)),
+                Median(currentSamples.Select(sample => sample.ElapsedMilliseconds)),
+                Median(legacySamples.Select(sample => sample.AllocatedBytes)),
+                Median(currentSamples.Select(sample => sample.AllocatedBytes)),
                 retainedBytes,
                 legacyWork.ContractIdComparisons,
                 legacyWork.IgnoreIdentityComparisons,
@@ -64,11 +81,38 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
                 indexedWork.ContractLinearScanComparisons,
                 indexedWork.ContractLookups,
                 indexedWork.InlineIgnoreIndexEntries,
+                indexedWork.LinearMembershipComparisons,
                 indexedWork.MembershipChecks,
                 indexedWork.LoadedIgnoresAccepted,
                 legacyDigest,
                 environment);
-            TestContext.Out.WriteLine(JsonSerializer.Serialize(row));
+            TestContext.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                row.Workload,
+                row.Version,
+                row.ContractCount,
+                row.BaselineEntryCount,
+                row.InlineIgnoreCount,
+                row.LoadedIgnoreCount,
+                row.SampleCount,
+                row.LegacyMedianMilliseconds,
+                row.CurrentMedianMilliseconds,
+                row.LegacyMedianAllocatedBytes,
+                row.CurrentMedianAllocatedBytes,
+                row.RetainedOutputDeltaBytes,
+                row.LegacyContractIdComparisons,
+                row.LegacyIgnoreIdentityComparisons,
+                row.LegacyLoadedIgnoresAdded,
+                row.IndexedContractIndexEntries,
+                row.IndexedContractLinearScanComparisons,
+                row.IndexedContractLookups,
+                row.IndexedInlineIgnoreIndexEntries,
+                row.IndexedLinearMembershipComparisons,
+                row.IndexedMembershipChecks,
+                row.IndexedLoadedIgnoresAccepted,
+                row.CanonicalIgnoreSha256,
+                row.Environment,
+            }));
         }
     }
 
@@ -96,7 +140,7 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
 
     private static ArchitectureContractDocument CreatePolicy(MergeWorkload workload)
     {
-        List<ArchitectureDependencyContract> contracts = Enumerable.Range(0, workload.ContractCount)
+        var contracts = Enumerable.Range(0, workload.ContractCount)
             .Select(index => new ArchitectureDependencyContract
             {
                 Id = ContractId(index),
@@ -207,6 +251,23 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
         return new Measurement(stopwatch.Elapsed.TotalMilliseconds, allocatedBytes, digest);
     }
 
+    private static Measurement MeasureLegacy(
+        MergeWorkload workload,
+        ArchitectureBaselineDocument baseline)
+    {
+        ArchitectureContractDocument policy = CreatePolicy(workload);
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        ArchitectureBaselineMergeLegacyReference.MergeBenchmarkGroups(policy, baseline);
+        stopwatch.Stop();
+        long allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        string digest = ArchitectureBaselineMergeLegacyReference.StrictIgnoreDigest(policy);
+        return new Measurement(stopwatch.Elapsed.TotalMilliseconds, allocatedBytes, digest);
+    }
+
     private static long MeasureRetainedOutput(
         MergeWorkload workload,
         ArchitectureBaselineDocument baseline)
@@ -226,16 +287,25 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
     private static double Median(IEnumerable<double> values)
     {
         double[] ordered = values.Order().ToArray();
-        return ordered[ordered.Length / 2];
+        int middle = ordered.Length / 2;
+        return ordered.Length % 2 == 0
+            ? (ordered[middle - 1] + ordered[middle]) / 2
+            : ordered[middle];
     }
 
     private static long Median(IEnumerable<long> values)
     {
         long[] ordered = values.Order().ToArray();
-        return ordered[ordered.Length / 2];
+        int middle = ordered.Length / 2;
+        return ordered.Length % 2 == 0
+            ? ordered[middle - 1] + ((ordered[middle] - ordered[middle - 1]) / 2)
+            : ordered[middle];
     }
 
-    private static string ContractId(int index) => $"Synthetic.Rule{index:D5}";
+    private static string ContractId(int index)
+    {
+        return $"Synthetic.Rule{index:D5}";
+    }
 
     private enum WorkloadKind
     {
@@ -264,7 +334,9 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
         int InlineIgnoreCount,
         int LoadedIgnoreCount,
         int SampleCount,
+        double LegacyMedianMilliseconds,
         double CurrentMedianMilliseconds,
+        long LegacyMedianAllocatedBytes,
         long CurrentMedianAllocatedBytes,
         long RetainedOutputDeltaBytes,
         long LegacyContractIdComparisons,
@@ -274,6 +346,7 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
         long IndexedContractLinearScanComparisons,
         long IndexedContractLookups,
         long IndexedInlineIgnoreIndexEntries,
+        long IndexedLinearMembershipComparisons,
         long IndexedMembershipChecks,
         long IndexedLoadedIgnoresAccepted,
         string CanonicalIgnoreSha256,

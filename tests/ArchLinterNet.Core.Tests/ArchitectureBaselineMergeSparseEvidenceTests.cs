@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
@@ -14,7 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 [Category("Benchmark")]
 public sealed class ArchitectureBaselineMergeSparseEvidenceTests
 {
-    private const int SampleCount = 5;
+    private const int SampleCountPerWorkload = 5;
 
     [Test]
     [Explicit("Hardware-sensitive #1126 review measurements; run manually after changing sparse lookup strategy.")]
@@ -29,9 +27,9 @@ public sealed class ArchitectureBaselineMergeSparseEvidenceTests
             _ = Measure(workload, baseline, useCurrent: false);
             _ = Measure(workload, baseline, useCurrent: true);
 
-            Sample[] currentSamples = new Sample[SampleCount];
-            Sample[] legacySamples = new Sample[SampleCount];
-            for (int sampleIndex = 0; sampleIndex < SampleCount; sampleIndex++)
+            var currentSamples = new Sample[SampleCountPerWorkload];
+            var legacySamples = new Sample[SampleCountPerWorkload];
+            for (int sampleIndex = 0; sampleIndex < SampleCountPerWorkload; sampleIndex++)
             {
                 // Alternate execution order to reduce drift from process warmth and CPU load.
                 if (sampleIndex % 2 == 0)
@@ -60,7 +58,7 @@ public sealed class ArchitectureBaselineMergeSparseEvidenceTests
                 workload.ContractCount,
                 workload.BaselineEntryCount,
                 workload.BaselineEntryCount * workload.ImportedDiagnosticCount,
-                SampleCount,
+                SampleCountPerWorkload,
                 Median(legacySamples.Select(sample => sample.ElapsedMilliseconds)),
                 Median(currentSamples.Select(sample => sample.ElapsedMilliseconds)),
                 Median(legacySamples.Select(sample => sample.AllocatedBytes)),
@@ -72,7 +70,26 @@ public sealed class ArchitectureBaselineMergeSparseEvidenceTests
                 current.MembershipChecks,
                 legacyDigest,
                 environment);
-            TestContext.Out.WriteLine(JsonSerializer.Serialize(row));
+            TestContext.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                row.Workload,
+                row.Group,
+                row.ContractCount,
+                row.BaselineEntryCount,
+                row.ImportedDiagnosticCount,
+                row.SampleCount,
+                row.LegacyMedianMilliseconds,
+                row.CurrentMedianMilliseconds,
+                row.LegacyMedianAllocatedBytes,
+                row.CurrentMedianAllocatedBytes,
+                row.LegacyContractIdComparisons,
+                row.IndexedContractIndexEntries,
+                row.IndexedContractLookups,
+                row.IndexedContractLinearScanComparisons,
+                row.IndexedMembershipChecks,
+                row.CanonicalIgnoreSha256,
+                row.Environment,
+            }));
         }
     }
 
@@ -90,7 +107,7 @@ public sealed class ArchitectureBaselineMergeSparseEvidenceTests
     {
         if (workload.GroupKind == GroupKind.Strict)
         {
-            List<ArchitectureDependencyContract> contracts = Enumerable.Range(0, workload.ContractCount)
+            var contracts = Enumerable.Range(0, workload.ContractCount)
                 .Select(index => new ArchitectureDependencyContract
                 {
                     Id = ContractId(index),
@@ -108,7 +125,7 @@ public sealed class ArchitectureBaselineMergeSparseEvidenceTests
             };
         }
 
-        List<ArchitectureExternalDependencyContract> externalContracts = Enumerable.Range(0, workload.ContractCount)
+        var externalContracts = Enumerable.Range(0, workload.ContractCount)
             .Select(index => new ArchitectureExternalDependencyContract
             {
                 Id = $"Synthetic.ExternalContract{index:D5}",
@@ -117,7 +134,7 @@ public sealed class ArchitectureBaselineMergeSparseEvidenceTests
                 Forbidden = new List<string>(),
             })
             .ToList();
-        List<ArchitectureExternalEvidenceRequirement> evidence = Enumerable.Range(0, workload.BaselineEntryCount)
+        var evidence = Enumerable.Range(0, workload.BaselineEntryCount)
             .Select(index => new ArchitectureExternalEvidenceRequirement
             {
                 Id = EvidenceId(index),
@@ -198,19 +215,15 @@ public sealed class ArchitectureBaselineMergeSparseEvidenceTests
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
-        long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         Stopwatch stopwatch = Stopwatch.StartNew();
         if (useCurrent)
         {
             ArchitectureBaselineLoadingService.Merge(policy, baseline, indexedWork);
         }
-        else if (workload.GroupKind == GroupKind.Strict)
-        {
-            ArchitectureBaselineMergeLegacyReference.MergeStrict(policy, baseline, legacyWork);
-        }
         else
         {
-            ArchitectureBaselineMergeLegacyReference.MergeImportedExternal(policy, baseline);
+            ArchitectureBaselineMergeLegacyReference.MergeBenchmarkGroups(policy, baseline, legacyWork);
         }
 
         stopwatch.Stop();
@@ -232,18 +245,30 @@ public sealed class ArchitectureBaselineMergeSparseEvidenceTests
     private static double Median(IEnumerable<double> values)
     {
         double[] ordered = values.Order().ToArray();
-        return ordered[ordered.Length / 2];
+        int middle = ordered.Length / 2;
+        return ordered.Length % 2 == 0
+            ? (ordered[middle - 1] + ordered[middle]) / 2
+            : ordered[middle];
     }
 
     private static long Median(IEnumerable<long> values)
     {
         long[] ordered = values.Order().ToArray();
-        return ordered[ordered.Length / 2];
+        int middle = ordered.Length / 2;
+        return ordered.Length % 2 == 0
+            ? ordered[middle - 1] + ((ordered[middle] - ordered[middle - 1]) / 2)
+            : ordered[middle];
     }
 
-    private static string ContractId(int index) => $"Synthetic.Rule{index:D5}";
+    private static string ContractId(int index)
+    {
+        return $"Synthetic.Rule{index:D5}";
+    }
 
-    private static string EvidenceId(int index) => $"Synthetic.Evidence{index:D5}";
+    private static string EvidenceId(int index)
+    {
+        return $"Synthetic.Evidence{index:D5}";
+    }
 
     private enum GroupKind
     {

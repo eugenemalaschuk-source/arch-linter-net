@@ -14,6 +14,8 @@ internal sealed class ArchitectureBaselineMergeWorkCounter
 
     internal long InlineIgnoreIndexEntries { get; set; }
 
+    internal long LinearMembershipComparisons { get; set; }
+
     internal long MembershipChecks { get; set; }
 
     internal long LoadedIgnoresAccepted { get; set; }

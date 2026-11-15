@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureBaselineMergeIndexTests
+public sealed partial class ArchitectureBaselineMergeIndexTests
 {
     [TestCase(1)]
     [TestCase(2)]
@@ -54,9 +54,9 @@ public sealed class ArchitectureBaselineMergeIndexTests
         Assert.Multiple(() =>
         {
             Assert.That(ignores.Select(ignore => ignore.SourceType),
-                Is.EqualTo(new[] { "A.Type", "a.Type", "A.Type", "C.Type" }));
+                Is.EqualTo(["A.Type", "a.Type", "A.Type", "C.Type"]));
             Assert.That(ignores.Select(ignore => ignore.Reason),
-                Is.EqualTo(new[] { "inline-first", "case-distinct", "reference-case-distinct", "loaded-first" }));
+                Is.EqualTo(["inline-first", "case-distinct", "reference-case-distinct", "loaded-first"]));
             Assert.That(ignores[0].IsFromLoadedBaseline, Is.False);
             Assert.That(ignores.Skip(1).All(ignore => ignore.IsFromLoadedBaseline), Is.True);
         });
@@ -135,33 +135,62 @@ public sealed class ArchitectureBaselineMergeIndexTests
             Assert.That(workCounter.ContractLookups, Is.EqualTo(entryCount));
             Assert.That(
                 workCounter.ContractIndexEntries,
-                Is.EqualTo(entryCount <= 4 ? 0 : contractCount));
+                Is.EqualTo(entryCount <= 8 ? 0 : contractCount));
             Assert.That(
                 workCounter.ContractLinearScanComparisons,
-                Is.EqualTo(entryCount <= 4 ? contractCount : 0));
+                Is.EqualTo(entryCount <= 8 ? contractCount : 0));
             Assert.That(workCounter.MembershipChecks, Is.Zero);
             Assert.That(workCounter.InlineIgnoreIndexEntries, Is.Zero);
         });
     }
 
     [Test]
-    public void Merge_SmallRepeatedIdGroupUsesOneLinearLookupForEarlyMatch()
+    public void Merge_SmallIgnoreListUsesLinearMembershipWithoutIndex()
     {
-        ArchitectureDependencyContract[] contracts = Enumerable.Range(0, 512)
-            .Select(index => Contract(ContractId(index)))
-            .ToArray();
-        ArchitectureContractDocument policy = Policy(contracts);
+        ArchitectureDependencyContract contract = Contract("rule", new List<ArchitectureIgnoredViolation>
+        {
+            ToPolicyIgnore(LegacyIgnore("Inline.Type", "Inline.Forbidden", "inline")),
+        });
+        ArchitectureContractDocument policy = Policy(contract);
         ArchitectureBaselineDocument baseline = Baseline(1,
-            Enumerable.Range(0, 4).Select(_ => Entry(ContractId(0))).ToArray());
+            Entry("rule",
+                LegacyIgnore("Inline.Type", "Inline.Forbidden", "loaded-duplicate"),
+                LegacyIgnore("Loaded.Type", "Loaded.Forbidden", "loaded-first")));
         ArchitectureBaselineMergeWorkCounter workCounter = new();
 
         ArchitectureBaselineLoadingService.Merge(policy, baseline, workCounter);
 
         Assert.Multiple(() =>
         {
-            Assert.That(workCounter.ContractLookups, Is.EqualTo(4));
-            Assert.That(workCounter.ContractIndexEntries, Is.Zero);
-            Assert.That(workCounter.ContractLinearScanComparisons, Is.EqualTo(1));
+            Assert.That(workCounter.InlineIgnoreIndexEntries, Is.Zero);
+            Assert.That(workCounter.LinearMembershipComparisons, Is.EqualTo(2));
+            Assert.That(workCounter.MembershipChecks, Is.EqualTo(2));
+            Assert.That(workCounter.LoadedIgnoresAccepted, Is.EqualTo(1));
+            Assert.That(contract.IgnoredViolations, Has.Count.EqualTo(2));
+            Assert.That(contract.IgnoredViolations[0].Reason, Is.EqualTo("inline"));
+            Assert.That(contract.IgnoredViolations[1].Reason, Is.EqualTo("loaded-first"));
+        });
+    }
+
+    [Test]
+    public void Merge_SmallIgnoreListPromotesToIndexAfterThreshold()
+    {
+        ArchitectureDependencyContract contract = Contract("rule");
+        ArchitectureContractDocument policy = Policy(contract);
+        ArchitectureBaselineDocument baseline = Baseline(1,
+            Entry("rule", Enumerable.Range(0, 10)
+                .Select(index => LegacyIgnore($"Source{index}", $"Forbidden{index}", $"loaded-{index}"))
+                .ToArray()));
+        ArchitectureBaselineMergeWorkCounter workCounter = new();
+
+        ArchitectureBaselineLoadingService.Merge(policy, baseline, workCounter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(workCounter.LinearMembershipComparisons, Is.EqualTo(36));
+            Assert.That(workCounter.MembershipChecks, Is.EqualTo(10));
+            Assert.That(workCounter.InlineIgnoreIndexEntries, Is.Zero);
+            Assert.That(contract.IgnoredViolations, Has.Count.EqualTo(10));
         });
     }
 
@@ -247,6 +276,7 @@ public sealed class ArchitectureBaselineMergeIndexTests
         {
             Assert.That(workCounter.InlineIgnoreIndexEntries, Is.EqualTo(inlineIgnoreCount));
             Assert.That(workCounter.MembershipChecks, Is.EqualTo(loadedIgnoreCount));
+            Assert.That(workCounter.LinearMembershipComparisons, Is.Zero);
             Assert.That(workCounter.LoadedIgnoresAccepted, Is.EqualTo(loadedIgnoreCount));
             Assert.That(contract.IgnoredViolations, Has.Count.EqualTo(totalIgnoreCount));
         });
@@ -276,7 +306,7 @@ public sealed class ArchitectureBaselineMergeIndexTests
             .Select(entryIndex =>
             {
                 int contractIndex = entryIndex % 12;
-                string id = contractIndex == 3 && entryIndex % 2 == 0
+                string id = contractIndex == 3 && entryIndex == 15
                     ? "rUlE03"
                     : ContractId(contractIndex);
                 ArchitectureBaselineIgnoredViolation[] ignores = Enumerable.Range(0, 3)
@@ -314,7 +344,9 @@ public sealed class ArchitectureBaselineMergeIndexTests
 
     private static ArchitectureDependencyContract Contract(
         string id,
-        IEnumerable<ArchitectureIgnoredViolation>? ignores = null) => new()
+        IEnumerable<ArchitectureIgnoredViolation>? ignores = null)
+    {
+        return new ArchitectureDependencyContract
         {
             Id = id,
             Name = id,
@@ -322,42 +354,57 @@ public sealed class ArchitectureBaselineMergeIndexTests
             Forbidden = new List<string>(),
             IgnoredViolations = ignores?.ToList() ?? new List<ArchitectureIgnoredViolation>(),
         };
+    }
 
-    private static ArchitectureContractDocument Policy(params ArchitectureDependencyContract[] contracts) => new()
+    private static ArchitectureContractDocument Policy(params ArchitectureDependencyContract[] contracts)
     {
-        Version = 1,
-        Name = "Generated baseline merge policy",
-        Contracts = new ArchitectureContractGroups { Strict = contracts.ToList() },
-    };
+        return new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Generated baseline merge policy",
+            Contracts = new ArchitectureContractGroups { Strict = contracts.ToList() },
+        };
+    }
 
     private static ArchitectureBaselineDocument Baseline(
         int version,
-        params ArchitectureBaselineContractEntry[] entries) => new()
+        params ArchitectureBaselineContractEntry[] entries)
+    {
+        return new ArchitectureBaselineDocument
         {
             Version = version,
             Baseline = new ArchitectureBaselineContractGroups { Strict = entries.ToList() },
         };
+    }
 
     private static ArchitectureBaselineContractEntry Entry(
         string id,
-        params ArchitectureBaselineIgnoredViolation[] ignores) => new()
+        params ArchitectureBaselineIgnoredViolation[] ignores)
+    {
+        return new ArchitectureBaselineContractEntry
         {
             Id = id,
             IgnoredViolations = ignores.ToList(),
         };
+    }
 
-    private static ArchitectureBaselineIgnoredViolation LegacyIgnore(string source, string forbidden, string reason) => new()
+    private static ArchitectureBaselineIgnoredViolation LegacyIgnore(string source, string forbidden, string reason)
     {
-        SourceType = source,
-        ForbiddenReference = forbidden,
-        Reason = reason,
-    };
+        return new ArchitectureBaselineIgnoredViolation
+        {
+            SourceType = source,
+            ForbiddenReference = forbidden,
+            Reason = reason,
+        };
+    }
 
     private static ArchitectureBaselineIgnoredViolation StructuredBaselineIgnore(
         string sourceMember,
         string reason,
         string kind = "dependency",
-        string forbiddenReference = "Forbidden.Type") => new()
+        string forbiddenReference = "Forbidden.Type")
+    {
+        return new ArchitectureBaselineIgnoredViolation
         {
             SourceType = "Source.Type",
             ForbiddenReference = forbiddenReference,
@@ -373,6 +420,7 @@ public sealed class ArchitectureBaselineMergeIndexTests
             Occurrence = 1,
             Configuration = "release",
         };
+    }
 
     private static ArchitectureIgnoredViolation StructuredPolicyIgnore(
         string sourceMember,
@@ -387,22 +435,28 @@ public sealed class ArchitectureBaselineMergeIndexTests
         return ToPolicyIgnore(baselineIgnore);
     }
 
-    private static ArchitectureIgnoredViolation ToPolicyIgnore(ArchitectureBaselineIgnoredViolation ignore) => new()
+    private static ArchitectureIgnoredViolation ToPolicyIgnore(ArchitectureBaselineIgnoredViolation ignore)
     {
-        SourceType = ignore.SourceType,
-        ForbiddenReference = ignore.ForbiddenReference,
-        Reason = ignore.Reason,
-        IdentityVersion = ignore.IdentityVersion,
-        ContractFamily = ignore.ContractFamily,
-        Kind = ignore.Kind,
-        SourceAssembly = ignore.SourceAssembly,
-        SourceMember = ignore.SourceMember,
-        TargetAssembly = ignore.TargetAssembly,
-        TargetType = ignore.TargetType,
-        TargetMember = ignore.TargetMember,
-        Occurrence = ignore.Occurrence,
-        Configuration = ignore.Configuration,
-    };
+        return new ArchitectureIgnoredViolation
+        {
+            SourceType = ignore.SourceType,
+            ForbiddenReference = ignore.ForbiddenReference,
+            Reason = ignore.Reason,
+            IdentityVersion = ignore.IdentityVersion,
+            ContractFamily = ignore.ContractFamily,
+            Kind = ignore.Kind,
+            SourceAssembly = ignore.SourceAssembly,
+            SourceMember = ignore.SourceMember,
+            TargetAssembly = ignore.TargetAssembly,
+            TargetType = ignore.TargetType,
+            TargetMember = ignore.TargetMember,
+            Occurrence = ignore.Occurrence,
+            Configuration = ignore.Configuration,
+        };
+    }
 
-    private static string ContractId(int index) => $"Rule{index:D2}";
+    private static string ContractId(int index)
+    {
+        return $"Rule{index:D2}";
+    }
 }

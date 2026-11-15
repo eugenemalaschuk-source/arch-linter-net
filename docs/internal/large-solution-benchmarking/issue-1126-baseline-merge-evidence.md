@@ -3,10 +3,10 @@
 ## Scope and pre-change effect contract
 
 Issue #1126 targets the baseline merge in `ArchitectureBaselineLoadingService.ContractGroupMerger`.
-The pre-change path linearly scans the selected contract group for every baseline entry and then
-linearly scans the growing ignore list for each eligible ignore. This evidence isolates that merge
-boundary with the same workload for the legacy reference and indexed implementation. The legacy
-reference is a test-only copy of the old strict-group behavior; it is not production code.
+The pre-change path iterates every contract group, materializes each group's contract list, linearly
+scans the selected group for every baseline entry, and then linearly scans the growing ignore list
+for each eligible ignore. The test-only reference models that full outer merge path for the same
+workload as the indexed implementation; it is not production code.
 
 Variables are independent: `C` is the number of contracts, `B` the baseline-entry count, and `I`
 the total of inline plus loaded ignores on the selected contract. The expected work changes from
@@ -38,12 +38,12 @@ loaded-text identity work. It cannot be used as a merge-only speedup claim.
 
 The explicit Core test `ArchitectureBaselineMergePerformanceEvidenceTests.RunBaselineMergeEffectMatrix`
 uses the same generated model objects and input dimensions for each run. It compares the current
-`ArchitectureBaselineLoadingService.Merge` output digest to a test-only copy of the old linear
-merge. Two warmups precede five Release samples. Direct timing starts immediately before `Merge`
-and stops immediately after it; SHA-256 serialization is outside the timed interval. Allocation is
-measured with `GC.GetAllocatedBytesForCurrentThread`; retained managed deltas use forced collections
-around the resulting policy object. That retained delta is an unstable GC observation, not peak
-temporary memory or a process working-set measurement.
+`ArchitectureBaselineLoadingService.Merge` output digest to a test-only copy of the old full outer
+merge path. Each implementation gets one warmup; five Release samples then alternate execution
+order. Direct timing includes the merge path and group iteration but excludes SHA-256 output
+serialization. Allocation is measured with `GC.GetAllocatedBytesForCurrentThread`; current retained
+managed deltas use forced collections around the resulting policy object. That retained delta is an
+unstable GC observation, not peak temporary memory or a process working-set measurement.
 
 Independent scale series are: `C = 32/128/512` with `B=64`; `B = 32/128/512` with `C=1`; and
 `I = 100/500/2,000` with equal inline/loaded halves for both v1 and v3. Small v1 and v3 cases use
@@ -60,28 +60,27 @@ processor count on every row.
 
 ## Pre-change results
 
-Each direct time and allocation below is the median of five warmed Release samples. The comparison
-counts are deterministic counts from the legacy reference. The `I` workload uses one contract and
-one baseline entry.
+Each direct time and allocation below is the median of five warmed Release samples from the full
+pre-index reference path. The comparison counts are deterministic. Retained output deltas are not
+reported for the legacy reference; the `I` workload uses one contract and one baseline entry.
 
-| Shape | C | B | Inline / loaded | Legacy ID comparisons | Legacy ignore comparisons | Merge median ms | Allocated bytes | Retained output delta bytes | Ordered output SHA-256 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| Small v1 | 8 | 8 | 2 / 4 | 8 | 14 | 0.0740 | 11,456 | 768 | `32e96c59f5475c83bf098e23e0bf3b8405105aab389d904e844d914e29a683e3` |
-| Small v3 | 8 | 8 | 2 / 4 | 8 | 14 | 0.0733 | 11,456 | 768 | `1bf87da9faaeb3e0cd9f13c0cff5ccf28de31fc866e70eaeddbdb9c71fb08252` |
-| Contracts | 512 | 64 | 0 / 0 | 32,768 | 0 | 1.5582 | 19,240 | -4,032 | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
-| Entries | 1 | 512 | 0 / 0 | 512 | 0 | 0.1863 | 54,576 | 0 | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
-| v1 ignores | 1 | 1 | 50 / 50 | 1 | 3,725 | 0.1520 | 24,256 | 10,304 | `45b4d6bf4db3fbc6a04a7c34205d23934c1078930538edfcd4a3e0aedbd03094` |
-| v3 ignores | 1 | 1 | 50 / 50 | 1 | 3,725 | 0.2515 | 24,256 | 9,712 | `1eef028e9179a6f258bcd8b365cb58d1a412562afbf4d6b0c30d4f686b518475` |
-| v1 ignores | 1 | 1 | 250 / 250 | 1 | 93,625 | 1.4757 | 81,728 | 48,048 | `8b7a7d2b1ddbb43f0ef3a4291b34528d0cebbc55171044685a3f6260802adcc9` |
-| v3 ignores | 1 | 1 | 250 / 250 | 1 | 93,625 | 4.0633 | 81,728 | 48,048 | `5ba8f6fadd7bc55ae1d4aae2cc7428280e18416223c786311cda2df163fa6d28` |
-| v1 ignores | 1 | 1 | 1,000 / 1,000 | 1 | 1,499,500 | 32.8129 | 298,016 | 192,192 | `7a5a63f5c96776aef883ab22280d96c2c0f64736b1cd0e2c00361b056d3acd66` |
-| v3 ignores | 1 | 1 | 1,000 / 1,000 | 1 | 1,499,500 | 14.0231 | 298,016 | 192,192 | `ffcc9a39a2ef6862363b4c197353a190b5184c477597551bc5da852e50552399` |
+| Shape | C | B | Inline / loaded | Legacy ID comparisons | Legacy ignore comparisons | Merge median ms | Allocated bytes | Ordered output SHA-256 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Small v1 | 8 | 8 | 2 / 4 | 8 | 14 | 0.0445 | 6,336 | `32e96c59f5475c83bf098e23e0bf3b8405105aab389d904e844d914e29a683e3` |
+| Small v3 | 8 | 8 | 2 / 4 | 8 | 14 | 0.0563 | 6,336 | `1bf87da9faaeb3e0cd9f13c0cff5ccf28de31fc866e70eaeddbdb9c71fb08252` |
+| Contracts | 512 | 64 | 0 / 0 | 32,768 | 0 | 2.1839 | 14,920 | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
+| Entries | 1 | 512 | 0 / 0 | 512 | 0 | 0.1100 | 53,840 | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
+| v1 ignores | 1 | 1 | 50 / 50 | 1 | 3,725 | 0.2889 | 15,032 | `45b4d6bf4db3fbc6a04a7c34205d23934c1078930538edfcd4a3e0aedbd03094` |
+| v3 ignores | 1 | 1 | 50 / 50 | 1 | 3,725 | 0.1900 | 15,032 | `1eef028e9179a6f258bcd8b365cb58d1a412562afbf4d6b0c30d4f686b518475` |
+| v1 ignores | 1 | 1 | 250 / 250 | 1 | 93,625 | 1.9256 | 54,904 | `8b7a7d2b1ddbb43f0ef3a4291b34528d0cebbc55171044685a3f6260802adcc9` |
+| v3 ignores | 1 | 1 | 250 / 250 | 1 | 93,625 | 3.3220 | 54,904 | `5ba8f6fadd7bc55ae1d4aae2cc7428280e18416223c786311cda2df163fa6d28` |
+| v1 ignores | 1 | 1 | 1,000 / 1,000 | 1 | 1,499,500 | 65.6254 | 205,192 | `7a5a63f5c96776aef883ab22280d96c2c0f64736b1cd0e2c00361b056d3acd66` |
+| v3 ignores | 1 | 1 | 1,000 / 1,000 | 1 | 1,499,500 | 89.6731 | 205,192 | `ffcc9a39a2ef6862363b4c197353a190b5184c477597551bc5da852e50552399` |
 
 The legacy ignore comparison counts grow from 3,725 to 93,625 to 1,499,500 as `I` grows from
 100 to 500 to 2,000. The new structural target for the largest ignore workload is 1,000 inline
-entries inspected once plus 1,000 constant-time membership checks for the 1,000 loaded entries. The measured retained deltas
-include required loaded output objects and are noisy; the negative contract-only delta demonstrates
-that this method cannot report temporary index peak memory. No peak working-set value was captured.
+entries inspected once plus 1,000 membership checks for the 1,000 loaded entries. No peak
+working-set value was captured.
 
 ## Baseline phase share
 
@@ -104,13 +103,13 @@ dotnet src/ArchLinterNet.Cli/bin/Release/net10.0/ArchLinterNet.Cli.dll `
 ```
 
 | Sample | Total ms | `baseline_loading` ms | Composite phase share | Whole-run Amdahl limit if that entire phase vanished |
-|---:|---:|---:|---:|---:|
-| 1 | 1,431 | 471 | 32.9% | 1.49x |
-| 2 | 1,600 | 543 | 33.9% | 1.51x |
-| 3 | 1,389 | 303 | 21.8% | 1.28x |
-| 4 | 1,472 | 489 | 33.2% | 1.50x |
-| 5 | 1,439 | 473 | 32.9% | 1.49x |
-| Median | 1,439 | 473 | 32.9% | 1.49x |
+| -----: | -------: | --------------------: | --------------------: | ---------------------------------------------------: |
+|      1 |    1,431 |                   471 |                 32.9% |                                                1.49x |
+|      2 |    1,600 |                   543 |                 33.9% |                                                1.51x |
+|      3 |    1,389 |                   303 |                 21.8% |                                                1.28x |
+|      4 |    1,472 |                   489 |                 33.2% |                                                1.50x |
+|      5 |    1,439 |                   473 |                 32.9% |                                                1.49x |
+| Median |    1,439 |                   473 |                 32.9% |                                                1.49x |
 
 The median composite `baseline_loading` share gives `1/(1-p) = 1.49x` only as a generous upper
 bound for a hypothetical removal of all baseline-loading work. Merge is a subset of this phase;
@@ -120,71 +119,73 @@ speedup.
 
 ## Revised results and effect decision
 
-The same Release matrix was rerun after the implementation and review refinements, in the same
-environment, with the same five-sample direct merge boundary and generated input dimensions. Every
-current digest matched the legacy digest. Multi-ID groups build one first-match contract index;
-small groups with one distinct ID reuse one first-match lookup; imported-only entries trigger no
-contract index. Ignore work remains one inline seed per existing ignore on a touched contract and
-one membership check per eligible loaded ignore.
+The same Release matrix was rerun after the implementation and review refinements in the same
+environment, with five alternating samples and the same generated input dimensions. Every current
+digest matched the legacy digest. Multi-ID groups build one first-match contract index; groups with
+up to eight entries sharing one ID reuse one first-match lookup; imported-only entries trigger no
+contract index. Small ignore lists use linear membership checks and larger lists use a set.
 
-| Shape | Legacy median ms | Current median ms | Local speedup | Legacy / current allocated bytes | Legacy scan work | Current work |
-|---|---:|---:|---:|---:|---:|---|
-| Small v1 | 0.0740 | 0.0546 | 1.36x | 11,456 / 5,168 | 8 ID / 14 ignore comparisons | 8 index / 8 lookup / 2 seed / 4 membership |
-| Small v3 | 0.0733 | 0.0570 | 1.29x | 11,456 / 5,728 | 8 ID / 14 ignore comparisons | 8 index / 8 lookup / 2 seed / 4 membership |
-| Contracts, C=512 B=64 | 1.5582 | 0.0908 | 17.16x | 19,240 / 54,848 | 32,768 ID comparisons | 512 index / 64 lookups |
-| Entries, C=1 B=512 | 0.1863 | 0.1008 | 1.85x | 54,576 / 2,880 | 512 ID comparisons | 1 index / 512 lookups |
-| v1 ignores, I=100 | 0.1520 | 0.0867 | 1.75x | 24,256 / 18,648 | 3,725 ignore comparisons | 1 ID scan / 1 lookup / 50 seed / 50 membership |
-| v3 ignores, I=100 | 0.2515 | 0.1218 | 2.06x | 24,256 / 29,288 | 3,725 ignore comparisons | 1 ID scan / 1 lookup / 50 seed / 50 membership |
-| v1 ignores, I=500 | 1.4757 | 0.2239 | 6.59x | 81,728 / 79,072 | 93,625 ignore comparisons | 1 ID scan / 1 lookup / 250 seed / 250 membership |
-| v3 ignores, I=500 | 4.0633 | 0.3685 | 11.03x | 81,728 / 130,816 | 93,625 ignore comparisons | 1 ID scan / 1 lookup / 250 seed / 250 membership |
-| v1 ignores, I=2,000 | 32.8129 | 0.6398 | 51.29x | 298,016 / 299,696 | 1,499,500 ignore comparisons | 1 ID scan / 1 lookup / 1,000 seed / 1,000 membership |
-| v3 ignores, I=2,000 | 14.0231 | 1.2485 | 11.23x | 298,016 / 492,112 | 1,499,500 ignore comparisons | 1 ID scan / 1 lookup / 1,000 seed / 1,000 membership |
+| Shape                 | Legacy median ms | Current median ms | Legacy/current | Legacy / current allocated bytes |             Legacy scan work | Current work                                                                      |
+| --------------------- | ---------------: | ----------------: | -------------: | -------------------------------: | ---------------------------: | --------------------------------------------------------------------------------- |
+| Small v1              |           0.0445 |            0.0464 |          0.96x |                    6,336 / 3,856 | 8 ID / 14 ignore comparisons | 1 linear contract comparison / 14 linear ignore comparisons / 4 membership checks |
+| Small v3              |           0.0563 |            0.0705 |          0.80x |                    6,336 / 3,856 | 8 ID / 14 ignore comparisons | 1 linear contract comparison / 14 linear ignore comparisons / 4 membership checks |
+| Contracts, C=512 B=64 |           2.1839 |            0.1079 |         20.24x |                  14,920 / 54,904 |        32,768 ID comparisons | 512 index entries / 64 lookups                                                    |
+| Entries, C=1 B=512    |           0.1100 |            0.0923 |          1.19x |                   53,840 / 2,720 |           512 ID comparisons | 512 lookups / 512 linear comparisons                                              |
+| v1 ignores, I=100     |           0.2889 |            0.0831 |          3.48x |                  15,032 / 18,712 |     3,725 ignore comparisons | 1 lookup / 50 index entries / 50 membership checks                                |
+| v3 ignores, I=100     |           0.1900 |            0.1281 |          1.48x |                  15,032 / 29,352 |     3,725 ignore comparisons | 1 lookup / 50 index entries / 50 membership checks                                |
+| v1 ignores, I=500     |           1.9256 |            0.2187 |          8.80x |                  54,904 / 79,136 |    93,625 ignore comparisons | 1 lookup / 250 index entries / 250 membership checks                              |
+| v3 ignores, I=500     |           3.3220 |            0.4818 |          6.90x |                 54,904 / 130,880 |    93,625 ignore comparisons | 1 lookup / 250 index entries / 250 membership checks                              |
+| v1 ignores, I=2,000   |          65.6254 |            1.1503 |         57.05x |                205,192 / 299,760 | 1,499,500 ignore comparisons | 1 lookup / 1,000 index entries / 1,000 membership checks                          |
+| v3 ignores, I=2,000   |          89.6731 |            1.1712 |         76.59x |                205,192 / 492,176 | 1,499,500 ignore comparisons | 1 lookup / 1,000 index entries / 1,000 membership checks                          |
 
-The effect contract still passes: all outputs match, work is bounded by C+B+I, both I=2,000
-cases exceed the 2x target, both small cases are faster, and the largest ignore allocations are
-below 3x. The largest v3 allocation is 1.65x baseline; the largest v1 allocation is within 0.6%
-of baseline. The C=512 contract-only case allocates 2.85x baseline because the group dictionary
-is the measured workload. Forced-GC retained output deltas stayed about 192 KB for the I=2,000
-cases before and after, because membership indexes are local to the merge and are not retained.
-That observation does not measure peak temporary memory; process peak working set was not measured.
+The effect contract passes: all outputs match, the deterministic index and membership work is
+linear, both I=2,000 cases exceed the 2x timing target, both small cases are below the 2x slowdown
+limit, and large-ignore allocations stay below 3x (1.46x for v1, 2.40x for v3). This run showed
+the small v3 workload 25% slower and the C=512 contract-only workload allocating 3.68x as much,
+while that contract lookup was 20.24x faster. These are synthetic microbenchmarks; the small
+sub-millisecond timing differences are sensitive to host noise. Current forced-GC retained-output
+deltas were 184 KB for both I=2,000 cases; that does not measure peak temporary memory. No process
+peak working-set value was captured.
 
 ## Review follow-up: sparse and imported-only groups
 
 The reviewer-requested shape matrix used C=512, early or late matching IDs, and imported-only
-external-diagnostic groups. Each row is a five-sample direct-merge median on the same Windows/.NET
-10 host. “Original PR” is the eager group-dictionary implementation at commit d1e43a53; “Revised”
-is the current lazy/single-ID path. The legacy comparison count is the prior linear contract scan.
+external-diagnostic groups. Each row is a five-sample alternating median on the same Windows/.NET
+10 host. “Legacy” is the pre-index merge reference; “Current” is the lazy/single-ID path. The
+legacy comparison count is the prior linear contract scan.
 
-| Shape | B / imported diagnostics | Original PR ms / bytes | Revised ms / bytes | Legacy ID comparisons | Revised contract work |
-|---|---:|---:|---:|---:|---|
-| First match, one entry | 1 / 0 | 0.0888 / 54,824 | 0.0395 / 6,816 | 1 | 1 lookup / 1 comparison |
-| First match, repeated ID | 4 / 0 | 0.0817 / 54,824 | 0.0402 / 6,816 | 4 | 4 lookups / 1 comparison |
-| Last match, one entry | 1 / 0 | 0.1115 / 54,824 | 0.0835 / 6,816 | 512 | 1 lookup / 512 comparisons |
-| Last match, repeated ID | 4 / 0 | 0.1028 / 54,824 | 0.0809 / 6,816 | 2,048 | 4 lookups / 512 comparisons |
-| Imported-only external group | 1 / 64 | 0.1194 / 54,936 | 0.0506 / 6,928 | 0 | no index or lookup |
-| Imported-only external group | 64 / 4,096 | 0.2458 / 58,144 | 0.1401 / 10,072 | 0 | no index or lookup |
+| Shape                        | B / imported diagnostics | Legacy ms / bytes | Current ms / bytes | Legacy/current | Legacy ID comparisons | Current contract work       |
+| ---------------------------- | -----------------------: | ----------------: | -----------------: | -------------: | --------------------: | --------------------------- |
+| First match, one entry       |                    1 / 0 |    0.0396 / 8,872 |     0.0284 / 6,872 |          1.39x |                     1 | 1 lookup / 1 comparison     |
+| First match, repeated ID     |                    4 / 0 |    0.0438 / 9,160 |     0.0444 / 6,872 |          0.99x |                     4 | 4 lookups / 1 comparison    |
+| Last match, one entry        |                    1 / 0 |    0.0593 / 8,872 |     0.1113 / 6,872 |          0.53x |                   512 | 1 lookup / 512 comparisons  |
+| Last match, repeated ID      |                    4 / 0 |    0.1687 / 9,160 |     0.0481 / 6,872 |          3.51x |                 2,048 | 4 lookups / 512 comparisons |
+| Imported-only external group |                   1 / 64 |    0.0387 / 8,864 |     0.0427 / 6,984 |          0.91x |                     0 | no index or lookup          |
+| Imported-only external group |               64 / 4,096 |   0.2117 / 12,072 |    0.1447 / 10,128 |          1.46x |                     0 | no index or lookup          |
 
-Every digest matched. An initial threshold-four linear path improved the first-match case but made
-the late-match repeated-ID case slower than dictionary indexing. The final path therefore reuses a
-linear lookup only for small groups with one case-insensitive distinct ID; other multi-ID groups
-retain the dictionary path. Imported external diagnostics are filtered before the lazy index is
-created.
+Every digest matched. Most timings in this matrix are below 0.2 ms and varied by shape; the late
+single-entry result favored the legacy path, while repeating the same late ID four times favored
+the cached current lookup. These micro-measurements do not establish a product regression. The
+current path reuses one lookup when up to eight entries share a case-insensitive ID, keeps the
+dictionary path for other multi-ID groups, and filters imported external diagnostics before index
+creation. The imported-only matrix confirms that no contract lookup or index is created there.
 
 ## Alternating CLI A/B follow-up
 
 The same generated `--timings` fixture was run in five alternating pairs, base/current then
-current/base, comparing d1e43a53 with the revised implementation. Each command used the same
-Release host and identical policy/baseline files.
+current/base, comparing d1e43a53 with PR head 67715f2 before the current review fixes. Each command
+used the same Release host and identical policy/baseline files. This earlier A/B sample was not
+repeated for the current working changes.
 
-| Pair | Base total / `baseline_loading` ms | Revised total / `baseline_loading` ms |
-|---:|---:|---:|
-| 1 | 1,376 / 400 | 1,258 / 201 |
-| 2 | 1,264 / 207 | 1,379 / 399 |
-| 3 | 1,402 / 414 | 1,379 / 220 |
-| 4 | 1,430 / 323 | 1,455 / 411 |
-| 5 | 1,399 / 407 | 1,271 / 214 |
-| Median | 1,399 / 400 | 1,379 / 220 |
-| Median paired delta (revised - base) | — | -23 / -193 |
+|                                 Pair | Base total / `baseline_loading` ms | Revised total / `baseline_loading` ms |
+| -----------------------------------: | ---------------------------------: | ------------------------------------: |
+|                                    1 |                        1,376 / 400 |                           1,258 / 201 |
+|                                    2 |                        1,264 / 207 |                           1,379 / 399 |
+|                                    3 |                        1,402 / 414 |                           1,379 / 220 |
+|                                    4 |                        1,430 / 323 |                           1,455 / 411 |
+|                                    5 |                        1,399 / 407 |                           1,271 / 214 |
+|                               Median |                        1,399 / 400 |                           1,379 / 220 |
+| Median paired delta (revised - base) |                                  — |                            -23 / -193 |
 
 Paired total deltas ranged from -128 to +115 ms. The composite phase alternated between roughly
 200 and 400 ms across adjacent runs, so this small sample cannot establish an end-to-end regression
@@ -234,25 +235,26 @@ Remove the temporary worktree after collecting the measurements with
 
 ## Validation
 
-Commands run after the review refinements:
+Commands run while fixing the review:
 
-| Command | Result |
-|---|---|
-| `make fmt` | Passed. The formatter's unrelated markdown whitespace changes were reverted. |
-| `dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter 'FullyQualifiedName~ArchitectureBaselineMergeIndexTests|FullyQualifiedName~ArchitectureBaselineMergerTests|FullyQualifiedName~ArchitectureBaselineLoaderTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests|FullyQualifiedName~ArchitectureApplicabilityBaselineLifecycleTests|FullyQualifiedName~ImportedExternalDiagnosticProjectionTests|FullyQualifiedName~ExternalDiagnosticsFederationReferenceScenarioTests' --logger 'console;verbosity=minimal'` | Passed, 86/86. |
-| `dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter FullyQualifiedName~RunBaselineMergeEffectMatrix --logger 'console;verbosity=detailed'` | Passed; every digest matched, with final medians and work counts shown above. |
-| `dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter FullyQualifiedName~RunSparseAndImportedOnlyEffectMatrix --logger 'console;verbosity=detailed'` | Passed; all six sparse/diagnostic shapes matched the reference digest. |
-| `powershell -NoProfile -File docs/internal/large-solution-benchmarking/issue-1126-run-cli-ab.ps1 -BaseCli F:/dev/arch-linter-net-issue-1126-ab-base/src/ArchLinterNet.Cli/bin/Release/net10.0/ArchLinterNet.Cli.dll -CurrentCli src/ArchLinterNet.Cli/bin/Release/net10.0/ArchLinterNet.Cli.dll` | Passed, five alternating pairs; medians and paired deltas are shown above. |
-| `dotnet test tests/ArchLinterNet.Core.Tests --no-restore -c Release --filter FullyQualifiedName~HistoryLayoutRules_RejectAnExceptionAndInterfaceOutsideTheirConventionalDirectories` | Passed, 1/1 when run alone. |
-| `dotnet test tests/ArchLinterNet.Core.Tests --no-restore -c Release --settings .benchmark/issue-1126-core-serial.runsettings` | Completed with 4,234 passed, 16 skipped, and 8 failed. All eight failures were self-policy negative tests whose Debug rebuilds could not overwrite `src/ArchLinterNet.Cli/bin/Debug/net10.0/ArchLinterNet.Cli.dll` because the same testhost held it (`MSB3021`/`MSB3027`); their expected-finding assertions then failed on the build-state preflight result. The isolated layout case above passed. |
-| `make lint-code-size` | Passed; the baseline loading service is 786 lines. |
-| `make lint-architecture` | Passed strict self-policy validation; no cycles and project coverage complete. |
-| `make public-api-check` | Passed for Core, Testing, and CEL snapshots. |
-| `make lint-docs` | Passed, 43 checks; MkDocs static build completed. |
-| `openspec archive index-baseline-contract-ignore-merging --yes` | Passed; synchronized the `baseline-generation` spec and archived the change as `2026-11-15-index-baseline-contract-ignore-merging`. |
-| `openspec validate --all` | Passed, 175/175 items. Existing repository-wide warnings remain non-fatal. |
-| `git diff --check` | Passed. |
+| Check                                                                                                     | Result                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dotnet test ... --filter FullyQualifiedName~ArchitectureBaselineMergeIndexTests`                         | Passed, 21/21, including a direct first-match check for case-insensitive duplicate IDs in lazy and indexed paths.                                              |
+| Baseline merge, loader, applicability, imported diagnostics, and federation tests                         | Passed, 91/91.                                                                                                                                                 |
+| `dotnet test ... --filter FullyQualifiedName~ArchitectureBaseline --collect:"XPlat Code Coverage"`        | Passed, 136/136. New contract lookup lines were 100% covered; membership lines were 98.4% covered, with uncovered generated record-key members.                |
+| Explicit performance matrices (`RunBaselineMergeEffectMatrix` and `RunSparseAndImportedOnlyEffectMatrix`) | Passed, both matrices; all ordered output digests matched. Current medians and deterministic work counts are above.                                            |
+| `dotnet format ArchLinterNet.slnx --no-restore --verify-no-changes` on changed C# files                   | Passed.                                                                                                                                                        |
+| `make lint-code-size`                                                                                     | Passed with existing size warnings; the baseline loading service is 754 lines and the expanded test fixture was split below 500 lines.                         |
+| `make lint-architecture`                                                                                  | Passed strict self-policy validation; no cycles and project coverage complete.                                                                                 |
+| `make public-api-check`                                                                                   | Passed for Core, Testing, and CEL snapshots.                                                                                                                   |
+| `make lint-workflows`                                                                                     | Passed actionlint, zizmor, and Prettier checks.                                                                                                                |
+| Qodana workflow contract tests under the repository Python 3.13 environment                               | Passed, 84/84.                                                                                                                                                 |
+| `openspec validate --all`                                                                                 | Passed, 175/175 items. Existing repository-wide warnings remain non-fatal.                                                                                     |
+| `git diff --check`                                                                                        | Passed.                                                                                                                                                        |
+| `make lint-docs`                                                                                          | 39 passed, 4 failed: unchanged governance-review shell tests timed out after 30 seconds while invoking Git Bash on Windows. The MkDocs build step did not run. |
 
-The full Core result is recorded rather than treated as green. The targeted merge tests, benchmark,
-architecture gate, API snapshot check, and documentation check passed; the remaining failures arise
-in self-policy tests that rebuild shared Debug outputs from inside the already-running testhost.
+The full Core suite was not rerun during this fix; the earlier local attempt had eight self-policy
+failures because Debug rebuilds could not overwrite the CLI DLL held by the testhost. CI remains the
+authoritative full-suite check. `make lint-docs` also remains incomplete locally because of the
+Windows shell-test timeouts described above. SonarCloud's new-code coverage gate and the trusted
+Qodana finding gate must be confirmed by CI on the updated commit.
