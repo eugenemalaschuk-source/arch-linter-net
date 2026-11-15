@@ -302,7 +302,7 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
         }
     }
 
-    private static bool HasAncestor(IReadOnlyDictionary<int, List<int>> parents, int descendant, int ancestor)
+    private static bool HasAncestor(Dictionary<int, List<int>> parents, int descendant, int ancestor)
     {
         HashSet<int> visited = [];
         Stack<int> pending = new();
