@@ -33,14 +33,20 @@ internal sealed class ArchitectureBaselineIgnoreMembership
     {
         if (_isStructured)
         {
-            return _structuredKeys is not null
-                ? _structuredKeys.Contains(StructuredIgnoreKey.From(candidate))
-                : ContainsStructuredLinear(candidate);
+            if (_structuredKeys is not null)
+            {
+                return _structuredKeys.Contains(StructuredIgnoreKey.From(candidate));
+            }
+
+            return ContainsStructuredLinear(candidate);
         }
 
-        return _legacyKeys is not null
-            ? _legacyKeys.Contains(new LegacyIgnoreKey(candidate.SourceType, candidate.ForbiddenReference))
-            : ContainsLegacyLinear(candidate);
+        if (_legacyKeys is not null)
+        {
+            return _legacyKeys.Contains(new LegacyIgnoreKey(candidate.SourceType, candidate.ForbiddenReference));
+        }
+
+        return ContainsLegacyLinear(candidate);
     }
 
     private void AddToIndex(ArchitectureIgnoredViolation existing, bool countAsInline)
@@ -109,7 +115,7 @@ internal sealed class ArchitectureBaselineIgnoreMembership
 
     private bool ContainsStructuredLinear(ArchitectureBaselineIgnoredViolation candidate)
     {
-        StructuredIgnoreKey candidateKey = StructuredIgnoreKey.From(candidate);
+        var candidateKey = StructuredIgnoreKey.From(candidate);
         foreach (ArchitectureIgnoredViolation existing in _ignores)
         {
             if (_workCounter is not null)

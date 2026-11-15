@@ -1,6 +1,5 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
-using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;

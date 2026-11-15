@@ -32,8 +32,8 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
             _ = MeasureLegacy(workload, baseline);
             _ = MeasureCurrent(workload, baseline);
 
-            Measurement[] legacySamples = new Measurement[SampleCountPerWorkload];
-            Measurement[] currentSamples = new Measurement[SampleCountPerWorkload];
+            var legacySamples = new Measurement[SampleCountPerWorkload];
+            var currentSamples = new Measurement[SampleCountPerWorkload];
             for (int sampleIndex = 0; sampleIndex < SampleCountPerWorkload; sampleIndex++)
             {
                 // Alternate order so both implementations see similar process warmth and CPU load.
@@ -243,7 +243,7 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
         GC.WaitForPendingFinalizers();
         GC.Collect();
         long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        Stopwatch stopwatch = Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
         ArchitectureBaselineLoadingService.Merge(policy, baseline);
         stopwatch.Stop();
         long allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
@@ -259,8 +259,8 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
-        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        Stopwatch stopwatch = Stopwatch.StartNew();
+        long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var stopwatch = Stopwatch.StartNew();
         ArchitectureBaselineMergeLegacyReference.MergeBenchmarkGroups(policy, baseline);
         stopwatch.Stop();
         long allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;

@@ -40,7 +40,7 @@ internal static class ArchitectureBaselineMergeLegacyReference
             _ = new List<(string GroupName, string ContractId)>();
             if (groupName == "strict")
             {
-                List<ArchitectureDependencyContract> contracts = policy.Contracts.Strict.ToList();
+                var contracts = policy.Contracts.Strict.ToList();
                 if (entries.Count > 0)
                 {
                     MergeStrictGroup(contracts, entries, baseline.Version, workCounter);

@@ -1,6 +1,3 @@
-using ArchLinterNet.Core.Contracts.Families;
-using ArchLinterNet.Core.Model;
-
 namespace ArchLinterNet.Core.Contracts;
 
 /// <summary>Resolves baseline contract IDs while preserving the first case-insensitive match.</summary>

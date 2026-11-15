@@ -215,8 +215,8 @@ public sealed class ArchitectureBaselineMergeSparseEvidenceTests
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
-        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        Stopwatch stopwatch = Stopwatch.StartNew();
+        long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var stopwatch = Stopwatch.StartNew();
         if (useCurrent)
         {
             ArchitectureBaselineLoadingService.Merge(policy, baseline, indexedWork);
