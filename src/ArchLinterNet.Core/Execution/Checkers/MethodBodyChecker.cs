@@ -25,11 +25,13 @@ internal static class MethodBodyChecker
             ResolveProjectAwareReferenceAssemblyPaths(contract, context, sourceLayer, sourceRoots);
 
         IReadOnlyList<ArchitectureViolation> roslynViolations = new ArchitectureSourceScanner()
-            .FindMethodBodyViolations(context.AnalysisContext.RepositoryRoot, sourceLayer.Namespace,
+            .FindMethodBodyViolationsWithObserver(context.AnalysisContext.RepositoryRoot, sourceLayer.Namespace,
                 contract.ForbiddenCalls, executionContext, sourceRoots: sourceRoots,
                 sourceLayer: sourceLayer, preprocessorSymbols: context.PreprocessorSymbols,
+                fileSystem: null, compilationFactory: null, assemblyLoader: null,
                 explicitReferenceAssemblyPaths: explicitReferenceAssemblyPaths,
-                sourceAssemblyHint: sourceAssemblyHint, cancellationToken: context.AnalysisContext.CancellationToken)
+                sourceAssemblyHint: sourceAssemblyHint, cancellationToken: context.AnalysisContext.CancellationToken,
+                benchmarkWorkObserver: context.BenchmarkWorkObserver)
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = new ArchitectureIlMethodBodyScanner().FindMethodBodyViolations(

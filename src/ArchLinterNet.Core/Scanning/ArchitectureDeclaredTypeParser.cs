@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -22,12 +23,14 @@ internal static class ArchitectureDeclaredTypeParser
 
     public static IReadOnlyList<ParsedTypeInfo> ParseSourceText(
         string sourceText,
-        IReadOnlyList<string>? preprocessorSymbols = null)
+        IReadOnlyList<string>? preprocessorSymbols = null,
+        BenchmarkWorkObserver? benchmarkWorkObserver = null)
     {
         CSharpParseOptions options = preprocessorSymbols?.Count > 0
             ? CSharpParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbols)
             : CSharpParseOptions.Default;
 
+        benchmarkWorkObserver?.RecordSourceFactFileParse();
         SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceText, options);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
         List<ParsedTypeInfo> results = new();

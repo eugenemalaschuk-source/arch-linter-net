@@ -188,7 +188,11 @@
         "wall_clock": { "$ref": "#/$defs/measurement" },
         "processor_time": { "$ref": "#/$defs/measurement" },
         "allocated_bytes": { "$ref": "#/$defs/measurement" },
-        "peak_managed_memory": { "$ref": "#/$defs/measurement" }
+        "peak_managed_memory": { "$ref": "#/$defs/measurement" },
+        "work_counters": { "$ref": "#/$defs/work_counters" },
+        "history_work_counters": { "$ref": "#/$defs/history_work_counters" },
+        "timing_boundaries": { "$ref": "#/$defs/timing_boundaries" },
+        "report_output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "work": {
@@ -209,6 +213,65 @@
         "graph_traversal_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "witness_path_materialization_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "canonical_identity_candidate_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+      }
+    },
+    "work_counters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrumentation", "project_file_parses", "source_fact_file_parses", "method_body_compilation_calls", "method_body_syntax_trees", "ast_semantic_lookups", "layer_membership_probes", "cel_context_constructions"],
+      "properties": {
+        "instrumentation": { "const": "benchmark-work-observer/v1" },
+        "project_file_parses": { "$ref": "#/$defs/measurement" },
+        "source_fact_file_parses": { "$ref": "#/$defs/measurement" },
+        "method_body_compilation_calls": { "$ref": "#/$defs/measurement" },
+        "method_body_syntax_trees": { "$ref": "#/$defs/measurement" },
+        "ast_semantic_lookups": { "$ref": "#/$defs/measurement" },
+        "layer_membership_probes": { "$ref": "#/$defs/measurement" },
+        "cel_context_constructions": { "$ref": "#/$defs/measurement" }
+      }
+    },
+    "history_work_counters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrumentation", "line_churn_algorithm_work", "task_commit_occurrences_examined", "co_change_edges_assigned", "ancestry_ancestors_visited", "ancestry_retained_entries"],
+      "properties": {
+        "instrumentation": { "const": "benchmark-history-work/v1" },
+        "line_churn_algorithm_work": { "$ref": "#/$defs/measurement" },
+        "task_commit_occurrences_examined": { "$ref": "#/$defs/measurement" },
+        "co_change_edges_assigned": { "$ref": "#/$defs/measurement" },
+        "ancestry_ancestors_visited": { "$ref": "#/$defs/measurement" },
+        "ancestry_retained_entries": { "$ref": "#/$defs/measurement" }
+      }
+    },
+    "timing_boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "fixture_materialization", "restore_and_build", "process_host_startup_and_shutdown", "cli_process", "core_analysis_session", "result_publication", "total_end_to_end"],
+      "properties": {
+        "contract": { "const": "independent-stopwatch-intervals/v1" },
+        "fixture_materialization": { "$ref": "#/$defs/measurement" },
+        "restore_and_build": { "$ref": "#/$defs/measurement" },
+        "process_host_startup_and_shutdown": { "$ref": "#/$defs/measurement" },
+        "cli_process": { "$ref": "#/$defs/measurement" },
+        "core_analysis_session": { "$ref": "#/$defs/measurement" },
+        "result_publication": { "$ref": "#/$defs/measurement" },
+        "total_end_to_end": { "$ref": "#/$defs/measurement" },
+        "profiler_overhead": { "$ref": "#/$defs/profiler_overhead" }
+      }
+    },
+    "profiler_overhead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrumentation", "observer_disabled_analysis", "observer_enabled_analysis", "observer_disabled_allocated_bytes", "observer_enabled_allocated_bytes", "observer_disabled_peak_retained_bytes", "observer_enabled_peak_retained_bytes", "canonical_results_match"],
+      "properties": {
+        "instrumentation": { "const": "benchmark-work-observer/v1" },
+        "observer_disabled_analysis": { "$ref": "#/$defs/measurement" },
+        "observer_enabled_analysis": { "$ref": "#/$defs/measurement" },
+        "observer_disabled_allocated_bytes": { "$ref": "#/$defs/measurement" },
+        "observer_enabled_allocated_bytes": { "$ref": "#/$defs/measurement" },
+        "observer_disabled_peak_retained_bytes": { "$ref": "#/$defs/measurement" },
+        "observer_enabled_peak_retained_bytes": { "$ref": "#/$defs/measurement" },
+        "canonical_results_match": { "type": "boolean" }
       }
     },
     "canonical_result": {
@@ -234,6 +297,9 @@
         "configuration": { "type": "string" },
         "source_identity": { "type": "string" },
         "tool_identity": { "type": "string" },
+        "source_revision": { "type": "string", "minLength": 1 },
+        "runner_identity": { "type": "string", "minLength": 1 },
+        "materialized_input_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "peak_working_set": { "$ref": "#/$defs/measurement" },
         "managed_allocation": { "$ref": "#/$defs/measurement" }
       }

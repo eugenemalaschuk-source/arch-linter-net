@@ -1,6 +1,7 @@
 using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.CEL.Values;
 using ArchLinterNet.Core.Contracts.Expressions;
+using ArchLinterNet.Core.Profiling;
 
 namespace ArchLinterNet.Core.Execution.Expressions;
 
@@ -48,30 +49,41 @@ internal static class ArchitectureExpressionContextFactory
         return CelValue.Object(new CelObjectValue(ArchitectureExpressionSchemas.DependencyObjectSchema.ObjectTypeId, members));
     }
 
-    public static CelEvaluationContext CreateSelectorContext(ArchitectureExpressionSubjectFacts subject)
+    public static CelEvaluationContext CreateSelectorContext(
+        ArchitectureExpressionSubjectFacts subject,
+        BenchmarkWorkObserver? benchmarkWorkObserver = null)
     {
-        return ArchitectureExpressionSchemas.SelectorEnvironment.CreateEvaluationContextBuilder()
+        CelEvaluationContext context = ArchitectureExpressionSchemas.SelectorEnvironment.CreateEvaluationContextBuilder()
             .Set(ArchitectureExpressionSchemas.SelectorSubjectVariable, CreateSubjectValue(subject))
             .Build();
+        benchmarkWorkObserver?.RecordCelContextConstruction();
+        return context;
     }
 
-    public static CelEvaluationContext CreateContextualSourceContext(ArchitectureExpressionSubjectFacts source)
+    public static CelEvaluationContext CreateContextualSourceContext(
+        ArchitectureExpressionSubjectFacts source,
+        BenchmarkWorkObserver? benchmarkWorkObserver = null)
     {
-        return ArchitectureExpressionSchemas.ContextualSourceEnvironment.CreateEvaluationContextBuilder()
+        CelEvaluationContext context = ArchitectureExpressionSchemas.ContextualSourceEnvironment.CreateEvaluationContextBuilder()
             .Set(ArchitectureExpressionSchemas.ContextualSourceVariable, CreateSubjectValue(source))
             .Build();
+        benchmarkWorkObserver?.RecordCelContextConstruction();
+        return context;
     }
 
     public static CelEvaluationContext CreateContextualTargetContext(
         ArchitectureExpressionSubjectFacts source,
         ArchitectureExpressionSubjectFacts target,
-        ArchitectureExpressionDependencyFacts dependency)
+        ArchitectureExpressionDependencyFacts dependency,
+        BenchmarkWorkObserver? benchmarkWorkObserver = null)
     {
-        return ArchitectureExpressionSchemas.ContextualTargetEnvironment.CreateEvaluationContextBuilder()
+        CelEvaluationContext context = ArchitectureExpressionSchemas.ContextualTargetEnvironment.CreateEvaluationContextBuilder()
             .Set(ArchitectureExpressionSchemas.ContextualTargetSourceVariable, CreateSubjectValue(source))
             .Set(ArchitectureExpressionSchemas.ContextualTargetTargetVariable, CreateSubjectValue(target))
             .Set(ArchitectureExpressionSchemas.ContextualTargetDependencyVariable, CreateDependencyValue(dependency))
             .Build();
+        benchmarkWorkObserver?.RecordCelContextConstruction();
+        return context;
     }
 
     private static Dictionary<string, CelValue> ToValueMap<T>(

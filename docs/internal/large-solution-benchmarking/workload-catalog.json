@@ -11,6 +11,194 @@
     { "id": "synthetic-many-projects-few-types", "shape": "many_projects_few_types", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "types", "references"] },
     { "id": "synthetic-few-projects-many-types", "shape": "few_projects_many_types", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["projects", "types", "source_roots"] },
     { "id": "synthetic-very-large-multi-project", "shape": "dense", "consumer_modes": ["staged_assemblies", "real_ms_build"], "dimensions": ["projects", "types", "references", "layers", "selector_predicate_terms", "contracts", "findings", "source_roots"], "workflow": "full_governance" },
-    { "id": "synthetic-pr-shaped-change", "shape": "wide_fan_out_fan_in", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["changed_projects", "changed_sources", "global_inputs"], "workflow": "pull_request" }
+    { "id": "synthetic-pr-shaped-change", "shape": "wide_fan_out_fan_in", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["changed_projects", "changed_sources", "global_inputs"], "workflow": "pull_request" },
+    { "id": "synthetic-contract-layer-dense-dag", "shape": "linear", "contract_layer_graph": "dense_dag", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["contract_layers", "contract_layer_references", "ignore_rules", "metric_rules", "report_rules", "method_body_rules"] },
+    { "id": "synthetic-contract-layer-layered-dag", "shape": "linear", "contract_layer_graph": "layered_dag", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["contract_layers", "contract_layer_references", "method_body_rules"] },
+    { "id": "synthetic-contract-layer-scc-tail", "shape": "linear", "contract_layer_graph": "strongly_connected_with_acyclic_tail", "consumer_modes": ["real_ms_build", "staged_assemblies"], "dimensions": ["contract_layers", "contract_layer_references", "method_body_rules"] }
+  ],
+  "audit_scale_families": [
+    {
+      "dimension": "project_count",
+      "fixed_dimensions": { "types_per_project": 4, "source_files_per_project": 2, "references_per_project": 0, "layer_count": 4 },
+      "workloads": [
+        { "id": "synthetic-audit-projects-small", "value": 2 },
+        { "id": "synthetic-audit-projects-medium", "value": 8 },
+        { "id": "synthetic-audit-projects-large", "value": 24 }
+      ]
+    },
+    {
+      "dimension": "source_files_per_project",
+      "fixed_dimensions": { "project_count": 4, "types_per_project": 16, "layer_count": 4 },
+      "workloads": [
+        { "id": "synthetic-audit-files-small", "value": 1 },
+        { "id": "synthetic-audit-files-medium", "value": 8 },
+        { "id": "synthetic-audit-files-large", "value": 24 }
+      ]
+    },
+    {
+      "dimension": "contracts_per_workload",
+      "fixed_dimensions": { "project_count": 4, "types_per_project": 16, "source_files_per_project": 2, "layer_count": 4 },
+      "workloads": [
+        { "id": "synthetic-audit-contracts-small", "value": 1 },
+        { "id": "synthetic-audit-contracts-medium", "value": 8 },
+        { "id": "synthetic-audit-contracts-large", "value": 32 }
+      ]
+    },
+    {
+      "dimension": "ignore_rule_count",
+      "fixed_dimensions": { "project_count": 4, "types_per_project": 64, "source_files_per_project": 8, "contracts_per_workload": 1 },
+      "workloads": [
+        { "id": "synthetic-audit-ignores-small", "value": 1 },
+        { "id": "synthetic-audit-ignores-medium", "value": 16 },
+        { "id": "synthetic-audit-ignores-large", "value": 64 }
+      ]
+    },
+    {
+      "dimension": "finding_candidates",
+      "fixed_dimensions": { "project_count": 4, "types_per_project": 64, "source_files_per_project": 8, "layer_count": 4 },
+      "workloads": [
+        { "id": "synthetic-audit-findings-small", "value": 1 },
+        { "id": "synthetic-audit-findings-medium", "value": 16 },
+        { "id": "synthetic-audit-findings-large", "value": 64 }
+      ]
+    },
+    {
+      "dimension": "metric_rule_count",
+      "fixed_dimensions": { "project_count": 4, "types_per_project": 16, "source_files_per_project": 2, "layer_count": 4 },
+      "workloads": [
+        { "id": "synthetic-audit-metrics-small", "value": 1 },
+        { "id": "synthetic-audit-metrics-medium", "value": 8 },
+        { "id": "synthetic-audit-metrics-large", "value": 32 }
+      ]
+    },
+    {
+      "dimension": "report_rule_count",
+      "fixed_dimensions": { "project_count": 4, "types_per_project": 16, "source_files_per_project": 2, "layer_count": 4, "finding_candidates": 12 },
+      "workloads": [
+        { "id": "synthetic-audit-reports-small", "value": 1 },
+        { "id": "synthetic-audit-reports-medium", "value": 8 },
+        { "id": "synthetic-audit-reports-large", "value": 32 }
+      ]
+    },
+    {
+      "dimension": "method_body_rule_count",
+      "fixed_dimensions": { "project_count": 4, "types_per_project": 64, "source_files_per_project": 8, "layer_count": 4 },
+      "workloads": [
+        { "id": "synthetic-audit-method-bodies-small", "value": 1 },
+        { "id": "synthetic-audit-method-bodies-medium", "value": 4 },
+        { "id": "synthetic-audit-method-bodies-large", "value": 16 }
+      ]
+    }
+  ],
+  "contract_layer_graph_scale_families": [
+    {
+      "graph_shape": "dense_dag",
+      "dimension": "layer_count",
+      "workloads": [
+        { "id": "synthetic-audit-dense-dag-small", "value": 4 },
+        { "id": "synthetic-audit-dense-dag-medium", "value": 8 },
+        { "id": "synthetic-audit-dense-dag-large", "value": 12 }
+      ]
+    },
+    {
+      "graph_shape": "layered_dag",
+      "dimension": "layer_count",
+      "workloads": [
+        { "id": "synthetic-audit-layered-dag-small", "value": 4 },
+        { "id": "synthetic-audit-layered-dag-medium", "value": 8 },
+        { "id": "synthetic-audit-layered-dag-large", "value": 12 }
+      ]
+    },
+    {
+      "graph_shape": "strongly_connected_with_acyclic_tail",
+      "dimension": "layer_count",
+      "workloads": [
+        { "id": "synthetic-audit-scc-tail-small", "value": 4 },
+        { "id": "synthetic-audit-scc-tail-medium", "value": 8 },
+        { "id": "synthetic-audit-scc-tail-large", "value": 12 }
+      ]
+    }
+  ],
+  "history_workloads": [
+    {
+      "owner_issue": "#1138",
+      "family": "line_churn_sparse_edits",
+      "dimensions": ["line_count", "edit_count"],
+      "workloads": [
+        { "id": "synthetic-history-line-sparse-small", "line_count": 1000, "edit_count": 4 },
+        { "id": "synthetic-history-line-sparse-medium", "line_count": 5000, "edit_count": 8 },
+        { "id": "synthetic-history-line-sparse-large", "line_count": 10000, "edit_count": 16 }
+      ]
+    },
+    {
+      "owner_issue": "#1138",
+      "family": "line_churn_dense_edits",
+      "dimensions": ["line_count", "edit_count"],
+      "workloads": [
+        { "id": "synthetic-history-line-dense-small", "line_count": 1000, "edit_count": 500 },
+        { "id": "synthetic-history-line-dense-medium", "line_count": 5000, "edit_count": 2500 },
+        { "id": "synthetic-history-line-dense-large", "line_count": 10000, "edit_count": 5000 }
+      ]
+    },
+    {
+      "owner_issue": "#1139",
+      "family": "task_commit_occurrences_sparse",
+      "dimensions": ["task_count", "commit_count", "occurrence_count"],
+      "workloads": [
+        { "id": "synthetic-history-task-sparse-small", "task_count": 100, "commit_count": 100, "occurrence_count": 100 },
+        { "id": "synthetic-history-task-sparse-medium", "task_count": 500, "commit_count": 500, "occurrence_count": 500 },
+        { "id": "synthetic-history-task-sparse-large", "task_count": 1000, "commit_count": 1000, "occurrence_count": 1000 }
+      ]
+    },
+    {
+      "owner_issue": "#1139",
+      "family": "task_commit_occurrences_overlapping",
+      "dimensions": ["task_count", "commit_count", "occurrence_count", "pair_count"],
+      "workloads": [
+        { "id": "synthetic-history-task-overlap-small", "task_count": 100, "commit_count": 50, "occurrence_count": 200, "pair_count": 4950 },
+        { "id": "synthetic-history-task-overlap-medium", "task_count": 250, "commit_count": 100, "occurrence_count": 500, "pair_count": 31125 },
+        { "id": "synthetic-history-task-overlap-large", "task_count": 500, "commit_count": 200, "occurrence_count": 1000, "pair_count": 124750 }
+      ]
+    },
+    {
+      "owner_issue": "#1140",
+      "family": "co_change_disconnected_components",
+      "dimensions": ["vertex_count", "edge_count", "component_count"],
+      "workloads": [
+        { "id": "synthetic-history-cochange-disconnected-small", "vertex_count": 200, "edge_count": 100, "component_count": 100 },
+        { "id": "synthetic-history-cochange-disconnected-medium", "vertex_count": 2000, "edge_count": 1000, "component_count": 1000 },
+        { "id": "synthetic-history-cochange-disconnected-large", "vertex_count": 10000, "edge_count": 5000, "component_count": 5000 }
+      ]
+    },
+    {
+      "owner_issue": "#1140",
+      "family": "co_change_dense_component",
+      "dimensions": ["vertex_count", "edge_count", "component_count"],
+      "workloads": [
+        { "id": "synthetic-history-cochange-dense-small", "vertex_count": 45, "edge_count": 990, "component_count": 1 },
+        { "id": "synthetic-history-cochange-dense-medium", "vertex_count": 100, "edge_count": 4950, "component_count": 1 },
+        { "id": "synthetic-history-cochange-dense-large", "vertex_count": 200, "edge_count": 19900, "component_count": 1 }
+      ]
+    },
+    {
+      "owner_issue": "#1141",
+      "family": "ancestry_query_long_rename_chain",
+      "dimensions": ["reachable_commit_count", "query_endpoint_count", "retained_ancestor_entry_count"],
+      "workloads": [
+        { "id": "synthetic-history-ancestry-chain-small", "reachable_commit_count": 1000, "query_endpoint_count": 10, "retained_ancestor_entry_count": 10000 },
+        { "id": "synthetic-history-ancestry-chain-medium", "reachable_commit_count": 5000, "query_endpoint_count": 50, "retained_ancestor_entry_count": 250000 },
+        { "id": "synthetic-history-ancestry-chain-large", "reachable_commit_count": 10000, "query_endpoint_count": 100, "retained_ancestor_entry_count": 1000000 }
+      ]
+    },
+    {
+      "owner_issue": "#1141",
+      "family": "ancestry_query_merged_dag",
+      "dimensions": ["reachable_commit_count", "merge_count", "query_endpoint_count", "retained_ancestor_entry_count"],
+      "workloads": [
+        { "id": "synthetic-history-ancestry-merged-small", "reachable_commit_count": 1000, "merge_count": 100, "query_endpoint_count": 10, "retained_ancestor_entry_count": 5000 },
+        { "id": "synthetic-history-ancestry-merged-medium", "reachable_commit_count": 5000, "merge_count": 500, "query_endpoint_count": 50, "retained_ancestor_entry_count": 125000 },
+        { "id": "synthetic-history-ancestry-merged-large", "reachable_commit_count": 10000, "merge_count": 1000, "query_endpoint_count": 100, "retained_ancestor_entry_count": 500000 }
+      ]
+    }
   ]
 }

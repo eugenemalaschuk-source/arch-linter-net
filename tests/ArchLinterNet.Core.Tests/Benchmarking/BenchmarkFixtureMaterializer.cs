@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Tests;
 
-internal static class BenchmarkFixtureMaterializer
+internal static partial class BenchmarkFixtureMaterializer
 {
     public static BenchmarkMaterializedFixture Materialize(BenchmarkWorkloadDefinition definition)
     {
@@ -20,6 +20,7 @@ internal static class BenchmarkFixtureMaterializer
             }
 
             WriteProjects(root, definition);
+            WriteContractLayerSources(root, definition);
             string solutionPath = WriteSolution(root, definition);
             string policyPath = WritePolicy(root, definition);
             string manifestPath = WriteBenchmarkMetadata(root, definition);
@@ -50,6 +51,11 @@ internal static class BenchmarkFixtureMaterializer
             Directory.CreateDirectory(projectDirectory);
             WriteProject(projectDirectory, project, definition, projectPaths);
             WriteSources(projectDirectory, project, definition);
+        }
+
+        if (definition.Dimensions.IgnoreRuleCount > 0)
+        {
+            WriteIgnoreTargetSource(root, definition);
         }
     }
 
@@ -113,9 +119,19 @@ internal static class BenchmarkFixtureMaterializer
                 {
                     content.AppendLine($"public sealed class SourceRoot{sourceRoot:00}Type{typeIndex:000}")
                         .AppendLine("{")
-                        .AppendLine($"    public const string Identity = \"{project.Id}-type-{typeIndex:000}\";")
-                        .AppendLine("}")
-                        .AppendLine();
+                        .AppendLine($"    public const string Identity = \"{project.Id}-type-{typeIndex:000}\";");
+                    if (definition.Dimensions.MethodBodyRuleCount > 0)
+                    {
+                        content.AppendLine("    public void SyntheticMethodBodyTarget() => System.Console.WriteLine(Identity);");
+                    }
+
+                    if (typeIndex <= definition.Dimensions.IgnoreRuleCount &&
+                        project.Id == BenchmarkGraphBuilder.ProjectId(0))
+                    {
+                        content.AppendLine("    public global::Synthetic.Forbidden.Target? IgnoredReference { get; set; }");
+                    }
+
+                    content.AppendLine("}").AppendLine();
                 }
 
                 if (content.Length == 0)
@@ -127,6 +143,16 @@ internal static class BenchmarkFixtureMaterializer
                 File.WriteAllText(sourcePath, content.ToString());
             }
         }
+    }
+
+    private static void WriteIgnoreTargetSource(string root, BenchmarkWorkloadDefinition definition)
+    {
+        BenchmarkProjectNode firstProject = definition.Projects[0];
+        string sourceDirectory = Path.Combine(root, "src", firstProject.AssemblyName, "SourceRoot01");
+        Directory.CreateDirectory(sourceDirectory);
+        File.WriteAllText(
+            Path.Combine(sourceDirectory, "IgnoredReferenceTarget.cs"),
+            "namespace Synthetic.Forbidden;\npublic sealed class Target { }\n");
     }
 
     private static string WriteSolution(string root, BenchmarkWorkloadDefinition definition)
@@ -172,6 +198,8 @@ internal static class BenchmarkFixtureMaterializer
             content.AppendLine();
         }
 
+        AppendContractGraphLayers(content, definition);
+
         content.AppendLine("analysis:");
         if (definition.CompilationMode == BenchmarkCompilationMode.StagedAssemblies)
         {
@@ -193,16 +221,29 @@ internal static class BenchmarkFixtureMaterializer
             }
         }
 
+        AppendMetricPolicy(content, definition);
         content.AppendLine("contracts:")
             .AppendLine("  strict:");
         for (int contract = 1; contract <= definition.Inventory.ContractCount; contract++)
         {
+            string sourceLayer = definition.ContractLayerGraph is not null
+                ? "contract_layer_01"
+                : "synthetic_layer_01";
+            string forbiddenReferences = definition.ContractLayerGraph is not null
+                ? "[contract_layer_02]"
+                : definition.Dimensions.IgnoreRuleCount > 0
+                    ? "[synthetic_forbidden_layer]"
+                    : "[]";
             content.AppendLine($"    - id: synthetic-contract-{contract:000}")
                 .AppendLine($"      name: synthetic-contract-{contract:000}")
-                .AppendLine("      source: synthetic_layer_01")
-                .AppendLine("      forbidden: []")
+                .AppendLine($"      source: {sourceLayer}")
+                .AppendLine($"      forbidden: {forbiddenReferences}")
                 .AppendLine("      reason: Synthetic benchmark workload contract.");
+            AppendIgnoreEntries(content, definition, contract);
         }
+
+        AppendAuditContracts(content, definition);
+        AppendMethodBodyContracts(content, definition);
 
         content.AppendLine("  strict_layers:");
         for (int layer = 1; layer <= definition.Dimensions.LayerCount; layer++)
@@ -302,6 +343,7 @@ internal static class BenchmarkFixtureMaterializer
         File.WriteAllText(manifestPath, BenchmarkJson.Serialize(definition.ToManifest()));
         File.WriteAllText(Path.Combine(directory, "workflow.json"), BenchmarkJson.Serialize(definition.Workflow));
         File.WriteAllText(Path.Combine(directory, "pull-request-change.json"), BenchmarkJson.Serialize(definition.PullRequestChange));
+        WriteReportRuleCatalog(directory, definition);
         if (definition.CompilationMode == BenchmarkCompilationMode.StagedAssemblies)
         {
             string stagedDirectory = Path.Combine(directory, "staged-assemblies");

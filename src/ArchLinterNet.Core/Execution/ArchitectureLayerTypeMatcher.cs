@@ -37,7 +37,7 @@ internal static class ArchitectureLayerTypeMatcher
         }
 
         CelEvaluationContext context = ArchitectureExpressionContextFactory.CreateSelectorContext(
-            expressionFacts.BuildSubjectFacts(type));
+            expressionFacts.BuildSubjectFacts(type), expressionFacts.BenchmarkWorkObserver);
         string description =
             $"Layer selector at '{layer.Selector.WhenLocation?.YamlPath}' (role: {layer.Selector.Role}, " +
             $"when: {layer.Selector.When}) for type '{ArchitectureTypeNames.SafeFullName(type)}'";

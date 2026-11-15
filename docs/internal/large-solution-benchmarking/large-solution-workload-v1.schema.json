@@ -16,6 +16,7 @@
     "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
     "topology": { "$ref": "#/$defs/topology" },
     "inventory": { "$ref": "#/$defs/inventory" },
+    "contract_layer_graph": { "$ref": "#/$defs/contract_layer_graph" },
     "workflow": { "$ref": "#/$defs/workflow" },
     "pull_request_change": { "$ref": "#/$defs/pull_request_change" },
     "workload_identity": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
@@ -34,7 +35,11 @@
         "selector_predicate_terms_per_layer": { "type": "integer", "minimum": 1, "maximum": 25 },
         "contracts_per_workload": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
         "finding_candidates": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
-        "source_root_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+        "source_root_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "ignore_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "metric_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "report_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "method_body_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
       }
     },
     "project": {
@@ -75,7 +80,23 @@
         "selector_predicate_evaluation_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "contract_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "finding_candidate_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
-        "source_root_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+        "source_root_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "ignore_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "metric_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "report_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "contract_layer_node_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "contract_layer_reference_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "method_body_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+      }
+    },
+    "contract_layer_graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "layers", "edges"],
+      "properties": {
+        "shape": { "enum": ["dense_dag", "layered_dag", "strongly_connected_with_acyclic_tail"] },
+        "layers": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "edges": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["from_layer", "to_layer"], "properties": { "from_layer": { "type": "string" }, "to_layer": { "type": "string" } } } }
       }
     },
     "workflow": {

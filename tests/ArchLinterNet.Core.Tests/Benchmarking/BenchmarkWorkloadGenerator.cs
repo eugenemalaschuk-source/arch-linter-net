@@ -10,7 +10,8 @@ internal static class BenchmarkWorkloadGenerator
         BenchmarkDimensionSet? dimensions = null,
         BenchmarkCompilationMode compilationMode = BenchmarkCompilationMode.RealMsBuild,
         BenchmarkExecutionMode executionMode = BenchmarkExecutionMode.SingleCommand,
-        int independentProcesses = 1)
+        int independentProcesses = 1,
+        BenchmarkContractLayerGraphShape? contractLayerGraphShape = null)
     {
         ValidateWorkloadId(workloadId);
         BenchmarkDimensionSet resolvedDimensions = dimensions ?? DefaultDimensions(shape);
@@ -33,7 +34,10 @@ internal static class BenchmarkWorkloadGenerator
         IReadOnlyList<BenchmarkProjectEdge> edges = BenchmarkGraphBuilder.CreateEdges(
             shape, projects, resolvedDimensions.ReferencesPerProject);
         BenchmarkTopologySummary topology = BenchmarkGraphBuilder.Summarize(projects, edges, shape);
-        BenchmarkInventoryCounts inventory = CreateInventory(resolvedDimensions, topology);
+        BenchmarkContractLayerGraph? contractLayerGraph = BenchmarkGraphBuilder.CreateContractLayerGraph(
+            contractLayerGraphShape,
+            resolvedDimensions.LayerCount);
+        BenchmarkInventoryCounts inventory = CreateInventory(resolvedDimensions, topology, contractLayerGraph);
         BenchmarkWorkflowDescriptor workflow = CreateWorkflow(executionMode, independentProcesses);
         BenchmarkPullRequestChange change = CreatePullRequestChange(projects, resolvedDimensions);
 
@@ -49,6 +53,7 @@ internal static class BenchmarkWorkloadGenerator
             Inventory = inventory,
             Workflow = workflow,
             PullRequestChange = change,
+            ContractLayerGraph = contractLayerGraph,
             WorkloadIdentity = string.Empty,
         };
 
@@ -80,18 +85,21 @@ internal static class BenchmarkWorkloadGenerator
 
     private static BenchmarkInventoryCounts CreateInventory(
         BenchmarkDimensionSet dimensions,
-        BenchmarkTopologySummary topology)
+        BenchmarkTopologySummary topology,
+        BenchmarkContractLayerGraph? contractLayerGraph)
     {
         return new BenchmarkInventoryCounts
         {
             ProjectCount = dimensions.ProjectCount,
             AssemblyCount = dimensions.ProjectCount,
-            SourceFileCount = CheckedProduct(
+            SourceFileCount = checked(CheckedProduct(
                 "source_file_count",
                 dimensions.ProjectCount,
                 dimensions.SourceFilesPerProject,
-                dimensions.SourceRootCount),
-            TypeCount = CheckedProduct("type_count", dimensions.ProjectCount, dimensions.TypesPerProject),
+                dimensions.SourceRootCount) + (contractLayerGraph is null ? 0 : 1) +
+                (dimensions.IgnoreRuleCount == 0 ? 0 : 1)),
+            TypeCount = checked(CheckedProduct("type_count", dimensions.ProjectCount, dimensions.TypesPerProject) +
+                (contractLayerGraph?.Layers.Count ?? 0)),
             ReferenceEdgeCount = topology.ReferenceEdgeCount,
             LayerCount = dimensions.LayerCount,
             SelectorPredicateEvaluationCount = CheckedProduct(
@@ -100,9 +108,16 @@ internal static class BenchmarkWorkloadGenerator
                 dimensions.TypesPerProject,
                 dimensions.LayerCount,
                 dimensions.SelectorPredicateTermsPerLayer),
-            ContractCount = dimensions.ContractsPerWorkload,
+            ContractCount = dimensions.ContractsPerWorkload + dimensions.MethodBodyRuleCount +
+                (contractLayerGraph is null ? 0 : 2),
             FindingCandidateCount = dimensions.FindingCandidates,
             SourceRootCount = dimensions.SourceRootCount,
+            IgnoreRuleCount = dimensions.IgnoreRuleCount,
+            MetricRuleCount = dimensions.MetricRuleCount,
+            ReportRuleCount = dimensions.ReportRuleCount,
+            MethodBodyRuleCount = dimensions.MethodBodyRuleCount,
+            ContractLayerNodeCount = contractLayerGraph?.Layers.Count ?? 0,
+            ContractLayerReferenceCount = contractLayerGraph?.Edges.Count ?? 0,
         };
     }
 

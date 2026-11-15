@@ -144,6 +144,18 @@ internal sealed record BenchmarkProfileSample
     public required BenchmarkResourceMeasurement AllocatedBytes { get; init; }
 
     public required BenchmarkResourceMeasurement PeakManagedMemory { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BenchmarkWorkCounterEvidence? WorkCounters { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BenchmarkHistoryWorkCounterEvidence? HistoryWorkCounters { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BenchmarkTimingBoundaryEvidence? TimingBoundaries { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReportOutputSha256 { get; init; }
 }
 
 internal sealed record BenchmarkCanonicalResultIdentity
@@ -247,6 +259,15 @@ internal sealed record BenchmarkEnvironmentEvidence
 
     public required string ToolIdentity { get; init; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SourceRevision { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RunnerIdentity { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MaterializedInputSha256 { get; init; }
+
     public required BenchmarkResourceMeasurement PeakWorkingSet { get; init; }
 
     public required BenchmarkResourceMeasurement ManagedAllocation { get; init; }
@@ -309,6 +330,14 @@ internal sealed record BenchmarkEvidenceDocument
             sample.ProcessorTime.Validate("samples.processor_time");
             sample.AllocatedBytes.Validate("samples.allocated_bytes");
             sample.PeakManagedMemory.Validate("samples.peak_managed_memory");
+            sample.WorkCounters?.Validate();
+            sample.HistoryWorkCounters?.Validate();
+            sample.TimingBoundaries?.Validate();
+
+            if (sample.ReportOutputSha256 is not null && !IsSha256(sample.ReportOutputSha256))
+            {
+                throw new InvalidOperationException("The report output identity must be a lowercase SHA-256 digest.");
+            }
 
             if (!sample.RawAnalysisProfile.TryGetProperty("SchemaId", out JsonElement schemaId) ||
                 !string.Equals(schemaId.GetString(), "analysis-profile/v1", StringComparison.Ordinal))
@@ -324,6 +353,16 @@ internal sealed record BenchmarkEvidenceDocument
 
         Environment.PeakWorkingSet.Validate("environment.peak_working_set");
         Environment.ManagedAllocation.Validate("environment.managed_allocation");
+
+        if (Environment.SourceRevision is { Length: 0 } || Environment.RunnerIdentity is { Length: 0 })
+        {
+            throw new InvalidOperationException("Optional benchmark provenance strings must be non-empty when present.");
+        }
+
+        if (Environment.MaterializedInputSha256 is not null && !IsSha256(Environment.MaterializedInputSha256))
+        {
+            throw new InvalidOperationException("The materialized input identity must be a lowercase SHA-256 digest.");
+        }
 
         if (Complexity is not null && Complexity.Disposition != BenchmarkEvidenceDisposition.NotReproduced &&
             Complexity.ScalePoints.Count < 3)

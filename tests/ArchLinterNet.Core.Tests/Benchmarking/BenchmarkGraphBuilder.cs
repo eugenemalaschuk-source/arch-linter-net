@@ -28,6 +28,64 @@ internal static class BenchmarkGraphBuilder
         };
     }
 
+    public static BenchmarkContractLayerGraph? CreateContractLayerGraph(
+        BenchmarkContractLayerGraphShape? shape,
+        int layerCount)
+    {
+        if (shape is null)
+        {
+            return null;
+        }
+
+        string[] layers = Enumerable.Range(1, layerCount)
+            .Select(index => $"contract_layer_{index:00}")
+            .ToArray();
+        var edges = new List<BenchmarkContractLayerEdge>();
+        switch (shape.Value)
+        {
+            case BenchmarkContractLayerGraphShape.DenseDag:
+                for (int from = 0; from < layers.Length; from++)
+                {
+                    for (int to = from + 1; to < layers.Length; to++)
+                    {
+                        edges.Add(new BenchmarkContractLayerEdge(layers[from], layers[to]));
+                    }
+                }
+
+                break;
+            case BenchmarkContractLayerGraphShape.LayeredDag:
+                for (int from = 0; from < layers.Length - 1; from++)
+                {
+                    edges.Add(new BenchmarkContractLayerEdge(layers[from], layers[from + 1]));
+                }
+
+                break;
+            case BenchmarkContractLayerGraphShape.StronglyConnectedWithAcyclicTail:
+                if (layers.Length < 3)
+                {
+                    throw new ArgumentException("An SCC with an acyclic tail requires at least three contract layers.", nameof(layerCount));
+                }
+
+                edges.Add(new BenchmarkContractLayerEdge(layers[0], layers[1]));
+                edges.Add(new BenchmarkContractLayerEdge(layers[1], layers[0]));
+                for (int from = 1; from < layers.Length - 1; from++)
+                {
+                    edges.Add(new BenchmarkContractLayerEdge(layers[from], layers[from + 1]));
+                }
+
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(shape), shape, "Unknown contract layer graph shape.");
+        }
+
+        return new BenchmarkContractLayerGraph
+        {
+            Shape = shape.Value,
+            Layers = layers,
+            Edges = edges,
+        };
+    }
+
     public static IReadOnlyList<BenchmarkProjectEdge> CreateEdges(
         BenchmarkTopologyShape shape,
         IReadOnlyList<BenchmarkProjectNode> projects,

@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.Profiling;
 
 namespace ArchLinterNet.Core.Discovery;
 
@@ -45,11 +46,35 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         return discovery;
     }
 
+    internal ProjectDiscoveryResult ResolveAndApply(
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        bool resolveAssemblyOutputs,
+        CancellationToken cancellationToken,
+        BenchmarkWorkObserver benchmarkWorkObserver)
+    {
+        ProjectDiscoveryResult discovery = ResolveFromDocument(
+            document, repositoryRoot, resolveAssemblyOutputs, cancellationToken, benchmarkWorkObserver);
+        ApplyDiscoveryResult(document.Analysis, discovery);
+        return discovery;
+    }
+
     public ProjectDiscoveryResult ResolveFromDocument(
         ArchitectureContractDocument document,
         string repositoryRoot,
         bool resolveAssemblyOutputs = true,
         CancellationToken cancellationToken = default)
+    {
+        return ResolveFromDocument(document, repositoryRoot, resolveAssemblyOutputs, cancellationToken,
+            benchmarkWorkObserver: null);
+    }
+
+    internal ProjectDiscoveryResult ResolveFromDocument(
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        bool resolveAssemblyOutputs,
+        CancellationToken cancellationToken,
+        BenchmarkWorkObserver? benchmarkWorkObserver)
     {
         ArchitectureAnalysisConfiguration analysis = document.Analysis;
         bool hasSolution = !string.IsNullOrWhiteSpace(analysis.Solution);
@@ -74,7 +99,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         }
 
         return BuildDiscoveryResult(
-            projectPaths, analysis, repositoryRoot, resolveAssemblyOutputs, diagnostics, cancellationToken);
+            projectPaths, analysis, repositoryRoot, resolveAssemblyOutputs, diagnostics, cancellationToken,
+            benchmarkWorkObserver);
     }
 
     private List<string> ResolveSolutionProjectPaths(
@@ -121,7 +147,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         string repositoryRoot,
         bool resolveAssemblyOutputs,
         List<ArchitectureProjectDiscoveryDiagnostic> diagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        BenchmarkWorkObserver? benchmarkWorkObserver = null)
     {
         List<string> targetAssemblyNames = new();
         List<string> assemblySearchPaths = new();
@@ -136,7 +163,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             ProcessProjectPath(
                 projectPath, analysis, repositoryRoot, resolveAssemblyOutputs,
                 diagnostics, targetAssemblyNames, assemblySearchPaths, sourceRoots, discoveredProjects,
-                resolvedAssemblyPaths, resolvedAssemblyPathsByProject);
+                resolvedAssemblyPaths, resolvedAssemblyPathsByProject, benchmarkWorkObserver);
         }
 
         return new ProjectDiscoveryResult(
@@ -162,7 +189,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         List<string> sourceRoots,
         List<ArchitectureDiscoveredProject> discoveredProjects,
         Dictionary<string, string> resolvedAssemblyPaths,
-        Dictionary<string, string> resolvedAssemblyPathsByProject)
+        Dictionary<string, string> resolvedAssemblyPathsByProject,
+        BenchmarkWorkObserver? benchmarkWorkObserver)
     {
         if (!_fileSystem.FileExists(projectPath))
         {
@@ -174,7 +202,10 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         DiscoveredProjectFile projectFile;
         try
         {
-            projectFile = _projectFileParser.Parse(projectPath, _fileSystem);
+            projectFile = benchmarkWorkObserver is not null
+                && _projectFileParser is ArchitectureProjectFileParser parser
+                ? parser.Parse(projectPath, _fileSystem, benchmarkWorkObserver)
+                : _projectFileParser.Parse(projectPath, _fileSystem);
         }
         catch (Exception ex)
         {

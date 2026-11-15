@@ -41,6 +41,22 @@ that shape because ordinary MSBuild project-reference cycles are not buildable.
 An external IL/assembly producer is required before it can become an executable
 staged benchmark.
 
+Optional `ignore_rule_count`, `metric_rule_count`, and `report_rule_count`
+dimensions default to zero and are omitted from canonical serialization when
+unset, preserving identities for existing manifests. When set, ignore entries
+and metric declarations are emitted into the synthetic policy, and report-rule
+descriptors are written to `.benchmark/report-rules.json`. Their inventory
+counts are independent of project, type, and source-root dimensions.
+
+An optional `contract_layer_graph` describes executable type references among
+synthetic namespaces inside a normal project fixture. `dense_dag` creates every
+forward edge, `layered_dag` creates a forward chain, and
+`strongly_connected_with_acyclic_tail` creates a two-layer SCC followed by a
+one-way tail. The fixture emits both `strict_cycles` and
+`strict_acyclic_siblings` policy entries for these layers. This graph is
+independent from project references: `CyclicScc` remains structural-only and
+continues to fail closed for compilation.
+
 `RealMsBuild` workloads own candidate compilation through an explicit restore and
 build. `StagedAssemblies` workloads perform that external compilation before the
 analysis run, copy the resulting DLLs into `.benchmark/staged-assemblies`, and
@@ -58,6 +74,11 @@ canonical-result SHA-256, deterministic work counts, cache/prepared mode,
 environment identity, and resource measurements. Unavailable CPU, allocation,
 peak-memory, cache, or prepared-state values are represented explicitly; zero
 is never used as a substitute for unavailable data.
+
+The optional audit extension records fixed-key Core work counters, independent timer intervals,
+observer overhead, and source/runner/materialized-input provenance. Timer intervals may overlap and
+are never subtracted to infer process startup or analyzer time. The extension leaves
+`analysis-profile/v1` unchanged, and old evidence omits the optional fields.
 
 Complexity observations record the scale variable, multiple size points,
 deterministic work counters, the current/target work model, and an explicit
@@ -109,6 +130,22 @@ multi-command matrix is a manual measurement and must not run from the normal
 test or acceptance gate; deterministic schema/contract tests remain in that
 gate.
 
+Shared History scale shapes live in `workload-catalog.json`: sparse and dense line churn (#1138),
+sparse and overlapping task occurrences (#1139), disconnected and dense co-change components
+(#1140), and long rename-chain and merged-DAG ancestry queries (#1141). Each listed family has
+three scale points with independently named dimensions. The test-only
+`BenchmarkHistoryInputFactory` materializes these as canonical `benchmark-history-input/v1` data
+with stable input and expected-shape-summary SHA-256 identities. Its ordinary tests check line edit
+counts, task occurrences, graph components, and ancestry answers against the generated records.
+Owning History tasks remain responsible for running their production algorithm, recording its
+operation counts and resources, and hashing the canonical algorithm output.
+
+The #1123 audit adds independent three-point project, source-file, contract, ignore, finding,
+metric, report-rule, and method-body families, plus three-point dense DAG, layered DAG, and
+SCC-with-acyclic-tail graphs. Deterministic checker, counter, and report checksum assertions run in
+ordinary Core tests. The environment-sensitive repeated matrix is explicit and writes
+issue-scoped `benchmark-evidence/v1` documents; it is not part of normal tests or acceptance.
+
 Committed artifacts contain synthetic `Synthetic.ProjectNNN` identities only;
 private adopter names, repository URLs, proprietary topology, and raw private
 CI logs are out of scope.
@@ -140,6 +177,10 @@ output digests, and measurement limits for #1124 are documented in
 The indexed cycle baseline candidate comparison, including reproducible legacy/candidate timing,
 allocation, work-count, and output-digest evidence for #1125, is documented in
 [`issue-1125-cycle-baseline-candidate-evidence.md`](issue-1125-cycle-baseline-candidate-evidence.md).
+
+The #1123 dated correction, measurement boundaries, and per-task baseline/effect/disposition
+ledger are documented in
+[`issue-1123-audited-hot-path-evidence.md`](issue-1123-audited-hot-path-evidence.md).
 
 The issue #1147 recorder workload attribution, paired full-analysis comparisons, and evidence-gated
 fallback disposition are documented in [`issue-1147/README.md`](issue-1147/README.md).

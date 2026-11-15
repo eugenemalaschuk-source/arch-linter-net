@@ -1,6 +1,7 @@
 using System.Xml.Linq;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.Profiling;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -14,8 +15,15 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     private const string IncludeAttribute = "Include";
 
     public DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
+        => Parse(projectPath, fileSystem, benchmarkWorkObserver: null);
+
+    internal DiscoveredProjectFile Parse(
+        string projectPath,
+        IArchitectureFileSystem? fileSystem,
+        BenchmarkWorkObserver? benchmarkWorkObserver)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
+        benchmarkWorkObserver?.RecordProjectFileParse();
         XDocument document = XDocument.Parse(fileSystem.ReadAllText(projectPath));
 
         XElement[] propertyGroups = document.Descendants("PropertyGroup").ToArray();

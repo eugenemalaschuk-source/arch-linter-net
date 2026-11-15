@@ -78,7 +78,7 @@ internal static partial class ArchitectureContextSelectorMatcher
                 $"{contractLabel}{locationLabel}(role: {selector.Role}, when: {selector.When}) " +
                 $"for source '{ArchitectureTypeNames.SafeFullName(candidateType)}'";
             CelEvaluationContext sourceContext = ArchitectureExpressionContextFactory.CreateContextualSourceContext(
-                expressionFacts.BuildSubjectFacts(candidateType));
+                expressionFacts.BuildSubjectFacts(candidateType), expressionFacts.BenchmarkWorkObserver);
             return expressionFacts.Evaluate(
                 selector.CompiledWhen, sourceContext, sourceDescription, selector.WhenLocation);
         }
@@ -89,7 +89,7 @@ internal static partial class ArchitectureContextSelectorMatcher
         CelEvaluationContext targetContext = ArchitectureExpressionContextFactory.CreateContextualTargetContext(
             expressionFacts.BuildSubjectFacts(sourceType),
             expressionFacts.BuildSubjectFacts(candidateType),
-            ArchitectureExpressionFactService.BuildDependencyFacts());
+            ArchitectureExpressionFactService.BuildDependencyFacts(), expressionFacts.BenchmarkWorkObserver);
         return expressionFacts.Evaluate(
             selector.CompiledWhen, targetContext, targetDescription, selector.WhenLocation);
     }

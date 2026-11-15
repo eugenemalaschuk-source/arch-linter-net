@@ -11,6 +11,13 @@ internal enum BenchmarkTopologyShape
     FewProjectsManyTypes,
 }
 
+internal enum BenchmarkContractLayerGraphShape
+{
+    DenseDag,
+    LayeredDag,
+    StronglyConnectedWithAcyclicTail,
+}
+
 internal enum BenchmarkCompilationMode
 {
     RealMsBuild,
@@ -45,6 +52,18 @@ internal sealed record BenchmarkDimensionSet
 
     public int SourceRootCount { get; init; } = 1;
 
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int IgnoreRuleCount { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int MetricRuleCount { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int ReportRuleCount { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int MethodBodyRuleCount { get; init; }
+
     public void Validate(BenchmarkTopologyShape shape)
     {
         if (ProjectCount < 1)
@@ -69,7 +88,8 @@ internal sealed record BenchmarkDimensionSet
         }
 
         if (ReferencesPerProject < 0 || LayerCount < 1 || SelectorPredicateTermsPerLayer is < 1 or > 25 ||
-            ContractsPerWorkload < 1 || FindingCandidates < 0 || SourceRootCount < 1)
+            ContractsPerWorkload < 1 || FindingCandidates < 0 || SourceRootCount < 1 ||
+            IgnoreRuleCount < 0 || MetricRuleCount < 0 || ReportRuleCount < 0 || MethodBodyRuleCount < 0)
         {
             throw new ArgumentOutOfRangeException(
                 paramName: null,
@@ -127,7 +147,36 @@ internal sealed record BenchmarkInventoryCounts
     public required int FindingCandidateCount { get; init; }
 
     public required int SourceRootCount { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int IgnoreRuleCount { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int MetricRuleCount { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int ReportRuleCount { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int MethodBodyRuleCount { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int ContractLayerNodeCount { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int ContractLayerReferenceCount { get; init; }
 }
+
+internal sealed record BenchmarkContractLayerGraph
+{
+    public required BenchmarkContractLayerGraphShape Shape { get; init; }
+
+    public required IReadOnlyList<string> Layers { get; init; }
+
+    public required IReadOnlyList<BenchmarkContractLayerEdge> Edges { get; init; }
+}
+
+internal sealed record BenchmarkContractLayerEdge(string FromLayer, string ToLayer);
 
 internal sealed record BenchmarkWorkflowDescriptor
 {
@@ -177,6 +226,9 @@ internal sealed record BenchmarkWorkloadDefinition
 
     public required string WorkloadIdentity { get; init; }
 
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public BenchmarkContractLayerGraph? ContractLayerGraph { get; init; }
+
     public BenchmarkWorkloadManifest ToManifest() => new()
     {
         SchemaId = ManifestSchemaId,
@@ -192,6 +244,7 @@ internal sealed record BenchmarkWorkloadDefinition
         Workflow = Workflow,
         PullRequestChange = PullRequestChange,
         WorkloadIdentity = WorkloadIdentity,
+        ContractLayerGraph = ContractLayerGraph,
     };
 }
 
@@ -222,4 +275,7 @@ internal sealed record BenchmarkWorkloadManifest
     public required BenchmarkPullRequestChange PullRequestChange { get; init; }
 
     public required string WorkloadIdentity { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public BenchmarkContractLayerGraph? ContractLayerGraph { get; init; }
 }

@@ -2,6 +2,7 @@ using System.Reflection;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Execution;
@@ -119,6 +120,10 @@ public sealed class ArchitectureAnalysisContext : IDisposable
     // The session receives this one shared recorder when it creates lazily-materialized indexes.
     // ArchitectureAnalysisSnapshot projects the values through its immutable public counters.
     internal AnalysisSessionProfilingCounters ProfilingCounters { get; } = new();
+
+    // Set only by the internal benchmark entry point. The observer is invocation-owned and passed
+    // down explicitly to the exact Core operations under measurement.
+    internal BenchmarkWorkObserver? BenchmarkWorkObserver { get; init; }
 
     internal void RecordConsumedInputPaths(IEnumerable<string> paths)
     {

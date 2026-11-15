@@ -93,9 +93,11 @@ public sealed class ArchitectureAnalysisSession
             fileSystem: null,
             new ArchitectureSourceFileFactIndex.ProjectOwnership(context.ProjectDiscovery, SourceRootAssemblyOwnership: null),
             new ArchitectureSourceFileFactIndex.ConstructionOptions(
-                context.ProfilingCounters, context.CancellationToken, context.MaxParallelism));
+                context.ProfilingCounters, context.CancellationToken, context.MaxParallelism,
+                BenchmarkWorkObserver: context.BenchmarkWorkObserver));
         ExpressionFacts = new ArchitectureExpressionFactService(
-            RoleIndex, SourceFileFactIndex, context.ProjectDiscovery, context.ProfilingCounters, context.Timing);
+            RoleIndex, SourceFileFactIndex, context.ProjectDiscovery, context.ProfilingCounters, context.Timing,
+            context.BenchmarkWorkObserver);
         Facts = new ArchitectureAnalysisFactService(
             context,
             document,

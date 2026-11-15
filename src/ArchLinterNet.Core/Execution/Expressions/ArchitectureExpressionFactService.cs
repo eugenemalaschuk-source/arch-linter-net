@@ -4,6 +4,7 @@ using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Scanning;
 
@@ -22,6 +23,7 @@ internal sealed class ArchitectureExpressionFactService
     private readonly ProjectDiscoveryResult? _projectDiscovery;
     private readonly AnalysisSessionProfilingCounters? _profilingCounters;
     private readonly ValidationTiming? _timing;
+    internal BenchmarkWorkObserver? BenchmarkWorkObserver { get; }
     private readonly Dictionary<Type, ArchitectureExpressionSubjectFacts> _subjectFactsCache = new();
 
     public ArchitectureExpressionFactService(
@@ -29,13 +31,15 @@ internal sealed class ArchitectureExpressionFactService
         ArchitectureSourceFileFactIndex sourceFileFactIndex,
         ProjectDiscoveryResult? projectDiscovery,
         AnalysisSessionProfilingCounters? profilingCounters = null,
-        ValidationTiming? timing = null)
+        ValidationTiming? timing = null,
+        BenchmarkWorkObserver? benchmarkWorkObserver = null)
     {
         _roleIndex = roleIndex ?? throw new ArgumentNullException(nameof(roleIndex));
         _sourceFileFactIndex = sourceFileFactIndex ?? throw new ArgumentNullException(nameof(sourceFileFactIndex));
         _projectDiscovery = projectDiscovery;
         _profilingCounters = profilingCounters;
         _timing = timing;
+        BenchmarkWorkObserver = benchmarkWorkObserver;
     }
 
     public ArchitectureExpressionSubjectFacts BuildSubjectFacts(Type type)

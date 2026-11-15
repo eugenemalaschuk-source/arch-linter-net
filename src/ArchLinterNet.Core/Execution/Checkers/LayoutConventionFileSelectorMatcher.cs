@@ -517,7 +517,7 @@ internal static class LayoutConventionFileSelectorMatcher
         ArchitectureLayoutFileMatcher matcher, ArchitectureCheckerContext context, Type type)
     {
         var expressionContext = ArchitectureExpressionContextFactory.CreateSelectorContext(
-            context.ExpressionFacts.BuildSubjectFacts(type));
+            context.ExpressionFacts.BuildSubjectFacts(type), context.ExpressionFacts.BenchmarkWorkObserver);
         string description =
             $"Layout convention files_matching at '{matcher.WhenLocation?.YamlPath}' (contract: {matcher.WhenContractName}, " +
             $"when: {matcher.When}) for type '{ArchitectureTypeNames.SafeFullName(type)}'";

@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Resolution;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -27,6 +28,26 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         IReadOnlyList<string>? explicitReferenceAssemblyPaths = null,
         string? sourceAssemblyHint = null,
         CancellationToken cancellationToken = default)
+        => FindMethodBodyViolationsWithObserver(repositoryRoot, sourceNamespacePrefix, forbiddenCallPatterns,
+            executionContext, sourceRoots, sourceLayer, preprocessorSymbols, fileSystem, compilationFactory,
+            assemblyLoader, explicitReferenceAssemblyPaths, sourceAssemblyHint, cancellationToken,
+            benchmarkWorkObserver: null);
+
+    internal IEnumerable<ArchitectureViolation> FindMethodBodyViolationsWithObserver(
+        string repositoryRoot,
+        string sourceNamespacePrefix,
+        IReadOnlyList<string> forbiddenCallPatterns,
+        ArchitectureContractExecutionContext executionContext,
+        string[]? sourceRoots,
+        ArchitectureLayer? sourceLayer,
+        IReadOnlyList<string>? preprocessorSymbols,
+        IArchitectureFileSystem? fileSystem,
+        IRoslynCompilationFactory? compilationFactory,
+        IArchitectureAssemblyLoader? assemblyLoader,
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths,
+        string? sourceAssemblyHint,
+        CancellationToken cancellationToken,
+        BenchmarkWorkObserver? benchmarkWorkObserver)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
         compilationFactory ??= RoslynCompilationFactory.Real;
@@ -48,6 +69,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         CSharpCompilation compilation = compilationFactory.Create(
             "ArchitectureSourceScanner", sourceFiles, preprocessorSymbols, fileSystem, assemblyLoader,
             explicitReferenceAssemblyPaths);
+        benchmarkWorkObserver?.RecordMethodBodyCompilation(compilation.SyntaxTrees.Count());
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<ForbiddenCallPattern> patterns =
             ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCallPatterns);
@@ -65,7 +87,11 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                 continue;
             }
 
-            List<ForbiddenCallMatch> matches = FindForbiddenUsagesInBodies(semanticModel, root, patterns, matchCache);
+            List<ForbiddenCallMatch> matches = FindForbiddenUsagesInBodies(
+                semanticModel, root, patterns, matchCache,
+                onSemanticLookup: benchmarkWorkObserver is null
+                    ? null
+                    : benchmarkWorkObserver.RecordAstSemanticLookup);
             if (matches.Count == 0)
             {
                 continue;

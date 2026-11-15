@@ -58,9 +58,11 @@ Selector phase materiality:
 | synthetic-selector-s-terms-small | 6.182 | unavailable | 1.602% |
 | synthetic-selector-s-terms-medium | 8.668 | unavailable | 2.240% |
 | synthetic-selector-s-terms-large | 8.875 | unavailable | 1.684% |
+
 ### 2. Repeated selector/classification work across contract families
 
 Multiple contract families may repeatedly scan the same type/reference/source universe despite existing indexes. **Outcome C.** Current model: Contract-family execution grows with requested contract count while one source fact-index materialization remains available to the snapshot. Across one, four, and eight synthetic contracts, FactIndexMaterializations remains bounded at one; source scanning is not applicable to the staged-assembly mode; ContractFamilyCounts identify the requested family work. The measured shape is already served by the existing immutable snapshot/fact-index boundary when used correctly. No shared projection or Core change is justified. Routing: Outcome C; retain the result as adoption guidance only.
+
 ### 3. Graph/reachability/witness work
 
 Repeated traversal, alternate-path closure, or witness reconstruction may amplify with graph density. **Outcome B.** Current model: The reusable corpus reports graph edges and alternate paths; this validation path does not expose a graph-traversal counter independent of the selected contract families. Linear, wide fan-out/fan-in, diamond, and dense synthetic graphs are measured at three project sizes; CyclicScc is retained as structural-only because the #502 materializer rejects cyclic project compilation. All executable shapes preserve canonical results. The required topology space is covered. The evidence remains insufficient for an independently attributable material graph-specific phase or witness counter, so no graph optimization issue is justified. Routing: No graph optimization issue; close as not material on the measured current tree.
@@ -84,15 +86,19 @@ Topology coverage:
 | CyclicScc | 4 | 4 | 1 | yes | structural-only |
 | CyclicScc | 8 | 8 | 1 | yes | structural-only |
 | CyclicScc | 12 | 12 | 1 | yes | structural-only |
+
 ### 4. Cross-process build/preflight/fact repetition
 
 Independent read-only processes may repeat project, build-state, assembly, and fact preparation over one unchanged build. **Outcome D.** Current model: Preparation and fact counters repeat once per process; bounded parallel dispatch can hide elapsed duplication without removing it. Repeated strict processes retain equivalent canonical results while ProjectGraphEvaluations and FactIndexMaterializations repeat per process; source scanning is not applicable to the staged-assembly mode. This is an existing prepared-analysis decision boundary, not a new #655 implementation lane. Routing: Route to #492/#493; do not duplicate persisted prepared-analysis work here.
+
 ### 5. Exact-request cache eligibility and recomputation
 
 Real MSBuild projects may remain cache-ineligible or recompute despite an opt-in exact-request cache. **Outcome D.** Current model: Cache eligibility, misses, hits, and rejected units are governed by analysis-cache/v1 evaluated-input authorization. The cache-enabled real-MSBuild matrix records the actual Cache counters and never treats an ineligible unit as a successful hit. Cache trust and eligibility are explicitly owned by the existing real-MSBuild lane; #655 must not relax authorization or duplicate its measurements. Routing: Route to #675; preserve fail-closed cache semantics.
+
 ### 6. Public-API cross-process reuse
 
 Independent public-api diff processes may repeat exported-surface preparation. **Outcome D.** Current model: Earlier in-process memoization does not prove that persisted exported-surface facts are safe or material. No public-api-specific prepared fact boundary is exercised by the reusable validation fixture in this lane. The public-API consumer and materiality gate already have a dedicated owner; no duplicate persistence evidence is created here. Routing: Route to #498, subject to the #493 materiality gate.
+
 ### 7. Consumer-forced sequential execution versus bounded parallelism
 
 Consumers may force --max-parallelism 1 across assembly-consuming commands even though deterministic bounded parallel scanning is already available. **Outcome B.** Current model: The same immutable staged-assembly inputs are executed once sequentially and once with the resolved default bounded degree; type-loading work is partitioned by target assembly. Each executable #502 graph shape is paired at three project sizes. The bounded profile reports active concurrency, while the sequential profile reports NotApplicable concurrency; allocations, peak working-set availability, and canonical-result digests are retained for both variants. The existing bounded capability is exercised and semantically equivalent, but it does not materially improve the measured hot phase and generally increases managed allocation; peak working-set data is unavailable on this host. No Core change is justified by this matrix, and concurrency must not mask the remaining bottleneck. Routing: No parallelism change; retain the paired evidence and continue attribution in the owning performance/adoption lanes.
@@ -193,5 +199,20 @@ Topology coverage:
 - Public-API prepared reuse belongs to #498 and remains conditional on the #493 materiality gate.
 - No private adopter identity, repository URL, namespace, proprietary topology, or raw private CI log is committed.
 - No universal timing SLA is claimed.
+
+## Dated coverage correction — 2026-11-15 (#1123)
+
+This note corrects the interpretation of the historical graph-reachability evidence above; it does
+not replace its measurements, checksums, or Outcome B disposition. The #655 graph matrix used
+generated policy without cycle or acyclic-sibling contracts. Its `CyclicScc` workload was
+structural-only because project-reference cycles are rejected by the buildable fixture materializer.
+Consequently, the historical graph rows did not execute cycle enumeration or acyclic-sibling
+checking, and the earlier sentence “The required topology space is covered” describes only the
+recorded project topology shapes. It is not evidence that those contract checkers ran.
+
+Issue #1123 adds executable same-project type-reference contracts and fixed-key observations for
+the relevant Core work boundaries. New baseline values must be recorded in
+[`large-solution-benchmarking/issue-1123-audited-hot-path-evidence.md`](large-solution-benchmarking/issue-1123-audited-hot-path-evidence.md).
+No current .NET timing or memory result is inferred from the historical #655 table.
 
 OpenSpec: the analysis-profile specification documents the selector phase timing semantics. This change adds internal profiling/evidence support only; it changes no public API, policy semantics, cache trust boundary, or documented user guarantee.

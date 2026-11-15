@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 
@@ -21,13 +22,17 @@ namespace ArchLinterNet.Core.Execution;
 internal sealed class ArchitectureCheckerContext
 {
     private readonly ArchitectureAnalysisSession _session;
+    private readonly BenchmarkWorkObserver? _benchmarkWorkObserver;
 
     public ArchitectureCheckerContext(ArchitectureAnalysisSession session)
     {
         _session = session;
+        _benchmarkWorkObserver = session.Context.BenchmarkWorkObserver;
     }
 
     public ArchitectureContractDocument Document => _session.Document;
+
+    internal BenchmarkWorkObserver? BenchmarkWorkObserver => _benchmarkWorkObserver;
 
     public ArchitectureAnalysisContext AnalysisContext => _session.Context;
 
@@ -65,8 +70,15 @@ internal sealed class ArchitectureCheckerContext
 
     public bool IsInAnyDeclaredLayer(Type type) => _session.Facts.IsInAnyDeclaredLayer(type);
 
-    public string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames) =>
-        _session.Facts.ResolveContainingLayer(type, candidateLayerNames);
+    public string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames)
+    {
+        for (int index = 0; index < candidateLayerNames.Count; index++)
+        {
+            _benchmarkWorkObserver?.RecordLayerMembershipProbe();
+        }
+
+        return _session.Facts.ResolveContainingLayer(type, candidateLayerNames);
+    }
 
     public IEnumerable<string> ResolveProjectAssemblyNames(List<string> projectNames) =>
         _session.Facts.ResolveProjectAssemblyNames(projectNames);
