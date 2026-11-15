@@ -1,5 +1,4 @@
 using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
@@ -332,11 +331,11 @@ public sealed class ArchitectureSourceScannerExecutableBodyTraversalTests
     private static (CSharpCompilation Compilation, SyntaxTree SyntaxTree) Compile(string source)
     {
         SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(source, path: "src/Caller.cs");
-        MetadataReference[] references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
-            .Select(path => MetadataReference.CreateFromFile(path))
+            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
             .ToArray();
-        CSharpCompilation compilation = CSharpCompilation.Create(
+        var compilation = CSharpCompilation.Create(
             "ArchitectureSourceScannerTraversalTests",
             [syntaxTree],
             references,
@@ -344,12 +343,16 @@ public sealed class ArchitectureSourceScannerExecutableBodyTraversalTests
         return (compilation, syntaxTree);
     }
 
-    private static int CountLegacyBodyDescendantVisits(CompilationUnitSyntax root) =>
-        GetLegacyBodyRoots(root).Sum(bodyRoot => bodyRoot.DescendantNodes().Count());
+    private static int CountLegacyBodyDescendantVisits(CompilationUnitSyntax root)
+    {
+        return GetLegacyBodyRoots(root).Sum(bodyRoot => bodyRoot.DescendantNodes().Count());
+    }
 
-    private static int CountLegacySemanticLookups(CompilationUnitSyntax root) =>
-        GetLegacyBodyRoots(root).Sum(bodyRoot =>
+    private static int CountLegacySemanticLookups(CompilationUnitSyntax root)
+    {
+        return GetLegacyBodyRoots(root).Sum(bodyRoot =>
             bodyRoot.DescendantNodes().Count(IsSemanticLookupCandidate));
+    }
 
     private static IEnumerable<SyntaxNode> GetLegacyBodyRoots(CompilationUnitSyntax root)
     {
@@ -394,9 +397,11 @@ public sealed class ArchitectureSourceScannerExecutableBodyTraversalTests
         }
     }
 
-    private static bool IsSemanticLookupCandidate(SyntaxNode node) => node is
-        InvocationExpressionSyntax or MemberAccessExpressionSyntax or ObjectCreationExpressionSyntax or
-        ImplicitObjectCreationExpressionSyntax or IdentifierNameSyntax;
+    private static bool IsSemanticLookupCandidate(SyntaxNode node)
+    {
+        return node is InvocationExpressionSyntax or MemberAccessExpressionSyntax or ObjectCreationExpressionSyntax or
+            ImplicitObjectCreationExpressionSyntax or IdentifierNameSyntax;
+    }
 
     private static string CreateNestedLocalFunctionSource(int depth)
     {

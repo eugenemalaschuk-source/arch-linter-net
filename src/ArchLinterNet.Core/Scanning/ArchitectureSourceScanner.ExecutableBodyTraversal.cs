@@ -9,7 +9,12 @@ namespace ArchLinterNet.Core.Scanning;
 /// Matches are kept in the original method/accessor/local-function region order so identity and
 /// suppression side effects remain unchanged even though each syntax node is queried only once.
 /// </summary>
-internal sealed class ArchitectureSourceExecutableBodyTraversal : CSharpSyntaxWalker
+internal sealed class ArchitectureSourceExecutableBodyTraversal(
+    SemanticModel semanticModel,
+    IReadOnlyList<ForbiddenCallPattern> patterns,
+    Dictionary<string, bool> matchCache,
+    Action? onSyntaxNodeVisited,
+    Action? onSemanticLookup) : CSharpSyntaxWalker
 {
     private enum ExecutableBodyKind
     {
@@ -18,39 +23,23 @@ internal sealed class ArchitectureSourceExecutableBodyTraversal : CSharpSyntaxWa
         LocalFunction,
     }
 
-    private sealed class ExecutableBodyRegion(ExecutableBodyKind kind, ExecutableBodyRegion? parent)
+    private sealed class ExecutableBodyRegion(ExecutableBodyRegion? parent)
     {
-        public ExecutableBodyKind Kind { get; } = kind;
-
         public ExecutableBodyRegion? Parent { get; } = parent;
 
         public List<ArchitectureSourceScanner.ForbiddenCallMatch> Matches { get; } = new();
     }
 
-    private readonly SemanticModel _semanticModel;
-    private readonly IReadOnlyList<ForbiddenCallPattern> _patterns;
-    private readonly Dictionary<string, bool> _matchCache;
-    private readonly Action? _onSyntaxNodeVisited;
-    private readonly Action? _onSemanticLookup;
+    private readonly SemanticModel _semanticModel = semanticModel;
+    private readonly IReadOnlyList<ForbiddenCallPattern> _patterns = patterns;
+    private readonly Dictionary<string, bool> _matchCache = matchCache;
+    private readonly Action? _onSyntaxNodeVisited = onSyntaxNodeVisited;
+    private readonly Action? _onSemanticLookup = onSemanticLookup;
     private readonly Dictionary<SyntaxNode, ExecutableBodyRegion> _bodyRootRegions = new();
     private readonly List<ExecutableBodyRegion> _methodBodies = new();
     private readonly List<ExecutableBodyRegion> _accessorBodies = new();
     private readonly List<ExecutableBodyRegion> _localFunctionBodies = new();
     private ExecutableBodyRegion? _activeBodyRegions;
-
-    public ArchitectureSourceExecutableBodyTraversal(
-        SemanticModel semanticModel,
-        IReadOnlyList<ForbiddenCallPattern> patterns,
-        Dictionary<string, bool> matchCache,
-        Action? onSyntaxNodeVisited,
-        Action? onSemanticLookup)
-    {
-        _semanticModel = semanticModel;
-        _patterns = patterns;
-        _matchCache = matchCache;
-        _onSyntaxNodeVisited = onSyntaxNodeVisited;
-        _onSemanticLookup = onSemanticLookup;
-    }
 
     public override void Visit(SyntaxNode? node)
     {
@@ -144,7 +133,7 @@ internal sealed class ArchitectureSourceExecutableBodyTraversal : CSharpSyntaxWa
 
     private ExecutableBodyRegion CreateBodyRegion(ExecutableBodyKind kind, ExecutableBodyRegion? parent)
     {
-        ExecutableBodyRegion region = new(kind, parent);
+        ExecutableBodyRegion region = new(parent);
         GetRegionList(kind).Add(region);
         return region;
     }
