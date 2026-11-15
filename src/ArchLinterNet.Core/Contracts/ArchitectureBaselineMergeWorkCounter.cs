@@ -10,6 +10,8 @@ internal sealed class ArchitectureBaselineMergeWorkCounter
 
     internal long ContractLookups { get; set; }
 
+    internal long ContractLinearScanComparisons { get; set; }
+
     internal long InlineIgnoreIndexEntries { get; set; }
 
     internal long MembershipChecks { get; set; }

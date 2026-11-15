@@ -112,6 +112,7 @@ public sealed class ArchitectureBaselineMergeIndexTests
     }
 
     [TestCase(1, 1)]
+    [TestCase(512, 4)]
     [TestCase(32, 64)]
     [TestCase(128, 256)]
     [TestCase(512, 64)]
@@ -131,10 +132,95 @@ public sealed class ArchitectureBaselineMergeIndexTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(workCounter.ContractIndexEntries, Is.EqualTo(contractCount));
             Assert.That(workCounter.ContractLookups, Is.EqualTo(entryCount));
+            Assert.That(
+                workCounter.ContractIndexEntries,
+                Is.EqualTo(entryCount <= 4 ? 0 : contractCount));
+            Assert.That(
+                workCounter.ContractLinearScanComparisons,
+                Is.EqualTo(entryCount <= 4 ? contractCount : 0));
             Assert.That(workCounter.MembershipChecks, Is.Zero);
             Assert.That(workCounter.InlineIgnoreIndexEntries, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void Merge_SmallRepeatedIdGroupUsesOneLinearLookupForEarlyMatch()
+    {
+        ArchitectureDependencyContract[] contracts = Enumerable.Range(0, 512)
+            .Select(index => Contract(ContractId(index)))
+            .ToArray();
+        ArchitectureContractDocument policy = Policy(contracts);
+        ArchitectureBaselineDocument baseline = Baseline(1,
+            Enumerable.Range(0, 4).Select(_ => Entry(ContractId(0))).ToArray());
+        ArchitectureBaselineMergeWorkCounter workCounter = new();
+
+        ArchitectureBaselineLoadingService.Merge(policy, baseline, workCounter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(workCounter.ContractLookups, Is.EqualTo(4));
+            Assert.That(workCounter.ContractIndexEntries, Is.Zero);
+            Assert.That(workCounter.ContractLinearScanComparisons, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Merge_ImportedExternalOnlyGroupDoesNotBuildContractOrIgnoreIndexes()
+    {
+        string[] evidenceIds = Enumerable.Range(0, 64).Select(index => $"scan-{index:D2}").ToArray();
+        ArchitectureExternalDependencyContract[] contracts = Enumerable.Range(0, 512)
+            .Select(index => new ArchitectureExternalDependencyContract
+            {
+                Id = ContractId(index),
+                Name = ContractId(index),
+                Source = "Synthetic.Layer",
+                Forbidden = new List<string>(),
+            })
+            .ToArray();
+        ArchitectureContractDocument policy = new()
+        {
+            Version = 1,
+            Name = "Imported diagnostics skip native contract merge",
+            Contracts = new ArchitectureContractGroups { StrictExternal = contracts.ToList() },
+            ExternalEvidence = evidenceIds.Select(id => new ArchitectureExternalEvidenceRequirement
+            {
+                Id = id,
+                Format = "sarif",
+                Required = true,
+                Tool = "Synthetic Analyzer",
+                Run = "synthetic-run",
+            }).ToList(),
+        };
+        ArchitectureBaselineDocument baseline = new()
+        {
+            Version = 3,
+            Baseline = new ArchitectureBaselineContractGroups
+            {
+                StrictExternal = evidenceIds.Select(id => Entry(id,
+                    new ArchitectureBaselineIgnoredViolation
+                    {
+                        SourceType = "Synthetic.ImportedType",
+                        ForbiddenReference = "Synthetic.External.Diagnostic",
+                        Reason = "imported diagnostic",
+                        IdentityVersion = ArchitectureViolationIdentity.CurrentVersion,
+                        ContractFamily = "external",
+                        Kind = "external_diagnostic",
+                    })).ToList(),
+            },
+        };
+        ArchitectureBaselineMergeWorkCounter workCounter = new();
+
+        ArchitectureBaselineLoadingService.Merge(policy, baseline, workCounter);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(workCounter.ContractIndexEntries, Is.Zero);
+            Assert.That(workCounter.ContractLookups, Is.Zero);
+            Assert.That(workCounter.ContractLinearScanComparisons, Is.Zero);
+            Assert.That(workCounter.InlineIgnoreIndexEntries, Is.Zero);
+            Assert.That(workCounter.MembershipChecks, Is.Zero);
+            Assert.That(contracts.All(contract => contract.IgnoredViolations.Count == 0), Is.True);
         });
     }
 

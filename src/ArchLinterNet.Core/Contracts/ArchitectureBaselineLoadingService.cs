@@ -431,6 +431,8 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
     private sealed class ContractGroupMerger
     {
+        private const int SingleIdLinearLookupEntryThreshold = 4;
+
         private readonly Families.ArchitectureContractGroups _groups;
         private readonly HashSet<string> _externalEvidenceIds;
         private readonly ArchitectureBaselineMergeWorkCounter? _workCounter;
@@ -458,20 +460,10 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             }
 
             var contracts = GetContracts(groupName);
-            var contractsById = new Dictionary<string, IArchitectureContract>(StringComparer.OrdinalIgnoreCase);
-            foreach (IArchitectureContract candidate in contracts)
-            {
-                if (_workCounter is not null)
-                {
-                    _workCounter.ContractIndexEntries++;
-                }
-
-                if (candidate.Id is { } contractId)
-                {
-                    contractsById.TryAdd(contractId, candidate);
-                }
-            }
-
+            Dictionary<string, IArchitectureContract>? contractsById = null;
+            bool singleIdGroup = HasSingleContractId(baselineEntries);
+            IArchitectureContract? singleIdContract = null;
+            bool singleIdContractResolved = false;
             var memberships = new Dictionary<IArchitectureContract, ArchitectureBaselineIgnoreMembership>(
                 ReferenceEqualityComparer.Instance);
             bool isStructured = documentVersion is 2 or 3;
@@ -496,7 +488,37 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                     _workCounter.ContractLookups++;
                 }
 
-                if (!contractsById.TryGetValue(baselineEntry.Id, out IArchitectureContract? contract))
+                IArchitectureContract? contract;
+                if (singleIdGroup)
+                {
+                    if (!singleIdContractResolved)
+                    {
+                        foreach (IArchitectureContract candidate in contracts)
+                        {
+                            if (_workCounter is not null)
+                            {
+                                _workCounter.ContractLinearScanComparisons++;
+                            }
+
+                            if (string.Equals(candidate.Id, baselineEntry.Id, StringComparison.OrdinalIgnoreCase))
+                            {
+                                singleIdContract = candidate;
+                                break;
+                            }
+                        }
+
+                        singleIdContractResolved = true;
+                    }
+
+                    contract = singleIdContract;
+                }
+                else
+                {
+                    contractsById ??= BuildContractIndex(contracts);
+                    contractsById.TryGetValue(baselineEntry.Id, out contract);
+                }
+
+                if (contract is null)
                 {
                     unknownIds.Add((groupName, baselineEntry.Id));
                     continue;
@@ -557,6 +579,37 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             }
 
             return unknownIds;
+        }
+
+        private static bool HasSingleContractId(List<ArchitectureBaselineContractEntry> baselineEntries)
+        {
+            if (baselineEntries.Count > SingleIdLinearLookupEntryThreshold)
+            {
+                return false;
+            }
+
+            string firstId = baselineEntries[0].Id;
+            return baselineEntries.All(entry =>
+                string.Equals(entry.Id, firstId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private Dictionary<string, IArchitectureContract> BuildContractIndex(List<IArchitectureContract> contracts)
+        {
+            var contractsById = new Dictionary<string, IArchitectureContract>(StringComparer.OrdinalIgnoreCase);
+            foreach (IArchitectureContract candidate in contracts)
+            {
+                if (_workCounter is not null)
+                {
+                    _workCounter.ContractIndexEntries++;
+                }
+
+                if (candidate.Id is { } contractId)
+                {
+                    contractsById.TryAdd(contractId, candidate);
+                }
+            }
+
+            return contractsById;
         }
 
         private ArchitectureBaselineIgnoreMembership GetOrCreateMembership(

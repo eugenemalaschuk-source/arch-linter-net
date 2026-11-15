@@ -79,7 +79,7 @@ one baseline entry.
 
 The legacy ignore comparison counts grow from 3,725 to 93,625 to 1,499,500 as `I` grows from
 100 to 500 to 2,000. The new structural target for the largest ignore workload is 1,000 inline
-entries inspected once plus 2,000 constant-time membership checks. The measured retained deltas
+entries inspected once plus 1,000 constant-time membership checks for the 1,000 loaded entries. The measured retained deltas
 include required loaded output objects and are noisy; the negative contract-only delta demonstrates
 that this method cannot report temporary index peak memory. No peak working-set value was captured.
 
@@ -118,60 +118,78 @@ the baseline decoder and content identity remain. Timing variance is visible in 
 numbers do not substitute for the direct merge measurements and do not predict a 1.49x product
 speedup.
 
-## Indexed results and effect decision
+## Revised results and effect decision
 
-The same Release matrix was rerun after the implementation, in the same environment, with the same
-five-sample direct merge boundary and generated input dimensions. Every indexed digest matched the
-legacy digest. The indexed structural counters were exactly `C` contract index entries, `B` contract
-lookups, `inline` inline-key index entries for the touched contract, and `loaded` membership checks
-and accepts for the unique loaded-ignore inputs.
+The same Release matrix was rerun after the implementation and review refinements, in the same
+environment, with the same five-sample direct merge boundary and generated input dimensions. Every
+current digest matched the legacy digest. Multi-ID groups build one first-match contract index;
+small groups with one distinct ID reuse one first-match lookup; imported-only entries trigger no
+contract index. Ignore work remains one inline seed per existing ignore on a touched contract and
+one membership check per eligible loaded ignore.
 
-| Shape | Legacy median ms | Indexed median ms | Local speedup | Legacy / indexed allocated bytes | Legacy scan work | Indexed work |
+| Shape | Legacy median ms | Current median ms | Local speedup | Legacy / current allocated bytes | Legacy scan work | Current work |
 |---|---:|---:|---:|---:|---:|---|
-| Small v1 | 0.0740 | 0.0512 | 1.45x | 11,456 / 5,144 | 8 ID / 14 ignore comparisons | 8 index / 8 lookup / 2 seed / 4 membership |
-| Small v3 | 0.0733 | 0.0581 | 1.26x | 11,456 / 5,704 | 8 ID / 14 ignore comparisons | 8 index / 8 lookup / 2 seed / 4 membership |
-| Contracts, C=512 B=64 | 1.5582 | 0.0878 | 17.75x | 19,240 / 54,824 | 32,768 ID comparisons | 512 index / 64 lookups |
-| Entries, C=1 B=512 | 0.1863 | 0.1045 | 1.78x | 54,576 / 2,856 | 512 ID comparisons | 1 index / 512 lookups |
-| v1 ignores, I=100 | 0.1520 | 0.0907 | 1.68x | 24,256 / 18,776 | 3,725 ignore comparisons | 50 seed / 50 membership |
-| v3 ignores, I=100 | 0.2515 | 0.1228 | 2.05x | 24,256 / 29,416 | 3,725 ignore comparisons | 50 seed / 50 membership |
-| v1 ignores, I=500 | 1.4757 | 0.2333 | 6.33x | 81,728 / 79,200 | 93,625 ignore comparisons | 250 seed / 250 membership |
-| v3 ignores, I=500 | 4.0633 | 0.3893 | 10.44x | 81,728 / 130,944 | 93,625 ignore comparisons | 250 seed / 250 membership |
-| v1 ignores, I=2,000 | 32.8129 | 0.4812 | 68.19x | 298,016 / 299,824 | 1,499,500 ignore comparisons | 1,000 seed / 1,000 membership |
-| v3 ignores, I=2,000 | 14.0231 | 0.9548 | 14.69x | 298,016 / 492,240 | 1,499,500 ignore comparisons | 1,000 seed / 1,000 membership |
+| Small v1 | 0.0740 | 0.0546 | 1.36x | 11,456 / 5,168 | 8 ID / 14 ignore comparisons | 8 index / 8 lookup / 2 seed / 4 membership |
+| Small v3 | 0.0733 | 0.0570 | 1.29x | 11,456 / 5,728 | 8 ID / 14 ignore comparisons | 8 index / 8 lookup / 2 seed / 4 membership |
+| Contracts, C=512 B=64 | 1.5582 | 0.0908 | 17.16x | 19,240 / 54,848 | 32,768 ID comparisons | 512 index / 64 lookups |
+| Entries, C=1 B=512 | 0.1863 | 0.1008 | 1.85x | 54,576 / 2,880 | 512 ID comparisons | 1 index / 512 lookups |
+| v1 ignores, I=100 | 0.1520 | 0.0867 | 1.75x | 24,256 / 18,648 | 3,725 ignore comparisons | 1 ID scan / 1 lookup / 50 seed / 50 membership |
+| v3 ignores, I=100 | 0.2515 | 0.1218 | 2.06x | 24,256 / 29,288 | 3,725 ignore comparisons | 1 ID scan / 1 lookup / 50 seed / 50 membership |
+| v1 ignores, I=500 | 1.4757 | 0.2239 | 6.59x | 81,728 / 79,072 | 93,625 ignore comparisons | 1 ID scan / 1 lookup / 250 seed / 250 membership |
+| v3 ignores, I=500 | 4.0633 | 0.3685 | 11.03x | 81,728 / 130,816 | 93,625 ignore comparisons | 1 ID scan / 1 lookup / 250 seed / 250 membership |
+| v1 ignores, I=2,000 | 32.8129 | 0.6398 | 51.29x | 298,016 / 299,696 | 1,499,500 ignore comparisons | 1 ID scan / 1 lookup / 1,000 seed / 1,000 membership |
+| v3 ignores, I=2,000 | 14.0231 | 1.2485 | 11.23x | 298,016 / 492,112 | 1,499,500 ignore comparisons | 1 ID scan / 1 lookup / 1,000 seed / 1,000 membership |
 
-Pre-sizing each lazy membership set from the existing inline-list count reduced the large v3
-allocation from the first indexed sample's 849,144 bytes to 492,232 bytes. That is 1.65x the
-pre-change allocation and below the 3x limit. The largest v1 case allocated within 0.6% of the
-pre-change value. The C=512 contract-only case allocated 2.85x its pre-change value because the
-group lookup table itself is the measured workload; this is transient O(C) storage and remains
-below 3x in this workload.
+The effect contract still passes: all outputs match, work is bounded by C+B+I, both I=2,000
+cases exceed the 2x target, both small cases are faster, and the largest ignore allocations are
+below 3x. The largest v3 allocation is 1.65x baseline; the largest v1 allocation is within 0.6%
+of baseline. The C=512 contract-only case allocates 2.85x baseline because the group dictionary
+is the measured workload. Forced-GC retained output deltas stayed about 192 KB for the I=2,000
+cases before and after, because membership indexes are local to the merge and are not retained.
+That observation does not measure peak temporary memory; process peak working set was not measured.
 
-The local effect contract passes: all outputs match, work counters are linear, both I=2,000 cases
-exceed the 2x target, both small cases are faster, and the largest ignore allocations are below
-3x. Forced-GC retained output deltas stayed about 192 KB for the I=2,000 cases before and after,
-because the membership indexes are local to the merge and are not retained. That observation does
-not measure their peak temporary memory. Per-call allocated bytes include both those transient
-indexes and the required loaded output objects; process peak working set was not measured.
+## Review follow-up: sparse and imported-only groups
 
-The same five-sample CLI `--timings` fixture was rerun after the final helper extraction and Release
-rebuild:
+The reviewer-requested shape matrix used C=512, early or late matching IDs, and imported-only
+external-diagnostic groups. Each row is a five-sample direct-merge median on the same Windows/.NET
+10 host. “Original PR” is the eager group-dictionary implementation at commit d1e43a53; “Revised”
+is the current lazy/single-ID path. The legacy comparison count is the prior linear contract scan.
 
-| Sample | Total ms | `baseline_loading` ms | Composite phase share | Whole-run Amdahl limit if that entire phase vanished |
-|---:|---:|---:|---:|---:|
-| 1 | 1,531 | 446 | 29.1% | 1.41x |
-| 2 | 1,650 | 423 | 25.6% | 1.34x |
-| 3 | 1,741 | 545 | 31.3% | 1.46x |
-| 4 | 1,657 | 493 | 29.8% | 1.42x |
-| 5 | 1,661 | 483 | 29.1% | 1.41x |
-| Median across samples | 1,657 | 483 | 29.1% | 1.41x |
+| Shape | B / imported diagnostics | Original PR ms / bytes | Revised ms / bytes | Legacy ID comparisons | Revised contract work |
+|---|---:|---:|---:|---:|---|
+| First match, one entry | 1 / 0 | 0.0888 / 54,824 | 0.0395 / 6,816 | 1 | 1 lookup / 1 comparison |
+| First match, repeated ID | 4 / 0 | 0.0817 / 54,824 | 0.0402 / 6,816 | 4 | 4 lookups / 1 comparison |
+| Last match, one entry | 1 / 0 | 0.1115 / 54,824 | 0.0835 / 6,816 | 512 | 1 lookup / 512 comparisons |
+| Last match, repeated ID | 4 / 0 | 0.1028 / 54,824 | 0.0809 / 6,816 | 2,048 | 4 lookups / 512 comparisons |
+| Imported-only external group | 1 / 64 | 0.1194 / 54,936 | 0.0506 / 6,928 | 0 | no index or lookup |
+| Imported-only external group | 64 / 4,096 | 0.2458 / 58,144 | 0.1401 / 10,072 | 0 | no index or lookup |
 
-The baseline `baseline_loading` median was 473 ms (32.9% median share) and its generous
-whole-phase Amdahl limit was 1.49x. The final indexed sample measured 483 ms (29.1% median share);
-whole CLI total medians were 1,439 ms before and 1,657 ms after. This composite phase did not show
-an end-to-end time reduction in this noisy, single synthetic comparison, even though the isolated
-merge improved sharply. The result is consistent with merge being a small part of decode, identity,
-and analysis work in this fixture. It does not isolate merge from decoding and identity work or
-predict a general consumer speedup.
+Every digest matched. An initial threshold-four linear path improved the first-match case but made
+the late-match repeated-ID case slower than dictionary indexing. The final path therefore reuses a
+linear lookup only for small groups with one case-insensitive distinct ID; other multi-ID groups
+retain the dictionary path. Imported external diagnostics are filtered before the lazy index is
+created.
+
+## Alternating CLI A/B follow-up
+
+The same generated `--timings` fixture was run in five alternating pairs, base/current then
+current/base, comparing d1e43a53 with the revised implementation. Each command used the same
+Release host and identical policy/baseline files.
+
+| Pair | Base total / `baseline_loading` ms | Revised total / `baseline_loading` ms |
+|---:|---:|---:|
+| 1 | 1,376 / 400 | 1,258 / 201 |
+| 2 | 1,264 / 207 | 1,379 / 399 |
+| 3 | 1,402 / 414 | 1,379 / 220 |
+| 4 | 1,430 / 323 | 1,455 / 411 |
+| 5 | 1,399 / 407 | 1,271 / 214 |
+| Median | 1,399 / 400 | 1,379 / 220 |
+| Median paired delta (revised - base) | — | -23 / -193 |
+
+Paired total deltas ranged from -128 to +115 ms. The composite phase alternated between roughly
+200 and 400 ms across adjacent runs, so this small sample cannot establish an end-to-end regression
+or product speedup. The phase still includes YAML decoding and content identity work, not merge
+alone; no general CLI speedup is claimed from the isolated merge measurements.
 
 ## Reproduction
 
@@ -185,21 +203,49 @@ dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-
 
 The test is `[Explicit]` and stays out of routine test and acceptance runs. Its JSON rows include
 the workload dimensions, current direct medians, allocations, retained deltas, deterministic legacy
-scan counts, canonical digests, and environment. Rerun the five-command CLI sample above against a
-fixture with the same policy/baseline shape to refresh the composite phase share.
+scan counts, canonical digests, and environment. The sparse review shapes use a second explicit
+matrix:
+
+```powershell
+dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release `
+  --filter FullyQualifiedName~RunSparseAndImportedOnlyEffectMatrix `
+  --logger 'console;verbosity=detailed'
+```
+
+Generate the CLI fixture with the script above. For a fresh checkout, make a detached worktree at
+the original PR head and build its Release CLI, then build the current branch's Release CLI:
+
+```powershell
+git worktree add --detach ..\arch-linter-net-issue-1126-ab-base d1e43a53
+dotnet build ..\arch-linter-net-issue-1126-ab-base\src\ArchLinterNet.Cli\ArchLinterNet.Cli.csproj -c Release
+dotnet build src\ArchLinterNet.Cli\ArchLinterNet.Cli.csproj -c Release
+```
+
+Run an alternating A/B comparison with both Release CLI assemblies available:
+
+```powershell
+powershell -NoProfile -File docs/internal/large-solution-benchmarking/issue-1126-run-cli-ab.ps1 `
+  -BaseCli ..\arch-linter-net-issue-1126-ab-base\src\ArchLinterNet.Cli\bin\Release\net10.0\ArchLinterNet.Cli.dll `
+  -CurrentCli src\ArchLinterNet.Cli\bin\Release\net10.0\ArchLinterNet.Cli.dll
+```
+
+Remove the temporary worktree after collecting the measurements with
+`git worktree remove ..\arch-linter-net-issue-1126-ab-base`.
 
 ## Validation
 
-Commands run after the final helper extraction:
+Commands run after the review refinements:
 
 | Command | Result |
 |---|---|
 | `make fmt` | Passed. The formatter's unrelated markdown whitespace changes were reverted. |
-| `dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter 'FullyQualifiedName~ArchitectureBaselineMergeIndexTests|FullyQualifiedName~ArchitectureBaselineMergerTests|FullyQualifiedName~ArchitectureBaselineLoaderTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests|FullyQualifiedName~ArchitectureApplicabilityBaselineLifecycleTests|FullyQualifiedName~ImportedExternalDiagnosticProjectionTests|FullyQualifiedName~ExternalDiagnosticsFederationReferenceScenarioTests'` | Passed, 83/83. |
-| `dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter FullyQualifiedName~RunBaselineMergeEffectMatrix --logger 'console;verbosity=detailed'` | Passed; every indexed digest matched the legacy reference and the measured effect criteria passed. |
+| `dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter 'FullyQualifiedName~ArchitectureBaselineMergeIndexTests|FullyQualifiedName~ArchitectureBaselineMergerTests|FullyQualifiedName~ArchitectureBaselineLoaderTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests|FullyQualifiedName~ArchitectureApplicabilityBaselineLifecycleTests|FullyQualifiedName~ImportedExternalDiagnosticProjectionTests|FullyQualifiedName~ExternalDiagnosticsFederationReferenceScenarioTests' --logger 'console;verbosity=minimal'` | Passed, 86/86. |
+| `dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter FullyQualifiedName~RunBaselineMergeEffectMatrix --logger 'console;verbosity=detailed'` | Passed; every digest matched, with final medians and work counts shown above. |
+| `dotnet test tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --no-restore -c Release --filter FullyQualifiedName~RunSparseAndImportedOnlyEffectMatrix --logger 'console;verbosity=detailed'` | Passed; all six sparse/diagnostic shapes matched the reference digest. |
+| `powershell -NoProfile -File docs/internal/large-solution-benchmarking/issue-1126-run-cli-ab.ps1 -BaseCli F:/dev/arch-linter-net-issue-1126-ab-base/src/ArchLinterNet.Cli/bin/Release/net10.0/ArchLinterNet.Cli.dll -CurrentCli src/ArchLinterNet.Cli/bin/Release/net10.0/ArchLinterNet.Cli.dll` | Passed, five alternating pairs; medians and paired deltas are shown above. |
 | `dotnet test tests/ArchLinterNet.Core.Tests --no-restore -c Release --filter FullyQualifiedName~HistoryLayoutRules_RejectAnExceptionAndInterfaceOutsideTheirConventionalDirectories` | Passed, 1/1 when run alone. |
 | `dotnet test tests/ArchLinterNet.Core.Tests --no-restore -c Release --settings .benchmark/issue-1126-core-serial.runsettings` | Completed with 4,234 passed, 16 skipped, and 8 failed. All eight failures were self-policy negative tests whose Debug rebuilds could not overwrite `src/ArchLinterNet.Cli/bin/Debug/net10.0/ArchLinterNet.Cli.dll` because the same testhost held it (`MSB3021`/`MSB3027`); their expected-finding assertions then failed on the build-state preflight result. The isolated layout case above passed. |
-| `make lint-code-size` | Passed; the baseline loading service is 733 lines. |
+| `make lint-code-size` | Passed; the baseline loading service is 786 lines. |
 | `make lint-architecture` | Passed strict self-policy validation; no cycles and project coverage complete. |
 | `make public-api-check` | Passed for Core, Testing, and CEL snapshots. |
 | `make lint-docs` | Passed, 43 checks; MkDocs static build completed. |

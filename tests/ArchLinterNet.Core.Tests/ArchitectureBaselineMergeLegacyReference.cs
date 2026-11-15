@@ -18,7 +18,7 @@ internal static class ArchitectureBaselineMergeLegacyReference
         ArchitectureBaselineDocument baseline,
         LegacyWorkCounter? workCounter = null)
     {
-        List<ArchitectureDependencyContract> contracts = policy.Contracts.Strict;
+        List<ArchitectureDependencyContract> contracts = policy.Contracts.Strict.ToList();
         bool isStructured = baseline.Version is 2 or 3;
 
         foreach (ArchitectureBaselineContractEntry baselineEntry in baseline.Baseline.Strict)
@@ -74,29 +74,88 @@ internal static class ArchitectureBaselineMergeLegacyReference
 
     internal static string StrictIgnoreDigest(ArchitectureContractDocument policy)
     {
-        BaselineMergeIgnoreSnapshot[] snapshots = policy.Contracts.Strict
-            .SelectMany(contract => contract.IgnoredViolations.Select(ignore => new BaselineMergeIgnoreSnapshot(
-                contract.Id,
-                ignore.SourceType,
-                ignore.ForbiddenReference,
-                ignore.Reason,
-                ignore.Issue,
-                ignore.IdentityVersion,
-                ignore.ContractFamily,
-                ignore.Kind,
-                ignore.SourceAssembly,
-                ignore.SourceMember,
-                ignore.TargetAssembly,
-                ignore.TargetType,
-                ignore.TargetMember,
-                ignore.Occurrence,
-                ignore.Configuration,
-                ignore.IsFromLoadedBaseline)))
-            .ToArray();
+        return IgnoreDigest(policy.Contracts.Strict.SelectMany(contract =>
+            contract.IgnoredViolations.Select(ignore => Snapshot(contract.Id, ignore))));
+    }
 
-        byte[] json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(snapshots));
+    internal static string StrictExternalIgnoreDigest(ArchitectureContractDocument policy)
+    {
+        return IgnoreDigest(policy.Contracts.StrictExternal.SelectMany(contract =>
+            contract.IgnoredViolations.Select(ignore => Snapshot(contract.Id, ignore))));
+    }
+
+    internal static void MergeImportedExternal(
+        ArchitectureContractDocument policy,
+        ArchitectureBaselineDocument baseline)
+    {
+        // The old merger materialized each group before examining its entries. Imported diagnostics
+        // then bypassed contract lookup and never became native contract ignores.
+        List<IArchitectureContract> contracts = policy.Contracts.StrictExternal
+            .Select(contract => (IArchitectureContract)contract)
+            .ToList();
+        HashSet<string> externalEvidenceIds = new(
+            policy.ExternalEvidence.Select(requirement => requirement.Id),
+            StringComparer.Ordinal);
+        var unknownIds = new List<(string GroupName, string ContractId)>();
+
+        foreach (ArchitectureBaselineContractEntry entry in baseline.Baseline.StrictExternal)
+        {
+            bool containsImportedDiagnostic = baseline.Version is 2 or 3
+                && entry.IgnoredViolations.Any(ignore =>
+                    string.Equals(ignore.Kind, "external_diagnostic", StringComparison.Ordinal));
+            bool containsOnlyImportedDiagnostics = containsImportedDiagnostic
+                && entry.IgnoredViolations.All(ignore =>
+                    string.Equals(ignore.Kind, "external_diagnostic", StringComparison.Ordinal));
+            if (containsOnlyImportedDiagnostics)
+            {
+                if (!externalEvidenceIds.Contains(entry.Id))
+                {
+                    unknownIds.Add(("strict_external", entry.Id));
+                }
+
+                continue;
+            }
+
+            IArchitectureContract? contract = contracts.FirstOrDefault(candidate =>
+            {
+                return string.Equals(candidate.Id, entry.Id, StringComparison.OrdinalIgnoreCase);
+            });
+            if (contract is null)
+            {
+                unknownIds.Add(("strict_external", entry.Id));
+            }
+            else
+            {
+                throw new InvalidOperationException("The sparse imported-diagnostic fixture contains a native contract entry.");
+            }
+        }
+    }
+
+    private static string IgnoreDigest(IEnumerable<BaselineMergeIgnoreSnapshot> snapshots)
+    {
+        BaselineMergeIgnoreSnapshot[] orderedSnapshots = snapshots.ToArray();
+
+        byte[] json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(orderedSnapshots));
         return Convert.ToHexStringLower(SHA256.HashData(json));
     }
+
+    private static BaselineMergeIgnoreSnapshot Snapshot(string? contractId, ArchitectureIgnoredViolation ignore) => new(
+        contractId,
+        ignore.SourceType,
+        ignore.ForbiddenReference,
+        ignore.Reason,
+        ignore.Issue,
+        ignore.IdentityVersion,
+        ignore.ContractFamily,
+        ignore.Kind,
+        ignore.SourceAssembly,
+        ignore.SourceMember,
+        ignore.TargetAssembly,
+        ignore.TargetType,
+        ignore.TargetMember,
+        ignore.Occurrence,
+        ignore.Configuration,
+        ignore.IsFromLoadedBaseline);
 
     private static bool IdentityEquals(
         ArchitectureIgnoredViolation existing,

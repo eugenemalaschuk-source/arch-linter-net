@@ -21,7 +21,7 @@ See `proposal.md` and the `baseline-generation` delta. `ArchitectureBaselineLoad
 
 ## Decisions
 
-1. **Build one contract lookup for each non-empty baseline group.** Iterate the group's contracts in their existing order and add IDs to a `StringComparer.OrdinalIgnoreCase` dictionary with first-write-wins behavior. Resolve every regular baseline entry with one lookup. Keep imported external-diagnostic handling before contract resolution so those entries continue to resolve against external evidence IDs.
+1. **Choose a contract lookup that matches the group shape.** Defer lookup work until the first non-imported ordinary baseline entry. For a group of at most four entries that all share one ID under `OrdinalIgnoreCase`, resolve the ID once with a first-match linear scan and reuse that result. Otherwise build one `StringComparer.OrdinalIgnoreCase` dictionary on demand, iterating in contract order and retaining the first duplicate ID. Imported external-diagnostic handling remains before resolution, so an imported-only group does not build a native-contract index.
 
 2. **Build membership indexes lazily for touched contracts.** When a valid, non-applicability baseline ignore first targets a contract, seed its version-specific set from that contract's existing inline ignores. Add each accepted loaded key to the set as well as to the existing ordered list. Applicability-only entries therefore allocate no ignore set.
 
@@ -33,7 +33,7 @@ See `proposal.md` and the `baseline-generation` delta. `ArchitectureBaselineLoad
 
 ## Risks / Trade-offs
 
-- **Hash indexes retain additional O(C+I) temporary memory.** Build only the group index for non-empty groups and create ignore membership sets only for contracts that receive eligible baseline ignores. Measure allocations and retained memory against the pre-change path.
+- **Hash indexes retain additional O(C+I) temporary memory.** Build a group index only when an ordinary multi-ID group needs one, and create ignore membership sets only for contracts that receive eligible baseline ignores. Measure allocations and retained memory against the pre-change path.
 - **A key drift could broaden or narrow suppression.** Keep key fields next to the parity tests and compare generated small-input outputs against a test-only copy of the prior linear merge semantics for v1/v2/v3.
 - **Hash collisions can affect constants.** Use the default ordinal string hashing/equality for keys and preserve explicit work-count assertions; benchmark data remains environment-labelled.
 
