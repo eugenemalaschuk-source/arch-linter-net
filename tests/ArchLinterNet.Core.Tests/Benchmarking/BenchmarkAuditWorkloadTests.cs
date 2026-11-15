@@ -77,7 +77,7 @@ public sealed class BenchmarkAuditWorkloadTests
         });
 
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
-        string policy = File.ReadAllText(fixture.PolicyPath);
+        string policy = File.ReadAllText(fixture.PolicyPath).ReplaceLineEndings("\n");
         string source = File.ReadAllText(Path.Combine(fixture.Root, "src", "Synthetic.Project001", "SourceRoot01", "ContractLayerGraph.cs"));
         string reportRules = File.ReadAllText(Path.Combine(fixture.Root, ".benchmark", "report-rules.json"));
         Assert.Multiple(() =>
@@ -127,7 +127,7 @@ public sealed class BenchmarkAuditWorkloadTests
                 MethodBodyRuleCount = methodBodyRuleCount,
             });
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
-        string policy = File.ReadAllText(fixture.PolicyPath);
+        string policy = File.ReadAllText(fixture.PolicyPath).ReplaceLineEndings("\n");
         string strictContracts = policy.Split("  strict:\n", StringSplitOptions.None)[1]
             .Split("  strict_method_body:", StringSplitOptions.None)[0]
             .Split("  strict_layers:", StringSplitOptions.None)[0];
