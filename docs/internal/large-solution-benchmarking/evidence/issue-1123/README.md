@@ -1,6 +1,6 @@
 # Issue #1123 audited hot-path baseline
 
-Captured on 2026-11-15 from source revision `fe2a1b327f36a16fe89dd7347ec35ad7e694fb53`.
+Captured on 2026-11-15 from source revision `e2695484fc0610ee7123049460dd4fde058c9ff9`.
 The run used .NET 10.0.14 on macOS 15.8.1 (x64), runner label `local-x64-6cpu`, and
 `ArchLinterNet.Core.Tests/0.1.0.0`. Each linked document is `benchmark-evidence/v1`, records its
 materialized-input SHA-256, and passed validation against the repository evidence schema.
@@ -17,17 +17,17 @@ observer overhead, allocation deltas, and phase boundaries.
 
 | Family | Scale values | Evidence files (small / medium / large) |
 |---|---:|---|
-| Projects | 2 / 8 / 24 projects | [small](fe2a1b327f36/synthetic-audit-projects-small.json) · [medium](fe2a1b327f36/synthetic-audit-projects-medium.json) · [large](fe2a1b327f36/synthetic-audit-projects-large.json) |
-| Source files | 1 / 8 / 24 files per project | [small](fe2a1b327f36/synthetic-audit-files-small.json) · [medium](fe2a1b327f36/synthetic-audit-files-medium.json) · [large](fe2a1b327f36/synthetic-audit-files-large.json) |
-| Contracts | 1 / 8 / 32 contracts | [small](fe2a1b327f36/synthetic-audit-contracts-small.json) · [medium](fe2a1b327f36/synthetic-audit-contracts-medium.json) · [large](fe2a1b327f36/synthetic-audit-contracts-large.json) |
-| Ignore rules | 1 / 16 / 64 rules | [small](fe2a1b327f36/synthetic-audit-ignores-small.json) · [medium](fe2a1b327f36/synthetic-audit-ignores-medium.json) · [large](fe2a1b327f36/synthetic-audit-ignores-large.json) |
-| Finding candidates | 1 / 16 / 64 findings | [small](fe2a1b327f36/synthetic-audit-findings-small.json) · [medium](fe2a1b327f36/synthetic-audit-findings-medium.json) · [large](fe2a1b327f36/synthetic-audit-findings-large.json) |
-| Metric rules | 1 / 8 / 32 rules | [small](fe2a1b327f36/synthetic-audit-metrics-small.json) · [medium](fe2a1b327f36/synthetic-audit-metrics-medium.json) · [large](fe2a1b327f36/synthetic-audit-metrics-large.json) |
-| Report rules | 1 / 8 / 32 rules | [small](fe2a1b327f36/synthetic-audit-reports-small.json) · [medium](fe2a1b327f36/synthetic-audit-reports-medium.json) · [large](fe2a1b327f36/synthetic-audit-reports-large.json) |
-| Method-body rules | 1 / 4 / 16 rules | [small](fe2a1b327f36/synthetic-audit-method-bodies-small.json) · [medium](fe2a1b327f36/synthetic-audit-method-bodies-medium.json) · [large](fe2a1b327f36/synthetic-audit-method-bodies-large.json) |
-| Dense DAG | 4 / 8 / 12 layers | [small](fe2a1b327f36/synthetic-audit-dense-dag-small.json) · [medium](fe2a1b327f36/synthetic-audit-dense-dag-medium.json) · [large](fe2a1b327f36/synthetic-audit-dense-dag-large.json) |
-| Layered DAG | 4 / 8 / 12 layers | [small](fe2a1b327f36/synthetic-audit-layered-dag-small.json) · [medium](fe2a1b327f36/synthetic-audit-layered-dag-medium.json) · [large](fe2a1b327f36/synthetic-audit-layered-dag-large.json) |
-| SCC with acyclic tail | 4 / 8 / 12 layers | [small](fe2a1b327f36/synthetic-audit-scc-tail-small.json) · [medium](fe2a1b327f36/synthetic-audit-scc-tail-medium.json) · [large](fe2a1b327f36/synthetic-audit-scc-tail-large.json) |
+| Projects | 2 / 8 / 24 projects | [small](e2695484fc06/synthetic-audit-projects-small.json) · [medium](e2695484fc06/synthetic-audit-projects-medium.json) · [large](e2695484fc06/synthetic-audit-projects-large.json) |
+| Source files | 1 / 8 / 24 files per project | [small](e2695484fc06/synthetic-audit-files-small.json) · [medium](e2695484fc06/synthetic-audit-files-medium.json) · [large](e2695484fc06/synthetic-audit-files-large.json) |
+| Contracts | 1 / 8 / 32 contracts | [small](e2695484fc06/synthetic-audit-contracts-small.json) · [medium](e2695484fc06/synthetic-audit-contracts-medium.json) · [large](e2695484fc06/synthetic-audit-contracts-large.json) |
+| Ignore rules | 1 / 16 / 64 rules | [small](e2695484fc06/synthetic-audit-ignores-small.json) · [medium](e2695484fc06/synthetic-audit-ignores-medium.json) · [large](e2695484fc06/synthetic-audit-ignores-large.json) |
+| Finding candidates | 1 / 16 / 64 findings | [small](e2695484fc06/synthetic-audit-findings-small.json) · [medium](e2695484fc06/synthetic-audit-findings-medium.json) · [large](e2695484fc06/synthetic-audit-findings-large.json) |
+| Metric rules | 1 / 8 / 32 rules | [small](e2695484fc06/synthetic-audit-metrics-small.json) · [medium](e2695484fc06/synthetic-audit-metrics-medium.json) · [large](e2695484fc06/synthetic-audit-metrics-large.json) |
+| Report rules | 1 / 8 / 32 rules | [small](e2695484fc06/synthetic-audit-reports-small.json) · [medium](e2695484fc06/synthetic-audit-reports-medium.json) · [large](e2695484fc06/synthetic-audit-reports-large.json) |
+| Method-body rules | 1 / 4 / 16 rules | [small](e2695484fc06/synthetic-audit-method-bodies-small.json) · [medium](e2695484fc06/synthetic-audit-method-bodies-medium.json) · [large](e2695484fc06/synthetic-audit-method-bodies-large.json) |
+| Dense DAG | 4 / 8 / 12 layers | [small](e2695484fc06/synthetic-audit-dense-dag-small.json) · [medium](e2695484fc06/synthetic-audit-dense-dag-medium.json) · [large](e2695484fc06/synthetic-audit-dense-dag-large.json) |
+| Layered DAG | 4 / 8 / 12 layers | [small](e2695484fc06/synthetic-audit-layered-dag-small.json) · [medium](e2695484fc06/synthetic-audit-layered-dag-medium.json) · [large](e2695484fc06/synthetic-audit-layered-dag-large.json) |
+| SCC with acyclic tail | 4 / 8 / 12 layers | [small](e2695484fc06/synthetic-audit-scc-tail-small.json) · [medium](e2695484fc06/synthetic-audit-scc-tail-medium.json) · [large](e2695484fc06/synthetic-audit-scc-tail-large.json) |
 
 The canonical dimensions and selection rules remain in the
 [`workload-catalog.json`](../../workload-catalog.json). Project-reference SCCs remain structural-only
