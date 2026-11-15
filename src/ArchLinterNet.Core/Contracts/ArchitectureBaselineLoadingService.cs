@@ -395,9 +395,12 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         }
     }
 
-    internal static void Merge(ArchitectureContractDocument policyDocument, ArchitectureBaselineDocument baselineDocument)
+    internal static void Merge(
+        ArchitectureContractDocument policyDocument,
+        ArchitectureBaselineDocument baselineDocument,
+        ArchitectureBaselineMergeWorkCounter? workCounter = null)
     {
-        var groupMerger = new ContractGroupMerger(policyDocument);
+        var groupMerger = new ContractGroupMerger(policyDocument, workCounter);
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
             groupMerger.MergeGroup(baselineDocument.Baseline.GetGroup(groupName), groupName, baselineDocument.Version);
@@ -430,10 +433,14 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
     {
         private readonly Families.ArchitectureContractGroups _groups;
         private readonly HashSet<string> _externalEvidenceIds;
+        private readonly ArchitectureBaselineMergeWorkCounter? _workCounter;
 
-        public ContractGroupMerger(ArchitectureContractDocument document)
+        public ContractGroupMerger(
+            ArchitectureContractDocument document,
+            ArchitectureBaselineMergeWorkCounter? workCounter = null)
         {
             _groups = document.Contracts;
+            _workCounter = workCounter;
             _externalEvidenceIds = new HashSet<string>(
                 document.ExternalEvidence.Select(requirement => requirement.Id),
                 StringComparer.Ordinal);
@@ -445,7 +452,28 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             int documentVersion)
         {
             var unknownIds = new List<(string GroupName, string ContractId)>();
+            if (baselineEntries.Count == 0)
+            {
+                return unknownIds;
+            }
+
             var contracts = GetContracts(groupName);
+            var contractsById = new Dictionary<string, IArchitectureContract>(StringComparer.OrdinalIgnoreCase);
+            foreach (IArchitectureContract candidate in contracts)
+            {
+                if (_workCounter is not null)
+                {
+                    _workCounter.ContractIndexEntries++;
+                }
+
+                if (candidate.Id is { } contractId)
+                {
+                    contractsById.TryAdd(contractId, candidate);
+                }
+            }
+
+            var memberships = new Dictionary<IArchitectureContract, ArchitectureBaselineIgnoreMembership>(
+                ReferenceEqualityComparer.Instance);
             bool isStructured = documentVersion is 2 or 3;
 
             foreach (var baselineEntry in baselineEntries)
@@ -463,16 +491,17 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                     continue;
                 }
 
-                var contract = contracts.FirstOrDefault(c =>
-                    string.Equals(c.Id, baselineEntry.Id, StringComparison.OrdinalIgnoreCase));
+                if (_workCounter is not null)
+                {
+                    _workCounter.ContractLookups++;
+                }
 
-                if (contract == null)
+                if (!contractsById.TryGetValue(baselineEntry.Id, out IArchitectureContract? contract))
                 {
                     unknownIds.Add((groupName, baselineEntry.Id));
                     continue;
                 }
 
-                var ignores = GetIgnoredViolations(contract);
                 foreach (var baselineIgnore in baselineEntry.IgnoredViolations)
                 {
                     // Applicability findings are evidence of an assessment boundary, not
@@ -490,15 +519,16 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                     // entries dedup by the full structured identity — two entries can legitimately
                     // share (source_type, forbidden_reference) display text while being distinct
                     // identities (different assembly/member/occurrence), and must both be kept.
-                    bool isDuplicate = isStructured
-                        ? ignores.Any(existing => IdentityEquals(existing, baselineIgnore))
-                        : ignores.Any(existing =>
-                            string.Equals(existing.SourceType, baselineIgnore.SourceType, StringComparison.Ordinal) &&
-                            string.Equals(existing.ForbiddenReference, baselineIgnore.ForbiddenReference, StringComparison.Ordinal));
-
-                    if (!isDuplicate)
+                    ArchitectureBaselineIgnoreMembership membership = GetOrCreateMembership(
+                        contract, isStructured, memberships);
+                    if (_workCounter is not null)
                     {
-                        ignores.Add(new ArchitectureIgnoredViolation
+                        _workCounter.MembershipChecks++;
+                    }
+
+                    if (!membership.Contains(baselineIgnore))
+                    {
+                        ArchitectureIgnoredViolation loadedIgnore = new()
                         {
                             SourceType = baselineIgnore.SourceType,
                             ForbiddenReference = baselineIgnore.ForbiddenReference,
@@ -514,12 +544,45 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                             Occurrence = isStructured ? baselineIgnore.Occurrence ?? 0 : null,
                             Configuration = isStructured ? baselineIgnore.Configuration : null,
                             IsFromLoadedBaseline = true,
-                        });
+                        };
+
+                        membership.AddLoaded(loadedIgnore);
+
+                        if (_workCounter is not null)
+                        {
+                            _workCounter.LoadedIgnoresAccepted++;
+                        }
                     }
                 }
             }
 
             return unknownIds;
+        }
+
+        private ArchitectureBaselineIgnoreMembership GetOrCreateMembership(
+            IArchitectureContract contract,
+            bool isStructured,
+            Dictionary<IArchitectureContract, ArchitectureBaselineIgnoreMembership> memberships)
+        {
+            if (memberships.TryGetValue(contract, out ArchitectureBaselineIgnoreMembership? membership))
+            {
+                return membership;
+            }
+
+            List<ArchitectureIgnoredViolation> ignores = GetIgnoredViolations(contract);
+            membership = new ArchitectureBaselineIgnoreMembership(ignores, isStructured);
+            foreach (ArchitectureIgnoredViolation existing in ignores)
+            {
+                if (_workCounter is not null)
+                {
+                    _workCounter.InlineIgnoreIndexEntries++;
+                }
+
+                membership.SeedInline(existing);
+            }
+
+            memberships.Add(contract, membership);
+            return membership;
         }
 
         private static bool IsImportedExternalDiagnosticEntry(
@@ -548,20 +611,6 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             }
 
             return true;
-        }
-
-        private static bool IdentityEquals(ArchitectureIgnoredViolation existing, ArchitectureBaselineIgnoredViolation candidate)
-        {
-            return existing.IdentityVersion == ArchitectureViolationIdentity.CurrentVersion
-                && string.Equals(existing.ContractFamily, candidate.ContractFamily, StringComparison.Ordinal)
-                && string.Equals(existing.SourceAssembly, candidate.SourceAssembly, StringComparison.Ordinal)
-                && string.Equals(existing.SourceType, candidate.SourceType, StringComparison.Ordinal)
-                && string.Equals(existing.SourceMember, candidate.SourceMember, StringComparison.Ordinal)
-                && string.Equals(existing.TargetAssembly, candidate.TargetAssembly, StringComparison.Ordinal)
-                && string.Equals(existing.TargetType, candidate.TargetType, StringComparison.Ordinal)
-                && string.Equals(existing.TargetMember, candidate.TargetMember, StringComparison.Ordinal)
-                && (existing.Occurrence ?? 0) == (candidate.Occurrence ?? 0)
-                && string.Equals(existing.Configuration, candidate.Configuration, StringComparison.Ordinal);
         }
 
         private List<IArchitectureContract> GetContracts(string groupName)
