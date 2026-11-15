@@ -84,6 +84,9 @@ internal static class BenchmarkIdentity
         using var document = JsonDocument.Parse(json);
         return JsonSerializer.Serialize(document.RootElement, _normalizedJsonOptions);
     }
+
+    public static string NormalizeLineEndings(string text) =>
+        text.Replace("\r\n", "\n", StringComparison.Ordinal);
 }
 
 internal static class BenchmarkEvidenceFactory

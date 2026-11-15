@@ -28,6 +28,16 @@ public sealed class BenchmarkAuditWorkloadTests
     }
 
     [Test]
+    public void WorkloadIdentityJson_NormalizesWindowsAndUnixLineEndings()
+    {
+        const string UnixJson = "{\n  \"workload_id\": \"synthetic-example\"\n}";
+        string windowsJson = UnixJson.Replace("\n", "\r\n", StringComparison.Ordinal);
+
+        Assert.That(BenchmarkIdentity.NormalizeLineEndings(windowsJson), Is.EqualTo(UnixJson));
+        Assert.That(BenchmarkIdentity.NormalizeLineEndings(UnixJson), Is.EqualTo(UnixJson));
+    }
+
+    [Test]
     public void AuditDimensions_MaterializeIndependentCountsAndExecutableCycleWithTail()
     {
         BenchmarkDimensionSet dimensions = new()

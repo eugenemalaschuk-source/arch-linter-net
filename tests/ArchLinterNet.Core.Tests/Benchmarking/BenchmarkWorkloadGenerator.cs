@@ -57,7 +57,8 @@ internal static class BenchmarkWorkloadGenerator
             WorkloadIdentity = string.Empty,
         };
 
-        string identityInput = BenchmarkJson.Serialize(definition.ToManifest() with { WorkloadIdentity = string.Empty });
+        string identityInput = BenchmarkIdentity.NormalizeLineEndings(
+            BenchmarkJson.Serialize(definition.ToManifest() with { WorkloadIdentity = string.Empty }));
         return definition with { WorkloadIdentity = BenchmarkIdentity.Sha256(identityInput) };
     }
 

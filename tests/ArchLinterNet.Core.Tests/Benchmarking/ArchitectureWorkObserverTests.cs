@@ -64,17 +64,17 @@ public sealed class ArchitectureWorkObserverTests
     [Test]
     public void SourceFactIndex_ObserverCountsActualSourceParsesAndPreservesFacts()
     {
-        const string source = "namespace ArchLinterNet.Core.Tests.Benchmarking; public sealed class SourceFixture { }";
-        const string root = "/fake/work-observer";
+        const string Source = "namespace ArchLinterNet.Core.Tests.Benchmarking; public sealed class SourceFixture { }";
+        const string Root = "/fake/work-observer";
         FakeArchitectureFileSystem fileSystem = new();
-        fileSystem.AddDirectory(root);
-        fileSystem.AddDirectory(root + "/src");
-        fileSystem.AddFile(root + "/src/SourceFixture.cs", source, DateTime.UtcNow);
+        fileSystem.AddDirectory(Root);
+        fileSystem.AddDirectory(Root + "/src");
+        fileSystem.AddFile(Root + "/src/SourceFixture.cs", Source, DateTime.UtcNow);
         BenchmarkWorkObserver observer = new();
 
         ArchitectureSourceFileFactIndex Build(BenchmarkWorkObserver? workObserver) =>
             new(
-                [typeof(ArchitectureWorkObserverTests).Assembly], root, ["src"], null, fileSystem,
+                [typeof(ArchitectureWorkObserverTests).Assembly], Root, ["src"], null, fileSystem,
                 new ArchitectureSourceFileFactIndex.ProjectOwnership(null,
                     new Dictionary<string, string>(StringComparer.Ordinal) { ["src"] = "ArchLinterNet.Core.Tests" }),
                 new ArchitectureSourceFileFactIndex.ConstructionOptions(
