@@ -15,7 +15,7 @@
 
 ## 4. Refresh and review retained evidence
 
-- [ ] 4.1 Regenerate affected 33-workload × 8-sample evidence at the implementation commit; verify metric result counts, ordinary/method-body counts, fixed SARIF volume, stable input identities, and evidence schema validation.
+- [x] 4.1 Regenerate affected 33-workload × 8-sample evidence at the implementation commit; verify metric result counts, ordinary/method-body counts, fixed SARIF volume, stable input identities, and evidence schema validation.
 - [ ] 4.2 Inspect current Qodana trusted-gate and Sonar new-issue results; fix actionable regressions or add a precise evidence-based disposition, and verify the resulting PR checks or documented limitation.
 
 ## Workflow follow-up

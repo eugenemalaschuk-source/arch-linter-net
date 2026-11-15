@@ -80,6 +80,12 @@ preparation cost is not attributed to the analyzer. The materializer creates onl
 bounded synthetic fixtures; the very-large catalog entry is staged and does not
 silently turn a normal test run into a large build.
 
+The materialized-input SHA-256 uses fixture-relative paths and bytes for source,
+project, policy, solution, and workload metadata. It excludes the temporary root,
+generated `bin`/`obj` outputs, analysis caches, and per-run profile/output files.
+Staged assemblies, their build receipts, and the staged manifest remain included
+because analysis consumes those files directly.
+
 ## Evidence
 
 `benchmark-evidence/v1` wraps raw `analysis-profile/v1` JSON in the

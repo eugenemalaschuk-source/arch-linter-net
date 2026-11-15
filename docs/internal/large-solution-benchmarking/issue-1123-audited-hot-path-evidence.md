@@ -41,7 +41,7 @@ Deterministic contract and schema checks:
 
 ```sh
 dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter "FullyQualifiedName~BenchmarkAudit|FullyQualifiedName~BenchmarkHistoryWorkloadCatalogTests"
-dotnet test tests/ArchLinterNet.Core.Tests --no-restore -c Release --filter "FullyQualifiedName~BenchmarkAuditMatrixTests" --logger "console;verbosity=normal"
+dotnet test tests/ArchLinterNet.Core.Tests --no-restore -c Release --filter "FullyQualifiedName~BenchmarkAuditMatrixTests" --logger "console;verbosity=normal" -- NUnit.ExplicitTests=true
 ```
 
 The second command explicitly runs the environment-sensitive repeated matrix and writes one
