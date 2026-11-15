@@ -11,6 +11,8 @@ namespace ArchLinterNet.Core.Tests;
 [NonParallelizable]
 public sealed class BenchmarkAuditEvidenceTests
 {
+    private static readonly int[] _expectedMetricValues = [6, 7];
+
     [Test]
     public void LegacyEvidence_OmitsOptionalAuditFields()
     {
@@ -81,7 +83,7 @@ public sealed class BenchmarkAuditEvidenceTests
             Assert.That(roundTrip.Environment.MaterializedInputSha256, Is.EqualTo(new string('a', 64)));
             Assert.That(roundTrip.Samples.Single().ReportOutputSha256, Is.EqualTo(new string('b', 64)));
             Assert.That(roundTrip.Samples.Single().MetricWork!.MetricCount, Is.EqualTo(2));
-            Assert.That(roundTrip.Samples.Single().MetricWork!.Results.Select(result => result.Value), Is.EqualTo(new[] { 6, 7 }));
+            Assert.That(roundTrip.Samples.Single().MetricWork!.Results.Select(result => result.Value), Is.EqualTo(_expectedMetricValues));
             Assert.That(validation.IsValid, Is.True, Describe(validation));
         });
     }

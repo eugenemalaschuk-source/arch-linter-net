@@ -7,6 +7,13 @@ namespace ArchLinterNet.Core.Tests;
 [NonParallelizable]
 public sealed class BenchmarkAuditExecutionTests
 {
+    private static readonly string[] _expectedMetricIds =
+    [
+        "synthetic-metric-001",
+        "synthetic-metric-002",
+        "synthetic-metric-003",
+    ];
+
     [TestCase(nameof(BenchmarkContractLayerGraphShape.DenseDag), false)]
     [TestCase(nameof(BenchmarkContractLayerGraphShape.LayeredDag), false)]
     [TestCase(nameof(BenchmarkContractLayerGraphShape.StronglyConnectedWithAcyclicTail), true)]
@@ -61,7 +68,7 @@ public sealed class BenchmarkAuditExecutionTests
             Assert.That(observed.Sample.MetricWork!.MetricCount, Is.EqualTo(3));
             Assert.That(observed.Sample.MetricWork.IsComplete, Is.True);
             Assert.That(observed.Sample.MetricWork.Results.Select(result => result.MetricId),
-                Is.EqualTo(new[] { "synthetic-metric-001", "synthetic-metric-002", "synthetic-metric-003" }));
+                Is.EqualTo(_expectedMetricIds));
             Assert.That(observed.Sample.MetricWork.Results.All(result =>
                 result.MetricKind == "topology_type_count" && result.Value > 0 &&
                 result.Value == result.ContributorCount), Is.True);

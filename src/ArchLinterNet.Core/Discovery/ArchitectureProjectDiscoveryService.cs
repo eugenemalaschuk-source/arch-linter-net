@@ -203,7 +203,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         try
         {
             projectFile = benchmarkWorkObserver is not null
-                && _projectFileParser is ArchitectureProjectFileParser parser
+                && _projectFileParser is ArchitectureProjectFileParser
                 ? ArchitectureProjectFileParser.Parse(projectPath, _fileSystem, benchmarkWorkObserver)
                 : _projectFileParser.Parse(projectPath, _fileSystem);
         }

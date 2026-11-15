@@ -233,13 +233,13 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
 
     private static void ValidateAncestryStructure(
         BenchmarkHistoryWorkloadInput input,
-        IReadOnlyList<BenchmarkHistoryInputRecord> commits,
-        IReadOnlyList<BenchmarkHistoryInputRecord> edges,
-        IReadOnlyList<BenchmarkHistoryInputRecord> queries,
-        IReadOnlyDictionary<int, List<int>> parents)
+        BenchmarkHistoryInputRecord[] commits,
+        BenchmarkHistoryInputRecord[] edges,
+        BenchmarkHistoryInputRecord[] queries,
+        Dictionary<int, List<int>> parents)
     {
-        Assert.That(commits.Select(commit => commit.First).Distinct().Count(), Is.EqualTo(commits.Count), input.WorkloadId);
-        Assert.That(commits.Count, Is.EqualTo(input.Dimensions["reachable_commit_count"]), input.WorkloadId);
+        Assert.That(commits.Select(commit => commit.First).Distinct().Count(), Is.EqualTo(commits.Length), input.WorkloadId);
+        Assert.That(commits.Length, Is.EqualTo(input.Dimensions["reachable_commit_count"]), input.WorkloadId);
         Assert.That(edges.All(edge => edge.Second!.Value < edge.First), Is.True,
             $"Parent edges must point backward through the deterministic commit order ({input.WorkloadId}).");
 

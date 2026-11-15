@@ -43,7 +43,7 @@ public sealed class BenchmarkMaterializedInputIdentityTests
             $"Canonical inputs differed: {string.Join("; ", DescribeDifferingInputs(first.Root, second.Root))}");
     }
 
-    private static IReadOnlyList<string> DescribeDifferingInputs(string firstRoot, string secondRoot)
+    private static string[] DescribeDifferingInputs(string firstRoot, string secondRoot)
     {
         static Dictionary<string, string> HashInputs(string root)
         {
