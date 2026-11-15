@@ -134,121 +134,61 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
     /// <see cref="TargetMember"/>, and <see cref="SourceMember"/> are the structured identity fields
     /// derived from the resolved symbol and its enclosing member.
     /// </summary>
-    private sealed record ForbiddenCallMatch(
+    internal sealed record ForbiddenCallMatch(
         string Display,
         string? TargetAssembly,
         string? TargetType,
         string TargetMember,
         string? SourceMember);
 
-    private static List<ForbiddenCallMatch> FindForbiddenUsagesInBodies(
+    internal static List<ForbiddenCallMatch> FindForbiddenUsagesInBodies(
         SemanticModel semanticModel,
         CompilationUnitSyntax root,
         IReadOnlyList<ForbiddenCallPattern> patterns,
-        Dictionary<string, bool> matchCache)
+        Dictionary<string, bool> matchCache,
+        Action? onSyntaxNodeVisited = null,
+        Action? onSemanticLookup = null)
     {
-        List<ForbiddenCallMatch> matches = new();
-
-        foreach (SyntaxNode bodyNode in EnumerateExecutableBodies(root))
-        {
-            foreach (SyntaxNode node in bodyNode.DescendantNodes())
-            {
-                if (!TryGetReferencedSymbol(semanticModel, node, out ISymbol? symbol, out bool usedCandidateFallback) ||
-                    symbol == null)
-                {
-                    continue;
-                }
-
-                SymbolDescriptor descriptor = ArchitectureForbiddenCallMatcher.FromRoslynSymbol(symbol);
-                if (!ArchitectureForbiddenCallMatcher.TryMatch(descriptor, patterns, matchCache,
-                        out string matchedPattern))
-                {
-                    continue;
-                }
-
-                string symbolName = symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-                int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-                string fallbackMarker = usedCandidateFallback ? " [ambiguous-candidate]" : string.Empty;
-                string display = $"line {line}: {matchedPattern} -> {symbolName}{fallbackMarker}";
-                string? sourceMember = semanticModel.GetEnclosingSymbol(node.SpanStart)
-                    ?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-                matches.Add(new ForbiddenCallMatch(
-                    display,
-                    symbol.ContainingAssembly?.Name,
-                    symbol.ContainingType?.ToDisplayString(),
-                    symbolName,
-                    sourceMember));
-            }
-        }
-
-        return matches;
+        ArchitectureSourceExecutableBodyTraversal traversal = new(
+            semanticModel, patterns, matchCache, onSyntaxNodeVisited, onSemanticLookup);
+        traversal.Visit(root);
+        return traversal.CollectMatches();
     }
 
-    private static IEnumerable<SyntaxNode> EnumerateExecutableBodies(CompilationUnitSyntax root)
-    {
-        foreach (BaseMethodDeclarationSyntax method in root.DescendantNodes().OfType<BaseMethodDeclarationSyntax>())
-        {
-            if (method.Body != null)
-            {
-                yield return method.Body;
-            }
-
-            if (method.ExpressionBody != null)
-            {
-                yield return method.ExpressionBody.Expression;
-            }
-        }
-
-        foreach (AccessorDeclarationSyntax accessor in root.DescendantNodes().OfType<AccessorDeclarationSyntax>())
-        {
-            if (accessor.Body != null)
-            {
-                yield return accessor.Body;
-            }
-
-            if (accessor.ExpressionBody != null)
-            {
-                yield return accessor.ExpressionBody.Expression;
-            }
-        }
-
-        foreach (LocalFunctionStatementSyntax localFunction in root.DescendantNodes()
-                     .OfType<LocalFunctionStatementSyntax>())
-        {
-            if (localFunction.Body != null)
-            {
-                yield return localFunction.Body;
-            }
-
-            if (localFunction.ExpressionBody != null)
-            {
-                yield return localFunction.ExpressionBody.Expression;
-            }
-        }
-    }
-
-    private static bool TryGetReferencedSymbol(
+    internal static bool TryGetReferencedSymbol(
         SemanticModel semanticModel,
         SyntaxNode node,
         out ISymbol? symbol,
-        out bool usedCandidateFallback)
+        out bool usedCandidateFallback,
+        Action? onSemanticLookup = null)
     {
-        usedCandidateFallback = false;
-
-        symbol = node switch
+        switch (node)
         {
-            InvocationExpressionSyntax invocation => GetResolvedSymbol(semanticModel.GetSymbolInfo(invocation),
-                out usedCandidateFallback),
-            MemberAccessExpressionSyntax memberAccess => GetResolvedSymbol(semanticModel.GetSymbolInfo(memberAccess),
-                out usedCandidateFallback),
-            ObjectCreationExpressionSyntax objectCreation => GetResolvedSymbol(
-                semanticModel.GetSymbolInfo(objectCreation), out usedCandidateFallback),
-            ImplicitObjectCreationExpressionSyntax implicitObjectCreation => GetResolvedSymbol(
-                semanticModel.GetSymbolInfo(implicitObjectCreation), out usedCandidateFallback),
-            IdentifierNameSyntax identifierName => GetResolvedSymbol(semanticModel.GetSymbolInfo(identifierName),
-                out usedCandidateFallback),
-            _ => null
-        };
+            case InvocationExpressionSyntax invocation:
+                onSemanticLookup?.Invoke();
+                symbol = GetResolvedSymbol(semanticModel.GetSymbolInfo(invocation), out usedCandidateFallback);
+                break;
+            case MemberAccessExpressionSyntax memberAccess:
+                onSemanticLookup?.Invoke();
+                symbol = GetResolvedSymbol(semanticModel.GetSymbolInfo(memberAccess), out usedCandidateFallback);
+                break;
+            case ObjectCreationExpressionSyntax objectCreation:
+                onSemanticLookup?.Invoke();
+                symbol = GetResolvedSymbol(semanticModel.GetSymbolInfo(objectCreation), out usedCandidateFallback);
+                break;
+            case ImplicitObjectCreationExpressionSyntax implicitObjectCreation:
+                onSemanticLookup?.Invoke();
+                symbol = GetResolvedSymbol(semanticModel.GetSymbolInfo(implicitObjectCreation), out usedCandidateFallback);
+                break;
+            case IdentifierNameSyntax identifierName:
+                onSemanticLookup?.Invoke();
+                symbol = GetResolvedSymbol(semanticModel.GetSymbolInfo(identifierName), out usedCandidateFallback);
+                break;
+            default:
+                symbol = null;
+                usedCandidateFallback = false;
+                return false;
+        }
 
         return symbol != null;
     }
