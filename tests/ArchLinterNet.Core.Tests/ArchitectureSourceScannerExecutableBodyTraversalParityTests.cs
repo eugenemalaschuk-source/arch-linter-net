@@ -199,7 +199,7 @@ public sealed class ArchitectureSourceScannerExecutableBodyTraversalParityTests
     private static (CSharpCompilation Compilation, SyntaxTree SyntaxTree) Compile(string source)
     {
         SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(source, path: "src/Caller.cs");
-        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+        MetadataReference[] references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
             .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
             .ToArray();

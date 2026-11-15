@@ -30,11 +30,6 @@ internal sealed class ArchitectureSourceExecutableBodyTraversal(
         public List<ArchitectureSourceScanner.ForbiddenCallMatch> Matches { get; } = new();
     }
 
-    private readonly SemanticModel _semanticModel = semanticModel;
-    private readonly IReadOnlyList<ForbiddenCallPattern> _patterns = patterns;
-    private readonly Dictionary<string, bool> _matchCache = matchCache;
-    private readonly Action? _onSyntaxNodeVisited = onSyntaxNodeVisited;
-    private readonly Action? _onSemanticLookup = onSemanticLookup;
     private readonly Dictionary<SyntaxNode, ExecutableBodyRegion> _bodyRootRegions = new();
     private readonly List<ExecutableBodyRegion> _methodBodies = new();
     private readonly List<ExecutableBodyRegion> _accessorBodies = new();
@@ -48,7 +43,7 @@ internal sealed class ArchitectureSourceExecutableBodyTraversal(
             return;
         }
 
-        _onSyntaxNodeVisited?.Invoke();
+        onSyntaxNodeVisited?.Invoke();
 
         if (_activeBodyRegions != null)
         {
@@ -152,7 +147,7 @@ internal sealed class ArchitectureSourceExecutableBodyTraversal(
     private void RecordNodeMatch(SyntaxNode node)
     {
         if (!ArchitectureSourceScanner.TryGetReferencedSymbol(
-                _semanticModel, node, out ISymbol? symbol, out bool usedCandidateFallback, _onSemanticLookup)
+                semanticModel, node, out ISymbol? symbol, out bool usedCandidateFallback, onSemanticLookup)
             || symbol == null)
         {
             return;
@@ -160,7 +155,7 @@ internal sealed class ArchitectureSourceExecutableBodyTraversal(
 
         SymbolDescriptor descriptor = ArchitectureForbiddenCallMatcher.FromRoslynSymbol(symbol);
         if (!ArchitectureForbiddenCallMatcher.TryMatch(
-                descriptor, _patterns, _matchCache, out string matchedPattern))
+                descriptor, patterns, matchCache, out string matchedPattern))
         {
             return;
         }
@@ -169,7 +164,7 @@ internal sealed class ArchitectureSourceExecutableBodyTraversal(
         int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
         string fallbackMarker = usedCandidateFallback ? " [ambiguous-candidate]" : string.Empty;
         string display = $"line {line}: {matchedPattern} -> {symbolName}{fallbackMarker}";
-        string? sourceMember = _semanticModel.GetEnclosingSymbol(node.SpanStart)
+        string? sourceMember = semanticModel.GetEnclosingSymbol(node.SpanStart)
             ?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         ArchitectureSourceScanner.ForbiddenCallMatch match = new(
             display,
