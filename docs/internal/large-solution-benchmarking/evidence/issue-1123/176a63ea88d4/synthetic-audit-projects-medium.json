@@ -1,0 +1,5650 @@
+{
+  "evidence_schema_id": "benchmark-evidence/v1",
+  "workload": {
+    "schema_id": "large-solution-benchmark/v1",
+    "generator_version": "1",
+    "workload_id": "synthetic-audit-projects-medium",
+    "shape": "linear",
+    "compilation_mode": "real_ms_build",
+    "dimensions": {
+      "project_count": 8,
+      "types_per_project": 4,
+      "source_files_per_project": 2,
+      "references_per_project": 0,
+      "layer_count": 4,
+      "selector_predicate_terms_per_layer": 2,
+      "contracts_per_workload": 2,
+      "finding_candidates": 0,
+      "source_root_count": 1
+    },
+    "projects": [
+      {
+        "id": "project-001",
+        "assembly_name": "Synthetic.Project001"
+      },
+      {
+        "id": "project-002",
+        "assembly_name": "Synthetic.Project002"
+      },
+      {
+        "id": "project-003",
+        "assembly_name": "Synthetic.Project003"
+      },
+      {
+        "id": "project-004",
+        "assembly_name": "Synthetic.Project004"
+      },
+      {
+        "id": "project-005",
+        "assembly_name": "Synthetic.Project005"
+      },
+      {
+        "id": "project-006",
+        "assembly_name": "Synthetic.Project006"
+      },
+      {
+        "id": "project-007",
+        "assembly_name": "Synthetic.Project007"
+      },
+      {
+        "id": "project-008",
+        "assembly_name": "Synthetic.Project008"
+      }
+    ],
+    "edges": [
+      {
+        "from_project_id": "project-001",
+        "to_project_id": "project-002"
+      },
+      {
+        "from_project_id": "project-002",
+        "to_project_id": "project-003"
+      },
+      {
+        "from_project_id": "project-003",
+        "to_project_id": "project-004"
+      },
+      {
+        "from_project_id": "project-004",
+        "to_project_id": "project-005"
+      },
+      {
+        "from_project_id": "project-005",
+        "to_project_id": "project-006"
+      },
+      {
+        "from_project_id": "project-006",
+        "to_project_id": "project-007"
+      },
+      {
+        "from_project_id": "project-007",
+        "to_project_id": "project-008"
+      }
+    ],
+    "topology": {
+      "project_count": 8,
+      "reference_edge_count": 7,
+      "strongly_connected_component_count": 8,
+      "contains_cycle": false,
+      "alternate_path_count": 0
+    },
+    "inventory": {
+      "project_count": 8,
+      "assembly_count": 8,
+      "source_file_count": 16,
+      "type_count": 32,
+      "reference_edge_count": 7,
+      "layer_count": 4,
+      "selector_predicate_evaluation_count": 256,
+      "contract_count": 2,
+      "finding_candidate_count": 0,
+      "source_root_count": 1
+    },
+    "workflow": {
+      "execution_mode": "single_command",
+      "command_families": [
+        "validation"
+      ],
+      "commands": [
+        "validation --mode strict"
+      ],
+      "independent_processes": 1
+    },
+    "pull_request_change": {
+      "changed_project_ids": [
+        "project-001",
+        "project-002"
+      ],
+      "changed_source_paths": [
+        "src/Synthetic.Project001/SourceRoot01/Type001.cs",
+        "src/Synthetic.Project001/SourceRoot01/Type002.cs",
+        "src/Synthetic.Project002/SourceRoot01/Type001.cs",
+        "src/Synthetic.Project002/SourceRoot01/Type002.cs"
+      ],
+      "includes_global_input": false
+    },
+    "workload_identity": "575e9a960cdea47c5979e2644dd9faf1f52d985f06f15734d3f2238043805410"
+  },
+  "run": {
+    "execution_mode": "single_command",
+    "cache_mode": "disabled",
+    "prepared_state_mode": "unprepared",
+    "parallel_mode": "sequential",
+    "sample_ordinal": 1,
+    "is_warm_sample": true
+  },
+  "deterministic_work": {
+    "project_count": 8,
+    "assembly_count": 8,
+    "source_file_count": 16,
+    "type_count": 32,
+    "reference_edge_count": 7,
+    "layer_count": 4,
+    "selector_predicate_evaluation_count": 256,
+    "contract_count": 2,
+    "finding_candidate_count": 0,
+    "source_root_count": 1,
+    "graph_traversal_count": 7,
+    "witness_path_materialization_count": 0,
+    "canonical_identity_candidate_count": 0
+  },
+  "samples": [
+    {
+      "run": {
+        "execution_mode": "single_command",
+        "cache_mode": "disabled",
+        "prepared_state_mode": "unprepared",
+        "parallel_mode": "sequential",
+        "sample_ordinal": 1,
+        "is_warm_sample": true
+      },
+      "raw_analysis_profile": {
+        "SchemaId": "analysis-profile/v1",
+        "CompletionStatus": "Success",
+        "CancellationObserved": false,
+        "Counters": {
+          "PolicyCompositions": 1,
+          "ProjectGraphEvaluations": 1,
+          "AssemblyLoads": 8,
+          "DiscoveredProjectCount": 8,
+          "RetainedAssemblyCount": 8,
+          "SelectedAssemblyCount": 8,
+          "ModesEvaluated": 1,
+          "SnapshotMaterializations": 1,
+          "FactIndexMaterializations": 1,
+          "SourceScanPasses": 1,
+          "SourceFilesScanned": 16,
+          "ContractFamilyCounts": {
+            "dependency": 2,
+            "layer": 4,
+            "layer_template": 0,
+            "allow_only": 0,
+            "cycle": 0,
+            "method_body": 0,
+            "asmdef": 0,
+            "independence": 0,
+            "assembly_independence": 0,
+            "assembly_dependency": 0,
+            "assembly_allow_only": 0,
+            "package_dependency": 0,
+            "package_allow_only": 0,
+            "framework_dependency": 0,
+            "framework_allow_only": 0,
+            "project_metadata": 0,
+            "protected": 0,
+            "external": 0,
+            "external_allow_only": 0,
+            "acyclic_sibling": 0,
+            "module_container": 0,
+            "type_placement": 0,
+            "layout_conventions": 1,
+            "layout_convention_applicability": 0,
+            "public_api_surface": 0,
+            "contract_surface_exposure": 0,
+            "versioned_contract_surface_isolation": 0,
+            "attribute_usage": 0,
+            "inheritance": 0,
+            "interface_implementation": 0,
+            "composition": 0,
+            "coverage": 0,
+            "metric_budgets": 0,
+            "context_dependency": 0,
+            "context_allow_only": 0,
+            "port_boundary": 0
+          },
+          "ContractFamilyResultCounts": {
+            "dependency": 0,
+            "layer": 0,
+            "layout_conventions": 0
+          },
+          "RenderedSinkCount": 0,
+          "OutputSinkCount": 0,
+          "Cache": {
+            "Status": "NotApplicable",
+            "Lookups": 0,
+            "Hits": 0,
+            "Misses": 0,
+            "Rejects": 0,
+            "Writes": 0,
+            "BytesRead": 0,
+            "BytesWritten": 0,
+            "IneligibleUnitCount": 0,
+            "CorruptionEvents": 0,
+            "CancelledBeforePublish": 0,
+            "AvoidedAssemblyLoads": 0,
+            "AvoidedFactIndexMaterializations": 0,
+            "AvoidedSourceScanPasses": 0,
+            "AvoidedContractExecutions": 0,
+            "AvoidedArtifactBytesLoaded": 0,
+            "Mode": "disabled",
+            "RejectReasonCounts": {}
+          },
+          "Concurrency": {
+            "Status": "NotApplicable",
+            "MaxParallelism": 0,
+            "ScheduledWorkItems": 0,
+            "CompletedWorkItems": 0,
+            "ObservedMaxConcurrency": 0,
+            "MergeOperations": 0
+          }
+        },
+        "Phases": [
+          {
+            "Name": "root_resolution",
+            "Indent": 1,
+            "Ordinal": 0,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.009
+          },
+          {
+            "Name": "condition_set_resolution",
+            "Indent": 1,
+            "Ordinal": 1,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_resolution",
+            "Indent": 1,
+            "Ordinal": 2,
+            "Count": null,
+            "ElapsedMs": 10,
+            "ProcessorTimeMs": 10.493
+          },
+          {
+            "Name": "configuration_check",
+            "Indent": 0,
+            "Ordinal": 3,
+            "Count": null,
+            "ElapsedMs": 10,
+            "ProcessorTimeMs": 10.782
+          },
+          {
+            "Name": "policy_consistency_check",
+            "Indent": 0,
+            "Ordinal": 4,
+            "Count": null,
+            "ElapsedMs": 5,
+            "ProcessorTimeMs": 5.656
+          },
+          {
+            "Name": "contract_checks",
+            "Indent": 0,
+            "Ordinal": 5,
+            "Count": null,
+            "ElapsedMs": 5,
+            "ProcessorTimeMs": 5.027
+          },
+          {
+            "Name": "dependency",
+            "Indent": 1,
+            "Ordinal": 6,
+            "Count": 2,
+            "ElapsedMs": 1,
+            "ProcessorTimeMs": 1.605
+          },
+          {
+            "Name": "layer",
+            "Indent": 1,
+            "Ordinal": 7,
+            "Count": 4,
+            "ElapsedMs": 3,
+            "ProcessorTimeMs": 3.189
+          },
+          {
+            "Name": "layer_template",
+            "Indent": 1,
+            "Ordinal": 8,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.004
+          },
+          {
+            "Name": "allow_only",
+            "Indent": 1,
+            "Ordinal": 9,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "cycle",
+            "Indent": 1,
+            "Ordinal": 10,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "method_body",
+            "Indent": 1,
+            "Ordinal": 11,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "asmdef",
+            "Indent": 1,
+            "Ordinal": 12,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "independence",
+            "Indent": 1,
+            "Ordinal": 13,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_independence",
+            "Indent": 1,
+            "Ordinal": 14,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_dependency",
+            "Indent": 1,
+            "Ordinal": 15,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_allow_only",
+            "Indent": 1,
+            "Ordinal": 16,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_dependency",
+            "Indent": 1,
+            "Ordinal": 17,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "package_allow_only",
+            "Indent": 1,
+            "Ordinal": 18,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_dependency",
+            "Indent": 1,
+            "Ordinal": 19,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_allow_only",
+            "Indent": 1,
+            "Ordinal": 20,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "project_metadata",
+            "Indent": 1,
+            "Ordinal": 21,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "protected",
+            "Indent": 1,
+            "Ordinal": 22,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "external",
+            "Indent": 1,
+            "Ordinal": 23,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "external_allow_only",
+            "Indent": 1,
+            "Ordinal": 24,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "acyclic_sibling",
+            "Indent": 1,
+            "Ordinal": 25,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "module_container",
+            "Indent": 1,
+            "Ordinal": 26,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "type_placement",
+            "Indent": 1,
+            "Ordinal": 27,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "layout_conventions",
+            "Indent": 1,
+            "Ordinal": 28,
+            "Count": 1,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.105
+          },
+          {
+            "Name": "layout_convention_applicability",
+            "Indent": 1,
+            "Ordinal": 29,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "public_api_surface",
+            "Indent": 1,
+            "Ordinal": 30,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "contract_surface_exposure",
+            "Indent": 1,
+            "Ordinal": 31,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "versioned_contract_surface_isolation",
+            "Indent": 1,
+            "Ordinal": 32,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "attribute_usage",
+            "Indent": 1,
+            "Ordinal": 33,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "inheritance",
+            "Indent": 1,
+            "Ordinal": 34,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "interface_implementation",
+            "Indent": 1,
+            "Ordinal": 35,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "composition",
+            "Indent": 1,
+            "Ordinal": 36,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "coverage",
+            "Indent": 1,
+            "Ordinal": 37,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "metric_budgets",
+            "Indent": 1,
+            "Ordinal": 38,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.003
+          },
+          {
+            "Name": "context_dependency",
+            "Indent": 1,
+            "Ordinal": 39,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "context_allow_only",
+            "Indent": 1,
+            "Ordinal": 40,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "port_boundary",
+            "Indent": 1,
+            "Ordinal": 41,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "post_processing",
+            "Indent": 0,
+            "Ordinal": 42,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "repository_metrics",
+            "Indent": 0,
+            "Ordinal": 43,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.091
+          },
+          {
+            "Name": "selector_predicate_evaluation",
+            "Indent": 1,
+            "Ordinal": 44,
+            "Count": 448,
+            "ElapsedMs": 1.478476,
+            "ProcessorTimeMs": null
+          }
+        ],
+        "Output": {
+          "CommittedSinkCount": 0,
+          "FailedSinkCount": 0,
+          "StagedSinkCount": 0,
+          "UncommittedSinkCount": 0,
+          "OutputFailed": false
+        },
+        "Measurements": {
+          "PeakWorkingSetBytes": null,
+          "AllocatedBytesTotal": null,
+          "CycleRecorder": {
+            "InvocationCount": 0,
+            "EnabledInvocationCount": 0,
+            "DisabledInvocationCount": 0,
+            "EmptyEvidenceInvocationCount": 0,
+            "NonEmptyEvidenceInvocationCount": 0,
+            "Vertices": 0,
+            "Edges": 0,
+            "CandidateEvidenceCount": 0,
+            "UniqueCandidateEdgePairs": 0,
+            "EmittedCandidateCount": 0,
+            "ElapsedMs": 0,
+            "ComponentIndexBuildElapsedMs": 0,
+            "CandidateEvaluationElapsedMs": 0,
+            "AllocatedBytes": 0,
+            "ObservationOverheadElapsedMs": 0,
+            "ObservationOverheadAllocatedBytes": 0,
+            "Invocations": []
+          }
+        }
+      },
+      "completion_status": "Success",
+      "exit_code": 0,
+      "output_failed": false,
+      "wall_clock": {
+        "status": "available",
+        "value": 41,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "processor_time": {
+        "status": "available",
+        "value": 42,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "allocated_bytes": {
+        "status": "available",
+        "value": 7979728,
+        "unit": "bytes",
+        "reason": null
+      },
+      "peak_managed_memory": {
+        "status": "unavailable",
+        "value": null,
+        "unit": null,
+        "reason": "Per-invocation peak retained managed memory is not sampled by this in-process harness."
+      },
+      "work_counters": {
+        "instrumentation": "benchmark-work-observer/v1",
+        "project_file_parses": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "source_fact_file_parses": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "method_body_compilation_calls": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "method_body_syntax_trees": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "ast_semantic_lookups": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "layer_membership_probes": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "cel_context_constructions": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        }
+      },
+      "history_work_counters": {
+        "instrumentation": "benchmark-history-work/v1",
+        "line_churn_algorithm_work": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History line-churn analysis."
+        },
+        "task_commit_occurrences_examined": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History bottleneck analysis."
+        },
+        "co_change_edges_assigned": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History co-change analysis."
+        },
+        "ancestry_ancestors_visited": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History ancestry queries."
+        },
+        "ancestry_retained_entries": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not retain History ancestry sets."
+        }
+      },
+      "timing_boundaries": {
+        "contract": "independent-stopwatch-intervals/v1",
+        "fixture_materialization": {
+          "status": "available",
+          "value": 8,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "restore_and_build": {
+          "status": "available",
+          "value": 6839,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "process_host_startup_and_shutdown": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This direct Core harness runs inside the test host; no analyzer child process is started."
+        },
+        "cli_process": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The measured path is the Core runner and does not launch the CLI."
+        },
+        "core_analysis_session": {
+          "status": "available",
+          "value": 41,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "result_publication": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not scale report rules and does not format a SARIF result."
+        },
+        "total_end_to_end": {
+          "status": "unavailable",
+          "value": null,
+          "unit": null,
+          "reason": "Fixture setup is shared across paired observer samples; only this isolated Core interval is attributed per sample."
+        },
+        "profiler_overhead": {
+          "instrumentation": "benchmark-work-observer/v1",
+          "observer_disabled_analysis": {
+            "status": "available",
+            "value": 41,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_enabled_analysis": {
+            "status": "available",
+            "value": 48,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_disabled_allocated_bytes": {
+            "status": "available",
+            "value": 7979728,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_enabled_allocated_bytes": {
+            "status": "available",
+            "value": 7993896,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_disabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-disabled run."
+          },
+          "observer_enabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-enabled run."
+          },
+          "canonical_results_match": true
+        }
+      }
+    },
+    {
+      "run": {
+        "execution_mode": "single_command",
+        "cache_mode": "disabled",
+        "prepared_state_mode": "unprepared",
+        "parallel_mode": "sequential",
+        "sample_ordinal": 2,
+        "is_warm_sample": true
+      },
+      "raw_analysis_profile": {
+        "SchemaId": "analysis-profile/v1",
+        "CompletionStatus": "Success",
+        "CancellationObserved": false,
+        "Counters": {
+          "PolicyCompositions": 1,
+          "ProjectGraphEvaluations": 1,
+          "AssemblyLoads": 8,
+          "DiscoveredProjectCount": 8,
+          "RetainedAssemblyCount": 8,
+          "SelectedAssemblyCount": 8,
+          "ModesEvaluated": 1,
+          "SnapshotMaterializations": 1,
+          "FactIndexMaterializations": 1,
+          "SourceScanPasses": 1,
+          "SourceFilesScanned": 16,
+          "ContractFamilyCounts": {
+            "dependency": 2,
+            "layer": 4,
+            "layer_template": 0,
+            "allow_only": 0,
+            "cycle": 0,
+            "method_body": 0,
+            "asmdef": 0,
+            "independence": 0,
+            "assembly_independence": 0,
+            "assembly_dependency": 0,
+            "assembly_allow_only": 0,
+            "package_dependency": 0,
+            "package_allow_only": 0,
+            "framework_dependency": 0,
+            "framework_allow_only": 0,
+            "project_metadata": 0,
+            "protected": 0,
+            "external": 0,
+            "external_allow_only": 0,
+            "acyclic_sibling": 0,
+            "module_container": 0,
+            "type_placement": 0,
+            "layout_conventions": 1,
+            "layout_convention_applicability": 0,
+            "public_api_surface": 0,
+            "contract_surface_exposure": 0,
+            "versioned_contract_surface_isolation": 0,
+            "attribute_usage": 0,
+            "inheritance": 0,
+            "interface_implementation": 0,
+            "composition": 0,
+            "coverage": 0,
+            "metric_budgets": 0,
+            "context_dependency": 0,
+            "context_allow_only": 0,
+            "port_boundary": 0
+          },
+          "ContractFamilyResultCounts": {
+            "dependency": 0,
+            "layer": 0,
+            "layout_conventions": 0
+          },
+          "RenderedSinkCount": 0,
+          "OutputSinkCount": 0,
+          "Cache": {
+            "Status": "NotApplicable",
+            "Lookups": 0,
+            "Hits": 0,
+            "Misses": 0,
+            "Rejects": 0,
+            "Writes": 0,
+            "BytesRead": 0,
+            "BytesWritten": 0,
+            "IneligibleUnitCount": 0,
+            "CorruptionEvents": 0,
+            "CancelledBeforePublish": 0,
+            "AvoidedAssemblyLoads": 0,
+            "AvoidedFactIndexMaterializations": 0,
+            "AvoidedSourceScanPasses": 0,
+            "AvoidedContractExecutions": 0,
+            "AvoidedArtifactBytesLoaded": 0,
+            "Mode": "disabled",
+            "RejectReasonCounts": {}
+          },
+          "Concurrency": {
+            "Status": "NotApplicable",
+            "MaxParallelism": 0,
+            "ScheduledWorkItems": 0,
+            "CompletedWorkItems": 0,
+            "ObservedMaxConcurrency": 0,
+            "MergeOperations": 0
+          }
+        },
+        "Phases": [
+          {
+            "Name": "root_resolution",
+            "Indent": 1,
+            "Ordinal": 0,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.009
+          },
+          {
+            "Name": "condition_set_resolution",
+            "Indent": 1,
+            "Ordinal": 1,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_resolution",
+            "Indent": 1,
+            "Ordinal": 2,
+            "Count": null,
+            "ElapsedMs": 10,
+            "ProcessorTimeMs": 10.629
+          },
+          {
+            "Name": "configuration_check",
+            "Indent": 0,
+            "Ordinal": 3,
+            "Count": null,
+            "ElapsedMs": 13,
+            "ProcessorTimeMs": 13.375
+          },
+          {
+            "Name": "policy_consistency_check",
+            "Indent": 0,
+            "Ordinal": 4,
+            "Count": null,
+            "ElapsedMs": 3,
+            "ProcessorTimeMs": 4.096
+          },
+          {
+            "Name": "contract_checks",
+            "Indent": 0,
+            "Ordinal": 5,
+            "Count": null,
+            "ElapsedMs": 6,
+            "ProcessorTimeMs": 12.484
+          },
+          {
+            "Name": "dependency",
+            "Indent": 1,
+            "Ordinal": 6,
+            "Count": 2,
+            "ElapsedMs": 1,
+            "ProcessorTimeMs": 2.633
+          },
+          {
+            "Name": "layer",
+            "Indent": 1,
+            "Ordinal": 7,
+            "Count": 4,
+            "ElapsedMs": 4,
+            "ProcessorTimeMs": 8.779
+          },
+          {
+            "Name": "layer_template",
+            "Indent": 1,
+            "Ordinal": 8,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.005
+          },
+          {
+            "Name": "allow_only",
+            "Indent": 1,
+            "Ordinal": 9,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "cycle",
+            "Indent": 1,
+            "Ordinal": 10,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "method_body",
+            "Indent": 1,
+            "Ordinal": 11,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.003
+          },
+          {
+            "Name": "asmdef",
+            "Indent": 1,
+            "Ordinal": 12,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0
+          },
+          {
+            "Name": "independence",
+            "Indent": 1,
+            "Ordinal": 13,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_independence",
+            "Indent": 1,
+            "Ordinal": 14,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_dependency",
+            "Indent": 1,
+            "Ordinal": 15,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_allow_only",
+            "Indent": 1,
+            "Ordinal": 16,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "package_dependency",
+            "Indent": 1,
+            "Ordinal": 17,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "package_allow_only",
+            "Indent": 1,
+            "Ordinal": 18,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_dependency",
+            "Indent": 1,
+            "Ordinal": 19,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_allow_only",
+            "Indent": 1,
+            "Ordinal": 20,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "project_metadata",
+            "Indent": 1,
+            "Ordinal": 21,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "protected",
+            "Indent": 1,
+            "Ordinal": 22,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "external",
+            "Indent": 1,
+            "Ordinal": 23,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "external_allow_only",
+            "Indent": 1,
+            "Ordinal": 24,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "acyclic_sibling",
+            "Indent": 1,
+            "Ordinal": 25,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "module_container",
+            "Indent": 1,
+            "Ordinal": 26,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.008
+          },
+          {
+            "Name": "type_placement",
+            "Indent": 1,
+            "Ordinal": 27,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "layout_conventions",
+            "Indent": 1,
+            "Ordinal": 28,
+            "Count": 1,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.348
+          },
+          {
+            "Name": "layout_convention_applicability",
+            "Indent": 1,
+            "Ordinal": 29,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "public_api_surface",
+            "Indent": 1,
+            "Ordinal": 30,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "contract_surface_exposure",
+            "Indent": 1,
+            "Ordinal": 31,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "versioned_contract_surface_isolation",
+            "Indent": 1,
+            "Ordinal": 32,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "attribute_usage",
+            "Indent": 1,
+            "Ordinal": 33,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "inheritance",
+            "Indent": 1,
+            "Ordinal": 34,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "interface_implementation",
+            "Indent": 1,
+            "Ordinal": 35,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "composition",
+            "Indent": 1,
+            "Ordinal": 36,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "coverage",
+            "Indent": 1,
+            "Ordinal": 37,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "metric_budgets",
+            "Indent": 1,
+            "Ordinal": 38,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "context_dependency",
+            "Indent": 1,
+            "Ordinal": 39,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "context_allow_only",
+            "Indent": 1,
+            "Ordinal": 40,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "port_boundary",
+            "Indent": 1,
+            "Ordinal": 41,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "post_processing",
+            "Indent": 0,
+            "Ordinal": 42,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "repository_metrics",
+            "Indent": 0,
+            "Ordinal": 43,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.108
+          },
+          {
+            "Name": "selector_predicate_evaluation",
+            "Indent": 1,
+            "Ordinal": 44,
+            "Count": 448,
+            "ElapsedMs": 1.381292,
+            "ProcessorTimeMs": null
+          }
+        ],
+        "Output": {
+          "CommittedSinkCount": 0,
+          "FailedSinkCount": 0,
+          "StagedSinkCount": 0,
+          "UncommittedSinkCount": 0,
+          "OutputFailed": false
+        },
+        "Measurements": {
+          "PeakWorkingSetBytes": null,
+          "AllocatedBytesTotal": null,
+          "CycleRecorder": {
+            "InvocationCount": 0,
+            "EnabledInvocationCount": 0,
+            "DisabledInvocationCount": 0,
+            "EmptyEvidenceInvocationCount": 0,
+            "NonEmptyEvidenceInvocationCount": 0,
+            "Vertices": 0,
+            "Edges": 0,
+            "CandidateEvidenceCount": 0,
+            "UniqueCandidateEdgePairs": 0,
+            "EmittedCandidateCount": 0,
+            "ElapsedMs": 0,
+            "ComponentIndexBuildElapsedMs": 0,
+            "CandidateEvaluationElapsedMs": 0,
+            "AllocatedBytes": 0,
+            "ObservationOverheadElapsedMs": 0,
+            "ObservationOverheadAllocatedBytes": 0,
+            "Invocations": []
+          }
+        }
+      },
+      "completion_status": "Success",
+      "exit_code": 0,
+      "output_failed": false,
+      "wall_clock": {
+        "status": "available",
+        "value": 48,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "processor_time": {
+        "status": "available",
+        "value": 55,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "allocated_bytes": {
+        "status": "available",
+        "value": 7993896,
+        "unit": "bytes",
+        "reason": null
+      },
+      "peak_managed_memory": {
+        "status": "unavailable",
+        "value": null,
+        "unit": null,
+        "reason": "Per-invocation peak retained managed memory is not sampled by this in-process harness."
+      },
+      "work_counters": {
+        "instrumentation": "benchmark-work-observer/v1",
+        "project_file_parses": {
+          "status": "available",
+          "value": 8,
+          "unit": "operations",
+          "reason": null
+        },
+        "source_fact_file_parses": {
+          "status": "available",
+          "value": 16,
+          "unit": "operations",
+          "reason": null
+        },
+        "method_body_compilation_calls": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "method_body_syntax_trees": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "ast_semantic_lookups": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "layer_membership_probes": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "cel_context_constructions": {
+          "status": "available",
+          "value": 448,
+          "unit": "operations",
+          "reason": null
+        }
+      },
+      "history_work_counters": {
+        "instrumentation": "benchmark-history-work/v1",
+        "line_churn_algorithm_work": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History line-churn analysis."
+        },
+        "task_commit_occurrences_examined": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History bottleneck analysis."
+        },
+        "co_change_edges_assigned": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History co-change analysis."
+        },
+        "ancestry_ancestors_visited": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History ancestry queries."
+        },
+        "ancestry_retained_entries": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not retain History ancestry sets."
+        }
+      },
+      "timing_boundaries": {
+        "contract": "independent-stopwatch-intervals/v1",
+        "fixture_materialization": {
+          "status": "available",
+          "value": 8,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "restore_and_build": {
+          "status": "available",
+          "value": 6839,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "process_host_startup_and_shutdown": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This direct Core harness runs inside the test host; no analyzer child process is started."
+        },
+        "cli_process": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The measured path is the Core runner and does not launch the CLI."
+        },
+        "core_analysis_session": {
+          "status": "available",
+          "value": 48,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "result_publication": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not scale report rules and does not format a SARIF result."
+        },
+        "total_end_to_end": {
+          "status": "unavailable",
+          "value": null,
+          "unit": null,
+          "reason": "Fixture setup is shared across paired observer samples; only this isolated Core interval is attributed per sample."
+        },
+        "profiler_overhead": {
+          "instrumentation": "benchmark-work-observer/v1",
+          "observer_disabled_analysis": {
+            "status": "available",
+            "value": 41,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_enabled_analysis": {
+            "status": "available",
+            "value": 48,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_disabled_allocated_bytes": {
+            "status": "available",
+            "value": 7979728,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_enabled_allocated_bytes": {
+            "status": "available",
+            "value": 7993896,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_disabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-disabled run."
+          },
+          "observer_enabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-enabled run."
+          },
+          "canonical_results_match": true
+        }
+      }
+    },
+    {
+      "run": {
+        "execution_mode": "single_command",
+        "cache_mode": "disabled",
+        "prepared_state_mode": "unprepared",
+        "parallel_mode": "sequential",
+        "sample_ordinal": 3,
+        "is_warm_sample": true
+      },
+      "raw_analysis_profile": {
+        "SchemaId": "analysis-profile/v1",
+        "CompletionStatus": "Success",
+        "CancellationObserved": false,
+        "Counters": {
+          "PolicyCompositions": 1,
+          "ProjectGraphEvaluations": 1,
+          "AssemblyLoads": 8,
+          "DiscoveredProjectCount": 8,
+          "RetainedAssemblyCount": 8,
+          "SelectedAssemblyCount": 8,
+          "ModesEvaluated": 1,
+          "SnapshotMaterializations": 1,
+          "FactIndexMaterializations": 1,
+          "SourceScanPasses": 1,
+          "SourceFilesScanned": 16,
+          "ContractFamilyCounts": {
+            "dependency": 2,
+            "layer": 4,
+            "layer_template": 0,
+            "allow_only": 0,
+            "cycle": 0,
+            "method_body": 0,
+            "asmdef": 0,
+            "independence": 0,
+            "assembly_independence": 0,
+            "assembly_dependency": 0,
+            "assembly_allow_only": 0,
+            "package_dependency": 0,
+            "package_allow_only": 0,
+            "framework_dependency": 0,
+            "framework_allow_only": 0,
+            "project_metadata": 0,
+            "protected": 0,
+            "external": 0,
+            "external_allow_only": 0,
+            "acyclic_sibling": 0,
+            "module_container": 0,
+            "type_placement": 0,
+            "layout_conventions": 1,
+            "layout_convention_applicability": 0,
+            "public_api_surface": 0,
+            "contract_surface_exposure": 0,
+            "versioned_contract_surface_isolation": 0,
+            "attribute_usage": 0,
+            "inheritance": 0,
+            "interface_implementation": 0,
+            "composition": 0,
+            "coverage": 0,
+            "metric_budgets": 0,
+            "context_dependency": 0,
+            "context_allow_only": 0,
+            "port_boundary": 0
+          },
+          "ContractFamilyResultCounts": {
+            "dependency": 0,
+            "layer": 0,
+            "layout_conventions": 0
+          },
+          "RenderedSinkCount": 0,
+          "OutputSinkCount": 0,
+          "Cache": {
+            "Status": "NotApplicable",
+            "Lookups": 0,
+            "Hits": 0,
+            "Misses": 0,
+            "Rejects": 0,
+            "Writes": 0,
+            "BytesRead": 0,
+            "BytesWritten": 0,
+            "IneligibleUnitCount": 0,
+            "CorruptionEvents": 0,
+            "CancelledBeforePublish": 0,
+            "AvoidedAssemblyLoads": 0,
+            "AvoidedFactIndexMaterializations": 0,
+            "AvoidedSourceScanPasses": 0,
+            "AvoidedContractExecutions": 0,
+            "AvoidedArtifactBytesLoaded": 0,
+            "Mode": "disabled",
+            "RejectReasonCounts": {}
+          },
+          "Concurrency": {
+            "Status": "NotApplicable",
+            "MaxParallelism": 0,
+            "ScheduledWorkItems": 0,
+            "CompletedWorkItems": 0,
+            "ObservedMaxConcurrency": 0,
+            "MergeOperations": 0
+          }
+        },
+        "Phases": [
+          {
+            "Name": "root_resolution",
+            "Indent": 1,
+            "Ordinal": 0,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.009
+          },
+          {
+            "Name": "condition_set_resolution",
+            "Indent": 1,
+            "Ordinal": 1,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_resolution",
+            "Indent": 1,
+            "Ordinal": 2,
+            "Count": null,
+            "ElapsedMs": 10,
+            "ProcessorTimeMs": 10.218
+          },
+          {
+            "Name": "configuration_check",
+            "Indent": 0,
+            "Ordinal": 3,
+            "Count": null,
+            "ElapsedMs": 9,
+            "ProcessorTimeMs": 9.036
+          },
+          {
+            "Name": "policy_consistency_check",
+            "Indent": 0,
+            "Ordinal": 4,
+            "Count": null,
+            "ElapsedMs": 4,
+            "ProcessorTimeMs": 4.383
+          },
+          {
+            "Name": "contract_checks",
+            "Indent": 0,
+            "Ordinal": 5,
+            "Count": null,
+            "ElapsedMs": 3,
+            "ProcessorTimeMs": 3.824
+          },
+          {
+            "Name": "dependency",
+            "Indent": 1,
+            "Ordinal": 6,
+            "Count": 2,
+            "ElapsedMs": 1,
+            "ProcessorTimeMs": 1.242
+          },
+          {
+            "Name": "layer",
+            "Indent": 1,
+            "Ordinal": 7,
+            "Count": 4,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.378
+          },
+          {
+            "Name": "layer_template",
+            "Indent": 1,
+            "Ordinal": 8,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "allow_only",
+            "Indent": 1,
+            "Ordinal": 9,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "cycle",
+            "Indent": 1,
+            "Ordinal": 10,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "method_body",
+            "Indent": 1,
+            "Ordinal": 11,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "asmdef",
+            "Indent": 1,
+            "Ordinal": 12,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "independence",
+            "Indent": 1,
+            "Ordinal": 13,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_independence",
+            "Indent": 1,
+            "Ordinal": 14,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_dependency",
+            "Indent": 1,
+            "Ordinal": 15,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_allow_only",
+            "Indent": 1,
+            "Ordinal": 16,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "package_dependency",
+            "Indent": 1,
+            "Ordinal": 17,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_allow_only",
+            "Indent": 1,
+            "Ordinal": 18,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_dependency",
+            "Indent": 1,
+            "Ordinal": 19,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "framework_allow_only",
+            "Indent": 1,
+            "Ordinal": 20,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "project_metadata",
+            "Indent": 1,
+            "Ordinal": 21,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "protected",
+            "Indent": 1,
+            "Ordinal": 22,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "external",
+            "Indent": 1,
+            "Ordinal": 23,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "external_allow_only",
+            "Indent": 1,
+            "Ordinal": 24,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "acyclic_sibling",
+            "Indent": 1,
+            "Ordinal": 25,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "module_container",
+            "Indent": 1,
+            "Ordinal": 26,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "type_placement",
+            "Indent": 1,
+            "Ordinal": 27,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "layout_conventions",
+            "Indent": 1,
+            "Ordinal": 28,
+            "Count": 1,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.083
+          },
+          {
+            "Name": "layout_convention_applicability",
+            "Indent": 1,
+            "Ordinal": 29,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "public_api_surface",
+            "Indent": 1,
+            "Ordinal": 30,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "contract_surface_exposure",
+            "Indent": 1,
+            "Ordinal": 31,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "versioned_contract_surface_isolation",
+            "Indent": 1,
+            "Ordinal": 32,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "attribute_usage",
+            "Indent": 1,
+            "Ordinal": 33,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "inheritance",
+            "Indent": 1,
+            "Ordinal": 34,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "interface_implementation",
+            "Indent": 1,
+            "Ordinal": 35,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "composition",
+            "Indent": 1,
+            "Ordinal": 36,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "coverage",
+            "Indent": 1,
+            "Ordinal": 37,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "metric_budgets",
+            "Indent": 1,
+            "Ordinal": 38,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.004
+          },
+          {
+            "Name": "context_dependency",
+            "Indent": 1,
+            "Ordinal": 39,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "context_allow_only",
+            "Indent": 1,
+            "Ordinal": 40,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "port_boundary",
+            "Indent": 1,
+            "Ordinal": 41,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "post_processing",
+            "Indent": 0,
+            "Ordinal": 42,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "repository_metrics",
+            "Indent": 0,
+            "Ordinal": 43,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.092
+          },
+          {
+            "Name": "selector_predicate_evaluation",
+            "Indent": 1,
+            "Ordinal": 44,
+            "Count": 448,
+            "ElapsedMs": 0.987179,
+            "ProcessorTimeMs": null
+          }
+        ],
+        "Output": {
+          "CommittedSinkCount": 0,
+          "FailedSinkCount": 0,
+          "StagedSinkCount": 0,
+          "UncommittedSinkCount": 0,
+          "OutputFailed": false
+        },
+        "Measurements": {
+          "PeakWorkingSetBytes": null,
+          "AllocatedBytesTotal": null,
+          "CycleRecorder": {
+            "InvocationCount": 0,
+            "EnabledInvocationCount": 0,
+            "DisabledInvocationCount": 0,
+            "EmptyEvidenceInvocationCount": 0,
+            "NonEmptyEvidenceInvocationCount": 0,
+            "Vertices": 0,
+            "Edges": 0,
+            "CandidateEvidenceCount": 0,
+            "UniqueCandidateEdgePairs": 0,
+            "EmittedCandidateCount": 0,
+            "ElapsedMs": 0,
+            "ComponentIndexBuildElapsedMs": 0,
+            "CandidateEvaluationElapsedMs": 0,
+            "AllocatedBytes": 0,
+            "ObservationOverheadElapsedMs": 0,
+            "ObservationOverheadAllocatedBytes": 0,
+            "Invocations": []
+          }
+        }
+      },
+      "completion_status": "Success",
+      "exit_code": 0,
+      "output_failed": false,
+      "wall_clock": {
+        "status": "available",
+        "value": 42,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "processor_time": {
+        "status": "available",
+        "value": 42,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "allocated_bytes": {
+        "status": "available",
+        "value": 8260696,
+        "unit": "bytes",
+        "reason": null
+      },
+      "peak_managed_memory": {
+        "status": "unavailable",
+        "value": null,
+        "unit": null,
+        "reason": "Per-invocation peak retained managed memory is not sampled by this in-process harness."
+      },
+      "work_counters": {
+        "instrumentation": "benchmark-work-observer/v1",
+        "project_file_parses": {
+          "status": "available",
+          "value": 8,
+          "unit": "operations",
+          "reason": null
+        },
+        "source_fact_file_parses": {
+          "status": "available",
+          "value": 16,
+          "unit": "operations",
+          "reason": null
+        },
+        "method_body_compilation_calls": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "method_body_syntax_trees": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "ast_semantic_lookups": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "layer_membership_probes": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "cel_context_constructions": {
+          "status": "available",
+          "value": 448,
+          "unit": "operations",
+          "reason": null
+        }
+      },
+      "history_work_counters": {
+        "instrumentation": "benchmark-history-work/v1",
+        "line_churn_algorithm_work": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History line-churn analysis."
+        },
+        "task_commit_occurrences_examined": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History bottleneck analysis."
+        },
+        "co_change_edges_assigned": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History co-change analysis."
+        },
+        "ancestry_ancestors_visited": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History ancestry queries."
+        },
+        "ancestry_retained_entries": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not retain History ancestry sets."
+        }
+      },
+      "timing_boundaries": {
+        "contract": "independent-stopwatch-intervals/v1",
+        "fixture_materialization": {
+          "status": "available",
+          "value": 8,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "restore_and_build": {
+          "status": "available",
+          "value": 6839,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "process_host_startup_and_shutdown": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This direct Core harness runs inside the test host; no analyzer child process is started."
+        },
+        "cli_process": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The measured path is the Core runner and does not launch the CLI."
+        },
+        "core_analysis_session": {
+          "status": "available",
+          "value": 42,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "result_publication": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not scale report rules and does not format a SARIF result."
+        },
+        "total_end_to_end": {
+          "status": "unavailable",
+          "value": null,
+          "unit": null,
+          "reason": "Fixture setup is shared across paired observer samples; only this isolated Core interval is attributed per sample."
+        },
+        "profiler_overhead": {
+          "instrumentation": "benchmark-work-observer/v1",
+          "observer_disabled_analysis": {
+            "status": "available",
+            "value": 40,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_enabled_analysis": {
+            "status": "available",
+            "value": 42,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_disabled_allocated_bytes": {
+            "status": "available",
+            "value": 8157984,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_enabled_allocated_bytes": {
+            "status": "available",
+            "value": 8260696,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_disabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-disabled run."
+          },
+          "observer_enabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-enabled run."
+          },
+          "canonical_results_match": true
+        }
+      }
+    },
+    {
+      "run": {
+        "execution_mode": "single_command",
+        "cache_mode": "disabled",
+        "prepared_state_mode": "unprepared",
+        "parallel_mode": "sequential",
+        "sample_ordinal": 4,
+        "is_warm_sample": true
+      },
+      "raw_analysis_profile": {
+        "SchemaId": "analysis-profile/v1",
+        "CompletionStatus": "Success",
+        "CancellationObserved": false,
+        "Counters": {
+          "PolicyCompositions": 1,
+          "ProjectGraphEvaluations": 1,
+          "AssemblyLoads": 8,
+          "DiscoveredProjectCount": 8,
+          "RetainedAssemblyCount": 8,
+          "SelectedAssemblyCount": 8,
+          "ModesEvaluated": 1,
+          "SnapshotMaterializations": 1,
+          "FactIndexMaterializations": 1,
+          "SourceScanPasses": 1,
+          "SourceFilesScanned": 16,
+          "ContractFamilyCounts": {
+            "dependency": 2,
+            "layer": 4,
+            "layer_template": 0,
+            "allow_only": 0,
+            "cycle": 0,
+            "method_body": 0,
+            "asmdef": 0,
+            "independence": 0,
+            "assembly_independence": 0,
+            "assembly_dependency": 0,
+            "assembly_allow_only": 0,
+            "package_dependency": 0,
+            "package_allow_only": 0,
+            "framework_dependency": 0,
+            "framework_allow_only": 0,
+            "project_metadata": 0,
+            "protected": 0,
+            "external": 0,
+            "external_allow_only": 0,
+            "acyclic_sibling": 0,
+            "module_container": 0,
+            "type_placement": 0,
+            "layout_conventions": 1,
+            "layout_convention_applicability": 0,
+            "public_api_surface": 0,
+            "contract_surface_exposure": 0,
+            "versioned_contract_surface_isolation": 0,
+            "attribute_usage": 0,
+            "inheritance": 0,
+            "interface_implementation": 0,
+            "composition": 0,
+            "coverage": 0,
+            "metric_budgets": 0,
+            "context_dependency": 0,
+            "context_allow_only": 0,
+            "port_boundary": 0
+          },
+          "ContractFamilyResultCounts": {
+            "dependency": 0,
+            "layer": 0,
+            "layout_conventions": 0
+          },
+          "RenderedSinkCount": 0,
+          "OutputSinkCount": 0,
+          "Cache": {
+            "Status": "NotApplicable",
+            "Lookups": 0,
+            "Hits": 0,
+            "Misses": 0,
+            "Rejects": 0,
+            "Writes": 0,
+            "BytesRead": 0,
+            "BytesWritten": 0,
+            "IneligibleUnitCount": 0,
+            "CorruptionEvents": 0,
+            "CancelledBeforePublish": 0,
+            "AvoidedAssemblyLoads": 0,
+            "AvoidedFactIndexMaterializations": 0,
+            "AvoidedSourceScanPasses": 0,
+            "AvoidedContractExecutions": 0,
+            "AvoidedArtifactBytesLoaded": 0,
+            "Mode": "disabled",
+            "RejectReasonCounts": {}
+          },
+          "Concurrency": {
+            "Status": "NotApplicable",
+            "MaxParallelism": 0,
+            "ScheduledWorkItems": 0,
+            "CompletedWorkItems": 0,
+            "ObservedMaxConcurrency": 0,
+            "MergeOperations": 0
+          }
+        },
+        "Phases": [
+          {
+            "Name": "root_resolution",
+            "Indent": 1,
+            "Ordinal": 0,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.008
+          },
+          {
+            "Name": "condition_set_resolution",
+            "Indent": 1,
+            "Ordinal": 1,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_resolution",
+            "Indent": 1,
+            "Ordinal": 2,
+            "Count": null,
+            "ElapsedMs": 9,
+            "ProcessorTimeMs": 10.001
+          },
+          {
+            "Name": "configuration_check",
+            "Indent": 0,
+            "Ordinal": 3,
+            "Count": null,
+            "ElapsedMs": 9,
+            "ProcessorTimeMs": 9.019
+          },
+          {
+            "Name": "policy_consistency_check",
+            "Indent": 0,
+            "Ordinal": 4,
+            "Count": null,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.768
+          },
+          {
+            "Name": "contract_checks",
+            "Indent": 0,
+            "Ordinal": 5,
+            "Count": null,
+            "ElapsedMs": 5,
+            "ProcessorTimeMs": 5.283
+          },
+          {
+            "Name": "dependency",
+            "Indent": 1,
+            "Ordinal": 6,
+            "Count": 2,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.734
+          },
+          {
+            "Name": "layer",
+            "Indent": 1,
+            "Ordinal": 7,
+            "Count": 4,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.341
+          },
+          {
+            "Name": "layer_template",
+            "Indent": 1,
+            "Ordinal": 8,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "allow_only",
+            "Indent": 1,
+            "Ordinal": 9,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "cycle",
+            "Indent": 1,
+            "Ordinal": 10,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "method_body",
+            "Indent": 1,
+            "Ordinal": 11,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "asmdef",
+            "Indent": 1,
+            "Ordinal": 12,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "independence",
+            "Indent": 1,
+            "Ordinal": 13,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_independence",
+            "Indent": 1,
+            "Ordinal": 14,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_dependency",
+            "Indent": 1,
+            "Ordinal": 15,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_allow_only",
+            "Indent": 1,
+            "Ordinal": 16,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "package_dependency",
+            "Indent": 1,
+            "Ordinal": 17,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_allow_only",
+            "Indent": 1,
+            "Ordinal": 18,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_dependency",
+            "Indent": 1,
+            "Ordinal": 19,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_allow_only",
+            "Indent": 1,
+            "Ordinal": 20,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "project_metadata",
+            "Indent": 1,
+            "Ordinal": 21,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "protected",
+            "Indent": 1,
+            "Ordinal": 22,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "external",
+            "Indent": 1,
+            "Ordinal": 23,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "external_allow_only",
+            "Indent": 1,
+            "Ordinal": 24,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "acyclic_sibling",
+            "Indent": 1,
+            "Ordinal": 25,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "module_container",
+            "Indent": 1,
+            "Ordinal": 26,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "type_placement",
+            "Indent": 1,
+            "Ordinal": 27,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "layout_conventions",
+            "Indent": 1,
+            "Ordinal": 28,
+            "Count": 1,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.086
+          },
+          {
+            "Name": "layout_convention_applicability",
+            "Indent": 1,
+            "Ordinal": 29,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "public_api_surface",
+            "Indent": 1,
+            "Ordinal": 30,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "contract_surface_exposure",
+            "Indent": 1,
+            "Ordinal": 31,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "versioned_contract_surface_isolation",
+            "Indent": 1,
+            "Ordinal": 32,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "attribute_usage",
+            "Indent": 1,
+            "Ordinal": 33,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "inheritance",
+            "Indent": 1,
+            "Ordinal": 34,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "interface_implementation",
+            "Indent": 1,
+            "Ordinal": 35,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "composition",
+            "Indent": 1,
+            "Ordinal": 36,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "coverage",
+            "Indent": 1,
+            "Ordinal": 37,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "metric_budgets",
+            "Indent": 1,
+            "Ordinal": 38,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.003
+          },
+          {
+            "Name": "context_dependency",
+            "Indent": 1,
+            "Ordinal": 39,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "context_allow_only",
+            "Indent": 1,
+            "Ordinal": 40,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "port_boundary",
+            "Indent": 1,
+            "Ordinal": 41,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "post_processing",
+            "Indent": 0,
+            "Ordinal": 42,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "repository_metrics",
+            "Indent": 0,
+            "Ordinal": 43,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.084
+          },
+          {
+            "Name": "selector_predicate_evaluation",
+            "Indent": 1,
+            "Ordinal": 44,
+            "Count": 448,
+            "ElapsedMs": 1.011208,
+            "ProcessorTimeMs": null
+          }
+        ],
+        "Output": {
+          "CommittedSinkCount": 0,
+          "FailedSinkCount": 0,
+          "StagedSinkCount": 0,
+          "UncommittedSinkCount": 0,
+          "OutputFailed": false
+        },
+        "Measurements": {
+          "PeakWorkingSetBytes": null,
+          "AllocatedBytesTotal": null,
+          "CycleRecorder": {
+            "InvocationCount": 0,
+            "EnabledInvocationCount": 0,
+            "DisabledInvocationCount": 0,
+            "EmptyEvidenceInvocationCount": 0,
+            "NonEmptyEvidenceInvocationCount": 0,
+            "Vertices": 0,
+            "Edges": 0,
+            "CandidateEvidenceCount": 0,
+            "UniqueCandidateEdgePairs": 0,
+            "EmittedCandidateCount": 0,
+            "ElapsedMs": 0,
+            "ComponentIndexBuildElapsedMs": 0,
+            "CandidateEvaluationElapsedMs": 0,
+            "AllocatedBytes": 0,
+            "ObservationOverheadElapsedMs": 0,
+            "ObservationOverheadAllocatedBytes": 0,
+            "Invocations": []
+          }
+        }
+      },
+      "completion_status": "Success",
+      "exit_code": 0,
+      "output_failed": false,
+      "wall_clock": {
+        "status": "available",
+        "value": 40,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "processor_time": {
+        "status": "available",
+        "value": 40,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "allocated_bytes": {
+        "status": "available",
+        "value": 8157984,
+        "unit": "bytes",
+        "reason": null
+      },
+      "peak_managed_memory": {
+        "status": "unavailable",
+        "value": null,
+        "unit": null,
+        "reason": "Per-invocation peak retained managed memory is not sampled by this in-process harness."
+      },
+      "work_counters": {
+        "instrumentation": "benchmark-work-observer/v1",
+        "project_file_parses": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "source_fact_file_parses": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "method_body_compilation_calls": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "method_body_syntax_trees": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "ast_semantic_lookups": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "layer_membership_probes": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "cel_context_constructions": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        }
+      },
+      "history_work_counters": {
+        "instrumentation": "benchmark-history-work/v1",
+        "line_churn_algorithm_work": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History line-churn analysis."
+        },
+        "task_commit_occurrences_examined": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History bottleneck analysis."
+        },
+        "co_change_edges_assigned": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History co-change analysis."
+        },
+        "ancestry_ancestors_visited": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History ancestry queries."
+        },
+        "ancestry_retained_entries": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not retain History ancestry sets."
+        }
+      },
+      "timing_boundaries": {
+        "contract": "independent-stopwatch-intervals/v1",
+        "fixture_materialization": {
+          "status": "available",
+          "value": 8,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "restore_and_build": {
+          "status": "available",
+          "value": 6839,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "process_host_startup_and_shutdown": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This direct Core harness runs inside the test host; no analyzer child process is started."
+        },
+        "cli_process": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The measured path is the Core runner and does not launch the CLI."
+        },
+        "core_analysis_session": {
+          "status": "available",
+          "value": 40,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "result_publication": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not scale report rules and does not format a SARIF result."
+        },
+        "total_end_to_end": {
+          "status": "unavailable",
+          "value": null,
+          "unit": null,
+          "reason": "Fixture setup is shared across paired observer samples; only this isolated Core interval is attributed per sample."
+        },
+        "profiler_overhead": {
+          "instrumentation": "benchmark-work-observer/v1",
+          "observer_disabled_analysis": {
+            "status": "available",
+            "value": 40,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_enabled_analysis": {
+            "status": "available",
+            "value": 42,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_disabled_allocated_bytes": {
+            "status": "available",
+            "value": 8157984,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_enabled_allocated_bytes": {
+            "status": "available",
+            "value": 8260696,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_disabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-disabled run."
+          },
+          "observer_enabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-enabled run."
+          },
+          "canonical_results_match": true
+        }
+      }
+    },
+    {
+      "run": {
+        "execution_mode": "single_command",
+        "cache_mode": "disabled",
+        "prepared_state_mode": "unprepared",
+        "parallel_mode": "bounded-6",
+        "sample_ordinal": 5,
+        "is_warm_sample": true
+      },
+      "raw_analysis_profile": {
+        "SchemaId": "analysis-profile/v1",
+        "CompletionStatus": "Success",
+        "CancellationObserved": false,
+        "Counters": {
+          "PolicyCompositions": 1,
+          "ProjectGraphEvaluations": 1,
+          "AssemblyLoads": 8,
+          "DiscoveredProjectCount": 8,
+          "RetainedAssemblyCount": 8,
+          "SelectedAssemblyCount": 8,
+          "ModesEvaluated": 1,
+          "SnapshotMaterializations": 1,
+          "FactIndexMaterializations": 1,
+          "SourceScanPasses": 1,
+          "SourceFilesScanned": 16,
+          "ContractFamilyCounts": {
+            "dependency": 2,
+            "layer": 4,
+            "layer_template": 0,
+            "allow_only": 0,
+            "cycle": 0,
+            "method_body": 0,
+            "asmdef": 0,
+            "independence": 0,
+            "assembly_independence": 0,
+            "assembly_dependency": 0,
+            "assembly_allow_only": 0,
+            "package_dependency": 0,
+            "package_allow_only": 0,
+            "framework_dependency": 0,
+            "framework_allow_only": 0,
+            "project_metadata": 0,
+            "protected": 0,
+            "external": 0,
+            "external_allow_only": 0,
+            "acyclic_sibling": 0,
+            "module_container": 0,
+            "type_placement": 0,
+            "layout_conventions": 1,
+            "layout_convention_applicability": 0,
+            "public_api_surface": 0,
+            "contract_surface_exposure": 0,
+            "versioned_contract_surface_isolation": 0,
+            "attribute_usage": 0,
+            "inheritance": 0,
+            "interface_implementation": 0,
+            "composition": 0,
+            "coverage": 0,
+            "metric_budgets": 0,
+            "context_dependency": 0,
+            "context_allow_only": 0,
+            "port_boundary": 0
+          },
+          "ContractFamilyResultCounts": {
+            "dependency": 0,
+            "layer": 0,
+            "layout_conventions": 0
+          },
+          "RenderedSinkCount": 0,
+          "OutputSinkCount": 0,
+          "Cache": {
+            "Status": "NotApplicable",
+            "Lookups": 0,
+            "Hits": 0,
+            "Misses": 0,
+            "Rejects": 0,
+            "Writes": 0,
+            "BytesRead": 0,
+            "BytesWritten": 0,
+            "IneligibleUnitCount": 0,
+            "CorruptionEvents": 0,
+            "CancelledBeforePublish": 0,
+            "AvoidedAssemblyLoads": 0,
+            "AvoidedFactIndexMaterializations": 0,
+            "AvoidedSourceScanPasses": 0,
+            "AvoidedContractExecutions": 0,
+            "AvoidedArtifactBytesLoaded": 0,
+            "Mode": "disabled",
+            "RejectReasonCounts": {}
+          },
+          "Concurrency": {
+            "Status": "Active",
+            "MaxParallelism": 6,
+            "ScheduledWorkItems": 24,
+            "CompletedWorkItems": 24,
+            "ObservedMaxConcurrency": 6,
+            "MergeOperations": 3
+          }
+        },
+        "Phases": [
+          {
+            "Name": "root_resolution",
+            "Indent": 1,
+            "Ordinal": 0,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.01
+          },
+          {
+            "Name": "condition_set_resolution",
+            "Indent": 1,
+            "Ordinal": 1,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_resolution",
+            "Indent": 1,
+            "Ordinal": 2,
+            "Count": null,
+            "ElapsedMs": 10,
+            "ProcessorTimeMs": 20.175
+          },
+          {
+            "Name": "configuration_check",
+            "Indent": 0,
+            "Ordinal": 3,
+            "Count": null,
+            "ElapsedMs": 11,
+            "ProcessorTimeMs": 20.883
+          },
+          {
+            "Name": "policy_consistency_check",
+            "Indent": 0,
+            "Ordinal": 4,
+            "Count": null,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.79
+          },
+          {
+            "Name": "contract_checks",
+            "Indent": 0,
+            "Ordinal": 5,
+            "Count": null,
+            "ElapsedMs": 3,
+            "ProcessorTimeMs": 3.872
+          },
+          {
+            "Name": "dependency",
+            "Indent": 1,
+            "Ordinal": 6,
+            "Count": 2,
+            "ElapsedMs": 1,
+            "ProcessorTimeMs": 1.213
+          },
+          {
+            "Name": "layer",
+            "Indent": 1,
+            "Ordinal": 7,
+            "Count": 4,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.425
+          },
+          {
+            "Name": "layer_template",
+            "Indent": 1,
+            "Ordinal": 8,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "allow_only",
+            "Indent": 1,
+            "Ordinal": 9,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "cycle",
+            "Indent": 1,
+            "Ordinal": 10,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "method_body",
+            "Indent": 1,
+            "Ordinal": 11,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "asmdef",
+            "Indent": 1,
+            "Ordinal": 12,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "independence",
+            "Indent": 1,
+            "Ordinal": 13,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_independence",
+            "Indent": 1,
+            "Ordinal": 14,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_dependency",
+            "Indent": 1,
+            "Ordinal": 15,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_allow_only",
+            "Indent": 1,
+            "Ordinal": 16,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_dependency",
+            "Indent": 1,
+            "Ordinal": 17,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_allow_only",
+            "Indent": 1,
+            "Ordinal": 18,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_dependency",
+            "Indent": 1,
+            "Ordinal": 19,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "framework_allow_only",
+            "Indent": 1,
+            "Ordinal": 20,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.01
+          },
+          {
+            "Name": "project_metadata",
+            "Indent": 1,
+            "Ordinal": 21,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "protected",
+            "Indent": 1,
+            "Ordinal": 22,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "external",
+            "Indent": 1,
+            "Ordinal": 23,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0
+          },
+          {
+            "Name": "external_allow_only",
+            "Indent": 1,
+            "Ordinal": 24,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "acyclic_sibling",
+            "Indent": 1,
+            "Ordinal": 25,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "module_container",
+            "Indent": 1,
+            "Ordinal": 26,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "type_placement",
+            "Indent": 1,
+            "Ordinal": 27,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0
+          },
+          {
+            "Name": "layout_conventions",
+            "Indent": 1,
+            "Ordinal": 28,
+            "Count": 1,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.095
+          },
+          {
+            "Name": "layout_convention_applicability",
+            "Indent": 1,
+            "Ordinal": 29,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "public_api_surface",
+            "Indent": 1,
+            "Ordinal": 30,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "contract_surface_exposure",
+            "Indent": 1,
+            "Ordinal": 31,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "versioned_contract_surface_isolation",
+            "Indent": 1,
+            "Ordinal": 32,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "attribute_usage",
+            "Indent": 1,
+            "Ordinal": 33,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "inheritance",
+            "Indent": 1,
+            "Ordinal": 34,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "interface_implementation",
+            "Indent": 1,
+            "Ordinal": 35,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "composition",
+            "Indent": 1,
+            "Ordinal": 36,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "coverage",
+            "Indent": 1,
+            "Ordinal": 37,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "metric_budgets",
+            "Indent": 1,
+            "Ordinal": 38,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.004
+          },
+          {
+            "Name": "context_dependency",
+            "Indent": 1,
+            "Ordinal": 39,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "context_allow_only",
+            "Indent": 1,
+            "Ordinal": 40,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "port_boundary",
+            "Indent": 1,
+            "Ordinal": 41,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "post_processing",
+            "Indent": 0,
+            "Ordinal": 42,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.006
+          },
+          {
+            "Name": "repository_metrics",
+            "Indent": 0,
+            "Ordinal": 43,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.092
+          },
+          {
+            "Name": "selector_predicate_evaluation",
+            "Indent": 1,
+            "Ordinal": 44,
+            "Count": 448,
+            "ElapsedMs": 0.999513,
+            "ProcessorTimeMs": null
+          }
+        ],
+        "Output": {
+          "CommittedSinkCount": 0,
+          "FailedSinkCount": 0,
+          "StagedSinkCount": 0,
+          "UncommittedSinkCount": 0,
+          "OutputFailed": false
+        },
+        "Measurements": {
+          "PeakWorkingSetBytes": null,
+          "AllocatedBytesTotal": null,
+          "CycleRecorder": {
+            "InvocationCount": 0,
+            "EnabledInvocationCount": 0,
+            "DisabledInvocationCount": 0,
+            "EmptyEvidenceInvocationCount": 0,
+            "NonEmptyEvidenceInvocationCount": 0,
+            "Vertices": 0,
+            "Edges": 0,
+            "CandidateEvidenceCount": 0,
+            "UniqueCandidateEdgePairs": 0,
+            "EmittedCandidateCount": 0,
+            "ElapsedMs": 0,
+            "ComponentIndexBuildElapsedMs": 0,
+            "CandidateEvaluationElapsedMs": 0,
+            "AllocatedBytes": 0,
+            "ObservationOverheadElapsedMs": 0,
+            "ObservationOverheadAllocatedBytes": 0,
+            "Invocations": []
+          }
+        }
+      },
+      "completion_status": "Success",
+      "exit_code": 0,
+      "output_failed": false,
+      "wall_clock": {
+        "status": "available",
+        "value": 40,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "processor_time": {
+        "status": "available",
+        "value": 68,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "allocated_bytes": {
+        "status": "available",
+        "value": 9050840,
+        "unit": "bytes",
+        "reason": null
+      },
+      "peak_managed_memory": {
+        "status": "unavailable",
+        "value": null,
+        "unit": null,
+        "reason": "Per-invocation peak retained managed memory is not sampled by this in-process harness."
+      },
+      "work_counters": {
+        "instrumentation": "benchmark-work-observer/v1",
+        "project_file_parses": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "source_fact_file_parses": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "method_body_compilation_calls": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "method_body_syntax_trees": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "ast_semantic_lookups": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "layer_membership_probes": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "cel_context_constructions": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        }
+      },
+      "history_work_counters": {
+        "instrumentation": "benchmark-history-work/v1",
+        "line_churn_algorithm_work": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History line-churn analysis."
+        },
+        "task_commit_occurrences_examined": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History bottleneck analysis."
+        },
+        "co_change_edges_assigned": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History co-change analysis."
+        },
+        "ancestry_ancestors_visited": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History ancestry queries."
+        },
+        "ancestry_retained_entries": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not retain History ancestry sets."
+        }
+      },
+      "timing_boundaries": {
+        "contract": "independent-stopwatch-intervals/v1",
+        "fixture_materialization": {
+          "status": "available",
+          "value": 8,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "restore_and_build": {
+          "status": "available",
+          "value": 6839,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "process_host_startup_and_shutdown": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This direct Core harness runs inside the test host; no analyzer child process is started."
+        },
+        "cli_process": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The measured path is the Core runner and does not launch the CLI."
+        },
+        "core_analysis_session": {
+          "status": "available",
+          "value": 40,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "result_publication": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not scale report rules and does not format a SARIF result."
+        },
+        "total_end_to_end": {
+          "status": "unavailable",
+          "value": null,
+          "unit": null,
+          "reason": "Fixture setup is shared across paired observer samples; only this isolated Core interval is attributed per sample."
+        },
+        "profiler_overhead": {
+          "instrumentation": "benchmark-work-observer/v1",
+          "observer_disabled_analysis": {
+            "status": "available",
+            "value": 40,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_enabled_analysis": {
+            "status": "available",
+            "value": 39,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_disabled_allocated_bytes": {
+            "status": "available",
+            "value": 9050840,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_enabled_allocated_bytes": {
+            "status": "available",
+            "value": 8256528,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_disabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-disabled run."
+          },
+          "observer_enabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-enabled run."
+          },
+          "canonical_results_match": true
+        }
+      }
+    },
+    {
+      "run": {
+        "execution_mode": "single_command",
+        "cache_mode": "disabled",
+        "prepared_state_mode": "unprepared",
+        "parallel_mode": "bounded-6",
+        "sample_ordinal": 6,
+        "is_warm_sample": true
+      },
+      "raw_analysis_profile": {
+        "SchemaId": "analysis-profile/v1",
+        "CompletionStatus": "Success",
+        "CancellationObserved": false,
+        "Counters": {
+          "PolicyCompositions": 1,
+          "ProjectGraphEvaluations": 1,
+          "AssemblyLoads": 8,
+          "DiscoveredProjectCount": 8,
+          "RetainedAssemblyCount": 8,
+          "SelectedAssemblyCount": 8,
+          "ModesEvaluated": 1,
+          "SnapshotMaterializations": 1,
+          "FactIndexMaterializations": 1,
+          "SourceScanPasses": 1,
+          "SourceFilesScanned": 16,
+          "ContractFamilyCounts": {
+            "dependency": 2,
+            "layer": 4,
+            "layer_template": 0,
+            "allow_only": 0,
+            "cycle": 0,
+            "method_body": 0,
+            "asmdef": 0,
+            "independence": 0,
+            "assembly_independence": 0,
+            "assembly_dependency": 0,
+            "assembly_allow_only": 0,
+            "package_dependency": 0,
+            "package_allow_only": 0,
+            "framework_dependency": 0,
+            "framework_allow_only": 0,
+            "project_metadata": 0,
+            "protected": 0,
+            "external": 0,
+            "external_allow_only": 0,
+            "acyclic_sibling": 0,
+            "module_container": 0,
+            "type_placement": 0,
+            "layout_conventions": 1,
+            "layout_convention_applicability": 0,
+            "public_api_surface": 0,
+            "contract_surface_exposure": 0,
+            "versioned_contract_surface_isolation": 0,
+            "attribute_usage": 0,
+            "inheritance": 0,
+            "interface_implementation": 0,
+            "composition": 0,
+            "coverage": 0,
+            "metric_budgets": 0,
+            "context_dependency": 0,
+            "context_allow_only": 0,
+            "port_boundary": 0
+          },
+          "ContractFamilyResultCounts": {
+            "dependency": 0,
+            "layer": 0,
+            "layout_conventions": 0
+          },
+          "RenderedSinkCount": 0,
+          "OutputSinkCount": 0,
+          "Cache": {
+            "Status": "NotApplicable",
+            "Lookups": 0,
+            "Hits": 0,
+            "Misses": 0,
+            "Rejects": 0,
+            "Writes": 0,
+            "BytesRead": 0,
+            "BytesWritten": 0,
+            "IneligibleUnitCount": 0,
+            "CorruptionEvents": 0,
+            "CancelledBeforePublish": 0,
+            "AvoidedAssemblyLoads": 0,
+            "AvoidedFactIndexMaterializations": 0,
+            "AvoidedSourceScanPasses": 0,
+            "AvoidedContractExecutions": 0,
+            "AvoidedArtifactBytesLoaded": 0,
+            "Mode": "disabled",
+            "RejectReasonCounts": {}
+          },
+          "Concurrency": {
+            "Status": "Active",
+            "MaxParallelism": 6,
+            "ScheduledWorkItems": 24,
+            "CompletedWorkItems": 24,
+            "ObservedMaxConcurrency": 6,
+            "MergeOperations": 3
+          }
+        },
+        "Phases": [
+          {
+            "Name": "root_resolution",
+            "Indent": 1,
+            "Ordinal": 0,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.009
+          },
+          {
+            "Name": "condition_set_resolution",
+            "Indent": 1,
+            "Ordinal": 1,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_resolution",
+            "Indent": 1,
+            "Ordinal": 2,
+            "Count": null,
+            "ElapsedMs": 11,
+            "ProcessorTimeMs": 11.38
+          },
+          {
+            "Name": "configuration_check",
+            "Indent": 0,
+            "Ordinal": 3,
+            "Count": null,
+            "ElapsedMs": 5,
+            "ProcessorTimeMs": 12.671
+          },
+          {
+            "Name": "policy_consistency_check",
+            "Indent": 0,
+            "Ordinal": 4,
+            "Count": null,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.847
+          },
+          {
+            "Name": "contract_checks",
+            "Indent": 0,
+            "Ordinal": 5,
+            "Count": null,
+            "ElapsedMs": 5,
+            "ProcessorTimeMs": 5.375
+          },
+          {
+            "Name": "dependency",
+            "Indent": 1,
+            "Ordinal": 6,
+            "Count": 2,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.718
+          },
+          {
+            "Name": "layer",
+            "Indent": 1,
+            "Ordinal": 7,
+            "Count": 4,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.449
+          },
+          {
+            "Name": "layer_template",
+            "Indent": 1,
+            "Ordinal": 8,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "allow_only",
+            "Indent": 1,
+            "Ordinal": 9,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "cycle",
+            "Indent": 1,
+            "Ordinal": 10,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "method_body",
+            "Indent": 1,
+            "Ordinal": 11,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "asmdef",
+            "Indent": 1,
+            "Ordinal": 12,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "independence",
+            "Indent": 1,
+            "Ordinal": 13,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_independence",
+            "Indent": 1,
+            "Ordinal": 14,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_dependency",
+            "Indent": 1,
+            "Ordinal": 15,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_allow_only",
+            "Indent": 1,
+            "Ordinal": 16,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_dependency",
+            "Indent": 1,
+            "Ordinal": 17,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_allow_only",
+            "Indent": 1,
+            "Ordinal": 18,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_dependency",
+            "Indent": 1,
+            "Ordinal": 19,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "framework_allow_only",
+            "Indent": 1,
+            "Ordinal": 20,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "project_metadata",
+            "Indent": 1,
+            "Ordinal": 21,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "protected",
+            "Indent": 1,
+            "Ordinal": 22,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "external",
+            "Indent": 1,
+            "Ordinal": 23,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "external_allow_only",
+            "Indent": 1,
+            "Ordinal": 24,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "acyclic_sibling",
+            "Indent": 1,
+            "Ordinal": 25,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "module_container",
+            "Indent": 1,
+            "Ordinal": 26,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "type_placement",
+            "Indent": 1,
+            "Ordinal": 27,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "layout_conventions",
+            "Indent": 1,
+            "Ordinal": 28,
+            "Count": 1,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.085
+          },
+          {
+            "Name": "layout_convention_applicability",
+            "Indent": 1,
+            "Ordinal": 29,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.003
+          },
+          {
+            "Name": "public_api_surface",
+            "Indent": 1,
+            "Ordinal": 30,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "contract_surface_exposure",
+            "Indent": 1,
+            "Ordinal": 31,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "versioned_contract_surface_isolation",
+            "Indent": 1,
+            "Ordinal": 32,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "attribute_usage",
+            "Indent": 1,
+            "Ordinal": 33,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "inheritance",
+            "Indent": 1,
+            "Ordinal": 34,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "interface_implementation",
+            "Indent": 1,
+            "Ordinal": 35,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "composition",
+            "Indent": 1,
+            "Ordinal": 36,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "coverage",
+            "Indent": 1,
+            "Ordinal": 37,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.003
+          },
+          {
+            "Name": "metric_budgets",
+            "Indent": 1,
+            "Ordinal": 38,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.003
+          },
+          {
+            "Name": "context_dependency",
+            "Indent": 1,
+            "Ordinal": 39,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "context_allow_only",
+            "Indent": 1,
+            "Ordinal": 40,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "port_boundary",
+            "Indent": 1,
+            "Ordinal": 41,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "post_processing",
+            "Indent": 0,
+            "Ordinal": 42,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "repository_metrics",
+            "Indent": 0,
+            "Ordinal": 43,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.088
+          },
+          {
+            "Name": "selector_predicate_evaluation",
+            "Indent": 1,
+            "Ordinal": 44,
+            "Count": 448,
+            "ElapsedMs": 1.04132,
+            "ProcessorTimeMs": null
+          }
+        ],
+        "Output": {
+          "CommittedSinkCount": 0,
+          "FailedSinkCount": 0,
+          "StagedSinkCount": 0,
+          "UncommittedSinkCount": 0,
+          "OutputFailed": false
+        },
+        "Measurements": {
+          "PeakWorkingSetBytes": null,
+          "AllocatedBytesTotal": null,
+          "CycleRecorder": {
+            "InvocationCount": 0,
+            "EnabledInvocationCount": 0,
+            "DisabledInvocationCount": 0,
+            "EmptyEvidenceInvocationCount": 0,
+            "NonEmptyEvidenceInvocationCount": 0,
+            "Vertices": 0,
+            "Edges": 0,
+            "CandidateEvidenceCount": 0,
+            "UniqueCandidateEdgePairs": 0,
+            "EmittedCandidateCount": 0,
+            "ElapsedMs": 0,
+            "ComponentIndexBuildElapsedMs": 0,
+            "CandidateEvaluationElapsedMs": 0,
+            "AllocatedBytes": 0,
+            "ObservationOverheadElapsedMs": 0,
+            "ObservationOverheadAllocatedBytes": 0,
+            "Invocations": []
+          }
+        }
+      },
+      "completion_status": "Success",
+      "exit_code": 0,
+      "output_failed": false,
+      "wall_clock": {
+        "status": "available",
+        "value": 39,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "processor_time": {
+        "status": "available",
+        "value": 46,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "allocated_bytes": {
+        "status": "available",
+        "value": 8256528,
+        "unit": "bytes",
+        "reason": null
+      },
+      "peak_managed_memory": {
+        "status": "unavailable",
+        "value": null,
+        "unit": null,
+        "reason": "Per-invocation peak retained managed memory is not sampled by this in-process harness."
+      },
+      "work_counters": {
+        "instrumentation": "benchmark-work-observer/v1",
+        "project_file_parses": {
+          "status": "available",
+          "value": 8,
+          "unit": "operations",
+          "reason": null
+        },
+        "source_fact_file_parses": {
+          "status": "available",
+          "value": 16,
+          "unit": "operations",
+          "reason": null
+        },
+        "method_body_compilation_calls": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "method_body_syntax_trees": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "ast_semantic_lookups": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "layer_membership_probes": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "cel_context_constructions": {
+          "status": "available",
+          "value": 448,
+          "unit": "operations",
+          "reason": null
+        }
+      },
+      "history_work_counters": {
+        "instrumentation": "benchmark-history-work/v1",
+        "line_churn_algorithm_work": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History line-churn analysis."
+        },
+        "task_commit_occurrences_examined": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History bottleneck analysis."
+        },
+        "co_change_edges_assigned": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History co-change analysis."
+        },
+        "ancestry_ancestors_visited": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History ancestry queries."
+        },
+        "ancestry_retained_entries": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not retain History ancestry sets."
+        }
+      },
+      "timing_boundaries": {
+        "contract": "independent-stopwatch-intervals/v1",
+        "fixture_materialization": {
+          "status": "available",
+          "value": 8,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "restore_and_build": {
+          "status": "available",
+          "value": 6839,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "process_host_startup_and_shutdown": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This direct Core harness runs inside the test host; no analyzer child process is started."
+        },
+        "cli_process": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The measured path is the Core runner and does not launch the CLI."
+        },
+        "core_analysis_session": {
+          "status": "available",
+          "value": 39,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "result_publication": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not scale report rules and does not format a SARIF result."
+        },
+        "total_end_to_end": {
+          "status": "unavailable",
+          "value": null,
+          "unit": null,
+          "reason": "Fixture setup is shared across paired observer samples; only this isolated Core interval is attributed per sample."
+        },
+        "profiler_overhead": {
+          "instrumentation": "benchmark-work-observer/v1",
+          "observer_disabled_analysis": {
+            "status": "available",
+            "value": 40,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_enabled_analysis": {
+            "status": "available",
+            "value": 39,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_disabled_allocated_bytes": {
+            "status": "available",
+            "value": 9050840,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_enabled_allocated_bytes": {
+            "status": "available",
+            "value": 8256528,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_disabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-disabled run."
+          },
+          "observer_enabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-enabled run."
+          },
+          "canonical_results_match": true
+        }
+      }
+    },
+    {
+      "run": {
+        "execution_mode": "single_command",
+        "cache_mode": "disabled",
+        "prepared_state_mode": "unprepared",
+        "parallel_mode": "bounded-6",
+        "sample_ordinal": 7,
+        "is_warm_sample": true
+      },
+      "raw_analysis_profile": {
+        "SchemaId": "analysis-profile/v1",
+        "CompletionStatus": "Success",
+        "CancellationObserved": false,
+        "Counters": {
+          "PolicyCompositions": 1,
+          "ProjectGraphEvaluations": 1,
+          "AssemblyLoads": 8,
+          "DiscoveredProjectCount": 8,
+          "RetainedAssemblyCount": 8,
+          "SelectedAssemblyCount": 8,
+          "ModesEvaluated": 1,
+          "SnapshotMaterializations": 1,
+          "FactIndexMaterializations": 1,
+          "SourceScanPasses": 1,
+          "SourceFilesScanned": 16,
+          "ContractFamilyCounts": {
+            "dependency": 2,
+            "layer": 4,
+            "layer_template": 0,
+            "allow_only": 0,
+            "cycle": 0,
+            "method_body": 0,
+            "asmdef": 0,
+            "independence": 0,
+            "assembly_independence": 0,
+            "assembly_dependency": 0,
+            "assembly_allow_only": 0,
+            "package_dependency": 0,
+            "package_allow_only": 0,
+            "framework_dependency": 0,
+            "framework_allow_only": 0,
+            "project_metadata": 0,
+            "protected": 0,
+            "external": 0,
+            "external_allow_only": 0,
+            "acyclic_sibling": 0,
+            "module_container": 0,
+            "type_placement": 0,
+            "layout_conventions": 1,
+            "layout_convention_applicability": 0,
+            "public_api_surface": 0,
+            "contract_surface_exposure": 0,
+            "versioned_contract_surface_isolation": 0,
+            "attribute_usage": 0,
+            "inheritance": 0,
+            "interface_implementation": 0,
+            "composition": 0,
+            "coverage": 0,
+            "metric_budgets": 0,
+            "context_dependency": 0,
+            "context_allow_only": 0,
+            "port_boundary": 0
+          },
+          "ContractFamilyResultCounts": {
+            "dependency": 0,
+            "layer": 0,
+            "layout_conventions": 0
+          },
+          "RenderedSinkCount": 0,
+          "OutputSinkCount": 0,
+          "Cache": {
+            "Status": "NotApplicable",
+            "Lookups": 0,
+            "Hits": 0,
+            "Misses": 0,
+            "Rejects": 0,
+            "Writes": 0,
+            "BytesRead": 0,
+            "BytesWritten": 0,
+            "IneligibleUnitCount": 0,
+            "CorruptionEvents": 0,
+            "CancelledBeforePublish": 0,
+            "AvoidedAssemblyLoads": 0,
+            "AvoidedFactIndexMaterializations": 0,
+            "AvoidedSourceScanPasses": 0,
+            "AvoidedContractExecutions": 0,
+            "AvoidedArtifactBytesLoaded": 0,
+            "Mode": "disabled",
+            "RejectReasonCounts": {}
+          },
+          "Concurrency": {
+            "Status": "Active",
+            "MaxParallelism": 6,
+            "ScheduledWorkItems": 24,
+            "CompletedWorkItems": 24,
+            "ObservedMaxConcurrency": 6,
+            "MergeOperations": 3
+          }
+        },
+        "Phases": [
+          {
+            "Name": "root_resolution",
+            "Indent": 1,
+            "Ordinal": 0,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.009
+          },
+          {
+            "Name": "condition_set_resolution",
+            "Indent": 1,
+            "Ordinal": 1,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_resolution",
+            "Indent": 1,
+            "Ordinal": 2,
+            "Count": null,
+            "ElapsedMs": 10,
+            "ProcessorTimeMs": 10.091
+          },
+          {
+            "Name": "configuration_check",
+            "Indent": 0,
+            "Ordinal": 3,
+            "Count": null,
+            "ElapsedMs": 7,
+            "ProcessorTimeMs": 14.452
+          },
+          {
+            "Name": "policy_consistency_check",
+            "Indent": 0,
+            "Ordinal": 4,
+            "Count": null,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.85
+          },
+          {
+            "Name": "contract_checks",
+            "Indent": 0,
+            "Ordinal": 5,
+            "Count": null,
+            "ElapsedMs": 3,
+            "ProcessorTimeMs": 3.823
+          },
+          {
+            "Name": "dependency",
+            "Indent": 1,
+            "Ordinal": 6,
+            "Count": 2,
+            "ElapsedMs": 1,
+            "ProcessorTimeMs": 1.214
+          },
+          {
+            "Name": "layer",
+            "Indent": 1,
+            "Ordinal": 7,
+            "Count": 4,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.399
+          },
+          {
+            "Name": "layer_template",
+            "Indent": 1,
+            "Ordinal": 8,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "allow_only",
+            "Indent": 1,
+            "Ordinal": 9,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "cycle",
+            "Indent": 1,
+            "Ordinal": 10,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "method_body",
+            "Indent": 1,
+            "Ordinal": 11,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0
+          },
+          {
+            "Name": "asmdef",
+            "Indent": 1,
+            "Ordinal": 12,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "independence",
+            "Indent": 1,
+            "Ordinal": 13,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_independence",
+            "Indent": 1,
+            "Ordinal": 14,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_dependency",
+            "Indent": 1,
+            "Ordinal": 15,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0
+          },
+          {
+            "Name": "assembly_allow_only",
+            "Indent": 1,
+            "Ordinal": 16,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_dependency",
+            "Indent": 1,
+            "Ordinal": 17,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_allow_only",
+            "Indent": 1,
+            "Ordinal": 18,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "framework_dependency",
+            "Indent": 1,
+            "Ordinal": 19,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_allow_only",
+            "Indent": 1,
+            "Ordinal": 20,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "project_metadata",
+            "Indent": 1,
+            "Ordinal": 21,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "protected",
+            "Indent": 1,
+            "Ordinal": 22,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "external",
+            "Indent": 1,
+            "Ordinal": 23,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "external_allow_only",
+            "Indent": 1,
+            "Ordinal": 24,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "acyclic_sibling",
+            "Indent": 1,
+            "Ordinal": 25,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "module_container",
+            "Indent": 1,
+            "Ordinal": 26,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "type_placement",
+            "Indent": 1,
+            "Ordinal": 27,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "layout_conventions",
+            "Indent": 1,
+            "Ordinal": 28,
+            "Count": 1,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.088
+          },
+          {
+            "Name": "layout_convention_applicability",
+            "Indent": 1,
+            "Ordinal": 29,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "public_api_surface",
+            "Indent": 1,
+            "Ordinal": 30,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "contract_surface_exposure",
+            "Indent": 1,
+            "Ordinal": 31,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "versioned_contract_surface_isolation",
+            "Indent": 1,
+            "Ordinal": 32,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "attribute_usage",
+            "Indent": 1,
+            "Ordinal": 33,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "inheritance",
+            "Indent": 1,
+            "Ordinal": 34,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "interface_implementation",
+            "Indent": 1,
+            "Ordinal": 35,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "composition",
+            "Indent": 1,
+            "Ordinal": 36,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "coverage",
+            "Indent": 1,
+            "Ordinal": 37,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "metric_budgets",
+            "Indent": 1,
+            "Ordinal": 38,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "context_dependency",
+            "Indent": 1,
+            "Ordinal": 39,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "context_allow_only",
+            "Indent": 1,
+            "Ordinal": 40,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "port_boundary",
+            "Indent": 1,
+            "Ordinal": 41,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "post_processing",
+            "Indent": 0,
+            "Ordinal": 42,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "repository_metrics",
+            "Indent": 0,
+            "Ordinal": 43,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.084
+          },
+          {
+            "Name": "selector_predicate_evaluation",
+            "Indent": 1,
+            "Ordinal": 44,
+            "Count": 448,
+            "ElapsedMs": 1.021952,
+            "ProcessorTimeMs": null
+          }
+        ],
+        "Output": {
+          "CommittedSinkCount": 0,
+          "FailedSinkCount": 0,
+          "StagedSinkCount": 0,
+          "UncommittedSinkCount": 0,
+          "OutputFailed": false
+        },
+        "Measurements": {
+          "PeakWorkingSetBytes": null,
+          "AllocatedBytesTotal": null,
+          "CycleRecorder": {
+            "InvocationCount": 0,
+            "EnabledInvocationCount": 0,
+            "DisabledInvocationCount": 0,
+            "EmptyEvidenceInvocationCount": 0,
+            "NonEmptyEvidenceInvocationCount": 0,
+            "Vertices": 0,
+            "Edges": 0,
+            "CandidateEvidenceCount": 0,
+            "UniqueCandidateEdgePairs": 0,
+            "EmittedCandidateCount": 0,
+            "ElapsedMs": 0,
+            "ComponentIndexBuildElapsedMs": 0,
+            "CandidateEvaluationElapsedMs": 0,
+            "AllocatedBytes": 0,
+            "ObservationOverheadElapsedMs": 0,
+            "ObservationOverheadAllocatedBytes": 0,
+            "Invocations": []
+          }
+        }
+      },
+      "completion_status": "Success",
+      "exit_code": 0,
+      "output_failed": false,
+      "wall_clock": {
+        "status": "available",
+        "value": 37,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "processor_time": {
+        "status": "available",
+        "value": 44,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "allocated_bytes": {
+        "status": "available",
+        "value": 8374136,
+        "unit": "bytes",
+        "reason": null
+      },
+      "peak_managed_memory": {
+        "status": "unavailable",
+        "value": null,
+        "unit": null,
+        "reason": "Per-invocation peak retained managed memory is not sampled by this in-process harness."
+      },
+      "work_counters": {
+        "instrumentation": "benchmark-work-observer/v1",
+        "project_file_parses": {
+          "status": "available",
+          "value": 8,
+          "unit": "operations",
+          "reason": null
+        },
+        "source_fact_file_parses": {
+          "status": "available",
+          "value": 16,
+          "unit": "operations",
+          "reason": null
+        },
+        "method_body_compilation_calls": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "method_body_syntax_trees": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "ast_semantic_lookups": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "layer_membership_probes": {
+          "status": "available",
+          "value": 0,
+          "unit": "operations",
+          "reason": null
+        },
+        "cel_context_constructions": {
+          "status": "available",
+          "value": 448,
+          "unit": "operations",
+          "reason": null
+        }
+      },
+      "history_work_counters": {
+        "instrumentation": "benchmark-history-work/v1",
+        "line_churn_algorithm_work": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History line-churn analysis."
+        },
+        "task_commit_occurrences_examined": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History bottleneck analysis."
+        },
+        "co_change_edges_assigned": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History co-change analysis."
+        },
+        "ancestry_ancestors_visited": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History ancestry queries."
+        },
+        "ancestry_retained_entries": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not retain History ancestry sets."
+        }
+      },
+      "timing_boundaries": {
+        "contract": "independent-stopwatch-intervals/v1",
+        "fixture_materialization": {
+          "status": "available",
+          "value": 8,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "restore_and_build": {
+          "status": "available",
+          "value": 6839,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "process_host_startup_and_shutdown": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This direct Core harness runs inside the test host; no analyzer child process is started."
+        },
+        "cli_process": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The measured path is the Core runner and does not launch the CLI."
+        },
+        "core_analysis_session": {
+          "status": "available",
+          "value": 37,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "result_publication": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not scale report rules and does not format a SARIF result."
+        },
+        "total_end_to_end": {
+          "status": "unavailable",
+          "value": null,
+          "unit": null,
+          "reason": "Fixture setup is shared across paired observer samples; only this isolated Core interval is attributed per sample."
+        },
+        "profiler_overhead": {
+          "instrumentation": "benchmark-work-observer/v1",
+          "observer_disabled_analysis": {
+            "status": "available",
+            "value": 36,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_enabled_analysis": {
+            "status": "available",
+            "value": 37,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_disabled_allocated_bytes": {
+            "status": "available",
+            "value": 8281976,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_enabled_allocated_bytes": {
+            "status": "available",
+            "value": 8374136,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_disabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-disabled run."
+          },
+          "observer_enabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-enabled run."
+          },
+          "canonical_results_match": true
+        }
+      }
+    },
+    {
+      "run": {
+        "execution_mode": "single_command",
+        "cache_mode": "disabled",
+        "prepared_state_mode": "unprepared",
+        "parallel_mode": "bounded-6",
+        "sample_ordinal": 8,
+        "is_warm_sample": true
+      },
+      "raw_analysis_profile": {
+        "SchemaId": "analysis-profile/v1",
+        "CompletionStatus": "Success",
+        "CancellationObserved": false,
+        "Counters": {
+          "PolicyCompositions": 1,
+          "ProjectGraphEvaluations": 1,
+          "AssemblyLoads": 8,
+          "DiscoveredProjectCount": 8,
+          "RetainedAssemblyCount": 8,
+          "SelectedAssemblyCount": 8,
+          "ModesEvaluated": 1,
+          "SnapshotMaterializations": 1,
+          "FactIndexMaterializations": 1,
+          "SourceScanPasses": 1,
+          "SourceFilesScanned": 16,
+          "ContractFamilyCounts": {
+            "dependency": 2,
+            "layer": 4,
+            "layer_template": 0,
+            "allow_only": 0,
+            "cycle": 0,
+            "method_body": 0,
+            "asmdef": 0,
+            "independence": 0,
+            "assembly_independence": 0,
+            "assembly_dependency": 0,
+            "assembly_allow_only": 0,
+            "package_dependency": 0,
+            "package_allow_only": 0,
+            "framework_dependency": 0,
+            "framework_allow_only": 0,
+            "project_metadata": 0,
+            "protected": 0,
+            "external": 0,
+            "external_allow_only": 0,
+            "acyclic_sibling": 0,
+            "module_container": 0,
+            "type_placement": 0,
+            "layout_conventions": 1,
+            "layout_convention_applicability": 0,
+            "public_api_surface": 0,
+            "contract_surface_exposure": 0,
+            "versioned_contract_surface_isolation": 0,
+            "attribute_usage": 0,
+            "inheritance": 0,
+            "interface_implementation": 0,
+            "composition": 0,
+            "coverage": 0,
+            "metric_budgets": 0,
+            "context_dependency": 0,
+            "context_allow_only": 0,
+            "port_boundary": 0
+          },
+          "ContractFamilyResultCounts": {
+            "dependency": 0,
+            "layer": 0,
+            "layout_conventions": 0
+          },
+          "RenderedSinkCount": 0,
+          "OutputSinkCount": 0,
+          "Cache": {
+            "Status": "NotApplicable",
+            "Lookups": 0,
+            "Hits": 0,
+            "Misses": 0,
+            "Rejects": 0,
+            "Writes": 0,
+            "BytesRead": 0,
+            "BytesWritten": 0,
+            "IneligibleUnitCount": 0,
+            "CorruptionEvents": 0,
+            "CancelledBeforePublish": 0,
+            "AvoidedAssemblyLoads": 0,
+            "AvoidedFactIndexMaterializations": 0,
+            "AvoidedSourceScanPasses": 0,
+            "AvoidedContractExecutions": 0,
+            "AvoidedArtifactBytesLoaded": 0,
+            "Mode": "disabled",
+            "RejectReasonCounts": {}
+          },
+          "Concurrency": {
+            "Status": "Active",
+            "MaxParallelism": 6,
+            "ScheduledWorkItems": 24,
+            "CompletedWorkItems": 24,
+            "ObservedMaxConcurrency": 6,
+            "MergeOperations": 3
+          }
+        },
+        "Phases": [
+          {
+            "Name": "root_resolution",
+            "Indent": 1,
+            "Ordinal": 0,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.01
+          },
+          {
+            "Name": "condition_set_resolution",
+            "Indent": 1,
+            "Ordinal": 1,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_resolution",
+            "Indent": 1,
+            "Ordinal": 2,
+            "Count": null,
+            "ElapsedMs": 11,
+            "ProcessorTimeMs": 11.088
+          },
+          {
+            "Name": "configuration_check",
+            "Indent": 0,
+            "Ordinal": 3,
+            "Count": null,
+            "ElapsedMs": 5,
+            "ProcessorTimeMs": 12.978
+          },
+          {
+            "Name": "policy_consistency_check",
+            "Indent": 0,
+            "Ordinal": 4,
+            "Count": null,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.845
+          },
+          {
+            "Name": "contract_checks",
+            "Indent": 0,
+            "Ordinal": 5,
+            "Count": null,
+            "ElapsedMs": 5,
+            "ProcessorTimeMs": 5.364
+          },
+          {
+            "Name": "dependency",
+            "Indent": 1,
+            "Ordinal": 6,
+            "Count": 2,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.729
+          },
+          {
+            "Name": "layer",
+            "Indent": 1,
+            "Ordinal": 7,
+            "Count": 4,
+            "ElapsedMs": 2,
+            "ProcessorTimeMs": 2.429
+          },
+          {
+            "Name": "layer_template",
+            "Indent": 1,
+            "Ordinal": 8,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "allow_only",
+            "Indent": 1,
+            "Ordinal": 9,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "cycle",
+            "Indent": 1,
+            "Ordinal": 10,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "method_body",
+            "Indent": 1,
+            "Ordinal": 11,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "asmdef",
+            "Indent": 1,
+            "Ordinal": 12,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "independence",
+            "Indent": 1,
+            "Ordinal": 13,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_independence",
+            "Indent": 1,
+            "Ordinal": 14,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "assembly_dependency",
+            "Indent": 1,
+            "Ordinal": 15,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "assembly_allow_only",
+            "Indent": 1,
+            "Ordinal": 16,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "package_dependency",
+            "Indent": 1,
+            "Ordinal": 17,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "package_allow_only",
+            "Indent": 1,
+            "Ordinal": 18,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "framework_dependency",
+            "Indent": 1,
+            "Ordinal": 19,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "framework_allow_only",
+            "Indent": 1,
+            "Ordinal": 20,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "project_metadata",
+            "Indent": 1,
+            "Ordinal": 21,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "protected",
+            "Indent": 1,
+            "Ordinal": 22,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "external",
+            "Indent": 1,
+            "Ordinal": 23,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "external_allow_only",
+            "Indent": 1,
+            "Ordinal": 24,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "acyclic_sibling",
+            "Indent": 1,
+            "Ordinal": 25,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "module_container",
+            "Indent": 1,
+            "Ordinal": 26,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0
+          },
+          {
+            "Name": "type_placement",
+            "Indent": 1,
+            "Ordinal": 27,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "layout_conventions",
+            "Indent": 1,
+            "Ordinal": 28,
+            "Count": 1,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.085
+          },
+          {
+            "Name": "layout_convention_applicability",
+            "Indent": 1,
+            "Ordinal": 29,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "public_api_surface",
+            "Indent": 1,
+            "Ordinal": 30,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "contract_surface_exposure",
+            "Indent": 1,
+            "Ordinal": 31,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "versioned_contract_surface_isolation",
+            "Indent": 1,
+            "Ordinal": 32,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "attribute_usage",
+            "Indent": 1,
+            "Ordinal": 33,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.001
+          },
+          {
+            "Name": "inheritance",
+            "Indent": 1,
+            "Ordinal": 34,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "interface_implementation",
+            "Indent": 1,
+            "Ordinal": 35,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "composition",
+            "Indent": 1,
+            "Ordinal": 36,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0
+          },
+          {
+            "Name": "coverage",
+            "Indent": 1,
+            "Ordinal": 37,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "metric_budgets",
+            "Indent": 1,
+            "Ordinal": 38,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.004
+          },
+          {
+            "Name": "context_dependency",
+            "Indent": 1,
+            "Ordinal": 39,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "context_allow_only",
+            "Indent": 1,
+            "Ordinal": 40,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0
+          },
+          {
+            "Name": "port_boundary",
+            "Indent": 1,
+            "Ordinal": 41,
+            "Count": 0,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "post_processing",
+            "Indent": 0,
+            "Ordinal": 42,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.002
+          },
+          {
+            "Name": "repository_metrics",
+            "Indent": 0,
+            "Ordinal": 43,
+            "Count": null,
+            "ElapsedMs": 0,
+            "ProcessorTimeMs": 0.088
+          },
+          {
+            "Name": "selector_predicate_evaluation",
+            "Indent": 1,
+            "Ordinal": 44,
+            "Count": 448,
+            "ElapsedMs": 1.035916,
+            "ProcessorTimeMs": null
+          }
+        ],
+        "Output": {
+          "CommittedSinkCount": 0,
+          "FailedSinkCount": 0,
+          "StagedSinkCount": 0,
+          "UncommittedSinkCount": 0,
+          "OutputFailed": false
+        },
+        "Measurements": {
+          "PeakWorkingSetBytes": null,
+          "AllocatedBytesTotal": null,
+          "CycleRecorder": {
+            "InvocationCount": 0,
+            "EnabledInvocationCount": 0,
+            "DisabledInvocationCount": 0,
+            "EmptyEvidenceInvocationCount": 0,
+            "NonEmptyEvidenceInvocationCount": 0,
+            "Vertices": 0,
+            "Edges": 0,
+            "CandidateEvidenceCount": 0,
+            "UniqueCandidateEdgePairs": 0,
+            "EmittedCandidateCount": 0,
+            "ElapsedMs": 0,
+            "ComponentIndexBuildElapsedMs": 0,
+            "CandidateEvaluationElapsedMs": 0,
+            "AllocatedBytes": 0,
+            "ObservationOverheadElapsedMs": 0,
+            "ObservationOverheadAllocatedBytes": 0,
+            "Invocations": []
+          }
+        }
+      },
+      "completion_status": "Success",
+      "exit_code": 0,
+      "output_failed": false,
+      "wall_clock": {
+        "status": "available",
+        "value": 36,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "processor_time": {
+        "status": "available",
+        "value": 44,
+        "unit": "milliseconds",
+        "reason": null
+      },
+      "allocated_bytes": {
+        "status": "available",
+        "value": 8281976,
+        "unit": "bytes",
+        "reason": null
+      },
+      "peak_managed_memory": {
+        "status": "unavailable",
+        "value": null,
+        "unit": null,
+        "reason": "Per-invocation peak retained managed memory is not sampled by this in-process harness."
+      },
+      "work_counters": {
+        "instrumentation": "benchmark-work-observer/v1",
+        "project_file_parses": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "source_fact_file_parses": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "method_body_compilation_calls": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "method_body_syntax_trees": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "ast_semantic_lookups": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "layer_membership_probes": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        },
+        "cel_context_constructions": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The per-invocation Core work observer was disabled for this paired sample."
+        }
+      },
+      "history_work_counters": {
+        "instrumentation": "benchmark-history-work/v1",
+        "line_churn_algorithm_work": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History line-churn analysis."
+        },
+        "task_commit_occurrences_examined": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History bottleneck analysis."
+        },
+        "co_change_edges_assigned": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History co-change analysis."
+        },
+        "ancestry_ancestors_visited": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not execute History ancestry queries."
+        },
+        "ancestry_retained_entries": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not retain History ancestry sets."
+        }
+      },
+      "timing_boundaries": {
+        "contract": "independent-stopwatch-intervals/v1",
+        "fixture_materialization": {
+          "status": "available",
+          "value": 8,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "restore_and_build": {
+          "status": "available",
+          "value": 6839,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "process_host_startup_and_shutdown": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This direct Core harness runs inside the test host; no analyzer child process is started."
+        },
+        "cli_process": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "The measured path is the Core runner and does not launch the CLI."
+        },
+        "core_analysis_session": {
+          "status": "available",
+          "value": 36,
+          "unit": "milliseconds",
+          "reason": null
+        },
+        "result_publication": {
+          "status": "not_applicable",
+          "value": null,
+          "unit": null,
+          "reason": "This workload does not scale report rules and does not format a SARIF result."
+        },
+        "total_end_to_end": {
+          "status": "unavailable",
+          "value": null,
+          "unit": null,
+          "reason": "Fixture setup is shared across paired observer samples; only this isolated Core interval is attributed per sample."
+        },
+        "profiler_overhead": {
+          "instrumentation": "benchmark-work-observer/v1",
+          "observer_disabled_analysis": {
+            "status": "available",
+            "value": 36,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_enabled_analysis": {
+            "status": "available",
+            "value": 37,
+            "unit": "milliseconds",
+            "reason": null
+          },
+          "observer_disabled_allocated_bytes": {
+            "status": "available",
+            "value": 8281976,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_enabled_allocated_bytes": {
+            "status": "available",
+            "value": 8374136,
+            "unit": "bytes",
+            "reason": null
+          },
+          "observer_disabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-disabled run."
+          },
+          "observer_enabled_peak_retained_bytes": {
+            "status": "unavailable",
+            "value": null,
+            "unit": null,
+            "reason": "Peak retained memory was not sampled for the observer-enabled run."
+          },
+          "canonical_results_match": true
+        }
+      }
+    }
+  ],
+  "canonical_result": {
+    "algorithm": "sha256-canonical-result/v1",
+    "sha256": "c574d68025d831f4c379743e3f0df5954f8001eab1bfe20f28fc1381e20c071a",
+    "finding_count": 0,
+    "completion_status": "Success",
+    "exit_code": 0
+  },
+  "environment": {
+    "runtime": ".NET 10.0.14",
+    "operating_system": "macOS 15.8.1",
+    "architecture": "X64",
+    "configuration": "Release; in-process Core; no analyzer child process",
+    "source_identity": "575e9a960cdea47c5979e2644dd9faf1f52d985f06f15734d3f2238043805410",
+    "tool_identity": "ArchLinterNet.Core.Tests/0.1.0.0",
+    "source_revision": "176a63ea88d496936130f17935c1393cee6b0efe",
+    "runner_identity": "local-x64-6cpu",
+    "materialized_input_sha256": "149a2fd87825334cb6c127f6042c971c59c6594898dbbd750ea24c7888d362d8",
+    "peak_working_set": {
+      "status": "unavailable",
+      "value": null,
+      "unit": null,
+      "reason": "A process-wide peak working set would include the complete NUnit host lifetime and is not attributable to this workload."
+    },
+    "managed_allocation": {
+      "status": "unavailable",
+      "value": null,
+      "unit": null,
+      "reason": "The evidence retains each isolated Core analysis allocation sample rather than aggregating unrelated test-host allocations."
+    }
+  },
+  "complexity": null,
+  "expected_effect": null,
+  "disposition": "candidate"
+}

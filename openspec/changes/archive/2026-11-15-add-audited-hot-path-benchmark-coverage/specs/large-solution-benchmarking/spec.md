@@ -133,6 +133,8 @@ The foundation SHALL represent independent scale variables, deterministic work c
 - **THEN** the evidence marks that value as not measured
 - **AND** it does not infer a current .NET result from source-level models or historical operation-count reproductions
 
+## ADDED Requirements
+
 ### Requirement: History workloads are reusable by algorithm-owning tasks
 
 The benchmark foundation SHALL provide synthetic, deterministic History inputs for the algorithm families owned by downstream tasks, with independent scale variables, required-output cardinality, bounded work counters, and canonical-result checks. History measurement SHALL extend the existing #502 catalog and evidence format rather than create a competing benchmark framework.
