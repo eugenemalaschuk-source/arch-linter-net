@@ -20,6 +20,7 @@ public sealed class BenchmarkAuditMatrixTests
 
     [Test]
     [Explicit("Runs the environment-sensitive #1123 repeated baseline matrix and writes issue-scoped evidence.")]
+    [CancelAfter(900_000)]
     public void WriteRepeatedBaselineMatrix()
     {
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
