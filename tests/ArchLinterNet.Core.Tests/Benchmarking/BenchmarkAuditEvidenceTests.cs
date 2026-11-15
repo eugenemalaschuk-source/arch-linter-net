@@ -88,10 +88,39 @@ public sealed class BenchmarkAuditEvidenceTests
         Assert.That(() => invalid.Validate(), Throws.InvalidOperationException);
     }
 
-    private static BenchmarkEvidenceDocument CreateEvidence()
+    [Test]
+    public void AuditedEvidence_ExtendedWorkloadDimensionsAndContractGraph_ValidateAgainstSchema()
     {
+        BenchmarkDimensionSet dimensions = new()
+        {
+            ProjectCount = 2,
+            TypesPerProject = 3,
+            SourceFilesPerProject = 2,
+            ReferencesPerProject = 0,
+            LayerCount = 4,
+            ContractsPerWorkload = 1,
+            IgnoreRuleCount = 2,
+            MetricRuleCount = 3,
+            ReportRuleCount = 4,
+            MethodBodyRuleCount = 5,
+        };
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
-            "synthetic-audit-evidence", BenchmarkTopologyShape.Linear);
+            "synthetic-audit-schema-extended",
+            BenchmarkTopologyShape.Linear,
+            dimensions,
+            compilationMode: BenchmarkCompilationMode.RealMsBuild,
+            contractLayerGraphShape: BenchmarkContractLayerGraphShape.DenseDag);
+        string json = BenchmarkEvidenceJson.Serialize(CreateEvidence(workload));
+        JsonSchema schema = JsonSchemaTextFactory.FromText(LoadEvidenceSchema());
+        EvaluationResults validation = schema.Evaluate(
+            JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
+
+        Assert.That(validation.IsValid, Is.True, Describe(validation));
+    }
+
+    private static BenchmarkEvidenceDocument CreateEvidence(BenchmarkWorkloadDefinition? workload = null)
+    {
+        workload ??= BenchmarkWorkloadGenerator.Create("synthetic-audit-evidence", BenchmarkTopologyShape.Linear);
         using JsonDocument profile = JsonDocument.Parse("""
             {
               "SchemaId": "analysis-profile/v1",
