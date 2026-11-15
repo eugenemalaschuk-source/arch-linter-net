@@ -4,8 +4,6 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.BuildState;
-using ArchLinterNet.Core.Model;
-using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 using Json.Schema;
 using NUnit.Framework;
@@ -269,27 +267,8 @@ public sealed class BenchmarkAuditMatrixTests
         }
         else
         {
-            string reportRulesPath = Path.Combine(fixture.Root, ".benchmark", "report-rules.json");
-            using JsonDocument reportRules = JsonDocument.Parse(File.ReadAllText(reportRulesPath));
-            string[] ruleIds = reportRules.RootElement.EnumerateArray()
-                .Select(rule => rule.GetProperty("id").GetString()!)
-                .ToArray();
-            int findingCount = Math.Max(1, fixture.Definition.Dimensions.FindingCandidates);
-            ArchitectureViolation[] findings = Enumerable.Range(0, findingCount)
-                .Select(index => new ArchitectureViolation(
-                    $"Synthetic report contract {index % ruleIds.Length + 1:000}",
-                    ruleIds[index % ruleIds.Length],
-                    $"Synthetic.Project001.Type{index:000}",
-                    "Synthetic.Forbidden",
-                    [$"Synthetic.Reference{index:000}"]))
-                .ToArray();
             Stopwatch publication = Stopwatch.StartNew();
-            string sarif = ArchitectureSarifFormatter.FormatResultAsSarif(
-                "strict",
-                findings,
-                Array.Empty<ArchitectureCycleFinding>(),
-                Array.Empty<BuildStatePreflightDiagnostic>(),
-                "synthetic-benchmark");
+            string sarif = BenchmarkSarifWorkloadFactory.FormatResult(fixture);
             publication.Stop();
             reportPublication = Milliseconds(publication.Elapsed);
             reportIdentity = BenchmarkIdentity.Sha256(BenchmarkIdentity.NormalizeJson(sarif));

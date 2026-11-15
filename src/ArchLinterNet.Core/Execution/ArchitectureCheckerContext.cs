@@ -72,9 +72,12 @@ internal sealed class ArchitectureCheckerContext
 
     public string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames)
     {
-        for (int index = 0; index < candidateLayerNames.Count; index++)
+        if (_benchmarkWorkObserver is not null)
         {
-            _benchmarkWorkObserver?.RecordLayerMembershipProbe();
+            for (int index = 0; index < candidateLayerNames.Count; index++)
+            {
+                _benchmarkWorkObserver.RecordLayerMembershipProbe();
+            }
         }
 
         return _session.Facts.ResolveContainingLayer(type, candidateLayerNames);

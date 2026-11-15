@@ -153,7 +153,7 @@ public sealed class ArchitectureWorkObserverTests
         document.Layers["first"] = new ArchitectureLayer { Namespace = namespaceName };
         document.Layers["second"] = new ArchitectureLayer { Namespace = "No.Match" };
 
-        string? Resolve(BenchmarkWorkObserver? observer)
+        string? Resolve(BenchmarkWorkObserver? observer, CountingReadOnlySet candidateLayerNames)
         {
             ArchitectureAnalysisContext analysisContext = new(
                 "/tmp", [typeof(ArchitectureWorkObserverTests).Assembly], Array.Empty<string>(), Array.Empty<string>())
@@ -161,16 +161,53 @@ public sealed class ArchitectureWorkObserverTests
                 BenchmarkWorkObserver = observer,
             };
             ArchitectureAnalysisSession session = new(analysisContext, document, null, false, null);
-            return session.CheckerContext.ResolveContainingLayer(
-                typeof(ArchitectureWorkObserverTests), new HashSet<string>(["first", "second"], StringComparer.Ordinal));
+            return session.CheckerContext.ResolveContainingLayer(typeof(ArchitectureWorkObserverTests), candidateLayerNames);
         }
 
-        string? expected = Resolve(null);
+        CountingReadOnlySet unobservedCandidates = new(["first", "second"]);
+        string? expected = Resolve(null, unobservedCandidates);
         BenchmarkWorkObserver benchmarkWorkObserver = new();
-        string? actual = Resolve(benchmarkWorkObserver);
+        CountingReadOnlySet observedCandidates = new(["first", "second"]);
+        string? actual = Resolve(benchmarkWorkObserver, observedCandidates);
 
         Assert.That(actual, Is.EqualTo(expected));
         Assert.That(benchmarkWorkObserver.LayerMembershipProbes, Is.EqualTo(2));
+        Assert.That(observedCandidates.CountReads, Is.GreaterThan(unobservedCandidates.CountReads),
+            "The observer-enabled path should read the candidate count for counter recording; the disabled path should skip that counter-only pass.");
+    }
+
+    private sealed class CountingReadOnlySet(IEnumerable<string> values) : IReadOnlySet<string>
+    {
+        private readonly HashSet<string> _values = new(values, StringComparer.Ordinal);
+
+        public int CountReads { get; private set; }
+
+        public int Count
+        {
+            get
+            {
+                CountReads++;
+                return _values.Count;
+            }
+        }
+
+        public bool Contains(string item) => _values.Contains(item);
+
+        public bool IsProperSubsetOf(IEnumerable<string> other) => _values.IsProperSubsetOf(other);
+
+        public bool IsProperSupersetOf(IEnumerable<string> other) => _values.IsProperSupersetOf(other);
+
+        public bool IsSubsetOf(IEnumerable<string> other) => _values.IsSubsetOf(other);
+
+        public bool IsSupersetOf(IEnumerable<string> other) => _values.IsSupersetOf(other);
+
+        public bool Overlaps(IEnumerable<string> other) => _values.Overlaps(other);
+
+        public bool SetEquals(IEnumerable<string> other) => _values.SetEquals(other);
+
+        public IEnumerator<string> GetEnumerator() => _values.GetEnumerator();
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     private static ArchitectureExpressionSubjectFacts CreateSubject() => new(
