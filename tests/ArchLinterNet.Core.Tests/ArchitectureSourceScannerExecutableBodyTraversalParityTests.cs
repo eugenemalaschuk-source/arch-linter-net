@@ -104,12 +104,137 @@ public sealed class ArchitectureSourceScannerExecutableBodyTraversalParityTests
         });
     }
 
-    private List<ArchitectureViolation> Scan(ArchitectureContractExecutionContext executionContext)
+    [Test]
+    public void FindMethodBodyViolations_MixedForbiddenCallsMatchLegacyOrderAndSelectiveSuppression()
+    {
+        const string Source = """
+            namespace TraversalFixture;
+            public sealed class Caller
+            {
+                public void First()
+                {
+                    System.Console.WriteLine("first");
+                    void Local()
+                    {
+                        System.Console.ReadLine();
+                        void Nested() => System.Console.WriteLine("nested");
+                        Nested();
+                    }
+
+                    Local();
+                }
+
+                public int Value
+                {
+                    get
+                    {
+                        System.Console.ReadLine();
+                        return 1;
+                    }
+                    set
+                    {
+                        System.Console.WriteLine(value.ToString());
+                    }
+                }
+
+                public void Second()
+                {
+                    System.Console.ReadLine();
+                    System.Console.WriteLine("second");
+                }
+            }
+            """;
+        IReadOnlyList<string> forbiddenCalls = [
+            "System.Console.WriteLine",
+            "System.Console.ReadLine",
+        ];
+        (CSharpCompilation compilation, SyntaxTree syntaxTree) = Compile(Source);
+        CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
+        SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree, ignoreAccessibility: true);
+        IReadOnlyList<ForbiddenCallPattern> patterns =
+            ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCalls);
+        List<ArchitectureSourceScanner.ForbiddenCallMatch> legacyMatches = FindLegacyForbiddenUsagesInBodies(
+            semanticModel, root, patterns, new Dictionary<string, bool>(StringComparer.Ordinal));
+        List<ArchitectureSourceScanner.ForbiddenCallMatch> currentMatches =
+            ArchitectureSourceScanner.FindForbiddenUsagesInBodies(
+                semanticModel, root, patterns, new Dictionary<string, bool>(StringComparer.Ordinal));
+        List<ArchitectureBaselineCandidate> legacyCandidates = CollectLegacyCandidates(legacyMatches);
+        ArchitectureViolationIdentity[] legacyIdentities = legacyCandidates
+            .Select(candidate => candidate.Identity!)
+            .ToArray();
+        string[] expectedReferences = legacyMatches
+            .Select(match => match.Display)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(display => display, StringComparer.Ordinal)
+            .ToArray();
+        string[] sourceMembers = legacyMatches
+            .Select(match => match.SourceMember)
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        string[] targetMembers = legacyMatches
+            .Select(match => match.TargetMember)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        WriteSource(Source);
+        List<ArchitectureBaselineCandidate> currentCandidates = new();
+        List<ArchitectureViolation> currentViolations = Scan(
+            CreateExecutionContext(baselineCandidates: currentCandidates, enableUnmatchedIgnoreTracking: true),
+            forbiddenCalls);
+        ArchitectureViolationIdentity[] currentIdentities = currentCandidates
+            .Select(candidate => candidate.Identity!)
+            .ToArray();
+
+        ArchitectureBaselineCandidate[] secondReadLineCandidates = legacyCandidates
+            .Where(candidate => candidate.Identity is { } identity
+                                && identity.SourceMember?.Contains("Second", StringComparison.Ordinal) == true
+                                && identity.TargetMember?.Contains("ReadLine", StringComparison.Ordinal) == true)
+            .ToArray();
+        ArchitectureIgnoredViolation[] secondReadLineIgnored = secondReadLineCandidates
+            .Select(ToIgnoredViolation)
+            .ToArray();
+        string secondReadLineDisplay = legacyMatches
+            .First(match => match.SourceMember!.Contains("Second", StringComparison.Ordinal)
+                            && match.TargetMember.Contains("ReadLine", StringComparison.Ordinal))
+            .Display;
+        string[] selectivelySuppressedExpected = GetLegacyVisibleReferences(legacyMatches, secondReadLineIgnored);
+        List<ArchitectureViolation> selectivelySuppressed = Scan(
+            CreateExecutionContext(ignoredViolations: secondReadLineIgnored), forbiddenCalls);
+        string[] selectivelySuppressedActual = selectivelySuppressed
+            .SelectMany(violation => violation.ForbiddenReferences)
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(currentMatches, Is.EqualTo(legacyMatches),
+                "mixed calls across methods, accessors, and local functions must preserve the full ordered records");
+            Assert.That(currentIdentities, Is.EqualTo(legacyIdentities),
+                "all structured identities and occurrence order must match the old traversal");
+            Assert.That(currentViolations, Has.Count.EqualTo(1));
+            Assert.That(currentViolations[0].ForbiddenReferences, Is.EqualTo(expectedReferences));
+            Assert.That(targetMembers, Has.Some.Contains("WriteLine"));
+            Assert.That(targetMembers, Has.Some.Contains("ReadLine"));
+            Assert.That(sourceMembers, Has.Some.Contains("First"));
+            Assert.That(sourceMembers, Has.Some.Contains("Second"));
+            Assert.That(sourceMembers, Has.Some.Contains("Local"));
+            Assert.That(sourceMembers, Has.Some.Contains("Value"));
+            Assert.That(secondReadLineCandidates, Is.Not.Empty,
+                "the selected suppression must target the ReadLine call from the second method");
+            Assert.That(secondReadLineIgnored, Is.Not.Empty);
+            Assert.That(selectivelySuppressedActual, Is.EqualTo(selectivelySuppressedExpected));
+            Assert.That(selectivelySuppressedActual, Does.Not.Contain(secondReadLineDisplay));
+        });
+    }
+
+    private List<ArchitectureViolation> Scan(
+        ArchitectureContractExecutionContext executionContext,
+        IReadOnlyList<string>? forbiddenCalls = null)
     {
         return new ArchitectureSourceScanner().FindMethodBodyViolations(
             _repoRoot,
             "TraversalFixture",
-            [ForbiddenCall],
+            forbiddenCalls ?? [ForbiddenCall],
             executionContext,
             sourceRoots: ["src"]).ToList();
     }
