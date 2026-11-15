@@ -16,7 +16,10 @@
 ## 4. Refresh and review retained evidence
 
 - [x] 4.1 Regenerate affected 33-workload × 8-sample evidence at the implementation commit; verify metric result counts, ordinary/method-body counts, fixed SARIF volume, stable input identities, and evidence schema validation.
-- [ ] 4.2 Inspect current Qodana trusted-gate and Sonar new-issue results; fix actionable regressions or add a precise evidence-based disposition, and verify the resulting PR checks or documented limitation.
+- [x] 4.2 Inspect current Qodana trusted-gate and Sonar new-issue results; fix actionable regressions or add a precise evidence-based disposition, and verify the resulting PR checks or documented limitation.
+  - SonarCloud analysis for head `aa2122e9c4a81fa04699455eeda8e0d7f3c67ec8` passed its Quality Gate with 0 new issues, 0 accepted issues, and 98.1% coverage on new code. The prior new CA1859 finding was fixed in this head and its History catalog regression test passed.
+  - The Qodana scan job completed successfully on run `43773678316`, but its trusted gate reports `UNASSESSABLE` because the GitHub PR patch is unavailable for inspection-suppression review. This is recorded as a non-pass limitation; the trusted gate did not verify scan completeness.
+  - All 45 jobs in CI run `43773678301` passed, including the strict architecture report gate and packed-artifact shards. The separate required `qodana` check remains failed with the documented `UNASSESSABLE` result.
 
 ## Workflow follow-up
 
