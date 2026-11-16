@@ -1,6 +1,4 @@
 using System.Text.RegularExpressions;
-using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Resolution;
 
@@ -12,111 +10,7 @@ internal static class ArchitectureIgnoreMatcher
     // pattern causing catastrophic backtracking.
     private static readonly TimeSpan _matchTimeout = TimeSpan.FromSeconds(1);
 
-    public static bool IsIgnored(
-        string sourceType,
-        string forbiddenReference,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker = null,
-        ArchitectureViolationIdentity? liveIdentity = null)
-    {
-        return IsIgnored(sourceType, forbiddenReference, ignoredViolations, usageTracker, liveIdentity, out _);
-    }
-
-    // Also reports whether any matching entry came from a loaded baseline document (as opposed to a
-    // policy-authored structured waiver) -- callers that feed baseline-comparison candidates need
-    // this to keep waiver debt and finding debt separate. See
-    // ArchitectureIgnoredViolation.IsFromLoadedBaseline.
-    public static bool IsIgnored(
-        string sourceType,
-        string forbiddenReference,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker,
-        ArchitectureViolationIdentity? liveIdentity,
-        out bool matchedByLoadedBaseline)
-    {
-        matchedByLoadedBaseline = false;
-
-        if (usageTracker == null)
-        {
-            for (int i = 0; i < ignoredViolations.Count; i++)
-            {
-                if (Matches(sourceType, forbiddenReference, liveIdentity, ignoredViolations[i]))
-                {
-                    matchedByLoadedBaseline = ignoredViolations[i].IsFromLoadedBaseline;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        bool anyMatched = false;
-
-        for (int i = 0; i < ignoredViolations.Count; i++)
-        {
-            if (Matches(sourceType, forbiddenReference, liveIdentity, ignoredViolations[i]))
-            {
-                usageTracker.MarkMatched(i);
-                anyMatched = true;
-                if (ignoredViolations[i].IsFromLoadedBaseline)
-                {
-                    matchedByLoadedBaseline = true;
-                }
-            }
-        }
-
-        return anyMatched;
-    }
-
-    // A `version: 2`-sourced ignore entry (IdentityVersion == 2) was merged from a structured
-    // baseline and is matched by exact identity equality — including assembly, member, and
-    // occurrence — never by glob text matching. Manually authored ignores and entries merged from
-    // a `version: 1` baseline have no IdentityVersion and keep the legacy glob-pair behavior
-    // exactly as before.
-    private static bool Matches(
-        string sourceType, string forbiddenReference, ArchitectureViolationIdentity? liveIdentity, ArchitectureIgnoredViolation ignore)
-    {
-        // An incomplete or non-canonical manual waiver is lifecycle evidence, never a fallback
-        // glob suppression. This keeps malformed strict declarations fail-closed while allowing
-        // compatibility-profile legacy entries (which have no validation error) unchanged.
-        if (ignore.WaiverValidationError is not null)
-        {
-            return false;
-        }
-
-        if (ignore.HasStructuredWaiverFields)
-        {
-            return liveIdentity is not null
-                && ignore.Target is not null
-                && string.Equals(
-                    ignore.Target.Fingerprint,
-                    ArchitectureWaiverTargetFingerprint.Create(liveIdentity),
-                    StringComparison.Ordinal);
-        }
-
-        if (ignore.IdentityVersion == ArchitectureViolationIdentity.CurrentVersion && liveIdentity != null)
-        {
-            return MatchesIdentity(liveIdentity, ignore);
-        }
-
-        return MatchesPattern(sourceType, ignore.SourceType) && MatchesPattern(forbiddenReference, ignore.ForbiddenReference);
-    }
-
-    private static bool MatchesIdentity(ArchitectureViolationIdentity live, ArchitectureIgnoredViolation ignore)
-    {
-        return string.Equals(ignore.ContractFamily, live.ContractFamily, StringComparison.Ordinal)
-            && string.Equals(ignore.Kind, live.Kind, StringComparison.Ordinal)
-            && string.Equals(ignore.SourceAssembly, live.SourceAssembly, StringComparison.Ordinal)
-            && string.Equals(ignore.SourceType, live.SourceType, StringComparison.Ordinal)
-            && string.Equals(ignore.SourceMember, live.SourceMember, StringComparison.Ordinal)
-            && string.Equals(ignore.TargetAssembly, live.TargetAssembly, StringComparison.Ordinal)
-            && string.Equals(ignore.TargetType, live.TargetType, StringComparison.Ordinal)
-            && string.Equals(ignore.TargetMember, live.TargetMember, StringComparison.Ordinal)
-            && (ignore.Occurrence ?? 0) == live.Occurrence
-            && string.Equals(ignore.Configuration, live.Configuration, StringComparison.Ordinal);
-    }
-
-    private static bool MatchesPattern(string value, string pattern)
+    internal static bool MatchesPattern(string value, string pattern)
     {
         if (string.IsNullOrWhiteSpace(pattern))
         {
@@ -148,13 +42,43 @@ internal static class ArchitectureIgnoreMatcher
         return Regex.IsMatch(normalizedValue, regexPattern, RegexOptions.CultureInvariant, _matchTimeout);
     }
 
-    private static bool ContainsGlobSyntax(string pattern)
+    internal static CompiledPattern CompilePattern(string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
+            return CompiledPattern.Never;
+        }
+
+        string normalizedPattern = Normalize(pattern);
+        if (normalizedPattern == "*")
+        {
+            return CompiledPattern.Any;
+        }
+
+        if (normalizedPattern.EndsWith('*')
+            && !normalizedPattern.Contains("**", StringComparison.Ordinal)
+            && normalizedPattern.Count(ch => ch == '*') == 1
+            && !normalizedPattern.Contains('?'))
+        {
+            return CompiledPattern.Prefix(normalizedPattern[..^1]);
+        }
+
+        if (!ContainsGlobSyntax(normalizedPattern))
+        {
+            return CompiledPattern.Exact(normalizedPattern);
+        }
+
+        string regexPattern = "^" + GlobToRegex(normalizedPattern) + "$";
+        return CompiledPattern.Regex(new Regex(regexPattern, RegexOptions.CultureInvariant, _matchTimeout));
+    }
+
+    internal static bool ContainsGlobSyntax(string pattern)
     {
         return pattern.Contains('*', StringComparison.Ordinal)
                || pattern.Contains('?', StringComparison.Ordinal);
     }
 
-    private static string Normalize(string value)
+    internal static string Normalize(string value)
     {
         return value.Replace('\\', '/');
     }
@@ -169,5 +93,61 @@ internal static class ArchitectureIgnoreMatcher
         escaped = escaped.Replace("<<<DOUBLESTAR>>>", ".*");
 
         return escaped;
+    }
+
+    internal sealed class CompiledPattern
+    {
+        private readonly MatchKind _kind;
+        private readonly string? _pattern;
+        private readonly Regex? _regex;
+
+        private CompiledPattern(MatchKind kind, string? pattern = null, Regex? regex = null)
+        {
+            _kind = kind;
+            _pattern = pattern;
+            _regex = regex;
+        }
+
+        internal static CompiledPattern Never { get; } = new(MatchKind.Never);
+
+        internal static CompiledPattern Any { get; } = new(MatchKind.Any);
+
+        internal static CompiledPattern Exact(string pattern)
+        {
+            return new CompiledPattern(MatchKind.Exact, pattern);
+        }
+
+        internal static CompiledPattern Prefix(string pattern)
+        {
+            return new CompiledPattern(MatchKind.Prefix, pattern);
+        }
+
+        internal static CompiledPattern Regex(Regex regex)
+        {
+            return new CompiledPattern(MatchKind.Regex, regex: regex);
+        }
+
+        internal bool IsMatch(string value)
+        {
+            string normalizedValue = Normalize(value);
+            return _kind switch
+            {
+                MatchKind.Never => false,
+                MatchKind.Any => true,
+                MatchKind.Exact => normalizedValue == _pattern,
+                MatchKind.Prefix => normalizedValue.StartsWith(_pattern!, StringComparison.Ordinal),
+                MatchKind.Regex => _regex!.IsMatch(normalizedValue),
+                _ => throw new ArgumentOutOfRangeException(),
+            };
+        }
+
+        private enum MatchKind
+        {
+            Never,
+            Any,
+            Exact,
+            Prefix,
+            Regex,
+        }
     }
 }

@@ -6,6 +6,7 @@ namespace ArchLinterNet.Core.Resolution;
 internal sealed class ArchitectureContractExecutionContext
 {
     private readonly IReadOnlyList<ArchitectureIgnoredViolation> _ignoredViolations;
+    private readonly ArchitectureIgnoreMatcherIndex _ignoreMatcherIndex;
     private readonly ArchitectureIgnoreUsageTracker? _tracker;
     private readonly string? _contractGroup;
     private readonly List<ArchitectureBaselineCandidate>? _baselineCandidates;
@@ -26,11 +27,15 @@ internal sealed class ArchitectureContractExecutionContext
         bool enableUnmatchedIgnoreTracking,
         string? contractGroup,
         List<ArchitectureBaselineCandidate>? baselineCandidates,
-        List<ArchitectureBaselineCandidate>? findingIdentityCandidates = null)
+        List<ArchitectureBaselineCandidate>? findingIdentityCandidates = null,
+        CancellationToken cancellationToken = default,
+        ArchitectureIgnoreMatcherWorkCounter? matcherWorkCounter = null)
     {
         ContractName = contractName ?? throw new ArgumentNullException(nameof(contractName));
         ContractId = contractId;
         _ignoredViolations = ignoredViolations ?? throw new ArgumentNullException(nameof(ignoredViolations));
+        _ignoreMatcherIndex = ArchitectureIgnoreMatcherIndex.Build(
+            _ignoredViolations, cancellationToken, matcherWorkCounter);
         _tracker = enableUnmatchedIgnoreTracking && ignoredViolations.Count > 0
             ? new ArchitectureIgnoreUsageTracker()
             : null;
@@ -62,8 +67,14 @@ internal sealed class ArchitectureContractExecutionContext
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
             sourceType, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
 
-        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(
-            sourceType, forbiddenReference, _ignoredViolations, _tracker, liveIdentity, out bool matchedByLoadedBaseline);
+        string? liveWaiverFingerprint = _ignoreMatcherIndex.CreateLiveWaiverFingerprint(liveIdentity);
+        bool ignored = _ignoreMatcherIndex.IsIgnored(
+            sourceType,
+            forbiddenReference,
+            _tracker,
+            liveIdentity,
+            liveWaiverFingerprint,
+            out bool matchedByLoadedBaseline);
 
         if (ContractId != null && liveIdentity != null)
         {
@@ -132,6 +143,7 @@ internal sealed class ArchitectureContractExecutionContext
 
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
             sourceType, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
+        string? liveWaiverFingerprint = _ignoreMatcherIndex.CreateLiveWaiverFingerprint(liveIdentity);
 
         // Deliberately does not stop at the first matching alias (PublicApiSurfaceChecker calls this
         // with more than one representation of the same finding -- e.g. a signature and its
@@ -145,8 +157,14 @@ internal sealed class ArchitectureContractExecutionContext
         bool matchedByLoadedBaseline = false;
         foreach (string alias in forbiddenReferenceAliases)
         {
-            if (ArchitectureIgnoreMatcher.IsIgnored(
-                    sourceType, alias, _ignoredViolations, _tracker, liveIdentity, out bool aliasMatchedByLoadedBaseline))
+            _ignoreMatcherIndex.ThrowIfCancellationRequested();
+            if (_ignoreMatcherIndex.IsIgnored(
+                    sourceType,
+                    alias,
+                    _tracker,
+                    liveIdentity,
+                    liveWaiverFingerprint,
+                    out bool aliasMatchedByLoadedBaseline))
             {
                 ignored = true;
                 matchedByLoadedBaseline |= aliasMatchedByLoadedBaseline;

@@ -283,7 +283,8 @@ public sealed class ArchitectureAnalysisSession
             EnableUnmatchedIgnoreTracking,
             contractGroup,
             _cycleBaselineCandidateRecorder.CandidateStore,
-            _findingIdentityService.Candidates);
+            _findingIdentityService.Candidates,
+            Context.CancellationToken);
     }
 
     internal void CollectUnmatchedIgnores(ArchitectureContractExecutionContext executionContext)

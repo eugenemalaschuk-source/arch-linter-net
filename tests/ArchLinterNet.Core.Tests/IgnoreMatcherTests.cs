@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class IgnoreMatcherTests
+public sealed partial class IgnoreMatcherTests
 {
     [Test]
     public void IsIgnored_ExactMatch_ReturnsTrue()
@@ -16,7 +16,7 @@ public sealed class IgnoreMatcherTests
             new() { SourceType = "A", ForbiddenReference = "B" }
         };
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("A", "B", ignored);
+        bool result = IsIgnored("A", "B", ignored);
 
         Assert.That(result, Is.True);
     }
@@ -29,7 +29,7 @@ public sealed class IgnoreMatcherTests
             new() { SourceType = "A", ForbiddenReference = "B" }
         };
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("X", "Y", ignored);
+        bool result = IsIgnored("X", "Y", ignored);
 
         Assert.That(result, Is.False);
     }
@@ -42,7 +42,7 @@ public sealed class IgnoreMatcherTests
             new() { SourceType = "MyApp.*", ForbiddenReference = "B" }
         };
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("MyApp.Services.Foo", "B", ignored);
+        bool result = IsIgnored("MyApp.Services.Foo", "B", ignored);
 
         Assert.That(result, Is.True);
     }
@@ -55,7 +55,7 @@ public sealed class IgnoreMatcherTests
             new() { SourceType = "MyApp.*", ForbiddenReference = "B" }
         };
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("Other.Services.Foo", "B", ignored);
+        bool result = IsIgnored("Other.Services.Foo", "B", ignored);
 
         Assert.That(result, Is.False);
     }
@@ -68,7 +68,7 @@ public sealed class IgnoreMatcherTests
             new() { SourceType = "*", ForbiddenReference = "MyApp.**.Models.*" }
         };
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("Any.Source", "MyApp.Domain.Models.Foo", ignored);
+        bool result = IsIgnored("Any.Source", "MyApp.Domain.Models.Foo", ignored);
 
         Assert.That(result, Is.True);
     }
@@ -81,7 +81,7 @@ public sealed class IgnoreMatcherTests
             new() { SourceType = "MyApp.?ervice*", ForbiddenReference = "B" }
         };
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("MyApp.Services.Foo", "B", ignored);
+        bool result = IsIgnored("MyApp.Services.Foo", "B", ignored);
 
         Assert.That(result, Is.True);
     }
@@ -94,7 +94,7 @@ public sealed class IgnoreMatcherTests
             new() { SourceType = "", ForbiddenReference = "" }
         };
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("A", "B", ignored);
+        bool result = IsIgnored("A", "B", ignored);
 
         Assert.That(result, Is.False);
     }
@@ -107,9 +107,9 @@ public sealed class IgnoreMatcherTests
             new() { SourceType = "A", ForbiddenReference = "B" }
         };
 
-        Assert.That(ArchitectureIgnoreMatcher.IsIgnored("A", "B", ignored), Is.True);
-        Assert.That(ArchitectureIgnoreMatcher.IsIgnored("A", "C", ignored), Is.False);
-        Assert.That(ArchitectureIgnoreMatcher.IsIgnored("X", "B", ignored), Is.False);
+        Assert.That(IsIgnored("A", "B", ignored), Is.True);
+        Assert.That(IsIgnored("A", "C", ignored), Is.False);
+        Assert.That(IsIgnored("X", "B", ignored), Is.False);
     }
 
     [Test]
@@ -155,7 +155,7 @@ public sealed class IgnoreMatcherTests
         };
         var tracker = new ArchitectureIgnoreUsageTracker();
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("A", "B", ignored, tracker);
+        bool result = IsIgnored("A", "B", ignored, tracker);
 
         Assert.That(result, Is.True);
         Assert.That(tracker.IsMatched(0), Is.True);
@@ -172,7 +172,7 @@ public sealed class IgnoreMatcherTests
         };
         var tracker = new ArchitectureIgnoreUsageTracker();
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("X", "Y", ignored, tracker);
+        bool result = IsIgnored("X", "Y", ignored, tracker);
 
         Assert.That(result, Is.False);
         Assert.That(tracker.MatchedIndexes, Is.Empty);
@@ -188,7 +188,7 @@ public sealed class IgnoreMatcherTests
         };
         var tracker = new ArchitectureIgnoreUsageTracker();
 
-        ArchitectureIgnoreMatcher.IsIgnored("A", "B", ignored, tracker);
+        IsIgnored("A", "B", ignored, tracker);
 
         Assert.That(tracker.IsMatched(0), Is.True, "Broad wildcard entry should be tracked");
         Assert.That(tracker.IsMatched(1), Is.True, "Specific overlapping entry should also be tracked");
@@ -202,8 +202,18 @@ public sealed class IgnoreMatcherTests
             new() { SourceType = "*", ForbiddenReference = "B" }
         };
 
-        bool result = ArchitectureIgnoreMatcher.IsIgnored("A", "B", ignored);
+        bool result = IsIgnored("A", "B", ignored);
 
         Assert.That(result, Is.True);
+    }
+
+    private static bool IsIgnored(
+        string sourceType,
+        string forbiddenReference,
+        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
+        ArchitectureIgnoreUsageTracker? usageTracker = null)
+    {
+        var index = ArchitectureIgnoreMatcherIndex.Build(ignoredViolations);
+        return index.IsIgnored(sourceType, forbiddenReference, usageTracker, null, null, out _);
     }
 }
