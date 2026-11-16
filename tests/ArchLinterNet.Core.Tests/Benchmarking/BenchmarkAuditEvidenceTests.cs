@@ -78,15 +78,21 @@ public sealed class BenchmarkAuditEvidenceTests
         using JsonDocument serializedEvidence = JsonDocument.Parse(json);
         JsonElement serializedSample = serializedEvidence.RootElement.GetProperty("samples").EnumerateArray().Single();
         bool samplesAreMultiline = serializedSample.GetRawText().Contains('\n');
-        string rawProfileSha256 = serializedSample.GetProperty("raw_analysis_profile_sha256").GetString()!;
-        bool fullProfileIsCompressed = serializedSample
-            .GetProperty("raw_analysis_profile_gzip_base64")
-            .GetString() is { Length: > 0 };
-        BenchmarkEvidenceDocument roundTrip = BenchmarkEvidenceJson.Deserialize(json);
-        string repeatedSerialization = BenchmarkEvidenceJson.Serialize(evidence);
+        string archiveJson = BenchmarkEvidenceJson.SerializeArchive(json);
+        using JsonDocument archive = JsonDocument.Parse(archiveJson);
+        string archiveSha256 = archive.RootElement.GetProperty("payload_sha256").GetString()!;
+        bool archiveChunksAreBounded = archive.RootElement.GetProperty("payload_base64_chunks")
+            .EnumerateArray()
+            .All(chunk => chunk.GetString() is { Length: > 0 and <= 4096 });
+        BenchmarkEvidenceDocument roundTrip = BenchmarkEvidenceJson.Deserialize(archiveJson);
+        BenchmarkEvidenceDocument directRoundTrip = BenchmarkEvidenceJson.Deserialize(json);
+        string repeatedArchive = BenchmarkEvidenceJson.SerializeArchive(json);
         JsonSchema schema = JsonSchemaTextFactory.FromText(LoadEvidenceSchema());
         EvaluationResults validation = schema.Evaluate(
             JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
+        JsonSchema archiveSchema = JsonSchemaTextFactory.FromText(LoadArchiveEvidenceSchema());
+        EvaluationResults archiveValidation = archiveSchema.Evaluate(
+            JsonNode.Parse(archiveJson), new EvaluationOptions { OutputFormat = OutputFormat.List });
 
         evidence.Validate();
         Assert.Multiple(() =>
@@ -108,15 +114,18 @@ public sealed class BenchmarkAuditEvidenceTests
                 Is.EqualTo(sample.LoadedAssemblies.Sha256));
             Assert.That(roundTrip.Samples.Single().RawAnalysisProfile.GetProperty("Output")
                 .GetProperty("OutputFailed").GetBoolean(), Is.False);
+            Assert.That(directRoundTrip.Samples.Single().RawAnalysisProfile.GetProperty("Phases").GetArrayLength(),
+                Is.EqualTo(0));
             Assert.That(samplesAreMultiline, Is.True,
                 "Large measurement samples must remain indented in committed evidence JSON.");
-            Assert.That(fullProfileIsCompressed, Is.True);
-            Assert.That(repeatedSerialization, Is.EqualTo(json), "Compressed profile evidence must be deterministic.");
+            Assert.That(archiveChunksAreBounded, Is.True);
+            Assert.That(repeatedArchive, Is.EqualTo(archiveJson), "Evidence archives must be deterministic.");
             Assert.That(validation.IsValid, Is.True, Describe(validation));
+            Assert.That(archiveValidation.IsValid, Is.True, Describe(archiveValidation));
         });
 
-        string corruptedProfileDigest = json.Replace(rawProfileSha256, new string('0', 64), StringComparison.Ordinal);
-        Assert.That(() => BenchmarkEvidenceJson.Deserialize(corruptedProfileDigest),
+        string corruptedArchiveDigest = archiveJson.Replace(archiveSha256, new string('0', 64), StringComparison.Ordinal);
+        Assert.That(() => BenchmarkEvidenceJson.Deserialize(corruptedArchiveDigest),
             Throws.InvalidOperationException.With.Message.Contains("SHA-256"));
     }
 
@@ -256,6 +265,17 @@ public sealed class BenchmarkAuditEvidenceTests
             "internal",
             "large-solution-benchmarking",
             "benchmark-evidence-v1.schema.json"));
+    }
+
+    private static string LoadArchiveEvidenceSchema()
+    {
+        string root = new ArchitectureRepositoryRootResolver().Resolve();
+        return File.ReadAllText(Path.Combine(
+            root,
+            "docs",
+            "internal",
+            "large-solution-benchmarking",
+            "benchmark-evidence-archive-v1.schema.json"));
     }
 
     private static string Describe(EvaluationResults results) =>

@@ -47,27 +47,41 @@ public sealed class BenchmarkAuditMatrixTests
             "internal",
             "large-solution-benchmarking",
             "benchmark-evidence-v1.schema.json")));
+        JsonSchema archiveSchema = JsonSchemaTextFactory.FromText(File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "docs",
+            "internal",
+            "large-solution-benchmarking",
+            "benchmark-evidence-archive-v1.schema.json")));
         int workloadCount = 0;
         foreach (BenchmarkWorkloadDefinition workload in EnumerateAuditScaleWorkloads(catalog.RootElement)
                      .Concat(EnumerateContractGraphScaleWorkloads(catalog.RootElement)))
         {
             string outputPath = Path.Combine(evidenceDirectory, $"{workload.WorkloadId}.json");
             BenchmarkEvidenceDocument evidence = RunWorkload(workload, repositoryRoot, sourceRevision);
-            string json = BenchmarkEvidenceJson.Serialize(evidence);
-            string[] evidenceLines = json.Split(Environment.NewLine, StringSplitOptions.None);
+            string evidenceJson = BenchmarkEvidenceJson.Serialize(evidence);
+            EvaluationResults validation = schema.Evaluate(
+                JsonNode.Parse(evidenceJson), new EvaluationOptions { OutputFormat = OutputFormat.List });
+            Assert.That(validation.IsValid, Is.True,
+                $"{workload.WorkloadId}: {Describe(validation)}");
+
+            string archivedJson = BenchmarkEvidenceJson.SerializeArchive(evidenceJson);
+            string[] evidenceLines = archivedJson.Split(Environment.NewLine, StringSplitOptions.None);
             int maximumLineBytes = evidenceLines.Max(line => Encoding.UTF8.GetByteCount(line));
-            int evidenceBytes = Encoding.UTF8.GetByteCount(json);
+            int evidenceBytes = Encoding.UTF8.GetByteCount(archivedJson);
             Assert.That(evidenceLines.Length, Is.LessThan(300),
                 $"{workload.WorkloadId} must stay below GitHub's complete-patch review limit.");
             Assert.That(maximumLineBytes, Is.LessThanOrEqualTo(8 * 1024 + 64),
                 $"{workload.WorkloadId} contains an overlong JSON line.");
             Assert.That(evidenceBytes, Is.LessThan(96 * 1024),
                 $"{workload.WorkloadId} must stay below GitHub's per-file patch limit.");
-            EvaluationResults validation = schema.Evaluate(
-                JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
-            Assert.That(validation.IsValid, Is.True,
-                $"{workload.WorkloadId}: {Describe(validation)}");
-            File.WriteAllText(outputPath, json + Environment.NewLine);
+            EvaluationResults archiveValidation = archiveSchema.Evaluate(
+                JsonNode.Parse(archivedJson), new EvaluationOptions { OutputFormat = OutputFormat.List });
+            Assert.That(archiveValidation.IsValid, Is.True,
+                $"{workload.WorkloadId} archive: {Describe(archiveValidation)}");
+            BenchmarkEvidenceDocument restored = BenchmarkEvidenceJson.Deserialize(archivedJson);
+            Assert.That(restored.Environment.SourceRevision, Is.EqualTo(sourceRevision));
+            File.WriteAllText(outputPath, archivedJson + Environment.NewLine);
             TestContext.Progress.WriteLine(
                 $"{workload.WorkloadId}: input={evidence.Environment.MaterializedInputSha256}, result={evidence.CanonicalResult.Sha256}");
             workloadCount++;
