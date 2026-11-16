@@ -8,13 +8,17 @@ internal static class LineChurnCalculator
     private const int MaxMyersEditDistance = 32;
 
     public static (long Additions, long Deletions) Compute(byte[] oldContent, byte[] newContent)
-        => ComputeCore(oldContent, newContent, collectWork: false, out _);
+    {
+        return ComputeCore(oldContent, newContent, collectWork: false, out _);
+    }
 
     internal static (long Additions, long Deletions) ComputeWithWork(
         byte[] oldContent,
         byte[] newContent,
         out WorkCounts work)
-        => ComputeCore(oldContent, newContent, collectWork: true, out work);
+    {
+        return ComputeCore(oldContent, newContent, collectWork: true, out work);
+    }
 
     private static (long Additions, long Deletions) ComputeCore(
         byte[] oldContent,
@@ -28,7 +32,10 @@ internal static class LineChurnCalculator
         return (newLines.Count - common, oldLines.Count - common);
     }
 
-    public static bool ContainsNul(byte[] content) => Array.IndexOf(content, (byte)0) >= 0;
+    public static bool ContainsNul(byte[] content)
+    {
+        return Array.IndexOf(content, (byte)0) >= 0;
+    }
 
     // LF terminates a line and is not payload. CR stays payload, empty content has zero lines, and a
     // terminal LF adds no extra trailing line.

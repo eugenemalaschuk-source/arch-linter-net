@@ -1,4 +1,3 @@
-using System.Text;
 using ArchLinterNet.Core.History.Evidence;
 using NUnit.Framework;
 
@@ -30,8 +29,8 @@ public sealed class HistoryLineChurnTests
     public void AmbiguousDiffScriptsProduceOneDeterministicTotal()
     {
         (long additions, long deletions) = LineChurnCalculator.ComputeWithWork(
-            Encoding.ASCII.GetBytes("a\nb\na\nb\n"),
-            Encoding.ASCII.GetBytes("b\na\nb\na\n"),
+            "a\nb\na\nb\n"u8.ToArray(),
+            "b\na\nb\na\n"u8.ToArray(),
             out LineChurnCalculator.WorkCounts work);
 
         Assert.That(deletions, Is.EqualTo(1));
@@ -43,8 +42,8 @@ public sealed class HistoryLineChurnTests
     public void CommonPrefixAndSuffixReductionPreservesLcsLength()
     {
         (long additions, long deletions) = LineChurnCalculator.Compute(
-            Encoding.ASCII.GetBytes("h1\nh2\nx\nt1\nt2\n"),
-            Encoding.ASCII.GetBytes("h1\nh2\ny\nz\nt1\nt2\n"));
+            "h1\nh2\nx\nt1\nt2\n"u8.ToArray(),
+            "h1\nh2\ny\nz\nt1\nt2\n"u8.ToArray());
 
         Assert.That(deletions, Is.EqualTo(1));
         Assert.That(additions, Is.EqualTo(2));
@@ -53,15 +52,15 @@ public sealed class HistoryLineChurnTests
     [Test]
     public void AnEmptySideIsTheEmptyByteSequence()
     {
-        Assert.That(LineChurnCalculator.Compute([], Encoding.ASCII.GetBytes("a\nb\nc\n")), Is.EqualTo((3L, 0L)));
-        Assert.That(LineChurnCalculator.Compute(Encoding.ASCII.GetBytes("a\nb\nc\n"), []), Is.EqualTo((0L, 3L)));
+        Assert.That(LineChurnCalculator.Compute([], "a\nb\nc\n"u8.ToArray()), Is.EqualTo((3L, 0L)));
+        Assert.That(LineChurnCalculator.Compute("a\nb\nc\n"u8.ToArray(), []), Is.EqualTo((0L, 3L)));
     }
 
     [Test]
     public void NulDetectionIsExactByteDetection()
     {
-        Assert.That(LineChurnCalculator.ContainsNul([0x41, 0x00, 0x42]), Is.True);
-        Assert.That(LineChurnCalculator.ContainsNul([0x41, 0x42]), Is.False);
+        Assert.That(LineChurnCalculator.ContainsNul("A\0B"u8.ToArray()), Is.True);
+        Assert.That(LineChurnCalculator.ContainsNul("AB"u8.ToArray()), Is.False);
         Assert.That(LineChurnCalculator.ContainsNul([]), Is.False);
     }
 
@@ -224,9 +223,11 @@ public sealed class HistoryLineChurnTests
     public void LargeLengthDifferenceSkipsFrontierAllocationAndFallsBackExactly()
     {
         string[] oldLines = Enumerable.Range(0, 100).Select(static line => $"old-{line:0000}").ToArray();
-        string[] newLines = Enumerable.Range(0, 100).Select(static line => $"new-{line:0000}")
-            .Concat(oldLines.Reverse())
-            .ToArray();
+        string[] newLines =
+        [
+            .. Enumerable.Range(0, 100).Select(static line => $"new-{line:0000}"),
+            .. oldLines.Reverse()
+        ];
 
         (long expectedAdditions, long expectedDeletions) = ReferenceChurn(oldLines, newLines);
         (long additions, long deletions) = LineChurnCalculator.ComputeWithWork(
@@ -247,7 +248,7 @@ public sealed class HistoryLineChurnTests
     [Test]
     public void NulBlobStillRoutesToBinaryEvidenceWithoutTextChurn()
     {
-        using GitTestRepository repository = GitTestRepository.Create();
+        using var repository = GitTestRepository.Create();
         repository.WriteBytes("binary.bin", [0x01, 0x00, 0x02]);
         string first = repository.Commit("add binary");
         repository.WriteBytes("binary.bin", [0x03, 0x00, 0x04]);
@@ -264,7 +265,7 @@ public sealed class HistoryLineChurnTests
     [Test]
     public void ChurnMatchesGitNumstatOnAMixedEdit()
     {
-        using GitTestRepository repository = GitTestRepository.Create();
+        using var repository = GitTestRepository.Create();
         repository.Write("a.txt", "one\ntwo\nthree\nfour\nfive\n");
         string first = repository.Commit("first");
         repository.Write("a.txt", "one\ntwo prime\nthree\ninserted\nfour\nfive\n");
@@ -311,7 +312,9 @@ public sealed class HistoryLineChurnTests
     }
 
     private static byte[] EncodeLines(IReadOnlyList<string> lines)
-        => Encoding.UTF8.GetBytes(string.Join('\n', lines));
+    {
+        return System.Text.Encoding.UTF8.GetBytes(string.Join('\n', lines));
+    }
 
     private static (long Additions, long Deletions) ReferenceChurn(
         IReadOnlyList<string> oldLines,

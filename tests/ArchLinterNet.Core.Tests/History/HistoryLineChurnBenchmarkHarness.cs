@@ -7,7 +7,6 @@ using System.Text.Json;
 using ArchLinterNet.Core.History;
 using ArchLinterNet.Core.History.Evidence;
 using ArchLinterNet.Core.Resolution;
-using ArchLinterNet.Core.Tests.Benchmarking;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests.History;
@@ -100,14 +99,24 @@ public sealed class HistoryLineChurnBenchmarkHarness
         foreach (LineChurnBaselineMeasurement measurement in measurements)
         {
             TestContext.Out.WriteLine(
-                $"{measurement.WorkloadId}: dpCells={measurement.BaselineDpCellUpdates}, " +
-                $"medianMs={measurement.MedianMilliseconds:F3}, allocatedBytes={measurement.MedianAllocatedBytes}");
+                $"{measurement.WorkloadId}: family={measurement.Family}, lineCount={measurement.LineCount}, " +
+                $"editCount={measurement.EditCount}, reducedLines={measurement.ReducedOldLineCount}/{measurement.ReducedNewLineCount}, " +
+                $"dpCells={measurement.BaselineDpCellUpdates}, " +
+                $"timeSamplesMs=[{string.Join(',', measurement.ElapsedMillisecondsSamples)}], " +
+                $"medianMs={measurement.MedianMilliseconds:F3}, " +
+                $"allocationSamples=[{string.Join(',', measurement.AllocatedBytesSamples)}], " +
+                $"allocatedBytes={measurement.MedianAllocatedBytes}");
         }
 
         foreach (HistoryIngestionBaselineMeasurement measurement in ingestionMeasurements)
         {
             TestContext.Out.WriteLine(
-                $"{measurement.WorkloadId}: directToIngestionShare={measurement.DirectToIngestionShare:P2}, " +
+                $"{measurement.WorkloadId}: directMedianMs={measurement.DirectCalculatorMedianMilliseconds:F3}, " +
+                $"fullIngestMedianMs={measurement.FullIngestionCallMedianMilliseconds:F3}, " +
+                $"fullIngestSamplesMs=[{string.Join(',', measurement.FullIngestionCallSamplesMilliseconds)}], " +
+                $"phaseMedianMs={measurement.IngestionPhaseMedianMilliseconds:F3}, " +
+                $"phaseSamplesMs=[{string.Join(',', measurement.IngestionPhaseSamplesMilliseconds)}], " +
+                $"directToIngestionShare={measurement.DirectToIngestionShare:P2}, " +
                 $"endToEndAmdahlUpperBound={measurement.EndToEndAmdahlUpperBound:F3}x");
         }
     }
@@ -133,7 +142,7 @@ public sealed class HistoryLineChurnBenchmarkHarness
             .ThenBy(static workload => workload.Dimensions["line_count"])
             .ToArray();
         string evidenceDirectory = Path.Combine(repositoryRoot, "docs", "internal", "large-solution-benchmarking", "issue-1138");
-        using JsonDocument baseline = JsonDocument.Parse(File.ReadAllText(Path.Combine(evidenceDirectory, "baseline.json")));
+        using var baseline = JsonDocument.Parse(File.ReadAllText(Path.Combine(evidenceDirectory, "baseline.json")));
 
         List<LineChurnCurrentMeasurement> measurements = [];
         foreach (BenchmarkHistoryWorkloadInput workload in workloads)
@@ -189,6 +198,9 @@ public sealed class HistoryLineChurnBenchmarkHarness
             TestContext.Out.WriteLine(
                 $"{measurement.WorkloadId}: fast={measurement.FastPathWork}, " +
                 $"dpCells={measurement.Work.DynamicProgrammingCells}, " +
+                $"totalWork={measurement.TotalAlgorithmWork}, baselineDpCells={measurement.BaselineDpCellUpdates}, " +
+                $"timeRatio={measurement.DirectTimeRatio:F3}, allocationRatio={measurement.AllocationRatio:F3}, " +
+                $"frontierBytes={measurement.FrontierBytes}, rowBytes={measurement.DynamicProgrammingRowBytes}, " +
                 $"medianMs={measurement.Direct.MedianMilliseconds:F3}, " +
                 $"allocatedBytes={measurement.Direct.MedianAllocatedBytes}");
         }
@@ -278,7 +290,7 @@ public sealed class HistoryLineChurnBenchmarkHarness
             GC.Collect();
 
             long allocationStart = GC.GetAllocatedBytesForCurrentThread();
-            Stopwatch stopwatch = Stopwatch.StartNew();
+            var stopwatch = Stopwatch.StartNew();
             (long measuredAdditions, long measuredDeletions) = LineChurnCalculator.Compute(oldContent, newContent);
             stopwatch.Stop();
             allocatedBytes[sample] = GC.GetAllocatedBytesForCurrentThread() - allocationStart;
@@ -317,7 +329,7 @@ public sealed class HistoryLineChurnBenchmarkHarness
             BindingFlags.Static | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("The current line-churn calculator does not expose work counters.");
         object?[] arguments = [oldContent, newContent, null];
-        ValueTuple<long, long> churn = (ValueTuple<long, long>)method.Invoke(null, arguments)!;
+        var churn = (ValueTuple<long, long>)method.Invoke(null, arguments)!;
         object work = arguments[2] ?? throw new InvalidOperationException("The line-churn work counters were not returned.");
 
         return (
@@ -341,13 +353,15 @@ public sealed class HistoryLineChurnBenchmarkHarness
     }
 
     private static bool IsExpectedBaselineCalculatorBlob(string blob)
-        => string.Equals(blob, ExpectedBaselineCalculatorBlob, StringComparison.Ordinal);
+    {
+        return string.Equals(blob, ExpectedBaselineCalculatorBlob, StringComparison.Ordinal);
+    }
 
     private static HistoryIngestionBaselineMeasurement MeasureIngestion(
         BenchmarkHistoryWorkloadInput workload,
         LineChurnBaselineMeasurement direct)
     {
-        using GitTestRepository repository = GitTestRepository.Create();
+        using var repository = GitTestRepository.Create();
         repository.Write("src/line-churn.txt", workload.BeforeText ?? string.Empty);
         string from = repository.Commit("line churn baseline");
         repository.Write("src/line-churn.txt", workload.AfterText ?? string.Empty);
@@ -369,7 +383,7 @@ public sealed class HistoryLineChurnBenchmarkHarness
             GC.Collect();
 
             HistoryIngestionTiming timing = new();
-            Stopwatch fullIngestionClock = Stopwatch.StartNew();
+            var fullIngestionClock = Stopwatch.StartNew();
             HistoryIngestionOutcome outcome = HistoryIngestionService.Default.Ingest(
                 new HistoryIngestionRequest(repository.Path, from, to),
                 timing);
@@ -383,7 +397,7 @@ public sealed class HistoryLineChurnBenchmarkHarness
         double medianIngestionMilliseconds = Median(ingestionMilliseconds);
         double share = direct.MedianMilliseconds / medianIngestionMilliseconds;
         double? measuredShare = share is >= 0d and < 1d ? share : null;
-        double? amdahlBound = measuredShare.HasValue ? 1d / (1d - measuredShare.Value) : null;
+        double? amdahlBound = share is >= 0d and < 1d ? 1d / (1d - share) : null;
         TestContext.Out.WriteLine(
             $"{workload.WorkloadId}: fullIngestMedianMs={medianFullIngestionCallMilliseconds:F3}, " +
             $"fullIngestSamplesMs=[{string.Join(",", fullIngestionCallMilliseconds.Select(static value => value.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)))}], " +
@@ -423,7 +437,7 @@ public sealed class HistoryLineChurnBenchmarkHarness
 
     private static (long Additions, long Deletions) ReadExpectedChurn(BenchmarkHistoryWorkloadInput workload)
     {
-        using JsonDocument expected = JsonDocument.Parse(workload.ExpectedOutputJson);
+        using var expected = JsonDocument.Parse(workload.ExpectedOutputJson);
         JsonElement values = expected.RootElement;
         return (values.GetProperty("additions").GetInt64(), values.GetProperty("deletions").GetInt64());
     }
@@ -463,7 +477,7 @@ public sealed class HistoryLineChurnBenchmarkHarness
             startInfo.ArgumentList.Add(argument);
         }
 
-        using Process process = Process.Start(startInfo)!;
+        using var process = Process.Start(startInfo)!;
         string output = process.StandardOutput.ReadToEnd();
         string error = process.StandardError.ReadToEnd();
         process.WaitForExit();
