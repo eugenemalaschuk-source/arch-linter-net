@@ -96,20 +96,9 @@ internal static class BenchmarkEvidenceJson
 
     private static void WriteRawProfileSummary(Utf8JsonWriter writer, JsonElement profile)
     {
+        // The complete profile is kept in the adjacent lossless compressed payload.
         writer.WriteStartObject();
         CopyProfileProperty(writer, profile, "SchemaId");
-        CopyProfileProperty(writer, profile, "CompletionStatus");
-        CopyProfileProperty(writer, profile, "CancellationObserved");
-
-        if (profile.TryGetProperty("Counters", out JsonElement counters))
-        {
-            writer.WritePropertyName("Counters");
-            writer.WriteStartObject();
-            CopyProfileProperty(writer, counters, "ContractFamilyCounts");
-            CopyProfileProperty(writer, counters, "ContractFamilyResultCounts");
-            writer.WriteEndObject();
-        }
-
         writer.WriteEndObject();
     }
 
