@@ -1,6 +1,8 @@
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.Profiling;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 
 namespace ArchLinterNet.Core.IO;
 
@@ -38,17 +40,46 @@ public sealed class RoslynCompilationFactory : IRoslynCompilationFactory
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
-    private static List<MetadataReference> BuildMetadataReferences(
-        IReadOnlyList<string> referenceAssemblyPaths, IArchitectureFileSystem fileSystem)
+    internal static IReadOnlyList<SyntaxTree> ParseMethodBodySourceFiles(
+        IReadOnlyList<ArchitectureMethodBodySourceFile> sourceFiles,
+        IReadOnlyList<string>? preprocessorSymbols,
+        CancellationToken cancellationToken,
+        BenchmarkWorkObserver? benchmarkWorkObserver)
     {
-        return referenceAssemblyPaths
-            .Where(fileSystem.FileExists)
-            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
-            .ToList();
+        CSharpParseOptions? parseOptions = preprocessorSymbols is { Count: > 0 }
+            ? CSharpParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbols)
+            : null;
+
+        List<SyntaxTree> syntaxTrees = new(sourceFiles.Count);
+        foreach (ArchitectureMethodBodySourceFile sourceFile in sourceFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            benchmarkWorkObserver?.RecordMethodBodySyntaxTreeParse();
+            SourceText text = sourceFile.Text;
+            syntaxTrees.Add(CSharpSyntaxTree.ParseText(
+                text, options: parseOptions, path: sourceFile.Path, cancellationToken: cancellationToken));
+        }
+
+        return syntaxTrees;
     }
 
-    private static List<MetadataReference> BuildMetadataReferences(
-        IArchitectureFileSystem fileSystem, IArchitectureAssemblyLoader assemblyLoader)
+    internal static CSharpCompilation CreateMethodBodyCompilation(
+        string assemblyName,
+        IReadOnlyList<SyntaxTree> syntaxTrees,
+        IReadOnlyList<string> referenceAssemblyPaths,
+        IArchitectureFileSystem fileSystem)
+    {
+        List<MetadataReference> references = BuildMetadataReferences(referenceAssemblyPaths, fileSystem);
+        return CSharpCompilation.Create(
+            assemblyName,
+            syntaxTrees,
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    internal static IReadOnlyList<string> GetDefaultReferenceAssemblyPaths(
+        IArchitectureFileSystem fileSystem,
+        IArchitectureAssemblyLoader assemblyLoader)
     {
         HashSet<string> paths = new(StringComparer.OrdinalIgnoreCase);
 
@@ -56,7 +87,7 @@ public sealed class RoslynCompilationFactory : IRoslynCompilationFactory
         if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
         {
             foreach (string path in trustedPlatformAssemblies.Split(Path.PathSeparator)
-                .Where(p => !string.IsNullOrWhiteSpace(p) && fileSystem.FileExists(p)))
+                .Where(path => !string.IsNullOrWhiteSpace(path) && fileSystem.FileExists(path)))
             {
                 paths.Add(path);
             }
@@ -81,8 +112,21 @@ public sealed class RoslynCompilationFactory : IRoslynCompilationFactory
             }
         }
 
-        return paths
+        return paths.ToArray();
+    }
+
+    private static List<MetadataReference> BuildMetadataReferences(
+        IReadOnlyList<string> referenceAssemblyPaths, IArchitectureFileSystem fileSystem)
+    {
+        return referenceAssemblyPaths
+            .Where(fileSystem.FileExists)
             .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
             .ToList();
+    }
+
+    private static List<MetadataReference> BuildMetadataReferences(
+        IArchitectureFileSystem fileSystem, IArchitectureAssemblyLoader assemblyLoader)
+    {
+        return BuildMetadataReferences(GetDefaultReferenceAssemblyPaths(fileSystem, assemblyLoader), fileSystem);
     }
 }

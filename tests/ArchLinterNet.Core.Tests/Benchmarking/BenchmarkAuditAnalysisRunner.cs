@@ -19,7 +19,14 @@ internal sealed record BenchmarkAuditAnalysisRun(
     BenchmarkCanonicalResultIdentity CanonicalResult,
     ValidationOutcome Outcome,
     IReadOnlyDictionary<string, int> TimedContractFamilyCounts,
-    string MaterializedInputSha256);
+    string MaterializedInputSha256,
+    IReadOnlyDictionary<string, long> ObservedWorkCounters,
+    long ManagedHeapBeforeBytes,
+    long ManagedHeapAfterEvaluationBytes)
+{
+    public long ManagedHeapDeltaAfterEvaluationBytes =>
+        Math.Max(0, ManagedHeapAfterEvaluationBytes - ManagedHeapBeforeBytes);
+}
 
 internal static class BenchmarkAuditAnalysisRunner
 {
@@ -44,6 +51,7 @@ internal static class BenchmarkAuditAnalysisRunner
             new ArchitectureProjectDiscoveryService(),
             new ArchitectureAssemblyResolutionService());
         ArchitectureAnalysisSnapshot? snapshot = null;
+        long managedHeapBeforeBytes = GC.GetTotalMemory(forceFullCollection: true);
         var elapsed = Stopwatch.StartNew();
         long allocatedBefore = GC.GetTotalAllocatedBytes(true);
         TimeSpan processorTimeBefore = Process.GetCurrentProcess().TotalProcessorTime;
@@ -90,6 +98,7 @@ internal static class BenchmarkAuditAnalysisRunner
 
             elapsed.Stop();
             long allocatedBytes = Math.Max(0, GC.GetTotalAllocatedBytes(true) - allocatedBefore);
+            long managedHeapAfterEvaluationBytes = GC.GetTotalMemory(forceFullCollection: true);
             TimeSpan processorTime = Process.GetCurrentProcess().TotalProcessorTime - processorTimeBefore;
             BenchmarkCanonicalResultIdentity canonical = CreateCanonicalResult(outcome);
             var loadedAssemblies =
@@ -164,7 +173,10 @@ internal static class BenchmarkAuditAnalysisRunner
                     .GroupBy(entry => entry.Name, StringComparer.Ordinal)
                     .ToDictionary(group => group.Key, group => group.Sum(entry => entry.Count!.Value),
                         StringComparer.Ordinal),
-                inputIdentity);
+                inputIdentity,
+                observer.Snapshot(),
+                managedHeapBeforeBytes,
+                managedHeapAfterEvaluationBytes);
         }
         finally
         {

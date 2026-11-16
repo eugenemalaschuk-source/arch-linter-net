@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Scanning;
@@ -24,7 +25,8 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         IReadOnlyList<string> forbiddenCallPatterns,
         ArchitectureContractExecutionContext executionContext,
         ArchitectureLayer? sourceLayer = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        BenchmarkWorkObserver? benchmarkWorkObserver = null)
     {
         Type[] sourceTypes = sourceLayer != null
             ? ArchitectureTypeScanner.FindTypesInLayer(targetAssemblies, sourceLayer, cancellationToken)
@@ -38,15 +40,23 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
             ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCallPatterns);
         Dictionary<string, bool> matchCache = new(StringComparer.Ordinal);
         List<ArchitectureViolation> violations = new();
+        Action? onMethodVisited = benchmarkWorkObserver is null
+            ? null
+            : benchmarkWorkObserver.RecordMethodBodyIlMethodVisit;
 
         // Checked per type — the same IL-scanning-per-type boundary the rest of the codebase
         // already uses (ArchitectureSourceFileFactIndex.RunReflectionPass, ArchitectureTypeIndex).
         foreach (Type sourceType in sourceTypes)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            benchmarkWorkObserver?.RecordMethodBodyIlTypeVisit();
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
             string sourceAssembly = sourceType.Assembly.GetName().Name ?? string.Empty;
-            var matches = FindMatchDetailsForType(sourceType, patterns, matchCache)
+            var matches = FindMatchDetailsForType(
+                    sourceType,
+                    patterns,
+                    matchCache,
+                    onMethodVisited)
                 .Where(match => !executionContext.IsIgnored(
                     sourceTypeName,
                     FormatMatch(match),
@@ -97,10 +107,12 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
     internal static IEnumerable<ArchitectureIlForbiddenCallMatch> FindMatchDetailsForType(
         Type type,
         IReadOnlyList<ForbiddenCallPattern> patterns,
-        Dictionary<string, bool> matchCache)
+        Dictionary<string, bool> matchCache,
+        Action? onMethodVisited = null)
     {
         foreach (MethodBase method in EnumerateMethods(type))
         {
+            onMethodVisited?.Invoke();
             foreach (IlForbiddenCallMatch match in FindMethodMatchDetails(method, patterns, matchCache))
             {
                 yield return new ArchitectureIlForbiddenCallMatch(
