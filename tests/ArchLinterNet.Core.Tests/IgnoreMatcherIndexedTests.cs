@@ -19,10 +19,15 @@ public sealed partial class IgnoreMatcherTests
             Kind = "dependency",
             SourceAssembly = "Some.Assembly",
         };
-        var index = ArchitectureIgnoreMatcherIndex.Build([ignore]);
+        ArchitectureIgnoreMatcherWorkCounter work = new();
+        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build([ignore], workCounter: work);
 
         bool missingIdentityMatch = index.IsIgnored(
             "App/Services/Worker", "System.Object", null, null, null, out bool missingIdentityBaseline);
+        Assert.That(work.VersionedIdentityEntriesIndexed, Is.Zero,
+            "A missing live identity must not build the exact identity index.");
+        Assert.That(work.VersionedFallbackEntriesProcessed, Is.Zero,
+            "A short fallback query must not build the fallback index.");
         bool liveIdentityMatch = index.IsIgnored(
             "App/Services/Worker", "System.Object", null, CreateIdentity(0), null, out bool liveIdentityBaseline);
 
@@ -32,6 +37,8 @@ public sealed partial class IgnoreMatcherTests
             Assert.That(missingIdentityBaseline, Is.False);
             Assert.That(liveIdentityMatch, Is.False, "A live identity makes a versioned baseline exact-only.");
             Assert.That(liveIdentityBaseline, Is.False);
+            Assert.That(work.VersionedIdentityEntriesIndexed, Is.EqualTo(1),
+                "The exact identity index is built when a live identity first needs it.");
         });
     }
 
@@ -54,18 +61,28 @@ public sealed partial class IgnoreMatcherTests
         Assert.That(work.VersionedFallbackEntriesProcessed, Is.Zero,
             "A live identity must not materialize a fallback index that cannot be consulted.");
 
-        bool firstMissingIdentityMatch = index.IsIgnored(
+        for (int query = 0; query < 4; query++)
+        {
+            bool fallbackMatch = index.IsIgnored(
+                "Fallback.Source", "Fallback.Target", null, null, null, out _);
+            Assert.That(fallbackMatch, Is.True);
+            Assert.That(work.VersionedFallbackEntriesProcessed, Is.Zero,
+                "A few early matches should keep using the compact ordered list.");
+        }
+
+        bool indexedFallbackMatch = index.IsIgnored(
             "Fallback.Source", "Fallback.Target", null, null, null, out _);
-        bool secondMissingIdentityMatch = index.IsIgnored(
+        bool reusedFallbackIndexMatch = index.IsIgnored(
             "Fallback.Source", "Fallback.Target", null, null, null, out _);
 
         Assert.Multiple(() =>
         {
-            Assert.That(firstMissingIdentityMatch, Is.True);
-            Assert.That(secondMissingIdentityMatch, Is.True);
+            Assert.That(indexedFallbackMatch, Is.True);
+            Assert.That(reusedFallbackIndexMatch, Is.True);
             Assert.That(work.IndexEntriesProcessed, Is.EqualTo(1));
             Assert.That(work.VersionedFallbackEntriesProcessed, Is.EqualTo(1),
-                "The immutable fallback lookup should be initialized once and reused.");
+                "The immutable fallback lookup should be initialized after the scan threshold and reused.");
+            Assert.That(work.MissingIdentityEntriesScanned, Is.EqualTo(4));
         });
     }
 
@@ -210,10 +227,11 @@ public sealed partial class IgnoreMatcherTests
         var work = new ArchitectureIgnoreMatcherWorkCounter();
         var matcherIndex = ArchitectureIgnoreMatcherIndex.Build(ignored, workCounter: work);
         var tracker = new ArchitectureIgnoreUsageTracker();
+        ArchitectureViolationIdentity liveIdentity = CreateIdentity(0);
         for (int finding = 0; finding < FindingCount; finding++)
         {
             Assert.That(matcherIndex.IsIgnored(
-                $"Source.Type.{finding}", $"Target.Type.{finding}", tracker, null, null, out _), Is.True);
+                $"Source.Type.{finding}", $"Target.Type.{finding}", tracker, liveIdentity, null, out _), Is.True);
         }
 
         Assert.Multiple(() =>

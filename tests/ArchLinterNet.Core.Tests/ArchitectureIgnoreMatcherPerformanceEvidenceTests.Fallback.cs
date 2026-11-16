@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
@@ -10,91 +8,84 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
 {
+    private const int MissWorkloadFallbackIndexBuildQueryNumber = 5;
+
     [Test]
     [Explicit("Hardware-sensitive #1127 deferred versioned-baseline fallback evidence; excluded from normal tests and CI.")]
     public void RunDeferredFallbackMatcherBenchmark()
     {
         string root = new ArchitectureRepositoryRootResolver().Resolve();
-        MatcherWorkload workload = CreateWorkload(
-            "deferred-fallback-i1024-f64-k64",
-            MatcherKind.VersionedIdentity,
-            exactIgnoreCount: 1_024,
-            findingCount: 64,
-            duplicatesPerFinding: 1,
-            wildcardCount: 0);
-        FallbackQuery[] queries = workload.Findings
-            .Select((finding, index) => new FallbackQuery(finding.SourceType, $"Target.Type.{index}"))
-            .ToArray();
+        FallbackScenario[] scenarios =
+        [
+            CreateFallbackScenario("early-matches-i1024-f64-k64", duplicatesPerFinding: 1, indexBuildQueryNumber: 0),
+            CreateFallbackScenario("no-matches-i1024-f64-k0", duplicatesPerFinding: 0,
+                indexBuildQueryNumber: MissWorkloadFallbackIndexBuildQueryNumber),
+        ];
+        List<object> scenarioEvidence = [];
 
-        FallbackMeasurement orderedWarmup = MeasureOrderedFallback(workload, queries);
-        FallbackMeasurement indexedWarmup = MeasureIndexedFallback(workload, queries);
-        Assert.That(indexedWarmup.ResultChecksum, Is.EqualTo(orderedWarmup.ResultChecksum));
-
-        FallbackMeasurement[] orderedSamples = new FallbackMeasurement[SampleCount];
-        FallbackMeasurement[] indexedSamples = new FallbackMeasurement[SampleCount];
-        for (int sample = 0; sample < SampleCount; sample++)
+        foreach (FallbackScenario scenario in scenarios)
         {
-            orderedSamples[sample] = MeasureOrderedFallback(workload, queries);
-            indexedSamples[sample] = MeasureIndexedFallback(workload, queries);
-            Assert.That(indexedSamples[sample].ResultChecksum, Is.EqualTo(orderedWarmup.ResultChecksum),
-                $"Deferred fallback changed matching or provenance in sample {sample}.");
-        }
+            FallbackMeasurement orderedWarmup = MeasureOrderedFallback(scenario.Workload, scenario.Queries);
+            FallbackMeasurement indexedWarmup = MeasureIndexedFallback(scenario);
+            Assert.That(indexedWarmup.ResultChecksum, Is.EqualTo(orderedWarmup.ResultChecksum));
 
-        ArchitectureIgnoreMatcherWorkCounter work = new();
-        ArchitectureIgnoreMatcherIndex countedIndex = ArchitectureIgnoreMatcherIndex.Build(
-            workload.Ignores,
-            workCounter: work);
-        Assert.That(work.VersionedFallbackEntriesProcessed, Is.Zero);
-        _ = countedIndex.IsIgnored(
-            queries[0].SourceType,
-            queries[0].ForbiddenReference,
-            null,
-            null,
-            null,
-            out _);
-        Assert.That(work.VersionedFallbackEntriesProcessed, Is.EqualTo(workload.Ignores.Count));
-        _ = countedIndex.IsIgnored(
-            queries[1].SourceType,
-            queries[1].ForbiddenReference,
-            null,
-            null,
-            null,
-            out _);
-        Assert.That(work.VersionedFallbackEntriesProcessed, Is.EqualTo(workload.Ignores.Count));
+            FallbackMeasurement[] orderedSamples = new FallbackMeasurement[SampleCount];
+            FallbackMeasurement[] indexedSamples = new FallbackMeasurement[SampleCount];
+            for (int sample = 0; sample < SampleCount; sample++)
+            {
+                orderedSamples[sample] = MeasureOrderedFallback(scenario.Workload, scenario.Queries);
+                indexedSamples[sample] = MeasureIndexedFallback(scenario);
+                Assert.That(indexedSamples[sample].ResultChecksum, Is.EqualTo(orderedWarmup.ResultChecksum),
+                    $"Deferred fallback changed matching or provenance for '{scenario.Name}' in sample {sample}.");
+            }
+
+            FallbackWorkEvidence work = MeasureFallbackWork(scenario);
+            var row = new
+            {
+                Scenario = scenario.Name,
+                InputSha256 = InputChecksum(scenario.Workload),
+                IgnoreEntriesI = scenario.Workload.Ignores.Count,
+                FindingsF = scenario.Queries.Length,
+                RequiredMatchesK = scenario.Workload.RequiredMatches,
+                ExpectedFallbackIndexBuildQueryNumber = scenario.IndexBuildQueryNumber,
+                SampleCount,
+                Baseline = new
+                {
+                    FirstQueryMedianMilliseconds = Median(orderedSamples.Select(sample => sample.FirstQueryMilliseconds)),
+                    SubsequentQueryMedianMillisecondsPerCall = Median(orderedSamples.Select(sample => sample.SubsequentQueryMillisecondsPerCall)),
+                    TotalQueryMedianMilliseconds = Median(orderedSamples.Select(sample => sample.TotalMilliseconds)),
+                    TotalAllocatedBytes = Median(orderedSamples.Select(sample => sample.TotalAllocatedBytes)),
+                },
+                Indexed = new
+                {
+                    IndexBuildMedianMilliseconds = Median(indexedSamples.Select(sample => sample.IndexBuildMilliseconds)),
+                    FirstQueryMedianMilliseconds = Median(indexedSamples.Select(sample => sample.FirstQueryMilliseconds)),
+                    LazyFallbackIndexQueryMedianMilliseconds = Median(indexedSamples.Select(sample => sample.LazyFallbackIndexQueryMilliseconds)),
+                    SubsequentQueryMedianMillisecondsPerCall = Median(indexedSamples.Select(sample => sample.SubsequentQueryMillisecondsPerCall)),
+                    TotalBuildAndQueryMedianMilliseconds = Median(indexedSamples.Select(sample => sample.TotalMilliseconds)),
+                    TotalAllocatedBytes = Median(indexedSamples.Select(sample => sample.TotalAllocatedBytes)),
+                },
+                work.VersionedIdentityEntriesIndexed,
+                work.MissingIdentityEntriesScanned,
+                work.VersionedFallbackEntriesProcessed,
+                CanonicalResultSha256 = orderedWarmup.ResultChecksum,
+            };
+            scenarioEvidence.Add(row);
+            TestContext.Out.WriteLine(JsonSerializer.Serialize(row));
+        }
 
         var evidence = new
         {
             Evidence = "architecture-ignore-matching-deferred-fallback",
             Revision = CurrentRevision(root),
-            RevisionState = "The implementation source hash identifies the measured matcher code if source changes are uncommitted.",
+            RevisionState = "Revision records HEAD at measurement time; the implementation source SHA-256 identifies the measured matcher code.",
             ImplementationSourceSha256 = ImplementationSourceSha256(root),
             OrderedReferenceSourceSha256 = OrderedReferenceSourceSha256(root),
             Environment = $"{RuntimeInformation.FrameworkDescription}; {RuntimeInformation.OSDescription}; "
                 + $"{RuntimeInformation.ProcessArchitecture}; processors={Environment.ProcessorCount}",
-            InputSha256 = InputChecksum(workload),
-            IgnoreEntriesI = workload.Ignores.Count,
-            FindingsF = queries.Length,
             SampleCount,
-            Baseline = new
-            {
-                FirstQueryMedianMilliseconds = Median(orderedSamples.Select(sample => sample.FirstQueryMilliseconds)),
-                SubsequentQueryMedianMillisecondsPerCall = Median(orderedSamples.Select(sample => sample.SubsequentQueryMillisecondsPerCall)),
-                TotalQueryMedianMilliseconds = Median(orderedSamples.Select(sample => sample.TotalMilliseconds)),
-                TotalAllocatedBytes = Median(orderedSamples.Select(sample => sample.TotalAllocatedBytes)),
-            },
-            Indexed = new
-            {
-                IndexBuildMedianMilliseconds = Median(indexedSamples.Select(sample => sample.IndexBuildMilliseconds)),
-                FirstQueryIncludingFallbackBuildMedianMilliseconds = Median(indexedSamples.Select(sample => sample.FirstQueryMilliseconds)),
-                SubsequentQueryMedianMillisecondsPerCall = Median(indexedSamples.Select(sample => sample.SubsequentQueryMillisecondsPerCall)),
-                TotalBuildAndQueryMedianMilliseconds = Median(indexedSamples.Select(sample => sample.TotalMilliseconds)),
-                TotalAllocatedBytes = Median(indexedSamples.Select(sample => sample.TotalAllocatedBytes)),
-            },
-            VersionedFallbackEntriesProcessedAfterFirstQuery = work.VersionedFallbackEntriesProcessed,
-            CanonicalResultSha256 = orderedWarmup.ResultChecksum,
+            Scenarios = scenarioEvidence,
         };
-
-        TestContext.Out.WriteLine(JsonSerializer.Serialize(evidence));
         string evidencePath = Path.Combine(
             root,
             "docs",
@@ -106,6 +97,24 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         File.WriteAllText(evidencePath, JsonSerializer.Serialize(evidence,
             new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine);
         TestContext.Progress.WriteLine($"Wrote deferred fallback evidence to {Path.GetRelativePath(root, evidencePath)}");
+    }
+
+    private static FallbackScenario CreateFallbackScenario(
+        string name,
+        int duplicatesPerFinding,
+        int indexBuildQueryNumber)
+    {
+        MatcherWorkload workload = CreateWorkload(
+            name,
+            MatcherKind.VersionedIdentity,
+            exactIgnoreCount: 1_024,
+            findingCount: 64,
+            duplicatesPerFinding,
+            wildcardCount: 0);
+        FallbackQuery[] queries = workload.Findings
+            .Select((finding, index) => new FallbackQuery(finding.SourceType, $"Target.Type.{index}"))
+            .ToArray();
+        return new FallbackScenario(name, workload, queries, indexBuildQueryNumber);
     }
 
     private static FallbackMeasurement MeasureOrderedFallback(
@@ -146,44 +155,45 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         return new FallbackMeasurement(
             0,
             firstQuery.Elapsed.TotalMilliseconds,
+            0,
             subsequentQueries.Elapsed.TotalMilliseconds / (queries.Count - 1),
             total.Elapsed.TotalMilliseconds,
             allocatedBytes,
             checksum);
     }
 
-    private static FallbackMeasurement MeasureIndexedFallback(
-        MatcherWorkload workload,
-        IReadOnlyList<FallbackQuery> queries)
+    private static FallbackMeasurement MeasureIndexedFallback(FallbackScenario scenario)
     {
-        bool[] suppressed = new bool[queries.Count];
-        bool[] loadedBaseline = new bool[queries.Count];
+        bool[] suppressed = new bool[scenario.Queries.Length];
+        bool[] loadedBaseline = new bool[scenario.Queries.Length];
         long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         Stopwatch total = Stopwatch.StartNew();
         Stopwatch indexBuild = Stopwatch.StartNew();
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
+        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(scenario.Workload.Ignores);
         indexBuild.Stop();
 
         Stopwatch firstQuery = Stopwatch.StartNew();
-        suppressed[0] = index.IsIgnored(
-            queries[0].SourceType,
-            queries[0].ForbiddenReference,
-            null,
-            null,
-            null,
-            out loadedBaseline[0]);
+        RunIndexedFallbackQuery(index, scenario.Queries[0], out suppressed[0], out loadedBaseline[0]);
         firstQuery.Stop();
 
         Stopwatch subsequentQueries = Stopwatch.StartNew();
-        for (int queryIndex = 1; queryIndex < queries.Count; queryIndex++)
+        double lazyFallbackIndexQueryMilliseconds = 0;
+        int subsequentQueryCount = 0;
+        for (int queryIndex = 1; queryIndex < scenario.Queries.Length; queryIndex++)
         {
-            suppressed[queryIndex] = index.IsIgnored(
-                queries[queryIndex].SourceType,
-                queries[queryIndex].ForbiddenReference,
-                null,
-                null,
-                null,
-                out loadedBaseline[queryIndex]);
+            if (queryIndex + 1 == scenario.IndexBuildQueryNumber)
+            {
+                subsequentQueries.Stop();
+                Stopwatch lazyFallbackQuery = Stopwatch.StartNew();
+                RunIndexedFallbackQuery(index, scenario.Queries[queryIndex], out suppressed[queryIndex], out loadedBaseline[queryIndex]);
+                lazyFallbackQuery.Stop();
+                lazyFallbackIndexQueryMilliseconds = lazyFallbackQuery.Elapsed.TotalMilliseconds;
+                subsequentQueries.Start();
+                continue;
+            }
+
+            RunIndexedFallbackQuery(index, scenario.Queries[queryIndex], out suppressed[queryIndex], out loadedBaseline[queryIndex]);
+            subsequentQueryCount++;
         }
 
         subsequentQueries.Stop();
@@ -193,19 +203,109 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         return new FallbackMeasurement(
             indexBuild.Elapsed.TotalMilliseconds,
             firstQuery.Elapsed.TotalMilliseconds,
-            subsequentQueries.Elapsed.TotalMilliseconds / (queries.Count - 1),
+            lazyFallbackIndexQueryMilliseconds,
+            subsequentQueryCount == 0 ? 0 : subsequentQueries.Elapsed.TotalMilliseconds / subsequentQueryCount,
             total.Elapsed.TotalMilliseconds,
             allocatedBytes,
             checksum);
     }
+
+    private static void RunIndexedFallbackQuery(
+        ArchitectureIgnoreMatcherIndex index,
+        FallbackQuery query,
+        out bool suppressed,
+        out bool loadedBaseline)
+    {
+        suppressed = index.IsIgnored(
+            query.SourceType,
+            query.ForbiddenReference,
+            null,
+            null,
+            null,
+            out loadedBaseline);
+    }
+
+    private static FallbackWorkEvidence MeasureFallbackWork(FallbackScenario scenario)
+    {
+        ArchitectureIgnoreMatcherWorkCounter work = new();
+        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(
+            scenario.Workload.Ignores,
+            workCounter: work);
+
+        if (scenario.IndexBuildQueryNumber == 0)
+        {
+            foreach (FallbackQuery query in scenario.Queries)
+            {
+                bool match = index.IsIgnored(query.SourceType, query.ForbiddenReference, null, null, null, out _);
+                Assert.That(match, Is.True);
+            }
+
+            Assert.That(work.VersionedFallbackEntriesProcessed, Is.Zero,
+                "Early ordered matches should not materialize the fallback index.");
+        }
+        else
+        {
+            for (int queryIndex = 0; queryIndex < scenario.IndexBuildQueryNumber - 1; queryIndex++)
+            {
+                bool match = index.IsIgnored(
+                    scenario.Queries[queryIndex].SourceType,
+                    scenario.Queries[queryIndex].ForbiddenReference,
+                    null,
+                    null,
+                    null,
+                    out _);
+                Assert.That(match, Is.False);
+                Assert.That(work.VersionedFallbackEntriesProcessed, Is.Zero);
+            }
+
+            Assert.That(work.MissingIdentityEntriesScanned,
+                Is.EqualTo((scenario.IndexBuildQueryNumber - 1) * scenario.Workload.Ignores.Count));
+            _ = index.IsIgnored(
+                scenario.Queries[scenario.IndexBuildQueryNumber - 1].SourceType,
+                scenario.Queries[scenario.IndexBuildQueryNumber - 1].ForbiddenReference,
+                null,
+                null,
+                null,
+                out _);
+            Assert.That(work.VersionedFallbackEntriesProcessed, Is.EqualTo(scenario.Workload.Ignores.Count));
+            _ = index.IsIgnored(
+                scenario.Queries[scenario.IndexBuildQueryNumber].SourceType,
+                scenario.Queries[scenario.IndexBuildQueryNumber].ForbiddenReference,
+                null,
+                null,
+                null,
+                out _);
+            Assert.That(work.VersionedFallbackEntriesProcessed, Is.EqualTo(scenario.Workload.Ignores.Count),
+                "The fallback index should be built once and reused.");
+        }
+
+        Assert.That(work.VersionedIdentityEntriesIndexed, Is.Zero,
+            "Fallback-only scenarios must not build the exact live-identity index.");
+        return new FallbackWorkEvidence(
+            work.VersionedIdentityEntriesIndexed,
+            work.MissingIdentityEntriesScanned,
+            work.VersionedFallbackEntriesProcessed);
+    }
+
+    private sealed record FallbackScenario(
+        string Name,
+        MatcherWorkload Workload,
+        FallbackQuery[] Queries,
+        int IndexBuildQueryNumber);
 
     private sealed record FallbackQuery(string SourceType, string ForbiddenReference);
 
     private sealed record FallbackMeasurement(
         double IndexBuildMilliseconds,
         double FirstQueryMilliseconds,
+        double LazyFallbackIndexQueryMilliseconds,
         double SubsequentQueryMillisecondsPerCall,
         double TotalMilliseconds,
         long TotalAllocatedBytes,
         string ResultChecksum);
+
+    private sealed record FallbackWorkEvidence(
+        long VersionedIdentityEntriesIndexed,
+        long MissingIdentityEntriesScanned,
+        long VersionedFallbackEntriesProcessed);
 }

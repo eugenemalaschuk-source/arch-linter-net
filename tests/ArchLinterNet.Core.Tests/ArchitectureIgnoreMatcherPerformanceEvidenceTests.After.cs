@@ -26,7 +26,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
             Evidence = "architecture-ignore-matching-after",
             Revision = CurrentRevision(root),
             BaselineRevision = before.RootElement.GetProperty("metadata").GetProperty("Revision").GetString(),
-            RevisionState = "Implementation source changes are in the working tree; the source SHA-256 below identifies the measured matcher files.",
+            RevisionState = "Revision records HEAD at measurement time; the implementation source SHA-256 identifies the measured matcher files.",
             ImplementationSourceSha256 = ImplementationSourceSha256(root),
             Environment = environment,
             WorkloadDefinition = "Same deterministic workload generator, fixture definitions, five-sample count, and tracker shape as before.json; canonical result hashes are checked against the baseline. This after artifact also records an SHA-256 for each serialized input; the historical before artifact predates per-input hashes.",
@@ -85,7 +85,9 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
                 BeforeEntryEvaluations = baselineRow.GetProperty("LegacyEntryEvaluations").GetInt64(),
                 BeforeFingerprintCreations = baselineRow.GetProperty("StructuredFingerprintCreations").GetInt64(),
                 work.IndexEntriesProcessed,
+                work.VersionedIdentityEntriesIndexed,
                 work.VersionedFallbackEntriesProcessed,
+                work.MissingIdentityEntriesScanned,
                 work.ExactLookupProbes,
                 work.ExactCandidateMatches,
                 work.LiveWaiverFingerprintsBuilt,
@@ -140,13 +142,18 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         var total = Stopwatch.StartNew();
         var indexBuild = Stopwatch.StartNew();
         var index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
+        string? firstFindingFingerprint = workload.Findings.Length == 0
+            ? null
+            : index.CreateLiveWaiverFingerprint(workload.Findings[0]);
         indexBuild.Stop();
         var query = Stopwatch.StartNew();
 
         for (int findingIndex = 0; findingIndex < workload.Findings.Length; findingIndex++)
         {
             ArchitectureViolationIdentity finding = workload.Findings[findingIndex];
-            string? fingerprint = index.CreateLiveWaiverFingerprint(finding);
+            string? fingerprint = findingIndex == 0
+                ? firstFindingFingerprint
+                : index.CreateLiveWaiverFingerprint(finding);
             ignored[findingIndex] = index.IsIgnored(
                 finding.SourceType,
                 $"Target.Type.{findingIndex}",
@@ -166,12 +173,13 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
 
     private static long MeasureRetainedIndexBytes(MatcherWorkload workload)
     {
-        _ = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
+        WarmLiveIdentityIndex(workload);
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
         long before = GC.GetTotalMemory(forceFullCollection: true);
         var index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
+        MaterializeLiveIdentityIndex(workload, index);
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
@@ -180,14 +188,47 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         return Math.Max(0, after - before);
     }
 
+    private static void WarmLiveIdentityIndex(MatcherWorkload workload)
+    {
+        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
+        MaterializeLiveIdentityIndex(workload, index);
+    }
+
+    private static void MaterializeLiveIdentityIndex(
+        MatcherWorkload workload,
+        ArchitectureIgnoreMatcherIndex index)
+    {
+        if (workload.Findings.Length == 0)
+        {
+            return;
+        }
+
+        ArchitectureViolationIdentity finding = workload.Findings[0];
+        string? fingerprint = index.CreateLiveWaiverFingerprint(finding);
+        _ = index.IsIgnored(
+            finding.SourceType,
+            "Target.Type.0",
+            null,
+            finding,
+            fingerprint,
+            out _);
+    }
+
     private static void AssertWorkCounts(MatcherWorkload workload, ArchitectureIgnoreMatcherWorkCounter work)
     {
         Assert.Multiple(() =>
         {
             Assert.That(work.IndexEntriesProcessed, Is.EqualTo(workload.Ignores.Count),
                 $"Every original ignore entry must be indexed once for '{workload.Name}'.");
+            int expectedVersionedIdentityEntries = workload.Kind == MatcherKind.VersionedIdentity
+                ? workload.Ignores.Count - workload.WildcardCount
+                : 0;
+            Assert.That(work.VersionedIdentityEntriesIndexed, Is.EqualTo(expectedVersionedIdentityEntries),
+                $"Live-identity workloads must build the exact identity index only when queried for '{workload.Name}'.");
             Assert.That(work.VersionedFallbackEntriesProcessed, Is.Zero,
                 $"Live-identity workloads must not build the deferred versioned fallback for '{workload.Name}'.");
+            Assert.That(work.MissingIdentityEntriesScanned, Is.Zero,
+                $"Live-identity workloads must not scan the missing-identity fallback for '{workload.Name}'.");
             Assert.That(work.ExactLookupProbes, Is.LessThanOrEqualTo(workload.Findings.Length * 3),
                 $"Exact dictionary probes must remain constant per finding for '{workload.Name}'.");
             Assert.That(work.ExactCandidateMatches, Is.EqualTo(workload.RequiredMatches),

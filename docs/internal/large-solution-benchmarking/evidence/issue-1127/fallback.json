@@ -1,27 +1,65 @@
 {
   "Evidence": "architecture-ignore-matching-deferred-fallback",
-  "Revision": "c3e936bff8763b68eddf6865516e1595d69492a9",
-  "RevisionState": "The implementation source hash identifies the measured matcher code if source changes are uncommitted.",
-  "ImplementationSourceSha256": "943313d0efdd048a9b14fbbae292f0a916d7349ba20538d51b4cb113540b2ba0",
+  "Revision": "dc113a2edccfeeb08e5ab361c7dc537dbaf47e95",
+  "RevisionState": "Revision records HEAD at measurement time; the implementation source SHA-256 identifies the measured matcher code.",
+  "ImplementationSourceSha256": "3d9d2809b2144c8bd702614068d0a4796ab1f0f3886a985792bb16384677a02d",
   "OrderedReferenceSourceSha256": "24ebdeaa9866e636fabcbb862332daaae1f90a4b4e542fb7adb517632ab9146f",
   "Environment": ".NET 10.0.15; Microsoft Windows 10.0.19045; X64; processors=6",
-  "InputSha256": "65c78da18c6cf47ccc378d3432840c525ff9198b15159694cae390210e99bff0",
-  "IgnoreEntriesI": 1024,
-  "FindingsF": 64,
   "SampleCount": 5,
-  "Baseline": {
-    "FirstQueryMedianMilliseconds": 0.0012,
-    "SubsequentQueryMedianMillisecondsPerCall": 0.004015873015873016,
-    "TotalQueryMedianMilliseconds": 0.2551,
-    "TotalAllocatedBytes": 120
-  },
-  "Indexed": {
-    "IndexBuildMedianMilliseconds": 1.0794,
-    "FirstQueryIncludingFallbackBuildMedianMilliseconds": 0.5864,
-    "SubsequentQueryMedianMillisecondsPerCall": 0.0003841269841269841,
-    "TotalBuildAndQueryMedianMilliseconds": 1.7048,
-    "TotalAllocatedBytes": 1129544
-  },
-  "VersionedFallbackEntriesProcessedAfterFirstQuery": 1024,
-  "CanonicalResultSha256": "6b55975b54d4721403af2f7761320f029075dcf347ed44efd4d491a101815310"
+  "Scenarios": [
+    {
+      "Scenario": "early-matches-i1024-f64-k64",
+      "InputSha256": "c9fb93471546a9e03b99b03ba133dae3a3c8539239a361ae4b2fd4f14f7e708e",
+      "IgnoreEntriesI": 1024,
+      "FindingsF": 64,
+      "RequiredMatchesK": 64,
+      "ExpectedFallbackIndexBuildQueryNumber": 0,
+      "SampleCount": 5,
+      "Baseline": {
+        "FirstQueryMedianMilliseconds": 0.0006,
+        "SubsequentQueryMedianMillisecondsPerCall": 0.003711111111111111,
+        "TotalQueryMedianMilliseconds": 0.2343,
+        "TotalAllocatedBytes": 120
+      },
+      "Indexed": {
+        "IndexBuildMedianMilliseconds": 0.0002,
+        "FirstQueryMedianMilliseconds": 0.001,
+        "LazyFallbackIndexQueryMedianMilliseconds": 0,
+        "SubsequentQueryMedianMillisecondsPerCall": 0.003173015873015873,
+        "TotalBuildAndQueryMedianMilliseconds": 0.2015,
+        "TotalAllocatedBytes": 232
+      },
+      "VersionedIdentityEntriesIndexed": 0,
+      "MissingIdentityEntriesScanned": 2080,
+      "VersionedFallbackEntriesProcessed": 0,
+      "CanonicalResultSha256": "6b55975b54d4721403af2f7761320f029075dcf347ed44efd4d491a101815310"
+    },
+    {
+      "Scenario": "no-matches-i1024-f64-k0",
+      "InputSha256": "dbea7d855505081d0353edc5dd2080f6f9e1e7f9c6380524d43027f31093cdab",
+      "IgnoreEntriesI": 1024,
+      "FindingsF": 64,
+      "RequiredMatchesK": 0,
+      "ExpectedFallbackIndexBuildQueryNumber": 5,
+      "SampleCount": 5,
+      "Baseline": {
+        "FirstQueryMedianMilliseconds": 0.1136,
+        "SubsequentQueryMedianMillisecondsPerCall": 0.09849365079365079,
+        "TotalQueryMedianMilliseconds": 6.3189,
+        "TotalAllocatedBytes": 120
+      },
+      "Indexed": {
+        "IndexBuildMedianMilliseconds": 0.0008,
+        "FirstQueryMedianMilliseconds": 0.101,
+        "LazyFallbackIndexQueryMedianMilliseconds": 0.7257,
+        "SubsequentQueryMedianMillisecondsPerCall": 0.005169354838709677,
+        "TotalBuildAndQueryMedianMilliseconds": 1.1686,
+        "TotalAllocatedBytes": 376376
+      },
+      "VersionedIdentityEntriesIndexed": 0,
+      "MissingIdentityEntriesScanned": 4096,
+      "VersionedFallbackEntriesProcessed": 1024,
+      "CanonicalResultSha256": "77773a0e2089313b2dd723b42500d0befccff5bc0361cb00fd4e49033eef4b24"
+    }
+  ]
 }
