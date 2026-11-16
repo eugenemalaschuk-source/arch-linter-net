@@ -424,4 +424,63 @@ public sealed class ArchitectureContractExecutionContextTests
             "The occurrence is suppressed (via the policy waiver on alias A), but alias B still genuinely matches "
             + "the loaded baseline, so it must remain a baseline-comparison candidate -- not silently Resolved.");
     }
+
+    [Test]
+    public void IsIgnoredWithAliases_ComputesStructuredWaiverFingerprintOnceForTheFinding()
+    {
+        ArchitectureViolationIdentity identity = new(
+            ArchitectureViolationIdentity.CurrentVersion,
+            "strict",
+            "dependency",
+            "contract-id",
+            "Host.A",
+            "Program",
+            null,
+            "mscorlib",
+            null,
+            "System.Object",
+            0);
+        var ignoredViolations = new List<ArchitectureIgnoredViolation>
+        {
+            new()
+            {
+                SourceType = "unused waiver source",
+                ForbiddenReference = "unused waiver reference",
+                WaiverId = "ARCH-IGN-1127",
+                Target = new ArchitectureWaiverTarget
+                {
+                    Fingerprint = ArchitectureWaiverTargetFingerprint.Create(identity),
+                },
+                Owner = "architecture-team",
+                Issue = "ARCH-1127",
+            },
+        };
+        var work = new ArchitectureIgnoreMatcherWorkCounter();
+        var context = new ArchitectureContractExecutionContext(
+            "contract-name",
+            "contract-id",
+            ignoredViolations,
+            enableUnmatchedIgnoreTracking: true,
+            contractGroup: "strict",
+            baselineCandidates: new List<ArchitectureBaselineCandidate>(),
+            matcherWorkCounter: work);
+
+        bool ignored = context.IsIgnoredWithAliases(
+            "Program",
+            forbiddenReferenceAliases: ["Display.Alias", "Canonical.Alias"],
+            canonicalForbiddenReference: "Canonical.Alias",
+            sourceAssembly: "Host.A",
+            targetAssembly: "mscorlib",
+            targetMember: "System.Object");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ignored, Is.True);
+            Assert.That(work.IndexEntriesProcessed, Is.EqualTo(1));
+            Assert.That(work.LiveWaiverFingerprintsBuilt, Is.EqualTo(1));
+            Assert.That(work.ExactLookupProbes, Is.EqualTo(2));
+            Assert.That(work.ExactCandidateMatches, Is.EqualTo(2));
+            Assert.That(work.MatchedOriginalIndices, Is.EqualTo(2));
+        });
+    }
 }

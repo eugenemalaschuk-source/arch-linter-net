@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class IgnoreMatcherTests
+public sealed partial class IgnoreMatcherTests
 {
     [Test]
     public void IsIgnored_ExactMatch_ReturnsTrue()
