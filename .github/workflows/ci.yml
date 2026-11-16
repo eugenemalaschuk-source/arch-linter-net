@@ -295,7 +295,7 @@ jobs:
             /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
             /d:sonar.javascript.lcov.reportPaths="relay/coverage/lcov.info" \
             /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
-            /d:sonar.coverage.exclusions="tools/ArchLinterNet.GitFuzz/**,tools/ArchLinterNet.ProcessTreeProbe/**,tools/**/tests/**,tests/qodana/**,tools/badge_promotion/cli.py,tools/badge_promotion/contracts.py,**/CheckpointBReleaseGateTests*.cs"
+            /d:sonar.coverage.exclusions="tools/ArchLinterNet.GitFuzz/**,tools/ArchLinterNet.ProcessTreeProbe/**,tools/**/tests/**,tests/qodana/**,tools/badge_promotion/cli.py,tools/badge_promotion/contracts.py,**/CheckpointBReleaseGateTests*.cs,docs/internal/large-solution-benchmarking/issue-1126-generate-phase-share-fixture.ps1,docs/internal/large-solution-benchmarking/issue-1126-run-cli-ab.ps1"
 
       - name: Build for SonarCloud analysis
         if: env.TRUSTED_PR == 'true'

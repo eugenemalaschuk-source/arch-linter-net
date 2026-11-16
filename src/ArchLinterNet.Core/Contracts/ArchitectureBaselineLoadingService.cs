@@ -395,9 +395,12 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         }
     }
 
-    internal static void Merge(ArchitectureContractDocument policyDocument, ArchitectureBaselineDocument baselineDocument)
+    internal static void Merge(
+        ArchitectureContractDocument policyDocument,
+        ArchitectureBaselineDocument baselineDocument,
+        ArchitectureBaselineMergeWorkCounter? workCounter = null)
     {
-        var groupMerger = new ContractGroupMerger(policyDocument);
+        var groupMerger = new ContractGroupMerger(policyDocument, workCounter);
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
             groupMerger.MergeGroup(baselineDocument.Baseline.GetGroup(groupName), groupName, baselineDocument.Version);
@@ -428,12 +431,16 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
     private sealed class ContractGroupMerger
     {
-        private readonly Families.ArchitectureContractGroups _groups;
+        private readonly ArchitectureContractGroups _groups;
         private readonly HashSet<string> _externalEvidenceIds;
+        private readonly ArchitectureBaselineMergeWorkCounter? _workCounter;
 
-        public ContractGroupMerger(ArchitectureContractDocument document)
+        public ContractGroupMerger(
+            ArchitectureContractDocument document,
+            ArchitectureBaselineMergeWorkCounter? workCounter = null)
         {
             _groups = document.Contracts;
+            _workCounter = workCounter;
             _externalEvidenceIds = new HashSet<string>(
                 document.ExternalEvidence.Select(requirement => requirement.Id),
                 StringComparer.Ordinal);
@@ -445,81 +452,159 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             int documentVersion)
         {
             var unknownIds = new List<(string GroupName, string ContractId)>();
-            var contracts = GetContracts(groupName);
+            if (baselineEntries.Count == 0)
+            {
+                return unknownIds;
+            }
+
+            List<IArchitectureContract> contracts = GetContracts(groupName);
+            ArchitectureBaselineContractLookup contractLookup = new(contracts, baselineEntries, _workCounter);
+            var memberships = new Dictionary<List<ArchitectureIgnoredViolation>, ArchitectureBaselineIgnoreMembership>(
+                ReferenceEqualityComparer.Instance);
             bool isStructured = documentVersion is 2 or 3;
 
             foreach (var baselineEntry in baselineEntries)
             {
-                if (IsImportedExternalDiagnosticEntry(baselineEntry, groupName, documentVersion))
-                {
-                    if (!_externalEvidenceIds.Contains(baselineEntry.Id))
-                    {
-                        unknownIds.Add((groupName, baselineEntry.Id));
-                    }
-
-                    // Imported findings are compared through their exact structured identities by
-                    // baseline lifecycle services. They must not become native external-contract
-                    // ignores, which could otherwise affect ArchitectureIgnoreMatcher.
-                    continue;
-                }
-
-                var contract = contracts.FirstOrDefault(c =>
-                    string.Equals(c.Id, baselineEntry.Id, StringComparison.OrdinalIgnoreCase));
-
-                if (contract == null)
-                {
-                    unknownIds.Add((groupName, baselineEntry.Id));
-                    continue;
-                }
-
-                var ignores = GetIgnoredViolations(contract);
-                foreach (var baselineIgnore in baselineEntry.IgnoredViolations)
-                {
-                    // Applicability findings are evidence of an assessment boundary, not
-                    // ordinary conformance violations. Validate their owning entry above, but do
-                    // not feed them into ArchitectureIgnoreMatcher: doing so would let a matching
-                    // baseline entry turn an unassessable assessment into a pass (and would also
-                    // create a spurious unmatched-ignore result).
-                    if (isStructured
-                        && string.Equals(baselineIgnore.Kind, "applicability", StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    // Version-1 entries dedup by the legacy display pair, exactly as before. Version-2
-                    // entries dedup by the full structured identity — two entries can legitimately
-                    // share (source_type, forbidden_reference) display text while being distinct
-                    // identities (different assembly/member/occurrence), and must both be kept.
-                    bool isDuplicate = isStructured
-                        ? ignores.Any(existing => IdentityEquals(existing, baselineIgnore))
-                        : ignores.Any(existing =>
-                            string.Equals(existing.SourceType, baselineIgnore.SourceType, StringComparison.Ordinal) &&
-                            string.Equals(existing.ForbiddenReference, baselineIgnore.ForbiddenReference, StringComparison.Ordinal));
-
-                    if (!isDuplicate)
-                    {
-                        ignores.Add(new ArchitectureIgnoredViolation
-                        {
-                            SourceType = baselineIgnore.SourceType,
-                            ForbiddenReference = baselineIgnore.ForbiddenReference,
-                            Reason = baselineIgnore.Reason,
-                            IdentityVersion = isStructured ? baselineIgnore.IdentityVersion ?? ArchitectureViolationIdentity.CurrentVersion : null,
-                            ContractFamily = isStructured ? baselineIgnore.ContractFamily : null,
-                            Kind = isStructured ? baselineIgnore.Kind : null,
-                            SourceAssembly = isStructured ? baselineIgnore.SourceAssembly : null,
-                            SourceMember = isStructured ? baselineIgnore.SourceMember : null,
-                            TargetAssembly = isStructured ? baselineIgnore.TargetAssembly : null,
-                            TargetType = isStructured ? baselineIgnore.TargetType : null,
-                            TargetMember = isStructured ? baselineIgnore.TargetMember : null,
-                            Occurrence = isStructured ? baselineIgnore.Occurrence ?? 0 : null,
-                            Configuration = isStructured ? baselineIgnore.Configuration : null,
-                            IsFromLoadedBaseline = true,
-                        });
-                    }
-                }
+                MergeEntry(
+                    baselineEntry,
+                    groupName,
+                    documentVersion,
+                    isStructured,
+                    contractLookup,
+                    memberships,
+                    unknownIds);
             }
 
             return unknownIds;
+        }
+
+        private void MergeEntry(
+            ArchitectureBaselineContractEntry baselineEntry,
+            string groupName,
+            int documentVersion,
+            bool isStructured,
+            ArchitectureBaselineContractLookup contractLookup,
+            Dictionary<List<ArchitectureIgnoredViolation>, ArchitectureBaselineIgnoreMembership> memberships,
+            List<(string GroupName, string ContractId)> unknownIds)
+        {
+            if (TryRecordImportedEntry(baselineEntry, groupName, documentVersion, unknownIds))
+            {
+                return;
+            }
+
+            IArchitectureContract? contract = contractLookup.Find(baselineEntry.Id);
+            if (contract is null)
+            {
+                unknownIds.Add((groupName, baselineEntry.Id));
+                return;
+            }
+
+            MergeIgnores(
+                baselineEntry.IgnoredViolations,
+                contract,
+                isStructured,
+                memberships);
+        }
+
+        private bool TryRecordImportedEntry(
+            ArchitectureBaselineContractEntry baselineEntry,
+            string groupName,
+            int documentVersion,
+            List<(string GroupName, string ContractId)> unknownIds)
+        {
+            if (!IsImportedExternalDiagnosticEntry(baselineEntry, groupName, documentVersion))
+            {
+                return false;
+            }
+
+            if (!_externalEvidenceIds.Contains(baselineEntry.Id))
+            {
+                unknownIds.Add((groupName, baselineEntry.Id));
+            }
+
+            // Imported findings are compared through their exact structured identities by
+            // baseline lifecycle services. They must not become native external-contract ignores,
+            // which could otherwise affect ArchitectureIgnoreMatcher.
+            return true;
+        }
+
+        private void MergeIgnores(
+            List<ArchitectureBaselineIgnoredViolation> baselineIgnores,
+            IArchitectureContract contract,
+            bool isStructured,
+            Dictionary<List<ArchitectureIgnoredViolation>, ArchitectureBaselineIgnoreMembership> memberships)
+        {
+            List<ArchitectureIgnoredViolation>? ignores = null;
+            foreach (ArchitectureBaselineIgnoredViolation baselineIgnore in baselineIgnores)
+            {
+                // Applicability findings are evidence of an assessment boundary, not ordinary
+                // conformance violations. Validate their owning entry above, but do not feed them
+                // into ArchitectureIgnoreMatcher.
+                if (isStructured
+                    && string.Equals(baselineIgnore.Kind, "applicability", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                ignores ??= GetIgnoredViolations(contract);
+                ArchitectureBaselineIgnoreMembership membership = GetOrCreateMembership(
+                    ignores, isStructured, memberships);
+                if (_workCounter is not null)
+                {
+                    _workCounter.MembershipChecks++;
+                }
+
+                if (membership.Contains(baselineIgnore))
+                {
+                    continue;
+                }
+
+                membership.AddLoaded(CreateLoadedIgnore(baselineIgnore, isStructured));
+                if (_workCounter is not null)
+                {
+                    _workCounter.LoadedIgnoresAccepted++;
+                }
+            }
+        }
+
+        private static ArchitectureIgnoredViolation CreateLoadedIgnore(
+            ArchitectureBaselineIgnoredViolation baselineIgnore,
+            bool isStructured)
+        {
+            return new ArchitectureIgnoredViolation
+            {
+                SourceType = baselineIgnore.SourceType,
+                ForbiddenReference = baselineIgnore.ForbiddenReference,
+                Reason = baselineIgnore.Reason,
+                IdentityVersion = isStructured
+                    ? baselineIgnore.IdentityVersion ?? ArchitectureViolationIdentity.CurrentVersion
+                    : null,
+                ContractFamily = isStructured ? baselineIgnore.ContractFamily : null,
+                Kind = isStructured ? baselineIgnore.Kind : null,
+                SourceAssembly = isStructured ? baselineIgnore.SourceAssembly : null,
+                SourceMember = isStructured ? baselineIgnore.SourceMember : null,
+                TargetAssembly = isStructured ? baselineIgnore.TargetAssembly : null,
+                TargetType = isStructured ? baselineIgnore.TargetType : null,
+                TargetMember = isStructured ? baselineIgnore.TargetMember : null,
+                Occurrence = isStructured ? baselineIgnore.Occurrence ?? 0 : null,
+                Configuration = isStructured ? baselineIgnore.Configuration : null,
+                IsFromLoadedBaseline = true,
+            };
+        }
+
+        private ArchitectureBaselineIgnoreMembership GetOrCreateMembership(
+            List<ArchitectureIgnoredViolation> ignores,
+            bool isStructured,
+            Dictionary<List<ArchitectureIgnoredViolation>, ArchitectureBaselineIgnoreMembership> memberships)
+        {
+            if (memberships.TryGetValue(ignores, out ArchitectureBaselineIgnoreMembership? membership))
+            {
+                return membership;
+            }
+
+            membership = new ArchitectureBaselineIgnoreMembership(ignores, isStructured, _workCounter);
+            memberships.Add(ignores, membership);
+            return membership;
         }
 
         private static bool IsImportedExternalDiagnosticEntry(
@@ -548,20 +633,6 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             }
 
             return true;
-        }
-
-        private static bool IdentityEquals(ArchitectureIgnoredViolation existing, ArchitectureBaselineIgnoredViolation candidate)
-        {
-            return existing.IdentityVersion == ArchitectureViolationIdentity.CurrentVersion
-                && string.Equals(existing.ContractFamily, candidate.ContractFamily, StringComparison.Ordinal)
-                && string.Equals(existing.SourceAssembly, candidate.SourceAssembly, StringComparison.Ordinal)
-                && string.Equals(existing.SourceType, candidate.SourceType, StringComparison.Ordinal)
-                && string.Equals(existing.SourceMember, candidate.SourceMember, StringComparison.Ordinal)
-                && string.Equals(existing.TargetAssembly, candidate.TargetAssembly, StringComparison.Ordinal)
-                && string.Equals(existing.TargetType, candidate.TargetType, StringComparison.Ordinal)
-                && string.Equals(existing.TargetMember, candidate.TargetMember, StringComparison.Ordinal)
-                && (existing.Occurrence ?? 0) == (candidate.Occurrence ?? 0)
-                && string.Equals(existing.Configuration, candidate.Configuration, StringComparison.Ordinal);
         }
 
         private List<IArchitectureContract> GetContracts(string groupName)
