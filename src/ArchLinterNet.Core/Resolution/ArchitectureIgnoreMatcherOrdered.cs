@@ -156,9 +156,10 @@ internal static class ArchitectureIgnoreMatcherOrdered
                 continue;
             }
 
-            if (ignore.HasStructuredWaiverFields)
+            if (ignore.HasStructuredWaiverFields
+                && !string.IsNullOrWhiteSpace(ignore.Target?.Fingerprint))
             {
-                return !string.IsNullOrWhiteSpace(ignore.Target?.Fingerprint);
+                return true;
             }
         }
 

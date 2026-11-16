@@ -156,6 +156,96 @@ public sealed partial class IgnoreMatcherTests
         Assert.That(indexedMatch, Is.False);
     }
 
+    [TestCase(2, null)]
+    [TestCase(2, "")]
+    [TestCase(2, " ")]
+    [TestCase(8, null)]
+    [TestCase(8, "")]
+    [TestCase(8, " ")]
+    [TestCase(9, null)]
+    [TestCase(9, "")]
+    [TestCase(9, " ")]
+    public void IndexedMatcher_MalformedStructuredWaiverDoesNotHideLaterValidWaiver(
+        int ignoreCount,
+        string? malformedFingerprint)
+    {
+        ArchitectureViolationIdentity liveIdentity = CreateIdentity(0);
+        var ignored = new List<ArchitectureIgnoredViolation>
+        {
+            new()
+            {
+                WaiverId = "ARCH-IGN-MALFORMED",
+                Target = new ArchitectureWaiverTarget { Fingerprint = malformedFingerprint! },
+            },
+            new()
+            {
+                WaiverId = "ARCH-IGN-VALID",
+                Target = new ArchitectureWaiverTarget
+                {
+                    Fingerprint = ArchitectureWaiverTargetFingerprint.Create(liveIdentity),
+                },
+                IsFromLoadedBaseline = true,
+            },
+        };
+        while (ignored.Count < ignoreCount)
+        {
+            int fillerIndex = ignored.Count;
+            ignored.Add(new ArchitectureIgnoredViolation
+            {
+                SourceType = $"Unrelated.Source.{fillerIndex}",
+                ForbiddenReference = $"Unrelated.Target.{fillerIndex}",
+            });
+        }
+
+        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(ignored);
+        string? liveFingerprint = index.CreateLiveWaiverFingerprint(liveIdentity);
+
+        bool expectedWithoutTracker = ArchitectureIgnoreMatcherTestReference.IsIgnored(
+            liveIdentity.SourceType,
+            "Target.Type.0",
+            ignored,
+            null,
+            liveIdentity,
+            out bool expectedLoadedWithoutTracker);
+        bool actualWithoutTracker = index.IsIgnored(
+            liveIdentity.SourceType,
+            "Target.Type.0",
+            null,
+            liveIdentity,
+            liveFingerprint,
+            out bool actualLoadedWithoutTracker);
+
+        var expectedTracker = new ArchitectureIgnoreUsageTracker();
+        bool expectedWithTracker = ArchitectureIgnoreMatcherTestReference.IsIgnored(
+            liveIdentity.SourceType,
+            "Target.Type.0",
+            ignored,
+            expectedTracker,
+            liveIdentity,
+            out bool expectedLoadedWithTracker);
+        var actualTracker = new ArchitectureIgnoreUsageTracker();
+        bool actualWithTracker = index.IsIgnored(
+            liveIdentity.SourceType,
+            "Target.Type.0",
+            actualTracker,
+            liveIdentity,
+            liveFingerprint,
+            out bool actualLoadedWithTracker);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(expectedWithoutTracker, Is.True);
+            Assert.That(actualWithoutTracker, Is.EqualTo(expectedWithoutTracker));
+            Assert.That(actualLoadedWithoutTracker, Is.EqualTo(expectedLoadedWithoutTracker));
+            Assert.That(actualLoadedWithoutTracker, Is.True);
+            Assert.That(expectedWithTracker, Is.True);
+            Assert.That(actualWithTracker, Is.EqualTo(expectedWithTracker));
+            Assert.That(actualLoadedWithTracker, Is.EqualTo(expectedLoadedWithTracker));
+            Assert.That(actualTracker.MatchedIndexes, Is.EquivalentTo(expectedTracker.MatchedIndexes));
+            Assert.That(actualTracker.MatchedIndexes, Is.EquivalentTo([1]));
+        });
+    }
+
     [Test]
     public void IndexedMatcher_TrackerGetsAllOrderedOverlappingMatches_WithoutTrackerUsesEarliestProvenance()
     {

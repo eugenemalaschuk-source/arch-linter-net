@@ -1,8 +1,8 @@
 {
   "Evidence": "architecture-ignore-matching-deferred-fallback",
-  "Revision": "118650dee20ee87f76de44f26f2d3e12f78c8221",
+  "Revision": "1544e110576aebe3d90e75b8c415ef9276ab3a15",
   "RevisionState": "Revision records HEAD at measurement time; the implementation source SHA-256 identifies the measured matcher code.",
-  "ImplementationSourceSha256": "821a901c9c717dbc48b372405226eec338b09068e74630c768822acec6b8a674",
+  "ImplementationSourceSha256": "93866eb8808b61a9c82dfb2b45080ee402d59834307faa89cb63d16df1a5f9f6",
   "OrderedReferenceSourceSha256": "24ebdeaa9866e636fabcbb862332daaae1f90a4b4e542fb7adb517632ab9146f",
   "Environment": ".NET 10.0.15; Microsoft Windows 10.0.19045; X64; processors=6",
   "SampleCount": 5,
@@ -16,17 +16,17 @@
       "ExpectedFallbackIndexBuildQueryNumber": 0,
       "SampleCount": 5,
       "Baseline": {
-        "FirstQueryMedianMilliseconds": 0.0003,
-        "SubsequentQueryMedianMillisecondsPerCall": 0.003315873015873016,
-        "TotalQueryMedianMilliseconds": 0.2118,
+        "FirstQueryMedianMilliseconds": 0.0012,
+        "SubsequentQueryMedianMillisecondsPerCall": 0.004407936507936508,
+        "TotalQueryMedianMilliseconds": 0.2801,
         "TotalAllocatedBytes": 120
       },
       "Indexed": {
-        "IndexBuildMedianMilliseconds": 0.0002,
-        "FirstQueryMedianMilliseconds": 0.0006,
+        "IndexBuildMedianMilliseconds": 0.0004,
+        "FirstQueryMedianMilliseconds": 0.0007,
         "LazyFallbackIndexQueryMedianMilliseconds": 0,
-        "SubsequentQueryMedianMillisecondsPerCall": 0.003219047619047619,
-        "TotalBuildAndQueryMedianMilliseconds": 0.2044,
+        "SubsequentQueryMedianMillisecondsPerCall": 0.0033920634920634922,
+        "TotalBuildAndQueryMedianMilliseconds": 0.2148,
         "TotalAllocatedBytes": 232
       },
       "VersionedIdentityEntriesIndexed": 0,
@@ -43,18 +43,18 @@
       "ExpectedFallbackIndexBuildQueryNumber": 5,
       "SampleCount": 5,
       "Baseline": {
-        "FirstQueryMedianMilliseconds": 0.1006,
-        "SubsequentQueryMedianMillisecondsPerCall": 0.09853492063492063,
-        "TotalQueryMedianMilliseconds": 6.3086,
+        "FirstQueryMedianMilliseconds": 0.1086,
+        "SubsequentQueryMedianMillisecondsPerCall": 0.10164444444444444,
+        "TotalQueryMedianMilliseconds": 6.5128,
         "TotalAllocatedBytes": 120
       },
       "Indexed": {
-        "IndexBuildMedianMilliseconds": 0.0006,
-        "FirstQueryMedianMilliseconds": 0.0998,
-        "LazyFallbackIndexQueryMedianMilliseconds": 0.4675,
-        "SubsequentQueryMedianMillisecondsPerCall": 0.004851612903225807,
-        "TotalBuildAndQueryMedianMilliseconds": 0.8851,
-        "TotalAllocatedBytes": 248008
+        "IndexBuildMedianMilliseconds": 0.0008,
+        "FirstQueryMedianMilliseconds": 0.1008,
+        "LazyFallbackIndexQueryMedianMilliseconds": 0.4514,
+        "SubsequentQueryMedianMillisecondsPerCall": 0.005004838709677419,
+        "TotalBuildAndQueryMedianMilliseconds": 0.8699,
+        "TotalAllocatedBytes": 201152
       },
       "VersionedIdentityEntriesIndexed": 0,
       "MissingIdentityEntriesScanned": 4096,

@@ -9,6 +9,7 @@ namespace ArchLinterNet.Core.Resolution;
 internal sealed class ArchitectureIgnoreMatcherIndex
 {
     private const long MissingIdentityIndexScanMultiplier = 4;
+    private const int MaximumInitialDictionaryCapacity = 64;
     internal const int SmallLiveIdentityListThreshold = 8;
 
     private readonly IReadOnlyList<ArchitectureIgnoredViolation> _ignoredViolations;
@@ -246,7 +247,8 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         Dictionary<PatternPair, CandidateGroup> literalPairs,
         List<WildcardEntry> wildcardEntries,
         Dictionary<string, ArchitectureIgnoreMatcher.CompiledPattern> patternMatchers,
-        IgnoreEntry entry)
+        IgnoreEntry entry,
+        int ignoredEntryCapacity)
     {
         if (string.IsNullOrWhiteSpace(entry.SourcePattern)
             || string.IsNullOrWhiteSpace(entry.ForbiddenPattern))
@@ -261,7 +263,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
             var key = new PatternPair(
                 ArchitectureIgnoreMatcher.Normalize(entry.SourcePattern),
                 ArchitectureIgnoreMatcher.Normalize(entry.ForbiddenPattern));
-            Add(literalPairs, key, entry);
+            Add(literalPairs, key, entry, ignoredEntryCapacity);
             return;
         }
 
@@ -343,7 +345,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
             {
                 if (ignore.Target is { } target && !string.IsNullOrWhiteSpace(target.Fingerprint))
                 {
-                    Add(waiverFingerprints, target.Fingerprint, entry);
+                    Add(waiverFingerprints, target.Fingerprint, entry, ignoredViolations.Count);
                 }
 
                 continue;
@@ -356,11 +358,11 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                     workCounter.VersionedIdentityEntriesIndexed++;
                 }
 
-                Add(identities, IdentityKey.From(ignore), entry);
+                Add(identities, IdentityKey.From(ignore), entry, ignoredViolations.Count);
                 continue;
             }
 
-            AddFallbackPattern(literalPairs, wildcardEntries, patternMatchers, entry);
+            AddFallbackPattern(literalPairs, wildcardEntries, patternMatchers, entry, ignoredViolations.Count);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -390,16 +392,25 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                 workCounter.VersionedFallbackEntriesProcessed++;
             }
 
-            AddFallbackPattern(literalPairs, wildcardEntries, patternMatchers, entry);
+            AddFallbackPattern(literalPairs, wildcardEntries, patternMatchers, entry, ignoredViolations.Count);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         return new MissingIdentityIndex(literalPairs, wildcardEntries.ToArray());
     }
 
-    private static void Add<TKey>(Dictionary<TKey, CandidateGroup> table, TKey key, IgnoreEntry entry)
+    private static void Add<TKey>(
+        Dictionary<TKey, CandidateGroup> table,
+        TKey key,
+        IgnoreEntry entry,
+        int capacityHint)
         where TKey : notnull
     {
+        if (table.Count == 0 && capacityHint > 0)
+        {
+            table.EnsureCapacity(Math.Min(capacityHint, MaximumInitialDictionaryCapacity));
+        }
+
         if (table.TryGetValue(key, out CandidateGroup group))
         {
             group.Add(entry);
