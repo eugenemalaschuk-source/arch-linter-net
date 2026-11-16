@@ -1,0 +1,279 @@
+{
+  "schema": "issue-1138-line-churn-baseline/v1",
+  "phase": "pre-change baseline",
+  "capturedUtc": "2026-11-16T15:55:56.903458+00:00",
+  "sourceRevision": "190da651d7c12f5bc3bc2a34239a5c79698ef68d",
+  "calculatorBlob": "27d5bfeabe7267541143975ed5fe2dde35316b7b",
+  "runtime": ".NET 10.0.14",
+  "operatingSystem": "macOS 15.8.1",
+  "architecture": "X64",
+  "processorCount": 6,
+  "configuration": "Release",
+  "sampleCount": 7,
+  "workloadCatalog": "docs/internal/large-solution-benchmarking/workload-catalog.json",
+  "measurements": [
+    {
+      "workloadId": "synthetic-history-line-dense-small",
+      "family": "line_churn_dense_edits",
+      "inputSha256": "ef30cc99a8c73cf5e1fbd7aa60b9438d8072ad8ab908035cc00175fbb961d491",
+      "expectedOutputSha256": "ac98a233a475395adf020985d37e8c9024bb06aaecc2eb712b50ff001719ec5f",
+      "lineCount": 1000,
+      "editCount": 500,
+      "reducedOldLineCount": 998,
+      "reducedNewLineCount": 998,
+      "baselineDpCellUpdates": 996004,
+      "additions": 500,
+      "deletions": 500,
+      "outputDigest": "D3A8B400663F6D95BDA450F03BF89DA092B2B5BFE1474E348D3C9F25FBB430F0",
+      "elapsedMillisecondsSamples": [
+        2.676,
+        2.663,
+        4.7331,
+        2.8558,
+        2.7994,
+        2.7582,
+        2.7701
+      ],
+      "allocatedBytesSamples": [
+        379248,
+        379248,
+        379248,
+        379248,
+        379248,
+        379248,
+        379248
+      ],
+      "medianMilliseconds": 2.7701,
+      "medianAllocatedBytes": 379248
+    },
+    {
+      "workloadId": "synthetic-history-line-dense-medium",
+      "family": "line_churn_dense_edits",
+      "inputSha256": "68476e64413a6030db1dbe43cdba16b1ace17d14f3111e7b0ae9250fb431a07f",
+      "expectedOutputSha256": "58880f861f5fb0e0d250dd288e0814ca85bb004f0f6bd6985a933cd9df1d0a29",
+      "lineCount": 5000,
+      "editCount": 2500,
+      "reducedOldLineCount": 4998,
+      "reducedNewLineCount": 4998,
+      "baselineDpCellUpdates": 24980004,
+      "additions": 2500,
+      "deletions": 2500,
+      "outputDigest": "021ED8060BB9A9066E63A2214FD3DB1A140AD79B066282680E2C2BAE7C570DF9",
+      "elapsedMillisecondsSamples": [
+        67.3005,
+        54.7183,
+        62.3105,
+        68.9086,
+        192.54,
+        97.7096,
+        60.9905
+      ],
+      "allocatedBytesSamples": [
+        1933976,
+        1933976,
+        1933976,
+        1933976,
+        1933976,
+        1933976,
+        1933976
+      ],
+      "medianMilliseconds": 67.3005,
+      "medianAllocatedBytes": 1933976
+    },
+    {
+      "workloadId": "synthetic-history-line-dense-large",
+      "family": "line_churn_dense_edits",
+      "inputSha256": "9428f1ccc058c6d8ece9592e5cb0e67a3749083e0c5e9878538133d8d5488355",
+      "expectedOutputSha256": "27dc35f4b7ff54419e908502869c2dd91ff6bbacad26d6f41f3ed01142c670b9",
+      "lineCount": 10000,
+      "editCount": 5000,
+      "reducedOldLineCount": 9998,
+      "reducedNewLineCount": 9998,
+      "baselineDpCellUpdates": 99960004,
+      "additions": 5000,
+      "deletions": 5000,
+      "outputDigest": "C11DEC1E40086086C441391801B9CE1C41EAB0019F3F8BC68C2A7BCB67A0116A",
+      "elapsedMillisecondsSamples": [
+        300.9283,
+        336.0026,
+        225.611,
+        202.2769,
+        201.5439,
+        275.2928,
+        202.8853
+      ],
+      "allocatedBytesSamples": [
+        3906752,
+        3906752,
+        3906752,
+        3906752,
+        3906752,
+        3906752,
+        3906752
+      ],
+      "medianMilliseconds": 225.611,
+      "medianAllocatedBytes": 3906752
+    },
+    {
+      "workloadId": "synthetic-history-line-sparse-small",
+      "family": "line_churn_sparse_edits",
+      "inputSha256": "c3bef818650280cf0ce0edd56ab3ff72f9920f5329e999ca1dd45bc3a22aa105",
+      "expectedOutputSha256": "33ffe3d3d0ae2cfeb739b76f9ec07675181bfb7d63ba317ae81b4eb631e3799e",
+      "lineCount": 1000,
+      "editCount": 4,
+      "reducedOldLineCount": 601,
+      "reducedNewLineCount": 601,
+      "baselineDpCellUpdates": 361201,
+      "additions": 4,
+      "deletions": 4,
+      "outputDigest": "1E5040B4DB14CA674E235DE801FD4C74B1F0448E6EB1F838D1E9D4E443D99074",
+      "elapsedMillisecondsSamples": [
+        0.9806,
+        1.0489,
+        2.3914,
+        1.004,
+        1.0311,
+        1.0135,
+        1.0371
+      ],
+      "allocatedBytesSamples": [
+        257640,
+        257640,
+        257640,
+        257640,
+        257640,
+        257640,
+        257640
+      ],
+      "medianMilliseconds": 1.0311,
+      "medianAllocatedBytes": 257640
+    },
+    {
+      "workloadId": "synthetic-history-line-sparse-medium",
+      "family": "line_churn_sparse_edits",
+      "inputSha256": "7f55150bd51a59d4d74a98b63d7bb2e32d91fbe06a91a5903667a919b1e0fef5",
+      "expectedOutputSha256": "dfb1ac77b651d915eaf86bbbaa2a3edd07cf380dbbdeb79d735977a6109e8542",
+      "lineCount": 5000,
+      "editCount": 8,
+      "reducedOldLineCount": 3890,
+      "reducedNewLineCount": 3890,
+      "baselineDpCellUpdates": 15132100,
+      "additions": 8,
+      "deletions": 8,
+      "outputDigest": "19E16BD832F1AECB14BD2A2DDBFEAE837F707AADCD17BE484B704AA7928DE2F8",
+      "elapsedMillisecondsSamples": [
+        33.1566,
+        40.8327,
+        35.5939,
+        36.6704,
+        31.393,
+        33.7534,
+        31.4133
+      ],
+      "allocatedBytesSamples": [
+        1500976,
+        1500976,
+        1500976,
+        1500976,
+        1500976,
+        1500976,
+        1500976
+      ],
+      "medianMilliseconds": 33.7534,
+      "medianAllocatedBytes": 1500976
+    },
+    {
+      "workloadId": "synthetic-history-line-sparse-large",
+      "family": "line_churn_sparse_edits",
+      "inputSha256": "4393e8cf9900bd7f02037baf2262208c2afbdcf4cc4e48f520ca12dc8ac7849d",
+      "expectedOutputSha256": "e1455000d4e1a6590b66b40bcf94da59087e31cf7f16143cbc3c90c9106b34da",
+      "lineCount": 10000,
+      "editCount": 16,
+      "reducedOldLineCount": 8824,
+      "reducedNewLineCount": 8824,
+      "baselineDpCellUpdates": 77862976,
+      "additions": 16,
+      "deletions": 16,
+      "outputDigest": "B78A8FA258AECC2E108A37B2A3ADA33C924544E96ABCF587E6E913EA875A0D20",
+      "elapsedMillisecondsSamples": [
+        229.428,
+        211.9962,
+        274.7014,
+        231.0744,
+        282.3111,
+        213.2768,
+        214.3142
+      ],
+      "allocatedBytesSamples": [
+        3679040,
+        3679040,
+        3679040,
+        3679040,
+        3679040,
+        3679040,
+        3679040
+      ],
+      "medianMilliseconds": 229.428,
+      "medianAllocatedBytes": 3679040
+    }
+  ],
+  "ingestionMeasurements": [
+    {
+      "workloadId": "synthetic-history-line-sparse-large",
+      "directCalculatorMedianMilliseconds": 229.428,
+      "fullIngestionCallSamplesMilliseconds": [
+        206.4002,
+        206.8895,
+        210.6462,
+        211.2062,
+        232.3291,
+        322.5448,
+        363.0297
+      ],
+      "fullIngestionCallMedianMilliseconds": 211.2062,
+      "ingestionPhaseSamplesMilliseconds": [
+        206.092,
+        206.679,
+        210.435,
+        210.965,
+        231.894,
+        318.838,
+        362.788
+      ],
+      "ingestionPhaseMedianMilliseconds": 210.965,
+      "directToIngestionShare": null,
+      "endToEndAmdahlUpperBound": null
+    },
+    {
+      "workloadId": "synthetic-history-line-dense-large",
+      "directCalculatorMedianMilliseconds": 225.611,
+      "fullIngestionCallSamplesMilliseconds": [
+        262.0928,
+        268.8185,
+        274.9142,
+        295.7494,
+        297.6661,
+        307.3733,
+        404.8681
+      ],
+      "fullIngestionCallMedianMilliseconds": 295.7494,
+      "ingestionPhaseSamplesMilliseconds": [
+        261.889,
+        268.611,
+        274.674,
+        295.446,
+        297.457,
+        304.629,
+        404.616
+      ],
+      "ingestionPhaseMedianMilliseconds": 295.446,
+      "directToIngestionShare": 0.7636285480256967,
+      "endToEndAmdahlUpperBound": 4.230629340588529
+    }
+  ],
+  "memoryNotes": {
+    "allocatedBytes": "Measured per Compute call with GC.GetAllocatedBytesForCurrentThread; median of seven warmed samples.",
+    "retainedMemory": "No persistent calculator state is retained after Compute returns; peak temporary/working-set memory is not measured by this in-process harness.",
+    "deterministicDpStorage": "The existing exact implementation uses two integer rows of min(reducedOldLineCount, reducedNewLineCount) \u002B 1 elements."
+  }
+}
