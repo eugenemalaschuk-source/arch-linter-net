@@ -1,7 +1,7 @@
 {
   "schema": "issue-1138-line-churn-baseline/v1",
   "phase": "pre-change baseline",
-  "capturedUtc": "2026-11-16T14:32:23.112222+00:00",
+  "capturedUtc": "2026-11-16T15:13:09.0971+00:00",
   "sourceRevision": "190da651d7c12f5bc3bc2a34239a5c79698ef68d",
   "calculatorBlob": "27d5bfeabe7267541143975ed5fe2dde35316b7b",
   "runtime": ".NET 10.0.14",
@@ -25,7 +25,7 @@
       "additions": 500,
       "deletions": 500,
       "outputDigest": "D3A8B400663F6D95BDA450F03BF89DA092B2B5BFE1474E348D3C9F25FBB430F0",
-      "medianMilliseconds": 2.6049,
+      "medianMilliseconds": 2.7297,
       "medianAllocatedBytes": 379248
     },
     {
@@ -41,7 +41,7 @@
       "additions": 2500,
       "deletions": 2500,
       "outputDigest": "021ED8060BB9A9066E63A2214FD3DB1A140AD79B066282680E2C2BAE7C570DF9",
-      "medianMilliseconds": 50.9467,
+      "medianMilliseconds": 55.8611,
       "medianAllocatedBytes": 1933976
     },
     {
@@ -57,7 +57,7 @@
       "additions": 5000,
       "deletions": 5000,
       "outputDigest": "C11DEC1E40086086C441391801B9CE1C41EAB0019F3F8BC68C2A7BCB67A0116A",
-      "medianMilliseconds": 197.0591,
+      "medianMilliseconds": 228.8115,
       "medianAllocatedBytes": 3906752
     },
     {
@@ -73,7 +73,7 @@
       "additions": 4,
       "deletions": 4,
       "outputDigest": "1E5040B4DB14CA674E235DE801FD4C74B1F0448E6EB1F838D1E9D4E443D99074",
-      "medianMilliseconds": 1.125,
+      "medianMilliseconds": 1.1573,
       "medianAllocatedBytes": 257640
     },
     {
@@ -89,7 +89,7 @@
       "additions": 8,
       "deletions": 8,
       "outputDigest": "19E16BD832F1AECB14BD2A2DDBFEAE837F707AADCD17BE484B704AA7928DE2F8",
-      "medianMilliseconds": 31.242,
+      "medianMilliseconds": 38.7001,
       "medianAllocatedBytes": 1500976
     },
     {
@@ -105,24 +105,24 @@
       "additions": 16,
       "deletions": 16,
       "outputDigest": "B78A8FA258AECC2E108A37B2A3ADA33C924544E96ABCF587E6E913EA875A0D20",
-      "medianMilliseconds": 154.0662,
+      "medianMilliseconds": 166.2072,
       "medianAllocatedBytes": 3679040
     }
   ],
   "ingestionMeasurements": [
     {
       "workloadId": "synthetic-history-line-sparse-large",
-      "directCalculatorMedianMilliseconds": 154.0662,
-      "ingestionPhaseMedianMilliseconds": 199.035,
-      "directToIngestionShare": 0.7740658678121939,
-      "endToEndAmdahlUpperBound": 4.426068740993757
+      "directCalculatorMedianMilliseconds": 166.2072,
+      "ingestionPhaseMedianMilliseconds": 204.75,
+      "directToIngestionShare": 0.8117567765567766,
+      "endToEndAmdahlUpperBound": 5.312276222796476
     },
     {
       "workloadId": "synthetic-history-line-dense-large",
-      "directCalculatorMedianMilliseconds": 197.0591,
-      "ingestionPhaseMedianMilliseconds": 262.567,
-      "directToIngestionShare": 0.7505097746479946,
-      "endToEndAmdahlUpperBound": 4.0081730600431404
+      "directCalculatorMedianMilliseconds": 228.8115,
+      "ingestionPhaseMedianMilliseconds": 267.788,
+      "directToIngestionShare": 0.8544501620685019,
+      "endToEndAmdahlUpperBound": 6.870498890357007
     }
   ],
   "memoryNotes": {

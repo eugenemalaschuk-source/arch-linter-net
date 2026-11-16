@@ -1,0 +1,249 @@
+{
+  "schema": "issue-1138-line-churn-current/v1",
+  "phase": "post-change measurement",
+  "capturedUtc": "2026-11-16T15:13:41.481195+00:00",
+  "sourceRevision": "726fdf0ca1b7935e28e61571ca14595f9e3b5a36",
+  "calculatorBlob": "51cc3fd812269fa02dde9a1cf8841e007fb0bad0",
+  "runtime": ".NET 10.0.14",
+  "operatingSystem": "macOS 15.8.1",
+  "architecture": "X64",
+  "processorCount": 6,
+  "configuration": "Release",
+  "sampleCount": 5,
+  "workloadCatalog": "docs/internal/large-solution-benchmarking/workload-catalog.json",
+  "baselineRevision": "190da651d7c12f5bc3bc2a34239a5c79698ef68d",
+  "measurements": [
+    {
+      "workloadId": "synthetic-history-line-dense-small",
+      "direct": {
+        "workloadId": "synthetic-history-line-dense-small",
+        "family": "line_churn_dense_edits",
+        "inputSha256": "ef30cc99a8c73cf5e1fbd7aa60b9438d8072ad8ab908035cc00175fbb961d491",
+        "expectedOutputSha256": "ac98a233a475395adf020985d37e8c9024bb06aaecc2eb712b50ff001719ec5f",
+        "lineCount": 1000,
+        "editCount": 500,
+        "reducedOldLineCount": 998,
+        "reducedNewLineCount": 998,
+        "baselineDpCellUpdates": 996004,
+        "additions": 500,
+        "deletions": 500,
+        "outputDigest": "D3A8B400663F6D95BDA450F03BF89DA092B2B5BFE1474E348D3C9F25FBB430F0",
+        "medianMilliseconds": 4.044,
+        "medianAllocatedBytes": 379544
+      },
+      "work": {
+        "usedMyers": false,
+        "usedFallback": true,
+        "frontierSteps": 561,
+        "lineComparisons": 577,
+        "dynamicProgrammingCells": 996004,
+        "frontierArrayLength": 67,
+        "dynamicProgrammingRowLength": 999
+      },
+      "fastPathWork": 1138,
+      "totalAlgorithmWork": 997142,
+      "baselineDpCellUpdates": 996004,
+      "directTimeRatio": 1.4814814814814814,
+      "allocationRatio": 1.0007804919208538,
+      "frontierBytes": 268,
+      "dynamicProgrammingRowBytes": 7992
+    },
+    {
+      "workloadId": "synthetic-history-line-dense-medium",
+      "direct": {
+        "workloadId": "synthetic-history-line-dense-medium",
+        "family": "line_churn_dense_edits",
+        "inputSha256": "68476e64413a6030db1dbe43cdba16b1ace17d14f3111e7b0ae9250fb431a07f",
+        "expectedOutputSha256": "58880f861f5fb0e0d250dd288e0814ca85bb004f0f6bd6985a933cd9df1d0a29",
+        "lineCount": 5000,
+        "editCount": 2500,
+        "reducedOldLineCount": 4998,
+        "reducedNewLineCount": 4998,
+        "baselineDpCellUpdates": 24980004,
+        "additions": 2500,
+        "deletions": 2500,
+        "outputDigest": "021ED8060BB9A9066E63A2214FD3DB1A140AD79B066282680E2C2BAE7C570DF9",
+        "medianMilliseconds": 66.6368,
+        "medianAllocatedBytes": 1934272
+      },
+      "work": {
+        "usedMyers": false,
+        "usedFallback": true,
+        "frontierSteps": 561,
+        "lineComparisons": 577,
+        "dynamicProgrammingCells": 24980004,
+        "frontierArrayLength": 67,
+        "dynamicProgrammingRowLength": 4999
+      },
+      "fastPathWork": 1138,
+      "totalAlgorithmWork": 24981142,
+      "baselineDpCellUpdates": 24980004,
+      "directTimeRatio": 1.192901679343944,
+      "allocationRatio": 1.0001530525714901,
+      "frontierBytes": 268,
+      "dynamicProgrammingRowBytes": 39992
+    },
+    {
+      "workloadId": "synthetic-history-line-dense-large",
+      "direct": {
+        "workloadId": "synthetic-history-line-dense-large",
+        "family": "line_churn_dense_edits",
+        "inputSha256": "9428f1ccc058c6d8ece9592e5cb0e67a3749083e0c5e9878538133d8d5488355",
+        "expectedOutputSha256": "27dc35f4b7ff54419e908502869c2dd91ff6bbacad26d6f41f3ed01142c670b9",
+        "lineCount": 10000,
+        "editCount": 5000,
+        "reducedOldLineCount": 9998,
+        "reducedNewLineCount": 9998,
+        "baselineDpCellUpdates": 99960004,
+        "additions": 5000,
+        "deletions": 5000,
+        "outputDigest": "C11DEC1E40086086C441391801B9CE1C41EAB0019F3F8BC68C2A7BCB67A0116A",
+        "medianMilliseconds": 245.1101,
+        "medianAllocatedBytes": 3907048
+      },
+      "work": {
+        "usedMyers": false,
+        "usedFallback": true,
+        "frontierSteps": 561,
+        "lineComparisons": 577,
+        "dynamicProgrammingCells": 99960004,
+        "frontierArrayLength": 67,
+        "dynamicProgrammingRowLength": 9999
+      },
+      "fastPathWork": 1138,
+      "totalAlgorithmWork": 99961142,
+      "baselineDpCellUpdates": 99960004,
+      "directTimeRatio": 1.071231559602555,
+      "allocationRatio": 1.0000757662631259,
+      "frontierBytes": 268,
+      "dynamicProgrammingRowBytes": 79992
+    },
+    {
+      "workloadId": "synthetic-history-line-sparse-small",
+      "direct": {
+        "workloadId": "synthetic-history-line-sparse-small",
+        "family": "line_churn_sparse_edits",
+        "inputSha256": "c3bef818650280cf0ce0edd56ab3ff72f9920f5329e999ca1dd45bc3a22aa105",
+        "expectedOutputSha256": "33ffe3d3d0ae2cfeb739b76f9ec07675181bfb7d63ba317ae81b4eb631e3799e",
+        "lineCount": 1000,
+        "editCount": 4,
+        "reducedOldLineCount": 601,
+        "reducedNewLineCount": 601,
+        "baselineDpCellUpdates": 361201,
+        "additions": 4,
+        "deletions": 4,
+        "outputDigest": "1E5040B4DB14CA674E235DE801FD4C74B1F0448E6EB1F838D1E9D4E443D99074",
+        "medianMilliseconds": 0.2438,
+        "medianAllocatedBytes": 253072
+      },
+      "work": {
+        "usedMyers": true,
+        "usedFallback": false,
+        "frontierSteps": 41,
+        "lineComparisons": 634,
+        "dynamicProgrammingCells": 0,
+        "frontierArrayLength": 67,
+        "dynamicProgrammingRowLength": 0
+      },
+      "fastPathWork": 675,
+      "totalAlgorithmWork": 675,
+      "baselineDpCellUpdates": 361201,
+      "directTimeRatio": 0.2106627495031539,
+      "allocationRatio": 0.9822698338767272,
+      "frontierBytes": 268,
+      "dynamicProgrammingRowBytes": 0
+    },
+    {
+      "workloadId": "synthetic-history-line-sparse-medium",
+      "direct": {
+        "workloadId": "synthetic-history-line-sparse-medium",
+        "family": "line_churn_sparse_edits",
+        "inputSha256": "7f55150bd51a59d4d74a98b63d7bb2e32d91fbe06a91a5903667a919b1e0fef5",
+        "expectedOutputSha256": "dfb1ac77b651d915eaf86bbbaa2a3edd07cf380dbbdeb79d735977a6109e8542",
+        "lineCount": 5000,
+        "editCount": 8,
+        "reducedOldLineCount": 3890,
+        "reducedNewLineCount": 3890,
+        "baselineDpCellUpdates": 15132100,
+        "additions": 8,
+        "deletions": 8,
+        "outputDigest": "19E16BD832F1AECB14BD2A2DDBFEAE837F707AADCD17BE484B704AA7928DE2F8",
+        "medianMilliseconds": 0.9006,
+        "medianAllocatedBytes": 1470088
+      },
+      "work": {
+        "usedMyers": true,
+        "usedFallback": false,
+        "frontierSteps": 145,
+        "lineComparisons": 4023,
+        "dynamicProgrammingCells": 0,
+        "frontierArrayLength": 67,
+        "dynamicProgrammingRowLength": 0
+      },
+      "fastPathWork": 4168,
+      "totalAlgorithmWork": 4168,
+      "baselineDpCellUpdates": 15132100,
+      "directTimeRatio": 0.023271257697008534,
+      "allocationRatio": 0.9794213898156933,
+      "frontierBytes": 268,
+      "dynamicProgrammingRowBytes": 0
+    },
+    {
+      "workloadId": "synthetic-history-line-sparse-large",
+      "direct": {
+        "workloadId": "synthetic-history-line-sparse-large",
+        "family": "line_churn_sparse_edits",
+        "inputSha256": "4393e8cf9900bd7f02037baf2262208c2afbdcf4cc4e48f520ca12dc8ac7849d",
+        "expectedOutputSha256": "e1455000d4e1a6590b66b40bcf94da59087e31cf7f16143cbc3c90c9106b34da",
+        "lineCount": 10000,
+        "editCount": 16,
+        "reducedOldLineCount": 8824,
+        "reducedNewLineCount": 8824,
+        "baselineDpCellUpdates": 77862976,
+        "additions": 16,
+        "deletions": 16,
+        "outputDigest": "B78A8FA258AECC2E108A37B2A3ADA33C924544E96ABCF587E6E913EA875A0D20",
+        "medianMilliseconds": 2.4171,
+        "medianAllocatedBytes": 3608680
+      },
+      "work": {
+        "usedMyers": true,
+        "usedFallback": false,
+        "frontierSteps": 545,
+        "lineComparisons": 9349,
+        "dynamicProgrammingCells": 0,
+        "frontierArrayLength": 67,
+        "dynamicProgrammingRowLength": 0
+      },
+      "fastPathWork": 9894,
+      "totalAlgorithmWork": 9894,
+      "baselineDpCellUpdates": 77862976,
+      "directTimeRatio": 0.014542691291352,
+      "allocationRatio": 0.9808754457684613,
+      "frontierBytes": 268,
+      "dynamicProgrammingRowBytes": 0
+    }
+  ],
+  "ingestionMeasurements": [
+    {
+      "workloadId": "synthetic-history-line-sparse-large",
+      "directCalculatorMedianMilliseconds": 2.4171,
+      "ingestionPhaseMedianMilliseconds": 6.509,
+      "directToIngestionShare": 0.3713473651866646,
+      "endToEndAmdahlUpperBound": 1.5907035851316014
+    },
+    {
+      "workloadId": "synthetic-history-line-dense-large",
+      "directCalculatorMedianMilliseconds": 245.1101,
+      "ingestionPhaseMedianMilliseconds": 253.563,
+      "directToIngestionShare": 0.9666635116322176,
+      "endToEndAmdahlUpperBound": 29.997160737734987
+    }
+  ],
+  "memoryNotes": {
+    "allocatedBytes": "Measured per uninstrumented Compute call with GC.GetAllocatedBytesForCurrentThread; median of five warmed samples.",
+    "retainedMemory": "No persistent calculator state is retained after Compute returns; peak temporary/working-set memory is not measured by this in-process harness.",
+    "boundedSearchBytes": "The fixed Myers frontier uses FrontierArrayLength \u00D7 sizeof(int); it is discarded before fallback.",
+    "fallbackBytes": "The exact dense fallback uses two rows of DynamicProgrammingRowLength integers plus the fixed frontier during the bounded attempt."
+  }
+}
