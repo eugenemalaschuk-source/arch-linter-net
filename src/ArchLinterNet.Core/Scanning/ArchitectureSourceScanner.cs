@@ -7,6 +7,7 @@ using ArchLinterNet.Core.Resolution;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 
 namespace ArchLinterNet.Core.Scanning;
 
@@ -80,21 +81,36 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
 
         ArchitectureLayer effectiveLayer = sourceLayer
                                            ?? new ArchitectureLayer { Namespace = sourceNamespacePrefix };
-        var sourceFiles =
-            FindMatchingSourceFiles(repositoryRoot, effectiveLayer, sourceRoots, fileSystem, cancellationToken)
+        IReadOnlyList<string> sourceFiles = request.PreparedSourceFilePaths
+            ?? FindMatchingSourceFiles(repositoryRoot, effectiveLayer, sourceRoots, fileSystem, cancellationToken)
                 .ToList();
         if (sourceFiles.Count == 0) return Array.Empty<ArchitectureViolation>();
 
-        // The compilation build itself (parsing every source file, resolving references) is not
-        // individually interruptible — it is one call into the Roslyn API — but is checked
-        // immediately before and after so it does not run unconditionally on an already-cancelled
-        // token, and per-file semantic analysis below is checked at each syntax tree boundary.
-        cancellationToken.ThrowIfCancellationRequested();
-        CSharpCompilation compilation = compilationFactory.Create(
-            "ArchitectureSourceScanner", sourceFiles, preprocessorSymbols, fileSystem, assemblyLoader,
-            explicitReferenceAssemblyPaths);
-        benchmarkWorkObserver?.RecordMethodBodyCompilation(compilation.SyntaxTrees.Length);
-        cancellationToken.ThrowIfCancellationRequested();
+        CSharpCompilation compilation;
+        if (request.PreparedCompilation is { } preparedCompilation)
+        {
+            compilation = preparedCompilation;
+        }
+        else
+        {
+            // The compilation build itself (parsing every source file, resolving references) is not
+            // individually interruptible — it is one call into the Roslyn API — but is checked
+            // immediately before and after so it does not run unconditionally on an already-cancelled
+            // token, and per-file semantic analysis below is checked at each syntax tree boundary.
+            cancellationToken.ThrowIfCancellationRequested();
+            if (benchmarkWorkObserver is not null)
+            {
+                for (int index = 0; index < sourceFiles.Count; index++)
+                {
+                    benchmarkWorkObserver.RecordMethodBodySyntaxTreeParse();
+                }
+            }
+            compilation = compilationFactory.Create(
+                "ArchitectureSourceScanner", sourceFiles, preprocessorSymbols, fileSystem, assemblyLoader,
+                explicitReferenceAssemblyPaths);
+            benchmarkWorkObserver?.RecordMethodBodyCompilation(compilation.SyntaxTrees.Length);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
         IReadOnlyList<ForbiddenCallPattern> patterns =
             ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCallPatterns);
         Dictionary<string, bool> matchCache = new(StringComparer.Ordinal);
@@ -143,12 +159,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         return violations;
     }
 
-    // internal, not private: lets other Core call sites that already hold a live cancellation
-    // token (e.g. ArchitectureAnalysisSession.Checking's project-aware reference resolution
-    // prepass) reuse the same per-file-checked discovery path as FindMethodBodyViolations itself,
-    // instead of going through the public 4-arg overload above and silently getting
-    // CancellationToken.None.
-    internal static IReadOnlyList<string> FindMatchingSourceFiles(
+    private static IReadOnlyList<string> FindMatchingSourceFiles(
         string repositoryRoot,
         ArchitectureLayer layer,
         string[]? sourceRoots,
@@ -158,6 +169,48 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         fileSystem ??= ArchitectureFileSystem.Real;
         string[] roots = sourceRoots ?? _defaultSourceRoots;
         return FindSourceFilesForNamespace(repositoryRoot, layer, roots, fileSystem, cancellationToken);
+    }
+
+    internal static IReadOnlyList<ArchitectureMethodBodySourceFile> FindMatchingSourceFileInputs(
+        string repositoryRoot,
+        ArchitectureLayer layer,
+        string[]? sourceRoots,
+        IArchitectureFileSystem? fileSystem,
+        CancellationToken cancellationToken,
+        BenchmarkWorkObserver? benchmarkWorkObserver)
+    {
+        fileSystem ??= ArchitectureFileSystem.Real;
+        string[] roots = sourceRoots ?? _defaultSourceRoots;
+        List<ArchitectureMethodBodySourceFile> result = new();
+
+        foreach (string root in roots)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string fullRoot = Path.Combine(repositoryRoot, root);
+            if (!fileSystem.DirectoryExists(fullRoot)) continue;
+
+            benchmarkWorkObserver?.RecordMethodBodySourceDirectoryEnumerated();
+            foreach (string filePath in fileSystem.EnumerateFiles(fullRoot, "*.cs", SearchOption.AllDirectories))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                benchmarkWorkObserver?.RecordMethodBodySourceFileEnumerated();
+
+                string relativeToRoot = Path.GetRelativePath(fullRoot, filePath);
+                if (ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot)) continue;
+
+                benchmarkWorkObserver?.RecordMethodBodySourceFileRead();
+                if (!FileContainsNamespace(filePath, layer, fileSystem)) continue;
+
+                benchmarkWorkObserver?.RecordMethodBodySourceFileRead();
+                string sourceText = fileSystem.ReadAllText(filePath);
+
+                result.Add(new ArchitectureMethodBodySourceFile(
+                    filePath,
+                    SourceText.From(sourceText, checksumAlgorithm: SourceHashAlgorithm.Sha256)));
+            }
+        }
+
+        return result;
     }
 
     internal static List<ForbiddenCallMatch> FindForbiddenUsagesInBodies(

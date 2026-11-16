@@ -33,6 +33,8 @@ public sealed class ArchitectureAnalysisSession
 
     private readonly ArchitectureCoreContractCheckingService _coreContractCheckingService;
 
+    private readonly ArchitectureMethodBodyPreparationCache _methodBodyPreparationCache;
+
     private readonly ArchitectureSupplementalContractCheckingService _supplementalContractCheckingService;
 
     private readonly ArchitectureFrameworkReferenceAnalysisService _frameworkReferenceAnalysisService;
@@ -78,6 +80,8 @@ public sealed class ArchitectureAnalysisSession
     {
         Context = context ?? throw new ArgumentNullException(nameof(context));
         Document = document ?? throw new ArgumentNullException(nameof(document));
+        _methodBodyPreparationCache = new ArchitectureMethodBodyPreparationCache();
+        context.RegisterRunScopedResource(_methodBodyPreparationCache);
         SelectedContractIds = selectedContractIds;
         EnableUnmatchedIgnoreTracking = enableUnmatchedIgnoreTracking;
         PreprocessorSymbols = preprocessorSymbols;
@@ -218,6 +222,8 @@ public sealed class ArchitectureAnalysisSession
         _contractSurfaceExposureIndex.MaterializationCount;
 
     internal ArchitectureCheckerContext CheckerContext => _checkerContext ??= new ArchitectureCheckerContext(this);
+
+    internal ArchitectureMethodBodyPreparationCache MethodBodyPreparationCache => _methodBodyPreparationCache;
 
     public ArchitectureReferenceGraph ReferenceGraph { get; } = new();
 

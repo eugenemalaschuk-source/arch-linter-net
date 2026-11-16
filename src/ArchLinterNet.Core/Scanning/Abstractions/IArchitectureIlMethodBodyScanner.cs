@@ -1,6 +1,7 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Scanning;
@@ -13,5 +14,6 @@ internal interface IArchitectureIlMethodBodyScanner
         IReadOnlyList<string> forbiddenCallPatterns,
         ArchitectureContractExecutionContext executionContext,
         ArchitectureLayer? sourceLayer = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        BenchmarkWorkObserver? benchmarkWorkObserver = null);
 }

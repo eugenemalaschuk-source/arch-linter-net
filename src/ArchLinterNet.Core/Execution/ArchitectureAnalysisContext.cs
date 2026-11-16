@@ -11,7 +11,9 @@ public sealed class ArchitectureAnalysisContext : IDisposable
 {
     private readonly IArchitectureAssemblyLoadScope? _isolatedLoadScope;
     private readonly HashSet<string> _consumedInputPaths = new(StringComparer.OrdinalIgnoreCase);
-    private readonly object _consumedInputPathsGate = new();
+    private readonly Lock _consumedInputPathsGate = new();
+    private readonly List<IDisposable> _runScopedResources = new();
+    private readonly Lock _runScopedResourcesGate = new();
     private bool _disposed;
 
     public ArchitectureAnalysisContext(
@@ -145,6 +147,21 @@ public sealed class ArchitectureAnalysisContext : IDisposable
         }
     }
 
+    internal void RegisterRunScopedResource(IDisposable resource)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        lock (_runScopedResourcesGate)
+        {
+            if (_disposed)
+            {
+                resource.Dispose();
+                return;
+            }
+
+            _runScopedResources.Add(resource);
+        }
+    }
+
     // Set once by ArchitectureRunnerSetupService at construction time. Deep type/IL/source scanning
     // and fact-index materialization code (spread across many ArchitectureAnalysisSession partial-
     // class files) reads this to check cancellation at its own natural per-file/per-type loop
@@ -164,12 +181,20 @@ public sealed class ArchitectureAnalysisContext : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
+        IDisposable[] runScopedResources;
+        lock (_runScopedResourcesGate)
         {
-            return;
+            if (_disposed) return;
+            _disposed = true;
+            runScopedResources = _runScopedResources.ToArray();
+            _runScopedResources.Clear();
         }
 
-        _disposed = true;
+        foreach (IDisposable resource in runScopedResources)
+        {
+            resource.Dispose();
+        }
+
         _isolatedLoadScope?.Dispose();
     }
 

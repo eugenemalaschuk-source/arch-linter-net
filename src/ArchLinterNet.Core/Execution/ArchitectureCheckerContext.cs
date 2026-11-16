@@ -34,6 +34,8 @@ internal sealed class ArchitectureCheckerContext
 
     public ArchitectureAnalysisContext AnalysisContext => _session.Context;
 
+    internal ArchitectureMethodBodyPreparationCache MethodBodyPreparationCache => _session.MethodBodyPreparationCache;
+
     public ArchitectureTypeIndex TypeIndex => _session.TypeIndex;
 
     public ArchitectureRoleIndex RoleIndex => _session.RoleIndex;
