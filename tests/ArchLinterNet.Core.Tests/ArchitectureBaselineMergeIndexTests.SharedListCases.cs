@@ -38,7 +38,7 @@ public sealed partial class ArchitectureBaselineMergeIndexTests
 
     private static ArchitectureContractDocument CreateSharedIgnoreListPolicy(int version)
     {
-        List<ArchitectureIgnoredViolation> sharedIgnores = Enumerable.Range(0, 9)
+        var sharedIgnores = Enumerable.Range(0, 9)
             .Select(index => ToPolicyIgnore(SharedIgnore(version, $"inline-{index}", $"inline-{index}")))
             .ToList();
         ArchitectureDependencyContract firstContract = Contract("A");
