@@ -74,6 +74,11 @@ public sealed class BenchmarkAuditExecutionTests
                 result.Value == result.ContributorCount), Is.True);
             Assert.That(observed.Sample.MetricWork.ResultsSha256, Does.Match("^[0-9a-f]{64}$"));
             Assert.That(observed.Sample.RawAnalysisProfile.GetProperty("SchemaId").GetString(), Is.EqualTo("analysis-profile/v1"));
+            Assert.That(observed.Sample.LoadedAssemblies!.Artifacts, Is.Not.Empty);
+            Assert.That(observed.Sample.LoadedAssemblies.Artifacts.All(artifact =>
+                artifact.FileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+                && artifact.Sha256.Length == 64), Is.True);
+            Assert.That(observed.Sample.LoadedAssemblies.Sha256, Does.Match("^[0-9a-f]{64}$"));
             Assert.That(observed.Sample.WorkCounters!.ProjectFileParses.Value, Is.GreaterThan(0));
             Assert.That(observed.Sample.WorkCounters!.SourceFactFileParses.Value, Is.GreaterThan(0));
             Assert.That(observed.Sample.WorkCounters!.MethodBodyCompilationCalls.Value, Is.GreaterThan(0));
@@ -83,6 +88,8 @@ public sealed class BenchmarkAuditExecutionTests
             Assert.That(observed.Sample.WorkCounters!.CelContextConstructions.Value, Is.GreaterThan(0));
             Assert.That(observed.CanonicalResult.Sha256, Is.EqualTo(unobserved.CanonicalResult.Sha256));
             Assert.That(observed.MaterializedInputSha256, Is.EqualTo(unobserved.MaterializedInputSha256));
+            Assert.That(observed.Sample.LoadedAssemblies!.Sha256,
+                Is.EqualTo(unobserved.Sample.LoadedAssemblies!.Sha256));
         });
     }
 }

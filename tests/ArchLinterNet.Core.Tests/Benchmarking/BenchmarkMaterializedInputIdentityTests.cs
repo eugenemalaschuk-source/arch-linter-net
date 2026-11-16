@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -7,6 +8,36 @@ namespace ArchLinterNet.Core.Tests;
 [NonParallelizable]
 public sealed class BenchmarkMaterializedInputIdentityTests
 {
+    [Test]
+    public void LoadedAssemblyIdentity_DoesNotDependOnTemporaryFixtureRoot()
+    {
+        string digest = new string('c', 64);
+        ArchitectureLoadedAssemblyArtifact firstArtifact = new(
+            Path.Combine(Path.GetTempPath(), "fixture-a", "bin", "Debug", "net10.0", "Synthetic.Project000.dll"),
+            digest,
+            string.Empty,
+            2048);
+        ArchitectureLoadedAssemblyArtifact secondArtifact = new(
+            Path.Combine(Path.GetTempPath(), "fixture-b", "bin", "Debug", "net10.0", "Synthetic.Project000.dll"),
+            digest,
+            string.Empty,
+            2048);
+
+        BenchmarkLoadedAssemblyEvidence first = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts([firstArtifact]);
+        BenchmarkLoadedAssemblyEvidence second = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts([secondArtifact]);
+        BenchmarkLoadedAssemblyEvidence changedBytes = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts(
+        [
+            secondArtifact with { AssemblyContentDigest = new string('d', 64) },
+        ]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Sha256, Is.EqualTo(second.Sha256));
+            Assert.That(first.Artifacts, Is.EqualTo(second.Artifacts));
+            Assert.That(changedBytes.Sha256, Is.Not.EqualTo(first.Sha256));
+        });
+    }
+
     [TestCase(nameof(BenchmarkCompilationMode.RealMsBuild))]
     [TestCase(nameof(BenchmarkCompilationMode.StagedAssemblies))]
     public void EquivalentWorkloadsHaveStableInputIdentityAcrossIndependentBuildRoots(

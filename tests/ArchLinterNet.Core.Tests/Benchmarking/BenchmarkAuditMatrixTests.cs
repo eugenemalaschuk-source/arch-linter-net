@@ -186,6 +186,8 @@ public sealed class BenchmarkAuditMatrixTests
                 Assert.That(enabled.CanonicalResult.Sha256, Is.EqualTo(disabled.CanonicalResult.Sha256),
                     $"Observer parity failed for {workload.WorkloadId} ({mode}, pair {pair + 1}).");
                 Assert.That(enabled.MaterializedInputSha256, Is.EqualTo(disabled.MaterializedInputSha256));
+                Assert.That(enabled.Sample.LoadedAssemblies!.Sha256, Is.EqualTo(disabled.Sample.LoadedAssemblies!.Sha256),
+                    $"Loaded assemblies changed across paired samples for {workload.WorkloadId} ({mode}, pair {pair + 1}).");
                 canonicalResult ??= disabled.CanonicalResult;
                 Assert.That(disabled.CanonicalResult.Sha256, Is.EqualTo(canonicalResult.Sha256),
                     $"Canonical result changed across samples for {workload.WorkloadId}.");
@@ -197,6 +199,11 @@ public sealed class BenchmarkAuditMatrixTests
         }
 
         Assert.That(samples, Has.Count.EqualTo(8), $"Unexpected sample count for {workload.WorkloadId}.");
+        Assert.That(samples.All(sample => sample.LoadedAssemblies is { Artifacts.Count: > 0 }), Is.True,
+            $"Loaded DLL identities were missing for {workload.WorkloadId}.");
+        Assert.That(samples.Select(sample => sample.LoadedAssemblies!.Sha256)
+                .Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(1),
+            $"Loaded DLL identity changed across repeated samples for {workload.WorkloadId}.");
         if (workload.Dimensions.MetricRuleCount > 0)
         {
             Assert.That(samples.All(sample => sample.MetricWork?.MetricCount == workload.Dimensions.MetricRuleCount), Is.True,

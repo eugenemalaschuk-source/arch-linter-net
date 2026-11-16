@@ -95,6 +95,8 @@ internal static class BenchmarkAuditAnalysisRunner
             long allocatedBytes = Math.Max(0, GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore);
             TimeSpan processorTime = Process.GetCurrentProcess().TotalProcessorTime - processorTimeBefore;
             BenchmarkCanonicalResultIdentity canonical = CreateCanonicalResult(outcome);
+            BenchmarkLoadedAssemblyEvidence loadedAssemblies =
+                BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts(setup.Runner.Session.Context.LoadedAssemblyArtifacts);
             AnalysisProfile profile = AnalysisProfileBuilder.Build(
                 snapshot.Counters,
                 timing,
@@ -131,6 +133,7 @@ internal static class BenchmarkAuditAnalysisRunner
                 PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable(
                     "Per-invocation peak retained managed memory is not sampled by this in-process harness."),
                 MetricWork = metricWork,
+                LoadedAssemblies = loadedAssemblies,
                 WorkCounters = observerEnabled
                     ? BenchmarkWorkCounterEvidence.FromObserver(observer)
                     : BenchmarkWorkCounterEvidence.ObserverDisabled("The per-invocation Core work observer was disabled for this paired sample."),

@@ -61,7 +61,7 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
             BenchmarkHistoryWorkloadInput replay = replayById[input.WorkloadId];
             Assert.Multiple(() =>
             {
-                Assert.That(inputDocument.RootElement.GetProperty("generator_version").GetString(), Is.EqualTo("2"));
+                Assert.That(inputDocument.RootElement.GetProperty("generator_version").GetString(), Is.EqualTo("3"));
                 Assert.That(ids.Add(input.WorkloadId), Is.True);
                 Assert.That(replay.CanonicalInputJson, Is.EqualTo(input.CanonicalInputJson));
                 Assert.That(replay.InputSha256, Is.EqualTo(input.InputSha256));
@@ -193,7 +193,8 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
 
         ValidateAncestryStructure(input, commits, edges, queries, parents);
 
-        int satisfied = 0;
+        int positiveQueryCount = 0;
+        int negativeQueryCount = 0;
         foreach (BenchmarkHistoryInputRecord query in queries)
         {
             HashSet<int> visited = [];
@@ -212,23 +213,76 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
                 }
             }
 
-            if (visited.Contains(query.First) && query.First != query.Second.Value)
+            bool actualAncestry = visited.Contains(query.First) && query.First != query.Second.Value;
+            Assert.That(query.ExpectedAncestry, Is.Not.Null, input.WorkloadId);
+            Assert.That(actualAncestry, Is.EqualTo(query.ExpectedAncestry!.Value),
+                $"Query {query.First}→{query.Second} has an incorrect expected answer in {input.WorkloadId}.");
+            if (actualAncestry)
             {
-                satisfied++;
+                positiveQueryCount++;
+            }
+            else
+            {
+                negativeQueryCount++;
             }
         }
 
-        Assert.That(satisfied, Is.EqualTo(queries.Length), input.WorkloadId);
+        Assert.That(positiveQueryCount, Is.GreaterThan(0), input.WorkloadId);
+        Assert.That(negativeQueryCount, Is.GreaterThan(0), input.WorkloadId);
+        long strictAncestorClosureEntryCount = CountStrictAncestorClosureEntries(parents);
         return new SortedDictionary<string, long>(StringComparer.Ordinal)
         {
             ["merge_count"] = edges.Count(edge => edge.Value == "merge"),
+            ["negative_ancestry_query_count"] = negativeQueryCount,
             ["parent_edge_count"] = edges.Length,
+            ["positive_ancestry_query_count"] = positiveQueryCount,
             ["query_endpoint_count"] = queries.Length,
             ["reachable_commit_count"] = commits.Length,
             ["rename_event_count"] = records.Count(record => record.Kind == "rename_event"),
-            ["retained_ancestor_entry_count"] = input.Dimensions["retained_ancestor_entry_count"],
-            ["strict_ancestor_query_count"] = satisfied,
+            ["strict_ancestor_closure_entry_count"] = strictAncestorClosureEntryCount,
+            ["strict_ancestor_query_count"] = positiveQueryCount,
         };
+    }
+
+    private static long CountStrictAncestorClosureEntries(IReadOnlyDictionary<int, List<int>> parents)
+    {
+        int[] commitIds = parents.Keys.Order().ToArray();
+        int[] visitedAt = new int[commitIds.Length];
+        int[] pending = new int[commitIds.Length];
+        long count = 0;
+        for (int index = 0; index < commitIds.Length; index++)
+        {
+            int token = index + 1;
+            int top = 0;
+            int ancestorCount = 0;
+            foreach (int parent in parents[commitIds[index]])
+            {
+                if (visitedAt[parent] != token)
+                {
+                    visitedAt[parent] = token;
+                    pending[top++] = parent;
+                    ancestorCount++;
+                }
+            }
+
+            while (top > 0)
+            {
+                int current = pending[--top];
+                foreach (int parent in parents[current])
+                {
+                    if (visitedAt[parent] != token)
+                    {
+                        visitedAt[parent] = token;
+                        pending[top++] = parent;
+                        ancestorCount++;
+                    }
+                }
+            }
+
+            count += ancestorCount;
+        }
+
+        return count;
     }
 
     private static void ValidateAncestryStructure(
@@ -239,6 +293,8 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
         Dictionary<int, List<int>> parents)
     {
         Assert.That(commits.Select(commit => commit.First).Distinct().Count(), Is.EqualTo(commits.Length), input.WorkloadId);
+        Assert.That(commits.Select(commit => commit.First).OrderBy(id => id),
+            Is.EqualTo(Enumerable.Range(0, commits.Length)), input.WorkloadId);
         Assert.That(commits.Length, Is.EqualTo(input.Dimensions["reachable_commit_count"]), input.WorkloadId);
         Assert.That(edges.All(edge => edge.Second!.Value < edge.First), Is.True,
             $"Parent edges must point backward through the deterministic commit order ({input.WorkloadId}).");
@@ -287,7 +343,8 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
                 Assert.That(HasAncestor(parents, branchCommit, firstParent), Is.False, input.WorkloadId);
             }
 
-            Assert.That(queries.All(query => branchCommits.Contains(query.First)), Is.True, input.WorkloadId);
+            Assert.That(queries.Where(query => query.ExpectedAncestry == true)
+                .All(query => branchCommits.Contains(query.First)), Is.True, input.WorkloadId);
         }
         else
         {
@@ -297,8 +354,9 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
 
         foreach (BenchmarkHistoryInputRecord query in queries)
         {
-            Assert.That(HasAncestor(parents, query.Second!.Value, query.First), Is.True,
-                $"Expected graph-derived ancestry query {query.First} → {query.Second} to hold for {input.WorkloadId}.");
+            Assert.That(query.ExpectedAncestry, Is.Not.Null, input.WorkloadId);
+            Assert.That(HasAncestor(parents, query.Second!.Value, query.First), Is.EqualTo(query.ExpectedAncestry!.Value),
+                $"Graph-derived ancestry query {query.First} → {query.Second} did not match its expected answer for {input.WorkloadId}.");
         }
     }
 

@@ -222,7 +222,26 @@
         "metric_work": { "$ref": "#/$defs/metric_work" },
         "history_work_counters": { "$ref": "#/$defs/history_work_counters" },
         "timing_boundaries": { "$ref": "#/$defs/timing_boundaries" },
-        "report_output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "report_output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "loaded_assemblies": { "$ref": "#/$defs/loaded_assemblies" }
+      }
+    },
+    "loaded_assembly_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_name", "sha256"],
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^[^/\\\\]+\\.dll$" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "loaded_assemblies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "artifacts"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "artifacts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/loaded_assembly_artifact" } }
       }
     },
     "metric_result": {

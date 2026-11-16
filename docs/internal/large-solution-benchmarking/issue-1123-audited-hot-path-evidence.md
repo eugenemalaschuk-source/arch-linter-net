@@ -32,8 +32,9 @@ overhead compares observer-disabled and observer-enabled Core analysis and also 
 canonical results match.
 
 Provenance fields are source revision, runtime, OS, architecture, runner identity, tool identity,
-workload identity, and (when collected) a SHA-256 of materialized inputs. Public API snapshots and
-the analysis-profile schema are unchanged.
+workload identity, and (when collected) a SHA-256 of materialized source/configuration inputs.
+Compiled audit samples separately retain the exact DLL inventory and SHA-256 values captured from
+the PE bytes loaded by Core. Public API snapshots and the analysis-profile schema are unchanged.
 
 ## Commands
 

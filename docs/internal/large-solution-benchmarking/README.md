@@ -86,6 +86,13 @@ generated `bin`/`obj` outputs, analysis caches, and per-run profile/output files
 Staged assemblies, their build receipts, and the staged manifest remain included
 because analysis consumes those files directly.
 
+For compiled audit samples, `materialized_input_sha256` remains the source and
+configuration identity. Each sample separately records `loaded_assemblies`,
+including a canonical inventory SHA-256 and the per-DLL SHA-256 captured from the
+exact PE bytes consumed by the isolated loader. The inventory uses stable DLL
+file names and excludes temporary fixture paths; it does not hash a later read
+of the mutable `bin` directory.
+
 ## Evidence
 
 `benchmark-evidence/v1` wraps raw `analysis-profile/v1` JSON in the
@@ -159,7 +166,9 @@ with stable input and expected-shape-summary SHA-256 identities. Its ordinary te
 counts, task occurrences, graph components, and ancestry answers against the generated records.
 The merged-DAG fixture has separate side branches that fork from the mainline and rejoin through
 two-parent commits; long rename-chain fixtures contain continuous path-change events. Tests verify
-both structures and derive query answers from the parent-edge graph.
+both structures and independently derive positive and negative query answers from the parent-edge
+graph. `strict_ancestor_closure_entry_count` is derived from the graph's strict-ancestor closure;
+it is not a catalog input or a measured runtime memory value.
 Owning History tasks remain responsible for running their production algorithm, recording its
 operation counts and resources, and hashing the canonical algorithm output.
 

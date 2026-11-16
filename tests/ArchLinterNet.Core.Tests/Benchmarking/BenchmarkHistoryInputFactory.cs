@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -62,7 +63,7 @@ internal static class BenchmarkHistoryInputFactory
         var inputPayload = new
         {
             schema = "benchmark-history-input/v1",
-            generator_version = "2",
+            generator_version = "3",
             owner_issue = ownerIssue,
             family,
             workload_id = id,
@@ -200,10 +201,10 @@ internal static class BenchmarkHistoryInputFactory
         int queryCount = dimensions["query_endpoint_count"];
         int mergeCount = dimensions.TryGetValue("merge_count", out int merges) ? merges : 0;
         int renameEventCount = dimensions.TryGetValue("rename_event_count", out int renameEvents) ? renameEvents : 0;
-        long retainedEntries = dimensions["retained_ancestor_entry_count"];
         int mainlineCommitCount = commitCount - mergeCount;
+        int positiveQueryCount = (queryCount + 1) / 2;
         int availableQueryAncestors = mergeCount > 0 ? mergeCount : mainlineCommitCount;
-        if (mainlineCommitCount < 3 || queryCount > availableQueryAncestors ||
+        if (mainlineCommitCount < 3 || queryCount < 2 || positiveQueryCount > availableQueryAncestors ||
             renameEventCount > mainlineCommitCount - 1)
         {
             throw new InvalidOperationException("Ancestry workload dimensions cannot produce the declared graph and query shapes.");
@@ -266,24 +267,35 @@ internal static class BenchmarkHistoryInputFactory
 
         for (int query = 0; query < queryCount; query++)
         {
-            int ancestor = mergeCount > 0 ? sideBranchCommits[query] : mainlineCommits[query];
-            records.Add(new BenchmarkHistoryInputRecord("ancestry_query", ancestor, mainlineCommits[^1], null));
+            bool expectedAncestry = query % 2 == 0;
+            int ancestor = expectedAncestry
+                ? mergeCount > 0 ? sideBranchCommits[query / 2] : mainlineCommits[query / 2]
+                : mainlineCommits[^1];
+            int descendant = expectedAncestry
+                ? mainlineCommits[^1]
+                : mainlineCommits[query / 2 % (mainlineCommitCount - 1)];
+            records.Add(new BenchmarkHistoryInputRecord("ancestry_query", ancestor, descendant, null)
+            {
+                ExpectedAncestry = expectedAncestry,
+            });
         }
 
-        int satisfiedQueries = CountSatisfiedAncestryQueries(records);
+        AncestryGraphSummary summary = SummarizeAncestryGraph(records);
         return new BenchmarkHistoryExpectedOutput(new SortedDictionary<string, long>(StringComparer.Ordinal)
         {
             ["merge_count"] = records.Count(record => record.Kind == "parent_edge" && record.Value == "merge"),
+            ["negative_ancestry_query_count"] = summary.NegativeQueryCount,
             ["parent_edge_count"] = records.Count(record => record.Kind == "parent_edge"),
+            ["positive_ancestry_query_count"] = summary.PositiveQueryCount,
             ["query_endpoint_count"] = records.Count(record => record.Kind == "ancestry_query"),
             ["reachable_commit_count"] = records.Count(record => record.Kind == "commit"),
             ["rename_event_count"] = records.Count(record => record.Kind == "rename_event"),
-            ["retained_ancestor_entry_count"] = retainedEntries,
-            ["strict_ancestor_query_count"] = satisfiedQueries,
+            ["strict_ancestor_closure_entry_count"] = summary.StrictAncestorClosureEntryCount,
+            ["strict_ancestor_query_count"] = summary.PositiveQueryCount,
         });
     }
 
-    private static int CountSatisfiedAncestryQueries(IReadOnlyList<BenchmarkHistoryInputRecord> records)
+    private static AncestryGraphSummary SummarizeAncestryGraph(IReadOnlyList<BenchmarkHistoryInputRecord> records)
     {
         Dictionary<int, List<int>> parents = records
             .Where(record => record.Kind == "commit")
@@ -293,33 +305,72 @@ internal static class BenchmarkHistoryInputFactory
             parents[edge.First].Add(edge.Second!.Value);
         }
 
-        int satisfied = 0;
-        foreach (BenchmarkHistoryInputRecord query in records.Where(record => record.Kind == "ancestry_query"))
+        int commitCount = parents.Count;
+        int wordCount = checked((commitCount + 63) / 64);
+        ulong[][] ancestorBitsByCommit = new ulong[commitCount][];
+        long strictAncestorClosureEntryCount = 0;
+        for (int commit = 0; commit < commitCount; commit++)
         {
-            HashSet<int> visited = [];
-            Stack<int> pending = new();
-            pending.Push(query.Second!.Value);
-            while (pending.TryPop(out int current))
+            ulong[] ancestorBits = new ulong[wordCount];
+            foreach (int parent in parents[commit])
             {
-                if (!visited.Add(current))
+                if (parent >= commit)
                 {
-                    continue;
+                    throw new InvalidOperationException("Ancestry parent edges must point backward through commit order.");
                 }
 
-                foreach (int parent in parents[current])
+                ulong[] parentAncestors = ancestorBitsByCommit[parent];
+                for (int word = 0; word < wordCount; word++)
                 {
-                    pending.Push(parent);
+                    ancestorBits[word] |= parentAncestors[word];
                 }
+
+                ancestorBits[parent / 64] |= 1UL << (parent % 64);
             }
 
-            if (query.First != query.Second.Value && visited.Contains(query.First))
+            ancestorBitsByCommit[commit] = ancestorBits;
+            foreach (ulong word in ancestorBits)
             {
-                satisfied++;
+                strictAncestorClosureEntryCount += BitOperations.PopCount(word);
             }
         }
 
-        return satisfied;
+        int positiveQueryCount = 0;
+        int negativeQueryCount = 0;
+        foreach (BenchmarkHistoryInputRecord query in records.Where(record => record.Kind == "ancestry_query"))
+        {
+            if (!query.ExpectedAncestry.HasValue)
+            {
+                throw new InvalidOperationException("Every ancestry query must record its expected answer.");
+            }
+
+            bool actualAncestry = query.First != query.Second!.Value
+                && (ancestorBitsByCommit[query.Second.Value][query.First / 64] & (1UL << (query.First % 64))) != 0;
+            if (actualAncestry != query.ExpectedAncestry.Value)
+            {
+                throw new InvalidOperationException("A generated ancestry query does not match the parent graph.");
+            }
+
+            if (actualAncestry)
+            {
+                positiveQueryCount++;
+            }
+            else
+            {
+                negativeQueryCount++;
+            }
+        }
+
+        return new AncestryGraphSummary(
+            strictAncestorClosureEntryCount,
+            positiveQueryCount,
+            negativeQueryCount);
     }
+
+    private sealed record AncestryGraphSummary(
+        long StrictAncestorClosureEntryCount,
+        int PositiveQueryCount,
+        int NegativeQueryCount);
 }
 
 internal sealed record BenchmarkHistoryWorkloadInput(
@@ -337,6 +388,9 @@ internal sealed record BenchmarkHistoryWorkloadInput(
 
 internal sealed record BenchmarkHistoryInputRecord(string Kind, int First, int? Second, string? Value)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ExpectedAncestry { get; init; }
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? SourcePath { get; init; }
 

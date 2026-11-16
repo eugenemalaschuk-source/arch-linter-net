@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Resolution;
 using Json.Schema;
@@ -50,6 +51,14 @@ public sealed class BenchmarkAuditEvidenceTests
         {
             WorkCounters = BenchmarkWorkCounterEvidence.FromObserver(observer),
             MetricWork = CreateMetricWorkEvidence(2),
+            LoadedAssemblies = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts(
+            [
+                new ArchitectureLoadedAssemblyArtifact(
+                    Path.Combine(Path.GetTempPath(), "synthetic", "bin", "Synthetic.Project000.dll"),
+                    new string('c', 64),
+                    string.Empty,
+                    2048),
+            ]),
             HistoryWorkCounters = BenchmarkHistoryWorkCounterEvidence.NotApplicableToCoreWorkload(),
             TimingBoundaries = CreateTimingBoundaries(),
             ReportOutputSha256 = new string('b', 64),
@@ -84,6 +93,11 @@ public sealed class BenchmarkAuditEvidenceTests
             Assert.That(roundTrip.Samples.Single().ReportOutputSha256, Is.EqualTo(new string('b', 64)));
             Assert.That(roundTrip.Samples.Single().MetricWork!.MetricCount, Is.EqualTo(2));
             Assert.That(roundTrip.Samples.Single().MetricWork!.Results.Select(result => result.Value), Is.EqualTo(_expectedMetricValues));
+            Assert.That(roundTrip.Samples.Single().LoadedAssemblies!.Artifacts.Single().FileName,
+                Is.EqualTo("Synthetic.Project000.dll"));
+            Assert.That(roundTrip.Samples.Single().LoadedAssemblies!.Artifacts.Single().Sha256, Is.EqualTo(new string('c', 64)));
+            Assert.That(roundTrip.Samples.Single().LoadedAssemblies!.Sha256,
+                Is.EqualTo(sample.LoadedAssemblies.Sha256));
             Assert.That(validation.IsValid, Is.True, Describe(validation));
         });
     }

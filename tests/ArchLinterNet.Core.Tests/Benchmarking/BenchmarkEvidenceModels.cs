@@ -159,6 +159,9 @@ internal sealed record BenchmarkProfileSample
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ReportOutputSha256 { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BenchmarkLoadedAssemblyEvidence? LoadedAssemblies { get; init; }
 }
 
 internal sealed record BenchmarkMetricResultEvidence
@@ -422,6 +425,7 @@ internal sealed record BenchmarkEvidenceDocument
 
             sample.HistoryWorkCounters?.Validate();
             sample.TimingBoundaries?.Validate();
+            sample.LoadedAssemblies?.Validate();
 
             if (sample.ReportOutputSha256 is not null && !IsSha256(sample.ReportOutputSha256))
             {
