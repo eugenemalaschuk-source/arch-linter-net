@@ -103,8 +103,8 @@ internal static class ArchitectureIgnoreMatcherTestReference
 
         string escaped = Regex.Escape(normalizedPattern)
             .Replace(@"\*\*", "<<<DOUBLESTAR>>>")
-            .Replace(@"\*", @"[^/]*")
-            .Replace(@"\?", @"[^/]")
+            .Replace(@"\*", "[^/]*")
+            .Replace(@"\?", "[^/]")
             .Replace("<<<DOUBLESTAR>>>", ".*");
         return Regex.IsMatch(normalizedValue, "^" + escaped + "$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
     }

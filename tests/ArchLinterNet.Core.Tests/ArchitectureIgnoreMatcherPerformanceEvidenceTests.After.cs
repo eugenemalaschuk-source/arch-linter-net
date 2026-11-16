@@ -18,7 +18,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         string root = new ArchitectureRepositoryRootResolver().Resolve();
         string beforePath = Path.Combine(root, "docs", "internal", "large-solution-benchmarking", "evidence", "issue-1127", "before.json");
         string afterPath = Path.Combine(root, "docs", "internal", "large-solution-benchmarking", "evidence", "issue-1127", "after.json");
-        using JsonDocument before = JsonDocument.Parse(File.ReadAllText(beforePath));
+        using var before = JsonDocument.Parse(File.ReadAllText(beforePath));
         string environment = $"{RuntimeInformation.FrameworkDescription}; {RuntimeInformation.OSDescription}; "
             + $"{RuntimeInformation.ProcessArchitecture}; processors={Environment.ProcessorCount}";
         var metadata = new
@@ -49,13 +49,13 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
             }
 
             _ = RunIndexed(workload);
-            IndexedMeasurement[] samples = new IndexedMeasurement[SampleCount];
+            var samples = new IndexedMeasurement[SampleCount];
             for (int index = 0; index < SampleCount; index++)
             {
                 samples[index] = MeasureIndexed(workload);
             }
 
-            Assert.That(samples.Select(sample => sample.Checksum), Is.All.EqualTo(expectedChecksum),
+            Assert.That(samples.Select(sample => sample.ResultChecksum), Is.All.EqualTo(expectedChecksum),
                 $"Indexed result differs from the pre-change ordered matcher for '{workload.Name}'.");
 
             ArchitectureIgnoreMatcherWorkCounter work = new();
@@ -85,6 +85,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
                 BeforeEntryEvaluations = baselineRow.GetProperty("LegacyEntryEvaluations").GetInt64(),
                 BeforeFingerprintCreations = baselineRow.GetProperty("StructuredFingerprintCreations").GetInt64(),
                 work.IndexEntriesProcessed,
+                work.VersionedFallbackEntriesProcessed,
                 work.ExactLookupProbes,
                 work.ExactCandidateMatches,
                 work.LiveWaiverFingerprintsBuilt,
@@ -107,9 +108,9 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         ArchitectureIgnoreMatcherWorkCounter? workCounter = null)
     {
         ArchitectureIgnoreUsageTracker tracker = new();
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(
+        var index = ArchitectureIgnoreMatcherIndex.Build(
             workload.Ignores,
-            cancellationToken: default,
+            cancellationToken: CancellationToken.None,
             workCounter: workCounter);
         bool[] ignored = new bool[workload.Findings.Length];
         bool[] loadedBaseline = new bool[workload.Findings.Length];
@@ -136,11 +137,11 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         bool[] ignored = new bool[workload.Findings.Length];
         bool[] loadedBaseline = new bool[workload.Findings.Length];
         long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        Stopwatch total = Stopwatch.StartNew();
-        Stopwatch indexBuild = Stopwatch.StartNew();
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
+        var total = Stopwatch.StartNew();
+        var indexBuild = Stopwatch.StartNew();
+        var index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
         indexBuild.Stop();
-        Stopwatch query = Stopwatch.StartNew();
+        var query = Stopwatch.StartNew();
 
         for (int findingIndex = 0; findingIndex < workload.Findings.Length; findingIndex++)
         {
@@ -170,7 +171,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         GC.WaitForPendingFinalizers();
         GC.Collect();
         long before = GC.GetTotalMemory(forceFullCollection: true);
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
+        var index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
@@ -185,6 +186,8 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         {
             Assert.That(work.IndexEntriesProcessed, Is.EqualTo(workload.Ignores.Count),
                 $"Every original ignore entry must be indexed once for '{workload.Name}'.");
+            Assert.That(work.VersionedFallbackEntriesProcessed, Is.Zero,
+                $"Live-identity workloads must not build the deferred versioned fallback for '{workload.Name}'.");
             Assert.That(work.ExactLookupProbes, Is.LessThanOrEqualTo(workload.Findings.Length * 3),
                 $"Exact dictionary probes must remain constant per finding for '{workload.Name}'.");
             Assert.That(work.ExactCandidateMatches, Is.EqualTo(workload.RequiredMatches),
@@ -231,5 +234,5 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         double QueryMilliseconds,
         double TotalMilliseconds,
         long AllocatedBytes,
-        string Checksum);
+        string ResultChecksum);
 }

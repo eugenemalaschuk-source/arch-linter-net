@@ -1,4 +1,3 @@
-using System.Threading;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
@@ -20,7 +19,7 @@ public sealed partial class IgnoreMatcherTests
             Kind = "dependency",
             SourceAssembly = "Some.Assembly",
         };
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build([ignore]);
+        var index = ArchitectureIgnoreMatcherIndex.Build([ignore]);
 
         bool missingIdentityMatch = index.IsIgnored(
             "App/Services/Worker", "System.Object", null, null, null, out bool missingIdentityBaseline);
@@ -37,6 +36,40 @@ public sealed partial class IgnoreMatcherTests
     }
 
     [Test]
+    public void IndexedMatcher_VersionedFallbackIndexIsDeferredAndBuiltOnlyOnce()
+    {
+        var identity = CreateIdentity(0);
+        var ignore = CreateVersionedIgnore(
+            identity,
+            isFromLoadedBaseline: false,
+            sourceType: "Fallback.Source",
+            forbiddenReference: "Fallback.Target");
+        var work = new ArchitectureIgnoreMatcherWorkCounter();
+        var index = ArchitectureIgnoreMatcherIndex.Build([ignore], workCounter: work);
+
+        bool liveIdentityMatch = index.IsIgnored(
+            "Fallback.Source", "Fallback.Target", null, CreateIdentity(1), null, out _);
+
+        Assert.That(liveIdentityMatch, Is.False);
+        Assert.That(work.VersionedFallbackEntriesProcessed, Is.Zero,
+            "A live identity must not materialize a fallback index that cannot be consulted.");
+
+        bool firstMissingIdentityMatch = index.IsIgnored(
+            "Fallback.Source", "Fallback.Target", null, null, null, out _);
+        bool secondMissingIdentityMatch = index.IsIgnored(
+            "Fallback.Source", "Fallback.Target", null, null, null, out _);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstMissingIdentityMatch, Is.True);
+            Assert.That(secondMissingIdentityMatch, Is.True);
+            Assert.That(work.IndexEntriesProcessed, Is.EqualTo(1));
+            Assert.That(work.VersionedFallbackEntriesProcessed, Is.EqualTo(1),
+                "The immutable fallback lookup should be initialized once and reused.");
+        });
+    }
+
+    [Test]
     public void IndexedMatcher_InvalidStructuredWaiver_FailsClosedWithoutTextFallback()
     {
         var invalidWaiver = new ArchitectureIgnoredViolation
@@ -45,9 +78,9 @@ public sealed partial class IgnoreMatcherTests
             ForbiddenReference = "*",
             WaiverId = "ARCH-IGN-BAD",
             Target = new ArchitectureWaiverTarget { Fingerprint = ArchitectureWaiverTargetFingerprint.Create(CreateIdentity(0)) },
+            WaiverValidationError = "incomplete waiver",
         };
-        invalidWaiver.WaiverValidationError = "incomplete waiver";
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build([invalidWaiver]);
+        var index = ArchitectureIgnoreMatcherIndex.Build([invalidWaiver]);
 
         bool ignored = index.IsIgnored("Source.Type", "Target.Type", null, CreateIdentity(0), null, out _);
 
@@ -72,7 +105,7 @@ public sealed partial class IgnoreMatcherTests
                 Target = new ArchitectureWaiverTarget { Fingerprint = ArchitectureWaiverTargetFingerprint.Create(identity) },
             },
         };
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(ignored);
+        var index = ArchitectureIgnoreMatcherIndex.Build(ignored);
         string? fingerprint = index.CreateLiveWaiverFingerprint(identity);
 
         bool untrackedMatch = index.IsIgnored(identity.SourceType, "Target.Type", null, identity, fingerprint, out bool firstLoaded);
@@ -85,7 +118,7 @@ public sealed partial class IgnoreMatcherTests
             Assert.That(firstLoaded, Is.False, "The first matching original entry is a policy entry.");
             Assert.That(trackedMatch, Is.True);
             Assert.That(anyLoaded, Is.True, "At least one later overlapping entry came from the loaded baseline.");
-            Assert.That(tracker.MatchedIndexes, Is.EquivalentTo(new[] { 0, 1, 2, 3, 4 }),
+            Assert.That(tracker.MatchedIndexes, Is.EquivalentTo([0, 1, 2, 3, 4]),
                 "Both duplicate exact identities and the wildcard, literal, and waiver matches must be retained.");
         });
     }
@@ -110,7 +143,7 @@ public sealed partial class IgnoreMatcherTests
         }
 
         var work = new ArchitectureIgnoreMatcherWorkCounter();
-        ArchitectureIgnoreMatcherIndex matcherIndex = ArchitectureIgnoreMatcherIndex.Build(ignored, workCounter: work);
+        var matcherIndex = ArchitectureIgnoreMatcherIndex.Build(ignored, workCounter: work);
         var tracker = new ArchitectureIgnoreUsageTracker();
 
         for (int finding = 0; finding < findingCount; finding++)
@@ -152,7 +185,7 @@ public sealed partial class IgnoreMatcherTests
         }
 
         var work = new ArchitectureIgnoreMatcherWorkCounter();
-        ArchitectureIgnoreMatcherIndex matcherIndex = ArchitectureIgnoreMatcherIndex.Build(ignored, workCounter: work);
+        var matcherIndex = ArchitectureIgnoreMatcherIndex.Build(ignored, workCounter: work);
         var tracker = new ArchitectureIgnoreUsageTracker();
         for (int finding = 0; finding < FindingCount; finding++)
         {
@@ -175,17 +208,37 @@ public sealed partial class IgnoreMatcherTests
     {
         using var cancelledDuringBuild = new CancellationTokenSource();
         cancelledDuringBuild.Cancel();
-        Assert.Throws<OperationCanceledException>(() => ArchitectureIgnoreMatcherIndex.Build(
-            [new ArchitectureIgnoredViolation { SourceType = "*", ForbiddenReference = "*" }],
-            cancelledDuringBuild.Token));
+        bool buildCancelled = false;
+        try
+        {
+            _ = ArchitectureIgnoreMatcherIndex.Build(
+                [new ArchitectureIgnoredViolation { SourceType = "*", ForbiddenReference = "*" }],
+                cancelledDuringBuild.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            buildCancelled = true;
+        }
+
+        Assert.That(buildCancelled, Is.True);
 
         using var cancelledDuringQuery = new CancellationTokenSource();
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(
+        var index = ArchitectureIgnoreMatcherIndex.Build(
             [new ArchitectureIgnoredViolation { SourceType = "*", ForbiddenReference = "*" }],
             cancelledDuringQuery.Token);
         cancelledDuringQuery.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => index.IsIgnored("Source", "Target", null, null, null, out _));
+        bool queryCancelled = false;
+        try
+        {
+            index.IsIgnored("Source", "Target", null, null, null, out _);
+        }
+        catch (OperationCanceledException)
+        {
+            queryCancelled = true;
+        }
+
+        Assert.That(queryCancelled, Is.True);
     }
 
     [Test]
@@ -257,8 +310,8 @@ public sealed partial class IgnoreMatcherTests
                                 Fingerprint = ArchitectureWaiverTargetFingerprint.Create(CreateIdentity(random.Next(8))),
                             },
                             IsFromLoadedBaseline = random.Next(2) == 0,
+                            WaiverValidationError = "invalid fixture waiver",
                         };
-                        invalidWaiver.WaiverValidationError = "invalid fixture waiver";
                         ignored.Add(invalidWaiver);
                         break;
                 }
@@ -266,7 +319,7 @@ public sealed partial class IgnoreMatcherTests
 
             string sourceType = sourceValues[random.Next(sourceValues.Length)];
             string forbiddenReference = forbiddenValues[random.Next(forbiddenValues.Length)];
-            ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(ignored);
+            var index = ArchitectureIgnoreMatcherIndex.Build(ignored);
             string? fingerprint = index.CreateLiveWaiverFingerprint(liveIdentity);
 
             bool expectedUntracked = ArchitectureIgnoreMatcherTestReference.IsIgnored(
@@ -281,36 +334,38 @@ public sealed partial class IgnoreMatcherTests
             bool actualTracked = index.IsIgnored(
                 sourceType, forbiddenReference, actualTracker, liveIdentity, fingerprint, out bool actualTrackedBaseline);
 
-            Assert.Multiple(() =>
-            {
-                Assert.That(actualUntracked, Is.EqualTo(expectedUntracked), $"Suppression mismatch in sample {sample}.");
-                Assert.That(actualUntrackedBaseline, Is.EqualTo(expectedUntrackedBaseline), $"First-match provenance mismatch in sample {sample}.");
-                Assert.That(actualTracked, Is.EqualTo(expectedTracked), $"Tracked suppression mismatch in sample {sample}.");
-                Assert.That(actualTrackedBaseline, Is.EqualTo(expectedTrackedBaseline), $"Tracked provenance mismatch in sample {sample}.");
-                Assert.That(actualTracker.MatchedIndexes, Is.EquivalentTo(expectedTracker.MatchedIndexes), $"Matched indices mismatch in sample {sample}.");
-            });
+            Assert.That(actualUntracked, Is.EqualTo(expectedUntracked), $"Suppression mismatch in sample {sample}.");
+            Assert.That(actualUntrackedBaseline, Is.EqualTo(expectedUntrackedBaseline), $"First-match provenance mismatch in sample {sample}.");
+            Assert.That(actualTracked, Is.EqualTo(expectedTracked), $"Tracked suppression mismatch in sample {sample}.");
+            Assert.That(actualTrackedBaseline, Is.EqualTo(expectedTrackedBaseline), $"Tracked provenance mismatch in sample {sample}.");
+            Assert.That(actualTracker.MatchedIndexes, Is.EquivalentTo(expectedTracker.MatchedIndexes), $"Matched indices mismatch in sample {sample}.");
         }
     }
 
-    private static ArchitectureViolationIdentity CreateIdentity(int index) => new(
-        ArchitectureViolationIdentity.CurrentVersion,
-        "strict",
-        "dependency",
-        $"contract-{index % 2}",
-        $"Source.Assembly.{index}",
-        $"Source.Type.{index}",
-        $"Source.Type.{index}.Run",
-        $"Target.Assembly.{index}",
-        $"Target.Type.{index}",
-        $"Target.Type.{index}.Create",
-        index,
-        index % 2 == 0 ? "Debug" : null);
+    private static ArchitectureViolationIdentity CreateIdentity(int index)
+    {
+        return new ArchitectureViolationIdentity(
+            ArchitectureViolationIdentity.CurrentVersion,
+            "strict",
+            "dependency",
+            $"contract-{index % 2}",
+            $"Source.Assembly.{index}",
+            $"Source.Type.{index}",
+            $"Source.Type.{index}.Run",
+            $"Target.Assembly.{index}",
+            $"Target.Type.{index}",
+            $"Target.Type.{index}.Create",
+            index,
+            index % 2 == 0 ? "Debug" : null);
+    }
 
     private static ArchitectureIgnoredViolation CreateVersionedIgnore(
         ArchitectureViolationIdentity identity,
         bool isFromLoadedBaseline,
         string? sourceType = null,
-        string forbiddenReference = "Target.Type") => new()
+        string forbiddenReference = "Target.Type")
+    {
+        return new ArchitectureIgnoredViolation
         {
             SourceType = sourceType ?? identity.SourceType,
             ForbiddenReference = forbiddenReference,
@@ -326,4 +381,5 @@ public sealed partial class IgnoreMatcherTests
             Configuration = identity.Configuration,
             IsFromLoadedBaseline = isFromLoadedBaseline,
         };
+    }
 }

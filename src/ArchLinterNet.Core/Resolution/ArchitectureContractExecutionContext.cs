@@ -1,4 +1,3 @@
-using System.Threading;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 

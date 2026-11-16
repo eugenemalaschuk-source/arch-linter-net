@@ -42,14 +42,14 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         foreach (MatcherWorkload workload in CreateWorkloads())
         {
             MatchResult warmup = RunCurrent(workload);
-            Measurement[] samples = new Measurement[SampleCount];
+            var samples = new Measurement[SampleCount];
             for (int i = 0; i < SampleCount; i++)
             {
                 samples[i] = MeasureCurrent(workload);
             }
 
             string checksum = Checksum(warmup);
-            Assert.That(samples.Select(sample => sample.Checksum), Is.All.EqualTo(checksum),
+            Assert.That(samples.Select(sample => sample.ResultChecksum), Is.All.EqualTo(checksum),
                 $"Matcher results changed across samples for '{workload.Name}'.");
 
             var row = new
@@ -244,7 +244,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         bool[] ignored = new bool[workload.Findings.Length];
         bool[] loadedBaseline = new bool[workload.Findings.Length];
         long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        Stopwatch stopwatch = Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
 
         for (int index = 0; index < workload.Findings.Length; index++)
         {
@@ -288,7 +288,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         {
             workload.Name,
             Kind = workload.Kind.ToString(),
-            Findings = workload.Findings,
+            workload.Findings,
             Ignores = workload.Ignores.Select(ignore => new
             {
                 ignore.SourceType,
@@ -373,5 +373,5 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
 
     private sealed record MatchResult(bool[] Suppressed, bool[] MatchedByLoadedBaseline, int[] MatchedIndexes);
 
-    private sealed record Measurement(double ElapsedMilliseconds, long AllocatedBytes, string Checksum);
+    private sealed record Measurement(double ElapsedMilliseconds, long AllocatedBytes, string ResultChecksum);
 }

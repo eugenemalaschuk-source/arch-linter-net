@@ -1,6 +1,4 @@
 using System.Text.RegularExpressions;
-using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Resolution;
 
@@ -11,41 +9,6 @@ internal static class ArchitectureIgnoreMatcher
     // timeout on the static IsMatch call is this rule's (S6444) mitigation for a pathological
     // pattern causing catastrophic backtracking.
     private static readonly TimeSpan _matchTimeout = TimeSpan.FromSeconds(1);
-
-    public static bool IsIgnored(
-        string sourceType,
-        string forbiddenReference,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker = null,
-        ArchitectureViolationIdentity? liveIdentity = null)
-    {
-        return IsIgnored(sourceType, forbiddenReference, ignoredViolations, usageTracker, liveIdentity, out _);
-    }
-
-    // Also reports whether any matching entry came from a loaded baseline document (as opposed to a
-    // policy-authored structured waiver) -- callers that feed baseline-comparison candidates need
-    // this to keep waiver debt and finding debt separate. See
-    // ArchitectureIgnoredViolation.IsFromLoadedBaseline.
-    public static bool IsIgnored(
-        string sourceType,
-        string forbiddenReference,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker,
-        ArchitectureViolationIdentity? liveIdentity,
-        out bool matchedByLoadedBaseline)
-    {
-        // This compatibility entry point is retained for focused direct matcher tests. Contract
-        // executions build this immutable index once and reuse it for every finding.
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(ignoredViolations);
-        string? waiverFingerprint = index.CreateLiveWaiverFingerprint(liveIdentity);
-        return index.IsIgnored(
-            sourceType,
-            forbiddenReference,
-            usageTracker,
-            liveIdentity,
-            waiverFingerprint,
-            out matchedByLoadedBaseline);
-    }
 
     internal static bool MatchesPattern(string value, string pattern)
     {

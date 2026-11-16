@@ -1,4 +1,3 @@
-using System.Threading;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 
@@ -12,9 +11,8 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     private readonly Dictionary<IdentityKey, IgnoreEntry[]> _versionedIdentities;
     private readonly Dictionary<string, IgnoreEntry[]> _waiverFingerprints;
     private readonly Dictionary<PatternPair, IgnoreEntry[]> _literalPairs;
-    private readonly Dictionary<PatternPair, IgnoreEntry[]> _versionedFallbackLiteralPairs;
+    private readonly Lazy<VersionedFallbackIndex>? _versionedFallbackIndex;
     private readonly IgnoreEntry[] _wildcardFallbacks;
-    private readonly IgnoreEntry[] _versionedFallbackWildcards;
     private readonly CancellationToken _cancellationToken;
     private readonly ArchitectureIgnoreMatcherWorkCounter? _workCounter;
 
@@ -22,18 +20,16 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         Dictionary<IdentityKey, IgnoreEntry[]> versionedIdentities,
         Dictionary<string, IgnoreEntry[]> waiverFingerprints,
         Dictionary<PatternPair, IgnoreEntry[]> literalPairs,
-        Dictionary<PatternPair, IgnoreEntry[]> versionedFallbackLiteralPairs,
+        Lazy<VersionedFallbackIndex>? versionedFallbackIndex,
         IgnoreEntry[] wildcardFallbacks,
-        IgnoreEntry[] versionedFallbackWildcards,
         CancellationToken cancellationToken,
         ArchitectureIgnoreMatcherWorkCounter? workCounter)
     {
         _versionedIdentities = versionedIdentities;
         _waiverFingerprints = waiverFingerprints;
         _literalPairs = literalPairs;
-        _versionedFallbackLiteralPairs = versionedFallbackLiteralPairs;
+        _versionedFallbackIndex = versionedFallbackIndex;
         _wildcardFallbacks = wildcardFallbacks;
-        _versionedFallbackWildcards = versionedFallbackWildcards;
         _cancellationToken = cancellationToken;
         _workCounter = workCounter;
     }
@@ -48,9 +44,8 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         var versionedIdentities = new Dictionary<IdentityKey, List<IgnoreEntry>>();
         var waiverFingerprints = new Dictionary<string, List<IgnoreEntry>>(StringComparer.Ordinal);
         var literalPairs = new Dictionary<PatternPair, List<IgnoreEntry>>();
-        var versionedFallbackLiteralPairs = new Dictionary<PatternPair, List<IgnoreEntry>>();
+        var versionedFallbackEntries = new List<IgnoreEntry>();
         var wildcardFallbacks = new List<IgnoreEntry>();
-        var versionedFallbackWildcards = new List<IgnoreEntry>();
 
         for (int index = 0; index < ignoredViolations.Count; index++)
         {
@@ -80,7 +75,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                 {
                     Add(
                         waiverFingerprints,
-                        ignore.Target.Fingerprint ?? string.Empty,
+                        ignore.Target.Fingerprint,
                         entry);
                 }
 
@@ -91,7 +86,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
             if (ignore.IdentityVersion == ArchitectureViolationIdentity.CurrentVersion)
             {
                 Add(versionedIdentities, IdentityKey.From(ignore), entry);
-                AddFallbackPattern(versionedFallbackLiteralPairs, versionedFallbackWildcards, entry);
+                versionedFallbackEntries.Add(entry);
                 continue;
             }
 
@@ -99,13 +94,18 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        Lazy<VersionedFallbackIndex>? versionedFallbackIndex = versionedFallbackEntries.Count == 0
+            ? null
+            : new Lazy<VersionedFallbackIndex>(
+                () => BuildVersionedFallbackIndex(versionedFallbackEntries.ToArray(), cancellationToken, workCounter),
+                LazyThreadSafetyMode.ExecutionAndPublication);
+
         return new ArchitectureIgnoreMatcherIndex(
             Freeze(versionedIdentities),
             Freeze(waiverFingerprints, StringComparer.Ordinal),
             Freeze(literalPairs),
-            Freeze(versionedFallbackLiteralPairs),
+            versionedFallbackIndex,
             wildcardFallbacks.ToArray(),
-            versionedFallbackWildcards.ToArray(),
             cancellationToken,
             workCounter);
     }
@@ -130,7 +130,10 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         return ArchitectureWaiverTargetFingerprint.Create(liveIdentity);
     }
 
-    internal void ThrowIfCancellationRequested() => _cancellationToken.ThrowIfCancellationRequested();
+    internal void ThrowIfCancellationRequested()
+    {
+        _cancellationToken.ThrowIfCancellationRequested();
+    }
 
     internal bool IsIgnored(
         string sourceType,
@@ -142,6 +145,9 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     {
         matchedByLoadedBaseline = false;
         bool tracking = usageTracker is not null;
+        VersionedFallbackIndex? versionedFallback = liveIdentity is null
+            ? _versionedFallbackIndex?.Value
+            : null;
 
         IgnoreEntry[]? identityCandidates = null;
         if (liveIdentity is not null && _versionedIdentities.Count > 0)
@@ -160,7 +166,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         IgnoreEntry[]? literalCandidates = null;
         IgnoreEntry[]? versionedLiteralCandidates = null;
         bool lookupLiteralPairs = _literalPairs.Count > 0
-            || (liveIdentity is null && _versionedFallbackLiteralPairs.Count > 0);
+            || (versionedFallback is not null && versionedFallback.LiteralPairs.Count > 0);
         if (lookupLiteralPairs)
         {
             RecordExactLookupProbe();
@@ -169,10 +175,10 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                 ArchitectureIgnoreMatcher.Normalize(forbiddenReference));
             _literalPairs.TryGetValue(pair, out literalCandidates);
 
-            if (liveIdentity is null && _versionedFallbackLiteralPairs.Count > 0)
+            if (versionedFallback is not null && versionedFallback.LiteralPairs.Count > 0)
             {
                 RecordExactLookupProbe();
-                _versionedFallbackLiteralPairs.TryGetValue(pair, out versionedLiteralCandidates);
+                versionedFallback.LiteralPairs.TryGetValue(pair, out versionedLiteralCandidates);
             }
         }
 
@@ -200,7 +206,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                 out IgnoreEntry exactEntry,
                 out ExactSource exactSource);
             bool hasWildcard = TryPeekWildcard(
-                liveIdentity is null,
+                versionedFallback?.Wildcards,
                 wildcardPosition,
                 versionedWildcardPosition,
                 out IgnoreEntry wildcardEntry,
@@ -226,7 +232,8 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                     continue;
                 }
 
-                RecordMatch(wildcardEntry, usageTracker, ref anyMatched, ref matchedByLoadedBaseline);
+                RecordMatch(wildcardEntry, usageTracker, ref matchedByLoadedBaseline);
+                anyMatched = true;
                 if (!tracking)
                 {
                     return true;
@@ -246,7 +253,8 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                 _workCounter.ExactCandidateMatches++;
             }
 
-            RecordMatch(exactEntry, usageTracker, ref anyMatched, ref matchedByLoadedBaseline);
+            RecordMatch(exactEntry, usageTracker, ref matchedByLoadedBaseline);
+            anyMatched = true;
             if (!tracking)
             {
                 return true;
@@ -277,6 +285,29 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         }
 
         wildcardEntries.Add(entry);
+    }
+
+    private static VersionedFallbackIndex BuildVersionedFallbackIndex(
+        IReadOnlyList<IgnoreEntry> entries,
+        CancellationToken cancellationToken,
+        ArchitectureIgnoreMatcherWorkCounter? workCounter)
+    {
+        var literalPairs = new Dictionary<PatternPair, List<IgnoreEntry>>();
+        var wildcardEntries = new List<IgnoreEntry>();
+
+        for (int index = 0; index < entries.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (workCounter is not null)
+            {
+                workCounter.VersionedFallbackEntriesProcessed++;
+            }
+
+            AddFallbackPattern(literalPairs, wildcardEntries, entries[index]);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return new VersionedFallbackIndex(Freeze(literalPairs), wildcardEntries.ToArray());
     }
 
     private static void Add<TKey>(Dictionary<TKey, List<IgnoreEntry>> table, TKey key, IgnoreEntry entry)
@@ -364,15 +395,15 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     }
 
     private bool TryPeekWildcard(
-        bool includeVersionedFallbacks,
+        IgnoreEntry[]? versionedFallbacks,
         int wildcardPosition,
         int versionedWildcardPosition,
         out IgnoreEntry entry,
         out WildcardSource source)
     {
         IgnoreEntry? normal = GetAt(_wildcardFallbacks, wildcardPosition);
-        IgnoreEntry? versioned = includeVersionedFallbacks
-            ? GetAt(_versionedFallbackWildcards, versionedWildcardPosition)
+        IgnoreEntry? versioned = versionedFallbacks is not null
+            ? GetAt(versionedFallbacks, versionedWildcardPosition)
             : null;
 
         if (normal is null && versioned is null)
@@ -394,8 +425,10 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         return true;
     }
 
-    private static IgnoreEntry? GetAt(IgnoreEntry[] entries, int position) =>
-        position < entries.Length ? entries[position] : null;
+    private static IgnoreEntry? GetAt(IgnoreEntry[] entries, int position)
+    {
+        return position < entries.Length ? entries[position] : null;
+    }
 
     private static void AdvanceExact(
         ExactSource source,
@@ -441,11 +474,9 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     private void RecordMatch(
         IgnoreEntry entry,
         ArchitectureIgnoreUsageTracker? usageTracker,
-        ref bool anyMatched,
         ref bool matchedByLoadedBaseline)
     {
         usageTracker?.MarkMatched(entry.Index);
-        anyMatched = true;
         matchedByLoadedBaseline |= entry.IsFromLoadedBaseline;
 
         if (_workCounter is not null)
@@ -474,32 +505,42 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         int Occurrence,
         string? Configuration)
     {
-        internal static IdentityKey From(ArchitectureViolationIdentity identity) => new(
-            identity.ContractFamily,
-            identity.Kind,
-            identity.SourceAssembly,
-            identity.SourceType,
-            identity.SourceMember,
-            identity.TargetAssembly,
-            identity.TargetType,
-            identity.TargetMember,
-            identity.Occurrence,
-            identity.Configuration);
+        internal static IdentityKey From(ArchitectureViolationIdentity identity)
+        {
+            return new IdentityKey(
+                identity.ContractFamily,
+                identity.Kind,
+                identity.SourceAssembly,
+                identity.SourceType,
+                identity.SourceMember,
+                identity.TargetAssembly,
+                identity.TargetType,
+                identity.TargetMember,
+                identity.Occurrence,
+                identity.Configuration);
+        }
 
-        internal static IdentityKey From(ArchitectureIgnoredViolation ignore) => new(
-            ignore.ContractFamily,
-            ignore.Kind,
-            ignore.SourceAssembly,
-            ignore.SourceType,
-            ignore.SourceMember,
-            ignore.TargetAssembly,
-            ignore.TargetType,
-            ignore.TargetMember,
-            ignore.Occurrence ?? 0,
-            ignore.Configuration);
+        internal static IdentityKey From(ArchitectureIgnoredViolation ignore)
+        {
+            return new IdentityKey(
+                ignore.ContractFamily,
+                ignore.Kind,
+                ignore.SourceAssembly,
+                ignore.SourceType,
+                ignore.SourceMember,
+                ignore.TargetAssembly,
+                ignore.TargetType,
+                ignore.TargetMember,
+                ignore.Occurrence ?? 0,
+                ignore.Configuration);
+        }
     }
 
     private readonly record struct PatternPair(string SourceType, string ForbiddenReference);
+
+    private sealed record VersionedFallbackIndex(
+        Dictionary<PatternPair, IgnoreEntry[]> LiteralPairs,
+        IgnoreEntry[] Wildcards);
 
     private readonly record struct IgnoreEntry(
         int Index,
@@ -526,6 +567,8 @@ internal sealed class ArchitectureIgnoreMatcherIndex
 internal sealed class ArchitectureIgnoreMatcherWorkCounter
 {
     internal long IndexEntriesProcessed { get; set; }
+
+    internal long VersionedFallbackEntriesProcessed { get; set; }
 
     internal long ExactLookupProbes { get; set; }
 
