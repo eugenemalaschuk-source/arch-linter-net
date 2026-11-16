@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
 using ArchLinterNet.Core.Resolution;
-using ArchLinterNet.Core.Tests.Benchmarking;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -16,10 +15,9 @@ public sealed class RepositoryMetricsLargeSolutionEvidenceTests
     public void GenerateBaselineAndHeadEvidence()
     {
         string outputDirectory = Environment.GetEnvironmentVariable("ARCHLINERNET_990_EVIDENCE_DIR")
-                                 ?? Path.Combine(Path.GetTempPath(), "arch-linter-net-990-evidence");
+            ?? Path.Combine(Path.GetTempPath(), "arch-linter-net-990-evidence");
         string baselineCli = Environment.GetEnvironmentVariable("ARCHLINERNET_990_BASELINE_CLI")
-                             ?? throw new InvalidOperationException(
-                                 "ARCHLINERNET_990_BASELINE_CLI must point to the baseline CLI DLL.");
+            ?? throw new InvalidOperationException("ARCHLINERNET_990_BASELINE_CLI must point to the baseline CLI DLL.");
         string headCli = CliDllPath();
         Directory.CreateDirectory(outputDirectory);
 
@@ -36,24 +34,24 @@ public sealed class RepositoryMetricsLargeSolutionEvidenceTests
                 SelectorPredicateTermsPerLayer = 16,
                 ContractsPerWorkload = 8,
                 FindingCandidates = 128,
-                SourceRootCount = 4
+                SourceRootCount = 4,
             },
             BenchmarkCompilationMode.RealMsBuild,
             BenchmarkExecutionMode.FullGovernance,
-            6);
+            independentProcesses: 6);
         using BenchmarkMaterializedFixture baselineFixture = BenchmarkFixtureMaterializer.Materialize(workload);
         using BenchmarkMaterializedFixture headFixture = BenchmarkFixtureMaterializer.Materialize(workload);
         File.Copy(
             Path.Combine(baselineFixture.Root, ".benchmark", "workload.json"),
             Path.Combine(outputDirectory, "workload.json"),
-            true);
+            overwrite: true);
 
         RunCli(baselineFixture, baselineCli, Path.Combine(outputDirectory, "baseline-profile.json"),
             Path.Combine(outputDirectory, "baseline-report.json"), Path.Combine(outputDirectory, "baseline-error.log"),
-            1);
+            expectedExitCode: 1);
         RunCli(headFixture, headCli, Path.Combine(outputDirectory, "head-profile.json"),
             Path.Combine(outputDirectory, "head-report.json"), Path.Combine(outputDirectory, "head-error.log"),
-            1);
+            expectedExitCode: 1);
 
         TestContext.Out.WriteLine($"Evidence directory: {outputDirectory}");
         TestContext.Out.WriteLine($"Workload: {workload.WorkloadId}");
@@ -66,8 +64,7 @@ public sealed class RepositoryMetricsLargeSolutionEvidenceTests
     private static string CliDllPath()
     {
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
-        return Path.Combine(repositoryRoot, "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0",
-            "ArchLinterNet.Cli.dll");
+        return Path.Combine(repositoryRoot, "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
     }
 
     private static void RunCli(
@@ -84,21 +81,23 @@ public sealed class RepositoryMetricsLargeSolutionEvidenceTests
             WorkingDirectory = fixture.Root,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false
+            UseShellExecute = false,
         };
         startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
         foreach (string argument in new[]
-                 {
-                     cliPath,
-                     "--policy", fixture.PolicyPath,
-                     "--mode", "strict",
-                     "--format", "json",
-                     "--ensure-built",
-                     "--profile", profilePath
-                 })
+        {
+            cliPath,
+            "--policy", fixture.PolicyPath,
+            "--mode", "strict",
+            "--format", "json",
+            "--ensure-built",
+            "--profile", profilePath,
+        })
+        {
             startInfo.ArgumentList.Add(argument);
+        }
 
-        using var process = Process.Start(startInfo)!;
+        using Process process = Process.Start(startInfo)!;
         Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
         Task<string> errorTask = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
@@ -106,10 +105,9 @@ public sealed class RepositoryMetricsLargeSolutionEvidenceTests
         string error = errorTask.GetAwaiter().GetResult();
         File.WriteAllText(reportPath, output);
         File.WriteAllText(errorPath, error);
-        Assert.That(process.ExitCode, Is.EqualTo(expectedExitCode),
-            $"CLI failed: {cliPath}{Environment.NewLine}{error}");
+        Assert.That(process.ExitCode, Is.EqualTo(expectedExitCode), $"CLI failed: {cliPath}{Environment.NewLine}{error}");
         Assert.That(File.Exists(profilePath), Is.True, $"CLI did not write profile: {profilePath}");
-        using var report = JsonDocument.Parse(output);
+        using JsonDocument report = JsonDocument.Parse(output);
         Assert.That(report.RootElement.ValueKind, Is.EqualTo(JsonValueKind.Object));
     }
 }

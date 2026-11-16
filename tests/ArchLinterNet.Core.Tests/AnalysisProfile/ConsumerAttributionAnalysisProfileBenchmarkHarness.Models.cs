@@ -90,34 +90,25 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
                 SumObject(counters.GetProperty("ContractFamilyResultCounts")));
         }
 
-        public static CounterTotals Sum(IEnumerable<CounterTotals> counters)
-        {
-            return counters.Aggregate(
-                new CounterTotals(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), Add);
-        }
+        public static CounterTotals Sum(IEnumerable<CounterTotals> counters) => counters.Aggregate(
+            new CounterTotals(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), Add);
 
-        private static CounterTotals Add(CounterTotals left, CounterTotals right)
-        {
-            return new CounterTotals(
-                left.PolicyCompositions + right.PolicyCompositions,
-                left.ProjectGraphEvaluations + right.ProjectGraphEvaluations,
-                left.AssemblyLoads + right.AssemblyLoads,
-                left.DiscoveredProjectCount + right.DiscoveredProjectCount,
-                left.RetainedAssemblyCount + right.RetainedAssemblyCount,
-                left.SelectedAssemblyCount + right.SelectedAssemblyCount,
-                left.ModesEvaluated + right.ModesEvaluated,
-                left.SnapshotMaterializations + right.SnapshotMaterializations,
-                left.FactIndexMaterializations + right.FactIndexMaterializations,
-                left.SourceScanPasses + right.SourceScanPasses,
-                left.SourceFilesScanned + right.SourceFilesScanned,
-                left.ContractExecutions + right.ContractExecutions,
-                left.ContractResults + right.ContractResults);
-        }
+        private static CounterTotals Add(CounterTotals left, CounterTotals right) => new(
+            left.PolicyCompositions + right.PolicyCompositions,
+            left.ProjectGraphEvaluations + right.ProjectGraphEvaluations,
+            left.AssemblyLoads + right.AssemblyLoads,
+            left.DiscoveredProjectCount + right.DiscoveredProjectCount,
+            left.RetainedAssemblyCount + right.RetainedAssemblyCount,
+            left.SelectedAssemblyCount + right.SelectedAssemblyCount,
+            left.ModesEvaluated + right.ModesEvaluated,
+            left.SnapshotMaterializations + right.SnapshotMaterializations,
+            left.FactIndexMaterializations + right.FactIndexMaterializations,
+            left.SourceScanPasses + right.SourceScanPasses,
+            left.SourceFilesScanned + right.SourceFilesScanned,
+            left.ContractExecutions + right.ContractExecutions,
+            left.ContractResults + right.ContractResults);
 
-        private static int SumObject(JsonElement value)
-        {
-            return value.EnumerateObject().Sum(property => property.Value.GetInt32());
-        }
+        private static int SumObject(JsonElement value) => value.EnumerateObject().Sum(property => property.Value.GetInt32());
     }
 
     private sealed record BenchmarkEvidence(
@@ -150,7 +141,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
             string cliPath = CliDllPath();
             string cliAssemblySha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(cliPath)));
-            var package = PackageIdentity.Create(repositoryRoot, cliAssemblySha256);
+            PackageIdentity package = PackageIdentity.Create(repositoryRoot, cliAssemblySha256);
             return new EnvironmentIdentity(
                 RuntimeInformation.OSDescription,
                 RuntimeInformation.FrameworkDescription,
@@ -179,16 +170,18 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
                 .OrderBy(static path => path, StringComparer.Ordinal)
                 .ToArray();
             if (packages.Length != 1)
+            {
                 throw new InvalidOperationException(
                     $"Expected exactly one {PackageId} package in {packagesDirectory}, but found {packages.Length}. Run `rtk make pack` before recording evidence.");
+            }
 
             string packagePath = packages[0];
             string fileName = Path.GetFileName(packagePath);
             string version = fileName[PackageId.Length..^PackageExtension.Length].TrimStart('.');
             using ZipArchive archive = ZipFile.OpenRead(packagePath);
             ZipArchiveEntry assemblyEntry = archive.GetEntry("tools/net10.0/any/ArchLinterNet.Cli.dll")
-                                            ?? throw new InvalidOperationException(
-                                                $"Package '{packagePath}' does not contain tools/net10.0/any/ArchLinterNet.Cli.dll.");
+                ?? throw new InvalidOperationException(
+                    $"Package '{packagePath}' does not contain tools/net10.0/any/ArchLinterNet.Cli.dll.");
             string packageAssemblySha256;
             using (Stream assemblyStream = assemblyEntry.Open())
             {
@@ -196,9 +189,11 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             }
 
             if (!StringComparer.Ordinal.Equals(packageAssemblySha256, launchedAssemblySha256))
+            {
                 throw new InvalidOperationException(
                     $"Package '{packagePath}' contains CLI assembly SHA-256 '{packageAssemblySha256}', " +
                     $"but the harness launches '{launchedAssemblySha256}'. Run `rtk make pack` before recording evidence.");
+            }
 
             return new PackageIdentity(
                 PackageId,

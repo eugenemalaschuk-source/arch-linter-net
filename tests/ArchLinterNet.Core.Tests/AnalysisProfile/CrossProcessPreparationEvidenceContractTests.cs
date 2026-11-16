@@ -1,5 +1,4 @@
 using System.Text.Json;
-using ArchLinterNet.Core.Tests.Benchmarking;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -34,12 +33,10 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         Assert.Multiple(() =>
         {
             Assert.That(evidence.Processes[0].Identity.Projection.CommandFamily, Is.EqualTo("strict"));
-            Assert.That(evidence.Processes[1].Identity.ExecutionKind,
-                Is.EqualTo(PreparationExecutionKind.InProcessProjection));
+            Assert.That(evidence.Processes[1].Identity.ExecutionKind, Is.EqualTo(PreparationExecutionKind.InProcessProjection));
             Assert.That(evidence.Processes[2].Identity.Projection.CommandFamily, Is.EqualTo("architecture_health"));
             Assert.That(evidence.Processes[3].Identity.RevisionRole, Is.EqualTo(PreparationRevisionRole.Base));
-            Assert.That(evidence.Processes[2].Identity.ExecutionKind,
-                Is.EqualTo(PreparationExecutionKind.InProcessProjection));
+            Assert.That(evidence.Processes[2].Identity.ExecutionKind, Is.EqualTo(PreparationExecutionKind.InProcessProjection));
             Assert.That(evidence.CandidateIndependentProcesses, Has.Count.EqualTo(1));
             Assert.That(evidence.PreparedEffect.RepresentativeProcessCount, Is.EqualTo(1));
         });
@@ -48,7 +45,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     [Test]
     public void PreparedEffect_UsesStrictBreakEvenAndSeparatesCacheAvoidableWork()
     {
-        PreparedEffectContract effect = CreateEffect(1);
+        PreparedEffectContract effect = CreateEffect(representativeProcessCount: 1);
 
         Assert.Multiple(() =>
         {
@@ -67,10 +64,10 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     [Test]
     public void PreparationBreakEven_IgnoresCommonUnavoidableProjectionWork()
     {
-        PreparedEffectContract withoutProjection = CreateEffect(1);
+        PreparedEffectContract withoutProjection = CreateEffect(representativeProcessCount: 1);
         PreparedEffectContract withProjection = withoutProjection with
         {
-            UnavoidableProjectionWork = 1_000m
+            UnavoidableProjectionWork = 1_000m,
         };
 
         Assert.Multiple(() =>
@@ -92,12 +89,12 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         {
             IndependentPreparationWork = 500_000m,
             IndependentProjectionWork = 250_000m,
-            PerConsumerLoadAuthorizationCost = 125_000m
+            PerConsumerLoadAuthorizationCost = 125_000m,
         };
 
         Assert.Multiple(() =>
         {
-            Assert.That(() => changedCounters.Validate("synthetic", 1), Throws.Nothing);
+            Assert.That(() => changedCounters.Validate("synthetic", representativeProcessCount: 1), Throws.Nothing);
             Assert.That(changedCounters.ExpectedLocalSpeedup, Is.EqualTo(original.ExpectedLocalSpeedup));
             Assert.That(changedCounters.ColdPrepareMilliseconds, Is.EqualTo(original.ColdPrepareMilliseconds));
         });
@@ -147,8 +144,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
                 Route = outcome == PreparationDecisionOutcome.B ? "defer-prepared-analysis" : "route-to-one-process",
                 Reason = "Synthetic decision requires additional evidence.",
                 OneProcessAlternativeEvaluated = true,
-                BreakEvenObserved = false
-            }
+                BreakEvenObserved = false,
+            },
         };
 
         Assert.That(() => evidence.Validate(), Throws.Nothing);
@@ -165,8 +162,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
                 Route = "prepared-analysis-implementation",
                 Reason = "Synthetic contract deliberately omits required gates.",
                 OneProcessAlternativeEvaluated = false,
-                BreakEvenObserved = false
-            }
+                BreakEvenObserved = false,
+            },
         };
 
         Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
@@ -177,7 +174,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
     {
         CrossProcessPreparationEvidenceDocument evidence = CreateEvidence() with
         {
-            PreparedEffect = CreateEffect(1) with { Resources = UnavailableResources() }
+            PreparedEffect = CreateEffect(1) with { Resources = UnavailableResources() },
         };
 
         Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
@@ -190,8 +187,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         {
             PreparedEffect = CreateEffect(1) with
             {
-                MaterialSavingsThreshold = 0.60m
-            }
+                MaterialSavingsThreshold = 0.60m,
+            },
         };
 
         Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
@@ -204,8 +201,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         {
             PreparedEffect = CreateEffect(1) with
             {
-                MeasuredMaterialSavingsRatio = 0.10m
-            }
+                MeasuredMaterialSavingsRatio = 0.10m,
+            },
         };
 
         Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
@@ -220,7 +217,7 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             OneProcessWorkEvidenceComplete = false,
             MissingOneProcessWorkEvidenceFamilies = ["measure"],
             DistinctCrossProcessValue = false,
-            MeasuredMaterialSavingsRatio = 0
+            MeasuredMaterialSavingsRatio = 0,
         };
 
         CrossProcessPreparationEvidenceDocument evidence = CreateEvidence() with
@@ -233,8 +230,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
                 Route = "route-instrumentation-gap",
                 Reason = "Synthetic contract records missing process-bound work evidence.",
                 OneProcessAlternativeEvaluated = false,
-                BreakEvenObserved = false
-            }
+                BreakEvenObserved = false,
+            },
         };
 
         Assert.That(() => evidence.Validate(), Throws.Nothing);
@@ -247,22 +244,17 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         BenchmarkCanonicalResultIdentity different = BenchmarkIdentity.CreateCanonicalResult(
             "Success",
             0,
-            [
-                new BenchmarkFindingIdentity
-                {
-                    ContractId = "synthetic-contract",
-                    Kind = "synthetic-finding",
-                    SourceAssembly = "synthetic-assembly",
-                    SourceType = "Synthetic.Type",
-                    SourceMember = "Synthetic.Member",
-                    Location = "src/Synthetic.cs"
-                }
-            ]);
+            [new BenchmarkFindingIdentity
+            {
+                ContractId = "synthetic-contract",
+                Kind = "synthetic-finding",
+                SourceAssembly = "synthetic-assembly",
+                SourceType = "Synthetic.Type",
+                SourceMember = "Synthetic.Member",
+                Location = "src/Synthetic.cs",
+            }]);
         CrossProcessProcessEvidence altered = evidence.Processes[1] with { CanonicalResult = different };
-        evidence = evidence with
-        {
-            Processes = [evidence.Processes[0], altered, evidence.Processes[2], evidence.Processes[3]]
-        };
+        evidence = evidence with { Processes = [evidence.Processes[0], altered, evidence.Processes[2], evidence.Processes[3]] };
 
         Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
     }
@@ -274,8 +266,8 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         {
             Workflow = CreateEvidence().Workflow with
             {
-                MeasuredCommandFamilies = ["strict", "architecture_health", "measure"]
-            }
+                MeasuredCommandFamilies = ["strict", "architecture_health", "measure"],
+            },
         };
 
         Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
@@ -291,9 +283,9 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
                 CandidateRevision = new PreparationRevisionIdentity
                 {
                     Role = PreparationRevisionRole.Candidate,
-                    Identity = "private-adopter-branch"
-                }
-            }
+                    Identity = "private-adopter-branch",
+                },
+            },
         };
 
         Assert.That(() => evidence.Validate(), Throws.InvalidOperationException);
@@ -307,17 +299,17 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             new BenchmarkDimensionSet { ProjectCount = 4, FindingCandidates = 1 },
             BenchmarkCompilationMode.StagedAssemblies,
             BenchmarkExecutionMode.MultiCommand,
-            1);
+            independentProcesses: 1);
 
         JsonElement profile = JsonDocument.Parse("""
-                                                 {
-                                                   "SchemaId": "analysis-profile/v1",
-                                                   "CompletionStatus": "Success",
-                                                   "Counters": {},
-                                                   "Phases": [],
-                                                   "Output": { "OutputFailed": false }
-                                                 }
-                                                 """).RootElement.Clone();
+            {
+              "SchemaId": "analysis-profile/v1",
+              "CompletionStatus": "Success",
+              "Counters": {},
+              "Phases": [],
+              "Output": { "OutputFailed": false }
+            }
+            """).RootElement.Clone();
 
         BenchmarkCanonicalResultIdentity canonical = BenchmarkIdentity.CreateCanonicalResult("Success", 0, []);
         BenchmarkProfileSample[] samples =
@@ -325,62 +317,40 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             CreateSample(profile, 1),
             CreateSample(profile, 2),
             CreateSample(profile, 3),
-            CreateSample(profile, 4)
+            CreateSample(profile, 4),
         ];
-        PreparationProjectionIdentity strict = new()
-        {
-            CommandFamily = "strict", ProjectionId = "synthetic-strict-candidate",
-            ComparisonGroup = "strict-validation", ProcessBound = true
-        };
-        PreparationProjectionIdentity strictInProcess = new()
-        {
-            CommandFamily = "strict", ProjectionId = "synthetic-strict-in-process",
-            ComparisonGroup = "strict-validation", ProcessBound = false
-        };
-        PreparationProjectionIdentity health = new()
-        {
-            CommandFamily = "architecture_health", ProjectionId = "synthetic-health-candidate",
-            ComparisonGroup = "health-process-bound", ProcessBound = false
-        };
-        PreparationProjectionIdentity baseProjection = new()
-        {
-            CommandFamily = "strict", ProjectionId = "synthetic-strict-base", ComparisonGroup = "strict-base",
-            ProcessBound = true
-        };
+        PreparationProjectionIdentity strict = new() { CommandFamily = "strict", ProjectionId = "synthetic-strict-candidate", ComparisonGroup = "strict-validation", ProcessBound = true };
+        PreparationProjectionIdentity strictInProcess = new() { CommandFamily = "strict", ProjectionId = "synthetic-strict-in-process", ComparisonGroup = "strict-validation", ProcessBound = false };
+        PreparationProjectionIdentity health = new() { CommandFamily = "architecture_health", ProjectionId = "synthetic-health-candidate", ComparisonGroup = "health-process-bound", ProcessBound = false };
+        PreparationProjectionIdentity baseProjection = new() { CommandFamily = "strict", ProjectionId = "synthetic-strict-base", ComparisonGroup = "strict-base", ProcessBound = true };
         CrossProcessPreparationWorkflow workflow = new()
         {
             EvidenceSchemaId = CrossProcessPreparationWorkflow.SchemaId,
             WorkloadIdentity = workload.WorkloadIdentity,
             PreparationBoundary = PreparationBoundaryKind.StagedAssemblies,
-            CandidateRevision = new PreparationRevisionIdentity
-                { Role = PreparationRevisionRole.Candidate, Identity = "synthetic-candidate-revision" },
-            BaseRevision = new PreparationRevisionIdentity
-                { Role = PreparationRevisionRole.Base, Identity = "synthetic-base-revision" },
+            CandidateRevision = new PreparationRevisionIdentity { Role = PreparationRevisionRole.Candidate, Identity = "synthetic-candidate-revision" },
+            BaseRevision = new PreparationRevisionIdentity { Role = PreparationRevisionRole.Base, Identity = "synthetic-base-revision" },
             Projections = [strict, strictInProcess, health, baseProjection],
             MeasuredCommandFamilies = ["strict", "architecture_health"],
             CacheModesMeasured = ["disabled", "miss", "hit"],
-            OneProcessAlternativeMeasured = true
+            OneProcessAlternativeMeasured = true,
         };
         CrossProcessProcessEvidence[] processes =
         [
-            CreateProcess(strict, 1, PreparationRevisionRole.Candidate, PreparationExecutionKind.IndependentProcess,
-                samples[0], canonical),
-            CreateProcess(strictInProcess, 2, PreparationRevisionRole.Candidate,
-                PreparationExecutionKind.InProcessProjection, samples[1], canonical),
-            CreateProcess(health, 3, PreparationRevisionRole.Candidate, PreparationExecutionKind.InProcessProjection,
-                samples[2], canonical),
-            CreateProcess(baseProjection, 4, PreparationRevisionRole.Base, PreparationExecutionKind.IndependentProcess,
-                samples[3], canonical)
+            CreateProcess(strict, 1, PreparationRevisionRole.Candidate, PreparationExecutionKind.IndependentProcess, samples[0], canonical),
+            CreateProcess(strictInProcess, 2, PreparationRevisionRole.Candidate, PreparationExecutionKind.InProcessProjection, samples[1], canonical),
+            CreateProcess(health, 3, PreparationRevisionRole.Candidate, PreparationExecutionKind.InProcessProjection, samples[2], canonical),
+            CreateProcess(baseProjection, 4, PreparationRevisionRole.Base, PreparationExecutionKind.IndependentProcess, samples[3], canonical),
         ];
         BenchmarkEvidenceDocument benchmarkEvidence = BenchmarkEvidenceFactory.Create(
-                workload,
-                profile,
-                canonical,
-                samples[0]) with
-            {
-                Samples = samples,
-                Run = samples[0].Run
-            };
+            workload,
+            profile,
+            canonical,
+            sample: samples[0]) with
+        {
+            Samples = samples,
+            Run = samples[0].Run,
+        };
 
         return new CrossProcessPreparationEvidenceDocument
         {
@@ -395,74 +365,67 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
                 Route = "prepared-analysis-implementation",
                 Reason = "Synthetic contract records measured one-process and break-even gates.",
                 OneProcessAlternativeEvaluated = true,
-                BreakEvenObserved = true
-            }
+                BreakEvenObserved = true,
+            },
         };
     }
 
-    private static PreparedEffectContract CreateEffect(int representativeProcessCount)
+    private static PreparedEffectContract CreateEffect(int representativeProcessCount) => new()
     {
-        return new PreparedEffectContract
+        IssueReference = "#493",
+        CostModelUnit = PreparedEffectContract.CostModelUnitMilliseconds,
+        CostMeasurementBasis = "Synthetic Stopwatch duration measurements in milliseconds; deterministic counters are attribution only.",
+        RepresentativeProcessCount = representativeProcessCount,
+        RepeatedWorkShare = 0.5m,
+        CandidatePreparedBoundaryWork = 100,
+        CacheAvoidableWork = 30,
+        PreparedStateAvoidableWork = 70,
+        ColdPrepareCost = 50m,
+        PerConsumerLoadAuthorizationCost = 10m,
+        PerConsumerLoadAuthorizationCostLowerBound = 10m,
+        PerConsumerLoadAuthorizationCostUpperBound = 10m,
+        PerConsumerLoadAuthorizationCostBasis = "Synthetic measured duration load/authorization proxy in milliseconds; SelectedAssemblyCount is attribution only.",
+        UnavoidableProjectionWork = 0m,
+        MeasuredIndependentWorkflowWork = 100m,
+        MeasuredOneProcessAlternativeWork = 120m,
+        OneProcessWorkEvidenceComplete = true,
+        MissingOneProcessWorkEvidenceFamilies = [],
+        TimingEvidenceComplete = true,
+        MissingTimingEvidenceFamilies = [],
+        ExpectedPersistedReuseWork = 60m,
+        DistinctCrossProcessValue = true,
+        MaterialSavingsThreshold = 0.10m,
+        MeasuredMaterialSavingsRatio = 0.5m,
+        WorkMeasurementBasis = "Synthetic Stopwatch duration measurements in milliseconds; deterministic counters are attribution only.",
+        BreakEvenProcessCount = 2,
+        CacheModesMeasured = ["disabled", "miss", "hit"],
+        Resources = BoundedResources(),
+        ScaleEvidenceBasis = "Synthetic measured scale matrix for the contract test.",
+        ScaleEvidence =
+        [
+            SyntheticScalePoint("small", 50m, 1.0m),
+            SyntheticScalePoint("medium", 50m, 1.25m),
+            SyntheticScalePoint("large", 50m, 1.5m),
+        ],
+        ExpectedEffect = new BenchmarkExpectedEffectEvidence
         {
             IssueReference = "#493",
-            CostModelUnit = PreparedEffectContract.CostModelUnitMilliseconds,
-            CostMeasurementBasis =
-                "Synthetic Stopwatch duration measurements in milliseconds; deterministic counters are attribution only.",
-            RepresentativeProcessCount = representativeProcessCount,
-            RepeatedWorkShare = 0.5m,
-            CandidatePreparedBoundaryWork = 100,
-            CacheAvoidableWork = 30,
-            PreparedStateAvoidableWork = 70,
-            ColdPrepareCost = 50m,
-            PerConsumerLoadAuthorizationCost = 10m,
-            PerConsumerLoadAuthorizationCostLowerBound = 10m,
-            PerConsumerLoadAuthorizationCostUpperBound = 10m,
-            PerConsumerLoadAuthorizationCostBasis =
-                "Synthetic measured duration load/authorization proxy in milliseconds; SelectedAssemblyCount is attribution only.",
-            UnavoidableProjectionWork = 0m,
-            MeasuredIndependentWorkflowWork = 100m,
-            MeasuredOneProcessAlternativeWork = 120m,
-            OneProcessWorkEvidenceComplete = true,
-            MissingOneProcessWorkEvidenceFamilies = [],
-            TimingEvidenceComplete = true,
-            MissingTimingEvidenceFamilies = [],
-            ExpectedPersistedReuseWork = 60m,
-            DistinctCrossProcessValue = true,
-            MaterialSavingsThreshold = 0.10m,
-            MeasuredMaterialSavingsRatio = 0.5m,
-            WorkMeasurementBasis =
-                "Synthetic Stopwatch duration measurements in milliseconds; deterministic counters are attribution only.",
-            BreakEvenProcessCount = 2,
-            CacheModesMeasured = ["disabled", "miss", "hit"],
-            Resources = BoundedResources(),
-            ScaleEvidenceBasis = "Synthetic measured scale matrix for the contract test.",
-            ScaleEvidence =
-            [
-                SyntheticScalePoint("small", 50m, 1.0m),
-                SyntheticScalePoint("medium", 50m, 1.25m),
-                SyntheticScalePoint("large", 50m, 1.5m)
-            ],
-            ExpectedEffect = new BenchmarkExpectedEffectEvidence
-            {
-                IssueReference = "#493",
-                TargetPhase = "candidate_preparation",
-                BaselinePhaseShare = 0.5m,
-                CurrentWorkModel = "R x one-shot preparation",
-                TargetWorkModel = "prepare + R x load/authorization",
-                ExpectedLocalSpeedupSmall = 1.0m,
-                ExpectedLocalSpeedupMedium = 1.25m,
-                ExpectedLocalSpeedupLarge = 1.5m,
-                ExpectedEndToEndUpperBound = 1.3m,
-                MemoryAllocationTradeOff =
-                    "Synthetic resource availability is explicit; no private machine value is claimed.",
-                ColdPathTradeOff = "Cold preparation remains measured separately from reuse.",
-                SuccessThreshold = "Prepared-state cost is lower after the recorded break-even point.",
-                KillCriterion = "Defer when canonical results differ or no break-even is observed.",
-                Confidence = "synthetic deterministic contract"
-            },
-            ExactCacheHitSavingsExcluded = true
-        };
-    }
+            TargetPhase = "candidate_preparation",
+            BaselinePhaseShare = 0.5m,
+            CurrentWorkModel = "R x one-shot preparation",
+            TargetWorkModel = "prepare + R x load/authorization",
+            ExpectedLocalSpeedupSmall = 1.0m,
+            ExpectedLocalSpeedupMedium = 1.25m,
+            ExpectedLocalSpeedupLarge = 1.5m,
+            ExpectedEndToEndUpperBound = 1.3m,
+            MemoryAllocationTradeOff = "Synthetic resource availability is explicit; no private machine value is claimed.",
+            ColdPathTradeOff = "Cold preparation remains measured separately from reuse.",
+            SuccessThreshold = "Prepared-state cost is lower after the recorded break-even point.",
+            KillCriterion = "Defer when canonical results differ or no break-even is observed.",
+            Confidence = "synthetic deterministic contract",
+        },
+        ExactCacheHitSavingsExcluded = true,
+    };
 
     private static PreparedEffectScalePoint SyntheticScalePoint(
         string label,
@@ -492,39 +455,31 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
             ExpectedLocalSpeedup = expectedLocalSpeedup,
             TimingEvidenceComplete = true,
             MissingTimingEvidenceFamilies = [],
-            MeasurementBasis =
-                "Synthetic Stopwatch duration measurements in milliseconds; counters are attribution only."
+            MeasurementBasis = "Synthetic Stopwatch duration measurements in milliseconds; counters are attribution only.",
         };
     }
 
-    private static BenchmarkProfileSample CreateSample(JsonElement profile, int ordinal)
+    private static BenchmarkProfileSample CreateSample(JsonElement profile, int ordinal) => new()
     {
-        return new BenchmarkProfileSample
+        Run = new BenchmarkRunDescriptor
         {
-            Run = new BenchmarkRunDescriptor
-            {
-                ExecutionMode = BenchmarkExecutionMode.MultiCommand,
-                CacheMode = "disabled",
-                PreparedStateMode = "unprepared",
-                ParallelMode = "sequential",
-                SampleOrdinal = ordinal,
-                IsWarmSample = false
-            },
-            RawAnalysisProfile = profile,
-            CompletionStatus = "Success",
-            ExitCode = 0,
-            OutputFailed = false,
-            WallClock = BenchmarkResourceMeasurement.Available(1, "milliseconds"),
-            MeasuredWallClockMilliseconds = 1m,
-            ProcessorTime =
-                BenchmarkResourceMeasurement.Unavailable(
-                    "Synthetic contract sample has no processor-time measurement."),
-            AllocatedBytes =
-                BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no allocation measurement."),
-            PeakManagedMemory =
-                BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no memory measurement.")
-        };
-    }
+            ExecutionMode = BenchmarkExecutionMode.MultiCommand,
+            CacheMode = "disabled",
+            PreparedStateMode = "unprepared",
+            ParallelMode = "sequential",
+            SampleOrdinal = ordinal,
+            IsWarmSample = false,
+        },
+        RawAnalysisProfile = profile,
+        CompletionStatus = "Success",
+        ExitCode = 0,
+        OutputFailed = false,
+        WallClock = BenchmarkResourceMeasurement.Available(1, "milliseconds"),
+        MeasuredWallClockMilliseconds = 1m,
+        ProcessorTime = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no processor-time measurement."),
+        AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no allocation measurement."),
+        PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no memory measurement."),
+    };
 
     private static CrossProcessProcessEvidence CreateProcess(
         PreparationProjectionIdentity projection,
@@ -532,62 +487,46 @@ internal sealed class CrossProcessPreparationEvidenceContractTests
         PreparationRevisionRole revisionRole,
         PreparationExecutionKind executionKind,
         BenchmarkProfileSample sample,
-        BenchmarkCanonicalResultIdentity canonical)
-    {
-        return new CrossProcessProcessEvidence
+        BenchmarkCanonicalResultIdentity canonical) => new()
         {
             Identity = new PreparationProcessIdentity
             {
                 Projection = projection,
                 ProcessOrdinal = ordinal,
                 RevisionRole = revisionRole,
-                ExecutionKind = executionKind
+                ExecutionKind = executionKind,
             },
             Sample = sample,
             CanonicalResult = canonical,
-            Resources = UnavailableResources()
+            Resources = UnavailableResources(),
         };
-    }
 
-    private static PreparationResourceEvidence UnavailableResources()
+    private static PreparationResourceEvidence UnavailableResources() => new()
     {
-        return new PreparationResourceEvidence
+        StorageBytes = BenchmarkResourceMeasurement.Unavailable("Synthetic contract does not measure storage bytes."),
+        IoOperations = new BenchmarkResourceMeasurement
         {
-            StorageBytes =
-                BenchmarkResourceMeasurement.Unavailable("Synthetic contract does not measure storage bytes."),
-            IoOperations = new BenchmarkResourceMeasurement
-            {
-                Status = BenchmarkMeasurementStatus.NotApplicable,
-                Reason = "Synthetic contract has no storage-I/O counter."
-            },
-            AllocatedBytes =
-                BenchmarkResourceMeasurement.Unavailable(
-                    "Synthetic contract does not measure prepared-state allocations."),
-            PeakManagedMemory =
-                BenchmarkResourceMeasurement.Unavailable("Synthetic contract does not measure prepared-state memory.")
-        };
-    }
+            Status = BenchmarkMeasurementStatus.NotApplicable,
+            Reason = "Synthetic contract has no storage-I/O counter.",
+        },
+        AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Synthetic contract does not measure prepared-state allocations."),
+        PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Synthetic contract does not measure prepared-state memory."),
+    };
 
-    private static PreparationResourceEvidence BoundedResources()
+    private static PreparationResourceEvidence BoundedResources() => UnavailableResources() with
     {
-        return UnavailableResources() with
-        {
-            StorageBound = SyntheticBound("bytes"),
-            IoOperationsBound = SyntheticBound("operations"),
-            AllocatedBytesBound = SyntheticBound("bytes"),
-            PeakManagedMemoryBound = SyntheticBound("bytes")
-        };
-    }
+        StorageBound = SyntheticBound("bytes"),
+        IoOperationsBound = SyntheticBound("operations"),
+        AllocatedBytesBound = SyntheticBound("bytes"),
+        PeakManagedMemoryBound = SyntheticBound("bytes"),
+    };
 
-    private static PreparationResourceBound SyntheticBound(string unit)
+    private static PreparationResourceBound SyntheticBound(string unit) => new()
     {
-        return new PreparationResourceBound
-        {
-            LowerBound = 1,
-            UpperBound = 4,
-            Unit = unit,
-            Basis = "Synthetic bounded resource sensitivity fixture.",
-            Uncertainty = "Synthetic fixture range."
-        };
-    }
+        LowerBound = 1,
+        UpperBound = 4,
+        Unit = unit,
+        Basis = "Synthetic bounded resource sensitivity fixture.",
+        Uncertainty = "Synthetic fixture range.",
+    };
 }

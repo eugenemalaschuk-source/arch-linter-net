@@ -15,6 +15,20 @@ public sealed class BenchmarkAuditEvidenceTests
     private static readonly int[] _expectedMetricValues = [6, 7];
 
     [Test]
+    public void EvidenceDisposition_UsesStableJsonNamesForEveryDeclaredValue()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(BenchmarkJson.Serialize(BenchmarkEvidenceDisposition.Candidate), Is.EqualTo("\"candidate\""));
+            Assert.That(BenchmarkJson.Serialize(BenchmarkEvidenceDisposition.NotReproduced),
+                Is.EqualTo("\"not_reproduced\""));
+            Assert.That(BenchmarkJson.Serialize(BenchmarkEvidenceDisposition.Deferred), Is.EqualTo("\"deferred\""));
+            Assert.That(BenchmarkJson.Serialize(BenchmarkEvidenceDisposition.Implemented),
+                Is.EqualTo("\"implemented\""));
+        });
+    }
+
+    [Test]
     public void LegacyEvidence_OmitsOptionalAuditFields()
     {
         BenchmarkEvidenceDocument evidence = CreateEvidence();

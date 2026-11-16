@@ -426,7 +426,7 @@ internal sealed record BenchmarkEvidenceDocument
                 throw new InvalidOperationException(
                     "Every benchmark sample must retain an analysis-profile/v1 payload.");
 
-            if (sample.OutputFailed && sample.ExitCode == 0)
+            if (sample is { OutputFailed: true, ExitCode: 0 })
                 throw new InvalidOperationException(
                     "A failed output publication cannot be recorded with a successful exit code.");
         }

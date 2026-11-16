@@ -4,7 +4,6 @@ using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
-using ArchLinterNet.Core.Tests.Benchmarking;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -20,7 +19,6 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
 {
     private const int ProcessTimeoutMilliseconds = 300_000;
     private const string EvidencePath = "docs/internal/prepared-analysis-reuse-evidence.json";
-
     private static readonly string[] _measuredCommandFamilies =
     [
         "strict",
@@ -29,7 +27,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         "architecture_health",
         "change_snapshot",
         "topology",
-        "measure"
+        "measure",
     ];
 
     private static readonly string[] _sharedProjectionFamilies = ["strict", "audit"];
@@ -50,7 +48,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         "classification_roles",
         "classification_path_deferred",
         "source_set_expansion",
-        "subtractive_matcher_participation"
+        "subtractive_matcher_participation",
     ];
 
     [Test]
@@ -71,7 +69,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         CrossProcessPreparationEvidenceBundle bundle = new()
         {
             EvidenceSchemaId = CrossProcessPreparationEvidenceBundle.SchemaId,
-            Archetypes = archetypes
+            Archetypes = archetypes,
         };
         string json = CrossProcessPreparationEvidenceBundleJson.Serialize(bundle);
         string path = Path.Combine(repositoryRoot, EvidencePath);
@@ -99,11 +97,11 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 SelectorPredicateTermsPerLayer = 8,
                 ContractsPerWorkload = 4,
                 FindingCandidates = 0,
-                SourceRootCount = 2
+                SourceRootCount = 2,
             },
             compilationMode,
             BenchmarkExecutionMode.FullGovernance,
-            10);
+            independentProcesses: 10);
 
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
         cancellationToken.ThrowIfCancellationRequested();
@@ -151,7 +149,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 repositoryRoot,
                 changePolicyPath,
                 cancellationToken,
-                false)))
+                ensureBuiltOverride: false)))
             .ToArray();
         for (int index = 0; index < parallelCommands.Length; index++)
         {
@@ -220,13 +218,13 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ordinal,
             "disabled",
             baseCanonical,
-            false);
+            isWarmSample: false);
         PreparationProjectionIdentity baseProjection = new()
         {
             CommandFamily = "strict",
             ProjectionId = "synthetic-strict-base",
             ComparisonGroup = "strict-base",
-            ProcessBound = true
+            ProcessBound = true,
         };
         processes.Add(CreateProcess(baseProjection, ordinal, PreparationRevisionRole.Base,
             PreparationExecutionKind.IndependentProcess, baseSample, baseCanonical, workload));
@@ -237,14 +235,14 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             .Select(process => process.CanonicalResult)
             .First();
         BenchmarkEvidenceDocument benchmarkEvidence = BenchmarkEvidenceFactory.Create(
-                workload,
-                samples[0].RawAnalysisProfile,
-                candidateCanonical,
-                samples[0]) with
-            {
-                Samples = samples,
-                Run = samples[0].Run
-            };
+            workload,
+            samples[0].RawAnalysisProfile,
+            candidateCanonical,
+            samples[0]) with
+        {
+            Samples = samples,
+            Run = samples[0].Run,
+        };
         IReadOnlyList<MeasuredScalePoint> measuredScalePoints = MeasureScaleEvidence(
             compilationMode,
             repositoryRoot,
@@ -260,17 +258,17 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             CandidateRevision = new PreparationRevisionIdentity
             {
                 Role = PreparationRevisionRole.Candidate,
-                Identity = candidateRevision
+                Identity = candidateRevision,
             },
             BaseRevision = new PreparationRevisionIdentity
             {
                 Role = PreparationRevisionRole.Base,
-                Identity = baseRevision
+                Identity = baseRevision,
             },
             Projections = processes.Select(process => process.Identity.Projection).Distinct().ToList(),
             MeasuredCommandFamilies = _measuredCommandFamilies,
             CacheModesMeasured = ["disabled", "miss", "hit"],
-            OneProcessAlternativeMeasured = effect.DecisionCapableEvidence
+            OneProcessAlternativeMeasured = effect.DecisionCapableEvidence,
         };
         CrossProcessPreparationEvidenceDocument evidence = new()
         {
@@ -279,25 +277,22 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             Workflow = workflow,
             Processes = processes,
             PreparedEffect = effect,
-            Decision = CreateDecision(effect, workflow)
+            Decision = CreateDecision(effect, workflow),
         };
         evidence.Validate();
         return evidence;
     }
 
-    private static IReadOnlyList<(string Family, string CacheMode)> IndependentCommandMix()
-    {
-        return
-        [
-            ("no_new_debt", "disabled"),
-            ("architecture_health", "disabled"),
-            ("change_snapshot", "disabled"),
-            ("topology", "disabled"),
-            ("measure", "disabled"),
-            ("strict", "miss"),
-            ("strict", "hit")
-        ];
-    }
+    private static IReadOnlyList<(string Family, string CacheMode)> IndependentCommandMix() =>
+    [
+        ("no_new_debt", "disabled"),
+        ("architecture_health", "disabled"),
+        ("change_snapshot", "disabled"),
+        ("topology", "disabled"),
+        ("measure", "disabled"),
+        ("strict", "miss"),
+        ("strict", "hit"),
+    ];
 
     private static void RecordIndependentProcess(
         BenchmarkWorkloadDefinition workload,
@@ -317,14 +312,14 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ordinal,
             cacheMode,
             canonical,
-            cacheMode == "hit",
+            isWarmSample: cacheMode == "hit",
             parallelMode: parallelMode);
         PreparationProjectionIdentity projection = new()
         {
             CommandFamily = family,
             ProjectionId = $"synthetic-{family}-candidate-{cacheMode}-{parallelMode}",
             ComparisonGroup = ComparisonGroupFor(family),
-            ProcessBound = true
+            ProcessBound = true,
         };
         processes.Add(CreateProcess(projection, ordinal, PreparationRevisionRole.Candidate,
             PreparationExecutionKind.IndependentProcess, sample, canonical, workload));
@@ -348,20 +343,19 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 : BuildPreparationMode.Ordinary,
             NoRestore = false,
             MaxParallelism = 1,
-            CancellationToken = cancellationToken
+            CancellationToken = cancellationToken,
         });
 
-        var strictClock = Stopwatch.StartNew();
+        Stopwatch strictClock = Stopwatch.StartNew();
         ValidationOutcome strict = snapshot.Evaluate("strict");
         strictClock.Stop();
         Assert.That(strict.Passed, Is.True,
             $"The in-process strict projection must pass. preflight={strict.PreflightBlocked}; " +
             $"preflight_diagnostics={string.Join(" | ", strict.PreflightDiagnostics.Select(diagnostic => diagnostic.State))}; " +
             $"violations={strict.Violations.Count}; cycles={strict.Cycles.Count}; coverage={strict.CoverageFindings.Count}");
-        AddProjection("strict", snapshot.Counters, strict, strictClock.Elapsed, workload, processes, samples,
-            ref ordinal);
+        AddProjection("strict", snapshot.Counters, strict, strictClock.Elapsed, workload, processes, samples, ref ordinal);
 
-        var auditClock = Stopwatch.StartNew();
+        Stopwatch auditClock = Stopwatch.StartNew();
         ValidationOutcome audit = snapshot.Evaluate("audit");
         auditClock.Stop();
         Assert.That(audit.Passed, Is.True, "The in-process audit projection must pass.");
@@ -377,8 +371,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         IReadOnlyList<CrossProcessProcessEvidence> processBoundSources = processes
             .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
                               process.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess &&
-                              !_sharedProjectionFamilies.Contains(process.Identity.Projection.CommandFamily,
-                                  StringComparer.Ordinal))
+                              !_sharedProjectionFamilies.Contains(process.Identity.Projection.CommandFamily, StringComparer.Ordinal))
             .GroupBy(process => process.Identity.Projection.CommandFamily, StringComparer.Ordinal)
             .Select(group => group.First())
             .ToList();
@@ -397,15 +390,15 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 Run = source.Sample.Run with
                 {
                     SampleOrdinal = ordinal,
-                    PreparedStateMode = "one_process_process_bound"
+                    PreparedStateMode = "one_process_process_bound",
                 },
                 WallClock = BenchmarkResourceMeasurement.Unavailable(
                     "Process-bound one-process projection timing is not independently measured."),
-                MeasuredWallClockMilliseconds = null
+                MeasuredWallClockMilliseconds = null,
             };
             PreparationProjectionIdentity projection = source.Identity.Projection with
             {
-                ProjectionId = $"{source.Identity.Projection.ProjectionId}-one-process-process-bound"
+                ProjectionId = $"{source.Identity.Projection.ProjectionId}-one-process-process-bound",
             };
             processes.Add(CreateProcess(
                 projection,
@@ -441,23 +434,22 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ordinal,
             "disabled",
             canonical,
-            true,
-            "one_process_shared");
+            isWarmSample: true,
+            preparedStateMode: "one_process_shared");
         PreparationProjectionIdentity projection = new()
         {
             CommandFamily = family,
             ProjectionId = $"synthetic-{family}-in-process",
             ComparisonGroup = ComparisonGroupFor(family),
-            ProcessBound = false
+            ProcessBound = false,
         };
         processes.Add(CreateProcess(projection, ordinal, PreparationRevisionRole.Candidate,
             PreparationExecutionKind.InProcessProjection, sample, canonical, workload));
         samples.Add(sample);
     }
 
-    private static string FormatProjectionResult(string family, ValidationOutcome outcome)
-    {
-        return ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+    private static string FormatProjectionResult(string family, ValidationOutcome outcome) =>
+        ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
             family,
             outcome.Passed,
             outcome.Violations,
@@ -474,7 +466,6 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             outcome.ClassificationConflicts,
             outcome.ClassificationMetadataFailures,
             outcome.SubtractiveMatcherParticipation);
-    }
 
     private static CrossProcessProcessEvidence CreateProcess(
         PreparationProjectionIdentity projection,
@@ -483,36 +474,25 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         PreparationExecutionKind executionKind,
         BenchmarkProfileSample sample,
         BenchmarkCanonicalResultIdentity canonical,
-        BenchmarkWorkloadDefinition workload)
-    {
-        return new CrossProcessProcessEvidence
+        BenchmarkWorkloadDefinition workload) => new()
         {
             Identity = new PreparationProcessIdentity
             {
                 Projection = projection,
                 ProcessOrdinal = ordinal,
                 RevisionRole = revisionRole,
-                ExecutionKind = executionKind
+                ExecutionKind = executionKind,
             },
             Sample = sample,
             CanonicalResult = canonical,
             Resources = new PreparationResourceEvidence
             {
-                StorageBytes =
-                    BenchmarkResourceMeasurement.Unavailable(
-                        "Prepared-state storage is not implemented by issue #493."),
-                IoOperations =
-                    BenchmarkResourceMeasurement.NotApplicable(
-                        "No persisted prepared-state I/O exists in the pre-implementation harness."),
-                AllocatedBytes =
-                    BenchmarkResourceMeasurement.Unavailable(
-                        "Prepared-state allocation is not isolated from the host process."),
-                PeakManagedMemory =
-                    BenchmarkResourceMeasurement.Unavailable(
-                        "Prepared-state memory is not isolated from the host process.")
-            }
+                StorageBytes = BenchmarkResourceMeasurement.Unavailable("Prepared-state storage is not implemented by issue #493."),
+                IoOperations = BenchmarkResourceMeasurement.NotApplicable("No persisted prepared-state I/O exists in the pre-implementation harness."),
+                AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Prepared-state allocation is not isolated from the host process."),
+                PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Prepared-state memory is not isolated from the host process."),
+            },
         };
-    }
 
     private static BenchmarkExpectedEffectEvidence CreateExpectedEffect(
         decimal repeatedWorkShare,
@@ -532,28 +512,23 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ExpectedLocalSpeedupSmall = small.ExpectedLocalSpeedup,
             ExpectedLocalSpeedupMedium = medium.ExpectedLocalSpeedup,
             ExpectedLocalSpeedupLarge = large.ExpectedLocalSpeedup,
-            ExpectedEndToEndUpperBound =
-                1m / (1m - repeatedWorkShare + repeatedWorkShare / Math.Max(1m, medium.ExpectedLocalSpeedup)),
-            MemoryAllocationTradeOff =
-                "Direct storage, I/O, allocation, and peak-memory measurements remain unavailable; bounded pre-implementation sensitivity ranges are recorded and must be replaced by store instrumentation.",
+            ExpectedEndToEndUpperBound = 1m / ((1m - repeatedWorkShare) + repeatedWorkShare / Math.Max(1m, medium.ExpectedLocalSpeedup)),
+            MemoryAllocationTradeOff = "Direct storage, I/O, allocation, and peak-memory measurements remain unavailable; bounded pre-implementation sensitivity ranges are recorded and must be replaced by store instrumentation.",
             ColdPathTradeOff = "The cold preparation remains a separate cost and is never counted as a cache hit.",
-            SuccessThreshold =
-                "Only authorize implementation when persisted reuse is at least 10% cheaper than the measured representative one-process alternative, the measured small/medium/large matrix is decision-capable, and resource bounds are available.",
-            KillCriterion =
-                "Defer or route elsewhere when canonical equivalence, cache separation, or a representative crossover is not reproduced.",
+            SuccessThreshold = "Only authorize implementation when persisted reuse is at least 10% cheaper than the measured representative one-process alternative, the measured small/medium/large matrix is decision-capable, and resource bounds are available.",
+            KillCriterion = "Defer or route elsewhere when canonical equivalence, cache separation, or a representative crossover is not reproduced.",
             Confidence = scaleTimingComplete
                 ? "Decision costs and small/medium/large scaling are derived from Stopwatch wall-clock durations in milliseconds; analysis-profile counters identify attribution only. Each scale point has a separately measured serialized-state load/authorization proxy, while projection/consume duration remains a separate component and the persisted store remains an explicit pre-implementation proxy."
-                : "Decision costs remain non-authorizing because process-bound projection/consume timing is missing. Small/medium/large dimensions, attribution counters, and separately measured load proxies are retained, but no scale speedup is reported until every required projection family has independent duration evidence."
+                : "Decision costs remain non-authorizing because process-bound projection/consume timing is missing. Small/medium/large dimensions, attribution counters, and separately measured load proxies are retained, but no scale speedup is reported until every required projection family has independent duration evidence.",
         };
     }
 
-    private static BenchmarkCanonicalResultIdentity SuccessfulCanonicalResult(CliObservation observation,
-        string command)
+    private static BenchmarkCanonicalResultIdentity SuccessfulCanonicalResult(CliObservation observation, string command)
     {
         Assert.That(observation.ExitCode, Is.EqualTo(0),
             $"Synthetic issue #493 command '{command}' failed with exit code {observation.ExitCode}.\nstdout: {observation.Output}\nstderr: {observation.Error}");
         string completionStatus = observation.Profile.TryGetProperty("CompletionStatus", out JsonElement status) &&
-                                  status.ValueKind == JsonValueKind.String
+            status.ValueKind == JsonValueKind.String
             ? status.GetString()!
             : "Success";
         string canonicalText = ExtractCanonicalResult(observation.Output);
@@ -564,27 +539,30 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             CountCanonicalFindings(observation.Output));
     }
 
-    private static string ComparisonGroupFor(string family)
-    {
-        return family switch
+    private static string ComparisonGroupFor(string family) =>
+        family switch
         {
             "strict" => "strict-validation",
             "audit" => "audit-validation",
-            _ => $"{family}-process-bound"
+            _ => $"{family}-process-bound",
         };
-    }
 
     private static string ExtractCanonicalResult(string output)
     {
-        if (string.IsNullOrWhiteSpace(output)) return string.Empty;
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return string.Empty;
+        }
 
         try
         {
-            using var document = JsonDocument.Parse(output);
+            using JsonDocument document = JsonDocument.Parse(output);
             JsonElement root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object ||
                 !_canonicalResultFields.Any(field => root.TryGetProperty(field, out _)))
+            {
                 return BenchmarkIdentity.NormalizeJson(output);
+            }
 
             return string.Join(
                 "\n",
@@ -599,11 +577,14 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
 
     private static int CountCanonicalFindings(string output)
     {
-        if (string.IsNullOrWhiteSpace(output)) return 0;
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return 0;
+        }
 
         try
         {
-            using var document = JsonDocument.Parse(output);
+            using JsonDocument document = JsonDocument.Parse(output);
             JsonElement root = document.RootElement;
             return _canonicalResultFields
                 .Where(field => field is "violations" or "cycles" or "cycle_diagnostics" or "coverage_findings" or
@@ -628,9 +609,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         BenchmarkCanonicalResultIdentity canonical,
         bool isWarmSample,
         string preparedStateMode = "unprepared",
-        string parallelMode = "sequential")
-    {
-        return new BenchmarkProfileSample
+        string parallelMode = "sequential") => new()
         {
             Run = new BenchmarkRunDescriptor
             {
@@ -639,26 +618,19 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 PreparedStateMode = preparedStateMode,
                 ParallelMode = parallelMode,
                 SampleOrdinal = ordinal,
-                IsWarmSample = isWarmSample
+                IsWarmSample = isWarmSample,
             },
             RawAnalysisProfile = observation.Profile,
             CompletionStatus = canonical.CompletionStatus,
             ExitCode = canonical.ExitCode,
             OutputFailed = false,
             WallClock = BenchmarkResourceMeasurement.Available(
-                Math.Max(1, (long)Math.Ceiling(observation.Elapsed.TotalMilliseconds)), "milliseconds"),
+            Math.Max(1, (long)Math.Ceiling(observation.Elapsed.TotalMilliseconds)), "milliseconds"),
             MeasuredWallClockMilliseconds = DurationMilliseconds(observation.Elapsed),
-            ProcessorTime =
-                BenchmarkResourceMeasurement.Unavailable(
-                    "Processor time is not isolated by the pre-implementation harness."),
-            AllocatedBytes =
-                BenchmarkResourceMeasurement.Unavailable(
-                    "Allocation is not isolated by the pre-implementation harness."),
-            PeakManagedMemory =
-                BenchmarkResourceMeasurement.Unavailable(
-                    "Peak memory is not isolated by the pre-implementation harness.")
+            ProcessorTime = BenchmarkResourceMeasurement.Unavailable("Processor time is not isolated by the pre-implementation harness."),
+            AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Allocation is not isolated by the pre-implementation harness."),
+            PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Peak memory is not isolated by the pre-implementation harness."),
         };
-    }
 
     private static CliObservation RunCommand(
         BenchmarkMaterializedFixture fixture,
@@ -678,34 +650,20 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         {
             "strict" => ["--policy", policyPath, "--mode", "strict", "--format", "json", "--profile", profilePath],
             "audit" => ["--policy", policyPath, "--mode", "audit", "--format", "json", "--profile", profilePath],
-            "no_new_debt" =>
-            [
-                "gate", "--policy", policyPath, "--baseline", baselinePath, "--mode", "all", "--format", "json",
-                "--profile", profilePath
-            ],
-            "architecture_health" =>
-            [
-                "health", "--policy", policyPath, "--baseline", baselinePath, "--mode", "all", "--format", "json",
-                "--execution-context", "synthetic-issue-493", "--profile", profilePath
-            ],
-            "change_snapshot" =>
-            [
-                "change", "snapshot", "--policy", policyPath, "--mode", "strict", "--output", outputPath, "--profile",
-                profilePath
-            ],
-            "topology" =>
-            [
-                "topology", "capture", "--policy", policyPath, "--subject-kind", "assembly", "--format", "json",
-                "--output", outputPath, "--profile", profilePath
-            ],
+            "no_new_debt" => ["gate", "--policy", policyPath, "--baseline", baselinePath, "--mode", "all", "--format", "json", "--profile", profilePath],
+            "architecture_health" => ["health", "--policy", policyPath, "--baseline", baselinePath, "--mode", "all", "--format", "json", "--execution-context", "synthetic-issue-493", "--profile", profilePath],
+            "change_snapshot" => ["change", "snapshot", "--policy", policyPath, "--mode", "strict", "--output", outputPath, "--profile", profilePath],
+            "topology" => ["topology", "capture", "--policy", policyPath, "--subject-kind", "assembly", "--format", "json", "--output", outputPath, "--profile", profilePath],
             "measure" => ["measure", "--policy", policyPath, "--format", "json", "--profile", profilePath],
-            _ => throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown benchmark command family.")
+            _ => throw new ArgumentOutOfRangeException(nameof(family), family, "Unknown benchmark command family."),
         };
 
         bool ensureBuilt = ensureBuiltOverride ??
-                           (fixture.Definition.CompilationMode == BenchmarkCompilationMode.RealMsBuild &&
-                            family != "change_snapshot");
-        if (ensureBuilt) arguments.Add("--ensure-built");
+            (fixture.Definition.CompilationMode == BenchmarkCompilationMode.RealMsBuild && family != "change_snapshot");
+        if (ensureBuilt)
+        {
+            arguments.Add("--ensure-built");
+        }
 
         if (cacheMode != "disabled")
         {
@@ -718,20 +676,23 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             WorkingDirectory = fixture.Root,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false
+            UseShellExecute = false,
         };
         startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
         startInfo.ArgumentList.Add(CliDllPath(repositoryRoot));
-        foreach (string argument in arguments) startInfo.ArgumentList.Add(argument);
+        foreach (string argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var clock = Stopwatch.StartNew();
-        using var process = Process.Start(startInfo)!;
+        Stopwatch clock = Stopwatch.StartNew();
+        using Process process = Process.Start(startInfo)!;
         Task<string> standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
         Task<string> standardError = process.StandardError.ReadToEndAsync(cancellationToken);
         if (!process.WaitForExit(ProcessTimeoutMilliseconds))
         {
-            process.Kill(true);
+            process.Kill(entireProcessTree: true);
             throw new AssertionException($"Synthetic issue #493 command '{family}' exceeded the timeout.");
         }
 
@@ -757,28 +718,29 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 ? (object)new { Unavailable = "CLI subcommand does not expose profile counters." }
                 : counters,
             Phases = Array.Empty<object>(),
-            Output = new { OutputFailed = false }
+            Output = new { OutputFailed = false },
         });
     }
 
-    private static string CliDllPath(string repositoryRoot)
-    {
-        return Path.Combine(repositoryRoot, "src", "ArchLinterNet.Cli", "bin", "Release", "net10.0",
-            "ArchLinterNet.Cli.dll");
-    }
+    private static string CliDllPath(string repositoryRoot) =>
+        Path.Combine(repositoryRoot, "src", "ArchLinterNet.Cli", "bin", "Release", "net10.0", "ArchLinterNet.Cli.dll");
 
     private static string CreateChangeSnapshotPolicy(
         BenchmarkMaterializedFixture fixture,
         BenchmarkWorkloadDefinition workload)
     {
-        if (workload.CompilationMode == BenchmarkCompilationMode.StagedAssemblies) return fixture.PolicyPath;
+        if (workload.CompilationMode == BenchmarkCompilationMode.StagedAssemblies)
+        {
+            return fixture.PolicyPath;
+        }
 
         string original = File.ReadAllText(fixture.PolicyPath);
         int projectsStart = original.IndexOf("  projects:", StringComparison.Ordinal);
         int contractsStart = original.IndexOf("contracts:", StringComparison.Ordinal);
         if (projectsStart < 0 || contractsStart <= projectsStart)
-            throw new InvalidOperationException(
-                "Synthetic real-MSBuild policy did not contain its project analysis section.");
+        {
+            throw new InvalidOperationException("Synthetic real-MSBuild policy did not contain its project analysis section.");
+        }
 
         string searchPaths = string.Join(
             Environment.NewLine,
@@ -787,8 +749,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         string targetAssemblies = string.Join(
             Environment.NewLine,
             workload.Projects.Select(project => $"    - {project.AssemblyName}"));
-        string replacement =
-            $"  target_assemblies:{Environment.NewLine}{targetAssemblies}{Environment.NewLine}  assembly_search_paths:{Environment.NewLine}{searchPaths}{Environment.NewLine}";
+        string replacement = $"  target_assemblies:{Environment.NewLine}{targetAssemblies}{Environment.NewLine}  assembly_search_paths:{Environment.NewLine}{searchPaths}{Environment.NewLine}";
         string policy = original[..projectsStart] + replacement + original[contractsStart..];
         string path = Path.Combine(fixture.Root, "change-snapshot-policy.arch.yml");
         File.WriteAllText(path, policy);

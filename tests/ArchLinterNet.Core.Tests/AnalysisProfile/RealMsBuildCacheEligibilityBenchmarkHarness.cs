@@ -5,7 +5,6 @@ using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Resolution;
-using ArchLinterNet.Core.Tests.Benchmarking;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -21,7 +20,7 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
         "passed", "mode", "violations", "cycles", "cycle_diagnostics", "coverage_findings",
         "unmatched_ignored_violations", "policy_consistency_findings", "coverage_summary",
         "classification_conflicts", "classification_metadata_failures", "classification_roles",
-        "classification_path_deferred"
+        "classification_path_deferred",
     ];
 
     [Test]
@@ -43,30 +42,25 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                     ProjectCount = projects,
                     TypesPerProject = 4,
                     SourceFilesPerProject = 2,
-                    ReferencesPerProject = 1
-                });
+                    ReferencesPerProject = 1,
+                },
+                BenchmarkCompilationMode.RealMsBuild);
             using BenchmarkMaterializedFixture realFixture = BenchmarkFixtureMaterializer.Materialize(realWorkload);
             AddOrdinaryMsBuildFrameworkReference(realFixture);
             realFixture.Build();
             IReadOnlyList<string> realReasons = CollectIneligibilityReasons(realFixture);
             string cachePath = Path.Combine(realFixture.Root, ".benchmark", "analysis-cache");
-            RealMsBuildCacheMeasurement disabled = await RunObservationAsync(realWorkload, realFixture, size,
-                "disabled", null, true, realReasons, cancellationToken);
+            RealMsBuildCacheMeasurement disabled = await RunObservationAsync(realWorkload, realFixture, size, "disabled", null, true, realReasons, cancellationToken);
             realReasons = CollectReceiptReasons(realFixture);
             if (realReasons.Count == 0)
             {
-                string[] receiptFiles = Directory.GetFiles(realFixture.Root, "*.archlinternet-receipt.json",
-                    SearchOption.AllDirectories);
-                TestContext.Out.WriteLine(
-                    $"No typed receipt reasons for {size}; receipt files: {string.Join(", ", receiptFiles)}");
+                string[] receiptFiles = Directory.GetFiles(realFixture.Root, "*.archlinternet-receipt.json", SearchOption.AllDirectories);
+                TestContext.Out.WriteLine($"No typed receipt reasons for {size}; receipt files: {string.Join(", ", receiptFiles)}");
                 realReasons = ["receipt-reason-not-published"];
             }
-
             measurements.Add(disabled with { IneligibilityReasons = realReasons });
-            measurements.Add(await RunObservationAsync(realWorkload, realFixture, size, "population", cachePath, true,
-                realReasons, cancellationToken));
-            measurements.Add(await RunObservationAsync(realWorkload, realFixture, size, "repeat", cachePath, true,
-                realReasons, cancellationToken));
+            measurements.Add(await RunObservationAsync(realWorkload, realFixture, size, "population", cachePath, true, realReasons, cancellationToken));
+            measurements.Add(await RunObservationAsync(realWorkload, realFixture, size, "repeat", cachePath, true, realReasons, cancellationToken));
 
             BenchmarkWorkloadDefinition eligibleWorkload = BenchmarkWorkloadGenerator.Create(
                 $"synthetic-eligible-control-cache-{size}",
@@ -76,27 +70,22 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                     ProjectCount = projects,
                     TypesPerProject = 4,
                     SourceFilesPerProject = 2,
-                    ReferencesPerProject = 1
+                    ReferencesPerProject = 1,
                 },
                 BenchmarkCompilationMode.StagedAssemblies);
-            using BenchmarkMaterializedFixture eligibleFixture =
-                BenchmarkFixtureMaterializer.Materialize(eligibleWorkload);
+            using BenchmarkMaterializedFixture eligibleFixture = BenchmarkFixtureMaterializer.Materialize(eligibleWorkload);
             PromoteStagedReceiptsToVerifiedEligibility(eligibleFixture);
             string eligibleCachePath = Path.Combine(eligibleFixture.Root, ".benchmark", "analysis-cache");
-            measurements.Add(await RunObservationAsync(eligibleWorkload, eligibleFixture, size, "disabled", null, false,
-                [], cancellationToken));
-            measurements.Add(await RunObservationAsync(eligibleWorkload, eligibleFixture, size, "population",
-                eligibleCachePath, false, [], cancellationToken));
-            measurements.Add(await RunObservationAsync(eligibleWorkload, eligibleFixture, size, "repeat",
-                eligibleCachePath, false, [], cancellationToken));
+            measurements.Add(await RunObservationAsync(eligibleWorkload, eligibleFixture, size, "disabled", null, false, [], cancellationToken));
+            measurements.Add(await RunObservationAsync(eligibleWorkload, eligibleFixture, size, "population", eligibleCachePath, false, [], cancellationToken));
+            measurements.Add(await RunObservationAsync(eligibleWorkload, eligibleFixture, size, "repeat", eligibleCachePath, false, [], cancellationToken));
 
             string[] canonicalResults = measurements
                 .Where(measurement => measurement.Size == size)
                 .Select(measurement => measurement.CanonicalResultSha256)
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
-            Assert.That(canonicalResults, Has.Length.EqualTo(1),
-                $"Cache modes changed the canonical result for {size}.");
+            Assert.That(canonicalResults, Has.Length.EqualTo(1), $"Cache modes changed the canonical result for {size}.");
         }
 
         RealMsBuildCacheEffectEstimate effectEstimate = RealMsBuildCacheEffectModel.Calculate(measurements);
@@ -115,24 +104,20 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                 IssueReference = "#991",
                 Status = "open",
                 Phase2Authorized = false,
-                Evidence =
-                    "#991 remains open; normalized consumer workflows must be remeasured before any Phase 2 eligibility implementation."
+                Evidence = "#991 remains open; normalized consumer workflows must be remeasured before any Phase 2 eligibility implementation.",
             },
             Decision = "Pending",
-            DecisionRationale =
-                "The expanded cache-avoidable boundary includes assembly/artifact loading and analysis work, but the separately labelled eligibility-control attempt does not produce a verified hit. The effect estimate is incomplete, so the Phase 1 decision remains pending and cannot support a final A, B, or C outcome; route the incomplete evidence through the #991 normalization and owning prepared-analysis lanes before making a final eligibility decision.",
+            DecisionRationale = "The expanded cache-avoidable boundary includes assembly/artifact loading and analysis work, but the separately labelled eligibility-control attempt does not produce a verified hit. The effect estimate is incomplete, so the Phase 1 decision remains pending and cannot support a final A, B, or C outcome; route the incomplete evidence through the #991 normalization and owning prepared-analysis lanes before making a final eligibility decision.",
             ReferenceBaseDisposition = new RealMsBuildReferenceBaseDisposition
             {
                 Disposition = "routed-to-owning-lane",
                 CountedInEffectEstimate = false,
-                Evidence =
-                    "The current exact-request cache boundary covers validation modes, while immutable reference/base preparation is a separate consumer/prepared-analysis concern; it is routed separately and never counted as candidate cache savings."
+                Evidence = "The current exact-request cache boundary covers validation modes, while immutable reference/base preparation is a separate consumer/prepared-analysis concern; it is routed separately and never counted as candidate cache savings.",
             },
             EffectEstimate = effectEstimate,
             Measurements = measurements,
             StaleInputChecks = StaleInputChecks(),
-            Phase2Routing =
-                "Do not begin Phase 2 until #991 completes and the normalized dogfood workflows are remeasured; any future outcome A must be recorded only after that gate."
+            Phase2Routing = "Do not begin Phase 2 until #991 completes and the normalized dogfood workflows are remeasured; any future outcome A must be recorded only after that gate.",
         };
         document.Validate();
 
@@ -140,8 +125,7 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
         File.WriteAllText(evidencePath, RealMsBuildCacheEligibilityEvidenceSerialization.Serialize(document));
         File.WriteAllText(MarkdownPath(), RealMsBuildCacheEligibilityEvidenceMarkdown.Render(document));
         TestContext.Out.WriteLine($"Real-MSBuild cache eligibility evidence written to {evidencePath}");
-        TestContext.Out.WriteLine(
-            $"Phase 1 outcome: {document.Decision}; real-MSBuild hits: {measurements.Where(measurement => measurement.FixtureKind == "real-msbuild").Sum(measurement => measurement.Hits)}");
+        TestContext.Out.WriteLine($"Phase 1 outcome: {document.Decision}; real-MSBuild hits: {measurements.Where(measurement => measurement.FixtureKind == "real-msbuild").Sum(measurement => measurement.Hits)}");
     }
 
     private static async Task<RealMsBuildCacheMeasurement> RunObservationAsync(
@@ -160,7 +144,7 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
             WorkingDirectory = fixture.Root,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false
+            UseShellExecute = false,
         };
         startInfo.ArgumentList.Add(CliDllPath());
         startInfo.ArgumentList.Add("--policy");
@@ -173,7 +157,10 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
         startInfo.ArgumentList.Add(profilePath);
         startInfo.ArgumentList.Add("--max-parallelism");
         startInfo.ArgumentList.Add("1");
-        if (ensureBuilt) startInfo.ArgumentList.Add("--ensure-built");
+        if (ensureBuilt)
+        {
+            startInfo.ArgumentList.Add("--ensure-built");
+        }
 
         startInfo.ArgumentList.Add("--no-restore");
         if (cachePath != null)
@@ -182,7 +169,7 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
             startInfo.ArgumentList.Add(cachePath);
         }
 
-        var stopwatch = Stopwatch.StartNew();
+        Stopwatch stopwatch = Stopwatch.StartNew();
         try
         {
             using var process = Process.Start(startInfo)!;
@@ -196,12 +183,10 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                 string stdout = await stdoutTask.WaitAsync(linked.Token);
                 string stderr = await stderrTask.WaitAsync(linked.Token);
                 stopwatch.Stop();
-                Assert.That(process.ExitCode, Is.EqualTo(0),
-                    $"Benchmark command failed for {workload.WorkloadId}/{cacheMode}. stdout={stdout} stderr={stderr}");
-                Assert.That(File.Exists(profilePath), Is.True,
-                    $"No profile written for {workload.WorkloadId}/{cacheMode}.");
-                using var profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
-                using var resultDocument = JsonDocument.Parse(stdout);
+                Assert.That(process.ExitCode, Is.EqualTo(0), $"Benchmark command failed for {workload.WorkloadId}/{cacheMode}. stdout={stdout} stderr={stderr}");
+                Assert.That(File.Exists(profilePath), Is.True, $"No profile written for {workload.WorkloadId}/{cacheMode}.");
+                using JsonDocument profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
+                using JsonDocument resultDocument = JsonDocument.Parse(stdout);
                 JsonElement profile = profileDocument.RootElement.Clone();
                 JsonElement result = resultDocument.RootElement.Clone();
                 bool isReal = workload.CompilationMode == BenchmarkCompilationMode.RealMsBuild;
@@ -211,15 +196,12 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                     FixtureKind = isReal ? "real-msbuild" : "eligible-control",
                     CacheMode = cacheMode,
                     WorkloadId = workload.WorkloadId,
-                    WorkloadIdentity =
-                        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(workload.WorkloadId))),
+                    WorkloadIdentity = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(workload.WorkloadId))),
                     CalibrationPairIdentity = $"synthetic-cache-eligibility-{size}-p{workload.Dimensions.ProjectCount}",
                     Size = size,
                     ProjectCount = workload.Dimensions.ProjectCount,
-                    Eligibility =
-                        isReal ? "CacheIneligible" : hits > 0 ? "VerifiedCacheEligible" : "ControlUnavailable",
-                    IneligibilityReasons =
-                        ineligibilityReasons.OrderBy(reason => reason, StringComparer.Ordinal).ToArray(),
+                    Eligibility = isReal ? "CacheIneligible" : (hits > 0 ? "VerifiedCacheEligible" : "ControlUnavailable"),
+                    IneligibilityReasons = ineligibilityReasons.OrderBy(reason => reason, StringComparer.Ordinal).ToArray(),
                     Lookups = ReadCounter(profile, "Counters.Cache.Lookups"),
                     Hits = hits,
                     Misses = ReadCounter(profile, "Counters.Cache.Misses"),
@@ -229,20 +211,19 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                     BytesRead = ReadOptionalCounter(profile, "Counters.Cache.BytesRead"),
                     BytesWritten = ReadOptionalCounter(profile, "Counters.Cache.BytesWritten"),
                     AvoidedWork = ReadOptionalCounter(profile, "Counters.Cache.AvoidedFactIndexMaterializations") +
-                                  ReadOptionalCounter(profile, "Counters.Cache.AvoidedContractExecutions"),
+                        ReadOptionalCounter(profile, "Counters.Cache.AvoidedContractExecutions"),
                     DeterministicWork = ReadCounter(profile, "Counters.ProjectGraphEvaluations") +
-                                        ReadCounter(profile, "Counters.AssemblyLoads") +
-                                        ReadCounter(profile, "Counters.FactIndexMaterializations") +
-                                        ReadCounter(profile, "Counters.ContractExecutions"),
+                        ReadCounter(profile, "Counters.AssemblyLoads") +
+                        ReadCounter(profile, "Counters.FactIndexMaterializations") +
+                        ReadCounter(profile, "Counters.ContractExecutions"),
                     TotalElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds,
                     TargetedPhaseMilliseconds = ReadTargetedPhaseMilliseconds(profile),
                     TargetedPhaseSharePercent = TargetedPhaseShare(profile, stopwatch.Elapsed.TotalMilliseconds),
                     AllocatedBytes = ReadOptionalCounter(profile, "Measurements.AllocatedBytesTotal"),
                     PeakWorkingSetBytes = ReadOptionalCounter(profile, "Measurements.PeakWorkingSetBytes"),
-                    CanonicalResultSha256 = CanonicalResultSha256(result,
-                        ReadString(profile, "CompletionStatus") ?? "unknown", process.ExitCode),
+                    CanonicalResultSha256 = CanonicalResultSha256(result, ReadString(profile, "CompletionStatus") ?? "unknown", process.ExitCode),
                     CompletionStatus = ReadString(profile, "CompletionStatus") ?? "unknown",
-                    ExitCode = process.ExitCode
+                    ExitCode = process.ExitCode,
                 };
             }
             catch
@@ -259,7 +240,10 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
         }
         finally
         {
-            if (File.Exists(profilePath)) File.Delete(profilePath);
+            if (File.Exists(profilePath))
+            {
+                File.Delete(profilePath);
+            }
         }
     }
 
@@ -280,7 +264,10 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
     {
         try
         {
-            if (!process.HasExited) process.Kill(true);
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
         }
         catch (InvalidOperationException)
         {
@@ -293,11 +280,12 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
         SortedSet<string> reasons = new(StringComparer.Ordinal);
         foreach (BenchmarkProjectNode project in fixture.Definition.Projects)
         {
-            string projectPath =
-                Path.Combine(fixture.Root, "src", project.AssemblyName, $"{project.AssemblyName}.csproj");
-            EvaluatedBuildInputManifestV1 manifest =
-                EvaluatedBuildInputManifestCollector.Collect(projectPath, fixture.Root);
-            foreach (string reason in manifest.IneligibilityReasons) reasons.Add(reason);
+            string projectPath = Path.Combine(fixture.Root, "src", project.AssemblyName, $"{project.AssemblyName}.csproj");
+            EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(projectPath, fixture.Root);
+            foreach (string reason in manifest.IneligibilityReasons)
+            {
+                reasons.Add(reason);
+            }
         }
 
         return reasons.ToArray();
@@ -307,12 +295,10 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
     {
         foreach (BenchmarkProjectNode project in fixture.Definition.Projects)
         {
-            string projectPath =
-                Path.Combine(fixture.Root, "src", project.AssemblyName, $"{project.AssemblyName}.csproj");
+            string projectPath = Path.Combine(fixture.Root, "src", project.AssemblyName, $"{project.AssemblyName}.csproj");
             string projectContents = File.ReadAllText(projectPath);
             int closingProjectIndex = projectContents.LastIndexOf("</Project>", StringComparison.Ordinal);
-            Assert.That(closingProjectIndex, Is.GreaterThanOrEqualTo(0),
-                $"Generated project is malformed: {projectPath}");
+            Assert.That(closingProjectIndex, Is.GreaterThanOrEqualTo(0), $"Generated project is malformed: {projectPath}");
             string frameworkReference =
                 "  <ItemGroup>" + Environment.NewLine +
                 "    <FrameworkReference Include=\"Microsoft.AspNetCore.App\" />" + Environment.NewLine +
@@ -326,11 +312,14 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
         SortedSet<string> reasons = new(StringComparer.Ordinal);
         foreach (BenchmarkProjectNode project in fixture.Definition.Projects)
         {
-            string assemblyPath = Path.Combine(fixture.Root, "src", project.AssemblyName, "bin", "Debug", "net10.0",
-                $"{project.AssemblyName}.dll");
+            string assemblyPath = Path.Combine(fixture.Root, "src", project.AssemblyName, "bin", "Debug", "net10.0", $"{project.AssemblyName}.dll");
             if (BuildReceiptStore.TryRead(assemblyPath, out BuildReceiptV1? receipt) && receipt != null)
+            {
                 foreach (string reason in receipt.CacheIneligibilityReasons)
+                {
                     reasons.Add(reason);
+                }
+            }
         }
 
         return reasons.ToArray();
@@ -340,12 +329,9 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
     {
         foreach (BenchmarkProjectNode project in fixture.Definition.Projects)
         {
-            string projectPath =
-                Path.Combine(fixture.Root, "src", project.AssemblyName, $"{project.AssemblyName}.csproj");
-            string stagedAssemblyPath = Path.Combine(fixture.Root, ".benchmark", "staged-assemblies",
-                $"{project.AssemblyName}.dll");
-            EvaluatedBuildInputManifestV1 manifest =
-                EvaluatedBuildInputManifestCollector.Collect(projectPath, fixture.Root);
+            string projectPath = Path.Combine(fixture.Root, "src", project.AssemblyName, $"{project.AssemblyName}.csproj");
+            string stagedAssemblyPath = Path.Combine(fixture.Root, ".benchmark", "staged-assemblies", $"{project.AssemblyName}.dll");
+            EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(projectPath, fixture.Root);
             Assert.That(manifest.Eligibility, Is.EqualTo(CacheEligibility.VerifiedCacheEligible),
                 $"The staged control must be eligible before it is used to calibrate a real-MSBuild hit.");
             Assert.That(BuildReceiptStore.TryRead(stagedAssemblyPath, out BuildReceiptV1? receipt), Is.True);
@@ -356,62 +342,39 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
                 {
                     EvaluatedManifestFingerprint = manifest.Digest,
                     CacheEligibility = manifest.Eligibility,
-                    CacheIneligibilityReasons = manifest.IneligibilityReasons
+                    CacheIneligibilityReasons = manifest.IneligibilityReasons,
                 });
         }
     }
 
-    private static IReadOnlyList<RealMsBuildStaleInputCheck> StaleInputChecks()
-    {
-        return
-        [
-            new RealMsBuildStaleInputCheck
-            {
-                ChangeKind = "project", Disposition = "reject",
-                Evidence = "Existing evaluated-manifest digest comparison rejects changed project/import inputs."
-            },
-            new RealMsBuildStaleInputCheck
-            {
-                ChangeKind = "source", Disposition = "reject",
-                Evidence =
-                    "Source inputs outside the exact manifest reject reuse; no timestamp-only authorization is used."
-            },
-            new RealMsBuildStaleInputCheck
-            {
-                ChangeKind = "package", Disposition = "reject",
-                Evidence = "Package/framework/reference identity changes reject reuse or alter the cache key."
-            },
-            new RealMsBuildStaleInputCheck
-            {
-                ChangeKind = "configuration", Disposition = "reject",
-                Evidence =
-                    "Configuration/TFM/platform/RID and build identity changes reject reuse or alter the cache key."
-            },
-            new RealMsBuildStaleInputCheck
-            {
-                ChangeKind = "artifact", Disposition = "reject",
-                Evidence =
-                    "Selected PE/PDB/build-receipt byte changes are covered by existing artifact-manifest rejection tests."
-            }
-        ];
-    }
+    private static IReadOnlyList<RealMsBuildStaleInputCheck> StaleInputChecks() =>
+    [
+        new() { ChangeKind = "project", Disposition = "reject", Evidence = "Existing evaluated-manifest digest comparison rejects changed project/import inputs." },
+        new() { ChangeKind = "source", Disposition = "reject", Evidence = "Source inputs outside the exact manifest reject reuse; no timestamp-only authorization is used." },
+        new() { ChangeKind = "package", Disposition = "reject", Evidence = "Package/framework/reference identity changes reject reuse or alter the cache key." },
+        new() { ChangeKind = "configuration", Disposition = "reject", Evidence = "Configuration/TFM/platform/RID and build identity changes reject reuse or alter the cache key." },
+        new() { ChangeKind = "artifact", Disposition = "reject", Evidence = "Selected PE/PDB/build-receipt byte changes are covered by existing artifact-manifest rejection tests." },
+    ];
 
     private static double? ReadTargetedPhaseMilliseconds(JsonElement profile)
     {
-        if (!profile.TryGetProperty("Phases", out JsonElement phases)) return null;
+        if (!profile.TryGetProperty("Phases", out JsonElement phases))
+        {
+            return null;
+        }
 
-        var entries = phases.EnumerateArray().ToList();
+        List<JsonElement> entries = phases.EnumerateArray().ToList();
         bool hasLoadAndSetup = entries.Any(candidate =>
             candidate.TryGetProperty("Name", out JsonElement name) && name.GetString() == "load_and_setup");
         string[] avoidableNames =
         [
-            "configuration_check", "policy_consistency_check", "contract_checks", "post_processing"
+            "configuration_check", "policy_consistency_check", "contract_checks", "post_processing",
         ];
         double total = entries
             .Where(candidate => candidate.TryGetProperty("Name", out JsonElement name) &&
-                                (avoidableNames.Contains(name.GetString(), StringComparer.Ordinal) ||
-                                 (!hasLoadAndSetup && name.GetString() == "assembly_resolution") ||
-                                 (hasLoadAndSetup && name.GetString() == "load_and_setup")))
+                (avoidableNames.Contains(name.GetString(), StringComparer.Ordinal) ||
+                    (!hasLoadAndSetup && name.GetString() == "assembly_resolution") ||
+                    (hasLoadAndSetup && name.GetString() == "load_and_setup")))
             .Sum(candidate => candidate.TryGetProperty("ElapsedMs", out JsonElement elapsed) ? elapsed.GetDouble() : 0);
         return total > 0 ? total : null;
     }
@@ -422,17 +385,18 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
         return targeted.HasValue && totalMilliseconds > 0 ? targeted.Value / totalMilliseconds * 100 : null;
     }
 
-    private static long ReadCounter(JsonElement profile, string path)
-    {
-        return ReadOptionalCounter(profile, path) ?? 0;
-    }
+    private static long ReadCounter(JsonElement profile, string path) => ReadOptionalCounter(profile, path) ?? 0;
 
     private static long? ReadOptionalCounter(JsonElement profile, string path)
     {
         JsonElement current = profile;
         foreach (string segment in path.Split('.'))
+        {
             if (!current.TryGetProperty(segment, out current))
+            {
                 return null;
+            }
+        }
 
         return current.ValueKind == JsonValueKind.Number && current.TryGetInt64(out long value) ? value : null;
     }
@@ -441,8 +405,12 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
     {
         JsonElement current = profile;
         foreach (string segment in path.Split('.'))
+        {
             if (!current.TryGetProperty(segment, out current))
+            {
                 return null;
+            }
+        }
 
         return current.ValueKind == JsonValueKind.String ? current.GetString() : null;
     }
@@ -457,24 +425,12 @@ public sealed class RealMsBuildCacheEligibilityBenchmarkHarness
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
     }
 
-    private static string CliDllPath()
-    {
-        return Path.Combine(
-            new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0",
-            "ArchLinterNet.Cli.dll");
-    }
+    private static string CliDllPath() => Path.Combine(
+        new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
 
-    private static string EvidencePath()
-    {
-        return Path.Combine(
-            new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal",
-            "real-msbuild-cache-eligibility-evidence.json");
-    }
+    private static string EvidencePath() => Path.Combine(
+        new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal", "real-msbuild-cache-eligibility-evidence.json");
 
-    private static string MarkdownPath()
-    {
-        return Path.Combine(
-            new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal",
-            "real-msbuild-cache-eligibility-evidence.md");
-    }
+    private static string MarkdownPath() => Path.Combine(
+        new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal", "real-msbuild-cache-eligibility-evidence.md");
 }
