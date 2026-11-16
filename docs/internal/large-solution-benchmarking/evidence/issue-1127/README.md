@@ -24,30 +24,32 @@ Elapsed values include matcher/index work only. After values include index const
 
 | Workload | Before time / allocated | After time / allocated | Retained index estimate |
 | --- | ---: | ---: | ---: |
-| Small identity, I=8 / F=8 / K=8 | 0.0093 ms / 1,024 B | 0.0153 ms / 7,480 B | 1,936 B |
-| Identity, I=64 / F=64 / K=64 | 0.3350 ms / 6,272 B | 0.1069 ms / 42,632 B | 10,624 B |
-| Identity, I=256 / F=64 / K=64 | 1.1384 ms / 6,272 B | 0.3095 ms / 166,136 B | 42,040 B |
-| Identity, I=1,024 / F=64 / K=64 | 4.7136 ms / 6,272 B | 1.3248 ms / 685,840 B | 159,904 B |
-| Structured waiver, I=64 / F=64 / K=64 | 9.3793 ms / 7,767,168 B | 0.2183 ms / 147,768 B | 5,512 B |
-| Structured waiver, I=256 / F=64 / K=64 | 37.8799 ms / 31,049,856 B | 0.3134 ms / 210,072 B | 20,944 B |
-| Structured waiver, I=1,024 / F=64 / K=64 | 102.5309 ms / 116,316,288 B | 0.8956 ms / 466,256 B | 80,488 B |
-| Literal pair, I=1,024 / F=64 / K=64 | 1.4991 ms / 6,272 B | 0.9723 ms / 382,864 B | 89,312 B |
-| Identity finding scale, I=1,024 / F=16 / K=16 | 0.6533 ms / 1,456 B | 1.4434 ms / 681,024 B | 159,904 B |
-| Identity finding scale, I=1,024 / F=256 / K=256 | 7.9570 ms / 27,184 B | 1.5003 ms / 706,752 B | 159,904 B |
-| Identity match scale, I=1,024 / F=32 / K=512 | 1.0417 ms / 29,400 B | 1.1388 ms / 404,872 B | 101,184 B |
-| Wildcards, I=320 / W=256 / F=64 / K=64 | 90.6649 ms / 57,999,488 B | 123.7753 ms / 58,054,376 B | 8,568 B |
+| Small identity, I=8 / F=8 / K=8 | 0.0093 ms / 1,024 B | 0.0075 ms / 1,176 B | 4,104 B |
+| Identity, I=64 / F=64 / K=64 | 0.3350 ms / 6,272 B | 0.0893 ms / 27,416 B | 12,200 B |
+| Identity, I=256 / F=64 / K=64 | 1.1384 ms / 6,272 B | 0.2161 ms / 110,416 B | 61,376 B |
+| Identity, I=1,024 / F=64 / K=64 | 4.7136 ms / 6,272 B | 1.2742 ms / 486,720 B | 259,376 B |
+| Structured waiver, I=64 / F=64 / K=64 | 9.3793 ms / 7,767,168 B | 0.2358 ms / 137,664 B | 5,792 B |
+| Structured waiver, I=256 / F=64 / K=64 | 37.8799 ms / 31,049,856 B | 0.3464 ms / 175,448 B | 34,536 B |
+| Structured waiver, I=1,024 / F=64 / K=64 | 102.5309 ms / 116,316,288 B | 0.8156 ms / 348,088 B | 116,312 B |
+| Literal pair, I=1,024 / F=64 / K=64 | 1.4991 ms / 6,272 B | 0.5342 ms / 255,872 B | 131,760 B |
+| Identity finding scale, I=1,024 / F=16 / K=16 | 0.6533 ms / 1,456 B | 0.5915 ms / 482,288 B | 255,344 B |
+| Identity finding scale, I=1,024 / F=256 / K=256 | 7.9570 ms / 27,184 B | 0.7561 ms / 513,776 B | 255,344 B |
+| Identity match scale, I=1,024 / F=32 / K=32 | 0.9761 ms / 29,400 B | 0.4526 ms / 484,216 B | 255,344 B |
+| Identity match scale, I=1,024 / F=32 / K=128 | 0.9863 ms / 29,400 B | 0.5473 ms / 492,744 B | 259,184 B |
+| Identity match scale, I=1,024 / F=32 / K=512 | 1.0417 ms / 29,400 B | 0.6238 ms / 279,480 B | 134,816 B |
+| Wildcards, I=320 / W=256 / F=64 / K=64 | 90.6649 ms / 57,999,488 B | 4.3694 ms / 965,720 B | 404,000 B |
 
-The largest exact-heavy workloads improved for versioned identity, structured waiver, and literal-pair matching. The index reduced the identity case from 65,536 entry evaluations to 1,024 index entries plus 64 exact lookup probes and 64 returned candidates. For the structured-waiver case, fingerprint creation dropped from 65,536 to 64, one per finding. Literal pairs use the same bounded lookup shape.
+The largest exact-heavy workloads improved for versioned identity, structured waiver, and literal-pair matching. The index reduced the identity case from 65,536 entry evaluations to 1,024 index entries plus 64 exact lookup probes and 64 returned candidates. For structured waivers, fingerprint creation dropped from 65,536 to 64, one per finding. The first candidate for each identity is stored inline; duplicate candidates use a compact overflow array. In the current run, I=1,024/F=64 identity matching took 1.2742 ms versus 4.7136 ms before indexing; timing varies between runs, so the checked-in JSON records the latest five-sample medians.
 
-Index construction is now lazy for both live identity and missing identity. Small live workloads still pay more than the ordered matcher: I=8/F=8 took 0.0153 ms and allocated 7.3 KiB, compared with 0.0093 ms and 1 KiB before indexing. With I=1,024 and only F=16 findings, the live index still dominates and the run remains slower (1.4434 ms versus 0.6533 ms). At F=64, the identity-ignore-scale workload improved from 4.7136 to 1.3248 ms, and the separate identity-finding-scale workload improved from 1.9346 to 1.3380 ms. F=256 amortizes the live index (1.5003 ms versus 7.9570 ms). Match-count workloads with F=32 were slower at K=32, 128, and 512 in this run. The current retained estimate for the I=1,024 identity index is about 156 KiB, with about 670 KiB allocated for the full measured workload. The full I/F/K axes are in `after.json` and `before.json`.
+Small live lists (I≤8) stay on the ordered path: I=8/F=8 measured 0.0075 ms versus 0.0093 ms before indexing, with allocations of 1,176 B versus 1,024 B. The current five-sample run also improved the short high-I identity series (I=1,024/F=16: 0.5915 ms versus 0.6533 ms) and duplicate-heavy rows (F=32/K=32, 128, 512: 0.4526, 0.5473, and 0.6238 ms versus 0.9761, 0.9863, and 1.0417 ms). Treat small timing differences as environment-sensitive; the complete axes are in `after.json` and `before.json`.
 
-Wildcard cost remains separate and does not have a linear bound for arbitrary glob patterns. The unmatched double-star workload evaluated W×F patterns (16,384 at W=256) and took 123.7753 ms after indexing versus 90.6649 ms before; regex work remains dominant there. Allocations were effectively unchanged in that case, while the retained exact-index estimate was about 8 KiB. Wildcard-heavy and small/low-finding regressions are recorded as trade-offs rather than presented as wins.
+Wildcard matching now reuses each normalized pattern matcher from the index. In the unmatched double-star workload, 16,384 wildcard candidates took 4.3694 ms after indexing versus 90.6649 ms before; allocations fell from 57,999,488 B to 965,720 B. The retained estimate for the compiled wildcard index was about 404 KiB. These measurements cover this workload's double-star patterns; arbitrary glob runtimes remain pattern-dependent.
 
 ## Work and end-to-end limits
 
-- The first query with a live identity lazily prepares the exact indexes in O(I). Subsequent findings use a fixed number of exact dictionary probes; reporting all K matches and tracker indices adds O(K). A live structured-waiver fingerprint is built once per finding and reused for aliases.
+- The first query with a live identity lazily prepares the exact indexes in O(I), except lists of at most eight entries which stay ordered. Subsequent indexed findings use a fixed number of exact dictionary probes; reporting all K matches and tracker indices adds O(K). A live structured-waiver fingerprint is built once per finding and reused for aliases. Distinct glob patterns are normalized and prepared once with the index, then reused with the existing regex timeout.
 - Queries without a live identity use the ordered matcher directly at first. After cumulative ordered scanning reaches 4×I entries, the matcher requests the literal/wildcard fallback index; the next query builds it once and later queries reuse it. This keeps short or early-match checks on the no-index path while amortizing long repeated workloads. All live-identity matrix rows report zero missing-identity scan or fallback-build work.
-- `fallback.json` measures two I=1,024/F=64 cases without live identities. For early matches, the ordered path took 0.2343 ms and allocated 120 B; the adaptive path took 0.2015 ms and allocated 232 B without building an index. For 64 misses, the ordered path took 6.3189 ms and allocated 120 B; the adaptive path took 1.1686 ms and allocated 376,376 B. The first four misses scan 4×I entries, the fifth query builds the fallback index in 0.7257 ms, and later misses take 0.00517 ms each. This longer case benefits overall, with an allocation cost.
+- `fallback.json` measures two I=1,024/F=64 cases without live identities. For early matches, the ordered path took 0.2118 ms and allocated 120 B; the adaptive path took 0.2044 ms and allocated 232 B without building an index. For 64 misses, the ordered path took 6.3086 ms and allocated 120 B; the adaptive path took 0.8851 ms and allocated 248,008 B. The first four misses scan 4×I entries, the fifth query builds the fallback index, and subsequent misses use it. The complete workload is about 7.1× faster, with an allocation cost.
 - Wildcard fallback remains separately attributable as O(F×W) candidate evaluation plus pattern-matching cost. These measurements use unmatched double-star patterns and do not generalize regex runtime for arbitrary globs.
 - The focused workload is 100% matcher calls. Product-validation phase share is **not measured** because the current profile does not attribute matcher time separately. A whole-validation Amdahl bound and product-wide speedup are therefore **not measured**.
 - Retained-index estimates use full collections around a held index, exclude the input list, and are noisy at small sizes. They are not process peak working-set measurements.

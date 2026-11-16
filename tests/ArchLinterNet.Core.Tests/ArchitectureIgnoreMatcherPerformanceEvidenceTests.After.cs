@@ -88,6 +88,9 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
                 work.VersionedIdentityEntriesIndexed,
                 work.VersionedFallbackEntriesProcessed,
                 work.MissingIdentityEntriesScanned,
+                work.OrderedLiveQueries,
+                work.OrderedLiveEntriesScanned,
+                work.OrderedLiveMatches,
                 work.ExactLookupProbes,
                 work.ExactCandidateMatches,
                 work.LiveWaiverFingerprintsBuilt,
@@ -198,29 +201,30 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         MatcherWorkload workload,
         ArchitectureIgnoreMatcherIndex index)
     {
-        if (workload.Findings.Length == 0)
+        var tracker = new ArchitectureIgnoreUsageTracker();
+        for (int findingIndex = 0; findingIndex < workload.Findings.Length; findingIndex++)
         {
-            return;
+            ArchitectureViolationIdentity finding = workload.Findings[findingIndex];
+            string? fingerprint = index.CreateLiveWaiverFingerprint(finding);
+            _ = index.IsIgnored(
+                finding.SourceType,
+                $"Target.Type.{findingIndex}",
+                tracker,
+                finding,
+                fingerprint,
+                out _);
         }
-
-        ArchitectureViolationIdentity finding = workload.Findings[0];
-        string? fingerprint = index.CreateLiveWaiverFingerprint(finding);
-        _ = index.IsIgnored(
-            finding.SourceType,
-            "Target.Type.0",
-            null,
-            finding,
-            fingerprint,
-            out _);
     }
 
     private static void AssertWorkCounts(MatcherWorkload workload, ArchitectureIgnoreMatcherWorkCounter work)
     {
+        bool builtLiveIndex = work.IndexEntriesProcessed > 0;
+        int expectedIndexedEntries = builtLiveIndex ? workload.Ignores.Count : 0;
         Assert.Multiple(() =>
         {
-            Assert.That(work.IndexEntriesProcessed, Is.EqualTo(workload.Ignores.Count),
-                $"Every original ignore entry must be indexed once for '{workload.Name}'.");
-            int expectedVersionedIdentityEntries = workload.Kind == MatcherKind.VersionedIdentity
+            Assert.That(work.IndexEntriesProcessed, Is.EqualTo(expectedIndexedEntries),
+                $"Only indexed workloads should process entries while building the exact index for '{workload.Name}'.");
+            int expectedVersionedIdentityEntries = builtLiveIndex && workload.Kind == MatcherKind.VersionedIdentity
                 ? workload.Ignores.Count - workload.WildcardCount
                 : 0;
             Assert.That(work.VersionedIdentityEntriesIndexed, Is.EqualTo(expectedVersionedIdentityEntries),
@@ -231,8 +235,10 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
                 $"Live-identity workloads must not scan the missing-identity fallback for '{workload.Name}'.");
             Assert.That(work.ExactLookupProbes, Is.LessThanOrEqualTo(workload.Findings.Length * 3),
                 $"Exact dictionary probes must remain constant per finding for '{workload.Name}'.");
-            Assert.That(work.ExactCandidateMatches, Is.EqualTo(workload.RequiredMatches),
-                $"Exact candidate matches must preserve required cardinality for '{workload.Name}'.");
+            Assert.That(work.ExactLookupProbes + work.OrderedLiveQueries, Is.EqualTo(workload.Findings.Length),
+                $"Each finding must use either an ordered scan or the prepared index for '{workload.Name}'.");
+            Assert.That(work.ExactCandidateMatches + work.OrderedLiveMatches, Is.EqualTo(workload.RequiredMatches),
+                $"Indexed and ordered exact matches must preserve required cardinality for '{workload.Name}'.");
             Assert.That(work.LiveWaiverFingerprintsBuilt,
                 Is.EqualTo(workload.Kind == MatcherKind.StructuredWaiver ? workload.Findings.Length : 0),
                 $"Structured waiver fingerprints must be built at most once per applicable finding for '{workload.Name}'.");
@@ -256,6 +262,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         [
             "src/ArchLinterNet.Core/Resolution/ArchitectureIgnoreMatcher.cs",
             "src/ArchLinterNet.Core/Resolution/ArchitectureIgnoreMatcherIndex.cs",
+            "src/ArchLinterNet.Core/Resolution/ArchitectureIgnoreMatcherOrdered.cs",
             "src/ArchLinterNet.Core/Resolution/ArchitectureContractExecutionContext.cs",
             "src/ArchLinterNet.Core/Execution/ArchitectureAnalysisSession.cs",
         ];

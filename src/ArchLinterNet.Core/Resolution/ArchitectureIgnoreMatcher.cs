@@ -42,6 +42,36 @@ internal static class ArchitectureIgnoreMatcher
         return Regex.IsMatch(normalizedValue, regexPattern, RegexOptions.CultureInvariant, _matchTimeout);
     }
 
+    internal static CompiledPattern CompilePattern(string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
+            return CompiledPattern.Never;
+        }
+
+        string normalizedPattern = Normalize(pattern);
+        if (normalizedPattern == "*")
+        {
+            return CompiledPattern.Any;
+        }
+
+        if (normalizedPattern.EndsWith('*')
+            && !normalizedPattern.Contains("**", StringComparison.Ordinal)
+            && normalizedPattern.Count(ch => ch == '*') == 1
+            && !normalizedPattern.Contains('?'))
+        {
+            return CompiledPattern.Prefix(normalizedPattern[..^1]);
+        }
+
+        if (!ContainsGlobSyntax(normalizedPattern))
+        {
+            return CompiledPattern.Exact(normalizedPattern);
+        }
+
+        string regexPattern = "^" + GlobToRegex(normalizedPattern) + "$";
+        return CompiledPattern.Regex(new Regex(regexPattern, RegexOptions.CultureInvariant, _matchTimeout));
+    }
+
     internal static bool ContainsGlobSyntax(string pattern)
     {
         return pattern.Contains('*', StringComparison.Ordinal)
@@ -63,5 +93,52 @@ internal static class ArchitectureIgnoreMatcher
         escaped = escaped.Replace("<<<DOUBLESTAR>>>", ".*");
 
         return escaped;
+    }
+
+    internal sealed class CompiledPattern
+    {
+        private readonly MatchKind _kind;
+        private readonly string? _pattern;
+        private readonly Regex? _regex;
+
+        private CompiledPattern(MatchKind kind, string? pattern = null, Regex? regex = null)
+        {
+            _kind = kind;
+            _pattern = pattern;
+            _regex = regex;
+        }
+
+        internal static CompiledPattern Never { get; } = new(MatchKind.Never);
+
+        internal static CompiledPattern Any { get; } = new(MatchKind.Any);
+
+        internal static CompiledPattern Exact(string pattern) => new(MatchKind.Exact, pattern);
+
+        internal static CompiledPattern Prefix(string pattern) => new(MatchKind.Prefix, pattern);
+
+        internal static CompiledPattern Regex(Regex regex) => new(MatchKind.Regex, regex: regex);
+
+        internal bool IsMatch(string value)
+        {
+            string normalizedValue = Normalize(value);
+            return _kind switch
+            {
+                MatchKind.Never => false,
+                MatchKind.Any => true,
+                MatchKind.Exact => normalizedValue == _pattern,
+                MatchKind.Prefix => normalizedValue.StartsWith(_pattern!, StringComparison.Ordinal),
+                MatchKind.Regex => _regex!.IsMatch(normalizedValue),
+                _ => throw new ArgumentOutOfRangeException(),
+            };
+        }
+
+        private enum MatchKind
+        {
+            Never,
+            Any,
+            Exact,
+            Prefix,
+            Regex,
+        }
     }
 }

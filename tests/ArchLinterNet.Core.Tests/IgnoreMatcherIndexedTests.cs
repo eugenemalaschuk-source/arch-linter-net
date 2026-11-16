@@ -19,8 +19,9 @@ public sealed partial class IgnoreMatcherTests
             Kind = "dependency",
             SourceAssembly = "Some.Assembly",
         };
+        ArchitectureIgnoredViolation[] ignored = Enumerable.Repeat(ignore, 9).ToArray();
         ArchitectureIgnoreMatcherWorkCounter work = new();
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build([ignore], workCounter: work);
+        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(ignored, workCounter: work);
 
         bool missingIdentityMatch = index.IsIgnored(
             "App/Services/Worker", "System.Object", null, null, null, out bool missingIdentityBaseline);
@@ -37,8 +38,35 @@ public sealed partial class IgnoreMatcherTests
             Assert.That(missingIdentityBaseline, Is.False);
             Assert.That(liveIdentityMatch, Is.False, "A live identity makes a versioned baseline exact-only.");
             Assert.That(liveIdentityBaseline, Is.False);
-            Assert.That(work.VersionedIdentityEntriesIndexed, Is.EqualTo(1),
+            Assert.That(work.VersionedIdentityEntriesIndexed, Is.EqualTo(9),
                 "The exact identity index is built when a live identity first needs it.");
+        });
+    }
+
+    [Test]
+    public void IndexedMatcher_SmallLiveIdentityListUsesOrderedMatchingWithoutBuildingIndex()
+    {
+        ArchitectureViolationIdentity identity = CreateIdentity(0);
+        ArchitectureIgnoredViolation ignore = CreateVersionedIgnore(identity, isFromLoadedBaseline: true);
+        var work = new ArchitectureIgnoreMatcherWorkCounter();
+        var index = ArchitectureIgnoreMatcherIndex.Build([ignore], workCounter: work);
+
+        string? fingerprint = index.CreateLiveWaiverFingerprint(identity);
+        bool matched = index.IsIgnored(
+            identity.SourceType,
+            "Target.Type.0",
+            null,
+            identity,
+            fingerprint,
+            out bool matchedByLoadedBaseline);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(matched, Is.True);
+            Assert.That(matchedByLoadedBaseline, Is.True);
+            Assert.That(work.IndexEntriesProcessed, Is.Zero,
+                "A small ignore list should avoid allocating exact lookup dictionaries.");
+            Assert.That(work.VersionedIdentityEntriesIndexed, Is.Zero);
         });
     }
 
@@ -79,7 +107,8 @@ public sealed partial class IgnoreMatcherTests
         {
             Assert.That(indexedFallbackMatch, Is.True);
             Assert.That(reusedFallbackIndexMatch, Is.True);
-            Assert.That(work.IndexEntriesProcessed, Is.EqualTo(1));
+            Assert.That(work.IndexEntriesProcessed, Is.Zero,
+                "The small live-identity path must not prepare the separate live index.");
             Assert.That(work.VersionedFallbackEntriesProcessed, Is.EqualTo(1),
                 "The immutable fallback lookup should be initialized after the scan threshold and reused.");
             Assert.That(work.MissingIdentityEntriesScanned, Is.EqualTo(4));
@@ -201,8 +230,9 @@ public sealed partial class IgnoreMatcherTests
         Assert.Multiple(() =>
         {
             Assert.That(work.IndexEntriesProcessed, Is.EqualTo(ignoreCount));
-            Assert.That(work.ExactLookupProbes, Is.EqualTo(findingCount));
-            Assert.That(work.ExactCandidateMatches, Is.EqualTo(expectedMatches));
+            Assert.That(work.VersionedIdentityEntriesIndexed, Is.EqualTo(ignoreCount));
+            Assert.That(work.ExactLookupProbes + work.OrderedLiveQueries, Is.EqualTo(findingCount));
+            Assert.That(work.ExactCandidateMatches + work.OrderedLiveMatches, Is.EqualTo(expectedMatches));
             Assert.That(work.MatchedOriginalIndices, Is.EqualTo(expectedMatches));
             Assert.That(work.WildcardEntriesEvaluated, Is.Zero);
             Assert.That(tracker.MatchedIndexes, Has.Count.EqualTo(expectedMatches));

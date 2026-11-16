@@ -9,8 +9,11 @@ namespace ArchLinterNet.Core.Resolution;
 internal sealed class ArchitectureIgnoreMatcherIndex
 {
     private const long MissingIdentityIndexScanMultiplier = 4;
+    internal const int SmallLiveIdentityListThreshold = 8;
 
     private readonly IReadOnlyList<ArchitectureIgnoredViolation> _ignoredViolations;
+    private readonly bool _useOrderedLiveIdentityMatcher;
+    private readonly bool _hasValidStructuredWaiverFingerprint;
     private Lazy<LiveIdentityIndex>? _liveIdentityIndex;
     private Lazy<MissingIdentityIndex>? _missingIdentityIndex;
     private readonly CancellationToken _cancellationToken;
@@ -21,11 +24,15 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     private ArchitectureIgnoreMatcherIndex(
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
         CancellationToken cancellationToken,
-        ArchitectureIgnoreMatcherWorkCounter? workCounter)
+        ArchitectureIgnoreMatcherWorkCounter? workCounter,
+        bool useOrderedLiveIdentityMatcher,
+        bool hasValidStructuredWaiverFingerprint)
     {
         _ignoredViolations = ignoredViolations;
         _cancellationToken = cancellationToken;
         _workCounter = workCounter;
+        _useOrderedLiveIdentityMatcher = useOrderedLiveIdentityMatcher;
+        _hasValidStructuredWaiverFingerprint = hasValidStructuredWaiverFingerprint;
     }
 
     internal static ArchitectureIgnoreMatcherIndex Build(
@@ -35,10 +42,15 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     {
         ArgumentNullException.ThrowIfNull(ignoredViolations);
         cancellationToken.ThrowIfCancellationRequested();
+        bool useOrderedLiveIdentityMatcher = ignoredViolations.Count <= SmallLiveIdentityListThreshold;
+        bool hasValidStructuredWaiverFingerprint = useOrderedLiveIdentityMatcher
+            && ArchitectureIgnoreMatcherOrdered.HasValidStructuredWaiverFingerprint(ignoredViolations, cancellationToken);
         return new ArchitectureIgnoreMatcherIndex(
             ignoredViolations,
             cancellationToken,
-            workCounter);
+            workCounter,
+            useOrderedLiveIdentityMatcher,
+            hasValidStructuredWaiverFingerprint);
     }
 
     /// <summary>
@@ -51,6 +63,21 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         if (liveIdentity is null)
         {
             return null;
+        }
+
+        if (_useOrderedLiveIdentityMatcher)
+        {
+            if (!_hasValidStructuredWaiverFingerprint)
+            {
+                return null;
+            }
+
+            if (_workCounter is not null)
+            {
+                _workCounter.LiveWaiverFingerprintsBuilt++;
+            }
+
+            return ArchitectureWaiverTargetFingerprint.Create(liveIdentity);
         }
 
         LiveIdentityIndex liveIdentityIndex = GetLiveIdentityIndex();
@@ -82,36 +109,56 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     {
         matchedByLoadedBaseline = false;
         bool tracking = usageTracker is not null;
-        if (liveIdentity is null && Volatile.Read(ref _missingIdentityIndexRequested) == 0)
+        if (liveIdentity is not null && _useOrderedLiveIdentityMatcher)
         {
-            return IsIgnoredWithoutIdentityOrdered(
+            return ArchitectureIgnoreMatcherOrdered.IsIgnoredWithLiveIdentityOrdered(
                 sourceType,
                 forbiddenReference,
                 usageTracker,
+                liveIdentity,
+                liveWaiverFingerprint,
+                _ignoredViolations,
+                _cancellationToken,
+                _workCounter,
+                out matchedByLoadedBaseline);
+        }
+
+        if (liveIdentity is null && Volatile.Read(ref _missingIdentityIndexRequested) == 0)
+        {
+            return ArchitectureIgnoreMatcherOrdered.IsIgnoredWithoutIdentityOrdered(
+                sourceType,
+                forbiddenReference,
+                usageTracker,
+                _ignoredViolations,
+                _cancellationToken,
+                _workCounter,
+                ref _missingIdentityScanWork,
+                ref _missingIdentityIndexRequested,
+                MissingIdentityIndexScanMultiplier,
                 out matchedByLoadedBaseline);
         }
 
         LiveIdentityIndex? liveIndex = liveIdentity is null ? null : GetLiveIdentityIndex();
         MissingIdentityIndex? missingIdentityIndex = liveIdentity is null ? GetMissingIdentityIndex() : null;
-        Dictionary<IdentityKey, IgnoreEntry[]>? identities = liveIndex?.Identities;
-        IgnoreEntry[]? identityCandidates = null;
+        Dictionary<IdentityKey, CandidateGroup>? identities = liveIndex?.Identities;
+        CandidateGroup identityCandidates = default;
         if (liveIdentity is not null && identities is { Count: > 0 })
         {
             RecordExactLookupProbe();
             identities.TryGetValue(IdentityKey.From(liveIdentity), out identityCandidates);
         }
 
-        Dictionary<string, IgnoreEntry[]>? waiverFingerprints = liveIndex?.WaiverFingerprints;
-        IgnoreEntry[]? waiverCandidates = null;
+        Dictionary<string, CandidateGroup>? waiverFingerprints = liveIndex?.WaiverFingerprints;
+        CandidateGroup waiverCandidates = default;
         if (liveIdentity is not null && liveWaiverFingerprint is not null && waiverFingerprints is { Count: > 0 })
         {
             RecordExactLookupProbe();
             waiverFingerprints.TryGetValue(liveWaiverFingerprint, out waiverCandidates);
         }
 
-        Dictionary<PatternPair, IgnoreEntry[]> literalPairs = liveIndex?.LiteralPairs
+        Dictionary<PatternPair, CandidateGroup> literalPairs = liveIndex?.LiteralPairs
             ?? missingIdentityIndex!.LiteralPairs;
-        IgnoreEntry[]? literalCandidates = null;
+        CandidateGroup literalCandidates = default;
         if (literalPairs.Count > 0)
         {
             RecordExactLookupProbe();
@@ -121,7 +168,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
             literalPairs.TryGetValue(pair, out literalCandidates);
         }
 
-        IgnoreEntry[] wildcardEntries = liveIndex?.Wildcards ?? missingIdentityIndex!.Wildcards;
+        WildcardEntry[] wildcardEntries = liveIndex?.Wildcards ?? missingIdentityIndex!.Wildcards;
         int identityPosition = 0;
         int waiverPosition = 0;
         int literalPosition = 0;
@@ -144,14 +191,14 @@ internal sealed class ArchitectureIgnoreMatcherIndex
             bool hasWildcard = TryPeekWildcard(
                 wildcardEntries,
                 wildcardPosition,
-                out IgnoreEntry wildcardEntry);
+                out WildcardEntry wildcardEntry);
 
             if (!hasExact && !hasWildcard)
             {
                 return anyMatched;
             }
 
-            if (hasWildcard && (!hasExact || wildcardEntry.Index < exactEntry.Index))
+            if (hasWildcard && (!hasExact || wildcardEntry.Entry.Index < exactEntry.Index))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 if (_workCounter is not null)
@@ -160,13 +207,13 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                 }
 
                 wildcardPosition++;
-                if (!ArchitectureIgnoreMatcher.MatchesPattern(sourceType, wildcardEntry.SourcePattern)
-                    || !ArchitectureIgnoreMatcher.MatchesPattern(forbiddenReference, wildcardEntry.ForbiddenPattern))
+                if (!wildcardEntry.SourceMatcher.IsMatch(sourceType)
+                    || !wildcardEntry.ForbiddenMatcher.IsMatch(forbiddenReference))
                 {
                     continue;
                 }
 
-                RecordMatch(wildcardEntry, usageTracker, ref matchedByLoadedBaseline);
+                RecordMatch(wildcardEntry.Entry, usageTracker, ref matchedByLoadedBaseline);
                 anyMatched = true;
                 if (!tracking)
                 {
@@ -196,8 +243,9 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     }
 
     private static void AddFallbackPattern(
-        Dictionary<PatternPair, List<IgnoreEntry>> literalPairs,
-        List<IgnoreEntry> wildcardEntries,
+        Dictionary<PatternPair, CandidateGroup> literalPairs,
+        List<WildcardEntry> wildcardEntries,
+        Dictionary<string, ArchitectureIgnoreMatcher.CompiledPattern> patternMatchers,
         IgnoreEntry entry)
     {
         if (string.IsNullOrWhiteSpace(entry.SourcePattern)
@@ -217,7 +265,24 @@ internal sealed class ArchitectureIgnoreMatcherIndex
             return;
         }
 
-        wildcardEntries.Add(entry);
+        wildcardEntries.Add(new WildcardEntry(
+            entry,
+            GetPatternMatcher(patternMatchers, entry.SourcePattern),
+            GetPatternMatcher(patternMatchers, entry.ForbiddenPattern)));
+    }
+
+    private static ArchitectureIgnoreMatcher.CompiledPattern GetPatternMatcher(
+        Dictionary<string, ArchitectureIgnoreMatcher.CompiledPattern> patternMatchers,
+        string pattern)
+    {
+        string normalizedPattern = ArchitectureIgnoreMatcher.Normalize(pattern);
+        if (!patternMatchers.TryGetValue(normalizedPattern, out ArchitectureIgnoreMatcher.CompiledPattern? matcher))
+        {
+            matcher = ArchitectureIgnoreMatcher.CompilePattern(normalizedPattern);
+            patternMatchers.Add(normalizedPattern, matcher);
+        }
+
+        return matcher;
     }
 
     private LiveIdentityIndex GetLiveIdentityIndex()
@@ -253,10 +318,11 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         CancellationToken cancellationToken,
         ArchitectureIgnoreMatcherWorkCounter? workCounter)
     {
-        var identities = new Dictionary<IdentityKey, List<IgnoreEntry>>();
-        var waiverFingerprints = new Dictionary<string, List<IgnoreEntry>>(StringComparer.Ordinal);
-        var literalPairs = new Dictionary<PatternPair, List<IgnoreEntry>>();
-        var wildcardEntries = new List<IgnoreEntry>();
+        var identities = new Dictionary<IdentityKey, CandidateGroup>();
+        var waiverFingerprints = new Dictionary<string, CandidateGroup>(StringComparer.Ordinal);
+        var literalPairs = new Dictionary<PatternPair, CandidateGroup>();
+        var wildcardEntries = new List<WildcardEntry>();
+        var patternMatchers = new Dictionary<string, ArchitectureIgnoreMatcher.CompiledPattern>(StringComparer.Ordinal);
 
         for (int index = 0; index < ignoredViolations.Count; index++)
         {
@@ -294,15 +360,11 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                 continue;
             }
 
-            AddFallbackPattern(literalPairs, wildcardEntries, entry);
+            AddFallbackPattern(literalPairs, wildcardEntries, patternMatchers, entry);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return new LiveIdentityIndex(
-            Freeze(identities),
-            Freeze(waiverFingerprints, StringComparer.Ordinal),
-            Freeze(literalPairs),
-            wildcardEntries.ToArray());
+        return new LiveIdentityIndex(identities, waiverFingerprints, literalPairs, wildcardEntries.ToArray());
     }
 
     private static MissingIdentityIndex BuildMissingIdentityIndex(
@@ -310,8 +372,9 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         CancellationToken cancellationToken,
         ArchitectureIgnoreMatcherWorkCounter? workCounter)
     {
-        var literalPairs = new Dictionary<PatternPair, List<IgnoreEntry>>();
-        var wildcardEntries = new List<IgnoreEntry>();
+        var literalPairs = new Dictionary<PatternPair, CandidateGroup>();
+        var wildcardEntries = new List<WildcardEntry>();
+        var patternMatchers = new Dictionary<string, ArchitectureIgnoreMatcher.CompiledPattern>(StringComparer.Ordinal);
         for (int index = 0; index < ignoredViolations.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -327,111 +390,34 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                 workCounter.VersionedFallbackEntriesProcessed++;
             }
 
-            AddFallbackPattern(literalPairs, wildcardEntries, entry);
+            AddFallbackPattern(literalPairs, wildcardEntries, patternMatchers, entry);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return new MissingIdentityIndex(Freeze(literalPairs), wildcardEntries.ToArray());
+        return new MissingIdentityIndex(literalPairs, wildcardEntries.ToArray());
     }
 
-    private bool IsIgnoredWithoutIdentityOrdered(
-        string sourceType,
-        string forbiddenReference,
-        ArchitectureIgnoreUsageTracker? usageTracker,
-        out bool matchedByLoadedBaseline)
+    private static void Add<TKey>(Dictionary<TKey, CandidateGroup> table, TKey key, IgnoreEntry entry)
+        where TKey : notnull
     {
-        matchedByLoadedBaseline = false;
-        bool anyMatched = false;
-        long entriesScanned = 0;
-        try
+        if (table.TryGetValue(key, out CandidateGroup group))
         {
-            for (int index = 0; index < _ignoredViolations.Count; index++)
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-                ArchitectureIgnoredViolation ignore = _ignoredViolations[index];
-                entriesScanned++;
-                if (ignore.WaiverValidationError is not null || ignore.HasStructuredWaiverFields)
-                {
-                    continue;
-                }
-
-                if (!ArchitectureIgnoreMatcher.MatchesPattern(sourceType, ignore.SourceType)
-                    || !ArchitectureIgnoreMatcher.MatchesPattern(forbiddenReference, ignore.ForbiddenReference))
-                {
-                    continue;
-                }
-
-                if (usageTracker is null)
-                {
-                    matchedByLoadedBaseline = ignore.IsFromLoadedBaseline;
-                    return true;
-                }
-
-                usageTracker.MarkMatched(index);
-                matchedByLoadedBaseline |= ignore.IsFromLoadedBaseline;
-                anyMatched = true;
-            }
-
-            return anyMatched;
-        }
-        finally
-        {
-            RecordMissingIdentityScanWork(entriesScanned);
-        }
-    }
-
-    private void RecordMissingIdentityScanWork(long entriesScanned)
-    {
-        if (entriesScanned == 0)
-        {
+            group.Add(entry);
+            table[key] = group;
             return;
         }
 
-        if (_workCounter is not null)
-        {
-            _workCounter.MissingIdentityEntriesScanned += entriesScanned;
-        }
-
-        long totalEntriesScanned = Interlocked.Add(ref _missingIdentityScanWork, entriesScanned);
-        long indexThreshold = _ignoredViolations.Count * MissingIdentityIndexScanMultiplier;
-        if (totalEntriesScanned >= indexThreshold)
-        {
-            Interlocked.Exchange(ref _missingIdentityIndexRequested, 1);
-        }
-    }
-
-    private static void Add<TKey>(Dictionary<TKey, List<IgnoreEntry>> table, TKey key, IgnoreEntry entry)
-        where TKey : notnull
-    {
-        if (!table.TryGetValue(key, out List<IgnoreEntry>? entries))
-        {
-            entries = new List<IgnoreEntry>();
-            table.Add(key, entries);
-        }
-
-        entries.Add(entry);
-    }
-
-    private static Dictionary<TKey, IgnoreEntry[]> Freeze<TKey>(
-        Dictionary<TKey, List<IgnoreEntry>> table,
-        IEqualityComparer<TKey>? comparer = null)
-        where TKey : notnull
-    {
-        var frozen = new Dictionary<TKey, IgnoreEntry[]>(table.Count, comparer);
-        foreach ((TKey key, List<IgnoreEntry> entries) in table)
-        {
-            frozen.Add(key, entries.ToArray());
-        }
-
-        return frozen;
+        group = default;
+        group.Add(entry);
+        table.Add(key, group);
     }
 
     private bool TryPeekExact(
-        IgnoreEntry[]? identityCandidates,
+        CandidateGroup identityCandidates,
         int identityPosition,
-        IgnoreEntry[]? waiverCandidates,
+        CandidateGroup waiverCandidates,
         int waiverPosition,
-        IgnoreEntry[]? literalCandidates,
+        CandidateGroup literalCandidates,
         int literalPosition,
         out IgnoreEntry entry,
         out ExactSource source)
@@ -449,7 +435,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     }
 
     private static void Consider(
-        IgnoreEntry[]? candidates,
+        CandidateGroup candidates,
         int position,
         ExactSource candidateSource,
         ref int minimumIndex,
@@ -457,7 +443,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         ref ExactSource source,
         ref bool found)
     {
-        if (candidates is null || position >= candidates.Length)
+        if (position >= candidates.Count)
         {
             return;
         }
@@ -475,9 +461,9 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     }
 
     private static bool TryPeekWildcard(
-        IgnoreEntry[] wildcardEntries,
+        WildcardEntry[] wildcardEntries,
         int wildcardPosition,
-        out IgnoreEntry entry)
+        out WildcardEntry entry)
     {
         if (wildcardPosition >= wildcardEntries.Length)
         {
@@ -579,14 +565,52 @@ internal sealed class ArchitectureIgnoreMatcherIndex
     private readonly record struct PatternPair(string SourceType, string ForbiddenReference);
 
     private sealed record LiveIdentityIndex(
-        Dictionary<IdentityKey, IgnoreEntry[]> Identities,
-        Dictionary<string, IgnoreEntry[]> WaiverFingerprints,
-        Dictionary<PatternPair, IgnoreEntry[]> LiteralPairs,
-        IgnoreEntry[] Wildcards);
+        Dictionary<IdentityKey, CandidateGroup> Identities,
+        Dictionary<string, CandidateGroup> WaiverFingerprints,
+        Dictionary<PatternPair, CandidateGroup> LiteralPairs,
+        WildcardEntry[] Wildcards);
 
     private sealed record MissingIdentityIndex(
-        Dictionary<PatternPair, IgnoreEntry[]> LiteralPairs,
-        IgnoreEntry[] Wildcards);
+        Dictionary<PatternPair, CandidateGroup> LiteralPairs,
+        WildcardEntry[] Wildcards);
+
+    private struct CandidateGroup
+    {
+        private IgnoreEntry _first;
+        private IgnoreEntry[]? _remaining;
+
+        internal int Count { get; private set; }
+
+        internal IgnoreEntry this[int position] => position == 0 ? _first : _remaining![position - 1];
+
+        internal void Add(IgnoreEntry entry)
+        {
+            if (Count == 0)
+            {
+                _first = entry;
+                Count = 1;
+                return;
+            }
+
+            int remainingCount = Count - 1;
+            if (_remaining is null)
+            {
+                _remaining = new IgnoreEntry[4];
+            }
+            else if (remainingCount == _remaining.Length)
+            {
+                Array.Resize(ref _remaining, _remaining.Length * 2);
+            }
+
+            _remaining[remainingCount] = entry;
+            Count++;
+        }
+    }
+
+    private readonly record struct WildcardEntry(
+        IgnoreEntry Entry,
+        ArchitectureIgnoreMatcher.CompiledPattern SourceMatcher,
+        ArchitectureIgnoreMatcher.CompiledPattern ForbiddenMatcher);
 
     private readonly record struct IgnoreEntry(
         int Index,
@@ -610,6 +634,12 @@ internal sealed class ArchitectureIgnoreMatcherWorkCounter
     internal long VersionedFallbackEntriesProcessed { get; set; }
 
     internal long MissingIdentityEntriesScanned { get; set; }
+
+    internal long OrderedLiveEntriesScanned { get; set; }
+
+    internal long OrderedLiveQueries { get; set; }
+
+    internal long OrderedLiveMatches { get; set; }
 
     internal long VersionedIdentityEntriesIndexed { get; set; }
 
