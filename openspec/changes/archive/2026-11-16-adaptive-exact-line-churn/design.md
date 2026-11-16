@@ -32,16 +32,16 @@ Alternatives rejected: a full Myers trace can consume `O(D²)` memory on dense i
 
 Keep prefix/suffix trimming, byte equality, NUL and exact-rename routing, and the existing string-based line symbol table. This isolates the algorithm change and makes before/after allocations comparable. Any later line-copy or hex-string optimization needs its own materiality evidence.
 
-### Use the shared workload catalog and an issue-specific effect gate
+### Use the shared workload catalog and keep timing evidence informative
 
-Run the existing `line_churn_sparse_edits` and `line_churn_dense_edits` 1k/5k/10k catalog cases. Capture deterministic baseline DP cell counts, exact result parity, direct calculator time/allocated bytes, and the direct-to-integrated History ingestion phase share. Keep deterministic work assertions in ordinary NUnit tests; keep timing and memory observations environment-labelled in the existing #502 evidence area.
+Run the existing `line_churn_sparse_edits` and `line_churn_dense_edits` 1k/5k/10k catalog cases. Capture deterministic baseline DP cell counts, exact result parity, direct calculator time/allocated bytes, and complete `HistoryIngestionService.Ingest` call timings. Keep deterministic work and result assertions in NUnit tests; timing and allocation observations are informational and belong in the existing #502 evidence area. Do not fail tests on elapsed-time comparisons against saved results because CI hosts and local machines are not guaranteed to match.
 
-Success requires exhaustive small-input parity, the large sparse case to reduce deterministic work below 5% of its baseline DP cells and improve median direct time by at least 2x, and the large dense fallback to stay within 1.25x baseline median time and 5% of baseline allocated bytes. If semantic parity fails, sparse work exceeds the bound, or the dense regression gate fails, stop and reassess the algorithm/cutoff. Report peak temporary/retained memory as not measured unless the runner provides a reliable per-workload measurement; report the frontier and DP array bounds from the implementation separately.
+Success requires exhaustive small-input parity, the large sparse case to reduce deterministic work below 5% of its baseline DP cells, and dense cases to use the exact fallback with the expected DP-cell count. Compare timing medians only from explicitly paired captures on the same host, and report the environment and sample spread so readers can judge the evidence. Report peak temporary/retained memory as not measured unless the runner provides a reliable per-workload measurement; report the frontier and DP array bounds from the implementation separately.
 
 ## Risks / Trade-offs
 
 - **Risk:** Diagonal parity or repeated-line tie cases can produce an incorrect distance. → **Mitigation:** Compare all short sequences over a repeated-symbol alphabet against a test-only quadratic LCS oracle, plus seeded random and named edge cases.
-- **Risk:** Dense inputs pay for a fast-path attempt before fallback. → **Mitigation:** Stop at `K = 32`, test dense scale cases, and enforce the dense time/allocation kill criteria.
+- **Risk:** Dense inputs pay for a fast-path attempt before fallback. → **Mitigation:** Stop at `K = 32`, test dense scale cases, and record environment-labelled timings without making them hardware-sensitive test assertions.
 - **Risk:** An input with small but greater-than-32 distance gets no fast-path benefit. → **Mitigation:** Keep the cutoff explicit and bounded; only raise it with measured sparse/dense evidence.
 - **Risk:** Extra line-symbol allocations dominate the sparse run and hide the DP improvement. → **Mitigation:** Keep symbolization stable for this change and report allocation results independently from operation counts.
 

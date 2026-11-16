@@ -1,15 +1,15 @@
 {
   "schema": "issue-1138-line-churn-current/v1",
   "phase": "post-change measurement",
-  "capturedUtc": "2026-11-16T15:13:41.481195+00:00",
-  "sourceRevision": "726fdf0ca1b7935e28e61571ca14595f9e3b5a36",
+  "capturedUtc": "2026-11-16T15:56:34.054314+00:00",
+  "sourceRevision": "9653e4852b6270eac914248e92018f1627e9c320",
   "calculatorBlob": "51cc3fd812269fa02dde9a1cf8841e007fb0bad0",
   "runtime": ".NET 10.0.14",
   "operatingSystem": "macOS 15.8.1",
   "architecture": "X64",
   "processorCount": 6,
   "configuration": "Release",
-  "sampleCount": 5,
+  "sampleCount": 7,
   "workloadCatalog": "docs/internal/large-solution-benchmarking/workload-catalog.json",
   "baselineRevision": "190da651d7c12f5bc3bc2a34239a5c79698ef68d",
   "measurements": [
@@ -28,7 +28,25 @@
         "additions": 500,
         "deletions": 500,
         "outputDigest": "D3A8B400663F6D95BDA450F03BF89DA092B2B5BFE1474E348D3C9F25FBB430F0",
-        "medianMilliseconds": 4.044,
+        "elapsedMillisecondsSamples": [
+          2.7746,
+          2.8965,
+          7.9401,
+          2.9283,
+          15.3222,
+          5.0798,
+          9.5117
+        ],
+        "allocatedBytesSamples": [
+          379544,
+          379544,
+          379544,
+          379544,
+          379544,
+          379544,
+          379544
+        ],
+        "medianMilliseconds": 5.0798,
         "medianAllocatedBytes": 379544
       },
       "work": {
@@ -43,7 +61,7 @@
       "fastPathWork": 1138,
       "totalAlgorithmWork": 997142,
       "baselineDpCellUpdates": 996004,
-      "directTimeRatio": 1.4814814814814814,
+      "directTimeRatio": 1.8337966138406556,
       "allocationRatio": 1.0007804919208538,
       "frontierBytes": 268,
       "dynamicProgrammingRowBytes": 7992
@@ -63,7 +81,25 @@
         "additions": 2500,
         "deletions": 2500,
         "outputDigest": "021ED8060BB9A9066E63A2214FD3DB1A140AD79B066282680E2C2BAE7C570DF9",
-        "medianMilliseconds": 66.6368,
+        "elapsedMillisecondsSamples": [
+          61.2389,
+          61.5869,
+          93.8647,
+          80.2898,
+          96.1719,
+          145.19,
+          172.0934
+        ],
+        "allocatedBytesSamples": [
+          1934272,
+          1934272,
+          1934272,
+          1934272,
+          1934272,
+          1934272,
+          1934272
+        ],
+        "medianMilliseconds": 93.8647,
         "medianAllocatedBytes": 1934272
       },
       "work": {
@@ -78,7 +114,7 @@
       "fastPathWork": 1138,
       "totalAlgorithmWork": 24981142,
       "baselineDpCellUpdates": 24980004,
-      "directTimeRatio": 1.192901679343944,
+      "directTimeRatio": 1.394710291899763,
       "allocationRatio": 1.0001530525714901,
       "frontierBytes": 268,
       "dynamicProgrammingRowBytes": 39992
@@ -98,7 +134,25 @@
         "additions": 5000,
         "deletions": 5000,
         "outputDigest": "C11DEC1E40086086C441391801B9CE1C41EAB0019F3F8BC68C2A7BCB67A0116A",
-        "medianMilliseconds": 245.1101,
+        "elapsedMillisecondsSamples": [
+          284.8486,
+          231.2443,
+          218.9455,
+          221.1582,
+          215.5559,
+          216.6548,
+          236.2415
+        ],
+        "allocatedBytesSamples": [
+          3907048,
+          3907048,
+          3907048,
+          3907048,
+          3907048,
+          3907048,
+          3907048
+        ],
+        "medianMilliseconds": 221.1582,
         "medianAllocatedBytes": 3907048
       },
       "work": {
@@ -113,7 +167,7 @@
       "fastPathWork": 1138,
       "totalAlgorithmWork": 99961142,
       "baselineDpCellUpdates": 99960004,
-      "directTimeRatio": 1.071231559602555,
+      "directTimeRatio": 0.9802633736830207,
       "allocationRatio": 1.0000757662631259,
       "frontierBytes": 268,
       "dynamicProgrammingRowBytes": 79992
@@ -133,7 +187,25 @@
         "additions": 4,
         "deletions": 4,
         "outputDigest": "1E5040B4DB14CA674E235DE801FD4C74B1F0448E6EB1F838D1E9D4E443D99074",
-        "medianMilliseconds": 0.2438,
+        "elapsedMillisecondsSamples": [
+          0.3657,
+          0.3465,
+          0.3657,
+          0.3422,
+          0.3713,
+          0.2335,
+          0.2424
+        ],
+        "allocatedBytesSamples": [
+          253072,
+          253072,
+          253072,
+          253072,
+          253072,
+          253072,
+          253072
+        ],
+        "medianMilliseconds": 0.3465,
         "medianAllocatedBytes": 253072
       },
       "work": {
@@ -148,7 +220,7 @@
       "fastPathWork": 675,
       "totalAlgorithmWork": 675,
       "baselineDpCellUpdates": 361201,
-      "directTimeRatio": 0.2106627495031539,
+      "directTimeRatio": 0.3360488798370672,
       "allocationRatio": 0.9822698338767272,
       "frontierBytes": 268,
       "dynamicProgrammingRowBytes": 0
@@ -168,7 +240,25 @@
         "additions": 8,
         "deletions": 8,
         "outputDigest": "19E16BD832F1AECB14BD2A2DDBFEAE837F707AADCD17BE484B704AA7928DE2F8",
-        "medianMilliseconds": 0.9006,
+        "elapsedMillisecondsSamples": [
+          0.9124,
+          1.6926,
+          1.4135,
+          1.4551,
+          0.9612,
+          0.8722,
+          0.9815
+        ],
+        "allocatedBytesSamples": [
+          1470088,
+          1470088,
+          1470088,
+          1470088,
+          1470088,
+          1470088,
+          1470088
+        ],
+        "medianMilliseconds": 0.9815,
         "medianAllocatedBytes": 1470088
       },
       "work": {
@@ -183,7 +273,7 @@
       "fastPathWork": 4168,
       "totalAlgorithmWork": 4168,
       "baselineDpCellUpdates": 15132100,
-      "directTimeRatio": 0.023271257697008534,
+      "directTimeRatio": 0.02907855208660461,
       "allocationRatio": 0.9794213898156933,
       "frontierBytes": 268,
       "dynamicProgrammingRowBytes": 0
@@ -203,7 +293,25 @@
         "additions": 16,
         "deletions": 16,
         "outputDigest": "B78A8FA258AECC2E108A37B2A3ADA33C924544E96ABCF587E6E913EA875A0D20",
-        "medianMilliseconds": 2.4171,
+        "elapsedMillisecondsSamples": [
+          2.4805,
+          1.749,
+          1.7336,
+          2.7201,
+          1.7737,
+          1.851,
+          2.9317
+        ],
+        "allocatedBytesSamples": [
+          3608680,
+          3608680,
+          3608680,
+          3608680,
+          3608680,
+          3608680,
+          3608680
+        ],
+        "medianMilliseconds": 1.851,
         "medianAllocatedBytes": 3608680
       },
       "work": {
@@ -218,7 +326,7 @@
       "fastPathWork": 9894,
       "totalAlgorithmWork": 9894,
       "baselineDpCellUpdates": 77862976,
-      "directTimeRatio": 0.014542691291352,
+      "directTimeRatio": 0.008067890580051258,
       "allocationRatio": 0.9808754457684613,
       "frontierBytes": 268,
       "dynamicProgrammingRowBytes": 0
@@ -227,21 +335,59 @@
   "ingestionMeasurements": [
     {
       "workloadId": "synthetic-history-line-sparse-large",
-      "directCalculatorMedianMilliseconds": 2.4171,
-      "ingestionPhaseMedianMilliseconds": 6.509,
-      "directToIngestionShare": 0.3713473651866646,
-      "endToEndAmdahlUpperBound": 1.5907035851316014
+      "directCalculatorMedianMilliseconds": 1.851,
+      "fullIngestionCallSamplesMilliseconds": [
+        2.9559,
+        3.0002,
+        3.2001,
+        3.9067,
+        4.0212,
+        4.1302,
+        5.8796
+      ],
+      "fullIngestionCallMedianMilliseconds": 3.9067,
+      "ingestionPhaseSamplesMilliseconds": [
+        2.785,
+        2.809,
+        3.005,
+        3.716,
+        3.831,
+        3.921,
+        5.503
+      ],
+      "ingestionPhaseMedianMilliseconds": 3.716,
+      "directToIngestionShare": 0.4981162540365985,
+      "endToEndAmdahlUpperBound": 1.992493297587131
     },
     {
       "workloadId": "synthetic-history-line-dense-large",
-      "directCalculatorMedianMilliseconds": 245.1101,
-      "ingestionPhaseMedianMilliseconds": 253.563,
-      "directToIngestionShare": 0.9666635116322176,
-      "endToEndAmdahlUpperBound": 29.997160737734987
+      "directCalculatorMedianMilliseconds": 221.1582,
+      "fullIngestionCallSamplesMilliseconds": [
+        250.0127,
+        251.037,
+        251.1395,
+        255.9955,
+        262.0448,
+        264.3849,
+        337.2217
+      ],
+      "fullIngestionCallMedianMilliseconds": 255.9955,
+      "ingestionPhaseSamplesMilliseconds": [
+        249.778,
+        250.789,
+        250.9,
+        254.764,
+        261.801,
+        264.087,
+        336.986
+      ],
+      "ingestionPhaseMedianMilliseconds": 254.764,
+      "directToIngestionShare": 0.8680904680410104,
+      "endToEndAmdahlUpperBound": 7.580953287825311
     }
   ],
   "memoryNotes": {
-    "allocatedBytes": "Measured per uninstrumented Compute call with GC.GetAllocatedBytesForCurrentThread; median of five warmed samples.",
+    "allocatedBytes": "Measured per uninstrumented Compute call with GC.GetAllocatedBytesForCurrentThread; median of seven warmed samples.",
     "retainedMemory": "No persistent calculator state is retained after Compute returns; peak temporary/working-set memory is not measured by this in-process harness.",
     "boundedSearchBytes": "The fixed Myers frontier uses FrontierArrayLength \u00D7 sizeof(int); it is discarded before fallback.",
     "fallbackBytes": "The exact dense fallback uses two rows of DynamicProgrammingRowLength integers plus the fixed frontier during the bounded attempt."

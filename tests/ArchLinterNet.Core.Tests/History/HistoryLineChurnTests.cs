@@ -140,10 +140,44 @@ public sealed class HistoryLineChurnTests
             Assert.That((additions, deletions), Is.EqualTo((16L, 16L)));
             Assert.That(work.UsedMyers, Is.True);
             Assert.That(work.UsedFallback, Is.False);
+            Assert.That(work.FrontierSteps, Is.EqualTo(545));
             Assert.That(work.DynamicProgrammingCells, Is.Zero);
             Assert.That(work.FrontierArrayLength, Is.EqualTo(67));
             Assert.That(measuredWork, Is.LessThan((long)(baselineCells * 0.05)));
             Assert.That(measuredWork, Is.LessThanOrEqualTo(4L * (2 * reducedLength) * 33));
+        });
+    }
+
+    [Test]
+    public void DistanceJustAboveTheMyersBoundUsesExactFallback()
+    {
+        const int LineCount = 128;
+        const int EditCount = 17;
+        string[] oldLines = Enumerable.Range(0, LineCount).Select(static line => $"line-{line:000000}").ToArray();
+        string[] newLines = [.. oldLines];
+        for (int edit = 0; edit < EditCount; edit++)
+        {
+            int line = (int)((long)(edit + 1) * LineCount / (EditCount + 1));
+            newLines[line] = $"edited-{edit:000000}";
+        }
+
+        (long additions, long deletions) = LineChurnCalculator.ComputeWithWork(
+            EncodeLines(oldLines),
+            EncodeLines(newLines),
+            out LineChurnCalculator.WorkCounts work);
+        int firstEditIndex = LineCount / (EditCount + 1);
+        int lastEditIndex = EditCount * LineCount / (EditCount + 1);
+        int reducedLength = lastEditIndex - firstEditIndex + 1;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That((additions, deletions), Is.EqualTo((17L, 17L)));
+            Assert.That(work.UsedMyers, Is.False);
+            Assert.That(work.UsedFallback, Is.True);
+            Assert.That(work.FrontierSteps, Is.EqualTo(561));
+            Assert.That(work.FrontierArrayLength, Is.EqualTo(67));
+            Assert.That(work.DynamicProgrammingCells, Is.EqualTo((long)reducedLength * reducedLength));
+            Assert.That(work.DynamicProgrammingRowLength, Is.EqualTo(reducedLength + 1));
         });
     }
 
