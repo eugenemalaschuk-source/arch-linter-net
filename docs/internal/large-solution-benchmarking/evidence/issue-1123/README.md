@@ -1,13 +1,13 @@
 # Issue #1123 audited hot-path baseline
 
-Captured on 2026-11-16 from source revision `ebe7e5d9eafa2f25f67e4a64efd74ba843e65c84`.
+Captured on 2026-11-16 from source revision `b39285657fca545af7706206a6e4cb0c45da8dc7`.
 The run used .NET 10.0.14 on macOS 15.8.1 (x64), runner label `local-x64-6cpu`, and
-`ArchLinterNet.Core.Tests/0.1.0.0`. Each linked document is `benchmark-evidence/v1`, records its
-source/configuration input SHA-256 and exact loaded-DLL inventory with per-file SHA-256 values, and
-passed validation against the repository evidence schema. Each sample keeps the complete raw
-`analysis-profile/v1` as a lossless gzip/base64 payload with a SHA-256 digest; the evidence
-reader verifies and restores it. The matrix keeps each JSON file below 96 KiB, under 300 lines,
-and with lines shorter than 8 KiB so GitHub returns complete review patches.
+`ArchLinterNet.Core.Tests/0.1.0.0`. Each linked file is a `benchmark-evidence-archive/v1` envelope;
+its gzip/base64 chunks restore the complete `benchmark-evidence/v1` JSON payload, including all raw
+`analysis-profile/v1` samples. The payload SHA-256 is checked on restore, and the matrix validates
+both schemas before writing each archive. Files stay below 96 KiB, under 300 lines, and with lines
+shorter than 8 KiB so GitHub returns complete review patches. See the [archive schema](../../benchmark-evidence-archive-v1.schema.json)
+and [evidence schema](../../benchmark-evidence-v1.schema.json).
 
 ## Matrix
 
@@ -25,21 +25,22 @@ referenced.
 
 | Family | Scale values | Evidence files (small / medium / large) |
 |---|---:|---|
-| Projects | 2 / 8 / 24 projects | [small](ebe7e5d9eafa/synthetic-audit-projects-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-projects-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-projects-large.json) |
-| Source files | 1 / 8 / 24 files per project | [small](ebe7e5d9eafa/synthetic-audit-files-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-files-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-files-large.json) |
-| Contracts | 1 / 8 / 32 contracts | [small](ebe7e5d9eafa/synthetic-audit-contracts-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-contracts-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-contracts-large.json) |
-| Ignore rules | 1 / 16 / 64 rules | [small](ebe7e5d9eafa/synthetic-audit-ignores-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-ignores-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-ignores-large.json) |
-| Finding candidates | 1 / 16 / 64 findings | [small](ebe7e5d9eafa/synthetic-audit-findings-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-findings-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-findings-large.json) |
-| Metric rules | 1 / 8 / 32 rules | [small](ebe7e5d9eafa/synthetic-audit-metrics-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-metrics-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-metrics-large.json) |
-| Report rules | 1 / 8 / 32 rules | [small](ebe7e5d9eafa/synthetic-audit-reports-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-reports-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-reports-large.json) |
-| Method-body rules | 1 / 4 / 16 rules | [small](ebe7e5d9eafa/synthetic-audit-method-bodies-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-method-bodies-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-method-bodies-large.json) |
-| Dense DAG | 4 / 8 / 12 layers | [small](ebe7e5d9eafa/synthetic-audit-dense-dag-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-dense-dag-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-dense-dag-large.json) |
-| Layered DAG | 4 / 8 / 12 layers | [small](ebe7e5d9eafa/synthetic-audit-layered-dag-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-layered-dag-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-layered-dag-large.json) |
-| SCC with acyclic tail | 4 / 8 / 12 layers | [small](ebe7e5d9eafa/synthetic-audit-scc-tail-small.json) · [medium](ebe7e5d9eafa/synthetic-audit-scc-tail-medium.json) · [large](ebe7e5d9eafa/synthetic-audit-scc-tail-large.json) |
+| Projects | 2 / 8 / 24 projects | [small](b39285657fca/synthetic-audit-projects-small.json) · [medium](b39285657fca/synthetic-audit-projects-medium.json) · [large](b39285657fca/synthetic-audit-projects-large.json) |
+| Source files | 1 / 8 / 24 files per project | [small](b39285657fca/synthetic-audit-files-small.json) · [medium](b39285657fca/synthetic-audit-files-medium.json) · [large](b39285657fca/synthetic-audit-files-large.json) |
+| Contracts | 1 / 8 / 32 contracts | [small](b39285657fca/synthetic-audit-contracts-small.json) · [medium](b39285657fca/synthetic-audit-contracts-medium.json) · [large](b39285657fca/synthetic-audit-contracts-large.json) |
+| Ignore rules | 1 / 16 / 64 rules | [small](b39285657fca/synthetic-audit-ignores-small.json) · [medium](b39285657fca/synthetic-audit-ignores-medium.json) · [large](b39285657fca/synthetic-audit-ignores-large.json) |
+| Finding candidates | 1 / 16 / 64 findings | [small](b39285657fca/synthetic-audit-findings-small.json) · [medium](b39285657fca/synthetic-audit-findings-medium.json) · [large](b39285657fca/synthetic-audit-findings-large.json) |
+| Metric rules | 1 / 8 / 32 rules | [small](b39285657fca/synthetic-audit-metrics-small.json) · [medium](b39285657fca/synthetic-audit-metrics-medium.json) · [large](b39285657fca/synthetic-audit-metrics-large.json) |
+| Report rules | 1 / 8 / 32 rules | [small](b39285657fca/synthetic-audit-reports-small.json) · [medium](b39285657fca/synthetic-audit-reports-medium.json) · [large](b39285657fca/synthetic-audit-reports-large.json) |
+| Method-body rules | 1 / 4 / 16 rules | [small](b39285657fca/synthetic-audit-method-bodies-small.json) · [medium](b39285657fca/synthetic-audit-method-bodies-medium.json) · [large](b39285657fca/synthetic-audit-method-bodies-large.json) |
+| Dense DAG | 4 / 8 / 12 layers | [small](b39285657fca/synthetic-audit-dense-dag-small.json) · [medium](b39285657fca/synthetic-audit-dense-dag-medium.json) · [large](b39285657fca/synthetic-audit-dense-dag-large.json) |
+| Layered DAG | 4 / 8 / 12 layers | [small](b39285657fca/synthetic-audit-layered-dag-small.json) · [medium](b39285657fca/synthetic-audit-layered-dag-medium.json) · [large](b39285657fca/synthetic-audit-layered-dag-large.json) |
+| SCC with acyclic tail | 4 / 8 / 12 layers | [small](b39285657fca/synthetic-audit-scc-tail-small.json) · [medium](b39285657fca/synthetic-audit-scc-tail-medium.json) · [large](b39285657fca/synthetic-audit-scc-tail-large.json) |
 
 This run supersedes the earlier matrices in `0356a573b27b/`, `0d089308ccec/`,
-`4a5c95c8f750/`, `e2695484fc06/`, and `18f7c65dfc4b/`. Their generated directories were
-removed from the current tree; prior source-revision snapshots remain available in Git history.
+`4a5c95c8f750/`, `e2695484fc06/`, `18f7c65dfc4b/`, and `ebe7e5d9eafa/`. Their generated
+directories were removed from the current tree; prior source-revision snapshots remain available
+in Git history.
 
 The canonical dimensions and selection rules remain in the
 [`workload-catalog.json`](../../workload-catalog.json). Project-reference SCCs remain structural-only
