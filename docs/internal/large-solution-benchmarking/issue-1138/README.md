@@ -60,12 +60,12 @@ The same six catalog inputs were rerun from the current branch on this machine. 
 
 | Workload | Frontier steps + line comparisons | Fallback DP cells | Current / baseline median ms (range) | Median ratio | Current allocated bytes (% baseline) |
 |---|---:|---:|---:|---:|---:|
-| Sparse small | 41 + 634 | 0 | 0.347 (0.234–0.371) / 1.031 (0.981–2.391) | 2.98x faster | 253,072 (98.2%) |
-| Sparse medium | 145 + 4,023 | 0 | 0.982 (0.872–1.693) / 33.753 (31.393–40.833) | 34.4x faster | 1,470,088 (97.9%) |
-| Sparse large | 545 + 9,349 | 0 | 1.851 (1.734–2.932) / 229.428 (211.996–282.311) | 124.0x faster | 3,608,680 (98.1%) |
-| Dense small | 561 + 577 | 996,004 | 5.080 (2.775–15.322) / 2.770 (2.663–4.733) | 1.83x slower by median | 379,544 (100.1%) |
-| Dense medium | 561 + 577 | 24,980,004 | 93.865 (61.239–172.093) / 67.301 (54.718–192.540) | 1.40x slower by median | 1,934,272 (100.0%) |
-| Dense large | 561 + 577 | 99,960,004 | 221.158 (215.556–284.849) / 225.611 (201.544–336.003) | 0.98x | 3,907,048 (100.0%) |
+| Sparse small | 41 + 634 | 0 | 0.332 (0.231–1.856) / 1.031 (0.981–2.391) | 3.11x faster | 253,072 (98.2%) |
+| Sparse medium | 145 + 4,023 | 0 | 0.889 (0.856–1.662) / 33.753 (31.393–40.833) | 37.96x faster | 1,470,088 (97.9%) |
+| Sparse large | 545 + 9,349 | 0 | 1.830 (1.638–6.055) / 229.428 (211.996–282.311) | 125.4x faster | 3,608,680 (98.1%) |
+| Dense small | 561 + 577 | 996,004 | 2.810 (2.741–4.649) / 2.770 (2.663–4.733) | 1.01x slower by median | 379,544 (100.1%) |
+| Dense medium | 561 + 577 | 24,980,004 | 61.544 (56.233–93.787) / 67.301 (54.718–192.540) | 0.91x | 1,934,272 (100.0%) |
+| Dense large | 561 + 577 | 99,960,004 | 274.143 (216.565–481.154) / 225.611 (201.544–336.003) | 1.22x slower by median | 3,907,048 (100.0%) |
 
 The 10k sparse case performs 9,894 bounded-search steps/comparisons, 0.0127% of its 77,862,976 baseline DP cells. Sparse direct sample ranges do not overlap. Dense ranges overlap substantially, including the 10k case, so the dense median differences are not reliable regression or improvement estimates. Direct timings are environmental observations and are not asserted in tests.
 
@@ -75,8 +75,8 @@ The additional comparison wrapped the entire `HistoryIngestionService.Ingest` ca
 
 | Workload | Main median (range) | Current median (range) | Median comparison |
 |---|---:|---:|---:|
-| Sparse 10k / 16 edits | 211.206 ms (206.400–363.030) | 3.907 ms (2.956–5.880) | 54.1x faster |
-| Dense 10k / 5,000 edits | 295.749 ms (262.093–404.868) | 255.996 ms (250.013–337.222) | 13.4% lower median |
+| Sparse 10k / 16 edits | 211.206 ms (206.400–363.030) | 3.966 ms (3.085–4.855) | 53.3x faster |
+| Dense 10k / 5,000 edits | 295.749 ms (262.093–404.868) | 264.049 ms (250.072–327.466) | 10.7% lower median |
 
 The dense sample ranges overlap substantially, so its lower median does not establish a reliable improvement. The sparse call is faster in all seven samples. This is the Core History ingestion service, not the full CLI path through policy loading and report rendering.
 
