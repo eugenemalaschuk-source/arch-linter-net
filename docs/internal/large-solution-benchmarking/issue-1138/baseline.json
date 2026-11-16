@@ -1,0 +1,133 @@
+{
+  "schema": "issue-1138-line-churn-baseline/v1",
+  "phase": "pre-change baseline",
+  "capturedUtc": "2026-11-16T14:32:23.112222+00:00",
+  "sourceRevision": "190da651d7c12f5bc3bc2a34239a5c79698ef68d",
+  "calculatorBlob": "27d5bfeabe7267541143975ed5fe2dde35316b7b",
+  "runtime": ".NET 10.0.14",
+  "operatingSystem": "macOS 15.8.1",
+  "architecture": "X64",
+  "processorCount": 6,
+  "configuration": "Release",
+  "sampleCount": 5,
+  "workloadCatalog": "docs/internal/large-solution-benchmarking/workload-catalog.json",
+  "measurements": [
+    {
+      "workloadId": "synthetic-history-line-dense-small",
+      "family": "line_churn_dense_edits",
+      "inputSha256": "ef30cc99a8c73cf5e1fbd7aa60b9438d8072ad8ab908035cc00175fbb961d491",
+      "expectedOutputSha256": "ac98a233a475395adf020985d37e8c9024bb06aaecc2eb712b50ff001719ec5f",
+      "lineCount": 1000,
+      "editCount": 500,
+      "reducedOldLineCount": 998,
+      "reducedNewLineCount": 998,
+      "baselineDpCellUpdates": 996004,
+      "additions": 500,
+      "deletions": 500,
+      "outputDigest": "D3A8B400663F6D95BDA450F03BF89DA092B2B5BFE1474E348D3C9F25FBB430F0",
+      "medianMilliseconds": 2.6049,
+      "medianAllocatedBytes": 379248
+    },
+    {
+      "workloadId": "synthetic-history-line-dense-medium",
+      "family": "line_churn_dense_edits",
+      "inputSha256": "68476e64413a6030db1dbe43cdba16b1ace17d14f3111e7b0ae9250fb431a07f",
+      "expectedOutputSha256": "58880f861f5fb0e0d250dd288e0814ca85bb004f0f6bd6985a933cd9df1d0a29",
+      "lineCount": 5000,
+      "editCount": 2500,
+      "reducedOldLineCount": 4998,
+      "reducedNewLineCount": 4998,
+      "baselineDpCellUpdates": 24980004,
+      "additions": 2500,
+      "deletions": 2500,
+      "outputDigest": "021ED8060BB9A9066E63A2214FD3DB1A140AD79B066282680E2C2BAE7C570DF9",
+      "medianMilliseconds": 50.9467,
+      "medianAllocatedBytes": 1933976
+    },
+    {
+      "workloadId": "synthetic-history-line-dense-large",
+      "family": "line_churn_dense_edits",
+      "inputSha256": "9428f1ccc058c6d8ece9592e5cb0e67a3749083e0c5e9878538133d8d5488355",
+      "expectedOutputSha256": "27dc35f4b7ff54419e908502869c2dd91ff6bbacad26d6f41f3ed01142c670b9",
+      "lineCount": 10000,
+      "editCount": 5000,
+      "reducedOldLineCount": 9998,
+      "reducedNewLineCount": 9998,
+      "baselineDpCellUpdates": 99960004,
+      "additions": 5000,
+      "deletions": 5000,
+      "outputDigest": "C11DEC1E40086086C441391801B9CE1C41EAB0019F3F8BC68C2A7BCB67A0116A",
+      "medianMilliseconds": 197.0591,
+      "medianAllocatedBytes": 3906752
+    },
+    {
+      "workloadId": "synthetic-history-line-sparse-small",
+      "family": "line_churn_sparse_edits",
+      "inputSha256": "c3bef818650280cf0ce0edd56ab3ff72f9920f5329e999ca1dd45bc3a22aa105",
+      "expectedOutputSha256": "33ffe3d3d0ae2cfeb739b76f9ec07675181bfb7d63ba317ae81b4eb631e3799e",
+      "lineCount": 1000,
+      "editCount": 4,
+      "reducedOldLineCount": 601,
+      "reducedNewLineCount": 601,
+      "baselineDpCellUpdates": 361201,
+      "additions": 4,
+      "deletions": 4,
+      "outputDigest": "1E5040B4DB14CA674E235DE801FD4C74B1F0448E6EB1F838D1E9D4E443D99074",
+      "medianMilliseconds": 1.125,
+      "medianAllocatedBytes": 257640
+    },
+    {
+      "workloadId": "synthetic-history-line-sparse-medium",
+      "family": "line_churn_sparse_edits",
+      "inputSha256": "7f55150bd51a59d4d74a98b63d7bb2e32d91fbe06a91a5903667a919b1e0fef5",
+      "expectedOutputSha256": "dfb1ac77b651d915eaf86bbbaa2a3edd07cf380dbbdeb79d735977a6109e8542",
+      "lineCount": 5000,
+      "editCount": 8,
+      "reducedOldLineCount": 3890,
+      "reducedNewLineCount": 3890,
+      "baselineDpCellUpdates": 15132100,
+      "additions": 8,
+      "deletions": 8,
+      "outputDigest": "19E16BD832F1AECB14BD2A2DDBFEAE837F707AADCD17BE484B704AA7928DE2F8",
+      "medianMilliseconds": 31.242,
+      "medianAllocatedBytes": 1500976
+    },
+    {
+      "workloadId": "synthetic-history-line-sparse-large",
+      "family": "line_churn_sparse_edits",
+      "inputSha256": "4393e8cf9900bd7f02037baf2262208c2afbdcf4cc4e48f520ca12dc8ac7849d",
+      "expectedOutputSha256": "e1455000d4e1a6590b66b40bcf94da59087e31cf7f16143cbc3c90c9106b34da",
+      "lineCount": 10000,
+      "editCount": 16,
+      "reducedOldLineCount": 8824,
+      "reducedNewLineCount": 8824,
+      "baselineDpCellUpdates": 77862976,
+      "additions": 16,
+      "deletions": 16,
+      "outputDigest": "B78A8FA258AECC2E108A37B2A3ADA33C924544E96ABCF587E6E913EA875A0D20",
+      "medianMilliseconds": 154.0662,
+      "medianAllocatedBytes": 3679040
+    }
+  ],
+  "ingestionMeasurements": [
+    {
+      "workloadId": "synthetic-history-line-sparse-large",
+      "directCalculatorMedianMilliseconds": 154.0662,
+      "ingestionPhaseMedianMilliseconds": 199.035,
+      "directToIngestionShare": 0.7740658678121939,
+      "endToEndAmdahlUpperBound": 4.426068740993757
+    },
+    {
+      "workloadId": "synthetic-history-line-dense-large",
+      "directCalculatorMedianMilliseconds": 197.0591,
+      "ingestionPhaseMedianMilliseconds": 262.567,
+      "directToIngestionShare": 0.7505097746479946,
+      "endToEndAmdahlUpperBound": 4.0081730600431404
+    }
+  ],
+  "memoryNotes": {
+    "allocatedBytes": "Measured per Compute call with GC.GetAllocatedBytesForCurrentThread; median of five warmed samples.",
+    "retainedMemory": "No persistent calculator state is retained after Compute returns; peak temporary/working-set memory is not measured by this in-process harness.",
+    "deterministicDpStorage": "The existing exact implementation uses two integer rows of min(reducedOldLineCount, reducedNewLineCount) \u002B 1 elements."
+  }
+}
