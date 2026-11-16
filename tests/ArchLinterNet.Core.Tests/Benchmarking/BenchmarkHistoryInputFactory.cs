@@ -18,12 +18,12 @@ internal static class BenchmarkHistoryInputFactory
         using var catalog = JsonDocument.Parse(File.ReadAllText(catalogPath));
         List<BenchmarkHistoryWorkloadInput> workloads = [];
         foreach (JsonElement family in catalog.RootElement.GetProperty("history_workloads").EnumerateArray())
-        foreach (JsonElement workload in family.GetProperty("workloads").EnumerateArray())
-            workloads.Add(Create(
-                family.GetProperty("owner_issue").GetString()!,
-                family.GetProperty("family").GetString()!,
-                family.GetProperty("dimensions").EnumerateArray().Select(item => item.GetString()!).ToArray(),
-                workload));
+            foreach (JsonElement workload in family.GetProperty("workloads").EnumerateArray())
+                workloads.Add(Create(
+                    family.GetProperty("owner_issue").GetString()!,
+                    family.GetProperty("family").GetString()!,
+                    family.GetProperty("dimensions").EnumerateArray().Select(item => item.GetString()!).ToArray(),
+                    workload));
 
         return workloads;
     }
@@ -158,8 +158,8 @@ internal static class BenchmarkHistoryInputFactory
 
         if (family == "co_change_dense_component")
             for (int first = 0; first < vertexCount; first++)
-            for (int second = first + 1; second < vertexCount; second++)
-                records.Add(new BenchmarkHistoryInputRecord("co_change_edge", first, second, null));
+                for (int second = first + 1; second < vertexCount; second++)
+                    records.Add(new BenchmarkHistoryInputRecord("co_change_edge", first, second, null));
         else
             for (int edge = 0; edge < edgeCount; edge++)
                 records.Add(new BenchmarkHistoryInputRecord("co_change_edge", edge * 2, edge * 2 + 1, null));

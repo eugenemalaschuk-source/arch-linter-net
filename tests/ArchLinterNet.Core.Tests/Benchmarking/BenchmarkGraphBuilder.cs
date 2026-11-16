@@ -42,8 +42,8 @@ internal static class BenchmarkGraphBuilder
         {
             case BenchmarkContractLayerGraphShape.DenseDag:
                 for (int from = 0; from < layers.Length; from++)
-                for (int to = from + 1; to < layers.Length; to++)
-                    edges.Add(new BenchmarkContractLayerEdge(layers[from], layers[to]));
+                    for (int to = from + 1; to < layers.Length; to++)
+                        edges.Add(new BenchmarkContractLayerEdge(layers[from], layers[to]));
 
                 break;
             case BenchmarkContractLayerGraphShape.LayeredDag:
@@ -181,8 +181,8 @@ internal static class BenchmarkGraphBuilder
     {
         var edges = new List<BenchmarkProjectEdge>();
         for (int from = 0; from < projects.Count; from++)
-        for (int to = from + 1; to < projects.Count; to++)
-            edges.Add(new BenchmarkProjectEdge(projects[from].Id, projects[to].Id));
+            for (int to = from + 1; to < projects.Count; to++)
+                edges.Add(new BenchmarkProjectEdge(projects[from].Id, projects[to].Id));
 
         return edges;
     }

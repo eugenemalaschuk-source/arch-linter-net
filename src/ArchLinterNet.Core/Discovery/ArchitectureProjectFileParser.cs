@@ -185,9 +185,9 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
                 yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
 
             foreach (MemberDeclarationSyntax member in root.Members)
-            foreach (string assemblyName in CollectFriendAssembliesFromAttributes(member.AttributeLists)
-                         .OfType<string>())
-                yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
+                foreach (string assemblyName in CollectFriendAssembliesFromAttributes(member.AttributeLists)
+                             .OfType<string>())
+                    yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
         }
     }
 
