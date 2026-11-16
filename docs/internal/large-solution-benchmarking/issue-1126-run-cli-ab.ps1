@@ -1,15 +1,52 @@
+[CmdletBinding(DefaultParameterSetName = 'Benchmark')]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = 'Benchmark')]
     [string] $BaseCli,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = 'Benchmark')]
     [string] $CurrentCli,
 
+    [Parameter(ParameterSetName = 'Benchmark')]
     [ValidateRange(1, 20)]
-    [int] $Pairs = 5
+    [int] $Pairs = 5,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'MedianTests')]
+    [switch] $TestMedian
 )
 
 $ErrorActionPreference = 'Continue'
+
+function Get-Median {
+    param([double[]] $Values)
+
+    $ordered = @($Values | Sort-Object)
+    # PowerShell casts round; floor first so odd sample counts select the center index.
+    $middle = [int]([Math]::Floor($ordered.Count / 2))
+    if ($ordered.Count % 2 -eq 0) {
+        return ($ordered[$middle - 1] + $ordered[$middle]) / 2
+    }
+
+    return $ordered[$middle]
+}
+
+if ($TestMedian) {
+    $cases = @(
+        [pscustomobject]@{ Name = 'three'; Values = [double[]]@(10, 20, 30); Expected = 20 },
+        [pscustomobject]@{ Name = 'seven'; Values = [double[]]@(10, 20, 30, 40, 50, 60, 70); Expected = 40 },
+        [pscustomobject]@{ Name = 'even'; Values = [double[]]@(10, 20, 30, 40); Expected = 25 }
+    )
+
+    foreach ($case in $cases) {
+        $actual = Get-Median -Values $case.Values
+        if ($actual -ne $case.Expected) {
+            throw "Median test '$($case.Name)' expected $($case.Expected), got $actual."
+        }
+    }
+
+    Write-Output 'Median tests passed (3, 7, and 4 values).'
+    return
+}
+
 $repoRoot = (Get-Location).Path
 $fixtureDirectory = Join-Path $repoRoot '.benchmark/issue-1126-phase-share'
 $policyPath = Join-Path $fixtureDirectory 'policy.yml'
@@ -19,18 +56,6 @@ $cliPaths = @{
     current = (Resolve-Path -LiteralPath $CurrentCli).Path
 }
 $rows = [System.Collections.Generic.List[object]]::new()
-
-function Get-Median {
-    param([double[]] $Values)
-
-    $ordered = @($Values | Sort-Object)
-    $middle = [int]($ordered.Count / 2)
-    if ($ordered.Count % 2 -eq 0) {
-        return ($ordered[$middle - 1] + $ordered[$middle]) / 2
-    }
-
-    return $ordered[$middle]
-}
 
 for ($pair = 1; $pair -le $Pairs; $pair++) {
     $order = if ($pair % 2 -eq 1) { @('base', 'current') } else { @('current', 'base') }

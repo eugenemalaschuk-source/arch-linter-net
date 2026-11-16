@@ -459,7 +459,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
             List<IArchitectureContract> contracts = GetContracts(groupName);
             ArchitectureBaselineContractLookup contractLookup = new(contracts, baselineEntries, _workCounter);
-            var memberships = new Dictionary<IArchitectureContract, ArchitectureBaselineIgnoreMembership>(
+            var memberships = new Dictionary<List<ArchitectureIgnoredViolation>, ArchitectureBaselineIgnoreMembership>(
                 ReferenceEqualityComparer.Instance);
             bool isStructured = documentVersion is 2 or 3;
 
@@ -484,7 +484,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             int documentVersion,
             bool isStructured,
             ArchitectureBaselineContractLookup contractLookup,
-            Dictionary<IArchitectureContract, ArchitectureBaselineIgnoreMembership> memberships,
+            Dictionary<List<ArchitectureIgnoredViolation>, ArchitectureBaselineIgnoreMembership> memberships,
             List<(string GroupName, string ContractId)> unknownIds)
         {
             if (TryRecordImportedEntry(baselineEntry, groupName, documentVersion, unknownIds))
@@ -532,8 +532,9 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             List<ArchitectureBaselineIgnoredViolation> baselineIgnores,
             IArchitectureContract contract,
             bool isStructured,
-            Dictionary<IArchitectureContract, ArchitectureBaselineIgnoreMembership> memberships)
+            Dictionary<List<ArchitectureIgnoredViolation>, ArchitectureBaselineIgnoreMembership> memberships)
         {
+            List<ArchitectureIgnoredViolation>? ignores = null;
             foreach (ArchitectureBaselineIgnoredViolation baselineIgnore in baselineIgnores)
             {
                 // Applicability findings are evidence of an assessment boundary, not ordinary
@@ -545,8 +546,9 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                     continue;
                 }
 
+                ignores ??= GetIgnoredViolations(contract);
                 ArchitectureBaselineIgnoreMembership membership = GetOrCreateMembership(
-                    contract, isStructured, memberships);
+                    ignores, isStructured, memberships);
                 if (_workCounter is not null)
                 {
                     _workCounter.MembershipChecks++;
@@ -591,18 +593,17 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         }
 
         private ArchitectureBaselineIgnoreMembership GetOrCreateMembership(
-            IArchitectureContract contract,
+            List<ArchitectureIgnoredViolation> ignores,
             bool isStructured,
-            Dictionary<IArchitectureContract, ArchitectureBaselineIgnoreMembership> memberships)
+            Dictionary<List<ArchitectureIgnoredViolation>, ArchitectureBaselineIgnoreMembership> memberships)
         {
-            if (memberships.TryGetValue(contract, out ArchitectureBaselineIgnoreMembership? membership))
+            if (memberships.TryGetValue(ignores, out ArchitectureBaselineIgnoreMembership? membership))
             {
                 return membership;
             }
 
-            List<ArchitectureIgnoredViolation> ignores = GetIgnoredViolations(contract);
             membership = new ArchitectureBaselineIgnoreMembership(ignores, isStructured, _workCounter);
-            memberships.Add(contract, membership);
+            memberships.Add(ignores, membership);
             return membership;
         }
 

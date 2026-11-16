@@ -281,7 +281,11 @@ public sealed class ArchitectureBaselineMergePerformanceEvidenceTests
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
-        return GC.GetTotalMemory(forceFullCollection: true) - retainedBefore;
+        long retainedAfter = GC.GetTotalMemory(forceFullCollection: true);
+        // Keep the merged policy graph rooted through the final full collection.
+        GC.KeepAlive(policy);
+        GC.KeepAlive(baseline);
+        return retainedAfter - retainedBefore;
     }
 
     private static double Median(IEnumerable<double> values)
