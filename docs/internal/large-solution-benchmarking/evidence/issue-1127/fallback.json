@@ -1,0 +1,27 @@
+{
+  "Evidence": "architecture-ignore-matching-deferred-fallback",
+  "Revision": "c3e936bff8763b68eddf6865516e1595d69492a9",
+  "RevisionState": "The implementation source hash identifies the measured matcher code if source changes are uncommitted.",
+  "ImplementationSourceSha256": "943313d0efdd048a9b14fbbae292f0a916d7349ba20538d51b4cb113540b2ba0",
+  "OrderedReferenceSourceSha256": "24ebdeaa9866e636fabcbb862332daaae1f90a4b4e542fb7adb517632ab9146f",
+  "Environment": ".NET 10.0.15; Microsoft Windows 10.0.19045; X64; processors=6",
+  "InputSha256": "65c78da18c6cf47ccc378d3432840c525ff9198b15159694cae390210e99bff0",
+  "IgnoreEntriesI": 1024,
+  "FindingsF": 64,
+  "SampleCount": 5,
+  "Baseline": {
+    "FirstQueryMedianMilliseconds": 0.0012,
+    "SubsequentQueryMedianMillisecondsPerCall": 0.004015873015873016,
+    "TotalQueryMedianMilliseconds": 0.2551,
+    "TotalAllocatedBytes": 120
+  },
+  "Indexed": {
+    "IndexBuildMedianMilliseconds": 1.0794,
+    "FirstQueryIncludingFallbackBuildMedianMilliseconds": 0.5864,
+    "SubsequentQueryMedianMillisecondsPerCall": 0.0003841269841269841,
+    "TotalBuildAndQueryMedianMilliseconds": 1.7048,
+    "TotalAllocatedBytes": 1129544
+  },
+  "VersionedFallbackEntriesProcessedAfterFirstQuery": 1024,
+  "CanonicalResultSha256": "6b55975b54d4721403af2f7761320f029075dcf347ed44efd4d491a101815310"
+}

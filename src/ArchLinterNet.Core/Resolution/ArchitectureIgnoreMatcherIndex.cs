@@ -71,11 +71,11 @@ internal sealed class ArchitectureIgnoreMatcherIndex
 
             if (ignore.HasStructuredWaiverFields)
             {
-                if (ignore.Target is not null)
+                if (ignore.Target is { } target && !string.IsNullOrWhiteSpace(target.Fingerprint))
                 {
                     Add(
                         waiverFingerprints,
-                        ignore.Target.Fingerprint,
+                        target.Fingerprint,
                         entry);
                 }
 

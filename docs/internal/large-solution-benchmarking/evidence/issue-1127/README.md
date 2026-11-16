@@ -8,6 +8,7 @@ The explicit NUnit harness follows the existing #502 evidence style. It separate
 - Environment: .NET 10.0.15; Windows 10.0.19045; x64; 6 processors.
 - Each workload uses five samples, one ignore list per contract, one tracker, and independently varied ignore entries (I), findings (F), required matches (K), and wildcard entries (W).
 - `before.json` is the run against the unchanged ordered matcher. Its historical schema predates per-input hashes. `after.json` records each serialized input SHA-256 and verifies every canonical result hash against `before.json`; both runs use the same unchanged workload generator and fixture definitions.
+- `fallback.json` separately compares missing-live-identity queries against the ordered reference and measures compact index build, first lazy fallback query, subsequent queries, allocations, and result parity.
 - The old ordered matcher is now retained as a test-only reference, so a later baseline run cannot accidentally time the indexed compatibility entry point.
 
 ## Pre-implementation effect contract
@@ -46,6 +47,7 @@ Wildcard cost remains separate and does not have a linear bound for arbitrary gl
 
 - Exact preparation processes I entries once. Each finding uses a fixed number of exact dictionary probes; all required exact results and tracker indices add O(K) work. For an alias set, each alias gets lookups, while a live structured-waiver fingerprint is built once for the finding and reused.
 - Versioned baseline text/glob fallback is retained in a compact ordered entry list and its literal/wildcard indexes are built once, on the first finding without a live identity. All current live-identity benchmark workloads report zero fallback entries processed; the differential tests cover the deferred missing-identity fallback behavior.
+- The separate `fallback.json` scenario uses I=1,024 versioned baseline entries and F=64 queries without live identities. The ordered reference took 0.2551 ms and allocated 120 B across all queries. The indexed path took 1.0794 ms to build the compact index, 0.5864 ms for the first query that builds fallback maps, then 0.000384 ms per subsequent query; its combined build-plus-query time was 1.7048 ms with 1,129,544 B allocated. The 1,024 fallback entries were processed once and reused. Repeated queries are about 10× faster, while the full 64-query run still costs more because of initial setup.
 - Wildcard fallback remains separately attributable as O(F×W) candidate evaluation plus pattern-matching cost. These measurements use unmatched double-star patterns and do not generalize regex runtime for arbitrary globs.
 - The focused workload is 100% matcher calls. Product-validation phase share is **not measured** because the current profile does not attribute matcher time separately. A whole-validation Amdahl bound and product-wide speedup are therefore **not measured**.
 - Retained-index estimates use full collections around a held index, exclude the input list, and are noisy at small sizes. They are not process peak working-set measurements.
@@ -62,4 +64,10 @@ Run the after matrix and compare canonical result hashes:
 
 ```powershell
 dotnet test tests/ArchLinterNet.Core.Tests --no-restore -c Release --filter "FullyQualifiedName~RunAfterMatcherEffectMatrix" --logger "console;verbosity=normal" -- NUnit.ExplicitTests=true
+```
+
+Run the explicit first-and-repeated deferred fallback measurement:
+
+```powershell
+dotnet test tests/ArchLinterNet.Core.Tests --no-restore -c Release --filter "FullyQualifiedName~RunDeferredFallbackMatcherBenchmark" --logger "console;verbosity=normal" -- NUnit.ExplicitTests=true
 ```

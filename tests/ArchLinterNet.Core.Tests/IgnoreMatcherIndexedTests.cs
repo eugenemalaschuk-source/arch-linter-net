@@ -88,6 +88,29 @@ public sealed partial class IgnoreMatcherTests
     }
 
     [Test]
+    public void IndexedMatcher_NullStructuredFingerprint_FailsClosedLikeOrderedMatcher()
+    {
+        ArchitectureIgnoredViolation invalidWaiver = new()
+        {
+            SourceType = "*",
+            ForbiddenReference = "*",
+            WaiverId = "ARCH-IGN-NULL-FINGERPRINT",
+            Target = new ArchitectureWaiverTarget { Fingerprint = null! },
+        };
+        ArchitectureViolationIdentity liveIdentity = CreateIdentity(0);
+
+        bool orderedMatch = ArchitectureIgnoreMatcherTestReference.IsIgnored(
+            "Source.Type", "Target.Type", [invalidWaiver], null, liveIdentity, out _);
+        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build([invalidWaiver]);
+        string? fingerprint = index.CreateLiveWaiverFingerprint(liveIdentity);
+        bool indexedMatch = index.IsIgnored(
+            "Source.Type", "Target.Type", null, liveIdentity, fingerprint, out _);
+
+        Assert.That(indexedMatch, Is.EqualTo(orderedMatch));
+        Assert.That(indexedMatch, Is.False);
+    }
+
+    [Test]
     public void IndexedMatcher_TrackerGetsAllOrderedOverlappingMatches_WithoutTrackerUsesEarliestProvenance()
     {
         ArchitectureViolationIdentity identity = CreateIdentity(7);
