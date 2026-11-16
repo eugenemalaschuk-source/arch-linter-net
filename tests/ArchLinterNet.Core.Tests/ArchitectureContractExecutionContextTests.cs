@@ -476,10 +476,13 @@ public sealed class ArchitectureContractExecutionContextTests
         Assert.Multiple(() =>
         {
             Assert.That(ignored, Is.True);
-            Assert.That(work.IndexEntriesProcessed, Is.EqualTo(1));
+            Assert.That(work.IndexEntriesProcessed, Is.Zero,
+                "A one-entry ignore list should stay on the ordered path without building dictionaries.");
             Assert.That(work.LiveWaiverFingerprintsBuilt, Is.EqualTo(1));
-            Assert.That(work.ExactLookupProbes, Is.EqualTo(2));
-            Assert.That(work.ExactCandidateMatches, Is.EqualTo(2));
+            Assert.That(work.ExactLookupProbes, Is.Zero);
+            Assert.That(work.OrderedLiveQueries, Is.EqualTo(2));
+            Assert.That(work.OrderedLiveEntriesScanned, Is.EqualTo(2));
+            Assert.That(work.OrderedLiveMatches, Is.EqualTo(2));
             Assert.That(work.MatchedOriginalIndices, Is.EqualTo(2));
         });
     }
