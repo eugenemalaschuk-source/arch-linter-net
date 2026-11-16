@@ -13,8 +13,8 @@
 
 ## 3. Refresh evidence and synchronize the capability spec
 
-- [ ] 3.1 Regenerate the explicit #1123 repeated baseline matrix for the current source revision and verify all 33 evidence documents pass the benchmark evidence schema and record loaded DLL identities.
-- [ ] 3.2 Run `make fmt`, the focused benchmark tests, and `openspec validate --all`; inspect the final diff and confirm archived spec behavior matches the implementation.
+- [x] 3.1 Regenerate the explicit #1123 repeated baseline matrix for source revision `4a5c95c8f750` and verify all 33 evidence documents pass the benchmark evidence schema and record loaded DLL identities.
+- [x] 3.2 Run `make fmt`, the focused benchmark tests, and `openspec validate --all`; inspect the final diff and confirm the delta spec matches the implementation.
 
 ## Workflow follow-up
 
