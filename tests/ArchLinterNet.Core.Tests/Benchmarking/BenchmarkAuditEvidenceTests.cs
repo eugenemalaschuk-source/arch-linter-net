@@ -76,9 +76,9 @@ public sealed class BenchmarkAuditEvidenceTests
 
         string json = BenchmarkEvidenceJson.Serialize(evidence);
         using JsonDocument serializedEvidence = JsonDocument.Parse(json);
-        bool samplesAreSingleLine = serializedEvidence.RootElement.GetProperty("samples")
+        bool samplesAreMultiline = serializedEvidence.RootElement.GetProperty("samples")
             .EnumerateArray()
-            .All(serializedSample => !serializedSample.GetRawText().Contains('\n'));
+            .All(serializedSample => serializedSample.GetRawText().Contains('\n'));
         BenchmarkEvidenceDocument roundTrip = BenchmarkEvidenceJson.Deserialize(json);
         JsonSchema schema = JsonSchemaTextFactory.FromText(LoadEvidenceSchema());
         EvaluationResults validation = schema.Evaluate(
@@ -102,8 +102,8 @@ public sealed class BenchmarkAuditEvidenceTests
             Assert.That(roundTrip.Samples.Single().LoadedAssemblies!.Artifacts.Single().Sha256, Is.EqualTo(new string('c', 64)));
             Assert.That(roundTrip.Samples.Single().LoadedAssemblies!.Sha256,
                 Is.EqualTo(sample.LoadedAssemblies.Sha256));
-            Assert.That(samplesAreSingleLine, Is.True,
-                "Each measurement sample must stay on one line in committed evidence JSON.");
+            Assert.That(samplesAreMultiline, Is.True,
+                "Large measurement samples must remain indented in committed evidence JSON.");
             Assert.That(validation.IsValid, Is.True, Describe(validation));
         });
     }

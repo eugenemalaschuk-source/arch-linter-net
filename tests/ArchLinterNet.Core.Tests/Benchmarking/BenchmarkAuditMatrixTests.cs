@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.BuildState;
@@ -53,6 +54,12 @@ public sealed class BenchmarkAuditMatrixTests
             string outputPath = Path.Combine(evidenceDirectory, $"{workload.WorkloadId}.json");
             BenchmarkEvidenceDocument evidence = RunWorkload(workload, repositoryRoot, sourceRevision);
             string json = BenchmarkEvidenceJson.Serialize(evidence);
+            string[] evidenceLines = json.Split(Environment.NewLine, StringSplitOptions.None);
+            int maximumLineBytes = evidenceLines.Max(line => Encoding.UTF8.GetByteCount(line));
+            Assert.That(evidenceLines.Length, Is.LessThan(300),
+                $"{workload.WorkloadId} must stay below GitHub's complete-patch review limit.");
+            Assert.That(maximumLineBytes, Is.LessThanOrEqualTo(8 * 1024 + 64),
+                $"{workload.WorkloadId} contains an overlong JSON line.");
             EvaluationResults validation = schema.Evaluate(
                 JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
             Assert.That(validation.IsValid, Is.True,
