@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Tests.Benchmarking;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -28,7 +29,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 LayerCount = 2,
                 SelectorPredicateTermsPerLayer = 4,
                 ContractsPerWorkload = 2,
-                SourceRootCount = 1,
+                SourceRootCount = 1
             }),
             ("medium", new BenchmarkDimensionSet
             {
@@ -39,7 +40,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 LayerCount = 4,
                 SelectorPredicateTermsPerLayer = 8,
                 ContractsPerWorkload = 4,
-                SourceRootCount = 2,
+                SourceRootCount = 2
             }),
             ("large", new BenchmarkDimensionSet
             {
@@ -50,8 +51,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 LayerCount = 4,
                 SelectorPredicateTermsPerLayer = 8,
                 ContractsPerWorkload = 4,
-                SourceRootCount = 2,
-            }),
+                SourceRootCount = 2
+            })
         ];
 
         List<MeasuredScalePoint> points = [];
@@ -64,7 +65,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 dimensions,
                 compilationMode,
                 BenchmarkExecutionMode.FullGovernance,
-                independentProcesses: _measuredCommandFamilies.Length);
+                _measuredCommandFamilies.Length);
             using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
             if (compilationMode == BenchmarkCompilationMode.RealMsBuild)
             {
@@ -147,10 +148,6 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         return points;
     }
 
-    private sealed record ScaleTimingMeasurement(
-        decimal LoadAuthorizationMilliseconds,
-        IReadOnlyDictionary<string, decimal> ProjectionMillisecondsByFamily);
-
     private static ScaleTimingMeasurement MeasureScaleTiming(
         BenchmarkMaterializedFixture fixture,
         BenchmarkWorkloadDefinition workload,
@@ -165,17 +162,17 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 : BuildPreparationMode.Ordinary,
             NoRestore = false,
             MaxParallelism = 1,
-            CancellationToken = cancellationToken,
+            CancellationToken = cancellationToken
         });
 
-        Stopwatch strictClock = Stopwatch.StartNew();
+        var strictClock = Stopwatch.StartNew();
         ValidationOutcome strict = snapshot.Evaluate("strict");
         strictClock.Stop();
         Assert.That(strict.Passed, Is.True,
             "The scale-specific strict projection must pass before measuring load/authorization work.");
         _ = ReadRequiredCounterWork(snapshot.Counters, "scale/strict");
 
-        Stopwatch auditClock = Stopwatch.StartNew();
+        var auditClock = Stopwatch.StartNew();
         ValidationOutcome audit = snapshot.Evaluate("audit");
         auditClock.Stop();
         Assert.That(audit.Passed, Is.True,
@@ -186,11 +183,12 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         JsonElement auditProfile = CreateSyntheticProfile(snapshot.Counters, "scale-audit");
         decimal loadAuthorizationMilliseconds =
             (MeasureLoadAuthorizationDuration(strictProfile) + MeasureLoadAuthorizationDuration(auditProfile)) / 2m;
-        IReadOnlyDictionary<string, decimal> projectionMillisecondsByFamily = new Dictionary<string, decimal>(StringComparer.Ordinal)
-        {
-            ["strict"] = DurationMilliseconds(strictClock.Elapsed),
-            ["audit"] = DurationMilliseconds(auditClock.Elapsed),
-        };
+        IReadOnlyDictionary<string, decimal> projectionMillisecondsByFamily =
+            new Dictionary<string, decimal>(StringComparer.Ordinal)
+            {
+                ["strict"] = DurationMilliseconds(strictClock.Elapsed),
+                ["audit"] = DurationMilliseconds(auditClock.Elapsed)
+            };
         Assert.That(loadAuthorizationMilliseconds, Is.GreaterThan(0),
             "Scale-specific load/authorization duration must be positive.");
         Assert.That(projectionMillisecondsByFamily.Values.Sum(), Is.GreaterThan(0),
@@ -207,4 +205,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             $"Scale-specific projection '{projection}' must expose real profile and selected-state counters.");
         return measurement!;
     }
+
+    private sealed record ScaleTimingMeasurement(
+        decimal LoadAuthorizationMilliseconds,
+        IReadOnlyDictionary<string, decimal> ProjectionMillisecondsByFamily);
 }

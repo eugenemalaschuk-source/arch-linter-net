@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 [TestFixture]
 [NonParallelizable]
@@ -23,8 +23,10 @@ public sealed class BenchmarkAuditWorkloadTests
             Assert.That(workload.Inventory.MetricRuleCount, Is.Zero);
             Assert.That(workload.Inventory.ReportRuleCount, Is.Zero);
             Assert.That(workload.ContractLayerGraph, Is.Null);
+            Assert.That(workload.ToManifest().Shape, Is.EqualTo(BenchmarkTopologyShape.Linear));
         });
-        Assert.That(workload.WorkloadIdentity, Is.EqualTo("8b72dd51975208e1f5aac7da0ac266ec391dec4d13438e34e9a1ec963078b229"));
+        Assert.That(workload.WorkloadIdentity,
+            Is.EqualTo("8b72dd51975208e1f5aac7da0ac266ec391dec4d13438e34e9a1ec963078b229"));
     }
 
     [Test]
@@ -49,13 +51,21 @@ public sealed class BenchmarkAuditWorkloadTests
             LayerCount = 5,
             IgnoreRuleCount = 2,
             MetricRuleCount = 3,
-            ReportRuleCount = 4,
+            ReportRuleCount = 4
         };
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
             "synthetic-audit-contract-graph",
             BenchmarkTopologyShape.Linear,
             dimensions,
             contractLayerGraphShape: BenchmarkContractLayerGraphShape.StronglyConnectedWithAcyclicTail);
+        BenchmarkContractLayerEdge[] expectedEdges =
+        [
+            new("contract_layer_01", "contract_layer_02"),
+            new("contract_layer_02", "contract_layer_01"),
+            new("contract_layer_02", "contract_layer_03"),
+            new("contract_layer_03", "contract_layer_04"),
+            new("contract_layer_04", "contract_layer_05")
+        ];
 
         Assert.Multiple(() =>
         {
@@ -66,19 +76,17 @@ public sealed class BenchmarkAuditWorkloadTests
             Assert.That(workload.Inventory.MethodBodyRuleCount, Is.Zero);
             Assert.That(workload.Inventory.ContractLayerNodeCount, Is.EqualTo(5));
             Assert.That(workload.Inventory.ContractLayerReferenceCount, Is.EqualTo(5));
-            Assert.That(workload.ContractLayerGraph!.Edges, Is.EqualTo(new[]
-            {
-                new BenchmarkContractLayerEdge("contract_layer_01", "contract_layer_02"),
-                new BenchmarkContractLayerEdge("contract_layer_02", "contract_layer_01"),
-                new BenchmarkContractLayerEdge("contract_layer_02", "contract_layer_03"),
-                new BenchmarkContractLayerEdge("contract_layer_03", "contract_layer_04"),
-                new BenchmarkContractLayerEdge("contract_layer_04", "contract_layer_05"),
-            }));
+            Assert.That(workload.ContractLayerGraph!.Shape,
+                Is.EqualTo(BenchmarkContractLayerGraphShape.StronglyConnectedWithAcyclicTail));
+            Assert.That(workload.ToManifest().ContractLayerGraph!.Shape,
+                Is.EqualTo(BenchmarkContractLayerGraphShape.StronglyConnectedWithAcyclicTail));
+            Assert.That(workload.ContractLayerGraph!.Edges, Is.EqualTo(expectedEdges));
         });
 
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
         string policy = File.ReadAllText(fixture.PolicyPath).ReplaceLineEndings("\n");
-        string source = File.ReadAllText(Path.Combine(fixture.Root, "src", "Synthetic.Project001", "SourceRoot01", "ContractLayerGraph.cs"));
+        string source = File.ReadAllText(Path.Combine(fixture.Root, "src", "Synthetic.Project001", "SourceRoot01",
+            "ContractLayerGraph.cs"));
         string reportRules = File.ReadAllText(Path.Combine(fixture.Root, ".benchmark", "report-rules.json"));
         Assert.Multiple(() =>
         {
@@ -103,7 +111,8 @@ public sealed class BenchmarkAuditWorkloadTests
             new BenchmarkDimensionSet { MethodBodyRuleCount = 2, ReportRuleCount = 3 });
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
         string policy = File.ReadAllText(fixture.PolicyPath);
-        string source = File.ReadAllText(Path.Combine(fixture.Root, "src", "Synthetic.Project001", "SourceRoot01", "Type001.cs"));
+        string source =
+            File.ReadAllText(Path.Combine(fixture.Root, "src", "Synthetic.Project001", "SourceRoot01", "Type001.cs"));
 
         Assert.Multiple(() =>
         {
@@ -116,7 +125,8 @@ public sealed class BenchmarkAuditWorkloadTests
 
     [TestCase(1, 5)]
     [TestCase(16, 20)]
-    public void MethodBodyRuleScale_DoesNotIncreaseOrdinaryContractCount(int methodBodyRuleCount, int totalContractCount)
+    public void MethodBodyRuleScale_DoesNotIncreaseOrdinaryContractCount(int methodBodyRuleCount,
+        int totalContractCount)
     {
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
             $"synthetic-method-body-contract-independence-{methodBodyRuleCount}",
@@ -124,15 +134,15 @@ public sealed class BenchmarkAuditWorkloadTests
             new BenchmarkDimensionSet
             {
                 ContractsPerWorkload = 4,
-                MethodBodyRuleCount = methodBodyRuleCount,
+                MethodBodyRuleCount = methodBodyRuleCount
             });
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
         string policy = File.ReadAllText(fixture.PolicyPath).ReplaceLineEndings("\n");
-        string strictContracts = policy.Split("  strict:\n", StringSplitOptions.None)[1]
-            .Split("  strict_method_body:", StringSplitOptions.None)[0]
-            .Split("  strict_layers:", StringSplitOptions.None)[0];
-        string methodBodyContracts = policy.Split("  strict_method_body:\n", StringSplitOptions.None)[1]
-            .Split("  strict_layers:", StringSplitOptions.None)[0];
+        string strictContracts = policy.Split("  strict:\n")[1]
+            .Split("  strict_method_body:")[0]
+            .Split("  strict_layers:")[0];
+        string methodBodyContracts = policy.Split("  strict_method_body:\n")[1]
+            .Split("  strict_layers:")[0];
 
         int ordinaryContractCount = strictContracts.Split('\n')
             .Count(line => line.TrimStart().StartsWith("- id: synthetic-contract-", StringComparison.Ordinal));
@@ -161,17 +171,17 @@ public sealed class BenchmarkAuditWorkloadTests
                 ReferencesPerProject = 0,
                 LayerCount = 2,
                 ContractsPerWorkload = 1,
-                IgnoreRuleCount = 3,
+                IgnoreRuleCount = 3
             });
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
         fixture.Build();
         BenchmarkAuditAnalysisRun run = BenchmarkAuditAnalysisRunner.Run(
             fixture,
-            observerEnabled: false,
-            sampleOrdinal: 1,
-            isWarmSample: false,
-            parallelMode: "sequential",
-            maxParallelism: 1,
+            false,
+            1,
+            false,
+            "sequential",
+            1,
             BenchmarkResourceMeasurement.Unavailable("This is a deterministic checker-path test."),
             BenchmarkResourceMeasurement.Available(1, "milliseconds"));
 
@@ -212,8 +222,8 @@ public sealed class BenchmarkAuditWorkloadTests
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
             "synthetic-project-cycle", BenchmarkTopologyShape.CyclicScc);
 
-        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
-            () => BenchmarkFixtureMaterializer.Materialize(workload))!;
+        InvalidOperationException exception =
+            Assert.Throws<InvalidOperationException>(() => BenchmarkFixtureMaterializer.Materialize(workload))!;
 
         Assert.That(exception.Message, Does.Contain("structural-only"));
     }

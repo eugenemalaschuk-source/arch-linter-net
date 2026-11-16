@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 [TestFixture]
 [NonParallelizable]
@@ -11,7 +11,7 @@ public sealed class BenchmarkMaterializedInputIdentityTests
     [Test]
     public void LoadedAssemblyIdentity_DoesNotDependOnTemporaryFixtureRoot()
     {
-        string digest = new string('c', 64);
+        string digest = new('c', 64);
         ArchitectureLoadedAssemblyArtifact firstArtifact = new(
             Path.Combine(Path.GetTempPath(), "fixture-a", "bin", "Debug", "net10.0", "Synthetic.Project000.dll"),
             digest,
@@ -23,11 +23,11 @@ public sealed class BenchmarkMaterializedInputIdentityTests
             string.Empty,
             2048);
 
-        BenchmarkLoadedAssemblyEvidence first = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts([firstArtifact]);
-        BenchmarkLoadedAssemblyEvidence second = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts([secondArtifact]);
-        BenchmarkLoadedAssemblyEvidence changedBytes = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts(
+        var first = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts([firstArtifact]);
+        var second = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts([secondArtifact]);
+        var changedBytes = BenchmarkLoadedAssemblyEvidence.FromLoadedArtifacts(
         [
-            secondArtifact with { AssemblyContentDigest = new string('d', 64) },
+            secondArtifact with { AssemblyContentDigest = new string('d', 64) }
         ]);
 
         Assert.Multiple(() =>
@@ -54,7 +54,7 @@ public sealed class BenchmarkMaterializedInputIdentityTests
                 SourceFilesPerProject = 1,
                 ReferencesPerProject = 0,
                 LayerCount = 2,
-                ContractsPerWorkload = 1,
+                ContractsPerWorkload = 1
             },
             compilationMode);
         using BenchmarkMaterializedFixture first = BenchmarkFixtureMaterializer.Materialize(workload);
@@ -84,10 +84,10 @@ public sealed class BenchmarkMaterializedInputIdentityTests
                 {
                     string normalized = path.Replace('\\', '/');
                     return !normalized.Contains("/obj/", StringComparison.Ordinal)
-                        && !normalized.Contains("/bin/", StringComparison.Ordinal)
-                        && !normalized.Contains("/analysis-cache/", StringComparison.Ordinal)
-                        && !Path.GetFileName(path).StartsWith("profile-", StringComparison.Ordinal)
-                        && !Path.GetFileName(path).StartsWith("output-", StringComparison.Ordinal);
+                           && !normalized.Contains("/bin/", StringComparison.Ordinal)
+                           && !normalized.Contains("/analysis-cache/", StringComparison.Ordinal)
+                           && !Path.GetFileName(path).StartsWith("profile-", StringComparison.Ordinal)
+                           && !Path.GetFileName(path).StartsWith("output-", StringComparison.Ordinal);
                 })
                 .ToDictionary(
                     path => Path.GetRelativePath(root, path).Replace('\\', '/'),
@@ -99,8 +99,8 @@ public sealed class BenchmarkMaterializedInputIdentityTests
         Dictionary<string, string> second = HashInputs(secondRoot);
         return first.Keys.Union(second.Keys, StringComparer.Ordinal)
             .Where(path => !first.TryGetValue(path, out string? firstHash)
-                || !second.TryGetValue(path, out string? secondHash)
-                || !string.Equals(firstHash, secondHash, StringComparison.Ordinal))
+                           || !second.TryGetValue(path, out string? secondHash)
+                           || !string.Equals(firstHash, secondHash, StringComparison.Ordinal))
             .OrderBy(path => path, StringComparer.Ordinal)
             .Select(path => DescribeFileDifference(
                 Path.Combine(firstRoot, path),
@@ -115,13 +115,11 @@ public sealed class BenchmarkMaterializedInputIdentityTests
         byte[] second = File.ReadAllBytes(secondPath);
         int offset = Enumerable.Range(0, Math.Min(first.Length, second.Length))
             .FirstOrDefault(index => first[index] != second[index], -1);
-        if (offset < 0 && first.Length == second.Length)
-        {
-            return relativePath;
-        }
+        if (offset < 0 && first.Length == second.Length) return relativePath;
 
         string firstBytes = Convert.ToHexString(first.Skip(Math.Max(0, offset - 4)).Take(12).ToArray());
         string secondBytes = Convert.ToHexString(second.Skip(Math.Max(0, offset - 4)).Take(12).ToArray());
-        return $"{relativePath} (first byte difference {offset}, lengths {first.Length}/{second.Length}, bytes {firstBytes}/{secondBytes})";
+        return
+            $"{relativePath} (first byte difference {offset}, lengths {first.Length}/{second.Length}, bytes {firstBytes}/{secondBytes})";
     }
 }

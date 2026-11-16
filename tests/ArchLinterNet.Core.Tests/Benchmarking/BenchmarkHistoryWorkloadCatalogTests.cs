@@ -4,7 +4,7 @@ using ArchLinterNet.Core.History.Evidence;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 [TestFixture]
 public sealed class BenchmarkHistoryWorkloadCatalogTests
@@ -19,7 +19,7 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
             "internal",
             "large-solution-benchmarking",
             "workload-catalog.json");
-        using JsonDocument catalog = JsonDocument.Parse(File.ReadAllText(path));
+        using var catalog = JsonDocument.Parse(File.ReadAllText(path));
         JsonElement families = catalog.RootElement.GetProperty("history_workloads");
         HashSet<string> workloadIds = new(StringComparer.Ordinal);
 
@@ -50,18 +50,20 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
     {
         string root = new ArchitectureRepositoryRootResolver().Resolve();
         IReadOnlyList<BenchmarkHistoryWorkloadInput> workloads = BenchmarkHistoryInputFactory.ReadCatalog(root);
-        Dictionary<string, BenchmarkHistoryWorkloadInput> replayById = BenchmarkHistoryInputFactory.ReadCatalog(root)
+        var replayById = BenchmarkHistoryInputFactory.ReadCatalog(root)
             .ToDictionary(workload => workload.WorkloadId, StringComparer.Ordinal);
         Assert.That(workloads, Has.Count.EqualTo(24));
         HashSet<string> ids = new(StringComparer.Ordinal);
 
         foreach (BenchmarkHistoryWorkloadInput input in workloads)
         {
-            using JsonDocument inputDocument = JsonDocument.Parse(input.CanonicalInputJson);
+            using var inputDocument = JsonDocument.Parse(input.CanonicalInputJson);
+            string generatorVersion = inputDocument.RootElement.GetProperty("generator_version").GetString()!;
             BenchmarkHistoryWorkloadInput replay = replayById[input.WorkloadId];
             Assert.Multiple(() =>
             {
-                Assert.That(inputDocument.RootElement.GetProperty("generator_version").GetString(), Is.EqualTo("3"));
+                Assert.That(generatorVersion, Is.EqualTo("3"));
+                Assert.That(input.OwnerIssue, Does.Match("^#[0-9]+$"));
                 Assert.That(ids.Add(input.WorkloadId), Is.True);
                 Assert.That(replay.CanonicalInputJson, Is.EqualTo(input.CanonicalInputJson));
                 Assert.That(replay.InputSha256, Is.EqualTo(input.InputSha256));
@@ -78,20 +80,22 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
 
     private static SortedDictionary<string, long> RecomputeExpectedOutput(BenchmarkHistoryWorkloadInput input)
     {
-        IEnumerable<BenchmarkHistoryInputRecord> records = input.Records;
+        BenchmarkHistoryInputRecord[] records = input.Records.ToArray();
         return input.Family switch
         {
             "line_churn_sparse_edits" or "line_churn_dense_edits" => RecomputeLineOutput(input, records),
-            "task_commit_occurrences_sparse" or "task_commit_occurrences_overlapping" => RecomputeTaskOutput(input, records),
-            "co_change_disconnected_components" or "co_change_dense_component" => RecomputeCoChangeOutput(input, records),
-            "ancestry_query_long_rename_chain" or "ancestry_query_merged_dag" => RecomputeAncestryOutput(input, records),
-            _ => throw new AssertionException($"Unknown History workload family '{input.Family}'."),
+            "task_commit_occurrences_sparse" or "task_commit_occurrences_overlapping" => RecomputeTaskOutput(input,
+                records),
+            "co_change_disconnected_components" or "co_change_dense_component" => RecomputeCoChangeOutput(records),
+            "ancestry_query_long_rename_chain" or "ancestry_query_merged_dag" =>
+                RecomputeAncestryOutput(input, records),
+            _ => throw new AssertionException($"Unknown History workload family '{input.Family}'.")
         };
     }
 
     private static SortedDictionary<string, long> RecomputeLineOutput(
         BenchmarkHistoryWorkloadInput input,
-        IEnumerable<BenchmarkHistoryInputRecord> records)
+        BenchmarkHistoryInputRecord[] records)
     {
         int editCount = records.Count(record => record.Kind == "line_edit");
         int lineCount = input.Dimensions["line_count"];
@@ -107,35 +111,36 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
         {
             ["additions"] = editCount,
             ["deletions"] = editCount,
-            ["unchanged_lines"] = lineCount - editCount,
+            ["unchanged_lines"] = lineCount - editCount
         };
     }
 
     private static SortedDictionary<string, long> RecomputeTaskOutput(
         BenchmarkHistoryWorkloadInput input,
-        IEnumerable<BenchmarkHistoryInputRecord> records)
+        BenchmarkHistoryInputRecord[] records)
     {
-        BenchmarkHistoryInputRecord[] occurrences = records.Where(record => record.Kind == "task_commit_occurrence").ToArray();
+        BenchmarkHistoryInputRecord[] occurrences =
+            records.Where(record => record.Kind == "task_commit_occurrence").ToArray();
         int commitCount = records.Count(record => record.Kind == "commit");
         int taskCount = input.Dimensions["task_count"];
-        Assert.That(occurrences.Select(record => record.Second).Distinct().Count(), Is.EqualTo(taskCount), input.WorkloadId);
+        Assert.That(occurrences.Select(record => record.Second).Distinct().Count(), Is.EqualTo(taskCount),
+            input.WorkloadId);
         bool overlapping = input.Family.EndsWith("overlapping", StringComparison.Ordinal);
         return new SortedDictionary<string, long>(StringComparer.Ordinal)
         {
             ["candidate_task_pairs"] = overlapping ? (long)taskCount * (taskCount - 1) / 2 : 0,
             ["commit_count"] = commitCount,
             ["occurrence_count"] = occurrences.Length,
-            ["task_count"] = taskCount,
+            ["task_count"] = taskCount
         };
     }
 
     private static SortedDictionary<string, long> RecomputeCoChangeOutput(
-        BenchmarkHistoryWorkloadInput input,
-        IEnumerable<BenchmarkHistoryInputRecord> records)
+        BenchmarkHistoryInputRecord[] records)
     {
         int vertexCount = records.Count(record => record.Kind == "vertex");
         BenchmarkHistoryInputRecord[] edges = records.Where(record => record.Kind == "co_change_edge").ToArray();
-        Dictionary<int, List<int>> adjacency = Enumerable.Range(0, vertexCount)
+        var adjacency = Enumerable.Range(0, vertexCount)
             .ToDictionary(vertex => vertex, _ => new List<int>());
         foreach (BenchmarkHistoryInputRecord edge in edges)
         {
@@ -147,42 +152,33 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
         int componentCount = 0;
         foreach (int vertex in adjacency.Keys)
         {
-            if (!visited.Add(vertex))
-            {
-                continue;
-            }
+            if (!visited.Add(vertex)) continue;
 
             componentCount++;
             Stack<int> pending = new();
             pending.Push(vertex);
             while (pending.TryPop(out int current))
-            {
                 foreach (int neighbor in adjacency[current])
-                {
                     if (visited.Add(neighbor))
-                    {
                         pending.Push(neighbor);
-                    }
-                }
-            }
         }
 
         return new SortedDictionary<string, long>(StringComparer.Ordinal)
         {
             ["component_count"] = componentCount,
             ["edge_count"] = edges.Length,
-            ["vertex_count"] = vertexCount,
+            ["vertex_count"] = vertexCount
         };
     }
 
     private static SortedDictionary<string, long> RecomputeAncestryOutput(
         BenchmarkHistoryWorkloadInput input,
-        IEnumerable<BenchmarkHistoryInputRecord> records)
+        BenchmarkHistoryInputRecord[] records)
     {
         BenchmarkHistoryInputRecord[] edges = records.Where(record => record.Kind == "parent_edge").ToArray();
         BenchmarkHistoryInputRecord[] queries = records.Where(record => record.Kind == "ancestry_query").ToArray();
         BenchmarkHistoryInputRecord[] commits = records.Where(record => record.Kind == "commit").ToArray();
-        Dictionary<int, List<int>> parents = commits
+        var parents = commits
             .ToDictionary(commit => commit.First, _ => new List<int>());
         foreach (BenchmarkHistoryInputRecord edge in edges)
         {
@@ -202,15 +198,9 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
             pending.Push(query.Second!.Value);
             while (pending.TryPop(out int current))
             {
-                if (!visited.Add(current))
-                {
-                    continue;
-                }
+                if (!visited.Add(current)) continue;
 
-                foreach (int parent in parents[current])
-                {
-                    pending.Push(parent);
-                }
+                foreach (int parent in parents[current]) pending.Push(parent);
             }
 
             bool actualAncestry = visited.Contains(query.First) && query.First != query.Second.Value;
@@ -218,13 +208,9 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
             Assert.That(actualAncestry, Is.EqualTo(query.ExpectedAncestry!.Value),
                 $"Query {query.First}→{query.Second} has an incorrect expected answer in {input.WorkloadId}.");
             if (actualAncestry)
-            {
                 positiveQueryCount++;
-            }
             else
-            {
                 negativeQueryCount++;
-            }
         }
 
         Assert.That(positiveQueryCount, Is.GreaterThan(0), input.WorkloadId);
@@ -240,7 +226,7 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
             ["reachable_commit_count"] = commits.Length,
             ["rename_event_count"] = records.Count(record => record.Kind == "rename_event"),
             ["strict_ancestor_closure_entry_count"] = strictAncestorClosureEntryCount,
-            ["strict_ancestor_query_count"] = positiveQueryCount,
+            ["strict_ancestor_query_count"] = positiveQueryCount
         };
     }
 
@@ -256,27 +242,23 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
             int top = 0;
             int ancestorCount = 0;
             foreach (int parent in parents[commitIds[index]])
-            {
                 if (visitedAt[parent] != token)
                 {
                     visitedAt[parent] = token;
                     pending[top++] = parent;
                     ancestorCount++;
                 }
-            }
 
             while (top > 0)
             {
                 int current = pending[--top];
                 foreach (int parent in parents[current])
-                {
                     if (visitedAt[parent] != token)
                     {
                         visitedAt[parent] = token;
                         pending[top++] = parent;
                         ancestorCount++;
                     }
-                }
             }
 
             count += ancestorCount;
@@ -292,7 +274,8 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
         BenchmarkHistoryInputRecord[] queries,
         Dictionary<int, List<int>> parents)
     {
-        Assert.That(commits.Select(commit => commit.First).Distinct().Count(), Is.EqualTo(commits.Length), input.WorkloadId);
+        Assert.That(commits.Select(commit => commit.First).Distinct().Count(), Is.EqualTo(commits.Length),
+            input.WorkloadId);
         Assert.That(commits.Select(commit => commit.First).OrderBy(id => id),
             Is.EqualTo(Enumerable.Range(0, commits.Length)), input.WorkloadId);
         Assert.That(commits.Length, Is.EqualTo(input.Dimensions["reachable_commit_count"]), input.WorkloadId);
@@ -310,11 +293,11 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
             {
                 Assert.That(renameEvents[index].SourcePath, Is.Not.Null.And.Not.Empty, input.WorkloadId);
                 Assert.That(renameEvents[index].TargetPath, Is.Not.Null.And.Not.Empty, input.WorkloadId);
-                Assert.That(renameEvents[index].TargetPath, Is.Not.EqualTo(renameEvents[index].SourcePath), input.WorkloadId);
+                Assert.That(renameEvents[index].TargetPath, Is.Not.EqualTo(renameEvents[index].SourcePath),
+                    input.WorkloadId);
                 if (index > 0)
-                {
-                    Assert.That(renameEvents[index].SourcePath, Is.EqualTo(renameEvents[index - 1].TargetPath), input.WorkloadId);
-                }
+                    Assert.That(renameEvents[index].SourcePath, Is.EqualTo(renameEvents[index - 1].TargetPath),
+                        input.WorkloadId);
             }
         }
         else
@@ -355,7 +338,8 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
         foreach (BenchmarkHistoryInputRecord query in queries)
         {
             Assert.That(query.ExpectedAncestry, Is.Not.Null, input.WorkloadId);
-            Assert.That(HasAncestor(parents, query.Second!.Value, query.First), Is.EqualTo(query.ExpectedAncestry!.Value),
+            Assert.That(HasAncestor(parents, query.Second!.Value, query.First),
+                Is.EqualTo(query.ExpectedAncestry!.Value),
                 $"Graph-derived ancestry query {query.First} → {query.Second} did not match its expected answer for {input.WorkloadId}.");
         }
     }
@@ -367,20 +351,11 @@ public sealed class BenchmarkHistoryWorkloadCatalogTests
         pending.Push(descendant);
         while (pending.TryPop(out int current))
         {
-            if (!visited.Add(current))
-            {
-                continue;
-            }
+            if (!visited.Add(current)) continue;
 
-            if (current == ancestor)
-            {
-                return true;
-            }
+            if (current == ancestor) return true;
 
-            foreach (int parent in parents[current])
-            {
-                pending.Push(parent);
-            }
+            foreach (int parent in parents[current]) pending.Push(parent);
         }
 
         return false;

@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 internal static class BenchmarkEvidenceJson
 {
@@ -14,7 +14,7 @@ internal static class BenchmarkEvidenceJson
     public static string Serialize(BenchmarkEvidenceDocument evidence)
     {
         evidence.Validate();
-        using JsonDocument document = JsonDocument.Parse(BenchmarkJson.Serialize(evidence));
+        using var document = JsonDocument.Parse(BenchmarkJson.Serialize(evidence));
         using MemoryStream output = new();
         using (Utf8JsonWriter writer = new(output, new JsonWriterOptions { Indented = true }))
         {
@@ -39,11 +39,9 @@ internal static class BenchmarkEvidenceJson
             writer.WriteString("payload_sha256", Sha256(payload));
             writer.WriteStartArray("payload_base64_chunks");
             for (int offset = 0; offset < encodedPayload.Length; offset += Base64ChunkLength)
-            {
                 writer.WriteStringValue(encodedPayload.Substring(
                     offset,
                     Math.Min(Base64ChunkLength, encodedPayload.Length - offset)));
-            }
 
             writer.WriteEndArray();
             writer.WriteEndObject();
@@ -66,12 +64,10 @@ internal static class BenchmarkEvidenceJson
                     writer.WritePropertyName(property.Name);
                     bool isSamples = string.Equals(property.Name, "samples", StringComparison.OrdinalIgnoreCase);
                     if (isSamples || !TryWriteCompactValue(writer, property.Value))
-                    {
                         WriteEvidenceElement(
                             writer,
                             property.Value,
-                            compactArrayItems: !isSamples && property.Value.ValueKind == JsonValueKind.Array);
-                    }
+                            !isSamples && property.Value.ValueKind == JsonValueKind.Array);
                 }
 
                 writer.WriteEndObject();
@@ -79,12 +75,8 @@ internal static class BenchmarkEvidenceJson
             case JsonValueKind.Array:
                 writer.WriteStartArray();
                 foreach (JsonElement item in element.EnumerateArray())
-                {
                     if (!compactArrayItems || !TryWriteCompactValue(writer, item))
-                    {
                         WriteEvidenceElement(writer, item);
-                    }
-                }
 
                 writer.WriteEndArray();
                 break;
@@ -96,30 +88,22 @@ internal static class BenchmarkEvidenceJson
 
     private static bool TryWriteCompactValue(Utf8JsonWriter writer, JsonElement element)
     {
-        if (element.ValueKind is not (JsonValueKind.Array or JsonValueKind.Object))
-        {
-            return false;
-        }
+        if (element.ValueKind is not (JsonValueKind.Array or JsonValueKind.Object)) return false;
 
         string compactJson = JsonSerializer.Serialize(element);
-        if (Encoding.UTF8.GetByteCount(compactJson) > MaximumCompactValueBytes)
-        {
-            return false;
-        }
+        if (Encoding.UTF8.GetByteCount(compactJson) > MaximumCompactValueBytes) return false;
 
-        writer.WriteRawValue(compactJson, skipInputValidation: false);
+        writer.WriteRawValue(compactJson);
         return true;
     }
 
     public static BenchmarkEvidenceDocument Deserialize(string json)
     {
-        using JsonDocument document = JsonDocument.Parse(json);
+        using var document = JsonDocument.Parse(json);
         JsonElement root = document.RootElement;
         if (root.ValueKind == JsonValueKind.Object
             && root.TryGetProperty("archive_schema_id", out _))
-        {
             return DeserializeArchive(root);
-        }
 
         return DeserializeEvidencePayload(json);
     }
@@ -131,17 +115,13 @@ internal static class BenchmarkEvidenceJson
                 ArchiveSchemaId,
                 StringComparison.Ordinal)
             || !string.Equals(archive.GetProperty("encoding").GetString(), "gzip+base64", StringComparison.Ordinal))
-        {
             throw new InvalidOperationException("Unsupported benchmark evidence archive format.");
-        }
 
         StringBuilder encodedPayload = new();
         foreach (JsonElement chunk in archive.GetProperty("payload_base64_chunks").EnumerateArray())
         {
             if (chunk.ValueKind != JsonValueKind.String)
-            {
                 throw new InvalidOperationException("Benchmark evidence archive payload chunks must be strings.");
-            }
 
             encodedPayload.Append(chunk.GetString());
         }
@@ -160,9 +140,7 @@ internal static class BenchmarkEvidenceJson
                 Sha256(payload),
                 archive.GetProperty("payload_sha256").GetString(),
                 StringComparison.Ordinal))
-        {
             throw new InvalidOperationException("Benchmark evidence archive payload failed its SHA-256 check.");
-        }
 
         return DeserializeEvidencePayload(Encoding.UTF8.GetString(payload));
     }
@@ -177,7 +155,7 @@ internal static class BenchmarkEvidenceJson
     private static byte[] Compress(byte[] payload)
     {
         using MemoryStream compressed = new();
-        using (GZipStream gzip = new(compressed, CompressionLevel.SmallestSize, leaveOpen: true))
+        using (GZipStream gzip = new(compressed, CompressionLevel.SmallestSize, true))
         {
             gzip.Write(payload);
         }
@@ -194,6 +172,8 @@ internal static class BenchmarkEvidenceJson
         return payload.ToArray();
     }
 
-    private static string Sha256(byte[] payload) =>
-        Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+    private static string Sha256(byte[] payload)
+    {
+        return Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+    }
 }

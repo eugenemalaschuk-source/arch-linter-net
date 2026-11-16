@@ -1,13 +1,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ArchLinterNet.Core.Model;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 internal enum BenchmarkMeasurementStatus
 {
     Available,
     Unavailable,
-    NotApplicable,
+    NotApplicable
 }
 
 internal enum BenchmarkEvidenceDisposition
@@ -15,7 +16,7 @@ internal enum BenchmarkEvidenceDisposition
     Candidate,
     NotReproduced,
     Deferred,
-    Implemented,
+    Implemented
 }
 
 internal sealed record BenchmarkResourceMeasurement
@@ -24,28 +25,38 @@ internal sealed record BenchmarkResourceMeasurement
 
     public long? Value { get; init; }
 
-    public string? Unit { get; init; }
+    [JsonInclude]
+    public string? Unit { get; private init; }
 
     public string? Reason { get; init; }
 
-    public static BenchmarkResourceMeasurement Available(long value, string unit) => new()
+    public static BenchmarkResourceMeasurement Available(long value, string unit)
     {
-        Status = BenchmarkMeasurementStatus.Available,
-        Value = value,
-        Unit = unit,
-    };
+        return new BenchmarkResourceMeasurement
+        {
+            Status = BenchmarkMeasurementStatus.Available,
+            Value = value,
+            Unit = unit
+        };
+    }
 
-    public static BenchmarkResourceMeasurement Unavailable(string reason) => new()
+    public static BenchmarkResourceMeasurement Unavailable(string reason)
     {
-        Status = BenchmarkMeasurementStatus.Unavailable,
-        Reason = reason,
-    };
+        return new BenchmarkResourceMeasurement
+        {
+            Status = BenchmarkMeasurementStatus.Unavailable,
+            Reason = reason
+        };
+    }
 
-    public static BenchmarkResourceMeasurement NotApplicable(string reason) => new()
+    public static BenchmarkResourceMeasurement NotApplicable(string reason)
     {
-        Status = BenchmarkMeasurementStatus.NotApplicable,
-        Reason = reason,
-    };
+        return new BenchmarkResourceMeasurement
+        {
+            Status = BenchmarkMeasurementStatus.NotApplicable,
+            Reason = reason
+        };
+    }
 
     public void Validate(string fieldName)
     {
@@ -53,19 +64,15 @@ internal sealed record BenchmarkResourceMeasurement
         {
             case BenchmarkMeasurementStatus.Available:
                 if (!Value.HasValue || Value.Value < 0 || string.IsNullOrWhiteSpace(Unit) || Reason is not null)
-                {
                     throw new InvalidOperationException(
                         $"Available benchmark measurement '{fieldName}' must contain a non-negative value and unit, without a reason.");
-                }
 
                 break;
             case BenchmarkMeasurementStatus.Unavailable:
             case BenchmarkMeasurementStatus.NotApplicable:
                 if (Value is not null || Unit is not null || string.IsNullOrWhiteSpace(Reason))
-                {
                     throw new InvalidOperationException(
                         $"{Status} benchmark measurement '{fieldName}' must contain a reason and no value or unit.");
-                }
 
                 break;
             default:
@@ -136,8 +143,7 @@ internal sealed record BenchmarkProfileSample
     // contract. This higher-resolution value is runtime-only decision-model input for sub-process
     // and in-process timings, where rounding a sub-millisecond sample to zero would erase evidence.
     // Keep it out of benchmark-evidence/v1 until the versioned schema has an explicit field.
-    [JsonIgnore]
-    public decimal? MeasuredWallClockMilliseconds { get; init; }
+    [JsonIgnore] public decimal? MeasuredWallClockMilliseconds { get; init; }
 
     public required BenchmarkResourceMeasurement ProcessorTime { get; init; }
 
@@ -186,25 +192,21 @@ internal sealed record BenchmarkMetricWorkEvidence
     public required IReadOnlyList<BenchmarkMetricResultEvidence> Results { get; init; }
 
     public static BenchmarkMetricWorkEvidence FromOutcome(
-        ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome outcome,
+        ArchitectureMetricMeasurementOutcome outcome,
         int expectedMetricCount)
     {
         ArgumentNullException.ThrowIfNull(outcome);
         if (expectedMetricCount <= 0 || outcome.Measurements.Count != expectedMetricCount || !outcome.IsComplete)
-        {
             throw new InvalidOperationException(
                 $"Expected {expectedMetricCount} complete metric results but received " +
                 $"{outcome.Measurements.Count} (complete: {outcome.IsComplete}).");
-        }
 
         BenchmarkMetricResultEvidence[] results = outcome.Measurements
             .Select(measurement =>
             {
                 if (!measurement.IsEvaluable || !measurement.Value.HasValue)
-                {
                     throw new InvalidOperationException(
                         $"Metric '{measurement.Id}' did not produce an evaluable value.");
-                }
 
                 return new BenchmarkMetricResultEvidence
                 {
@@ -212,7 +214,7 @@ internal sealed record BenchmarkMetricWorkEvidence
                     MetricKind = measurement.Kind,
                     Value = measurement.Value.Value,
                     ContributorCount = measurement.ContributorCount ?? throw new InvalidOperationException(
-                        $"Metric '{measurement.Id}' did not produce contributor evidence."),
+                        $"Metric '{measurement.Id}' did not produce contributor evidence.")
                 };
             })
             .OrderBy(result => result.MetricId, StringComparer.Ordinal)
@@ -223,7 +225,7 @@ internal sealed record BenchmarkMetricWorkEvidence
             MetricCount = results.Length,
             IsComplete = true,
             ResultsSha256 = BenchmarkIdentity.Sha256(BenchmarkJson.Serialize(results)),
-            Results = results,
+            Results = results
         };
         evidence.Validate();
         return evidence;
@@ -233,12 +235,13 @@ internal sealed record BenchmarkMetricWorkEvidence
     {
         if (MetricCount <= 0 || !IsComplete || Results.Count != MetricCount ||
             Results.Any(result => string.IsNullOrWhiteSpace(result.MetricId) ||
-                string.IsNullOrWhiteSpace(result.MetricKind) || result.Value < 0 || result.ContributorCount < 0) ||
+                                  string.IsNullOrWhiteSpace(result.MetricKind) || result.Value < 0 ||
+                                  result.ContributorCount < 0) ||
             Results.Select(result => result.MetricId).Distinct(StringComparer.Ordinal).Count() != MetricCount ||
-            !string.Equals(ResultsSha256, BenchmarkIdentity.Sha256(BenchmarkJson.Serialize(Results)), StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("Metric-work evidence must contain complete, unique, reproducible metric results.");
-        }
+            !string.Equals(ResultsSha256, BenchmarkIdentity.Sha256(BenchmarkJson.Serialize(Results)),
+                StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "Metric-work evidence must contain complete, unique, reproducible metric results.");
     }
 }
 
@@ -384,97 +387,72 @@ internal sealed record BenchmarkEvidenceDocument
     public void Validate()
     {
         if (!string.Equals(EvidenceSchemaId, SchemaId, StringComparison.Ordinal))
-        {
             throw new InvalidOperationException($"Unsupported benchmark evidence schema '{EvidenceSchemaId}'.");
-        }
 
         if (!string.Equals(Workload.SchemaId, BenchmarkWorkloadDefinition.ManifestSchemaId, StringComparison.Ordinal))
-        {
             throw new InvalidOperationException("Benchmark evidence contains an unsupported workload manifest.");
-        }
 
         if (!IsSha256(Workload.WorkloadIdentity) || !IsSha256(CanonicalResult.Sha256))
-        {
             throw new InvalidOperationException("Benchmark evidence identities must be lowercase SHA-256 digests.");
-        }
 
         if (Samples.Count == 0)
-        {
             throw new InvalidOperationException("Benchmark evidence must retain at least one raw analysis profile.");
-        }
 
         foreach (BenchmarkProfileSample sample in Samples)
         {
             sample.WallClock.Validate("samples.wall_clock");
             if (sample.MeasuredWallClockMilliseconds is <= 0)
-            {
                 throw new InvalidOperationException(
                     "A measured benchmark wall-clock duration must be positive when present.");
-            }
             sample.ProcessorTime.Validate("samples.processor_time");
             sample.AllocatedBytes.Validate("samples.allocated_bytes");
             sample.PeakManagedMemory.Validate("samples.peak_managed_memory");
             sample.WorkCounters?.Validate();
             sample.MetricWork?.Validate();
-            if ((Workload.Dimensions.MetricRuleCount > 0) != (sample.MetricWork is not null) ||
-                sample.MetricWork is { } metricWork && metricWork.MetricCount != Workload.Dimensions.MetricRuleCount)
-            {
+            if (Workload.Dimensions.MetricRuleCount > 0 != sample.MetricWork is not null ||
+                (sample.MetricWork is { } metricWork && metricWork.MetricCount != Workload.Dimensions.MetricRuleCount))
                 throw new InvalidOperationException(
                     "Metric-work evidence must be present exactly when the workload declares metric rules and match their count.");
-            }
 
             sample.HistoryWorkCounters?.Validate();
             sample.TimingBoundaries?.Validate();
             sample.LoadedAssemblies?.Validate();
 
             if (sample.ReportOutputSha256 is not null && !IsSha256(sample.ReportOutputSha256))
-            {
                 throw new InvalidOperationException("The report output identity must be a lowercase SHA-256 digest.");
-            }
 
             if (!sample.RawAnalysisProfile.TryGetProperty("SchemaId", out JsonElement schemaId) ||
-                !string.Equals(schemaId.GetString(), "analysis-profile/v1", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException("Every benchmark sample must retain an analysis-profile/v1 payload.");
-            }
+                schemaId.GetString() is not "analysis-profile/v1")
+                throw new InvalidOperationException(
+                    "Every benchmark sample must retain an analysis-profile/v1 payload.");
 
             if (sample.OutputFailed && sample.ExitCode == 0)
-            {
-                throw new InvalidOperationException("A failed output publication cannot be recorded with a successful exit code.");
-            }
+                throw new InvalidOperationException(
+                    "A failed output publication cannot be recorded with a successful exit code.");
         }
 
         Environment.PeakWorkingSet.Validate("environment.peak_working_set");
         Environment.ManagedAllocation.Validate("environment.managed_allocation");
 
         if (Environment.SourceRevision is { Length: 0 } || Environment.RunnerIdentity is { Length: 0 })
-        {
-            throw new InvalidOperationException("Optional benchmark provenance strings must be non-empty when present.");
-        }
+            throw new InvalidOperationException(
+                "Optional benchmark provenance strings must be non-empty when present.");
 
         if (Environment.MaterializedInputSha256 is not null && !IsSha256(Environment.MaterializedInputSha256))
-        {
             throw new InvalidOperationException("The materialized input identity must be a lowercase SHA-256 digest.");
-        }
 
         if (Complexity is not null && Complexity.Disposition != BenchmarkEvidenceDisposition.NotReproduced &&
             Complexity.ScalePoints.Count < 3)
-        {
             throw new InvalidOperationException("A reproduced complexity claim requires at least three scale points.");
-        }
 
         if (Complexity is not null)
-        {
             foreach (BenchmarkScalePoint point in Complexity.ScalePoints)
-            {
                 point.AllocatedBytes.Validate($"complexity.scale_points[{point.Label}].allocated_bytes");
-            }
-        }
     }
 
     private static bool IsSha256(string value)
     {
         return value.Length == 64 && value.All(Uri.IsHexDigit)
-            && string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
+                                  && string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
     }
 }

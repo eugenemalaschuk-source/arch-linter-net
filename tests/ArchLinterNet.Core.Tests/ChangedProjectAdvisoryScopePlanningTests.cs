@@ -1,17 +1,18 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Tests.Benchmarking;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
 /// <summary>
-/// Evidence tests for issue #503 (changed-project advisory analysis and dependency-aware
-/// invalidation). These are pure, deterministic graph computations over the #502 synthetic
-/// project-graph generator — no CLI process, MSBuild, or analyzer execution is involved, so unlike
-/// the hardware-sensitive benchmark harnesses under AnalysisProfile/, they run in every normal
-/// `make test` pass. The K/P values asserted here are the numbers reported in
-/// docs/internal/changed-project-advisory-analysis-evidence.md; a change to either file must keep
-/// the other honest.
+///     Evidence tests for issue #503 (changed-project advisory analysis and dependency-aware
+///     invalidation). These are pure, deterministic graph computations over the #502 synthetic
+///     project-graph generator — no CLI process, MSBuild, or analyzer execution is involved, so unlike
+///     the hardware-sensitive benchmark harnesses under AnalysisProfile/, they run in every normal
+///     `make test` pass. The K/P values asserted here are the numbers reported in
+///     docs/internal/changed-project-advisory-analysis-evidence.md; a change to either file must keep
+///     the other honest.
 /// </summary>
 [TestFixture]
 [NonParallelizable]
@@ -22,7 +23,7 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         BenchmarkTopologyShape.Linear,
         BenchmarkTopologyShape.WideFanOutFanIn,
         BenchmarkTopologyShape.Diamond,
-        BenchmarkTopologyShape.Dense,
+        BenchmarkTopologyShape.Dense
     ];
 
     [TestCaseSource(nameof(_executableShapes))]
@@ -78,23 +79,21 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
     public void LinearAndDenseMiddleProjectChange_GrowsLinearlyWithPosition()
     {
         foreach (int projectCount in new[] { 8, 16, 32, 64 })
+        foreach (BenchmarkTopologyShape shape in new[] { BenchmarkTopologyShape.Linear, BenchmarkTopologyShape.Dense })
         {
-            foreach (BenchmarkTopologyShape shape in new[] { BenchmarkTopologyShape.Linear, BenchmarkTopologyShape.Dense })
-            {
-                BenchmarkWorkloadDefinition workload = CreateWorkload(shape, projectCount);
-                int middleIndex = projectCount / 2;
-                string middleProjectId = workload.Projects[middleIndex].Id;
+            BenchmarkWorkloadDefinition workload = CreateWorkload(shape, projectCount);
+            int middleIndex = projectCount / 2;
+            string middleProjectId = workload.Projects[middleIndex].Id;
 
-                ScopePlan plan = ChangedProjectScopePlanner.Plan(
-                    workload.Projects,
-                    workload.Edges,
-                    [OwnedSourceFile("middle-change", middleProjectId)]);
+            ScopePlan plan = ChangedProjectScopePlanner.Plan(
+                workload.Projects,
+                workload.Edges,
+                [OwnedSourceFile("middle-change", middleProjectId)]);
 
-                Assert.That(
-                    plan.AffectedProjectCount,
-                    Is.EqualTo(middleIndex + 1),
-                    $"{shape} P={projectCount}: K must equal the changed project's 0-based position + 1.");
-            }
+            Assert.That(
+                plan.AffectedProjectCount,
+                Is.EqualTo(middleIndex + 1),
+                $"{shape} P={projectCount}: K must equal the changed project's 0-based position + 1.");
         }
     }
 
@@ -141,19 +140,21 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
     [Test]
     public void ProjectReferenceEdgeChange_UnionsBothEndpointDependentClosures()
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, 8);
         BenchmarkProjectEdge edge = workload.Edges.Single(e =>
             e.FromProjectId == workload.Projects[3].Id && e.ToProjectId == workload.Projects[4].Id);
 
         ScopePlan plan = ChangedProjectScopePlanner.Plan(
             workload.Projects,
             workload.Edges,
-            [new ChangedInput
-            {
-                InputId = "edge-change",
-                Kind = ChangedInputKind.ProjectReferenceEdgeChange,
-                OwningProjectIds = [edge.FromProjectId, edge.ToProjectId],
-            }]);
+            [
+                new ChangedInput
+                {
+                    InputId = "edge-change",
+                    Kind = ChangedInputKind.ProjectReferenceEdgeChange,
+                    OwningProjectIds = [edge.FromProjectId, edge.ToProjectId]
+                }
+            ]);
 
         // The "From" endpoint (index 3) is already a transitive dependent of the "To" endpoint
         // (index 4) via the same edge, so the union collapses to the "To" endpoint's own closure:
@@ -170,7 +171,7 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         ChangedInputKind kind,
         ScopeDisposition expectedDisposition)
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Dense, projectCount: 16);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Dense, 16);
 
         ScopePlan plan = ChangedProjectScopePlanner.Plan(
             workload.Projects,
@@ -192,17 +193,19 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         // A reviewed public-API-surface contract's `assemblies` list can name more than one
         // project (schema/dependencies.arch.schema.json publicApiSurfaceContract), so this kind
         // must accept any owning-project count, including zero or several, without throwing.
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Dense, projectCount: 10);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Dense, 10);
 
         ScopePlan plan = ChangedProjectScopePlanner.Plan(
             workload.Projects,
             workload.Edges,
-            [new ChangedInput
-            {
-                InputId = "api-snapshot-change",
-                Kind = ChangedInputKind.ApiSnapshotOrBaselineChange,
-                OwningProjectIds = [workload.Projects[2].Id, workload.Projects[5].Id],
-            }]);
+            [
+                new ChangedInput
+                {
+                    InputId = "api-snapshot-change",
+                    Kind = ChangedInputKind.ApiSnapshotOrBaselineChange,
+                    OwningProjectIds = [workload.Projects[2].Id, workload.Projects[5].Id]
+                }
+            ]);
 
         Assert.Multiple(() =>
         {
@@ -218,38 +221,43 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         // "linked" describes how ownership was resolved (evaluated @(Compile) items), not a minimum
         // owner count, so this must behave like ProjectOwnedSourceFile's dependents-closure rule for
         // a single owner rather than rejecting it.
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, 8);
         string ownerId = workload.Projects[3].Id;
 
         ScopePlan plan = ChangedProjectScopePlanner.Plan(
             workload.Projects,
             workload.Edges,
-            [new ChangedInput
-            {
-                InputId = "linked-single-owner",
-                Kind = ChangedInputKind.SharedOrLinkedSourceFile,
-                OwningProjectIds = [ownerId],
-            }]);
+            [
+                new ChangedInput
+                {
+                    InputId = "linked-single-owner",
+                    Kind = ChangedInputKind.SharedOrLinkedSourceFile,
+                    OwningProjectIds = [ownerId]
+                }
+            ]);
 
-        Assert.That(plan.AffectedProjectCount, Is.EqualTo(4), "index-3 owner in an 8-project Linear chain closes to indices 0..3");
+        Assert.That(plan.AffectedProjectCount, Is.EqualTo(4),
+            "index-3 owner in an 8-project Linear chain closes to indices 0..3");
     }
 
     [Test]
     public void SharedSourceFileChange_UnionsMultipleOwningProjectsDependents()
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, 8);
         string firstOwnerId = workload.Projects[1].Id;
         string secondOwnerId = workload.Projects[5].Id;
 
         ScopePlan plan = ChangedProjectScopePlanner.Plan(
             workload.Projects,
             workload.Edges,
-            [new ChangedInput
-            {
-                InputId = "linked-multi-owner",
-                Kind = ChangedInputKind.SharedOrLinkedSourceFile,
-                OwningProjectIds = [firstOwnerId, secondOwnerId],
-            }]);
+            [
+                new ChangedInput
+                {
+                    InputId = "linked-multi-owner",
+                    Kind = ChangedInputKind.SharedOrLinkedSourceFile,
+                    OwningProjectIds = [firstOwnerId, secondOwnerId]
+                }
+            ]);
 
         // Union of dependents closures for index 1 (K=2: indices 0..1) and index 5 (K=6: indices
         // 0..5) collapses to the deeper owner's own closure, index 5's (K=6).
@@ -259,23 +267,25 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
     [Test]
     public void SharedOrLinkedSourceFileChange_RejectsZeroOwningProjects()
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, 8);
 
         Assert.Throws<ArgumentException>(() => ChangedProjectScopePlanner.Plan(
             workload.Projects,
             workload.Edges,
-            [new ChangedInput
-            {
-                InputId = "linked-zero-owner",
-                Kind = ChangedInputKind.SharedOrLinkedSourceFile,
-                OwningProjectIds = [],
-            }]));
+            [
+                new ChangedInput
+                {
+                    InputId = "linked-zero-owner",
+                    Kind = ChangedInputKind.SharedOrLinkedSourceFile,
+                    OwningProjectIds = []
+                }
+            ]));
     }
 
     [Test]
     public void EveryChangedInput_ReceivesExactlyOneDeterministicDecision()
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Diamond, projectCount: 10);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Diamond, 10);
         string leaf = workload.Projects[0].Id;
         string shared = workload.Projects[^1].Id;
 
@@ -283,25 +293,26 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         [
             OwnedSourceFile("a", leaf),
             OwnedSourceFile("b", shared),
-            new ChangedInput
+            new()
             {
                 InputId = "c",
                 Kind = ChangedInputKind.PackageOrFrameworkReferenceChange,
-                OwningProjectIds = [workload.Projects[2].Id],
+                OwningProjectIds = [workload.Projects[2].Id]
             },
-            new ChangedInput { InputId = "d", Kind = ChangedInputKind.PolicyOrImportChange, OwningProjectIds = [] },
+            new() { InputId = "d", Kind = ChangedInputKind.PolicyOrImportChange, OwningProjectIds = [] }
         ];
 
         ScopePlan plan = ChangedProjectScopePlanner.Plan(workload.Projects, workload.Edges, inputs);
 
         Assert.That(plan.Decisions, Has.Count.EqualTo(inputs.Length));
-        Assert.That(plan.Decisions.Select(decision => decision.InputId), Is.EqualTo(inputs.Select(input => input.InputId)));
+        Assert.That(plan.Decisions.Select(decision => decision.InputId),
+            Is.EqualTo(inputs.Select(input => input.InputId)));
     }
 
     [Test]
     public void RepeatedPlanning_OverSameInputs_IsDeterministic()
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.WideFanOutFanIn, projectCount: 20);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.WideFanOutFanIn, 20);
         ChangedInput[] inputs = [OwnedSourceFile("x", workload.Projects[5].Id)];
 
         ScopePlan first = ChangedProjectScopePlanner.Plan(workload.Projects, workload.Edges, inputs);
@@ -317,7 +328,7 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         // dependents closure (ChangedProjectScopePlanner's default) is K=9 (see
         // LinearAndDenseMiddleProjectChange_GrowsLinearlyWithPosition). No single number is
         // correct for every evaluator family — this is #503's own requirement, not an assumption.
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 16);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, 16);
         string changedProjectId = workload.Projects[8].Id;
         IReadOnlyList<string> allProjectIds = workload.Projects.Select(project => project.Id).ToList();
         IReadOnlyList<string> changedProjectIds = [changedProjectId];
@@ -378,14 +389,15 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
     [Test]
     public void EverySchemaContractFamilyReceivesAnExplicitSafeDisposition()
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, 8);
         IReadOnlyList<string> allProjectIds = workload.Projects.Select(project => project.Id).ToList();
         IReadOnlyList<string> changedProjectIds = [workload.Projects[2].Id];
         IReadOnlyList<string> dependentsClosureIds = ChangedProjectScopePlanner.DependentsClosure(
             workload.Projects, workload.Edges, changedProjectIds);
-        string schemaPath = Path.Combine(new ArchitectureRepositoryRootResolver().Resolve(), "schema", "dependencies.arch.schema.json");
+        string schemaPath = Path.Combine(new ArchitectureRepositoryRootResolver().Resolve(), "schema",
+            "dependencies.arch.schema.json");
 
-        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(schemaPath));
+        using var schema = JsonDocument.Parse(File.ReadAllText(schemaPath));
         IReadOnlyList<string> contractFamilies = schema.RootElement
             .GetProperty("$defs")
             .GetProperty("contracts")
@@ -394,7 +406,7 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
             .Select(property => property.Name switch
             {
                 "strict" or "audit" => "dependency",
-                string name => name[(name.IndexOf('_') + 1)..],
+                string name => name[(name.IndexOf('_') + 1)..]
             })
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
@@ -420,9 +432,7 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
                     ? dependentsClosureIds
                     : allProjectIds;
                 if (contractFamily == "dependency")
-                {
                     Assert.That(scope.Family, Is.EqualTo(EvaluatorFamily.UnanalyzedSafeFallback));
-                }
 
                 Assert.That(scope.RequiredProjectIds, Is.EqualTo(expectedProjectIds),
                     $"Schema family '{contractFamily}' must use its reviewed scope or fail closed to the full population.");
@@ -440,7 +450,7 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         string contractFamily,
         EvaluatorFamily expectedFamily)
     {
-        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, projectCount: 8);
+        BenchmarkWorkloadDefinition workload = CreateWorkload(BenchmarkTopologyShape.Linear, 8);
         IReadOnlyList<string> allProjectIds = workload.Projects.Select(project => project.Id).ToList();
         IReadOnlyList<string> changedProjectIds = [workload.Projects[2].Id];
         IReadOnlyList<string> dependentsClosureIds = ChangedProjectScopePlanner.DependentsClosure(
@@ -460,16 +470,21 @@ internal sealed class ChangedProjectAdvisoryScopePlanningTests
         });
     }
 
-    private static BenchmarkWorkloadDefinition CreateWorkload(BenchmarkTopologyShape shape, int projectCount) =>
-        BenchmarkWorkloadGenerator.Create(
+    private static BenchmarkWorkloadDefinition CreateWorkload(BenchmarkTopologyShape shape, int projectCount)
+    {
+        return BenchmarkWorkloadGenerator.Create(
             $"synthetic-scope-plan-{shape.ToString().ToLowerInvariant()}-{projectCount}",
             shape,
             new BenchmarkDimensionSet { ProjectCount = projectCount, ReferencesPerProject = 0 });
+    }
 
-    private static ChangedInput OwnedSourceFile(string inputId, string projectId) => new()
+    private static ChangedInput OwnedSourceFile(string inputId, string projectId)
     {
-        InputId = inputId,
-        Kind = ChangedInputKind.ProjectOwnedSourceFile,
-        OwningProjectIds = [projectId],
-    };
+        return new ChangedInput
+        {
+            InputId = inputId,
+            Kind = ChangedInputKind.ProjectOwnedSourceFile,
+            OwningProjectIds = [projectId]
+        };
+    }
 }

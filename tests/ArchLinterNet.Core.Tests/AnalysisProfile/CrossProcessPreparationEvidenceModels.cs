@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using ArchLinterNet.Core.Tests.Benchmarking;
 
 namespace ArchLinterNet.Core.Tests;
 
@@ -6,26 +7,26 @@ internal enum PreparationExecutionKind
 {
     IndependentProcess,
     InProcessProjection,
-    ProcessBoundProjection,
+    ProcessBoundProjection
 }
 
 internal enum PreparationRevisionRole
 {
     Candidate,
-    Base,
+    Base
 }
 
 internal enum PreparationBoundaryKind
 {
     MsBuildReceipt,
-    StagedAssemblies,
+    StagedAssemblies
 }
 
 internal enum PreparationDecisionOutcome
 {
     A,
     B,
-    C,
+    C
 }
 
 internal sealed record PreparationProjectionIdentity
@@ -115,10 +116,8 @@ internal sealed record PreparationResourceBound
     {
         if (LowerBound < 0 || UpperBound < LowerBound || string.IsNullOrWhiteSpace(Unit) ||
             string.IsNullOrWhiteSpace(Basis) || string.IsNullOrWhiteSpace(Uncertainty))
-        {
             throw new InvalidOperationException(
                 $"Preparation resource bound '{fieldName}' must contain ordered non-negative bounds, a unit, basis, and uncertainty.");
-        }
     }
 }
 
@@ -147,54 +146,42 @@ internal sealed record CrossProcessPreparationWorkflow
     public void Validate()
     {
         if (!string.Equals(EvidenceSchemaId, SchemaId, StringComparison.Ordinal))
-        {
             throw new InvalidOperationException($"Unsupported preparation evidence schema '{EvidenceSchemaId}'.");
-        }
 
         if (string.IsNullOrWhiteSpace(WorkloadIdentity))
-        {
             throw new InvalidOperationException("Preparation evidence requires a workload identity.");
-        }
 
         ValidateRevision(CandidateRevision, PreparationRevisionRole.Candidate, "candidate_revision");
-        if (BaseRevision is not null)
-        {
-            ValidateRevision(BaseRevision, PreparationRevisionRole.Base, "base_revision");
-        }
+        if (BaseRevision is not null) ValidateRevision(BaseRevision, PreparationRevisionRole.Base, "base_revision");
 
-        if (Projections.Count == 0 || Projections.Select(projection => projection.ProjectionId).Distinct(StringComparer.Ordinal).Count() != Projections.Count)
-        {
-            throw new InvalidOperationException("Preparation evidence requires unique projections.");
-        }
+        if (Projections.Count == 0 ||
+            Projections.Select(projection => projection.ProjectionId).Distinct(StringComparer.Ordinal).Count() !=
+            Projections.Count) throw new InvalidOperationException("Preparation evidence requires unique projections.");
 
         foreach (PreparationProjectionIdentity projection in Projections)
         {
             if (!PreparationContractIdentity.IsCommandFamily(projection.CommandFamily))
-            {
-                throw new InvalidOperationException($"Unknown preparation command family '{projection.CommandFamily}'.");
-            }
+                throw new InvalidOperationException(
+                    $"Unknown preparation command family '{projection.CommandFamily}'.");
 
             PreparationContractIdentity.ValidateToken(projection.ProjectionId, "projection_id");
             PreparationContractIdentity.ValidateToken(projection.ComparisonGroup, "comparison_group");
         }
 
         if (MeasuredCommandFamilies.Any(family =>
-                Projections.All(projection => !string.Equals(projection.CommandFamily, family, StringComparison.Ordinal))))
-        {
+                Projections.All(projection =>
+                    !string.Equals(projection.CommandFamily, family, StringComparison.Ordinal))))
             throw new InvalidOperationException("Every measured command family must have a declared projection.");
-        }
 
         if (MeasuredCommandFamilies.Count == 0 ||
             MeasuredCommandFamilies.Any(family => !PreparationContractIdentity.IsCommandFamily(family)) ||
             MeasuredCommandFamilies.Distinct(StringComparer.Ordinal).Count() != MeasuredCommandFamilies.Count)
-        {
-            throw new InvalidOperationException("Preparation evidence must declare each measured command family exactly once.");
-        }
+            throw new InvalidOperationException(
+                "Preparation evidence must declare each measured command family exactly once.");
 
-        if (CacheModesMeasured.Count == 0 || CacheModesMeasured.Any(mode => !PreparationContractIdentity.IsCacheMode(mode)))
-        {
+        if (CacheModesMeasured.Count == 0 ||
+            CacheModesMeasured.Any(mode => !PreparationContractIdentity.IsCacheMode(mode)))
             throw new InvalidOperationException("Preparation evidence must declare only known cache modes.");
-        }
     }
 
     private static void ValidateRevision(
@@ -203,9 +190,8 @@ internal sealed record CrossProcessPreparationWorkflow
         string fieldName)
     {
         if (revision.Role != expectedRole)
-        {
-            throw new InvalidOperationException($"{fieldName} has role '{revision.Role}' but expected '{expectedRole}'.");
-        }
+            throw new InvalidOperationException(
+                $"{fieldName} has role '{revision.Role}' but expected '{expectedRole}'.");
 
         PreparationContractIdentity.ValidateSyntheticIdentity(revision.Identity, fieldName);
     }
@@ -224,36 +210,26 @@ internal sealed record CrossProcessProcessEvidence
     public void Validate(CrossProcessPreparationWorkflow workflow)
     {
         if (Identity.ProcessOrdinal < 1)
-        {
             throw new InvalidOperationException("Preparation process ordinals start at one.");
-        }
 
         if (!workflow.Projections.Contains(Identity.Projection))
-        {
             throw new InvalidOperationException("Every process must reference a declared projection.");
-        }
 
         if (Identity.ExecutionKind == PreparationExecutionKind.InProcessProjection && Identity.Projection.ProcessBound)
-        {
             throw new InvalidOperationException("A process-bound projection cannot be recorded as in-process.");
-        }
 
-        if (Identity.ExecutionKind == PreparationExecutionKind.ProcessBoundProjection && !Identity.Projection.ProcessBound)
-        {
-            throw new InvalidOperationException("A process-bound projection must declare a process-bound projection identity.");
-        }
+        if (Identity.ExecutionKind == PreparationExecutionKind.ProcessBoundProjection &&
+            !Identity.Projection.ProcessBound)
+            throw new InvalidOperationException(
+                "A process-bound projection must declare a process-bound projection identity.");
 
         if (Identity.RevisionRole == PreparationRevisionRole.Base && workflow.BaseRevision is null)
-        {
             throw new InvalidOperationException("Base process evidence requires a declared base revision.");
-        }
 
         if (Sample.Run.SampleOrdinal != Identity.ProcessOrdinal ||
             Sample.CompletionStatus != CanonicalResult.CompletionStatus ||
             Sample.ExitCode != CanonicalResult.ExitCode)
-        {
             throw new InvalidOperationException("Process identity, profile sample, and canonical result disagree.");
-        }
 
         Resources.Validate($"processes[{Identity.ProcessOrdinal}].resources");
     }
@@ -274,14 +250,11 @@ internal sealed record PreparationDecision
     public void Validate()
     {
         if (string.IsNullOrWhiteSpace(Route) || string.IsNullOrWhiteSpace(Reason))
-        {
             throw new InvalidOperationException("Every #493 decision must include a route and reason.");
-        }
 
         if (Outcome == PreparationDecisionOutcome.A && (!OneProcessAlternativeEvaluated || !BreakEvenObserved))
-        {
-            throw new InvalidOperationException("Outcome A requires the one-process alternative and break-even effect to be measured.");
-        }
+            throw new InvalidOperationException(
+                "Outcome A requires the one-process alternative and break-even effect to be measured.");
     }
 }
 
@@ -321,9 +294,7 @@ internal sealed record CrossProcessPreparationEvidenceDocument
     public void Validate()
     {
         if (!string.Equals(EvidenceSchemaId, SchemaId, StringComparison.Ordinal))
-        {
             throw new InvalidOperationException($"Unsupported cross-process evidence schema '{EvidenceSchemaId}'.");
-        }
 
         BenchmarkEvidence.Validate();
         Workflow.Validate();
@@ -331,51 +302,38 @@ internal sealed record CrossProcessPreparationEvidenceDocument
         Decision.Validate();
 
         if (Workflow.OneProcessAlternativeMeasured != PreparedEffect.DecisionCapableEvidence)
-        {
             throw new InvalidOperationException(
                 "The one-process workflow flag must match complete attribution and timing evidence.");
-        }
 
         if (!PreparedEffect.DecisionCapableEvidence &&
             (Decision.Outcome != PreparationDecisionOutcome.C || Decision.OneProcessAlternativeEvaluated))
-        {
             throw new InvalidOperationException(
                 "Incomplete one-process attribution or timing evidence must remain non-decision-capable with Outcome C.");
-        }
 
         if (Decision.Outcome == PreparationDecisionOutcome.A && !PreparedEffect.Resources.HasBoundedTradeoffModel)
-        {
             throw new InvalidOperationException(
                 "Outcome A requires bounded storage, I/O, allocation, and peak-memory trade-off evidence.");
-        }
 
         if (Decision.Outcome == PreparationDecisionOutcome.A && !PreparedEffect.MateriallyCheaper)
-        {
             throw new InvalidOperationException(
                 "Outcome A requires measured savings at or above the issue-specific materiality threshold.");
-        }
 
-        if (!string.Equals(Workflow.WorkloadIdentity, BenchmarkEvidence.Workload.WorkloadIdentity, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("Cross-process evidence must use the composed benchmark workload identity.");
-        }
+        if (!string.Equals(Workflow.WorkloadIdentity, BenchmarkEvidence.Workload.WorkloadIdentity,
+                StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "Cross-process evidence must use the composed benchmark workload identity.");
 
-        if (Processes.Count == 0 || Processes.Select(process => process.Identity.ProcessOrdinal).Distinct().Count() != Processes.Count)
-        {
+        if (Processes.Count == 0 || Processes.Select(process => process.Identity.ProcessOrdinal).Distinct().Count() !=
+            Processes.Count)
             throw new InvalidOperationException("Cross-process evidence requires unique process ordinals.");
-        }
 
-        foreach (CrossProcessProcessEvidence process in Processes)
-        {
-            process.Validate(Workflow);
-        }
+        foreach (CrossProcessProcessEvidence process in Processes) process.Validate(Workflow);
 
         IReadOnlyList<CrossProcessProcessEvidence> candidateProcesses = Processes
             .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate)
             .ToList();
 
         if (Workflow.OneProcessAlternativeMeasured)
-        {
             foreach (string family in Workflow.MeasuredCommandFamilies)
             {
                 bool covered = candidateProcesses.Any(process =>
@@ -383,39 +341,33 @@ internal sealed record CrossProcessPreparationEvidenceDocument
                     process.Identity.ExecutionKind is PreparationExecutionKind.InProcessProjection or
                         PreparationExecutionKind.ProcessBoundProjection);
                 if (!covered)
-                {
                     throw new InvalidOperationException(
                         $"One-process alternative is incomplete: command family '{family}' has no shared or explicit process-bound projection.");
-                }
             }
-        }
 
         if (RepresentativeCandidateIndependentProcesses.Count != PreparedEffect.RepresentativeProcessCount)
-        {
             throw new InvalidOperationException(
                 "Prepared-effect R must count one disabled-cache candidate independent process per representative command family; supplemental cache-mode and duplicate samples are excluded.");
-        }
 
         foreach (IGrouping<string, CrossProcessProcessEvidence> group in candidateProcesses
                      .GroupBy(process => process.Identity.Projection.ComparisonGroup, StringComparer.Ordinal)
-                     .Where(group => group.Any(process => process.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess) &&
-                                     group.Any(process => process.Identity.ExecutionKind == PreparationExecutionKind.InProcessProjection)))
-        {
+                     .Where(group => group.Any(process =>
+                                         process.Identity.ExecutionKind ==
+                                         PreparationExecutionKind.IndependentProcess) &&
+                                     group.Any(process =>
+                                         process.Identity.ExecutionKind ==
+                                         PreparationExecutionKind.InProcessProjection)))
             if (group.Select(process => process.CanonicalResult.Sha256).Distinct(StringComparer.Ordinal).Count() != 1)
-            {
                 throw new InvalidOperationException(
                     $"Equivalent preparation modes in comparison group '{group.Key}' must have equivalent canonical results.");
-            }
-        }
 
         if (BenchmarkEvidence.Samples.Count != Processes.Count ||
             BenchmarkEvidence.Samples.Select(sample => sample.Run.SampleOrdinal).OrderBy(ordinal => ordinal)
-                .SequenceEqual(Processes.Select(process => process.Identity.ProcessOrdinal).OrderBy(ordinal => ordinal)) is false)
-        {
-            throw new InvalidOperationException("The composed benchmark envelope must retain every measured process sample.");
-        }
+                .SequenceEqual(Processes.Select(process => process.Identity.ProcessOrdinal)
+                    .OrderBy(ordinal => ordinal)) is false)
+            throw new InvalidOperationException(
+                "The composed benchmark envelope must retain every measured process sample.");
     }
-
 }
 
 internal static class PreparationContractIdentity
@@ -430,36 +382,40 @@ internal static class PreparationContractIdentity
         "topology",
         "measure",
         "baseline",
-        "public_api",
+        "public_api"
     };
 
     private static readonly HashSet<string> _cacheModes = new(StringComparer.Ordinal)
     {
         "disabled",
         "miss",
-        "hit",
+        "hit"
     };
 
-    public static bool IsCommandFamily(string value) => _commandFamilies.Contains(value);
+    public static bool IsCommandFamily(string value)
+    {
+        return _commandFamilies.Contains(value);
+    }
 
-    public static bool IsCacheMode(string value) => _cacheModes.Contains(value);
+    public static bool IsCacheMode(string value)
+    {
+        return _cacheModes.Contains(value);
+    }
 
     public static void ValidateSyntheticIdentity(string value, string fieldName)
     {
         if (!value.StartsWith("synthetic-", StringComparison.Ordinal) || value.Length == "synthetic-".Length)
-        {
             throw new InvalidOperationException($"{fieldName} must be a synthetic identity.");
-        }
 
         ValidateToken(value, fieldName);
     }
 
     public static void ValidateToken(string value, string fieldName)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsWhiteSpace) || value.Contains('/') || value.Contains('\\') ||
-            value.Contains("private", StringComparison.OrdinalIgnoreCase) || value.Contains("adopter", StringComparison.OrdinalIgnoreCase))
-        {
+        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsWhiteSpace) || value.Contains('/') ||
+            value.Contains('\\') ||
+            value.Contains("private", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("adopter", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"{fieldName} is not a privacy-safe identity.");
-        }
     }
 }

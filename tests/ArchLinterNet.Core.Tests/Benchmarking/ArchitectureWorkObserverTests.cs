@@ -1,3 +1,5 @@
+using System.Collections;
+using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
@@ -20,7 +22,8 @@ public sealed class ArchitectureWorkObserverTests
         string root = Path.Combine(Path.GetTempPath(), "arch-linter-observer-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         string projectPath = Path.Combine(root, "Sample.csproj");
-        File.WriteAllText(projectPath, "<Project><PropertyGroup><AssemblyName>Sample</AssemblyName></PropertyGroup></Project>");
+        File.WriteAllText(projectPath,
+            "<Project><PropertyGroup><AssemblyName>Sample</AssemblyName></PropertyGroup></Project>");
 
         try
         {
@@ -44,13 +47,13 @@ public sealed class ArchitectureWorkObserverTests
 
             ArchitectureContractDocument document = new()
             {
-                Analysis = new ArchitectureAnalysisConfiguration { Projects = ["Sample.csproj"] },
+                Analysis = new ArchitectureAnalysisConfiguration { Projects = ["Sample.csproj"] }
             };
             ProjectDiscoveryResult expectedDiscovery = new ArchitectureProjectDiscoveryService()
-                .ResolveFromDocument(document, root, resolveAssemblyOutputs: false);
+                .ResolveFromDocument(document, root, false);
             BenchmarkWorkObserver discoveryObserver = new();
             ProjectDiscoveryResult observedDiscovery = new ArchitectureProjectDiscoveryService()
-                .ResolveAndApply(document, root, resolveAssemblyOutputs: false, discoveryObserver, default);
+                .ResolveAndApply(document, root, false, discoveryObserver, CancellationToken.None);
 
             Assert.That(observedDiscovery.DiscoveredProjects.Select(project => project.AssemblyName),
                 Is.EqualTo(expectedDiscovery.DiscoveredProjects.Select(project => project.AssemblyName)));
@@ -58,7 +61,7 @@ public sealed class ArchitectureWorkObserverTests
         }
         finally
         {
-            Directory.Delete(root, recursive: true);
+            Directory.Delete(root, true);
         }
     }
 
@@ -73,13 +76,15 @@ public sealed class ArchitectureWorkObserverTests
         fileSystem.AddFile(Root + "/src/SourceFixture.cs", Source, DateTime.UtcNow);
         BenchmarkWorkObserver observer = new();
 
-        ArchitectureSourceFileFactIndex Build(BenchmarkWorkObserver? workObserver) =>
-            new(
+        ArchitectureSourceFileFactIndex Build(BenchmarkWorkObserver? workObserver)
+        {
+            return new ArchitectureSourceFileFactIndex(
                 [typeof(ArchitectureWorkObserverTests).Assembly], Root, ["src"], null, fileSystem,
                 new ArchitectureSourceFileFactIndex.ProjectOwnership(null,
                     new Dictionary<string, string>(StringComparer.Ordinal) { ["src"] = "ArchLinterNet.Core.Tests" }),
                 new ArchitectureSourceFileFactIndex.ConstructionOptions(
-                    ProfilingCounters: null, CancellationToken: default, BenchmarkWorkObserver: workObserver));
+                    null, CancellationToken.None, BenchmarkWorkObserver: workObserver));
+        }
 
         ArchitectureSourceFileFactIndex baseline = Build(null);
         ArchitectureSourceFileFactIndex observed = Build(observer);
@@ -110,24 +115,28 @@ public sealed class ArchitectureWorkObserverTests
             IReadOnlyList<ArchitectureViolation> expected = scanner.FindMethodBodyViolations(
                 root, layer.Namespace, patterns, executionContext, ["src"], layer).ToArray();
             BenchmarkWorkObserver observer = new();
-            IReadOnlyList<ArchitectureViolation> actual = ArchitectureSourceScanner.FindMethodBodyViolationsWithObserver(
-                new ArchitectureMethodBodyScanRequest
-                {
-                    RepositoryRoot = root,
-                    SourceNamespacePrefix = layer.Namespace,
-                    ForbiddenCallPatterns = patterns,
-                    ExecutionContext = executionContext,
-                    SourceRoots = ["src"],
-                    SourceLayer = layer,
-                    FileSystem = ArchitectureFileSystem.Real,
-                    BenchmarkWorkObserver = observer,
-                }).ToArray();
+            IReadOnlyList<ArchitectureViolation> actual = ArchitectureSourceScanner
+                .FindMethodBodyViolationsWithObserver(
+                    new ArchitectureMethodBodyScanRequest
+                    {
+                        RepositoryRoot = root,
+                        SourceNamespacePrefix = layer.Namespace,
+                        ForbiddenCallPatterns = patterns,
+                        ExecutionContext = executionContext,
+                        SourceRoots = ["src"],
+                        SourceLayer = layer,
+                        FileSystem = ArchitectureFileSystem.Real,
+                        BenchmarkWorkObserver = observer
+                    }).ToArray();
 
-            static string[] Describe(IEnumerable<ArchitectureViolation> violations) => violations
-                .Select(violation => string.Join("|", violation.ContractName, violation.ContractId,
-                    violation.SourceType, violation.ForbiddenNamespace,
-                    string.Join(";", violation.ForbiddenReferences)))
-                .ToArray();
+            static string[] Describe(IEnumerable<ArchitectureViolation> violations)
+            {
+                return violations
+                    .Select(violation => string.Join("|", violation.ContractName, violation.ContractId,
+                        violation.SourceType, violation.ForbiddenNamespace,
+                        string.Join(";", violation.ForbiddenReferences)))
+                    .ToArray();
+            }
 
             Assert.That(Describe(actual), Is.EqualTo(Describe(expected)));
             Assert.That(observer.MethodBodyCompilationCalls, Is.EqualTo(1));
@@ -136,7 +145,7 @@ public sealed class ArchitectureWorkObserverTests
         }
         finally
         {
-            Directory.Delete(root, recursive: true);
+            Directory.Delete(root, true);
         }
     }
 
@@ -144,8 +153,9 @@ public sealed class ArchitectureWorkObserverTests
     public void CelContextFactory_ObserverCountsContextConstructionAndLeavesUnexercisedCountsAbsent()
     {
         BenchmarkWorkObserver observer = new();
-        var expected = ArchitectureExpressionContextFactory.CreateSelectorContext(CreateSubject());
-        var actual = ArchitectureExpressionContextFactory.CreateSelectorContext(CreateSubject(), observer);
+        CelEvaluationContext expected = ArchitectureExpressionContextFactory.CreateSelectorContext(CreateSubject());
+        CelEvaluationContext actual =
+            ArchitectureExpressionContextFactory.CreateSelectorContext(CreateSubject(), observer);
 
         Assert.That(actual.Assignments.Count, Is.EqualTo(expected.Assignments.Count));
         Assert.That(observer.CelContextConstructions, Is.EqualTo(1));
@@ -157,19 +167,27 @@ public sealed class ArchitectureWorkObserverTests
     public void CheckerContext_ObserverCountsActualLayerMembershipProbesAndPreservesResolution()
     {
         string namespaceName = typeof(ArchitectureWorkObserverTests).Namespace!;
-        ArchitectureContractDocument document = new() { Version = 1, Name = "observer-test" };
-        document.Layers["first"] = new ArchitectureLayer { Namespace = namespaceName };
-        document.Layers["second"] = new ArchitectureLayer { Namespace = "No.Match" };
+        ArchitectureContractDocument document = new()
+        {
+            Version = 1,
+            Name = "observer-test",
+            Layers =
+            {
+                ["first"] = new ArchitectureLayer { Namespace = namespaceName },
+                ["second"] = new ArchitectureLayer { Namespace = "No.Match" }
+            }
+        };
 
         string? Resolve(BenchmarkWorkObserver? observer, CountingReadOnlySet candidateLayerNames)
         {
             ArchitectureAnalysisContext analysisContext = new(
                 "/tmp", [typeof(ArchitectureWorkObserverTests).Assembly], Array.Empty<string>(), Array.Empty<string>())
             {
-                BenchmarkWorkObserver = observer,
+                BenchmarkWorkObserver = observer
             };
             ArchitectureAnalysisSession session = new(analysisContext, document, null, false, null);
-            return session.CheckerContext.ResolveContainingLayer(typeof(ArchitectureWorkObserverTests), candidateLayerNames);
+            return session.CheckerContext.ResolveContainingLayer(typeof(ArchitectureWorkObserverTests),
+                candidateLayerNames);
         }
 
         CountingReadOnlySet unobservedCandidates = new(["first", "second"]);
@@ -199,27 +217,58 @@ public sealed class ArchitectureWorkObserverTests
             }
         }
 
-        public bool Contains(string item) => _values.Contains(item);
+        public bool Contains(string item)
+        {
+            return _values.Contains(item);
+        }
 
-        public bool IsProperSubsetOf(IEnumerable<string> other) => _values.IsProperSubsetOf(other);
+        public bool IsProperSubsetOf(IEnumerable<string> other)
+        {
+            return _values.IsProperSubsetOf(other);
+        }
 
-        public bool IsProperSupersetOf(IEnumerable<string> other) => _values.IsProperSupersetOf(other);
+        public bool IsProperSupersetOf(IEnumerable<string> other)
+        {
+            return _values.IsProperSupersetOf(other);
+        }
 
-        public bool IsSubsetOf(IEnumerable<string> other) => _values.IsSubsetOf(other);
+        public bool IsSubsetOf(IEnumerable<string> other)
+        {
+            return _values.IsSubsetOf(other);
+        }
 
-        public bool IsSupersetOf(IEnumerable<string> other) => _values.IsSupersetOf(other);
+        public bool IsSupersetOf(IEnumerable<string> other)
+        {
+            return _values.IsSupersetOf(other);
+        }
 
-        public bool Overlaps(IEnumerable<string> other) => _values.Overlaps(other);
+        public bool Overlaps(IEnumerable<string> other)
+        {
+            return _values.Overlaps(other);
+        }
 
-        public bool SetEquals(IEnumerable<string> other) => _values.SetEquals(other);
+        public bool SetEquals(IEnumerable<string> other)
+        {
+            return _values.SetEquals(other);
+        }
 
-        public IEnumerator<string> GetEnumerator() => _values.GetEnumerator();
+        public IEnumerator<string> GetEnumerator()
+        {
+            return _values.GetEnumerator();
+        }
 
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 
-    private static ArchitectureExpressionSubjectFacts CreateSubject() => new(
-        "Sample.Domain.Type", "Type", "Sample.Domain", "Sample", "Sample", "Domain",
-        new Dictionary<string, string>(), new Dictionary<string, bool>(), "class", false, false,
-        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
+    private static ArchitectureExpressionSubjectFacts CreateSubject()
+    {
+        return new ArchitectureExpressionSubjectFacts(
+            "Sample.Domain.Type", "Type", "Sample.Domain", "Sample", "Sample", "Domain",
+            new Dictionary<string, string>(), new Dictionary<string, bool>(), "class", false, false,
+            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<string>());
+    }
 }

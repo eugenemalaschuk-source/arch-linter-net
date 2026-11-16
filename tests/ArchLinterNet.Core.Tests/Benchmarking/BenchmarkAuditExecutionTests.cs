@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using NUnit.Framework;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 [TestFixture]
 [NonParallelizable]
@@ -11,7 +11,7 @@ public sealed class BenchmarkAuditExecutionTests
     [
         "synthetic-metric-001",
         "synthetic-metric-002",
-        "synthetic-metric-003",
+        "synthetic-metric-003"
     ];
 
     [TestCase(nameof(BenchmarkContractLayerGraphShape.DenseDag), false)]
@@ -37,25 +37,25 @@ public sealed class BenchmarkAuditExecutionTests
                 IgnoreRuleCount = 1,
                 MetricRuleCount = 3,
                 ReportRuleCount = 2,
-                MethodBodyRuleCount = 1,
+                MethodBodyRuleCount = 1
             },
             contractLayerGraphShape: graphShape);
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
-        Stopwatch build = Stopwatch.StartNew();
+        var build = Stopwatch.StartNew();
         fixture.Build();
         build.Stop();
-        BenchmarkResourceMeasurement buildMeasurement = BenchmarkResourceMeasurement.Available(
+        var buildMeasurement = BenchmarkResourceMeasurement.Available(
             Math.Max(1, (long)Math.Ceiling(build.Elapsed.TotalMilliseconds)), "milliseconds");
-        BenchmarkResourceMeasurement materializationMeasurement = BenchmarkResourceMeasurement.Unavailable(
+        var materializationMeasurement = BenchmarkResourceMeasurement.Unavailable(
             "Fixture materialization duration is not needed for this deterministic checker-invocation test.");
 
         BenchmarkAuditAnalysisRun unobserved = BenchmarkAuditAnalysisRunner.Run(
-            fixture, observerEnabled: false, sampleOrdinal: 1, isWarmSample: false,
-            parallelMode: "sequential", maxParallelism: 1,
+            fixture, false, 1, false,
+            "sequential", 1,
             materializationMeasurement, buildMeasurement);
         BenchmarkAuditAnalysisRun observed = BenchmarkAuditAnalysisRunner.Run(
-            fixture, observerEnabled: true, sampleOrdinal: 1, isWarmSample: false,
-            parallelMode: "sequential", maxParallelism: 1,
+            fixture, true, 1, false,
+            "sequential", 1,
             materializationMeasurement, buildMeasurement);
 
         Assert.Multiple(() =>
@@ -70,10 +70,11 @@ public sealed class BenchmarkAuditExecutionTests
             Assert.That(observed.Sample.MetricWork.Results.Select(result => result.MetricId),
                 Is.EqualTo(_expectedMetricIds));
             Assert.That(observed.Sample.MetricWork.Results.All(result =>
-                result.MetricKind == "topology_type_count" && result.Value > 0 &&
-                result.Value == result.ContributorCount), Is.True);
+                result is { MetricKind: "topology_type_count", Value: > 0 }
+                && result.Value == result.ContributorCount), Is.True);
             Assert.That(observed.Sample.MetricWork.ResultsSha256, Does.Match("^[0-9a-f]{64}$"));
-            Assert.That(observed.Sample.RawAnalysisProfile.GetProperty("SchemaId").GetString(), Is.EqualTo("analysis-profile/v1"));
+            Assert.That(observed.Sample.RawAnalysisProfile.GetProperty("SchemaId").GetString(),
+                Is.EqualTo("analysis-profile/v1"));
             Assert.That(observed.Sample.LoadedAssemblies!.Artifacts, Is.Not.Empty);
             Assert.That(observed.Sample.LoadedAssemblies.Artifacts.All(artifact =>
                 artifact.FileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)

@@ -2,24 +2,13 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using ArchLinterNet.Core.Tests.Benchmarking;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class PreparedAnalysisReuseBenchmarkHarness
 {
-    private sealed record MeasuredScalePoint(
-        string Label,
-        BenchmarkWorkloadDefinition Workload,
-        int CommandCount,
-        decimal IndependentPreparationWork,
-        decimal IndependentProjectionWork,
-        decimal IndependentPreparationMilliseconds,
-        decimal IndependentProjectionMilliseconds,
-        decimal PerConsumerLoadAuthorizationCost,
-        decimal PerConsumerLoadAuthorizationMilliseconds,
-        IReadOnlyList<string> MissingTimingEvidenceFamilies);
-
     private static PreparedEffectContract CreateEffect(
         BenchmarkWorkloadDefinition workload,
         IReadOnlyCollection<CrossProcessProcessEvidence> processes,
@@ -86,12 +75,14 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             .Where(family =>
             {
                 bool independentAvailable = representativeIndependentProcesses
-                    .Where(process => string.Equals(process.Identity.Projection.CommandFamily, family, StringComparison.Ordinal))
+                    .Where(process =>
+                        string.Equals(process.Identity.Projection.CommandFamily, family, StringComparison.Ordinal))
                     .Select(process => TryReadMeasuredDurationMilliseconds(process.Sample))
                     .Any(duration => duration is > 0);
                 bool oneProcessAvailable = processes
                     .Where(process => process.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
-                                      string.Equals(process.Identity.Projection.CommandFamily, family, StringComparison.Ordinal) &&
+                                      string.Equals(process.Identity.Projection.CommandFamily, family,
+                                          StringComparison.Ordinal) &&
                                       process.Identity.ExecutionKind is PreparationExecutionKind.InProcessProjection or
                                           PreparationExecutionKind.ProcessBoundProjection)
                     .Select(process => TryReadMeasuredDurationMilliseconds(process.Sample))
@@ -129,7 +120,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ? independentPreparationMilliseconds / representativeProcessCount
             : 0;
         IReadOnlyList<decimal> loadAuthorizationDurations = timingEvidenceComplete
-            ? sharedProcesses.Select(process => MeasureLoadAuthorizationDuration(process.Sample.RawAnalysisProfile)).ToList()
+            ? sharedProcesses.Select(process => MeasureLoadAuthorizationDuration(process.Sample.RawAnalysisProfile))
+                .ToList()
             : [];
         decimal loadAuthorizationCost = loadAuthorizationDurations.Count == 0
             ? 0
@@ -157,7 +149,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         {
             IssueReference = "#493",
             CostModelUnit = PreparedEffectContract.CostModelUnitMilliseconds,
-            CostMeasurementBasis = "Stopwatch wall-clock duration measurements retained in milliseconds; deterministic profile counters are attribution evidence and never interchangeable cost units.",
+            CostMeasurementBasis =
+                "Stopwatch wall-clock duration measurements retained in milliseconds; deterministic profile counters are attribution evidence and never interchangeable cost units.",
             RepresentativeProcessCount = representativeProcessCount,
             RepeatedWorkShare = repeatedWorkShare,
             CandidatePreparedBoundaryWork = candidateWork,
@@ -183,14 +176,15 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             WorkMeasurementBasis = workMeasurementBasis,
             BreakEvenProcessCount = null,
             CacheModesMeasured = ["disabled", "miss", "hit"],
-            Resources = CreatePreparationResourceEvidence(workload, representativeIndependentProcesses, representativeProcessCount),
+            Resources = CreatePreparationResourceEvidence(workload, representativeIndependentProcesses,
+                representativeProcessCount),
             ScaleEvidenceBasis =
                 $"Measured Stopwatch durations in milliseconds for small, medium, and large {workload.CompilationMode} workloads; each point runs one cache-disabled process for every representative command family ({string.Join(", ", _measuredCommandFamilies)}), independently times only available projections, and repeats an in-memory serialized-state load/authorization proxy. Process-bound families without projection-only or phase timing remain explicitly incomplete; no independent process duration is reused as projection timing. Measured analysis-profile/v1 counters remain scale-specific attribution evidence only.",
             ScaleEvidence = scaleEvidence,
             ExpectedEffect = CreateExpectedEffect(
                 repeatedWorkShare,
                 scaleEvidence),
-            ExactCacheHitSavingsExcluded = true,
+            ExactCacheHitSavingsExcluded = true
         };
         int? breakEven = effect.CalculateBreakEvenProcessCount();
         decimal expectedPersistedReuseWork = effect.PreparedReuseCost(representativeProcessCount);
@@ -204,7 +198,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             ExpectedPersistedReuseWork = expectedPersistedReuseWork,
             MeasuredMaterialSavingsRatio = measuredMaterialSavingsRatio,
             DistinctCrossProcessValue = decisionCapableEvidence &&
-                expectedPersistedReuseWork < measuredOneProcessAlternativeWork!.Value,
+                                        expectedPersistedReuseWork < measuredOneProcessAlternativeWork!.Value
         };
     }
 
@@ -253,24 +247,23 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                     MissingTimingEvidenceFamilies = point.MissingTimingEvidenceFamilies,
                     MeasurementBasis = timingEvidenceComplete
                         ? "scale-specific Stopwatch duration measurements in milliseconds from one cache-disabled CLI process per command family, independently timed projections, and a repeated serialized-state load/authorization proxy; analysis-profile counters remain attribution evidence."
-                        : $"scale-specific Stopwatch duration measurements in milliseconds are incomplete for process-bound projection families ({string.Join(", ", point.MissingTimingEvidenceFamilies)}); no independent process duration is reused as projection timing, so no authorizing S/M/L speedup is reported. The load proxy and analysis-profile counters remain attribution evidence.",
+                        : $"scale-specific Stopwatch duration measurements in milliseconds are incomplete for process-bound projection families ({string.Join(", ", point.MissingTimingEvidenceFamilies)}); no independent process duration is reused as projection timing, so no authorizing S/M/L speedup is reported. The load proxy and analysis-profile counters remain attribution evidence."
                 };
             })
             .ToList();
     }
 
-    private static decimal DurationMilliseconds(TimeSpan elapsed) =>
-        Math.Max(0.001m, (decimal)elapsed.TotalMilliseconds);
+    private static decimal DurationMilliseconds(TimeSpan elapsed)
+    {
+        return Math.Max(0.001m, (decimal)elapsed.TotalMilliseconds);
+    }
 
     private static decimal? TryReadMeasuredDurationMilliseconds(BenchmarkProfileSample sample)
     {
-        if (sample.MeasuredWallClockMilliseconds is > 0)
-        {
-            return sample.MeasuredWallClockMilliseconds.Value;
-        }
+        if (sample.MeasuredWallClockMilliseconds is > 0) return sample.MeasuredWallClockMilliseconds.Value;
 
         return sample.WallClock.Status == BenchmarkMeasurementStatus.Available &&
-            sample.WallClock.Value is > 0
+               sample.WallClock.Value is > 0
             ? sample.WallClock.Value.Value
             : null;
     }
@@ -280,16 +273,14 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         byte[] payload = Encoding.UTF8.GetBytes(profile.GetRawText());
         const int Repetitions = 32;
         long selectedAssemblyCount = 0;
-        Stopwatch stopwatch = Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
         for (int index = 0; index < Repetitions; index++)
         {
-            using JsonDocument document = JsonDocument.Parse(payload);
+            using var document = JsonDocument.Parse(payload);
             if (document.RootElement.TryGetProperty("Counters", out JsonElement counters) &&
                 counters.TryGetProperty("SelectedAssemblyCount", out JsonElement selected) &&
                 selected.TryGetInt64(out long value))
-            {
                 selectedAssemblyCount += value;
-            }
         }
 
         stopwatch.Stop();
@@ -334,16 +325,20 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 LowerBound = stateLowerBound,
                 UpperBound = stateUpperBound,
                 Unit = "bytes",
-                Basis = "Deterministic workload-record envelope plus the largest representative profile payload; this is a pre-implementation serialized-state proxy.",
-                Uncertainty = "16-256 bytes per deterministic record and 0.25x-4x profile payload; replace with store instrumentation before implementation.",
+                Basis =
+                    "Deterministic workload-record envelope plus the largest representative profile payload; this is a pre-implementation serialized-state proxy.",
+                Uncertainty =
+                    "16-256 bytes per deterministic record and 0.25x-4x profile payload; replace with store instrumentation before implementation."
             },
             IoOperationsBound = new PreparationResourceBound
             {
                 LowerBound = 2,
                 UpperBound = checked(2 + representativeProcessCount * 2L),
                 Unit = "operations",
-                Basis = "One persisted write and one authorization/read minimum, with one metadata/read allowance per representative consumer.",
-                Uncertainty = "The range covers one write plus one-to-two read/metadata operations per consumer until the store protocol is selected.",
+                Basis =
+                    "One persisted write and one authorization/read minimum, with one metadata/read allowance per representative consumer.",
+                Uncertainty =
+                    "The range covers one write plus one-to-two read/metadata operations per consumer until the store protocol is selected."
             },
             AllocatedBytesBound = new PreparationResourceBound
             {
@@ -351,7 +346,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 UpperBound = allocationUpperBound,
                 Unit = "bytes",
                 Basis = "Serialized-state envelope with one additional encode/decode working copy.",
-                Uncertainty = "One-to-two state copies; implementation must replace this proxy with allocation measurement.",
+                Uncertainty =
+                    "One-to-two state copies; implementation must replace this proxy with allocation measurement."
             },
             PeakManagedMemoryBound = new PreparationResourceBound
             {
@@ -359,8 +355,9 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
                 UpperBound = allocationUpperBound,
                 Unit = "bytes",
                 Basis = "Serialized-state envelope held during authorization/load.",
-                Uncertainty = "One-to-two state copies; excludes unrelated host memory and requires implementation instrumentation.",
-            },
+                Uncertainty =
+                    "One-to-two state copies; excludes unrelated host memory and requires implementation instrumentation."
+            }
         };
     }
 
@@ -373,7 +370,8 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             CrossProcessProcessEvidence? process = processes
                 .Where(candidate => candidate.Identity.RevisionRole == PreparationRevisionRole.Candidate &&
                                     candidate.Identity.ExecutionKind == PreparationExecutionKind.IndependentProcess &&
-                                    string.Equals(candidate.Identity.Projection.CommandFamily, family, StringComparison.Ordinal) &&
+                                    string.Equals(candidate.Identity.Projection.CommandFamily, family,
+                                        StringComparison.Ordinal) &&
                                     string.Equals(candidate.Sample.Run.CacheMode, "disabled", StringComparison.Ordinal))
                 .OrderBy(candidate => RepresentativeProcessPreference(candidate.Sample.Run.ParallelMode))
                 .ThenBy(candidate => candidate.Identity.ProcessOrdinal)
@@ -386,13 +384,16 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
         return selected;
     }
 
-    private static int RepresentativeProcessPreference(string parallelMode) => parallelMode switch
+    private static int RepresentativeProcessPreference(string parallelMode)
     {
-        "preparation-priming" => 0,
-        "bounded-parallel" => 1,
-        "sequential" => 2,
-        _ => 3,
-    };
+        return parallelMode switch
+        {
+            "preparation-priming" => 0,
+            "bounded-parallel" => 1,
+            "sequential" => 2,
+            _ => 3
+        };
+    }
 
     private static PreparationDecision CreateDecision(
         PreparedEffectContract effect,
@@ -410,59 +411,58 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             {
                 Outcome = PreparationDecisionOutcome.C,
                 Route = "route-instrumentation-gap",
-                Reason = $"Decision-capable attribution/duration evidence is missing. Counter families: {missingCounters}; duration families: {missingDurations}. The one-process alternative is not decision-capable, and missing work is not treated as zero.",
+                Reason =
+                    $"Decision-capable attribution/duration evidence is missing. Counter families: {missingCounters}; duration families: {missingDurations}. The one-process alternative is not decision-capable, and missing work is not treated as zero.",
                 OneProcessAlternativeEvaluated = false,
-                BreakEvenObserved = false,
+                BreakEvenObserved = false
             };
         }
 
         bool breakEvenObserved = effect.BreakEvenProcessCount.HasValue &&
-            effect.ExpectedSavings(effect.RepresentativeProcessCount) > 0 &&
-            effect.PerConsumerLoadAuthorizationCostUpperBound <
-            effect.ColdPrepareCost;
+                                 effect.ExpectedSavings(effect.RepresentativeProcessCount) > 0 &&
+                                 effect.PerConsumerLoadAuthorizationCostUpperBound <
+                                 effect.ColdPrepareCost;
         if (!effect.Resources.HasBoundedTradeoffModel)
-        {
             return new PreparationDecision
             {
                 Outcome = PreparationDecisionOutcome.B,
                 Route = "defer-prepared-analysis",
-                Reason = "The work crossover is measured, but Outcome A is not decision-capable without bounded storage, I/O, allocation, and peak-memory trade-off evidence.",
+                Reason =
+                    "The work crossover is measured, but Outcome A is not decision-capable without bounded storage, I/O, allocation, and peak-memory trade-off evidence.",
                 OneProcessAlternativeEvaluated = workflow.OneProcessAlternativeMeasured,
-                BreakEvenObserved = breakEvenObserved,
+                BreakEvenObserved = breakEvenObserved
             };
-        }
 
         if (effect.DistinctCrossProcessValue && effect.MateriallyCheaper && breakEvenObserved)
-        {
             return new PreparationDecision
             {
                 Outcome = PreparationDecisionOutcome.A,
                 Route = "authorize-prepared-analysis",
-                Reason = $"Measured duration evidence shows persisted reuse is materially cheaper than the measured one-process alternative ({effect.MeasuredMaterialSavingsRatio.ToString("P1", CultureInfo.InvariantCulture)} savings versus a {effect.MaterialSavingsThreshold.ToString("P1", CultureInfo.InvariantCulture)} threshold), with a strict break-even under the measured load-cost range.",
+                Reason =
+                    $"Measured duration evidence shows persisted reuse is materially cheaper than the measured one-process alternative ({effect.MeasuredMaterialSavingsRatio.ToString("P1", CultureInfo.InvariantCulture)} savings versus a {effect.MaterialSavingsThreshold.ToString("P1", CultureInfo.InvariantCulture)} threshold), with a strict break-even under the measured load-cost range.",
                 OneProcessAlternativeEvaluated = workflow.OneProcessAlternativeMeasured,
-                BreakEvenObserved = true,
+                BreakEvenObserved = true
             };
-        }
 
         if (workflow.OneProcessAlternativeMeasured)
-        {
             return new PreparationDecision
             {
                 Outcome = PreparationDecisionOutcome.B,
                 Route = "defer-prepared-analysis",
-                Reason = $"The complete one-process alternative was measured, but persisted reuse is not materially cheaper ({effect.MeasuredMaterialSavingsRatio.ToString("P1", CultureInfo.InvariantCulture)} savings versus a {effect.MaterialSavingsThreshold.ToString("P1", CultureInfo.InvariantCulture)} threshold), its work is no more expensive, or the load-cost range removes a strict representative crossover.",
+                Reason =
+                    $"The complete one-process alternative was measured, but persisted reuse is not materially cheaper ({effect.MeasuredMaterialSavingsRatio.ToString("P1", CultureInfo.InvariantCulture)} savings versus a {effect.MaterialSavingsThreshold.ToString("P1", CultureInfo.InvariantCulture)} threshold), its work is no more expensive, or the load-cost range removes a strict representative crossover.",
                 OneProcessAlternativeEvaluated = true,
-                BreakEvenObserved = breakEvenObserved,
+                BreakEvenObserved = breakEvenObserved
             };
-        }
 
         return new PreparationDecision
         {
             Outcome = PreparationDecisionOutcome.C,
             Route = "route-instrumentation-gap",
-            Reason = "The benchmark does not yet contain a complete one-process representative workflow, so the evidence cannot authorize or reject cross-process reuse.",
+            Reason =
+                "The benchmark does not yet contain a complete one-process representative workflow, so the evidence cannot authorize or reject cross-process reuse.",
             OneProcessAlternativeEvaluated = false,
-            BreakEvenObserved = breakEvenObserved,
+            BreakEvenObserved = breakEvenObserved
         };
     }
 
@@ -472,9 +472,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             !profile.TryGetProperty("Counters", out JsonElement counters) ||
             counters.ValueKind != JsonValueKind.Object ||
             counters.TryGetProperty("Unavailable", out _))
-        {
             return null;
-        }
 
         long preparationWork = SumProperties(
             counters,
@@ -486,7 +484,7 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             "SourceScanPasses",
             "SourceFilesScanned");
         long projectionWork = SumProperties(counters, "ModesEvaluated", "RenderedSinkCount", "OutputSinkCount") +
-            SumObject(counters, "ContractFamilyCounts");
+                              SumObject(counters, "ContractFamilyCounts");
         // SelectedAssemblyCount is a resulting prepared-state inventory cardinality. It is used
         // as the explicit pre-implementation load/authorization proxy and is intentionally kept
         // separate from projection/consume counters below.
@@ -497,37 +495,44 @@ public sealed partial class PreparedAnalysisReuseBenchmarkHarness
             "AvoidedFactIndexMaterializations",
             "AvoidedSourceScanPasses",
             "AvoidedContractExecutions");
-        if (preparationWork == 0 && projectionWork == 0 && loadAuthorizationWork == 0)
-        {
-            return null;
-        }
+        if (preparationWork == 0 && projectionWork == 0 && loadAuthorizationWork == 0) return null;
 
         return new CounterWorkMeasurement(preparationWork, projectionWork, loadAuthorizationWork, cacheAvoidableWork);
     }
 
-    private static long SumProperties(JsonElement value, params string[] names) =>
-        value.ValueKind == JsonValueKind.Object
-            ? names.Sum(name => value.TryGetProperty(name, out JsonElement property) && property.ValueKind == JsonValueKind.Number
-            ? property.GetInt64()
-            : 0)
+    private static long SumProperties(JsonElement value, params string[] names)
+    {
+        return value.ValueKind == JsonValueKind.Object
+            ? names.Sum(name =>
+                value.TryGetProperty(name, out JsonElement property) && property.ValueKind == JsonValueKind.Number
+                    ? property.GetInt64()
+                    : 0)
             : 0;
+    }
 
     private static long SumObject(JsonElement value, string propertyName, params string[] directNames)
     {
-        if (directNames.Length > 0)
-        {
-            return SumProperties(value, directNames);
-        }
+        if (directNames.Length > 0) return SumProperties(value, directNames);
 
-        if (!value.TryGetProperty(propertyName, out JsonElement property) || property.ValueKind != JsonValueKind.Object)
-        {
-            return 0;
-        }
+        if (!value.TryGetProperty(propertyName, out JsonElement property) ||
+            property.ValueKind != JsonValueKind.Object) return 0;
 
         return property.EnumerateObject()
             .Where(entry => entry.Value.ValueKind == JsonValueKind.Number)
             .Sum(entry => entry.Value.GetInt64());
     }
+
+    private sealed record MeasuredScalePoint(
+        string Label,
+        BenchmarkWorkloadDefinition Workload,
+        int CommandCount,
+        decimal IndependentPreparationWork,
+        decimal IndependentProjectionWork,
+        decimal IndependentPreparationMilliseconds,
+        decimal IndependentProjectionMilliseconds,
+        decimal PerConsumerLoadAuthorizationCost,
+        decimal PerConsumerLoadAuthorizationMilliseconds,
+        IReadOnlyList<string> MissingTimingEvidenceFamilies);
 
     private sealed record CounterWorkMeasurement(
         long PreparationWork,

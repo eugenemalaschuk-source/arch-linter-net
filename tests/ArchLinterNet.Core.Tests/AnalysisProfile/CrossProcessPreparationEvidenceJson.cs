@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.Tests.Benchmarking;
+
 namespace ArchLinterNet.Core.Tests;
 
 internal static class CrossProcessPreparationEvidenceJson
@@ -10,7 +12,8 @@ internal static class CrossProcessPreparationEvidenceJson
 
     public static CrossProcessPreparationEvidenceDocument Deserialize(string json)
     {
-        CrossProcessPreparationEvidenceDocument evidence = BenchmarkJson.Deserialize<CrossProcessPreparationEvidenceDocument>(json);
+        CrossProcessPreparationEvidenceDocument evidence =
+            BenchmarkJson.Deserialize<CrossProcessPreparationEvidenceDocument>(json);
         evidence.Validate();
         return evidence;
     }

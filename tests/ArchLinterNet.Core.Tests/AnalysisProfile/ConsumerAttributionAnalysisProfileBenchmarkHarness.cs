@@ -20,9 +20,10 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     private const int ProcessTimeoutMilliseconds = 300_000;
     private const int FixtureBuildTimeoutMilliseconds = 300_000;
     private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+
     private static readonly HashSet<string> _outputPhaseNames = new(StringComparer.Ordinal)
     {
-        "render_human", "render_json", "render_sarif", "output_staging", "output_stream_write", "output_commit",
+        "render_human", "render_json", "render_sarif", "output_staging", "output_stream_write", "output_commit"
     };
 
     [Test]
@@ -32,49 +33,51 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         Assert.That(File.Exists(CliDllPath()), Is.True,
             $"Release CLI not built at {CliDllPath()} — run `rtk make pack` first.");
 
-        using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("large-multi-host");
+        using var fixture = AdoptionAcceptanceFixture.Create("large-multi-host");
         cancellationToken.ThrowIfCancellationRequested();
-        Stopwatch buildClock = Stopwatch.StartNew();
+        var buildClock = Stopwatch.StartNew();
         fixture.Build(cancellationToken: cancellationToken, timeoutMilliseconds: FixtureBuildTimeoutMilliseconds);
         buildClock.Stop();
         cancellationToken.ThrowIfCancellationRequested();
 
         BatchSample priming = await RunBatchAsync(
-            fixture, processCount: 1, dispatchMode: "sequential", cancellationToken, ensureBuilt: true);
+            fixture, 1, "sequential", cancellationToken, true);
         ValidateSuccessfulBatch(priming, "ensure-built receipt preparation");
         Assert.That(priming.Processes.All(static process => process.PreparationMode == "--ensure-built"), Is.True,
             "The one-time preparation sample must use --ensure-built.");
         int projectsPerProcess = priming.Processes[0].Counters.DiscoveredProjectCount;
 
         List<ScenarioSummary> scenarios = new();
-        ScenarioSeries single = await RunSeriesAsync(fixture, processCount: 1, dispatchMode: "sequential", prime: false, cancellationToken);
+        ScenarioSeries single = await RunSeriesAsync(fixture, 1, "sequential", false, cancellationToken);
         ScenarioSummary singleSummary = Summarize(
             "1-process-sequential", "One independent strict validation process using prepared receipts", single);
         scenarios.Add(singleSummary);
 
-        ScenarioSeries sequentialTwo = await RunSeriesAsync(fixture, processCount: 2, dispatchMode: "sequential", prime: false, cancellationToken);
+        ScenarioSeries sequentialTwo = await RunSeriesAsync(fixture, 2, "sequential", false, cancellationToken);
         scenarios.Add(Summarize(
-            "2-process-sequential", "Two independent strict processes using prepared receipts over one unchanged build", sequentialTwo));
+            "2-process-sequential", "Two independent strict processes using prepared receipts over one unchanged build",
+            sequentialTwo));
 
-        ScenarioSeries sequentialFour = await RunSeriesAsync(fixture, processCount: 4, dispatchMode: "sequential", prime: false, cancellationToken);
+        ScenarioSeries sequentialFour = await RunSeriesAsync(fixture, 4, "sequential", false, cancellationToken);
         scenarios.Add(Summarize(
-            "4-process-sequential", "Four independent strict processes using prepared receipts over one unchanged build", sequentialFour));
+            "4-process-sequential",
+            "Four independent strict processes using prepared receipts over one unchanged build", sequentialFour));
 
-        ScenarioSeries parallelTwo = await RunSeriesAsync(fixture, processCount: 2, dispatchMode: "bounded-parallel", prime: false, cancellationToken);
+        ScenarioSeries parallelTwo = await RunSeriesAsync(fixture, 2, "bounded-parallel", false, cancellationToken);
         scenarios.Add(Summarize(
-            "2-process-bounded-parallel", "Two independent strict processes using prepared receipts dispatched together", parallelTwo));
+            "2-process-bounded-parallel",
+            "Two independent strict processes using prepared receipts dispatched together", parallelTwo));
 
-        ScenarioSeries parallelFour = await RunSeriesAsync(fixture, processCount: 4, dispatchMode: "bounded-parallel", prime: false, cancellationToken);
+        ScenarioSeries parallelFour = await RunSeriesAsync(fixture, 4, "bounded-parallel", false, cancellationToken);
         scenarios.Add(Summarize(
-            "4-process-bounded-parallel", "Four independent strict processes using prepared receipts dispatched together", parallelFour));
+            "4-process-bounded-parallel",
+            "Four independent strict processes using prepared receipts dispatched together", parallelFour));
 
         foreach (ScenarioSeries series in new[] { single, sequentialTwo, sequentialFour, parallelTwo, parallelFour })
+        foreach (BatchSample sample in series.MeasuredSamples)
         {
-            foreach (BatchSample sample in series.MeasuredSamples)
-            {
-                ValidateSuccessfulBatch(sample, $"{sample.DispatchMode} x{sample.ProcessCount}");
-                ValidatePerProcessCounters(sample, projectsPerProcess);
-            }
+            ValidateSuccessfulBatch(sample, $"{sample.DispatchMode} x{sample.ProcessCount}");
+            ValidatePerProcessCounters(sample, projectsPerProcess);
         }
 
         BenchmarkEvidence evidence = new(
@@ -98,26 +101,28 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
                 "The one-time --ensure-built restore/build and receipt preparation are recorded separately from measured --use-prepared-receipts validation. Outer process timing does not measure the caller's container or CI runner; comparable-version consumer-side timestamps are still required to prove a regression."),
             new RoutingDecision[]
             {
-                new("#502", "Feed the reusable large-multi-host process-count shape and per-process profile counters into the canonical benchmark foundation; do not create a competing framework."),
-                new("#492/#493", "Prepared-analysis reuse remains the owner for cross-process preparation; this harness measures duplication but does not implement reuse."),
-                new("#655/#675/#503", "No selector/layer, real-MSBuild cache-eligibility, or changed-project advisory conclusion is asserted by this matrix."),
+                new("#502",
+                    "Feed the reusable large-multi-host process-count shape and per-process profile counters into the canonical benchmark foundation; do not create a competing framework."),
+                new("#492/#493",
+                    "Prepared-analysis reuse remains the owner for cross-process preparation; this harness measures duplication but does not implement reuse."),
+                new("#655/#675/#503",
+                    "No selector/layer, real-MSBuild cache-eligibility, or changed-project advisory conclusion is asserted by this matrix.")
             },
             "The fixture build and one --ensure-built receipt-preparation invocation are reported separately. Measured runs use --use-prepared-receipts, so their build_state_preflight phases measure prepared-receipt verification without restore or graph build. The harness measures local startup/process and ArchLinterNet boundaries; container, scheduler, and CI-runner time require caller-side instrumentation.");
 
         File.WriteAllText(ResultsPath(), JsonSerializer.Serialize(evidence, _jsonOptions));
         TestContext.Out.WriteLine($"Consumer attribution evidence written to {ResultsPath()}");
         foreach (ScenarioSummary scenario in scenarios)
-        {
             TestContext.Out.WriteLine(
                 $"{scenario.ScenarioId} (n={scenario.SampleCount}): " +
                 $"inner_median={scenario.MedianAggregateCommandTotalMs:F1}ms " +
                 $"analysis_median={scenario.MedianAggregateAnalysisOnlyMs:F1}ms " +
                 $"outer_median={scenario.MedianOuterWallClockMs:F1}ms");
-        }
     }
 
     private static async Task<ScenarioSeries> RunSeriesAsync(
-        AdoptionAcceptanceFixture fixture, int processCount, string dispatchMode, bool prime, CancellationToken cancellationToken)
+        AdoptionAcceptanceFixture fixture, int processCount, string dispatchMode, bool prime,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         List<BatchSample> priming = new();
@@ -130,9 +135,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
 
         List<BatchSample> samples = new(RunsPerScenario);
         for (int index = 0; index < RunsPerScenario; index++)
-        {
             samples.Add(await RunBatchAsync(fixture, processCount, dispatchMode, cancellationToken));
-        }
 
         return new ScenarioSeries(samples, priming);
     }
@@ -145,7 +148,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         bool ensureBuilt = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Stopwatch outerClock = Stopwatch.StartNew();
+        var outerClock = Stopwatch.StartNew();
         IReadOnlyList<ProcessSample> processes;
         if (dispatchMode == "bounded-parallel")
         {
@@ -158,9 +161,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         {
             List<ProcessSample> samples = new(processCount);
             for (int index = 0; index < processCount; index++)
-            {
                 samples.Add(await RunProcessAsync(fixture, ensureBuilt, cancellationToken));
-            }
 
             processes = samples;
         }
@@ -197,7 +198,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            WorkingDirectory = fixture.Root,
+            WorkingDirectory = fixture.Root
         };
         startInfo.ArgumentList.Add(CliDllPath());
         startInfo.ArgumentList.Add("--policy");
@@ -219,7 +220,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
             Task<string> stderrTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
             using CancellationTokenSource timeoutSource = new(TimeSpan.FromMilliseconds(ProcessTimeoutMilliseconds));
-            using CancellationTokenSource linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
+            using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken, timeoutSource.Token);
             try
             {
@@ -230,8 +231,8 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
 
                 Assert.That(File.Exists(profilePath), Is.True,
                     $"No profile written (exit {process.ExitCode}).{Environment.NewLine}stdout:{stdout}{Environment.NewLine}stderr:{stderr}");
-                using JsonDocument profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
-                using JsonDocument resultDocument = JsonDocument.Parse(stdout);
+                using var profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
+                using var resultDocument = JsonDocument.Parse(stdout);
                 return CreateProcessSample(
                     profileDocument.RootElement.Clone(),
                     resultDocument.RootElement.GetRawText(),
@@ -243,10 +244,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             {
                 TryKillProcessTree(process);
                 await AwaitProcessCleanupAsync(process, stdoutTask, stderrTask);
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
+                if (cancellationToken.IsCancellationRequested) throw;
 
                 throw new AssertionException($"ArchLinterNet CLI process exceeded {ProcessTimeoutMilliseconds}ms.");
             }
@@ -259,10 +257,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
         }
         finally
         {
-            if (File.Exists(profilePath))
-            {
-                File.Delete(profilePath);
-            }
+            if (File.Exists(profilePath)) File.Delete(profilePath);
         }
     }
 
@@ -283,7 +278,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     {
         try
         {
-            process.Kill(entireProcessTree: true);
+            process.Kill(true);
         }
         catch (InvalidOperationException)
         {
@@ -304,28 +299,14 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             string name = phase.GetProperty("Name").GetString()!;
             double elapsed = phase.GetProperty("ElapsedMs").GetDouble();
             if (name == "total")
-            {
                 totalMs = elapsed;
-            }
-            else if (phase.GetProperty("Indent").GetInt32() == 0)
-            {
-                topLevelMs += elapsed;
-            }
+            else if (phase.GetProperty("Indent").GetInt32() == 0) topLevelMs += elapsed;
 
-            if (name is "build_state_preflight" or "post_ensure_built_preflight")
-            {
-                preflightMs += elapsed;
-            }
+            if (name is "build_state_preflight" or "post_ensure_built_preflight") preflightMs += elapsed;
 
-            if (name == "build_state_preflight")
-            {
-                buildStatePreflightMs += elapsed;
-            }
+            if (name == "build_state_preflight") buildStatePreflightMs += elapsed;
 
-            if (_outputPhaseNames.Contains(name))
-            {
-                outputMs += elapsed;
-            }
+            if (_outputPhaseNames.Contains(name)) outputMs += elapsed;
         }
 
         double commandTotalMs = totalMs is { } total ? total + outputMs : topLevelMs;
@@ -364,9 +345,11 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
     {
         Assert.Multiple(() =>
         {
-            Assert.That(sample.Processes.All(static process => process.PreparationMode == "--use-prepared-receipts"), Is.True,
+            Assert.That(sample.Processes.All(static process => process.PreparationMode == "--use-prepared-receipts"),
+                Is.True,
                 "Every timed scenario process must verify prepared receipts without building.");
-            Assert.That(sample.Processes.All(process => process.Counters.DiscoveredProjectCount == projectsPerProcess), Is.True,
+            Assert.That(sample.Processes.All(process => process.Counters.DiscoveredProjectCount == projectsPerProcess),
+                Is.True,
                 "Every independent process must retain the same discovered-project inventory.");
             Assert.That(sample.Counters.DiscoveredProjectCount, Is.EqualTo(projectsPerProcess * sample.ProcessCount),
                 "Aggregate project preparation must show the duplicated work per process.");
@@ -396,7 +379,8 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
 
     private static string DescribeDominantPreparation(ScenarioSummary singleSummary)
     {
-        double preflightMs = Median(singleSummary.Samples.Select(static sample => sample.AggregateBuildStatePreflightMs));
+        double preflightMs =
+            Median(singleSummary.Samples.Select(static sample => sample.AggregateBuildStatePreflightMs));
         double preflightShare = Median(singleSummary.Samples.Select(static sample =>
             100 * sample.AggregateBuildStatePreflightMs / sample.AggregateCommandTotalMs));
         return FormattableString.Invariant(
@@ -405,7 +389,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
 
     private static string ExtractCanonicalResult(string json)
     {
-        using JsonDocument document = JsonDocument.Parse(json);
+        using var document = JsonDocument.Parse(json);
         JsonElement root = document.RootElement;
         string[] canonicalFields =
         [
@@ -413,7 +397,7 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
             "unmatched_ignored_violations", "policy_consistency_findings", "coverage_summary",
             "classification_conflicts", "classification_metadata_failures", "classification_roles",
             "classification_path_deferred", "preflight_diagnostics", "source_set_expansion",
-            "subtractive_matcher_participation",
+            "subtractive_matcher_participation"
         ];
         return string.Join("\n", canonicalFields.Select(field =>
             root.TryGetProperty(field, out JsonElement value) ? value.GetRawText() : "null"));
@@ -421,22 +405,29 @@ public sealed partial class ConsumerAttributionAnalysisProfileBenchmarkHarness
 
     private static double Median(IEnumerable<double> values)
     {
-        List<double> sorted = values.Order().ToList();
+        var sorted = values.Order().ToList();
         int midpoint = sorted.Count / 2;
         return sorted.Count % 2 == 0 ? (sorted[midpoint - 1] + sorted[midpoint]) / 2 : sorted[midpoint];
     }
 
     private static double Percentile95(IEnumerable<double> values)
     {
-        List<double> sorted = values.Order().ToList();
+        var sorted = values.Order().ToList();
         int index = (int)Math.Ceiling(sorted.Count * 0.95) - 1;
         return sorted[Math.Clamp(index, 0, sorted.Count - 1)];
     }
 
-    private static string CliDllPath() => Path.Combine(
-        new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Release", "net10.0", "ArchLinterNet.Cli.dll");
+    private static string CliDllPath()
+    {
+        return Path.Combine(
+            new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Release", "net10.0",
+            "ArchLinterNet.Cli.dll");
+    }
 
-    private static string ResultsPath() => Path.Combine(
-        new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal", "consumer-attribution-analysis-profile-results.json");
-
+    private static string ResultsPath()
+    {
+        return Path.Combine(
+            new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal",
+            "consumer-attribution-analysis-profile-results.json");
+    }
 }

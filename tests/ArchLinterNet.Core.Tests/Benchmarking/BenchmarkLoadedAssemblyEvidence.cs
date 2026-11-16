@@ -1,6 +1,6 @@
 using ArchLinterNet.Core.Model;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 internal sealed record BenchmarkLoadedAssemblyArtifactEvidence
 {
@@ -23,7 +23,7 @@ internal sealed record BenchmarkLoadedAssemblyEvidence
             .Select(artifact => new BenchmarkLoadedAssemblyArtifactEvidence
             {
                 FileName = Path.GetFileName(artifact.AssemblyPath),
-                Sha256 = artifact.AssemblyContentDigest,
+                Sha256 = artifact.AssemblyContentDigest
             })
             .OrderBy(artifact => artifact.FileName, StringComparer.Ordinal)
             .ThenBy(artifact => artifact.Sha256, StringComparer.Ordinal)
@@ -31,7 +31,7 @@ internal sealed record BenchmarkLoadedAssemblyEvidence
         BenchmarkLoadedAssemblyEvidence evidence = new()
         {
             Sha256 = ComputeInventorySha256(artifacts),
-            Artifacts = artifacts,
+            Artifacts = artifacts
         };
         evidence.Validate();
         return evidence;
@@ -44,25 +44,28 @@ internal sealed record BenchmarkLoadedAssemblyEvidence
                 || !string.Equals(Path.GetFileName(artifact.FileName), artifact.FileName, StringComparison.Ordinal)
                 || !artifact.FileName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
                 || !IsSha256(artifact.Sha256)))
-        {
-            throw new InvalidOperationException("Loaded assembly evidence must contain safe DLL names and lowercase SHA-256 digests.");
-        }
+            throw new InvalidOperationException(
+                "Loaded assembly evidence must contain safe DLL names and lowercase SHA-256 digests.");
 
         BenchmarkLoadedAssemblyArtifactEvidence[] canonicalArtifacts = Artifacts
             .OrderBy(artifact => artifact.FileName, StringComparer.Ordinal)
             .ThenBy(artifact => artifact.Sha256, StringComparer.Ordinal)
             .ToArray();
         if (!string.Equals(Sha256, ComputeInventorySha256(canonicalArtifacts), StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("The loaded assembly inventory SHA-256 does not match its artifact identities.");
-        }
+            throw new InvalidOperationException(
+                "The loaded assembly inventory SHA-256 does not match its artifact identities.");
     }
 
     private static string ComputeInventorySha256(
-        IReadOnlyList<BenchmarkLoadedAssemblyArtifactEvidence> artifacts) =>
-        BenchmarkIdentity.Sha256(BenchmarkJson.Serialize(artifacts));
+        IReadOnlyList<BenchmarkLoadedAssemblyArtifactEvidence> artifacts)
+    {
+        return BenchmarkIdentity.Sha256(BenchmarkJson.Serialize(artifacts));
+    }
 
-    private static bool IsSha256(string value) => value.Length == 64
-        && value.All(Uri.IsHexDigit)
-        && string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
+    private static bool IsSha256(string value)
+    {
+        return value.Length == 64
+               && value.All(Uri.IsHexDigit)
+               && string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal);
+    }
 }

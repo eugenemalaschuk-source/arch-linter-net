@@ -2,7 +2,7 @@ using System.Text.Json;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 [TestFixture]
 public sealed class BenchmarkAuditScaleCatalogTests
@@ -17,7 +17,7 @@ public sealed class BenchmarkAuditScaleCatalogTests
             "internal",
             "large-solution-benchmarking",
             "workload-catalog.json");
-        using JsonDocument catalog = JsonDocument.Parse(File.ReadAllText(path));
+        using var catalog = JsonDocument.Parse(File.ReadAllText(path));
         HashSet<string> workloadIds = new(StringComparer.Ordinal);
 
         JsonElement auditFamilies = catalog.RootElement.GetProperty("audit_scale_families");
@@ -34,9 +34,7 @@ public sealed class BenchmarkAuditScaleCatalogTests
         JsonElement graphFamilies = catalog.RootElement.GetProperty("contract_layer_graph_scale_families");
         Assert.That(graphFamilies.GetArrayLength(), Is.EqualTo(3));
         foreach (JsonElement family in graphFamilies.EnumerateArray())
-        {
             AssertThreeNamedPoints(family, workloadIds, "value");
-        }
     }
 
     private static void AssertThreeNamedPoints(JsonElement family, HashSet<string> workloadIds, string valueProperty)

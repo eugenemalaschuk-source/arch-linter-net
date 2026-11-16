@@ -1,21 +1,20 @@
 using System.Collections.ObjectModel;
-using System.Threading;
 
 namespace ArchLinterNet.Core.Profiling;
 
 /// <summary>
-/// Optional, per-invocation observations for a small fixed set of Core work boundaries used by
-/// benchmark evidence. Callers own the instance and pass it explicitly; it has no ambient state.
+///     Optional, per-invocation observations for a small fixed set of Core work boundaries used by
+///     benchmark evidence. Callers own the instance and pass it explicitly; it has no ambient state.
 /// </summary>
 internal sealed class BenchmarkWorkObserver
 {
-    private long _projectFileParses;
-    private long _sourceFactFileParses;
+    private long _astSemanticLookups;
+    private long _celContextConstructions;
+    private long _layerMembershipProbes;
     private long _methodBodyCompilationCalls;
     private long _methodBodySyntaxTrees;
-    private long _astSemanticLookups;
-    private long _layerMembershipProbes;
-    private long _celContextConstructions;
+    private long _projectFileParses;
+    private long _sourceFactFileParses;
 
     internal long ProjectFileParses => Interlocked.Read(ref _projectFileParses);
     internal long SourceFactFileParses => Interlocked.Read(ref _sourceFactFileParses);
@@ -25,22 +24,41 @@ internal sealed class BenchmarkWorkObserver
     internal long LayerMembershipProbes => Interlocked.Read(ref _layerMembershipProbes);
     internal long CelContextConstructions => Interlocked.Read(ref _celContextConstructions);
 
-    internal void RecordProjectFileParse() => Interlocked.Increment(ref _projectFileParses);
-    internal void RecordSourceFactFileParse() => Interlocked.Increment(ref _sourceFactFileParses);
+    internal void RecordProjectFileParse()
+    {
+        Interlocked.Increment(ref _projectFileParses);
+    }
+
+    internal void RecordSourceFactFileParse()
+    {
+        Interlocked.Increment(ref _sourceFactFileParses);
+    }
+
     internal void RecordMethodBodyCompilation(long syntaxTreeCount)
     {
         Interlocked.Increment(ref _methodBodyCompilationCalls);
         Interlocked.Add(ref _methodBodySyntaxTrees, syntaxTreeCount);
     }
 
-    internal void RecordAstSemanticLookup() => Interlocked.Increment(ref _astSemanticLookups);
-    internal void RecordLayerMembershipProbe() => Interlocked.Increment(ref _layerMembershipProbes);
-    internal void RecordCelContextConstruction() => Interlocked.Increment(ref _celContextConstructions);
+    internal void RecordAstSemanticLookup()
+    {
+        Interlocked.Increment(ref _astSemanticLookups);
+    }
+
+    internal void RecordLayerMembershipProbe()
+    {
+        Interlocked.Increment(ref _layerMembershipProbes);
+    }
+
+    internal void RecordCelContextConstruction()
+    {
+        Interlocked.Increment(ref _celContextConstructions);
+    }
 
     /// <summary>
-    /// Returns only boundaries observed at least once. A missing key therefore means that the
-    /// invocation did not exercise that boundary, while the properties above retain exact zero
-    /// values for focused assertions.
+    ///     Returns only boundaries observed at least once. A missing key therefore means that the
+    ///     invocation did not exercise that boundary, while the properties above retain exact zero
+    ///     values for focused assertions.
     /// </summary>
     internal IReadOnlyDictionary<string, long> Snapshot()
     {
@@ -57,9 +75,6 @@ internal sealed class BenchmarkWorkObserver
 
     private static void AddIfObserved(Dictionary<string, long> values, string name, long value)
     {
-        if (value > 0)
-        {
-            values.Add(name, value);
-        }
+        if (value > 0) values.Add(name, value);
     }
 }

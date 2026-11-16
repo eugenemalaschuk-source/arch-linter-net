@@ -11,8 +11,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
     private static readonly char[] _pathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
 
     private readonly IArchitectureFileSystem _fileSystem;
-    private readonly IArchitectureSolutionParser _solutionParser;
     private readonly IArchitectureProjectFileParser _projectFileParser;
+    private readonly IArchitectureSolutionParser _solutionParser;
 
     public ArchitectureProjectDiscoveryService()
         : this(ArchitectureFileSystem.Real)
@@ -66,10 +66,10 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         CancellationToken cancellationToken = default)
     {
         return ResolveFromDocument(document, repositoryRoot, resolveAssemblyOutputs,
-            benchmarkWorkObserver: null, cancellationToken: cancellationToken);
+            null, cancellationToken);
     }
 
-    internal ProjectDiscoveryResult ResolveFromDocument(
+    private ProjectDiscoveryResult ResolveFromDocument(
         ArchitectureContractDocument document,
         string repositoryRoot,
         bool resolveAssemblyOutputs,
@@ -80,23 +80,15 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         bool hasSolution = !string.IsNullOrWhiteSpace(analysis.Solution);
         bool hasExplicitProjects = analysis.Projects.Count > 0;
 
-        if (!hasSolution && !hasExplicitProjects)
-        {
-            return ProjectDiscoveryResult.Empty;
-        }
+        if (!hasSolution && !hasExplicitProjects) return ProjectDiscoveryResult.Empty;
 
         List<ArchitectureProjectDiscoveryDiagnostic> diagnostics = new();
         List<string> projectPaths = new();
 
-        if (hasSolution)
-        {
-            projectPaths.AddRange(ResolveSolutionProjectPaths(analysis, repositoryRoot, diagnostics));
-        }
+        if (hasSolution) projectPaths.AddRange(ResolveSolutionProjectPaths(analysis, repositoryRoot, diagnostics));
 
         foreach (string explicitProject in analysis.Projects)
-        {
             projectPaths.Add(ResolvePath(explicitProject, repositoryRoot));
-        }
 
         return BuildDiscoveryResult(
             projectPaths, analysis, repositoryRoot, resolveAssemblyOutputs, diagnostics, cancellationToken,
@@ -121,14 +113,12 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         try
         {
             IReadOnlyList<string> discovered = _solutionParser.ParseProjectPaths(solutionPath, _fileSystem);
-            List<string> filtered = FilterProjects(discovered, repositoryRoot, analysis).ToList();
+            var filtered = FilterProjects(discovered, repositoryRoot, analysis).ToList();
 
             if (filtered.Count == 0)
-            {
                 diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
                     "no C# projects discovered", analysis.Solution,
                     $"Solution file '{analysis.Solution}' was parsed successfully but no .csproj entries were discovered (after project_include/project_exclude filtering, if configured)."));
-            }
 
             return filtered;
         }
@@ -174,7 +164,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         {
             DiscoveredProjects = discoveredProjects,
             ResolvedAssemblyPaths = resolvedAssemblyPaths,
-            ResolvedAssemblyPathsByNormalizedProjectPath = resolvedAssemblyPathsByProject,
+            ResolvedAssemblyPathsByNormalizedProjectPath = resolvedAssemblyPathsByProject
         };
     }
 
@@ -203,14 +193,15 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         try
         {
             projectFile = benchmarkWorkObserver is not null
-                && _projectFileParser is ArchitectureProjectFileParser
+                          && _projectFileParser is ArchitectureProjectFileParser
                 ? ArchitectureProjectFileParser.Parse(projectPath, _fileSystem, benchmarkWorkObserver)
                 : _projectFileParser.Parse(projectPath, _fileSystem);
         }
         catch (Exception ex)
         {
             diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
-                "unparsable project file", projectPath, $"Project file '{projectPath}' could not be parsed: {ex.Message}"));
+                "unparsable project file", projectPath,
+                $"Project file '{projectPath}' could not be parsed: {ex.Message}"));
             return;
         }
 
@@ -220,10 +211,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         discoveredProjects.Add(BuildDiscoveredProject(projectFile, projectPath, repositoryRoot));
         string normalizedProjectPath = ProjectPathNormalizer.Normalize(GetRelativePath(repositoryRoot, projectPath));
 
-        if (!resolveAssemblyOutputs)
-        {
-            return;
-        }
+        if (!resolveAssemblyOutputs) return;
 
         if (projectFile.TargetFrameworks.Count == 0)
         {
@@ -275,11 +263,9 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
                 .Select(entry => entry with { SourcePath = GetRelativePath(repositoryRoot, entry.SourcePath) })
                 .ToList(),
             projectFile.ProjectReferences
-                .Select(entry => entry with
-                {
-                    Path = GetRelativePath(repositoryRoot, entry.Path),
-                    SourcePath = GetRelativePath(repositoryRoot, entry.SourcePath)
-                })
+                .Select(entry => new ArchitectureDiscoveredProjectReference(
+                    GetRelativePath(repositoryRoot, entry.Path),
+                    GetRelativePath(repositoryRoot, entry.SourcePath)))
                 .ToList());
     }
 
@@ -309,7 +295,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             }
 
             return FinishResolve(
-                projectFile, projectDirectory, candidatePath, fileSystem, out outputDirectory, out diagnostic, out staleArtifactPath);
+                projectFile, projectDirectory, candidatePath, fileSystem, out outputDirectory, out diagnostic,
+                out staleArtifactPath);
         }
 
         List<(string Framework, string Directory, bool HasOutput)> candidates = projectFile.TargetFrameworks
@@ -321,15 +308,13 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             })
             .ToList();
 
-        List<(string Framework, string Directory, bool HasOutput)> withOutput =
+        var withOutput =
             candidates.Where(candidate => candidate.HasOutput).ToList();
 
         if (withOutput.Count == 1)
-        {
             return FinishResolve(
                 projectFile, projectDirectory, withOutput[0].Directory, fileSystem, out outputDirectory, out diagnostic,
                 out staleArtifactPath);
-        }
 
         string checkedList = string.Join(", ", candidates.Select(candidate =>
             $"{candidate.Framework} ({(candidate.HasOutput ? "found" : "missing")})"));
@@ -362,7 +347,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         staleArtifactPath = null;
         string dllPath = Path.Combine(candidateOutputDirectory, $"{projectFile.AssemblyName}.dll");
         DateTime dllWriteTimeUtc = fileSystem.GetLastWriteTimeUtc(dllPath);
-        DateTime latestSourceWriteTimeUtc = GetLatestSourceWriteTimeUtc(projectDirectory, projectFile.AbsolutePath, fileSystem);
+        DateTime latestSourceWriteTimeUtc =
+            GetLatestSourceWriteTimeUtc(projectDirectory, projectFile.AbsolutePath, fileSystem);
 
         if (dllWriteTimeUtc < latestSourceWriteTimeUtc)
         {
@@ -382,10 +368,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
     {
         DateTime latest = fileSystem.GetLastWriteTimeUtc(projectFilePath);
 
-        if (!fileSystem.DirectoryExists(projectDirectory))
-        {
-            return latest;
-        }
+        if (!fileSystem.DirectoryExists(projectDirectory)) return latest;
 
         foreach (string file in fileSystem.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
         {
@@ -395,15 +378,10 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             if (segments.Any(segment =>
                     string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase)))
-            {
                 continue;
-            }
 
             DateTime writeTime = fileSystem.GetLastWriteTimeUtc(file);
-            if (writeTime > latest)
-            {
-                latest = writeTime;
-            }
+            if (writeTime > latest) latest = writeTime;
         }
 
         return latest;
@@ -425,14 +403,9 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
 
             if (analysis.ProjectInclude.Count > 0 &&
                 !analysis.ProjectInclude.Any(pattern => ProjectPathGlob.IsMatch(relativePath, pattern)))
-            {
                 continue;
-            }
 
-            if (analysis.ProjectExclude.Any(pattern => ProjectPathGlob.IsMatch(relativePath, pattern)))
-            {
-                continue;
-            }
+            if (analysis.ProjectExclude.Any(pattern => ProjectPathGlob.IsMatch(relativePath, pattern))) continue;
 
             yield return path;
         }
@@ -454,7 +427,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         return GetRelativePath(repositoryRoot, directory);
     }
 
-    private static void ApplyDiscoveryResult(ArchitectureAnalysisConfiguration analysis, ProjectDiscoveryResult discovery)
+    private static void ApplyDiscoveryResult(ArchitectureAnalysisConfiguration analysis,
+        ProjectDiscoveryResult discovery)
     {
         bool seedAssemblies = analysis.TargetAssemblies.Count == 0 && discovery.TargetAssemblyNames.Count > 0;
 
@@ -468,8 +442,6 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         }
 
         if (analysis.SourceRoots.Count == 0 && discovery.SourceRoots.Count > 0)
-        {
             analysis.SourceRoots = discovery.SourceRoots.ToList();
-        }
     }
 }

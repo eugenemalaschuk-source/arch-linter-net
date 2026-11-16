@@ -1,17 +1,19 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Tests.Benchmarking;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
 /// <summary>
-/// Explicit, hardware-sensitive secondary timing evidence for issue #503. This harness measures
-/// full validation over the #502 staged-assembly workloads and applies the reviewed K/P scope model
-/// as an expected-effect calculation. It never executes a partial advisory analysis and therefore
-/// cannot manufacture evidence that an incremental path is semantically complete.
+///     Explicit, hardware-sensitive secondary timing evidence for issue #503. This harness measures
+///     full validation over the #502 staged-assembly workloads and applies the reviewed K/P scope model
+///     as an expected-effect calculation. It never executes a partial advisory analysis and therefore
+///     cannot manufacture evidence that an incremental path is semantically complete.
 /// </summary>
 [TestFixture]
 [Explicit("Hardware-sensitive #503 timing harness — run manually to refresh evidence, never in CI.")]
@@ -20,9 +22,10 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
 {
     private const int RunsPerScale = 3;
+
     private static readonly HashSet<string> _outputPhaseNames = new(StringComparer.Ordinal)
     {
-        "render_human", "render_json", "render_sarif", "output_staging", "output_stream_write", "output_commit",
+        "render_human", "render_json", "render_sarif", "output_staging", "output_stream_write", "output_commit"
     };
 
     [Test]
@@ -37,11 +40,12 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
         {
             BenchmarkWorkloadDefinition workload = CreateWorkload(label, projectCount);
             using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
-            List<ChangedProjectAdvisoryTimingSample> samples = Enumerable.Range(1, RunsPerScale)
+            var samples = Enumerable.Range(1, RunsPerScale)
                 .Select(sampleOrdinal => RunOnce(fixture, sampleOrdinal))
                 .ToList();
 
-            Assert.That(samples.Select(sample => sample.CanonicalResultSha256).Distinct().ToList(), Has.Count.EqualTo(1),
+            Assert.That(samples.Select(sample => sample.CanonicalResultSha256).Distinct().ToList(),
+                Has.Count.EqualTo(1),
                 $"Full strict samples for {label} must preserve canonical result identity.");
             scalePoints.Add(CreateScaleEvidence(workload, samples));
         }
@@ -52,18 +56,20 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             Issue = "#503",
             Outcome = "C",
             SourceIdentity = sourceIdentity,
-            Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
-            OperatingSystem = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
-            Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+            Runtime = RuntimeInformation.FrameworkDescription,
+            OperatingSystem = RuntimeInformation.OSDescription,
+            Architecture = RuntimeInformation.ProcessArchitecture.ToString(),
             Configuration = "Debug; staged assemblies; strict; max-parallelism=1",
-            MeasurementBoundary = "Full strict analysis-profile/v1 phases only; fixture restore/build and output rendering are excluded. " +
+            MeasurementBoundary =
+                "Full strict analysis-profile/v1 phases only; fixture restore/build and output rendering are excluded. " +
                 "Only the measured contract_checks phase is treated as project-scalable, and then only as an optimistic upper bound; " +
                 "all other phases (including setup, preflight, post-processing, and repository metrics) remain unscaled. " +
                 "No partial analyzer execution or realized savings are claimed.",
-            DecisionNote = "Outcome C: the timing model shows where K/P could reduce project-dependent work, but ownership " +
+            DecisionNote =
+                "Outcome C: the timing model shows where K/P could reduce project-dependent work, but ownership " +
                 "resolution from evaluated MSBuild Compile items and family-specific correctness remain unsafe for an implementation " +
                 "while #991 is open. Full strict validation remains authoritative; no implementation child is justified by this evidence.",
-            ScalePoints = scalePoints,
+            ScalePoints = scalePoints
         };
 
         Assert.That(SourceIdentity(), Is.EqualTo(sourceIdentity),
@@ -72,13 +78,11 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
         File.WriteAllText(resultsPath, ChangedProjectAdvisoryTimingEvidenceJson.Serialize(document));
         TestContext.Out.WriteLine($"Changed-project advisory timing evidence written to {resultsPath}");
         foreach (ChangedProjectAdvisoryScaleEvidence scale in scalePoints)
-        {
             TestContext.Out.WriteLine(
                 $"{scale.Label} P={scale.ProjectCount}: full={scale.FullValidationMedianMilliseconds:F1}ms " +
                 $"unscaled-residual={scale.UnscaledPhaseResidualMilliseconds:F1}ms " +
                 $"contract-checks-upper-bound={scale.ProjectScaledUpperBoundPhaseMedianMilliseconds:F1}ms " +
                 $"planner={scale.ScopePlanningMedianMilliseconds:F3}ms");
-        }
     }
 
     private static ChangedProjectAdvisoryScaleEvidence CreateScaleEvidence(
@@ -108,7 +112,7 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             UnscaledPhaseResidualMilliseconds = unscaledPhaseResidualMilliseconds,
             ProjectScaledUpperBoundPhaseMedianMilliseconds = projectScaledUpperBoundMilliseconds,
             Estimates = estimates,
-            Samples = samples,
+            Samples = samples
         };
 
         void AddEstimate(string changeClass, ChangedInputKind kind, string? ownerId = null)
@@ -117,14 +121,14 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             {
                 InputId = changeClass,
                 Kind = kind,
-                OwningProjectIds = ownerId is null ? [] : [ownerId],
+                OwningProjectIds = ownerId is null ? [] : [ownerId]
             };
             ScopePlan plan = ChangedProjectScopePlanner.Plan(workload.Projects, workload.Edges, [input]);
             decimal ratio = (decimal)plan.AffectedProjectCount / workload.Inventory.ProjectCount;
             decimal modeledUpperBoundMilliseconds = Round(
-                unscaledPhaseResidualMilliseconds + (projectScaledUpperBoundMilliseconds * ratio) + planningMilliseconds);
+                unscaledPhaseResidualMilliseconds + projectScaledUpperBoundMilliseconds * ratio + planningMilliseconds);
             decimal reduction = fullMilliseconds > 0
-                ? Round(Math.Clamp((1 - (modeledUpperBoundMilliseconds / fullMilliseconds)) * 100, -100, 100))
+                ? Round(Math.Clamp((1 - modeledUpperBoundMilliseconds / fullMilliseconds) * 100, -100, 100))
                 : 0;
             estimates.Add(new ChangedProjectAdvisoryEstimate
             {
@@ -136,7 +140,7 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
                 ModeledUpperBoundReductionPercent = reduction,
                 Authority = kind is ChangedInputKind.PolicyOrImportChange
                     ? "GlobalExpansion/full strict fallback"
-                    : "Optimistic K/P upper bound only; no incremental execution or savings authority",
+                    : "Optimistic K/P upper bound only; no incremental execution or savings authority"
             });
         }
     }
@@ -151,7 +155,7 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             WorkingDirectory = fixture.Root,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false,
+            UseShellExecute = false
         };
         startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
         startInfo.ArgumentList.Add(CliDllPath());
@@ -168,7 +172,7 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
 
         try
         {
-            using Process process = Process.Start(startInfo)!;
+            using var process = Process.Start(startInfo)!;
             Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
             Task<string> stderrTask = process.StandardError.ReadToEndAsync();
             process.WaitForExit();
@@ -177,8 +181,8 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             Assert.That(File.Exists(profilePath), Is.True,
                 $"No profile was written for sample {sampleOrdinal}. stdout:{stdout}{Environment.NewLine}stderr:{stderr}");
 
-            using JsonDocument profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
-            using JsonDocument resultDocument = JsonDocument.Parse(stdout);
+            using var profileDocument = JsonDocument.Parse(File.ReadAllText(profilePath));
+            using var resultDocument = JsonDocument.Parse(stdout);
             JsonElement profile = profileDocument.RootElement.Clone();
             JsonElement result = resultDocument.RootElement;
             string canonical = CanonicalResult(result);
@@ -191,20 +195,18 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
                 CanonicalResultSha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))),
                 Counters = ReadCounters(profile),
                 TopLevelPhaseMilliseconds = ReadTopLevelPhases(profile),
-                RawAnalysisProfile = profile,
+                RawAnalysisProfile = profile
             };
         }
         finally
         {
-            if (File.Exists(profilePath))
-            {
-                File.Delete(profilePath);
-            }
+            if (File.Exists(profilePath)) File.Delete(profilePath);
         }
     }
 
-    private static BenchmarkWorkloadDefinition CreateWorkload(string label, int projectCount) =>
-        BenchmarkWorkloadGenerator.Create(
+    private static BenchmarkWorkloadDefinition CreateWorkload(string label, int projectCount)
+    {
+        return BenchmarkWorkloadGenerator.Create(
             $"synthetic-changed-project-advisory-{label.ToLowerInvariant()}",
             BenchmarkTopologyShape.Dense,
             new BenchmarkDimensionSet
@@ -215,10 +217,11 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
                 ReferencesPerProject = Math.Min(4, projectCount - 1),
                 LayerCount = 4,
                 SelectorPredicateTermsPerLayer = 4,
-                ContractsPerWorkload = 4,
+                ContractsPerWorkload = 4
             },
             BenchmarkCompilationMode.StagedAssemblies,
             BenchmarkExecutionMode.PullRequest);
+    }
 
     private static decimal MeasurePlanner(BenchmarkWorkloadDefinition workload)
     {
@@ -226,48 +229,50 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
         {
             InputId = "planner-timing",
             Kind = ChangedInputKind.ProjectOwnedSourceFile,
-            OwningProjectIds = [workload.Projects[0].Id],
+            OwningProjectIds = [workload.Projects[0].Id]
         };
-        Stopwatch stopwatch = Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
         for (int iteration = 0; iteration < 1_000; iteration++)
-        {
             _ = ChangedProjectScopePlanner.Plan(workload.Projects, workload.Edges, [input]);
-        }
 
         stopwatch.Stop();
         return Round((decimal)(stopwatch.Elapsed.TotalMilliseconds / 1_000));
     }
 
-    private static IReadOnlyDictionary<string, int> ReadCounters(JsonElement profile) =>
-        profile.GetProperty("Counters").EnumerateObject()
+    private static IReadOnlyDictionary<string, int> ReadCounters(JsonElement profile)
+    {
+        return profile.GetProperty("Counters").EnumerateObject()
             .Where(property => property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out _))
             .ToDictionary(
                 property => JsonNamingPolicy.SnakeCaseLower.ConvertName(property.Name),
                 property => property.Value.GetInt32(),
                 StringComparer.Ordinal);
+    }
 
-    private static IReadOnlyDictionary<string, decimal> ReadTopLevelPhases(JsonElement profile) =>
-        profile.GetProperty("Phases").EnumerateArray()
+    private static IReadOnlyDictionary<string, decimal> ReadTopLevelPhases(JsonElement profile)
+    {
+        return profile.GetProperty("Phases").EnumerateArray()
             .Where(phase => phase.GetProperty("Indent").GetInt32() == 0 &&
-                phase.GetProperty("Name").GetString() != "total" &&
-                !_outputPhaseNames.Contains(phase.GetProperty("Name").GetString()!))
+                            phase.GetProperty("Name").GetString() != "total" &&
+                            !_outputPhaseNames.Contains(phase.GetProperty("Name").GetString()!))
             .ToDictionary(
                 phase => phase.GetProperty("Name").GetString()!,
                 phase => (decimal)phase.GetProperty("ElapsedMs").GetDouble(),
                 StringComparer.Ordinal);
+    }
 
-    private static decimal FullMilliseconds(ChangedProjectAdvisoryTimingSample sample) =>
-        sample.TopLevelPhaseMilliseconds.Values.Sum();
+    private static decimal FullMilliseconds(ChangedProjectAdvisoryTimingSample sample)
+    {
+        return sample.TopLevelPhaseMilliseconds.Values.Sum();
+    }
 
     private static decimal ProjectScaledUpperBoundMilliseconds(ChangedProjectAdvisoryTimingSample sample)
     {
         if (!sample.TopLevelPhaseMilliseconds.TryGetValue(
                 ChangedProjectAdvisoryScaleEvidence.ProjectScaledUpperBoundPhaseName, out decimal milliseconds))
-        {
             throw new InvalidOperationException(
                 $"Timing sample {sample.SampleOrdinal} has no '" +
                 $"{ChangedProjectAdvisoryScaleEvidence.ProjectScaledUpperBoundPhaseName}' phase for the upper-bound model.");
-        }
 
         return milliseconds;
     }
@@ -280,7 +285,7 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             "unmatched_ignored_violations", "policy_consistency_findings", "coverage_summary",
             "classification_conflicts", "classification_metadata_failures", "classification_roles",
             "classification_path_deferred", "preflight_diagnostics", "source_set_expansion",
-            "subtractive_matcher_participation",
+            "subtractive_matcher_participation"
         ];
         return string.Join("\n", fields.Select(field =>
             result.TryGetProperty(field, out JsonElement value) ? value.GetRawText() : "null"));
@@ -293,37 +298,42 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
         return sorted.Length % 2 == 0 ? Round((sorted[middle - 1] + sorted[middle]) / 2) : Round(sorted[middle]);
     }
 
-    private static decimal Round(decimal value) => Math.Round(value, 3, MidpointRounding.AwayFromZero);
+    private static decimal Round(decimal value)
+    {
+        return Math.Round(value, 3, MidpointRounding.AwayFromZero);
+    }
 
-    private static string CliDllPath() => Path.Combine(
-        new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
+    private static string CliDllPath()
+    {
+        return Path.Combine(
+            new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0",
+            "ArchLinterNet.Cli.dll");
+    }
 
-    private static string ResultsPath() => Path.Combine(
-        new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal", "changed-project-advisory-analysis-timing-results.json");
+    private static string ResultsPath()
+    {
+        return Path.Combine(
+            new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal",
+            "changed-project-advisory-analysis-timing-results.json");
+    }
 
     private static string SourceIdentity()
     {
         string? supplied = Environment.GetEnvironmentVariable("ARCH_LINTER_SOURCE_SHA");
         if (supplied is null || supplied.Length != 40 || !supplied.All(char.IsAsciiHexDigit))
-        {
             throw new InvalidOperationException(
                 "Set ARCH_LINTER_SOURCE_SHA to the full 40-character SHA of the clean source commit being measured.");
-        }
 
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
         string head = RunGit(repositoryRoot, "rev-parse", "HEAD");
         if (!string.Equals(supplied, head, StringComparison.OrdinalIgnoreCase))
-        {
             throw new InvalidOperationException(
                 $"ARCH_LINTER_SOURCE_SHA '{supplied}' does not match checked-out HEAD '{head}'.");
-        }
 
         string workingTree = RunGit(repositoryRoot, "status", "--porcelain", "--untracked-files=all");
         if (!string.IsNullOrWhiteSpace(workingTree))
-        {
             throw new InvalidOperationException(
                 "The timing evidence must be measured from a clean working tree; commit or remove all changes first.");
-        }
 
         return head.ToLowerInvariant();
     }
@@ -335,23 +345,19 @@ public sealed class ChangedProjectAdvisoryEffectBenchmarkHarness
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false,
+            UseShellExecute = false
         };
-        foreach (string argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
+        foreach (string argument in arguments) startInfo.ArgumentList.Add(argument);
 
         using Process process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Failed to start git for timing-evidence provenance.");
+                                ?? throw new InvalidOperationException(
+                                    "Failed to start git for timing-evidence provenance.");
         string stdout = process.StandardOutput.ReadToEnd();
         string stderr = process.StandardError.ReadToEnd();
         process.WaitForExit();
         if (process.ExitCode != 0)
-        {
             throw new InvalidOperationException(
                 $"git {string.Join(' ', arguments)} failed with exit code {process.ExitCode}: {stderr}");
-        }
 
         return stdout.Trim();
     }

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Tests.Benchmarking;
 using Json.Schema;
 using NUnit.Framework;
 
@@ -24,7 +25,7 @@ public sealed class LargeSolutionBenchmarkingTests
             SelectorPredicateTermsPerLayer = 4,
             ContractsPerWorkload = 2,
             FindingCandidates = 7,
-            SourceRootCount = 2,
+            SourceRootCount = 2
         };
 
         BenchmarkWorkloadDefinition first = BenchmarkWorkloadGenerator.Create(
@@ -32,7 +33,8 @@ public sealed class LargeSolutionBenchmarkingTests
         BenchmarkWorkloadDefinition second = BenchmarkWorkloadGenerator.Create(
             "synthetic-repeatable-dense", BenchmarkTopologyShape.Dense, dimensions);
 
-        Assert.That(BenchmarkJson.Serialize(first.ToManifest()), Is.EqualTo(BenchmarkJson.Serialize(second.ToManifest())));
+        Assert.That(BenchmarkJson.Serialize(first.ToManifest()),
+            Is.EqualTo(BenchmarkJson.Serialize(second.ToManifest())));
         Assert.That(first.WorkloadIdentity, Is.EqualTo(second.WorkloadIdentity));
         Assert.That(first.Topology, Is.EqualTo(second.Topology));
         Assert.That(first.Inventory, Is.EqualTo(second.Inventory));
@@ -41,13 +43,13 @@ public sealed class LargeSolutionBenchmarkingTests
     [Test]
     public void RequiredGraphShapes_ReportDeclaredTopology()
     {
-        var cases = new[]
+        (BenchmarkTopologyShape, int, bool, int)[] cases = new[]
         {
             (BenchmarkTopologyShape.Linear, 5, false, 4),
             (BenchmarkTopologyShape.WideFanOutFanIn, 5, false, 6),
             (BenchmarkTopologyShape.Diamond, 5, false, 5),
             (BenchmarkTopologyShape.Dense, 5, false, 10),
-            (BenchmarkTopologyShape.CyclicScc, 5, true, 5),
+            (BenchmarkTopologyShape.CyclicScc, 5, true, 5)
         };
 
         foreach ((BenchmarkTopologyShape shape, int projectCount, bool cycle, int edgeCount) in cases)
@@ -181,14 +183,16 @@ public sealed class LargeSolutionBenchmarkingTests
             ProjectCount = 2,
             TypesPerProject = 5,
             SourceFilesPerProject = 2,
-            SourceRootCount = 4,
+            SourceRootCount = 4
         };
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
             "synthetic-source-root-type-count", BenchmarkTopologyShape.Linear, dimensions);
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
 
         int materializedTypeCount = fixture.SourcePaths
-            .Sum(path => File.ReadAllLines(path).Count(line => line.StartsWith("public sealed class ", StringComparison.Ordinal)));
+            .Sum(path =>
+                File.ReadAllLines(path)
+                    .Count(line => line.StartsWith("public sealed class ", StringComparison.Ordinal)));
 
         Assert.Multiple(() =>
         {
@@ -206,7 +210,7 @@ public sealed class LargeSolutionBenchmarkingTests
             TypesPerProject = 2,
             SourceFilesPerProject = 1,
             ContractsPerWorkload = 3,
-            SourceRootCount = 1,
+            SourceRootCount = 1
         };
         BenchmarkWorkloadDefinition oneRoot = BenchmarkWorkloadGenerator.Create(
             "synthetic-contracts-one-root", BenchmarkTopologyShape.Linear, dimensions);
@@ -216,9 +220,9 @@ public sealed class LargeSolutionBenchmarkingTests
         using BenchmarkMaterializedFixture oneRootFixture = BenchmarkFixtureMaterializer.Materialize(oneRoot);
         using BenchmarkMaterializedFixture fourRootsFixture = BenchmarkFixtureMaterializer.Materialize(fourRoots);
         int oneRootContractCount = File.ReadAllText(oneRootFixture.PolicyPath)
-            .Split("id: synthetic-contract-", StringSplitOptions.None).Length - 1;
+            .Split("id: synthetic-contract-").Length - 1;
         int fourRootContractCount = File.ReadAllText(fourRootsFixture.PolicyPath)
-            .Split("id: synthetic-contract-", StringSplitOptions.None).Length - 1;
+            .Split("id: synthetic-contract-").Length - 1;
 
         Assert.Multiple(() =>
         {
@@ -242,7 +246,7 @@ public sealed class LargeSolutionBenchmarkingTests
                     {
                         ProjectCount = 2,
                         SourceFilesPerProject = 1_073_741_824,
-                        SourceRootCount = 2,
+                        SourceRootCount = 2
                     }),
                 Throws.TypeOf<ArgumentOutOfRangeException>().With.Message.Contains("source_file_count"));
             Assert.That(
@@ -253,9 +257,10 @@ public sealed class LargeSolutionBenchmarkingTests
                     {
                         ProjectCount = 2,
                         TypesPerProject = 2,
-                        LayerCount = 1_073_741_824,
+                        LayerCount = 1_073_741_824
                     }),
-                Throws.TypeOf<ArgumentOutOfRangeException>().With.Message.Contains("selector_predicate_evaluation_count"));
+                Throws.TypeOf<ArgumentOutOfRangeException>().With.Message
+                    .Contains("selector_predicate_evaluation_count"));
         });
     }
 
@@ -272,7 +277,7 @@ public sealed class LargeSolutionBenchmarkingTests
                 SourceFilesPerProject = 1,
                 LayerCount = 2,
                 SelectorPredicateTermsPerLayer = 3,
-                FindingCandidates = 2,
+                FindingCandidates = 2
             });
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
         string policy = File.ReadAllText(fixture.PolicyPath);
@@ -281,11 +286,12 @@ public sealed class LargeSolutionBenchmarkingTests
         {
             Assert.That(policy, Does.Contain("classification:"));
             Assert.That(
-                policy.Split("subject.simpleName.startsWith", StringSplitOptions.None).Length - 1,
+                policy.Split("subject.simpleName.startsWith").Length - 1,
                 Is.EqualTo(workload.Dimensions.LayerCount * workload.Dimensions.SelectorPredicateTermsPerLayer));
             Assert.That(
                 workload.Inventory.SelectorPredicateEvaluationCount,
-                Is.EqualTo(workload.Inventory.TypeCount * workload.Dimensions.LayerCount * workload.Dimensions.SelectorPredicateTermsPerLayer));
+                Is.EqualTo(workload.Inventory.TypeCount * workload.Dimensions.LayerCount *
+                           workload.Dimensions.SelectorPredicateTermsPerLayer));
             Assert.That(policy, Does.Contain("synthetic-finding-candidate-001"));
             Assert.That(policy, Does.Contain("subject.namespace == 'Synthetic.Synthetic.Project001'"));
             Assert.That(policy, Does.Contain("subject.simpleName == 'SourceRoot01Type001'"));
@@ -298,8 +304,9 @@ public sealed class LargeSolutionBenchmarkingTests
         {
             Assert.That(run.ExitCode, Is.Not.EqualTo(0));
             Assert.That(run.StandardOutput, Does.Contain("synthetic-finding-candidate-001"));
-            using JsonDocument output = JsonDocument.Parse(run.StandardOutput);
-            Assert.That(output.RootElement.GetProperty("violations").GetArrayLength(), Is.EqualTo(workload.Inventory.FindingCandidateCount));
+            using var output = JsonDocument.Parse(run.StandardOutput);
+            Assert.That(output.RootElement.GetProperty("violations").GetArrayLength(),
+                Is.EqualTo(workload.Inventory.FindingCandidateCount));
         });
     }
 
@@ -314,7 +321,7 @@ public sealed class LargeSolutionBenchmarkingTests
                 {
                     ProjectCount = 1,
                     TypesPerProject = 1,
-                    FindingCandidates = 2,
+                    FindingCandidates = 2
                 }),
             Throws.ArgumentException);
     }
@@ -348,7 +355,7 @@ public sealed class LargeSolutionBenchmarkingTests
         BenchmarkWorkloadDefinition staged = real with
         {
             WorkloadId = "synthetic-materialized-staged",
-            CompilationMode = BenchmarkCompilationMode.StagedAssemblies,
+            CompilationMode = BenchmarkCompilationMode.StagedAssemblies
         };
 
         using BenchmarkMaterializedFixture realFixture = BenchmarkFixtureMaterializer.Materialize(real);
@@ -360,9 +367,13 @@ public sealed class LargeSolutionBenchmarkingTests
             Assert.That(realFixture.SourcePaths, Has.Count.EqualTo(6));
             Assert.That(File.Exists(realFixture.SolutionPath), Is.True);
             Assert.That(File.Exists(realFixture.PolicyPath), Is.True);
-            Assert.That(File.Exists(Path.Combine(stagedFixture.Root, ".benchmark", "staged-assemblies", "manifest.json")), Is.True);
+            Assert.That(
+                File.Exists(Path.Combine(stagedFixture.Root, ".benchmark", "staged-assemblies", "manifest.json")),
+                Is.True);
             Assert.That(stagedFixture.StagedAssemblyPaths, Has.Count.EqualTo(3));
-            Assert.That(stagedFixture.StagedAssemblyPaths.All(path => File.Exists(BuildReceiptStore.ReceiptPathFor(path))), Is.True);
+            Assert.That(
+                stagedFixture.StagedAssemblyPaths.All(path => File.Exists(BuildReceiptStore.ReceiptPathFor(path))),
+                Is.True);
         });
     }
 
@@ -375,11 +386,12 @@ public sealed class LargeSolutionBenchmarkingTests
             BenchmarkCompilationMode.StagedAssemblies);
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
 
-        BenchmarkCliRun run = fixture.RunValidation(ensureBuilt: false);
+        BenchmarkCliRun run = fixture.RunValidation(false);
 
         Assert.Multiple(() =>
         {
-            Assert.That(run.ExitCode, Is.EqualTo(0), $"stdout: {run.StandardOutput}{Environment.NewLine}stderr: {run.StandardError}");
+            Assert.That(run.ExitCode, Is.EqualTo(0),
+                $"stdout: {run.StandardOutput}{Environment.NewLine}stderr: {run.StandardError}");
             Assert.That(() => JsonDocument.Parse(run.StandardOutput), Throws.Nothing);
             Assert.That(fixture.StagedAssemblyPaths, Has.Count.EqualTo(workload.Inventory.AssemblyCount));
         });
@@ -395,11 +407,11 @@ public sealed class LargeSolutionBenchmarkingTests
             SourceAssembly = "Synthetic.Project001",
             SourceType = "Synthetic.Project001.Type001",
             SourceMember = "Identity",
-            Location = "/private/tmp/run-a/src/Synthetic.Project001/SourceRoot01/Type001.cs",
+            Location = "/private/tmp/run-a/src/Synthetic.Project001/SourceRoot01/Type001.cs"
         };
         BenchmarkFindingIdentity equivalent = firstFinding with
         {
-            Location = "C:\\temp\\run-b\\src\\Synthetic.Project001\\SourceRoot01\\Type001.cs",
+            Location = "C:\\temp\\run-b\\src\\Synthetic.Project001\\SourceRoot01\\Type001.cs"
         };
         BenchmarkCanonicalResultIdentity first = BenchmarkIdentity.CreateCanonicalResult("Success", 0, [firstFinding]);
         BenchmarkCanonicalResultIdentity second = BenchmarkIdentity.CreateCanonicalResult("Success", 0, [equivalent]);
@@ -435,26 +447,27 @@ public sealed class LargeSolutionBenchmarkingTests
             new BenchmarkDimensionSet { ProjectCount = 4, FindingCandidates = 3 },
             BenchmarkCompilationMode.StagedAssemblies,
             BenchmarkExecutionMode.MultiCommand,
-            independentProcesses: 3);
-        using JsonDocument profile = JsonDocument.Parse("""
-            {
-              "SchemaId": "analysis-profile/v1",
-              "CompletionStatus": "Success",
-              "Counters": {},
-              "Phases": [],
-              "Output": { "OutputFailed": false }
-            }
-            """);
+            3);
+        using var profile = JsonDocument.Parse("""
+                                               {
+                                                 "SchemaId": "analysis-profile/v1",
+                                                 "CompletionStatus": "Success",
+                                                 "Counters": {},
+                                                 "Phases": [],
+                                                 "Output": { "OutputFailed": false }
+                                               }
+                                               """);
         BenchmarkCanonicalResultIdentity result = BenchmarkIdentity.CreateCanonicalResult("Success", 0, []);
-        BenchmarkEvidenceDocument evidence = BenchmarkEvidenceFactory.Create(workload, profile.RootElement.Clone(), result);
+        BenchmarkEvidenceDocument evidence =
+            BenchmarkEvidenceFactory.Create(workload, profile.RootElement.Clone(), result);
         BenchmarkProfileSample timedSample = evidence.Samples.Single() with
         {
-            MeasuredWallClockMilliseconds = 1.25m,
+            MeasuredWallClockMilliseconds = 1.25m
         };
         evidence = evidence with
         {
             Samples = [timedSample],
-            Run = timedSample.Run,
+            Run = timedSample.Run
         };
         string json = BenchmarkEvidenceJson.Serialize(evidence);
         BenchmarkEvidenceDocument roundTrip = BenchmarkEvidenceJson.Deserialize(json);
@@ -465,7 +478,8 @@ public sealed class LargeSolutionBenchmarkingTests
         Assert.Multiple(() =>
         {
             Assert.That(roundTrip.Workload.WorkloadIdentity, Is.EqualTo(workload.WorkloadIdentity));
-            Assert.That(roundTrip.Samples.Single().RawAnalysisProfile.GetProperty("SchemaId").GetString(), Is.EqualTo("analysis-profile/v1"));
+            Assert.That(roundTrip.Samples.Single().RawAnalysisProfile.GetProperty("SchemaId").GetString(),
+                Is.EqualTo("analysis-profile/v1"));
             Assert.That(json, Does.Not.Contain("measured_wall_clock_milliseconds"));
             Assert.That(validation.IsValid, Is.True, Describe(validation));
         });
@@ -476,7 +490,7 @@ public sealed class LargeSolutionBenchmarkingTests
     {
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
             "synthetic-evidence-failure", BenchmarkTopologyShape.Linear);
-        using JsonDocument invalidProfile = JsonDocument.Parse("{\"SchemaId\":\"wrong/v1\"}");
+        using var invalidProfile = JsonDocument.Parse("{\"SchemaId\":\"wrong/v1\"}");
         BenchmarkCanonicalResultIdentity result = BenchmarkIdentity.CreateCanonicalResult("Success", 0, []);
 
         Assert.That(
@@ -489,7 +503,7 @@ public sealed class LargeSolutionBenchmarkingTests
     {
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
             "synthetic-effect-contract", BenchmarkTopologyShape.Dense);
-        using JsonDocument profile = JsonDocument.Parse("{\"SchemaId\":\"analysis-profile/v1\"}");
+        using var profile = JsonDocument.Parse("{\"SchemaId\":\"analysis-profile/v1\"}");
         BenchmarkComplexityEvidence complexity = new()
         {
             ScaleVariable = "P=projects",
@@ -499,10 +513,22 @@ public sealed class LargeSolutionBenchmarkingTests
             Disposition = BenchmarkEvidenceDisposition.Candidate,
             ScalePoints =
             [
-                new() { Label = "small", ScaleValue = 4, DeterministicWork = 12, FindingCount = 0, AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Not measured.") },
-                new() { Label = "medium", ScaleValue = 8, DeterministicWork = 48, FindingCount = 0, AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Not measured.") },
-                new() { Label = "large", ScaleValue = 16, DeterministicWork = 192, FindingCount = 0, AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Not measured.") },
-            ],
+                new BenchmarkScalePoint
+                {
+                    Label = "small", ScaleValue = 4, DeterministicWork = 12, FindingCount = 0,
+                    AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Not measured.")
+                },
+                new BenchmarkScalePoint
+                {
+                    Label = "medium", ScaleValue = 8, DeterministicWork = 48, FindingCount = 0,
+                    AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Not measured.")
+                },
+                new BenchmarkScalePoint
+                {
+                    Label = "large", ScaleValue = 16, DeterministicWork = 192, FindingCount = 0,
+                    AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Not measured.")
+                }
+            ]
         };
         BenchmarkExpectedEffectEvidence expectedEffect = new()
         {
@@ -517,9 +543,10 @@ public sealed class LargeSolutionBenchmarkingTests
             ExpectedEndToEndUpperBound = 1.4m,
             MemoryAllocationTradeOff = "Index memory must remain bounded by the edge set.",
             ColdPathTradeOff = "Index construction is measured separately from warm reuse.",
-            SuccessThreshold = "Deterministic traversal work falls by at least one repeated factor at medium and large sizes.",
+            SuccessThreshold =
+                "Deterministic traversal work falls by at least one repeated factor at medium and large sizes.",
             KillCriterion = "Defer if the work reduction is not reproduced at three sizes or canonical results differ.",
-            Confidence = "medium; timing remains environment-dependent",
+            Confidence = "medium; timing remains environment-dependent"
         };
         BenchmarkEvidenceDocument evidence = BenchmarkEvidenceFactory.Create(
             workload,
@@ -544,14 +571,14 @@ public sealed class LargeSolutionBenchmarkingTests
     {
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
             "synthetic-evidence-measurement-invariants", BenchmarkTopologyShape.Linear);
-        using JsonDocument profile = JsonDocument.Parse("{\"SchemaId\":\"analysis-profile/v1\"}");
+        using var profile = JsonDocument.Parse("{\"SchemaId\":\"analysis-profile/v1\"}");
         BenchmarkEvidenceDocument evidence = BenchmarkEvidenceFactory.Create(
             workload,
             profile.RootElement.Clone(),
             BenchmarkIdentity.CreateCanonicalResult("Success", 0, []));
         BenchmarkProfileSample invalidSample = evidence.Samples.Single() with
         {
-            WallClock = new BenchmarkResourceMeasurement { Status = BenchmarkMeasurementStatus.Available },
+            WallClock = new BenchmarkResourceMeasurement { Status = BenchmarkMeasurementStatus.Available }
         };
 
         Assert.That(
@@ -564,7 +591,7 @@ public sealed class LargeSolutionBenchmarkingTests
             ["status"] = "unavailable",
             ["value"] = 0,
             ["unit"] = null,
-            ["reason"] = null,
+            ["reason"] = null
         };
         JsonSchema schema = JsonSchemaTextFactory.FromText(LoadEvidenceSchema());
         EvaluationResults validation = schema.Evaluate(
@@ -578,7 +605,7 @@ public sealed class LargeSolutionBenchmarkingTests
     {
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
             "synthetic-privacy-check", BenchmarkTopologyShape.Linear);
-        using JsonDocument profile = JsonDocument.Parse("{\"SchemaId\":\"analysis-profile/v1\"}");
+        using var profile = JsonDocument.Parse("{\"SchemaId\":\"analysis-profile/v1\"}");
         string json = BenchmarkEvidenceJson.Serialize(BenchmarkEvidenceFactory.Create(
             workload,
             profile.RootElement.Clone(),
@@ -597,7 +624,8 @@ public sealed class LargeSolutionBenchmarkingTests
     {
         BenchmarkWorkloadDefinition workload = BenchmarkWorkloadGenerator.Create(
             "synthetic-buildable-linear", BenchmarkTopologyShape.Linear,
-            new BenchmarkDimensionSet { ProjectCount = 2, TypesPerProject = 2, SourceFilesPerProject = 1, SourceRootCount = 2 });
+            new BenchmarkDimensionSet
+                { ProjectCount = 2, TypesPerProject = 2, SourceFilesPerProject = 1, SourceRootCount = 2 });
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
 
         fixture.Build();
@@ -619,7 +647,8 @@ public sealed class LargeSolutionBenchmarkingTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(run.ExitCode, Is.EqualTo(0), $"stdout: {run.StandardOutput}{Environment.NewLine}stderr: {run.StandardError}");
+            Assert.That(run.ExitCode, Is.EqualTo(0),
+                $"stdout: {run.StandardOutput}{Environment.NewLine}stderr: {run.StandardError}");
             Assert.That(() => JsonDocument.Parse(run.StandardOutput), Throws.Nothing);
         });
     }
@@ -646,7 +675,9 @@ public sealed class LargeSolutionBenchmarkingTests
             "large-solution-workload-v1.schema.json"));
     }
 
-    private static string Describe(EvaluationResults results) =>
-        string.Join(Environment.NewLine, results.Details?.Where(detail => !detail.IsValid).Select(detail =>
+    private static string Describe(EvaluationResults results)
+    {
+        return string.Join(Environment.NewLine, results.Details?.Where(detail => !detail.IsValid).Select(detail =>
             $"{detail.EvaluationPath}: {string.Join(",", detail.Errors?.Values.ToArray() ?? [])}").ToArray() ?? []);
+    }
 }

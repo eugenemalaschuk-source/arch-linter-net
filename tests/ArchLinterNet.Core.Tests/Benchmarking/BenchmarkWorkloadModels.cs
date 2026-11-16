@@ -1,4 +1,6 @@
-namespace ArchLinterNet.Core.Tests;
+using System.Text.Json.Serialization;
+
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 internal enum BenchmarkTopologyShape
 {
@@ -8,20 +10,20 @@ internal enum BenchmarkTopologyShape
     Dense,
     CyclicScc,
     ManyProjectsFewTypes,
-    FewProjectsManyTypes,
+    FewProjectsManyTypes
 }
 
 internal enum BenchmarkContractLayerGraphShape
 {
     DenseDag,
     LayeredDag,
-    StronglyConnectedWithAcyclicTail,
+    StronglyConnectedWithAcyclicTail
 }
 
 internal enum BenchmarkCompilationMode
 {
     RealMsBuild,
-    StagedAssemblies,
+    StagedAssemblies
 }
 
 internal enum BenchmarkExecutionMode
@@ -29,7 +31,7 @@ internal enum BenchmarkExecutionMode
     SingleCommand,
     FullGovernance,
     MultiCommand,
-    PullRequest,
+    PullRequest
 }
 
 internal sealed record BenchmarkDimensionSet
@@ -52,60 +54,50 @@ internal sealed record BenchmarkDimensionSet
 
     public int SourceRootCount { get; init; } = 1;
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int IgnoreRuleCount { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int MetricRuleCount { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int ReportRuleCount { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int MethodBodyRuleCount { get; init; }
 
     public void Validate(BenchmarkTopologyShape shape)
     {
         if (ProjectCount < 1)
-        {
             throw new ArgumentOutOfRangeException(
-                paramName: null,
-                message: "ProjectCount is invalid: a workload must contain at least one project.");
-        }
+                null,
+                "ProjectCount is invalid: a workload must contain at least one project.");
 
         if (TypesPerProject < 1)
-        {
             throw new ArgumentOutOfRangeException(
-                paramName: null,
-                message: "TypesPerProject must contain at least one type.");
-        }
+                null,
+                "TypesPerProject must contain at least one type.");
 
         if (SourceFilesPerProject < 1)
-        {
             throw new ArgumentOutOfRangeException(
-                paramName: null,
-                message: "SourceFilesPerProject must contain at least one source file.");
-        }
+                null,
+                "SourceFilesPerProject must contain at least one source file.");
 
         if (ReferencesPerProject < 0 || LayerCount < 1 || SelectorPredicateTermsPerLayer is < 1 or > 25 ||
             ContractsPerWorkload < 1 || FindingCandidates < 0 || SourceRootCount < 1 ||
             IgnoreRuleCount < 0 || MetricRuleCount < 0 || ReportRuleCount < 0 || MethodBodyRuleCount < 0)
-        {
             throw new ArgumentOutOfRangeException(
-                paramName: null,
-                message: "Workload dimensions cannot be negative and must contain at least one layer, contract, and source root.");
-        }
+                null,
+                "Workload dimensions cannot be negative and must contain at least one layer, contract, and source root.");
 
         int minimumProjects = shape switch
         {
             BenchmarkTopologyShape.WideFanOutFanIn => 3,
             BenchmarkTopologyShape.Diamond => 4,
-            _ => 1,
+            _ => 1
         };
         if (ProjectCount < minimumProjects)
-        {
             throw new ArgumentException($"The {shape} shape requires at least {minimumProjects} projects.");
-        }
     }
 }
 
@@ -148,22 +140,22 @@ internal sealed record BenchmarkInventoryCounts
 
     public required int SourceRootCount { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int IgnoreRuleCount { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int MetricRuleCount { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int ReportRuleCount { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int MethodBodyRuleCount { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int ContractLayerNodeCount { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int ContractLayerReferenceCount { get; init; }
 }
 
@@ -202,7 +194,7 @@ internal sealed record BenchmarkWorkloadDefinition
 {
     public const string ManifestSchemaId = "large-solution-benchmark/v1";
 
-    public const string GeneratorVersion = "2";
+    private const string GeneratorVersion = "2";
 
     public required string WorkloadId { get; init; }
 
@@ -226,26 +218,29 @@ internal sealed record BenchmarkWorkloadDefinition
 
     public required string WorkloadIdentity { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public BenchmarkContractLayerGraph? ContractLayerGraph { get; init; }
 
-    public BenchmarkWorkloadManifest ToManifest() => new()
+    public BenchmarkWorkloadManifest ToManifest()
     {
-        SchemaId = ManifestSchemaId,
-        GeneratorVersion = GeneratorVersion,
-        WorkloadId = WorkloadId,
-        Shape = Shape,
-        CompilationMode = CompilationMode,
-        Dimensions = Dimensions,
-        Projects = Projects,
-        Edges = Edges,
-        Topology = Topology,
-        Inventory = Inventory,
-        Workflow = Workflow,
-        PullRequestChange = PullRequestChange,
-        WorkloadIdentity = WorkloadIdentity,
-        ContractLayerGraph = ContractLayerGraph,
-    };
+        return new BenchmarkWorkloadManifest
+        {
+            SchemaId = ManifestSchemaId,
+            GeneratorVersion = GeneratorVersion,
+            WorkloadId = WorkloadId,
+            Shape = Shape,
+            CompilationMode = CompilationMode,
+            Dimensions = Dimensions,
+            Projects = Projects,
+            Edges = Edges,
+            Topology = Topology,
+            Inventory = Inventory,
+            Workflow = Workflow,
+            PullRequestChange = PullRequestChange,
+            WorkloadIdentity = WorkloadIdentity,
+            ContractLayerGraph = ContractLayerGraph
+        };
+    }
 }
 
 internal sealed record BenchmarkWorkloadManifest
@@ -276,6 +271,6 @@ internal sealed record BenchmarkWorkloadManifest
 
     public required string WorkloadIdentity { get; init; }
 
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public BenchmarkContractLayerGraph? ContractLayerGraph { get; init; }
 }

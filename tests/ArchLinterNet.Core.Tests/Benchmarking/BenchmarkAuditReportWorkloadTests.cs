@@ -1,8 +1,7 @@
-using System.Linq;
 using System.Text.Json;
 using NUnit.Framework;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 [TestFixture]
 [NonParallelizable]
@@ -19,12 +18,12 @@ public sealed class BenchmarkAuditReportWorkloadTests
             new BenchmarkDimensionSet
             {
                 ReportRuleCount = ruleCount,
-                FindingCandidates = 12,
+                FindingCandidates = 12
             });
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
         string first = BenchmarkSarifWorkloadFactory.FormatResult(fixture);
         string second = BenchmarkSarifWorkloadFactory.FormatResult(fixture);
-        using JsonDocument output = JsonDocument.Parse(first);
+        using var output = JsonDocument.Parse(first);
         JsonElement run = output.RootElement.GetProperty("runs")[0];
         JsonElement rules = run.GetProperty("tool").GetProperty("driver").GetProperty("rules");
         JsonElement results = run.GetProperty("results");

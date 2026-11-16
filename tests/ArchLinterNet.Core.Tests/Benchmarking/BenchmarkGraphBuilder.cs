@@ -1,4 +1,4 @@
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 internal static class BenchmarkGraphBuilder
 {
@@ -24,7 +24,7 @@ internal static class BenchmarkGraphBuilder
             BenchmarkTopologyShape.CyclicScc => Cyclic(projects),
             BenchmarkTopologyShape.ManyProjectsFewTypes => Linear(projects),
             BenchmarkTopologyShape.FewProjectsManyTypes => Linear(projects),
-            _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, "Unknown benchmark topology shape."),
+            _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, "Unknown benchmark topology shape.")
         };
     }
 
@@ -32,10 +32,7 @@ internal static class BenchmarkGraphBuilder
         BenchmarkContractLayerGraphShape? shape,
         int layerCount)
     {
-        if (shape is null)
-        {
-            return null;
-        }
+        if (shape is null) return null;
 
         string[] layers = Enumerable.Range(1, layerCount)
             .Select(index => $"contract_layer_{index:00}")
@@ -45,33 +42,24 @@ internal static class BenchmarkGraphBuilder
         {
             case BenchmarkContractLayerGraphShape.DenseDag:
                 for (int from = 0; from < layers.Length; from++)
-                {
-                    for (int to = from + 1; to < layers.Length; to++)
-                    {
-                        edges.Add(new BenchmarkContractLayerEdge(layers[from], layers[to]));
-                    }
-                }
+                for (int to = from + 1; to < layers.Length; to++)
+                    edges.Add(new BenchmarkContractLayerEdge(layers[from], layers[to]));
 
                 break;
             case BenchmarkContractLayerGraphShape.LayeredDag:
                 for (int from = 0; from < layers.Length - 1; from++)
-                {
                     edges.Add(new BenchmarkContractLayerEdge(layers[from], layers[from + 1]));
-                }
 
                 break;
             case BenchmarkContractLayerGraphShape.StronglyConnectedWithAcyclicTail:
                 if (layers.Length < 3)
-                {
-                    throw new ArgumentException("An SCC with an acyclic tail requires at least three contract layers.", nameof(layerCount));
-                }
+                    throw new ArgumentException("An SCC with an acyclic tail requires at least three contract layers.",
+                        nameof(layerCount));
 
                 edges.Add(new BenchmarkContractLayerEdge(layers[0], layers[1]));
                 edges.Add(new BenchmarkContractLayerEdge(layers[1], layers[0]));
                 for (int from = 1; from < layers.Length - 1; from++)
-                {
                     edges.Add(new BenchmarkContractLayerEdge(layers[from], layers[from + 1]));
-                }
 
                 break;
             default:
@@ -82,7 +70,7 @@ internal static class BenchmarkGraphBuilder
         {
             Shape = shape.Value,
             Layers = layers,
-            Edges = edges,
+            Edges = edges
         };
     }
 
@@ -91,11 +79,8 @@ internal static class BenchmarkGraphBuilder
         IReadOnlyList<BenchmarkProjectNode> projects,
         int referencesPerProject)
     {
-        List<BenchmarkProjectEdge> edges = CreateEdges(shape, projects).ToList();
-        if (referencesPerProject <= 0 || projects.Count < 2)
-        {
-            return edges;
-        }
+        var edges = CreateEdges(shape, projects).ToList();
+        if (referencesPerProject <= 0 || projects.Count < 2) return edges;
 
         HashSet<(string From, string To)> existing = edges
             .Select(edge => (edge.FromProjectId, edge.ToProjectId))
@@ -106,10 +91,7 @@ internal static class BenchmarkGraphBuilder
             for (int distance = 1; current < referencesPerProject && from + distance < projects.Count; distance++)
             {
                 int to = from + distance;
-                if (!existing.Add((projects[from].Id, projects[to].Id)))
-                {
-                    continue;
-                }
+                if (!existing.Add((projects[from].Id, projects[to].Id))) continue;
 
                 edges.Add(new BenchmarkProjectEdge(projects[from].Id, projects[to].Id));
                 current++;
@@ -127,14 +109,11 @@ internal static class BenchmarkGraphBuilder
         IReadOnlyList<BenchmarkProjectEdge> edges,
         BenchmarkTopologyShape shape)
     {
-        Dictionary<string, List<string>> adjacency = projects.ToDictionary(
+        var adjacency = projects.ToDictionary(
             project => project.Id,
             _ => new List<string>(),
             StringComparer.Ordinal);
-        foreach (BenchmarkProjectEdge edge in edges)
-        {
-            adjacency[edge.FromProjectId].Add(edge.ToProjectId);
-        }
+        foreach (BenchmarkProjectEdge edge in edges) adjacency[edge.FromProjectId].Add(edge.ToProjectId);
 
         int componentCount = CountStronglyConnectedComponents(adjacency);
         int alternatePaths = shape == BenchmarkTopologyShape.Diamond ? 2 : 0;
@@ -143,12 +122,16 @@ internal static class BenchmarkGraphBuilder
             ProjectCount = projects.Count,
             ReferenceEdgeCount = edges.Count,
             StronglyConnectedComponentCount = componentCount,
-            ContainsCycle = componentCount < projects.Count || edges.Any(edge => edge.FromProjectId == edge.ToProjectId),
-            AlternatePathCount = alternatePaths,
+            ContainsCycle =
+                componentCount < projects.Count || edges.Any(edge => edge.FromProjectId == edge.ToProjectId),
+            AlternatePathCount = alternatePaths
         };
     }
 
-    public static string ProjectId(int index) => $"project-{index + 1:000}";
+    public static string ProjectId(int index)
+    {
+        return $"project-{index + 1:000}";
+    }
 
     private static IReadOnlyList<BenchmarkProjectEdge> Linear(IReadOnlyList<BenchmarkProjectNode> projects)
     {
@@ -182,16 +165,13 @@ internal static class BenchmarkGraphBuilder
             new(source.Id, left.Id),
             new(source.Id, right.Id),
             new(left.Id, sink.Id),
-            new(right.Id, sink.Id),
+            new(right.Id, sink.Id)
         };
 
         for (int i = 4; i < projects.Count; i++)
         {
             edges.Add(new BenchmarkProjectEdge(sink.Id, projects[i].Id));
-            if (i < projects.Count - 1)
-            {
-                edges.Add(new BenchmarkProjectEdge(projects[i].Id, projects[i + 1].Id));
-            }
+            if (i < projects.Count - 1) edges.Add(new BenchmarkProjectEdge(projects[i].Id, projects[i + 1].Id));
         }
 
         return edges;
@@ -201,12 +181,8 @@ internal static class BenchmarkGraphBuilder
     {
         var edges = new List<BenchmarkProjectEdge>();
         for (int from = 0; from < projects.Count; from++)
-        {
-            for (int to = from + 1; to < projects.Count; to++)
-            {
-                edges.Add(new BenchmarkProjectEdge(projects[from].Id, projects[to].Id));
-            }
-        }
+        for (int to = from + 1; to < projects.Count; to++)
+            edges.Add(new BenchmarkProjectEdge(projects[from].Id, projects[to].Id));
 
         return edges;
     }
@@ -234,7 +210,6 @@ internal static class BenchmarkGraphBuilder
             stack.Push(node);
             onStack.Add(node);
             foreach (string target in adjacency[node])
-            {
                 if (!indexes.TryGetValue(target, out int targetIndex))
                 {
                     Visit(target);
@@ -244,33 +219,22 @@ internal static class BenchmarkGraphBuilder
                 {
                     lowLinks[node] = Math.Min(lowLinks[node], targetIndex);
                 }
-            }
 
-            if (lowLinks[node] != indexes[node])
-            {
-                return;
-            }
+            if (lowLinks[node] != indexes[node]) return;
 
             while (true)
             {
                 string member = stack.Pop();
                 onStack.Remove(member);
-                if (member == node)
-                {
-                    break;
-                }
+                if (member == node) break;
             }
 
             componentCount++;
         }
 
         foreach (string node in adjacency.Keys.Order(StringComparer.Ordinal))
-        {
             if (!indexes.ContainsKey(node))
-            {
                 Visit(node);
-            }
-        }
 
         return componentCount;
     }

@@ -4,12 +4,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Resolution;
 using Json.Schema;
 using NUnit.Framework;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 [TestFixture]
 [NonParallelizable]
@@ -29,7 +28,7 @@ public sealed class BenchmarkAuditMatrixTests
             "internal",
             "large-solution-benchmarking",
             "workload-catalog.json");
-        using JsonDocument catalog = JsonDocument.Parse(File.ReadAllText(catalogPath));
+        using var catalog = JsonDocument.Parse(File.ReadAllText(catalogPath));
         string sourceRevision = GetSourceRevision(repositoryRoot);
         string evidenceDirectory = Path.Combine(
             repositoryRoot,
@@ -58,7 +57,7 @@ public sealed class BenchmarkAuditMatrixTests
                      .Concat(EnumerateContractGraphScaleWorkloads(catalog.RootElement)))
         {
             string outputPath = Path.Combine(evidenceDirectory, $"{workload.WorkloadId}.json");
-            BenchmarkEvidenceDocument evidence = RunWorkload(workload, repositoryRoot, sourceRevision);
+            BenchmarkEvidenceDocument evidence = RunWorkload(workload, sourceRevision);
             string evidenceJson = BenchmarkEvidenceJson.Serialize(evidence);
             EvaluationResults validation = schema.Evaluate(
                 JsonNode.Parse(evidenceJson), new EvaluationOptions { OutputFormat = OutputFormat.List });
@@ -66,7 +65,7 @@ public sealed class BenchmarkAuditMatrixTests
                 $"{workload.WorkloadId}: {Describe(validation)}");
 
             string archivedJson = BenchmarkEvidenceJson.SerializeArchive(evidenceJson);
-            string[] evidenceLines = archivedJson.Split(Environment.NewLine, StringSplitOptions.None);
+            string[] evidenceLines = archivedJson.Split(Environment.NewLine);
             int maximumLineBytes = evidenceLines.Max(line => Encoding.UTF8.GetByteCount(line));
             int evidenceBytes = Encoding.UTF8.GetByteCount(archivedJson);
             Assert.That(evidenceLines.Length, Is.LessThan(300),
@@ -87,7 +86,8 @@ public sealed class BenchmarkAuditMatrixTests
             workloadCount++;
         }
 
-        Assert.That(workloadCount, Is.EqualTo(33), "The evidence matrix must contain eight independent audit families and three graph shapes, each at three sizes.");
+        Assert.That(workloadCount, Is.EqualTo(33),
+            "The evidence matrix must contain eight independent audit families and three graph shapes, each at three sizes.");
     }
 
     private static IEnumerable<BenchmarkWorkloadDefinition> EnumerateAuditScaleWorkloads(JsonElement catalog)
@@ -105,8 +105,7 @@ public sealed class BenchmarkAuditMatrixTests
                 yield return BenchmarkWorkloadGenerator.Create(
                     workloadId,
                     BenchmarkTopologyShape.Linear,
-                    dimensions,
-                    compilationMode: BenchmarkCompilationMode.RealMsBuild);
+                    dimensions);
             }
         }
     }
@@ -119,9 +118,11 @@ public sealed class BenchmarkAuditMatrixTests
             {
                 "dense_dag" => BenchmarkContractLayerGraphShape.DenseDag,
                 "layered_dag" => BenchmarkContractLayerGraphShape.LayeredDag,
-                "strongly_connected_with_acyclic_tail" => BenchmarkContractLayerGraphShape.StronglyConnectedWithAcyclicTail,
-                string value => throw new InvalidOperationException($"Unknown graph workload shape '{value}'."),
-                null => throw new InvalidOperationException("A graph workload shape is required."),
+                "strongly_connected_with_acyclic_tail" => BenchmarkContractLayerGraphShape
+                    .StronglyConnectedWithAcyclicTail,
+                not null => throw new InvalidOperationException(
+                    $"Unknown graph workload shape '{family.GetProperty("graph_shape").GetString()}'."),
+                null => throw new InvalidOperationException("A graph workload shape is required.")
             };
             foreach (JsonElement workloadElement in family.GetProperty("workloads").EnumerateArray())
             {
@@ -138,9 +139,8 @@ public sealed class BenchmarkAuditMatrixTests
                         ReferencesPerProject = 0,
                         LayerCount = layerCount,
                         ContractsPerWorkload = 1,
-                        MethodBodyRuleCount = 1,
+                        MethodBodyRuleCount = 1
                     },
-                    compilationMode: BenchmarkCompilationMode.RealMsBuild,
                     contractLayerGraphShape: shape);
             }
         }
@@ -149,7 +149,9 @@ public sealed class BenchmarkAuditMatrixTests
     private static BenchmarkDimensionSet SetDimension(
         BenchmarkDimensionSet dimensions,
         string name,
-        int value) => name switch
+        int value)
+    {
+        return name switch
         {
             "project_count" => dimensions with { ProjectCount = value },
             "source_files_per_project" => dimensions with { SourceFilesPerProject = value },
@@ -159,20 +161,20 @@ public sealed class BenchmarkAuditMatrixTests
             "metric_rule_count" => dimensions with { MetricRuleCount = value },
             "report_rule_count" => dimensions with { ReportRuleCount = value },
             "method_body_rule_count" => dimensions with { MethodBodyRuleCount = value },
-            _ => throw new InvalidOperationException($"Unknown audit scale dimension '{name}'."),
+            _ => throw new InvalidOperationException($"Unknown audit scale dimension '{name}'.")
         };
+    }
 
     private static BenchmarkEvidenceDocument RunWorkload(
         BenchmarkWorkloadDefinition workload,
-        string repositoryRoot,
         string sourceRevision)
     {
-        Stopwatch materialization = Stopwatch.StartNew();
+        var materialization = Stopwatch.StartNew();
         using BenchmarkMaterializedFixture fixture = BenchmarkFixtureMaterializer.Materialize(workload);
         materialization.Stop();
         BenchmarkResourceMeasurement materializationMeasurement = Milliseconds(materialization.Elapsed);
 
-        Stopwatch restoreAndBuild = Stopwatch.StartNew();
+        var restoreAndBuild = Stopwatch.StartNew();
         fixture.Build();
         restoreAndBuild.Stop();
         BenchmarkResourceMeasurement restoreAndBuildMeasurement = Milliseconds(restoreAndBuild.Elapsed);
@@ -192,9 +194,8 @@ public sealed class BenchmarkAuditMatrixTests
         foreach ((string mode, int? parallelism) in new (string Mode, int? Parallelism)[]
                  {
                      ("sequential", 1),
-                     ($"bounded-{boundedParallelism}", boundedParallelism),
+                     ($"bounded-{boundedParallelism}", boundedParallelism)
                  })
-        {
             for (int pair = 0; pair < WarmObserverPairsPerParallelMode; pair++)
             {
                 bool observerEnabledFirst = pair % 2 == 1;
@@ -210,17 +211,18 @@ public sealed class BenchmarkAuditMatrixTests
                 Assert.That(enabled.CanonicalResult.Sha256, Is.EqualTo(disabled.CanonicalResult.Sha256),
                     $"Observer parity failed for {workload.WorkloadId} ({mode}, pair {pair + 1}).");
                 Assert.That(enabled.MaterializedInputSha256, Is.EqualTo(disabled.MaterializedInputSha256));
-                Assert.That(enabled.Sample.LoadedAssemblies!.Sha256, Is.EqualTo(disabled.Sample.LoadedAssemblies!.Sha256),
+                Assert.That(enabled.Sample.LoadedAssemblies!.Sha256,
+                    Is.EqualTo(disabled.Sample.LoadedAssemblies!.Sha256),
                     $"Loaded assemblies changed across paired samples for {workload.WorkloadId} ({mode}, pair {pair + 1}).");
                 canonicalResult ??= disabled.CanonicalResult;
                 Assert.That(disabled.CanonicalResult.Sha256, Is.EqualTo(canonicalResult.Sha256),
                     $"Canonical result changed across samples for {workload.WorkloadId}.");
 
-                BenchmarkProfilerOverheadEvidence overhead = BenchmarkAuditAnalysisRunner.CreateObserverOverhead(disabled, enabled);
+                BenchmarkProfilerOverheadEvidence overhead =
+                    BenchmarkAuditAnalysisRunner.CreateObserverOverhead(disabled, enabled);
                 samples.Add(AddReportMeasurement(fixture, first.Sample, overhead));
                 samples.Add(AddReportMeasurement(fixture, second.Sample, overhead));
             }
-        }
 
         Assert.That(samples, Has.Count.EqualTo(8), $"Unexpected sample count for {workload.WorkloadId}.");
         Assert.That(samples.All(sample => sample.LoadedAssemblies is { Artifacts.Count: > 0 }), Is.True,
@@ -230,7 +232,8 @@ public sealed class BenchmarkAuditMatrixTests
             $"Loaded DLL identity changed across repeated samples for {workload.WorkloadId}.");
         if (workload.Dimensions.MetricRuleCount > 0)
         {
-            Assert.That(samples.All(sample => sample.MetricWork?.MetricCount == workload.Dimensions.MetricRuleCount), Is.True,
+            Assert.That(samples.All(sample => sample.MetricWork?.MetricCount == workload.Dimensions.MetricRuleCount),
+                Is.True,
                 $"Metric execution count did not match the declared scale for {workload.WorkloadId}.");
             Assert.That(samples.Select(sample => sample.MetricWork!.ResultsSha256)
                     .Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(1),
@@ -238,7 +241,6 @@ public sealed class BenchmarkAuditMatrixTests
         }
 
         if (workload.Dimensions.MethodBodyRuleCount > 0)
-        {
             foreach (BenchmarkProfileSample sample in samples)
             {
                 JsonElement contractCounts = sample.RawAnalysisProfile
@@ -251,7 +253,6 @@ public sealed class BenchmarkAuditMatrixTests
                     Is.EqualTo(workload.Dimensions.MethodBodyRuleCount),
                     $"Method-body work did not match the declared scale for {workload.WorkloadId}.");
             }
-        }
 
         string[] reportChecksums = samples
             .Where(sample => sample.ReportOutputSha256 is not null)
@@ -262,7 +263,7 @@ public sealed class BenchmarkAuditMatrixTests
             $"Report output changed across repeated samples for {workload.WorkloadId}.");
 
         string inputIdentity = BenchmarkMaterializedInputIdentity.Compute(fixture.Root);
-        using JsonDocument profile = JsonDocument.Parse(samples[0].RawAnalysisProfile.GetRawText());
+        using var profile = JsonDocument.Parse(samples[0].RawAnalysisProfile.GetRawText());
         string configuration = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "unknown";
         BenchmarkEvidenceDocument template = BenchmarkEvidenceFactory.Create(
@@ -273,7 +274,7 @@ public sealed class BenchmarkAuditMatrixTests
         BenchmarkEvidenceDocument evidence = template with
         {
             Samples = samples,
-            Environment = template.Environment with
+            Environment = new BenchmarkEnvironmentEvidence
             {
                 Runtime = RuntimeInformation.FrameworkDescription,
                 OperatingSystem = RuntimeInformation.OSDescription,
@@ -281,14 +282,15 @@ public sealed class BenchmarkAuditMatrixTests
                 Configuration = $"{configuration}; in-process Core; no analyzer child process",
                 SourceIdentity = workload.WorkloadIdentity,
                 SourceRevision = sourceRevision,
-                RunnerIdentity = $"local-{RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}-{Environment.ProcessorCount}cpu",
+                RunnerIdentity =
+                    $"local-{RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}-{Environment.ProcessorCount}cpu",
                 ToolIdentity = $"ArchLinterNet.Core.Tests/{Assembly.GetExecutingAssembly().GetName().Version}",
                 MaterializedInputSha256 = inputIdentity,
                 PeakWorkingSet = BenchmarkResourceMeasurement.Unavailable(
                     "A process-wide peak working set would include the complete NUnit host lifetime and is not attributable to this workload."),
                 ManagedAllocation = BenchmarkResourceMeasurement.Unavailable(
-                    "The evidence retains each isolated Core analysis allocation sample rather than aggregating unrelated test-host allocations."),
-            },
+                    "The evidence retains each isolated Core analysis allocation sample rather than aggregating unrelated test-host allocations.")
+            }
         };
         evidence.Validate();
         return evidence;
@@ -301,15 +303,18 @@ public sealed class BenchmarkAuditMatrixTests
         string mode,
         int? parallelism,
         BenchmarkResourceMeasurement materialization,
-        BenchmarkResourceMeasurement restoreAndBuild) => BenchmarkAuditAnalysisRunner.Run(
+        BenchmarkResourceMeasurement restoreAndBuild)
+    {
+        return BenchmarkAuditAnalysisRunner.Run(
             fixture,
             observerEnabled,
             ordinal,
-            isWarmSample: true,
-            parallelMode: mode,
-            maxParallelism: parallelism,
-            fixtureMaterialization: materialization,
-            restoreAndBuild: restoreAndBuild);
+            true,
+            mode,
+            parallelism,
+            materialization,
+            restoreAndBuild);
+    }
 
     private static BenchmarkProfileSample AddReportMeasurement(
         BenchmarkMaterializedFixture fixture,
@@ -325,7 +330,7 @@ public sealed class BenchmarkAuditMatrixTests
         }
         else
         {
-            Stopwatch publication = Stopwatch.StartNew();
+            var publication = Stopwatch.StartNew();
             string sarif = BenchmarkSarifWorkloadFactory.FormatResult(fixture);
             publication.Stop();
             reportPublication = Milliseconds(publication.Elapsed);
@@ -335,13 +340,16 @@ public sealed class BenchmarkAuditMatrixTests
         BenchmarkTimingBoundaryEvidence boundaries = sample.TimingBoundaries! with
         {
             ResultPublication = reportPublication,
-            ProfilerOverhead = overhead,
+            ProfilerOverhead = overhead
         };
         return sample with { TimingBoundaries = boundaries, ReportOutputSha256 = reportIdentity };
     }
 
-    private static BenchmarkResourceMeasurement Milliseconds(TimeSpan elapsed) =>
-        BenchmarkResourceMeasurement.Available(Math.Max(1, (long)Math.Ceiling(elapsed.TotalMilliseconds)), "milliseconds");
+    private static BenchmarkResourceMeasurement Milliseconds(TimeSpan elapsed)
+    {
+        return BenchmarkResourceMeasurement.Available(Math.Max(1, (long)Math.Ceiling(elapsed.TotalMilliseconds)),
+            "milliseconds");
+    }
 
     private static string GetSourceRevision(string repositoryRoot)
     {
@@ -350,26 +358,26 @@ public sealed class BenchmarkAuditMatrixTests
             WorkingDirectory = repositoryRoot,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false,
+            UseShellExecute = false
         };
         startInfo.ArgumentList.Add("rev-parse");
         startInfo.ArgumentList.Add("--verify");
         startInfo.ArgumentList.Add("HEAD");
         startInfo.Environment["GIT_CONFIG_GLOBAL"] = "/dev/null";
         startInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
-        using Process process = Process.Start(startInfo)!;
+        using var process = Process.Start(startInfo)!;
         string output = process.StandardOutput.ReadToEnd();
         string error = process.StandardError.ReadToEnd();
         process.WaitForExit();
         if (process.ExitCode != 0)
-        {
             throw new InvalidOperationException($"Could not identify the benchmark source revision: {error}");
-        }
 
         return output.Trim();
     }
 
-    private static string Describe(EvaluationResults results) =>
-        string.Join(Environment.NewLine, results.Details?.Where(detail => !detail.IsValid).Select(detail =>
+    private static string Describe(EvaluationResults results)
+    {
+        return string.Join(Environment.NewLine, results.Details?.Where(detail => !detail.IsValid).Select(detail =>
             $"{detail.EvaluationPath}: {string.Join(",", detail.Errors?.Values.ToArray() ?? [])}").ToArray() ?? []);
+    }
 }

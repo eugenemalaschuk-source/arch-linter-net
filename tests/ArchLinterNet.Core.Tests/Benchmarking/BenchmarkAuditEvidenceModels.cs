@@ -1,11 +1,11 @@
 using System.Text.Json.Serialization;
 using ArchLinterNet.Core.Profiling;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 internal sealed record BenchmarkWorkCounterEvidence
 {
-    public const string InstrumentationId = "benchmark-work-observer/v1";
+    private const string InstrumentationId = "benchmark-work-observer/v1";
 
     public required string Instrumentation { get; init; }
 
@@ -37,7 +37,7 @@ internal sealed record BenchmarkWorkCounterEvidence
             MethodBodySyntaxTrees = Read(observed, nameof(BenchmarkWorkObserver.MethodBodySyntaxTrees)),
             AstSemanticLookups = Read(observed, nameof(BenchmarkWorkObserver.AstSemanticLookups)),
             LayerMembershipProbes = Read(observed, nameof(BenchmarkWorkObserver.LayerMembershipProbes)),
-            CelContextConstructions = Read(observed, nameof(BenchmarkWorkObserver.CelContextConstructions)),
+            CelContextConstructions = Read(observed, nameof(BenchmarkWorkObserver.CelContextConstructions))
         };
     }
 
@@ -52,16 +52,14 @@ internal sealed record BenchmarkWorkCounterEvidence
             MethodBodySyntaxTrees = BenchmarkResourceMeasurement.NotApplicable(reason),
             AstSemanticLookups = BenchmarkResourceMeasurement.NotApplicable(reason),
             LayerMembershipProbes = BenchmarkResourceMeasurement.NotApplicable(reason),
-            CelContextConstructions = BenchmarkResourceMeasurement.NotApplicable(reason),
+            CelContextConstructions = BenchmarkResourceMeasurement.NotApplicable(reason)
         };
     }
 
     public void Validate()
     {
         if (!string.Equals(Instrumentation, InstrumentationId, StringComparison.Ordinal))
-        {
             throw new InvalidOperationException($"Unsupported benchmark work instrumentation '{Instrumentation}'.");
-        }
 
         ValidateOperations(ProjectFileParses, nameof(ProjectFileParses));
         ValidateOperations(SourceFactFileParses, nameof(SourceFactFileParses));
@@ -72,25 +70,26 @@ internal sealed record BenchmarkWorkCounterEvidence
         ValidateOperations(CelContextConstructions, nameof(CelContextConstructions));
     }
 
-    private static BenchmarkResourceMeasurement Read(IReadOnlyDictionary<string, long> observed, string key) =>
-        observed.TryGetValue(key, out long value)
+    private static BenchmarkResourceMeasurement Read(IReadOnlyDictionary<string, long> observed, string key)
+    {
+        return observed.TryGetValue(key, out long value)
             ? BenchmarkResourceMeasurement.Available(value, "operations")
             : BenchmarkResourceMeasurement.Available(0, "operations");
+    }
 
     private static void ValidateOperations(BenchmarkResourceMeasurement measurement, string fieldName)
     {
         measurement.Validate($"work_counters.{fieldName}");
-        if (measurement.Status == BenchmarkMeasurementStatus.Available && !string.Equals(measurement.Unit, "operations", StringComparison.Ordinal))
-        {
+        if (measurement.Status == BenchmarkMeasurementStatus.Available &&
+            !string.Equals(measurement.Unit, "operations", StringComparison.Ordinal))
             throw new InvalidOperationException($"Benchmark work counter '{fieldName}' must use the operations unit.");
-        }
     }
 }
 
 /// <summary>Fixed-key work boundaries reserved for the sibling History workloads.</summary>
 internal sealed record BenchmarkHistoryWorkCounterEvidence
 {
-    public const string InstrumentationId = "benchmark-history-work/v1";
+    private const string InstrumentationId = "benchmark-history-work/v1";
 
     public required string Instrumentation { get; init; }
 
@@ -107,9 +106,7 @@ internal sealed record BenchmarkHistoryWorkCounterEvidence
     public void Validate()
     {
         if (!string.Equals(Instrumentation, InstrumentationId, StringComparison.Ordinal))
-        {
             throw new InvalidOperationException($"Unsupported History instrumentation '{Instrumentation}'.");
-        }
 
         ValidateCount(LineChurnAlgorithmWork, nameof(LineChurnAlgorithmWork), "operations");
         ValidateCount(TaskCommitOccurrencesExamined, nameof(TaskCommitOccurrencesExamined), "operations");
@@ -118,30 +115,39 @@ internal sealed record BenchmarkHistoryWorkCounterEvidence
         ValidateCount(AncestryRetainedEntries, nameof(AncestryRetainedEntries), "entries");
     }
 
-    public static BenchmarkHistoryWorkCounterEvidence NotApplicableToCoreWorkload() => new()
+    public static BenchmarkHistoryWorkCounterEvidence NotApplicableToCoreWorkload()
     {
-        Instrumentation = InstrumentationId,
-        LineChurnAlgorithmWork = BenchmarkResourceMeasurement.NotApplicable("This workload does not execute History line-churn analysis."),
-        TaskCommitOccurrencesExamined = BenchmarkResourceMeasurement.NotApplicable("This workload does not execute History bottleneck analysis."),
-        CoChangeEdgesAssigned = BenchmarkResourceMeasurement.NotApplicable("This workload does not execute History co-change analysis."),
-        AncestryAncestorsVisited = BenchmarkResourceMeasurement.NotApplicable("This workload does not execute History ancestry queries."),
-        AncestryRetainedEntries = BenchmarkResourceMeasurement.NotApplicable("This workload does not retain History ancestry sets."),
-    };
+        return new BenchmarkHistoryWorkCounterEvidence
+        {
+            Instrumentation = InstrumentationId,
+            LineChurnAlgorithmWork =
+                BenchmarkResourceMeasurement.NotApplicable(
+                    "This workload does not execute History line-churn analysis."),
+            TaskCommitOccurrencesExamined =
+                BenchmarkResourceMeasurement.NotApplicable(
+                    "This workload does not execute History bottleneck analysis."),
+            CoChangeEdgesAssigned =
+                BenchmarkResourceMeasurement.NotApplicable(
+                    "This workload does not execute History co-change analysis."),
+            AncestryAncestorsVisited =
+                BenchmarkResourceMeasurement.NotApplicable("This workload does not execute History ancestry queries."),
+            AncestryRetainedEntries =
+                BenchmarkResourceMeasurement.NotApplicable("This workload does not retain History ancestry sets.")
+        };
+    }
 
     private static void ValidateCount(BenchmarkResourceMeasurement measurement, string name, string expectedUnit)
     {
         measurement.Validate($"history_work_counters.{name}");
         if (measurement.Status == BenchmarkMeasurementStatus.Available &&
             !string.Equals(measurement.Unit, expectedUnit, StringComparison.Ordinal))
-        {
             throw new InvalidOperationException($"History work counter '{name}' must use the '{expectedUnit}' unit.");
-        }
     }
 }
 
 /// <summary>
-/// Timer intervals are retained independently. Values may overlap and must never be subtracted
-/// from one another to infer process startup or analyzer time.
+///     Timer intervals are retained independently. Values may overlap and must never be subtracted
+///     from one another to infer process startup or analyzer time.
 /// </summary>
 internal sealed record BenchmarkTimingBoundaryEvidence
 {
@@ -169,9 +175,7 @@ internal sealed record BenchmarkTimingBoundaryEvidence
     public void Validate()
     {
         if (!string.Equals(Contract, BoundaryContract, StringComparison.Ordinal))
-        {
             throw new InvalidOperationException($"Unsupported benchmark timing boundary contract '{Contract}'.");
-        }
 
         FixtureMaterialization.Validate("timing_boundaries.fixture_materialization");
         RestoreAndBuild.Validate("timing_boundaries.restore_and_build");
@@ -207,9 +211,9 @@ internal sealed record BenchmarkProfilerOverheadEvidence
     public void Validate()
     {
         if (!string.Equals(Instrumentation, InstrumentationId, StringComparison.Ordinal))
-        {
             throw new InvalidOperationException($"Unsupported profiler-overhead instrumentation '{Instrumentation}'.");
-        }
+        if (!CanonicalResultsMatch)
+            throw new InvalidOperationException("Profiler instrumentation changed the canonical analysis result.");
 
         ObserverDisabledAnalysis.Validate("profiler_overhead.observer_disabled_analysis");
         ObserverEnabledAnalysis.Validate("profiler_overhead.observer_enabled_analysis");
@@ -218,13 +222,4 @@ internal sealed record BenchmarkProfilerOverheadEvidence
         ObserverDisabledPeakRetainedBytes.Validate("profiler_overhead.observer_disabled_peak_retained_bytes");
         ObserverEnabledPeakRetainedBytes.Validate("profiler_overhead.observer_enabled_peak_retained_bytes");
     }
-}
-
-internal static class BenchmarkAuditMeasurement
-{
-    public static BenchmarkResourceMeasurement Unavailable(string boundary) =>
-        BenchmarkResourceMeasurement.Unavailable(boundary);
-
-    public static BenchmarkResourceMeasurement NotApplicable(string boundary) =>
-        BenchmarkResourceMeasurement.NotApplicable(boundary);
 }
