@@ -38,8 +38,8 @@ public sealed partial class IgnoreMatcherTests
     [Test]
     public void IndexedMatcher_VersionedFallbackIndexIsDeferredAndBuiltOnlyOnce()
     {
-        var identity = CreateIdentity(0);
-        var ignore = CreateVersionedIgnore(
+        ArchitectureViolationIdentity identity = CreateIdentity(0);
+        ArchitectureIgnoredViolation ignore = CreateVersionedIgnore(
             identity,
             isFromLoadedBaseline: false,
             sourceType: "Fallback.Source",

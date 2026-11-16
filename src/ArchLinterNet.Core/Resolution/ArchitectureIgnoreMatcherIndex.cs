@@ -295,7 +295,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
         var literalPairs = new Dictionary<PatternPair, List<IgnoreEntry>>();
         var wildcardEntries = new List<IgnoreEntry>();
 
-        for (int index = 0; index < entries.Count; index++)
+        foreach (IgnoreEntry entry in entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (workCounter is not null)
@@ -303,7 +303,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
                 workCounter.VersionedFallbackEntriesProcessed++;
             }
 
-            AddFallbackPattern(literalPairs, wildcardEntries, entries[index]);
+            AddFallbackPattern(literalPairs, wildcardEntries, entry);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
