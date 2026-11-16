@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
@@ -15,7 +14,7 @@ namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
 [Category("E2E")]
-public sealed class ArchitectureMethodBodyPreparationReuseTests
+public sealed partial class ArchitectureMethodBodyPreparationReuseTests
 {
     private static readonly string[] _targetFrameworks = ["net10.0"];
 
@@ -28,8 +27,10 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
     {
         _fixtureRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-method-body-preparation-{Guid.NewGuid():N}");
         string consumerDirectory = Path.Combine(_fixtureRoot, "src", "Consumer");
+        string secretDirectory = Path.Combine(consumerDirectory, "Secret");
         string otherDirectory = Path.Combine(_fixtureRoot, "src", "Other");
         Directory.CreateDirectory(consumerDirectory);
+        Directory.CreateDirectory(secretDirectory);
         Directory.CreateDirectory(otherDirectory);
 
         string consumerProjectPath = Path.Combine(consumerDirectory, "Consumer.csproj");
@@ -52,6 +53,19 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
                 public void Write() => System.Console.WriteLine("other");
             }
             """);
+        File.WriteAllText(Path.Combine(secretDirectory, "SecretCaller.cs"), """
+            namespace ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer.Secret;
+
+            public sealed class SecretCaller
+            {
+                public void Write() => System.Diagnostics.Debug.Fail("secret");
+            }
+            """);
+
+        Action consumerIlTarget = MethodBodyPreparationTargets.Consumer.MethodBodyPreparationIlTarget.Write;
+        Action otherIlTarget = MethodBodyPreparationTargets.Other.MethodBodyPreparationIlTarget.Write;
+        Assert.That(consumerIlTarget.Method.DeclaringType, Is.Not.Null);
+        Assert.That(otherIlTarget.Method.DeclaringType, Is.Not.Null);
 
         RunDotnet(_fixtureRoot, "build", consumerProjectPath);
         RunDotnet(_fixtureRoot, "build", otherProjectPath);
@@ -59,14 +73,14 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
         _projectDiscovery = new ProjectDiscoveryResult(
             Array.Empty<string>(),
             Array.Empty<string>(),
-            new[] { "src/Consumer", "src/Other" },
+            ["src/Consumer", "src/Other"],
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
-            DiscoveredProjects = new[]
-            {
+            DiscoveredProjects =
+            [
                 new ArchitectureDiscoveredProject("src/Consumer/Consumer.csproj", "Fixture.Consumer", _targetFrameworks),
                 new ArchitectureDiscoveredProject("src/Other/Other.csproj", "Fixture.Other", _targetFrameworks),
-            },
+            ],
         };
     }
 
@@ -95,12 +109,12 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
                 List<ArchitectureViolation> violations = session.CheckMethodBodyContract(CreateContract(
                     id,
                     "consumer",
-                    shouldFindViolation ? "System.Console.WriteLine" : "System.Diagnostics.Debug.Fail"));
+                    shouldFindViolation ? "System.Console.WriteLine" : "System.Diagnostics.Debug.Assert"));
 
                 Assert.That(
                     violations.Any(violation => violation.ContractId == id
                         && violation.ForbiddenReferences.Any(reference => reference.Contains(
-                            shouldFindViolation ? "Console.WriteLine" : "Debug.Fail", StringComparison.Ordinal))),
+                            shouldFindViolation ? "Console.WriteLine" : "Debug.Assert", StringComparison.Ordinal))),
                     Is.EqualTo(shouldFindViolation),
                     $"Rule {id} must retain its own pattern evaluation and findings.");
             }
@@ -112,11 +126,11 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
             Assert.That(observer.MethodBodySourceFileReads, Is.EqualTo(fileReads));
             Assert.That(observer.MethodBodyOwnershipLookups, Is.EqualTo(1));
             Assert.That(observer.MethodBodyOwnershipProjectDirectories, Is.EqualTo(2));
-            Assert.That(observer.MethodBodyOwnershipComparisons, Is.EqualTo(2));
+            Assert.That(observer.MethodBodyOwnershipComparisons, Is.EqualTo(4));
             Assert.That(observer.MethodBodyBuildContextResolutions, Is.EqualTo(1));
-            Assert.That(observer.MethodBodySyntaxTreeParseCalls, Is.EqualTo(1));
+            Assert.That(observer.MethodBodySyntaxTreeParseCalls, Is.EqualTo(2));
             Assert.That(observer.MethodBodyCompilationCalls, Is.EqualTo(1));
-            Assert.That(observer.MethodBodySyntaxTrees, Is.EqualTo(1));
+            Assert.That(observer.MethodBodySyntaxTrees, Is.EqualTo(2));
 
             // The reflection/IL path remains per rule because its pattern matching and ignore
             // side effects are rule-specific. Its fixed input work therefore scales with Q.
@@ -152,11 +166,11 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
             Assert.That(observer.MethodBodySourceFileReads, Is.EqualTo(consumerReads + otherReads));
             Assert.That(observer.MethodBodyOwnershipLookups, Is.EqualTo(2));
             Assert.That(observer.MethodBodyOwnershipProjectDirectories, Is.EqualTo(4));
-            Assert.That(observer.MethodBodyOwnershipComparisons, Is.EqualTo(4));
+            Assert.That(observer.MethodBodyOwnershipComparisons, Is.EqualTo(6));
             Assert.That(observer.MethodBodyBuildContextResolutions, Is.EqualTo(2));
-            Assert.That(observer.MethodBodySyntaxTreeParseCalls, Is.EqualTo(2));
+            Assert.That(observer.MethodBodySyntaxTreeParseCalls, Is.EqualTo(3));
             Assert.That(observer.MethodBodyCompilationCalls, Is.EqualTo(2));
-            Assert.That(observer.MethodBodySyntaxTrees, Is.EqualTo(2));
+            Assert.That(observer.MethodBodySyntaxTrees, Is.EqualTo(3));
             Assert.That(observer.MethodBodyIlTypeVisits, Is.EqualTo(2));
             Assert.That(observer.MethodBodyIlMethodVisits, Is.EqualTo(2));
         }
@@ -169,39 +183,48 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
     [Test]
     public void PreparationCache_ConcurrentSameContextAccess_IsSingleFlightAndDisposalClearsIt()
     {
-        using ArchitectureMethodBodyPreparationCache cache = new();
+        ArchitectureMethodBodyPreparationCache cache = new();
         BenchmarkWorkObserver observer = new();
         ArchitectureLayer layer = new() { Namespace = "ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer" };
-        ArchitectureMethodBodyPreparation[] preparations = new ArchitectureMethodBodyPreparation[12];
-
-        Parallel.For(0, preparations.Length, index =>
+        var preparations = new ArchitectureMethodBodyPreparation[12];
+        try
         {
-            preparations[index] = cache.Prepare(
-                _fixtureRoot,
-                layer,
-                ["src/Consumer", "src/Other"],
-                preprocessorSymbols: null,
-                projectDiscovery: null,
-                buildConfiguration: "Debug",
-                cancellationToken: CancellationToken.None,
-                benchmarkWorkObserver: observer);
-        });
+            ConcurrentPreparationWork[] workItems = Enumerable.Range(0, preparations.Length)
+                .Select(index => new ConcurrentPreparationWork(
+                    index, cache, _fixtureRoot, layer, preparations, observer))
+                .ToArray();
+            Parallel.ForEach(workItems, static workItem => workItem.Prepare());
 
-        Assert.That(preparations.Select(preparation => preparation.Compilation).Distinct().Count(), Is.EqualTo(1));
-        Assert.That(observer.MethodBodySourceDirectoriesEnumerated, Is.EqualTo(2));
-        Assert.That(observer.MethodBodySyntaxTreeParseCalls, Is.EqualTo(1));
-        Assert.That(observer.MethodBodyCompilationCalls, Is.EqualTo(1));
-        cache.Dispose();
+            Assert.That(preparations.Select(preparation => preparation.Compilation).Distinct().Count(), Is.EqualTo(1));
+            Assert.That(observer.MethodBodySourceDirectoriesEnumerated, Is.EqualTo(2));
+            Assert.That(observer.MethodBodySyntaxTreeParseCalls, Is.EqualTo(2));
+            Assert.That(observer.MethodBodyCompilationCalls, Is.EqualTo(1));
+            cache.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => cache.Prepare(
-            _fixtureRoot,
-            layer,
-            ["src/Consumer", "src/Other"],
-            preprocessorSymbols: null,
-            projectDiscovery: null,
-            buildConfiguration: "Debug",
-            cancellationToken: CancellationToken.None,
-            benchmarkWorkObserver: observer));
+            ObjectDisposedException? disposedException = null;
+            try
+            {
+                cache.Prepare(
+                    _fixtureRoot,
+                    layer,
+                    ["src/Consumer", "src/Other"],
+                    preprocessorSymbols: null,
+                    projectDiscovery: null,
+                    buildConfiguration: "Debug",
+                    cancellationToken: CancellationToken.None,
+                    benchmarkWorkObserver: observer);
+            }
+            catch (ObjectDisposedException exception)
+            {
+                disposedException = exception;
+            }
+
+            Assert.That(disposedException, Is.Not.Null);
+        }
+        finally
+        {
+            cache.Dispose();
+        }
     }
 
     [Test]
@@ -212,17 +235,26 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
         using ArchitectureMethodBodyPreparationCache cache = new(fileSystem);
         BenchmarkWorkObserver observer = new();
         ArchitectureLayer layer = new() { Namespace = "ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer" };
-        string repositoryRoot = Path.Combine(Path.GetTempPath(), "arch-linter-method-body-cache-retry");
+        var repositoryRoot = Path.Combine(Path.GetTempPath(), "arch-linter-method-body-cache-retry");
+        OperationCanceledException? cancellationException = null;
+        try
+        {
+            cache.Prepare(
+                repositoryRoot,
+                layer,
+                ["src"],
+                preprocessorSymbols: null,
+                projectDiscovery: null,
+                buildConfiguration: "Debug",
+                cancellationToken: cancellationTokenSource.Token,
+                benchmarkWorkObserver: observer);
+        }
+        catch (OperationCanceledException exception)
+        {
+            cancellationException = exception;
+        }
 
-        Assert.Throws<OperationCanceledException>(() => cache.Prepare(
-            repositoryRoot,
-            layer,
-            ["src"],
-            preprocessorSymbols: null,
-            projectDiscovery: null,
-            buildConfiguration: "Debug",
-            cancellationToken: cancellationTokenSource.Token,
-            benchmarkWorkObserver: observer));
+        Assert.That(cancellationException, Is.Not.Null);
 
         ArchitectureMethodBodyPreparation retry = cache.Prepare(
             repositoryRoot,
@@ -266,14 +298,14 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
             benchmarkWorkObserver: observer);
 
         Assert.That(conditionalSymbols.Compilation, Is.Not.SameAs(defaultSymbols.Compilation));
-        CSharpParseOptions parseOptions = (CSharpParseOptions)conditionalSymbols.Compilation!.SyntaxTrees.Single().Options;
-        Assert.That(parseOptions.PreprocessorSymbolNames, Does.Contain("UNITY_EDITOR"));
+        Assert.That(conditionalSymbols.Compilation!.SyntaxTrees.All(syntaxTree =>
+            ((CSharpParseOptions)syntaxTree.Options).PreprocessorSymbolNames.Contains("UNITY_EDITOR")), Is.True);
         Assert.That(observer.MethodBodySourceDirectoriesEnumerated, Is.EqualTo(2));
         (int enumeratedFiles, int fileReads) = ExpectedInventoryWork(
             "ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer");
         Assert.That(observer.MethodBodySourceFilesEnumerated, Is.EqualTo(enumeratedFiles));
         Assert.That(observer.MethodBodySourceFileReads, Is.EqualTo(fileReads));
-        Assert.That(observer.MethodBodySyntaxTreeParseCalls, Is.EqualTo(2));
+        Assert.That(observer.MethodBodySyntaxTreeParseCalls, Is.EqualTo(4));
         Assert.That(observer.MethodBodyCompilationCalls, Is.EqualTo(2));
     }
 
@@ -286,7 +318,7 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
 
         Assert.Throws<ObjectDisposedException>(() => session.MethodBodyPreparationCache.Prepare(
             _fixtureRoot,
-            new ArchitectureLayer { Namespace = "ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer" },
+            new() { Namespace = "ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer" },
             ["src/Consumer", "src/Other"],
             preprocessorSymbols: null,
             projectDiscovery: _projectDiscovery,
@@ -295,24 +327,26 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
             benchmarkWorkObserver: null));
     }
 
-    private ArchitectureAnalysisSession CreateSession(BenchmarkWorkObserver observer)
+    private ArchitectureAnalysisSession CreateSession(
+        BenchmarkWorkObserver observer,
+        Dictionary<string, ArchitectureLayer>? layers = null)
     {
         ArchitectureContractDocument document = new()
         {
-            Layers = new Dictionary<string, ArchitectureLayer>
+            Layers = layers ?? new Dictionary<string, ArchitectureLayer>
             {
-                ["consumer"] = new ArchitectureLayer { Namespace = "ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer" },
-                ["other"] = new ArchitectureLayer { Namespace = "ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Other" },
+                ["consumer"] = new() { Namespace = "ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer" },
+                ["other"] = new() { Namespace = "ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Other" },
             },
             Analysis = new ArchitectureAnalysisConfiguration
             {
-                SourceRoots = new List<string> { "src/Consumer", "src/Other" },
+                SourceRoots = ["src/Consumer", "src/Other"],
             },
         };
 
         ArchitectureAnalysisContext context = new(
             _fixtureRoot,
-            new[] { typeof(ArchitectureMethodBodyPreparationReuseTests).Assembly },
+            [typeof(ArchitectureMethodBodyPreparationReuseTests).Assembly],
             Array.Empty<string>(),
             Array.Empty<string>(),
             projectDiscovery: _projectDiscovery)
@@ -323,21 +357,21 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
         return new ArchitectureAnalysisSession(context, document, null, false, null);
     }
 
-    private static ArchitectureMethodBodyContract CreateContract(string id, string source, string forbiddenCall)
+    private static ArchitectureMethodBodyContract CreateContract(string id, string source, params string[] forbiddenCalls)
     {
         return new ArchitectureMethodBodyContract
         {
             Name = id,
             Id = id,
             Source = source,
-            ForbiddenCalls = new List<string> { forbiddenCall },
+            ForbiddenCalls = [.. forbiddenCalls],
         };
     }
 
     private (int EnumeratedFiles, int FileReads) ExpectedInventoryWork(string namespaceName)
     {
-        int enumeratedFiles = 0;
-        int fileReads = 0;
+        var enumeratedFiles = 0;
+        var fileReads = 0;
         foreach (string root in new[] { "src/Consumer", "src/Other" })
         {
             string fullRoot = Path.Combine(_fixtureRoot, root);
@@ -348,7 +382,9 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
                 if (ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot)) continue;
 
                 fileReads++;
-                if (File.ReadAllText(filePath).Contains($"namespace {namespaceName};", StringComparison.Ordinal))
+                string source = File.ReadAllText(filePath);
+                if (source.Contains($"namespace {namespaceName};", StringComparison.Ordinal)
+                    || source.Contains($"namespace {namespaceName}.", StringComparison.Ordinal))
                 {
                     fileReads++;
                 }
@@ -396,35 +432,4 @@ public sealed class ArchitectureMethodBodyPreparationReuseTests
         }
     }
 
-    private sealed class CancelingFileSystem : IArchitectureFileSystem
-    {
-        private readonly CancellationTokenSource _cancellationTokenSource;
-
-        public CancelingFileSystem(CancellationTokenSource cancellationTokenSource)
-        {
-            _cancellationTokenSource = cancellationTokenSource;
-        }
-
-        public bool FileExists(string path) => false;
-
-        public string ReadAllText(string path) => "namespace ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer; internal sealed class Source { }";
-
-        public IEnumerable<string> ReadLines(string path) => ["namespace ArchLinterNet.Core.Tests.MethodBodyPreparationTargets.Consumer;"];
-
-        public bool DirectoryExists(string path) => true;
-
-        public IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption)
-        {
-            yield return Path.Combine(path, "First.cs");
-            _cancellationTokenSource.Cancel();
-            yield return Path.Combine(path, "Second.cs");
-        }
-
-        public IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption) =>
-            Array.Empty<string>();
-
-        public DateTime GetLastWriteTimeUtc(string path) => DateTime.UnixEpoch;
-
-        public string GetCurrentDirectory() => Path.GetTempPath();
-    }
 }

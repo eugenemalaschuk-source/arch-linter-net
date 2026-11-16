@@ -81,9 +81,8 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
 
         ArchitectureLayer effectiveLayer = sourceLayer
                                            ?? new ArchitectureLayer { Namespace = sourceNamespacePrefix };
-        IReadOnlyList<string> sourceFiles = request.PreparedSourceFilePaths is { } preparedSourceFilePaths
-            ? preparedSourceFilePaths
-            : FindMatchingSourceFiles(repositoryRoot, effectiveLayer, sourceRoots, fileSystem, cancellationToken)
+        IReadOnlyList<string> sourceFiles = request.PreparedSourceFilePaths
+            ?? FindMatchingSourceFiles(repositoryRoot, effectiveLayer, sourceRoots, fileSystem, cancellationToken)
                 .ToList();
         if (sourceFiles.Count == 0) return Array.Empty<ArchitectureViolation>();
 
@@ -160,12 +159,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         return violations;
     }
 
-    // internal, not private: lets other Core call sites that already hold a live cancellation
-    // token (e.g. ArchitectureAnalysisSession.Checking's project-aware reference resolution
-    // prepass) reuse the same per-file-checked discovery path as FindMethodBodyViolations itself,
-    // instead of going through the public 4-arg overload above and silently getting
-    // CancellationToken.None.
-    internal static IReadOnlyList<string> FindMatchingSourceFiles(
+    private static IReadOnlyList<string> FindMatchingSourceFiles(
         string repositoryRoot,
         ArchitectureLayer layer,
         string[]? sourceRoots,
@@ -207,16 +201,8 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                 benchmarkWorkObserver?.RecordMethodBodySourceFileRead();
                 if (!FileContainsNamespace(filePath, layer, fileSystem)) continue;
 
-                string sourceText;
-                try
-                {
-                    benchmarkWorkObserver?.RecordMethodBodySourceFileRead();
-                    sourceText = fileSystem.ReadAllText(filePath);
-                }
-                catch (IOException)
-                {
-                    continue;
-                }
+                benchmarkWorkObserver?.RecordMethodBodySourceFileRead();
+                string sourceText = fileSystem.ReadAllText(filePath);
 
                 result.Add(new ArchitectureMethodBodySourceFile(
                     filePath,

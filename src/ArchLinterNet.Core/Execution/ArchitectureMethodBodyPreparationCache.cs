@@ -2,7 +2,6 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
-using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Scanning;
 using Microsoft.CodeAnalysis;
@@ -24,7 +23,7 @@ internal sealed class ArchitectureMethodBodyPreparationCache : IDisposable
 {
     private const string DefaultParseOptionsIdentity = "CSharpParseOptions.Default";
 
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
 
     private readonly Dictionary<SourceInventoryKey, Lazy<SourceInventory>> _sourceInventories = new();
 
@@ -64,7 +63,7 @@ internal sealed class ArchitectureMethodBodyPreparationCache : IDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        SourceInventoryKey inventoryKey = SourceInventoryKey.Create(repositoryRoot, sourceLayer, sourceRoots);
+        var inventoryKey = SourceInventoryKey.Create(repositoryRoot, sourceLayer, sourceRoots);
         SourceInventory inventory = GetOrCreate(
             _sourceInventories,
             inventoryKey,
@@ -109,7 +108,7 @@ internal sealed class ArchitectureMethodBodyPreparationCache : IDisposable
                 sourceAssemblyHint = owner.AssemblyName;
                 string resolvedProjectPath = Path.GetFullPath(Path.Combine(repositoryRoot, owner.Path));
                 ownerProjectPath = resolvedProjectPath;
-                ProjectContextKey projectContextKey = ProjectContextKey.Create(
+                var projectContextKey = ProjectContextKey.Create(
                     resolvedProjectPath, buildConfiguration, owner.TargetFrameworks);
 
                 ArchitectureProjectRoslynResolution resolution = GetOrCreate(
@@ -284,13 +283,20 @@ internal sealed class ArchitectureMethodBodyPreparationCache : IDisposable
         return owningProjectPaths.Count == 1 ? owner : null;
     }
 
-    private static string NormalizeDirectory(string path) => path.Replace('\\', '/').TrimEnd('/') + "/";
+    private static string NormalizeDirectory(string path)
+    {
+        return path.Replace('\\', '/').TrimEnd('/') + "/";
+    }
 
-    private static string CreateSymbolsIdentity(IReadOnlyList<string>? symbols) =>
-        symbols is { Count: > 0 } ? CreateStringListIdentity(symbols) : string.Empty;
+    private static string CreateSymbolsIdentity(IReadOnlyList<string>? symbols)
+    {
+        return symbols is { Count: > 0 } ? CreateStringListIdentity(symbols) : string.Empty;
+    }
 
-    private static string CreateStringListIdentity(IEnumerable<string> values) =>
-        string.Join("\0", values.Select(value => $"{value.Length}:{value}"));
+    private static string CreateStringListIdentity(IEnumerable<string> values)
+    {
+        return string.Join("\0", values.Select(value => $"{value.Length}:{value}"));
+    }
 
     private static string CreateBuildContextIdentity(
         string? projectPath,
@@ -362,22 +368,38 @@ internal sealed class ArchitectureMethodBodyPreparationCache : IDisposable
             return true;
         }
 
-        public override bool Equals(object? obj) => obj is SourceContentIdentity other && Equals(other);
+        public override bool Equals(object? obj)
+        {
+            return obj is SourceContentIdentity other && Equals(other);
+        }
 
-        public override int GetHashCode() => _hashCode;
+        public override int GetHashCode()
+        {
+            return _hashCode;
+        }
 
         private readonly record struct SourceFileIdentity(string Path, string ContentChecksum);
     }
 
-    private readonly record struct SourceInventoryKey(string RepositoryRoot, string SourceRoots, string Namespace)
+    private readonly record struct SourceInventoryKey(
+        string RepositoryRoot,
+        string SourceRoots,
+        string Namespace,
+        string NamespaceSuffix,
+        string Exclusions)
     {
         public static SourceInventoryKey Create(string repositoryRoot, ArchitectureLayer sourceLayer, string[]? sourceRoots)
         {
             string[] roots = sourceRoots ?? ["src", "tests"];
+            string exclusions = CreateStringListIdentity(sourceLayer.Exclude
+                .Select(exclusion => CreateStringListIdentity([exclusion.Namespace, exclusion.NamespaceSuffix]))
+                .OrderBy(identity => identity, StringComparer.Ordinal));
             return new SourceInventoryKey(
                 Path.GetFullPath(repositoryRoot),
                 CreateStringListIdentity(roots),
-                sourceLayer.Namespace);
+                sourceLayer.Namespace,
+                sourceLayer.NamespaceSuffix,
+                exclusions);
         }
     }
 

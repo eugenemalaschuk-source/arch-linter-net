@@ -135,11 +135,15 @@ public sealed class MethodBodyPreparationReuseBenchmarkHarness
         return output;
     }
 
-    private static decimal Median(IReadOnlyList<Sample> samples, Func<Sample, decimal> select) =>
-        samples.Select(select).Order().ElementAt(samples.Count / 2);
+    private static decimal Median(IReadOnlyList<Sample> samples, Func<Sample, decimal> select)
+    {
+        return samples.Select(select).Order().ElementAt(samples.Count / 2);
+    }
 
-    private static long Median(IReadOnlyList<Sample> samples, Func<Sample, long> select) =>
-        samples.Select(select).Order().ElementAt(samples.Count / 2);
+    private static long Median(IReadOnlyList<Sample> samples, Func<Sample, long> select)
+    {
+        return samples.Select(select).Order().ElementAt(samples.Count / 2);
+    }
 
     private sealed record Sample(
         decimal WallMilliseconds,

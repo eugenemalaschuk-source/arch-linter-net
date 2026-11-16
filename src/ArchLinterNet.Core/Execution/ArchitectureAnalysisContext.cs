@@ -11,9 +11,9 @@ public sealed class ArchitectureAnalysisContext : IDisposable
 {
     private readonly IArchitectureAssemblyLoadScope? _isolatedLoadScope;
     private readonly HashSet<string> _consumedInputPaths = new(StringComparer.OrdinalIgnoreCase);
-    private readonly object _consumedInputPathsGate = new();
+    private readonly Lock _consumedInputPathsGate = new();
     private readonly List<IDisposable> _runScopedResources = new();
-    private readonly object _runScopedResourcesGate = new();
+    private readonly Lock _runScopedResourcesGate = new();
     private bool _disposed;
 
     public ArchitectureAnalysisContext(
