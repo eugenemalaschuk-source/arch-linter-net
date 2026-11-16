@@ -76,10 +76,14 @@ public sealed class BenchmarkAuditEvidenceTests
 
         string json = BenchmarkEvidenceJson.Serialize(evidence);
         using JsonDocument serializedEvidence = JsonDocument.Parse(json);
-        bool samplesAreMultiline = serializedEvidence.RootElement.GetProperty("samples")
-            .EnumerateArray()
-            .All(serializedSample => serializedSample.GetRawText().Contains('\n'));
+        JsonElement serializedSample = serializedEvidence.RootElement.GetProperty("samples").EnumerateArray().Single();
+        bool samplesAreMultiline = serializedSample.GetRawText().Contains('\n');
+        string rawProfileSha256 = serializedSample.GetProperty("raw_analysis_profile_sha256").GetString()!;
+        bool fullProfileIsCompressed = serializedSample
+            .GetProperty("raw_analysis_profile_gzip_base64")
+            .GetString() is { Length: > 0 };
         BenchmarkEvidenceDocument roundTrip = BenchmarkEvidenceJson.Deserialize(json);
+        string repeatedSerialization = BenchmarkEvidenceJson.Serialize(evidence);
         JsonSchema schema = JsonSchemaTextFactory.FromText(LoadEvidenceSchema());
         EvaluationResults validation = schema.Evaluate(
             JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
@@ -102,10 +106,18 @@ public sealed class BenchmarkAuditEvidenceTests
             Assert.That(roundTrip.Samples.Single().LoadedAssemblies!.Artifacts.Single().Sha256, Is.EqualTo(new string('c', 64)));
             Assert.That(roundTrip.Samples.Single().LoadedAssemblies!.Sha256,
                 Is.EqualTo(sample.LoadedAssemblies.Sha256));
+            Assert.That(roundTrip.Samples.Single().RawAnalysisProfile.GetProperty("Output")
+                .GetProperty("OutputFailed").GetBoolean(), Is.False);
             Assert.That(samplesAreMultiline, Is.True,
                 "Large measurement samples must remain indented in committed evidence JSON.");
+            Assert.That(fullProfileIsCompressed, Is.True);
+            Assert.That(repeatedSerialization, Is.EqualTo(json), "Compressed profile evidence must be deterministic.");
             Assert.That(validation.IsValid, Is.True, Describe(validation));
         });
+
+        string corruptedProfileDigest = json.Replace(rawProfileSha256, new string('0', 64), StringComparison.Ordinal);
+        Assert.That(() => BenchmarkEvidenceJson.Deserialize(corruptedProfileDigest),
+            Throws.InvalidOperationException.With.Message.Contains("SHA-256"));
     }
 
     [Test]

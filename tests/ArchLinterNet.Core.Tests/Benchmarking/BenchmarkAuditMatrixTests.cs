@@ -56,10 +56,13 @@ public sealed class BenchmarkAuditMatrixTests
             string json = BenchmarkEvidenceJson.Serialize(evidence);
             string[] evidenceLines = json.Split(Environment.NewLine, StringSplitOptions.None);
             int maximumLineBytes = evidenceLines.Max(line => Encoding.UTF8.GetByteCount(line));
+            int evidenceBytes = Encoding.UTF8.GetByteCount(json);
             Assert.That(evidenceLines.Length, Is.LessThan(300),
                 $"{workload.WorkloadId} must stay below GitHub's complete-patch review limit.");
             Assert.That(maximumLineBytes, Is.LessThanOrEqualTo(8 * 1024 + 64),
                 $"{workload.WorkloadId} contains an overlong JSON line.");
+            Assert.That(evidenceBytes, Is.LessThan(96 * 1024),
+                $"{workload.WorkloadId} must stay below GitHub's per-file patch limit.");
             EvaluationResults validation = schema.Evaluate(
                 JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
             Assert.That(validation.IsValid, Is.True,

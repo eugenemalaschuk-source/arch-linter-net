@@ -211,6 +211,14 @@
       "properties": {
         "run": { "$ref": "#/$defs/run" },
         "raw_analysis_profile": { "type": "object", "required": ["SchemaId"], "properties": { "SchemaId": { "const": "analysis-profile/v1" } } },
+        "raw_analysis_profile_gzip_base64": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+          "contentEncoding": "base64",
+          "contentMediaType": "application/gzip"
+        },
+        "raw_analysis_profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "completion_status": { "type": "string" },
         "exit_code": { "type": "integer" },
         "output_failed": { "type": "boolean" },
@@ -224,7 +232,17 @@
         "timing_boundaries": { "$ref": "#/$defs/timing_boundaries" },
         "report_output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "loaded_assemblies": { "$ref": "#/$defs/loaded_assemblies" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["raw_analysis_profile_gzip_base64"] },
+          "then": { "required": ["raw_analysis_profile_sha256"] }
+        },
+        {
+          "if": { "required": ["raw_analysis_profile_sha256"] },
+          "then": { "required": ["raw_analysis_profile_gzip_base64"] }
+        }
+      ]
     },
     "loaded_assembly_artifact": {
       "type": "object",
