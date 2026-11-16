@@ -29,8 +29,8 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
             FallbackMeasurement indexedWarmup = MeasureIndexedFallback(scenario);
             Assert.That(indexedWarmup.ResultChecksum, Is.EqualTo(orderedWarmup.ResultChecksum));
 
-            FallbackMeasurement[] orderedSamples = new FallbackMeasurement[SampleCount];
-            FallbackMeasurement[] indexedSamples = new FallbackMeasurement[SampleCount];
+            var orderedSamples = new FallbackMeasurement[SampleCount];
+            var indexedSamples = new FallbackMeasurement[SampleCount];
             for (int sample = 0; sample < SampleCount; sample++)
             {
                 orderedSamples[sample] = MeasureOrderedFallback(scenario.Workload, scenario.Queries);
@@ -124,9 +124,9 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         bool[] suppressed = new bool[queries.Count];
         bool[] loadedBaseline = new bool[queries.Count];
         long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        Stopwatch total = Stopwatch.StartNew();
+        var total = Stopwatch.StartNew();
 
-        Stopwatch firstQuery = Stopwatch.StartNew();
+        var firstQuery = Stopwatch.StartNew();
         suppressed[0] = ArchitectureIgnoreMatcherTestReference.IsIgnored(
             queries[0].SourceType,
             queries[0].ForbiddenReference,
@@ -136,7 +136,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
             out loadedBaseline[0]);
         firstQuery.Stop();
 
-        Stopwatch subsequentQueries = Stopwatch.StartNew();
+        var subsequentQueries = Stopwatch.StartNew();
         for (int index = 1; index < queries.Count; index++)
         {
             suppressed[index] = ArchitectureIgnoreMatcherTestReference.IsIgnored(
@@ -167,16 +167,16 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
         bool[] suppressed = new bool[scenario.Queries.Length];
         bool[] loadedBaseline = new bool[scenario.Queries.Length];
         long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        Stopwatch total = Stopwatch.StartNew();
-        Stopwatch indexBuild = Stopwatch.StartNew();
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(scenario.Workload.Ignores);
+        var total = Stopwatch.StartNew();
+        var indexBuild = Stopwatch.StartNew();
+        var index = ArchitectureIgnoreMatcherIndex.Build(scenario.Workload.Ignores);
         indexBuild.Stop();
 
-        Stopwatch firstQuery = Stopwatch.StartNew();
+        var firstQuery = Stopwatch.StartNew();
         RunIndexedFallbackQuery(index, scenario.Queries[0], out suppressed[0], out loadedBaseline[0]);
         firstQuery.Stop();
 
-        Stopwatch subsequentQueries = Stopwatch.StartNew();
+        var subsequentQueries = Stopwatch.StartNew();
         double lazyFallbackIndexQueryMilliseconds = 0;
         int subsequentQueryCount = 0;
         for (int queryIndex = 1; queryIndex < scenario.Queries.Length; queryIndex++)
@@ -184,7 +184,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
             if (queryIndex + 1 == scenario.IndexBuildQueryNumber)
             {
                 subsequentQueries.Stop();
-                Stopwatch lazyFallbackQuery = Stopwatch.StartNew();
+                var lazyFallbackQuery = Stopwatch.StartNew();
                 RunIndexedFallbackQuery(index, scenario.Queries[queryIndex], out suppressed[queryIndex], out loadedBaseline[queryIndex]);
                 lazyFallbackQuery.Stop();
                 lazyFallbackIndexQueryMilliseconds = lazyFallbackQuery.Elapsed.TotalMilliseconds;
@@ -228,7 +228,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
     private static FallbackWorkEvidence MeasureFallbackWork(FallbackScenario scenario)
     {
         ArchitectureIgnoreMatcherWorkCounter work = new();
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(
+        var index = ArchitectureIgnoreMatcherIndex.Build(
             scenario.Workload.Ignores,
             workCounter: work);
 

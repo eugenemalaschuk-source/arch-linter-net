@@ -147,10 +147,9 @@ internal static class ArchitectureIgnoreMatcherOrdered
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
         CancellationToken cancellationToken)
     {
-        for (int index = 0; index < ignoredViolations.Count; index++)
+        foreach (ArchitectureIgnoredViolation ignore in ignoredViolations)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ArchitectureIgnoredViolation ignore = ignoredViolations[index];
             if (ignore.WaiverValidationError is not null)
             {
                 continue;

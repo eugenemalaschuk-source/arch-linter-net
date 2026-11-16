@@ -21,7 +21,7 @@ public sealed partial class IgnoreMatcherTests
         };
         ArchitectureIgnoredViolation[] ignored = Enumerable.Repeat(ignore, 9).ToArray();
         ArchitectureIgnoreMatcherWorkCounter work = new();
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(ignored, workCounter: work);
+        var index = ArchitectureIgnoreMatcherIndex.Build(ignored, workCounter: work);
 
         bool missingIdentityMatch = index.IsIgnored(
             "App/Services/Worker", "System.Object", null, null, null, out bool missingIdentityBaseline);
@@ -147,7 +147,7 @@ public sealed partial class IgnoreMatcherTests
 
         bool orderedMatch = ArchitectureIgnoreMatcherTestReference.IsIgnored(
             "Source.Type", "Target.Type", [invalidWaiver], null, liveIdentity, out _);
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build([invalidWaiver]);
+        var index = ArchitectureIgnoreMatcherIndex.Build([invalidWaiver]);
         string? fingerprint = index.CreateLiveWaiverFingerprint(liveIdentity);
         bool indexedMatch = index.IsIgnored(
             "Source.Type", "Target.Type", null, liveIdentity, fingerprint, out _);
@@ -197,7 +197,7 @@ public sealed partial class IgnoreMatcherTests
             });
         }
 
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(ignored);
+        var index = ArchitectureIgnoreMatcherIndex.Build(ignored);
         string? liveFingerprint = index.CreateLiveWaiverFingerprint(liveIdentity);
 
         bool expectedWithoutTracker = ArchitectureIgnoreMatcherTestReference.IsIgnored(

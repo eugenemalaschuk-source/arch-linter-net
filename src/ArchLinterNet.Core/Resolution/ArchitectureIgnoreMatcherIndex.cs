@@ -10,7 +10,7 @@ internal sealed class ArchitectureIgnoreMatcherIndex
 {
     private const long MissingIdentityIndexScanMultiplier = 4;
     private const int MaximumInitialDictionaryCapacity = 64;
-    internal const int SmallLiveIdentityListThreshold = 8;
+    private const int SmallLiveIdentityListThreshold = 8;
 
     private readonly IReadOnlyList<ArchitectureIgnoredViolation> _ignoredViolations;
     private readonly bool _useOrderedLiveIdentityMatcher;

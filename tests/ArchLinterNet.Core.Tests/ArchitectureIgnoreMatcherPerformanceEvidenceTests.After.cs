@@ -193,7 +193,7 @@ public sealed partial class ArchitectureIgnoreMatcherPerformanceEvidenceTests
 
     private static void WarmLiveIdentityIndex(MatcherWorkload workload)
     {
-        ArchitectureIgnoreMatcherIndex index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
+        var index = ArchitectureIgnoreMatcherIndex.Build(workload.Ignores);
         MaterializeLiveIdentityIndex(workload, index);
     }
 

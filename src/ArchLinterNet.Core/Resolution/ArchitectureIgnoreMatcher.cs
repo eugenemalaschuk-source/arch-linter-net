@@ -112,11 +112,20 @@ internal static class ArchitectureIgnoreMatcher
 
         internal static CompiledPattern Any { get; } = new(MatchKind.Any);
 
-        internal static CompiledPattern Exact(string pattern) => new(MatchKind.Exact, pattern);
+        internal static CompiledPattern Exact(string pattern)
+        {
+            return new CompiledPattern(MatchKind.Exact, pattern);
+        }
 
-        internal static CompiledPattern Prefix(string pattern) => new(MatchKind.Prefix, pattern);
+        internal static CompiledPattern Prefix(string pattern)
+        {
+            return new CompiledPattern(MatchKind.Prefix, pattern);
+        }
 
-        internal static CompiledPattern Regex(Regex regex) => new(MatchKind.Regex, regex: regex);
+        internal static CompiledPattern Regex(Regex regex)
+        {
+            return new CompiledPattern(MatchKind.Regex, regex: regex);
+        }
 
         internal bool IsMatch(string value)
         {
