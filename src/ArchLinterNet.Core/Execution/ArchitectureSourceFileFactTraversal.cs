@@ -2,6 +2,7 @@ using System.Reflection;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
@@ -20,6 +21,7 @@ internal sealed class ArchitectureSourceFileFactTraversal
     private readonly IReadOnlyList<(string SourcePath, string AssemblyName)> _sourcePathAssemblyOwnership;
     private readonly CancellationToken _cancellationToken;
     private readonly AnalysisSessionProfilingCounters? _profilingCounters;
+    private readonly BenchmarkWorkObserver? _benchmarkWorkObserver;
     private readonly int _maxParallelism;
     private readonly int _parallelEligibilityThreshold;
     private readonly IBoundedParallelPartitionRunner _partitionRunner;
@@ -44,6 +46,7 @@ internal sealed class ArchitectureSourceFileFactTraversal
             projectOwnership.SourceRootAssemblyOwnership);
         _cancellationToken = options.CancellationToken;
         _profilingCounters = options.ProfilingCounters;
+        _benchmarkWorkObserver = options.BenchmarkWorkObserver;
         _maxParallelism = options.MaxParallelism;
         _parallelEligibilityThreshold =
             options.ParallelEligibilityThresholdOverride ?? BoundedParallelPartitionRunner.DefaultParallelEligibilityThreshold;
@@ -309,7 +312,7 @@ internal sealed class ArchitectureSourceFileFactTraversal
         string sourceText)
     {
         foreach (ArchitectureDeclaredTypeParser.ParsedTypeInfo parsed in
-            ArchitectureDeclaredTypeParser.ParseSourceText(sourceText, _preprocessorSymbols))
+            ArchitectureDeclaredTypeParser.ParseSourceText(sourceText, _preprocessorSymbols, _benchmarkWorkObserver))
         {
             SourceFactKey key = new(assemblyName, parsed.FullTypeName);
             if (!sourceMap.TryGetValue(key, out List<SourceDeclaration>? entries))

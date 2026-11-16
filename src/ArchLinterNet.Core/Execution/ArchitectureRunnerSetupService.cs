@@ -6,6 +6,7 @@ using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Results;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Resolution.Abstractions;
@@ -74,7 +75,24 @@ public sealed class ArchitectureRunnerSetupService(
         int? maxParallelism = null)
     {
         return BuildRunnerCore(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: false, cancellationToken, maxParallelism);
+            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: false, maxParallelism: maxParallelism,
+            benchmarkWorkObserver: null, cancellationToken: cancellationToken);
+    }
+
+    internal ArchitectureRunnerSetup BuildRunnerWithBenchmarkObserver(
+        ArchitectureContractDocument document,
+        string policyPath,
+        BenchmarkWorkObserver benchmarkWorkObserver,
+        ValidationTiming? timing = null,
+        string? mode = null,
+        int? maxParallelism = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(benchmarkWorkObserver);
+        return BuildRunnerCore(document, policyPath, conditionSetName: null, preprocessorSymbols: null,
+            selectedContractIds: null, enableUnmatchedIgnoreTracking: true, timing: timing, mode: mode,
+            loadPostBuildArtifacts: false, maxParallelism: maxParallelism,
+            benchmarkWorkObserver: benchmarkWorkObserver, cancellationToken: cancellationToken);
     }
 
     public ArchitectureRunnerSetup BuildRunnerForPostBuild(
@@ -90,7 +108,8 @@ public sealed class ArchitectureRunnerSetupService(
         int? maxParallelism = null)
     {
         return BuildRunnerCore(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: true, cancellationToken, maxParallelism);
+            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: true, maxParallelism: maxParallelism,
+            benchmarkWorkObserver: null, cancellationToken: cancellationToken);
     }
 
     public ArchitectureRunnerPreparation PrepareRunner(
@@ -186,8 +205,7 @@ public sealed class ArchitectureRunnerSetupService(
 
         ArchitectureAnalysisContext context = CreateAnalysisContext(
             preparation.RepositoryRoot, resolution, preparation.ProjectDiscovery,
-            ReferenceEquals(preparation.ProjectDiscovery, ProjectDiscoveryResult.Empty) ? null : preparation.ProjectDiscovery,
-            cancellationToken, maxParallelism, timing);
+            maxParallelism, timing, benchmarkWorkObserver: null, cancellationToken: cancellationToken);
         ArchitectureContractRunner runner = CreateRunner(
             context, document, selectedContractIds, enableUnmatchedIgnoreTracking, preparation.PreprocessorSymbols);
         return new ArchitectureRunnerSetup(preparation.RepositoryRoot, runner) { AssemblyLoads = resolution.AssemblyLoads };
@@ -203,8 +221,9 @@ public sealed class ArchitectureRunnerSetupService(
         ValidationTiming? timing,
         string? mode,
         bool loadPostBuildArtifacts,
-        CancellationToken cancellationToken,
-        int? maxParallelism)
+        int? maxParallelism,
+        BenchmarkWorkObserver? benchmarkWorkObserver,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -230,8 +249,11 @@ public sealed class ArchitectureRunnerSetupService(
                 // for this snapshot and must be available to the isolated resolver below.
                 resolveAssemblyOutputs = true;
             }
-            ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
-                document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
+            ProjectDiscoveryResult discovery = benchmarkWorkObserver is not null
+                && projectDiscoveryService is ArchitectureProjectDiscoveryService discoveryService
+                ? discoveryService.ResolveAndApply(document, repositoryRoot, resolveAssemblyOutputs,
+                    benchmarkWorkObserver, cancellationToken)
+                : projectDiscoveryService.ResolveAndApply(document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
             ArchitectureSourceSetExpander.BindProjectSets(document, discovery);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -244,12 +266,9 @@ public sealed class ArchitectureRunnerSetupService(
                     document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
                     cancellationToken);
 
-            ProjectDiscoveryResult? attemptedDiscovery = ReferenceEquals(discovery, ProjectDiscoveryResult.Empty)
-                ? null
-                : discovery;
-
             ArchitectureAnalysisContext context = CreateAnalysisContext(
-                repositoryRoot, resolution, discovery, attemptedDiscovery, cancellationToken, maxParallelism, timing);
+                repositoryRoot, resolution, discovery, maxParallelism, timing, benchmarkWorkObserver,
+                cancellationToken);
             ArchitectureContractRunner runner = CreateRunner(
                 context, document, selectedContractIds, enableUnmatchedIgnoreTracking, symbols);
 
@@ -337,11 +356,14 @@ public sealed class ArchitectureRunnerSetupService(
         string repositoryRoot,
         ResolutionResult resolution,
         ProjectDiscoveryResult discovery,
-        ProjectDiscoveryResult? attemptedDiscovery,
-        CancellationToken cancellationToken,
         int? maxParallelism,
-        ValidationTiming? timing)
+        ValidationTiming? timing,
+        BenchmarkWorkObserver? benchmarkWorkObserver,
+        CancellationToken cancellationToken)
     {
+        ProjectDiscoveryResult? attemptedDiscovery = ReferenceEquals(discovery, ProjectDiscoveryResult.Empty)
+            ? null
+            : discovery;
         return new ArchitectureAnalysisContext(repositoryRoot, resolution.ResolvedAssemblies,
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery,
             resolution.IsolatedLoadScope, resolution.SelectedAssemblyArtifactPaths)
@@ -350,6 +372,7 @@ public sealed class ArchitectureRunnerSetupService(
             CancellationToken = cancellationToken,
             MaxParallelism = MaxParallelismResolver.Resolve(maxParallelism),
             Timing = timing,
+            BenchmarkWorkObserver = benchmarkWorkObserver,
         };
     }
 

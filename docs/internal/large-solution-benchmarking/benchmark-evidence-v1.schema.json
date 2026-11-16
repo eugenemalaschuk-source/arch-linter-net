@@ -31,7 +31,11 @@
         "selector_predicate_terms_per_layer": { "type": "integer", "minimum": 1, "maximum": 25 },
         "contracts_per_workload": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
         "finding_candidates": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
-        "source_root_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+        "source_root_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "ignore_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "metric_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "report_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "method_body_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
       }
     },
     "workload": {
@@ -49,6 +53,7 @@
         "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
         "topology": { "$ref": "#/$defs/topology" },
         "inventory": { "$ref": "#/$defs/inventory" },
+        "contract_layer_graph": { "$ref": "#/$defs/contract_layer_graph" },
         "workflow": { "$ref": "#/$defs/workflow" },
         "pull_request_change": { "$ref": "#/$defs/pull_request_change" },
         "workload_identity": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
@@ -78,6 +83,24 @@
         "alternate_path_count": { "type": "integer", "minimum": 0 }
       }
     },
+    "contract_layer_graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "layers", "edges"],
+      "properties": {
+        "shape": { "enum": ["dense_dag", "layered_dag", "strongly_connected_with_acyclic_tail"] },
+        "layers": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from_layer", "to_layer"],
+            "properties": { "from_layer": { "type": "string" }, "to_layer": { "type": "string" } }
+          }
+        }
+      }
+    },
     "inventory": {
       "type": "object",
       "additionalProperties": false,
@@ -92,7 +115,13 @@
         "selector_predicate_evaluation_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "contract_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "finding_candidate_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
-        "source_root_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+        "source_root_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "ignore_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "metric_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "report_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "contract_layer_node_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "contract_layer_reference_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "method_body_rule_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
       }
     },
     "workflow": {
@@ -188,7 +217,53 @@
         "wall_clock": { "$ref": "#/$defs/measurement" },
         "processor_time": { "$ref": "#/$defs/measurement" },
         "allocated_bytes": { "$ref": "#/$defs/measurement" },
-        "peak_managed_memory": { "$ref": "#/$defs/measurement" }
+        "peak_managed_memory": { "$ref": "#/$defs/measurement" },
+        "work_counters": { "$ref": "#/$defs/work_counters" },
+        "metric_work": { "$ref": "#/$defs/metric_work" },
+        "history_work_counters": { "$ref": "#/$defs/history_work_counters" },
+        "timing_boundaries": { "$ref": "#/$defs/timing_boundaries" },
+        "report_output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "loaded_assemblies": { "$ref": "#/$defs/loaded_assemblies" }
+      }
+    },
+    "loaded_assembly_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_name", "sha256"],
+      "properties": {
+        "file_name": { "type": "string", "pattern": "^[^/\\\\]+\\.dll$" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "loaded_assemblies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "artifacts"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "artifacts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/loaded_assembly_artifact" } }
+      }
+    },
+    "metric_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric_id", "metric_kind", "value", "contributor_count"],
+      "properties": {
+        "metric_id": { "type": "string", "minLength": 1 },
+        "metric_kind": { "type": "string", "minLength": 1 },
+        "value": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "contributor_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+      }
+    },
+    "metric_work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric_count", "is_complete", "results_sha256", "results"],
+      "properties": {
+        "metric_count": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "is_complete": { "const": true },
+        "results_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "results": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/metric_result" } }
       }
     },
     "work": {
@@ -209,6 +284,65 @@
         "graph_traversal_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "witness_path_materialization_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "canonical_identity_candidate_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+      }
+    },
+    "work_counters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrumentation", "project_file_parses", "source_fact_file_parses", "method_body_compilation_calls", "method_body_syntax_trees", "ast_semantic_lookups", "layer_membership_probes", "cel_context_constructions"],
+      "properties": {
+        "instrumentation": { "const": "benchmark-work-observer/v1" },
+        "project_file_parses": { "$ref": "#/$defs/measurement" },
+        "source_fact_file_parses": { "$ref": "#/$defs/measurement" },
+        "method_body_compilation_calls": { "$ref": "#/$defs/measurement" },
+        "method_body_syntax_trees": { "$ref": "#/$defs/measurement" },
+        "ast_semantic_lookups": { "$ref": "#/$defs/measurement" },
+        "layer_membership_probes": { "$ref": "#/$defs/measurement" },
+        "cel_context_constructions": { "$ref": "#/$defs/measurement" }
+      }
+    },
+    "history_work_counters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrumentation", "line_churn_algorithm_work", "task_commit_occurrences_examined", "co_change_edges_assigned", "ancestry_ancestors_visited", "ancestry_retained_entries"],
+      "properties": {
+        "instrumentation": { "const": "benchmark-history-work/v1" },
+        "line_churn_algorithm_work": { "$ref": "#/$defs/measurement" },
+        "task_commit_occurrences_examined": { "$ref": "#/$defs/measurement" },
+        "co_change_edges_assigned": { "$ref": "#/$defs/measurement" },
+        "ancestry_ancestors_visited": { "$ref": "#/$defs/measurement" },
+        "ancestry_retained_entries": { "$ref": "#/$defs/measurement" }
+      }
+    },
+    "timing_boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "fixture_materialization", "restore_and_build", "process_host_startup_and_shutdown", "cli_process", "core_analysis_session", "result_publication", "total_end_to_end"],
+      "properties": {
+        "contract": { "const": "independent-stopwatch-intervals/v1" },
+        "fixture_materialization": { "$ref": "#/$defs/measurement" },
+        "restore_and_build": { "$ref": "#/$defs/measurement" },
+        "process_host_startup_and_shutdown": { "$ref": "#/$defs/measurement" },
+        "cli_process": { "$ref": "#/$defs/measurement" },
+        "core_analysis_session": { "$ref": "#/$defs/measurement" },
+        "result_publication": { "$ref": "#/$defs/measurement" },
+        "total_end_to_end": { "$ref": "#/$defs/measurement" },
+        "profiler_overhead": { "$ref": "#/$defs/profiler_overhead" }
+      }
+    },
+    "profiler_overhead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrumentation", "observer_disabled_analysis", "observer_enabled_analysis", "observer_disabled_allocated_bytes", "observer_enabled_allocated_bytes", "observer_disabled_peak_retained_bytes", "observer_enabled_peak_retained_bytes", "canonical_results_match"],
+      "properties": {
+        "instrumentation": { "const": "benchmark-work-observer/v1" },
+        "observer_disabled_analysis": { "$ref": "#/$defs/measurement" },
+        "observer_enabled_analysis": { "$ref": "#/$defs/measurement" },
+        "observer_disabled_allocated_bytes": { "$ref": "#/$defs/measurement" },
+        "observer_enabled_allocated_bytes": { "$ref": "#/$defs/measurement" },
+        "observer_disabled_peak_retained_bytes": { "$ref": "#/$defs/measurement" },
+        "observer_enabled_peak_retained_bytes": { "$ref": "#/$defs/measurement" },
+        "canonical_results_match": { "type": "boolean" }
       }
     },
     "canonical_result": {
@@ -234,6 +368,9 @@
         "configuration": { "type": "string" },
         "source_identity": { "type": "string" },
         "tool_identity": { "type": "string" },
+        "source_revision": { "type": "string", "minLength": 1 },
+        "runner_identity": { "type": "string", "minLength": 1 },
+        "materialized_input_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "peak_working_set": { "$ref": "#/$defs/measurement" },
         "managed_allocation": { "$ref": "#/$defs/measurement" }
       }

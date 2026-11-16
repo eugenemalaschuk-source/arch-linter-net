@@ -24,12 +24,21 @@ internal static class MethodBodyChecker
         (IReadOnlyList<string>? explicitReferenceAssemblyPaths, string? sourceAssemblyHint, ArchitectureViolation? fallbackDiagnostic) =
             ResolveProjectAwareReferenceAssemblyPaths(contract, context, sourceLayer, sourceRoots);
 
-        IReadOnlyList<ArchitectureViolation> roslynViolations = new ArchitectureSourceScanner()
-            .FindMethodBodyViolations(context.AnalysisContext.RepositoryRoot, sourceLayer.Namespace,
-                contract.ForbiddenCalls, executionContext, sourceRoots: sourceRoots,
-                sourceLayer: sourceLayer, preprocessorSymbols: context.PreprocessorSymbols,
-                explicitReferenceAssemblyPaths: explicitReferenceAssemblyPaths,
-                sourceAssemblyHint: sourceAssemblyHint, cancellationToken: context.AnalysisContext.CancellationToken)
+        IReadOnlyList<ArchitectureViolation> roslynViolations = ArchitectureSourceScanner.FindMethodBodyViolationsWithObserver(
+            new ArchitectureMethodBodyScanRequest
+            {
+                RepositoryRoot = context.AnalysisContext.RepositoryRoot,
+                SourceNamespacePrefix = sourceLayer.Namespace,
+                ForbiddenCallPatterns = contract.ForbiddenCalls,
+                ExecutionContext = executionContext,
+                SourceRoots = sourceRoots,
+                SourceLayer = sourceLayer,
+                PreprocessorSymbols = context.PreprocessorSymbols,
+                ExplicitReferenceAssemblyPaths = explicitReferenceAssemblyPaths,
+                SourceAssemblyHint = sourceAssemblyHint,
+                CancellationToken = context.AnalysisContext.CancellationToken,
+                BenchmarkWorkObserver = context.BenchmarkWorkObserver,
+            })
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = new ArchitectureIlMethodBodyScanner().FindMethodBodyViolations(

@@ -1,6 +1,7 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 internal static class BenchmarkWorkloadGenerator
 {
@@ -10,7 +11,8 @@ internal static class BenchmarkWorkloadGenerator
         BenchmarkDimensionSet? dimensions = null,
         BenchmarkCompilationMode compilationMode = BenchmarkCompilationMode.RealMsBuild,
         BenchmarkExecutionMode executionMode = BenchmarkExecutionMode.SingleCommand,
-        int independentProcesses = 1)
+        int independentProcesses = 1,
+        BenchmarkContractLayerGraphShape? contractLayerGraphShape = null)
     {
         ValidateWorkloadId(workloadId);
         BenchmarkDimensionSet resolvedDimensions = dimensions ?? DefaultDimensions(shape);
@@ -21,19 +23,21 @@ internal static class BenchmarkWorkloadGenerator
             resolvedDimensions.TypesPerProject);
 
         if (resolvedDimensions.FindingCandidates > materializedTypeCount)
-        {
             throw new ArgumentException(
                 "Finding candidates must target distinct materialized synthetic types.",
                 nameof(dimensions));
-        }
 
         ArgumentOutOfRangeException.ThrowIfLessThan(independentProcesses, 1);
 
-        IReadOnlyList<BenchmarkProjectNode> projects = BenchmarkGraphBuilder.CreateProjects(resolvedDimensions.ProjectCount);
+        IReadOnlyList<BenchmarkProjectNode> projects =
+            BenchmarkGraphBuilder.CreateProjects(resolvedDimensions.ProjectCount);
         IReadOnlyList<BenchmarkProjectEdge> edges = BenchmarkGraphBuilder.CreateEdges(
             shape, projects, resolvedDimensions.ReferencesPerProject);
         BenchmarkTopologySummary topology = BenchmarkGraphBuilder.Summarize(projects, edges, shape);
-        BenchmarkInventoryCounts inventory = CreateInventory(resolvedDimensions, topology);
+        BenchmarkContractLayerGraph? contractLayerGraph = BenchmarkGraphBuilder.CreateContractLayerGraph(
+            contractLayerGraphShape,
+            resolvedDimensions.LayerCount);
+        BenchmarkInventoryCounts inventory = CreateInventory(resolvedDimensions, topology, contractLayerGraph);
         BenchmarkWorkflowDescriptor workflow = CreateWorkflow(executionMode, independentProcesses);
         BenchmarkPullRequestChange change = CreatePullRequestChange(projects, resolvedDimensions);
 
@@ -49,10 +53,12 @@ internal static class BenchmarkWorkloadGenerator
             Inventory = inventory,
             Workflow = workflow,
             PullRequestChange = change,
-            WorkloadIdentity = string.Empty,
+            ContractLayerGraph = contractLayerGraph,
+            WorkloadIdentity = string.Empty
         };
 
-        string identityInput = BenchmarkJson.Serialize(definition.ToManifest() with { WorkloadIdentity = string.Empty });
+        string identityInput = BenchmarkIdentity.NormalizeLineEndings(
+            BenchmarkJson.Serialize(definition.ToManifest() with { WorkloadIdentity = string.Empty }));
         return definition with { WorkloadIdentity = BenchmarkIdentity.Sha256(identityInput) };
     }
 
@@ -71,27 +77,30 @@ internal static class BenchmarkWorkloadGenerator
                 SelectorPredicateTermsPerLayer = 16,
                 ContractsPerWorkload = 8,
                 FindingCandidates = 128,
-                SourceRootCount = 4,
+                SourceRootCount = 4
             },
             BenchmarkCompilationMode.StagedAssemblies,
             BenchmarkExecutionMode.FullGovernance,
-            independentProcesses: 6);
+            6);
     }
 
     private static BenchmarkInventoryCounts CreateInventory(
         BenchmarkDimensionSet dimensions,
-        BenchmarkTopologySummary topology)
+        BenchmarkTopologySummary topology,
+        BenchmarkContractLayerGraph? contractLayerGraph)
     {
         return new BenchmarkInventoryCounts
         {
             ProjectCount = dimensions.ProjectCount,
             AssemblyCount = dimensions.ProjectCount,
-            SourceFileCount = CheckedProduct(
-                "source_file_count",
-                dimensions.ProjectCount,
-                dimensions.SourceFilesPerProject,
-                dimensions.SourceRootCount),
-            TypeCount = CheckedProduct("type_count", dimensions.ProjectCount, dimensions.TypesPerProject),
+            SourceFileCount = checked(CheckedProduct(
+                                          "source_file_count",
+                                          dimensions.ProjectCount,
+                                          dimensions.SourceFilesPerProject,
+                                          dimensions.SourceRootCount) + (contractLayerGraph is null ? 0 : 1) +
+                                      (dimensions.IgnoreRuleCount == 0 ? 0 : 1)),
+            TypeCount = checked(CheckedProduct("type_count", dimensions.ProjectCount, dimensions.TypesPerProject) +
+                                (contractLayerGraph?.Layers.Count ?? 0)),
             ReferenceEdgeCount = topology.ReferenceEdgeCount,
             LayerCount = dimensions.LayerCount,
             SelectorPredicateEvaluationCount = CheckedProduct(
@@ -100,9 +109,16 @@ internal static class BenchmarkWorkloadGenerator
                 dimensions.TypesPerProject,
                 dimensions.LayerCount,
                 dimensions.SelectorPredicateTermsPerLayer),
-            ContractCount = dimensions.ContractsPerWorkload,
+            ContractCount = dimensions.ContractsPerWorkload + dimensions.MethodBodyRuleCount +
+                            (contractLayerGraph is null ? 0 : 2),
             FindingCandidateCount = dimensions.FindingCandidates,
             SourceRootCount = dimensions.SourceRootCount,
+            IgnoreRuleCount = dimensions.IgnoreRuleCount,
+            MetricRuleCount = dimensions.MetricRuleCount,
+            ReportRuleCount = dimensions.ReportRuleCount,
+            MethodBodyRuleCount = dimensions.MethodBodyRuleCount,
+            ContractLayerNodeCount = contractLayerGraph?.Layers.Count ?? 0,
+            ContractLayerReferenceCount = contractLayerGraph?.Edges.Count ?? 0
         };
     }
 
@@ -111,10 +127,7 @@ internal static class BenchmarkWorkloadGenerator
         int result = 1;
         try
         {
-            foreach (int factor in factors)
-            {
-                result = checked(result * factor);
-            }
+            foreach (int factor in factors) result = checked(result * factor);
         }
         catch (OverflowException exception)
         {
@@ -126,24 +139,27 @@ internal static class BenchmarkWorkloadGenerator
         return result;
     }
 
-    private static BenchmarkDimensionSet DefaultDimensions(BenchmarkTopologyShape shape) => shape switch
+    private static BenchmarkDimensionSet DefaultDimensions(BenchmarkTopologyShape shape)
     {
-        BenchmarkTopologyShape.ManyProjectsFewTypes => new BenchmarkDimensionSet
+        return shape switch
         {
-            ProjectCount = 32,
-            TypesPerProject = 2,
-            SourceFilesPerProject = 1,
-            ReferencesPerProject = 2,
-        },
-        BenchmarkTopologyShape.FewProjectsManyTypes => new BenchmarkDimensionSet
-        {
-            ProjectCount = 4,
-            TypesPerProject = 64,
-            SourceFilesPerProject = 16,
-            ReferencesPerProject = 3,
-        },
-        _ => new BenchmarkDimensionSet(),
-    };
+            BenchmarkTopologyShape.ManyProjectsFewTypes => new BenchmarkDimensionSet
+            {
+                ProjectCount = 32,
+                TypesPerProject = 2,
+                SourceFilesPerProject = 1,
+                ReferencesPerProject = 2
+            },
+            BenchmarkTopologyShape.FewProjectsManyTypes => new BenchmarkDimensionSet
+            {
+                ProjectCount = 4,
+                TypesPerProject = 64,
+                SourceFilesPerProject = 16,
+                ReferencesPerProject = 3
+            },
+            _ => new BenchmarkDimensionSet()
+        };
+    }
 
     private static BenchmarkWorkflowDescriptor CreateWorkflow(
         BenchmarkExecutionMode executionMode,
@@ -152,10 +168,12 @@ internal static class BenchmarkWorkloadGenerator
         IReadOnlyList<string> commandFamilies = executionMode switch
         {
             BenchmarkExecutionMode.SingleCommand => ["validation"],
-            BenchmarkExecutionMode.FullGovernance => ["validation", "gate", "health", "change-snapshot", "topology", "metrics"],
+            BenchmarkExecutionMode.FullGovernance =>
+                ["validation", "gate", "health", "change-snapshot", "topology", "metrics"],
             BenchmarkExecutionMode.MultiCommand => ["validation", "gate", "health", "change-snapshot"],
             BenchmarkExecutionMode.PullRequest => ["validation", "gate", "change-snapshot"],
-            _ => throw new ArgumentOutOfRangeException(nameof(executionMode), executionMode, "Unknown benchmark execution mode."),
+            _ => throw new ArgumentOutOfRangeException(nameof(executionMode), executionMode,
+                "Unknown benchmark execution mode.")
         };
 
         IReadOnlyList<string> commands = commandFamilies
@@ -167,7 +185,8 @@ internal static class BenchmarkWorkloadGenerator
                 "change-snapshot" => "change snapshot",
                 "topology" => "topology",
                 "metrics" => "measure",
-                _ => throw new ArgumentOutOfRangeException(nameof(executionMode), executionMode, "Unknown benchmark command family."),
+                _ => throw new ArgumentOutOfRangeException(nameof(executionMode), executionMode,
+                    "Unknown benchmark command family.")
             })
             .ToList();
         return new BenchmarkWorkflowDescriptor
@@ -175,7 +194,7 @@ internal static class BenchmarkWorkloadGenerator
             ExecutionMode = executionMode,
             CommandFamilies = commandFamilies,
             Commands = commands,
-            IndependentProcesses = independentProcesses,
+            IndependentProcesses = independentProcesses
         };
     }
 
@@ -193,13 +212,15 @@ internal static class BenchmarkWorkloadGenerator
         {
             ChangedProjectIds = changedProjects,
             ChangedSourcePaths = changedSources,
-            IncludesGlobalInput = false,
+            IncludesGlobalInput = false
         };
     }
 
-    private static string ProjectName(string projectId) =>
-        projectId.Replace("project-", "Synthetic.Project", StringComparison.Ordinal)
+    private static string ProjectName(string projectId)
+    {
+        return projectId.Replace("project-", "Synthetic.Project", StringComparison.Ordinal)
             .Replace("-", string.Empty, StringComparison.Ordinal);
+    }
 
     private static void ValidateWorkloadId(string workloadId)
     {
@@ -210,11 +231,9 @@ internal static class BenchmarkWorkloadGenerator
                 !((character >= 'a' && character <= 'z') ||
                   (character >= '0' && character <= '9') ||
                   character == '-')))
-        {
             throw new ArgumentException(
                 "Workload IDs must match the large-solution-workload/v1 pattern 'synthetic-[a-z0-9-]+'.",
                 nameof(workloadId));
-        }
     }
 }
 
@@ -222,10 +241,16 @@ internal static class BenchmarkJson
 {
     private static readonly JsonSerializerOptions _options = CreateOptions();
 
-    public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, _options);
+    public static string Serialize<T>(T value)
+    {
+        return JsonSerializer.Serialize(value, _options);
+    }
 
-    public static T Deserialize<T>(string json) => JsonSerializer.Deserialize<T>(json, _options)
-        ?? throw new InvalidOperationException("Benchmark JSON deserialized to null.");
+    public static T Deserialize<T>(string json)
+    {
+        return JsonSerializer.Deserialize<T>(json, _options)
+               ?? throw new InvalidOperationException("Benchmark JSON deserialized to null.");
+    }
 
     private static JsonSerializerOptions CreateOptions()
     {
@@ -233,9 +258,9 @@ internal static class BenchmarkJson
         {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower,
-            WriteIndented = true,
+            WriteIndented = true
         };
-        options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
         return options;
     }
 }

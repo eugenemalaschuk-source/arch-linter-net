@@ -3,7 +3,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
-using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
@@ -25,9 +25,12 @@ internal sealed class ArchitectureCheckerContext
     public ArchitectureCheckerContext(ArchitectureAnalysisSession session)
     {
         _session = session;
+        BenchmarkWorkObserver = session.Context.BenchmarkWorkObserver;
     }
 
     public ArchitectureContractDocument Document => _session.Document;
+
+    internal BenchmarkWorkObserver? BenchmarkWorkObserver { get; }
 
     public ArchitectureAnalysisContext AnalysisContext => _session.Context;
 
@@ -41,17 +44,6 @@ internal sealed class ArchitectureCheckerContext
 
     public ArchitectureReferenceGraph ReferenceGraph => _session.ReferenceGraph;
 
-    public ArchitecturePublicApiSurfaceRootResolution ResolvePublicApiSurfaceRoots(string publicApiSurfaceId) =>
-        _session.ResolvePublicApiSurfaceRoots(publicApiSurfaceId);
-
-    public ArchitecturePublicApiSurfaceMaterialization GetPublicApiSurface(Assembly assembly) =>
-        _session.GetPublicApiSurface(assembly);
-
-    public ArchitectureContractSurfaceExposureResult GetContractSurfaceExposure(
-        IEnumerable<Type> roots,
-        ArchitectureContractSurfaceShape surfaceShape) =>
-        _session.GetContractSurfaceExposure(roots, surfaceShape);
-
     public IReadOnlyList<string>? PreprocessorSymbols => _session.PreprocessorSymbols;
 
     // Matches analysis.configuration, defaulting to "Debug" exactly like project discovery's own
@@ -59,43 +51,89 @@ internal sealed class ArchitectureCheckerContext
     // evaluation-failure surfacing, so both read one resolution instead of two.
     public string ResolvedBuildConfiguration => _session.ResolvedBuildConfiguration;
 
-    public Type[] FindTypesInLayer(ArchitectureLayer layer) => _session.Facts.FindTypesInLayer(layer);
+    public ArchitecturePublicApiSurfaceRootResolution ResolvePublicApiSurfaceRoots(string publicApiSurfaceId)
+    {
+        return _session.ResolvePublicApiSurfaceRoots(publicApiSurfaceId);
+    }
 
-    public bool MatchesLayer(ArchitectureLayer layer, Type type) => _session.Facts.MatchesLayer(layer, type);
+    public ArchitecturePublicApiSurfaceMaterialization GetPublicApiSurface(Assembly assembly)
+    {
+        return _session.GetPublicApiSurface(assembly);
+    }
 
-    public bool IsInAnyDeclaredLayer(Type type) => _session.Facts.IsInAnyDeclaredLayer(type);
+    public ArchitectureContractSurfaceExposureResult GetContractSurfaceExposure(
+        IEnumerable<Type> roots,
+        ArchitectureContractSurfaceShape surfaceShape)
+    {
+        return _session.GetContractSurfaceExposure(roots, surfaceShape);
+    }
 
-    public string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames) =>
-        _session.Facts.ResolveContainingLayer(type, candidateLayerNames);
+    public Type[] FindTypesInLayer(ArchitectureLayer layer)
+    {
+        return _session.Facts.FindTypesInLayer(layer);
+    }
 
-    public IEnumerable<string> ResolveProjectAssemblyNames(List<string> projectNames) =>
-        _session.Facts.ResolveProjectAssemblyNames(projectNames);
+    public bool MatchesLayer(ArchitectureLayer layer, Type type)
+    {
+        return _session.Facts.MatchesLayer(layer, type);
+    }
 
-    public bool TryGetAssembly(string assemblyName, out Assembly assembly) =>
-        _session.Facts.TryGetAssembly(assemblyName, out assembly!);
+    public bool IsInAnyDeclaredLayer(Type type)
+    {
+        return _session.Facts.IsInAnyDeclaredLayer(type);
+    }
 
-    public bool TryGetProjectByNormalizedPath(string normalizedProjectPath, out ArchitectureDiscoveredProject project) =>
-        _session.Facts.TryGetProjectByNormalizedPath(normalizedProjectPath, out project!);
+    public string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames)
+    {
+        if (BenchmarkWorkObserver is not null)
+            for (int index = 0; index < candidateLayerNames.Count; index++)
+                BenchmarkWorkObserver.RecordLayerMembershipProbe();
+
+        return _session.Facts.ResolveContainingLayer(type, candidateLayerNames);
+    }
+
+    public IEnumerable<string> ResolveProjectAssemblyNames(List<string> projectNames)
+    {
+        return _session.Facts.ResolveProjectAssemblyNames(projectNames);
+    }
+
+    public bool TryGetAssembly(string assemblyName, out Assembly assembly)
+    {
+        return _session.Facts.TryGetAssembly(assemblyName, out assembly!);
+    }
+
+    public bool TryGetProjectByNormalizedPath(string normalizedProjectPath, out ArchitectureDiscoveredProject project)
+    {
+        return _session.Facts.TryGetProjectByNormalizedPath(normalizedProjectPath, out project!);
+    }
 
     public bool TryGetPackageReferences(
         string assemblyName,
-        out IReadOnlyList<ArchitectureDiscoveredPackageReference> references) =>
-        _session.Facts.TryGetPackageReferences(assemblyName, out references!);
+        out IReadOnlyList<ArchitectureDiscoveredPackageReference> references)
+    {
+        return _session.Facts.TryGetPackageReferences(assemblyName, out references!);
+    }
 
-    public IEnumerable<Type> FindContextSelectorMatchingTypes(ArchitectureContextSelector selector) =>
-        _session.Facts.FindContextSelectorMatchingTypes(selector);
+    public IEnumerable<Type> FindContextSelectorMatchingTypes(ArchitectureContextSelector selector)
+    {
+        return _session.Facts.FindContextSelectorMatchingTypes(selector);
+    }
 
     public bool IsExcludedFromContextMatch(
         Type candidateType,
         IReadOnlyList<ArchitectureContextSelector> excludeSelectors,
         ArchitectureTypeClassificationResult sourceDescriptor,
-        Type? sourceType = null) =>
-        _session.Facts.IsExcludedFromContextMatch(candidateType, excludeSelectors, sourceDescriptor, sourceType);
+        Type? sourceType = null)
+    {
+        return _session.Facts.IsExcludedFromContextMatch(candidateType, excludeSelectors, sourceDescriptor, sourceType);
+    }
 
     // Evaluation is cached per (project, configuration) on the session for the lifetime of the run,
     // so several framework contracts sharing a source project still trigger one design-time build.
-    public ArchitectureDiscoveredFrameworkReference[] ResolveFrameworkReferences(string sourceAssemblyName) =>
-        _session.ResolveFrameworkReferences(sourceAssemblyName);
+    public ArchitectureDiscoveredFrameworkReference[] ResolveFrameworkReferences(string sourceAssemblyName)
+    {
+        return _session.ResolveFrameworkReferences(sourceAssemblyName);
+    }
 
     // Recording port: the participation list itself stays session-owned, so contract-family
     // execution order remains the only thing that determines record order.
@@ -105,6 +143,8 @@ internal sealed class ArchitectureCheckerContext
         int? index,
         bool matched,
         bool evaluationFailed = false,
-        ArchitectureSelectorParticipationKind kind = ArchitectureSelectorParticipationKind.Exclusion) =>
+        ArchitectureSelectorParticipationKind kind = ArchitectureSelectorParticipationKind.Exclusion)
+    {
         _session.RecordSubtractiveMatcherParticipation(contract, field, index, matched, evaluationFailed, kind);
+    }
 }

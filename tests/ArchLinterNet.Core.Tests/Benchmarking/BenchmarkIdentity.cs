@@ -2,13 +2,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace ArchLinterNet.Core.Tests;
+namespace ArchLinterNet.Core.Tests.Benchmarking;
 
 internal static class BenchmarkIdentity
 {
     private static readonly JsonSerializerOptions _normalizedJsonOptions = new()
     {
-        WriteIndented = false,
+        WriteIndented = false
     };
 
     public static string Sha256(string content)
@@ -30,14 +30,14 @@ internal static class BenchmarkIdentity
                 source_assembly = finding.SourceAssembly,
                 source_type = finding.SourceType,
                 source_member = finding.SourceMember,
-                location = NormalizePath(finding.Location),
+                location = NormalizePath(finding.Location)
             })
             .ToList();
         string canonical = BenchmarkJson.Serialize(new
         {
             completion_status = completionStatus,
             exit_code = exitCode,
-            findings = canonicalFindings,
+            findings = canonicalFindings
         });
         return new BenchmarkCanonicalResultIdentity
         {
@@ -45,7 +45,7 @@ internal static class BenchmarkIdentity
             Sha256 = Sha256(canonical),
             FindingCount = findings.Count,
             CompletionStatus = completionStatus,
-            ExitCode = exitCode,
+            ExitCode = exitCode
         };
     }
 
@@ -59,7 +59,7 @@ internal static class BenchmarkIdentity
         {
             completion_status = completionStatus,
             exit_code = exitCode,
-            canonical_result = canonicalText,
+            canonical_result = canonicalText
         });
         return new BenchmarkCanonicalResultIdentity
         {
@@ -67,15 +67,16 @@ internal static class BenchmarkIdentity
             Sha256 = Sha256(canonical),
             FindingCount = findingCount,
             CompletionStatus = completionStatus,
-            ExitCode = exitCode,
+            ExitCode = exitCode
         };
     }
 
-    public static string NormalizePath(string path)
+    private static string NormalizePath(string path)
     {
         string normalized = path.Replace('\\', '/');
         string[] segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        int sourceIndex = Array.FindIndex(segments, segment => string.Equals(segment, "src", StringComparison.OrdinalIgnoreCase));
+        int sourceIndex = Array.FindIndex(segments,
+            segment => string.Equals(segment, "src", StringComparison.OrdinalIgnoreCase));
         return sourceIndex >= 0 ? string.Join('/', segments[sourceIndex..]) : normalized;
     }
 
@@ -83,6 +84,11 @@ internal static class BenchmarkIdentity
     {
         using var document = JsonDocument.Parse(json);
         return JsonSerializer.Serialize(document.RootElement, _normalizedJsonOptions);
+    }
+
+    public static string NormalizeLineEndings(string text)
+    {
+        return text.Replace("\r\n", "\n", StringComparison.Ordinal);
     }
 }
 
@@ -105,16 +111,21 @@ internal static class BenchmarkEvidenceFactory
                 PreparedStateMode = "unprepared",
                 ParallelMode = "sequential",
                 SampleOrdinal = 1,
-                IsWarmSample = false,
+                IsWarmSample = false
             },
             RawAnalysisProfile = rawProfile,
             CompletionStatus = "Success",
             ExitCode = 0,
             OutputFailed = false,
-            WallClock = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no wall-clock measurement."),
-            ProcessorTime = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no processor-time measurement."),
-            AllocatedBytes = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no allocation measurement."),
-            PeakManagedMemory = BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no memory measurement."),
+            WallClock = BenchmarkResourceMeasurement.Unavailable(
+                "Synthetic contract sample has no wall-clock measurement."),
+            ProcessorTime =
+                BenchmarkResourceMeasurement.Unavailable(
+                    "Synthetic contract sample has no processor-time measurement."),
+            AllocatedBytes =
+                BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no allocation measurement."),
+            PeakManagedMemory =
+                BenchmarkResourceMeasurement.Unavailable("Synthetic contract sample has no memory measurement.")
         };
         var evidence = new BenchmarkEvidenceDocument
         {
@@ -135,7 +146,7 @@ internal static class BenchmarkEvidenceFactory
                 SourceRootCount = workload.Inventory.SourceRootCount,
                 GraphTraversalCount = workload.Topology.ReferenceEdgeCount,
                 WitnessPathMaterializationCount = workload.Topology.AlternatePathCount,
-                CanonicalIdentityCandidateCount = workload.Inventory.FindingCandidateCount,
+                CanonicalIdentityCandidateCount = workload.Inventory.FindingCandidateCount
             },
             Samples = [resolvedSample],
             CanonicalResult = canonicalResult,
@@ -148,11 +159,11 @@ internal static class BenchmarkEvidenceFactory
                 SourceIdentity = workload.WorkloadIdentity,
                 ToolIdentity = "ArchLinterNet synthetic benchmark foundation",
                 PeakWorkingSet = BenchmarkResourceMeasurement.Unavailable("Not measured."),
-                ManagedAllocation = BenchmarkResourceMeasurement.Unavailable("Not measured."),
+                ManagedAllocation = BenchmarkResourceMeasurement.Unavailable("Not measured.")
             },
             Complexity = complexity,
             ExpectedEffect = expectedEffect,
-            Disposition = BenchmarkEvidenceDisposition.Candidate,
+            Disposition = BenchmarkEvidenceDisposition.Candidate
         };
         evidence.Validate();
         return evidence;

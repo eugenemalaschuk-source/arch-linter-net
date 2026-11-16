@@ -1,6 +1,7 @@
 using System.Xml.Linq;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.Profiling;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,14 +10,22 @@ namespace ArchLinterNet.Core.Discovery;
 
 internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFileParser
 {
-    private static readonly char[] _pathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
-
     private const string IncludeAttribute = "Include";
+    private static readonly char[] _pathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
 
     public DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
     {
+        return Parse(projectPath, fileSystem, null);
+    }
+
+    internal static DiscoveredProjectFile Parse(
+        string projectPath,
+        IArchitectureFileSystem? fileSystem,
+        BenchmarkWorkObserver? benchmarkWorkObserver)
+    {
         fileSystem ??= ArchitectureFileSystem.Real;
-        XDocument document = XDocument.Parse(fileSystem.ReadAllText(projectPath));
+        benchmarkWorkObserver?.RecordProjectFileParse();
+        var document = XDocument.Parse(fileSystem.ReadAllText(projectPath));
 
         XElement[] propertyGroups = document.Descendants("PropertyGroup").ToArray();
 
@@ -25,10 +34,12 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
         List<ArchitectureDiscoveredPackageReference> packageReferences =
             ParsePackageReferences(document, projectPath, fileSystem);
-        List<ArchitectureDiscoveredFrameworkReference> frameworkReferences = ParseFrameworkReferences(document, projectPath);
+        List<ArchitectureDiscoveredFrameworkReference> frameworkReferences =
+            ParseFrameworkReferences(document, projectPath);
         Dictionary<string, ArchitectureDiscoveredProjectProperty> properties =
             ParseProperties(document, projectPath, fileSystem);
-        List<ArchitectureDiscoveredFriendAssembly> friendAssemblies = ParseFriendAssemblies(document, projectPath, fileSystem);
+        List<ArchitectureDiscoveredFriendAssembly> friendAssemblies =
+            ParseFriendAssemblies(document, projectPath, fileSystem);
         List<ArchitectureDiscoveredProjectReference> projectReferences = ParseProjectReferences(document, projectPath);
 
         return new DiscoveredProjectFile(
@@ -60,18 +71,16 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
         if (!string.IsNullOrWhiteSpace(targetFrameworks))
-        {
             return targetFrameworks.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToList();
-        }
 
         string? targetFramework = propertyGroups
             .Select(group => group.Element("TargetFramework")?.Value)
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
         return !string.IsNullOrWhiteSpace(targetFramework)
-            ? new List<string> { targetFramework.Trim() }
-            : new List<string>();
+            ? [targetFramework.Trim()]
+            : [];
     }
 
     private static Dictionary<string, ArchitectureDiscoveredProjectProperty> ParseProperties(
@@ -82,7 +91,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
         foreach (string propsPath in EnumerateDirectoryBuildProps(projectPath, fileSystem))
         {
-            XDocument propsDocument = XDocument.Parse(fileSystem.ReadAllText(propsPath));
+            var propsDocument = XDocument.Parse(fileSystem.ReadAllText(propsPath));
             MergeScalarProperties(propsDocument, propsPath, properties);
         }
 
@@ -93,7 +102,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     private static List<ArchitectureDiscoveredPackageReference> ParsePackageReferences(
         XDocument document, string projectPath, IArchitectureFileSystem fileSystem)
     {
-        List<(string PackageId, string? Version)> rawReferences = document.Descendants("PackageReference")
+        var rawReferences = document.Descendants("PackageReference")
             .Select(element =>
             {
                 string? id = element.Attribute(IncludeAttribute)?.Value;
@@ -104,10 +113,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             .Select(reference => (PackageId: reference.Id!.Trim(), reference.Version))
             .ToList();
 
-        if (rawReferences.Count == 0)
-        {
-            return new List<ArchitectureDiscoveredPackageReference>();
-        }
+        if (rawReferences.Count == 0) return new List<ArchitectureDiscoveredPackageReference>();
 
         Dictionary<string, string>? centralPackageVersions = null;
 
@@ -115,21 +121,18 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             .Select(reference =>
             {
                 if (reference.Version != null)
-                {
                     return new ArchitectureDiscoveredPackageReference(reference.PackageId, reference.Version);
-                }
 
                 centralPackageVersions ??= LoadCentralPackageVersions(projectPath, fileSystem);
-                string? resolvedVersion = centralPackageVersions.TryGetValue(reference.PackageId, out string? version)
-                    ? version
-                    : null;
+                string? resolvedVersion = centralPackageVersions.GetValueOrDefault(reference.PackageId);
 
                 return new ArchitectureDiscoveredPackageReference(reference.PackageId, resolvedVersion);
             })
             .ToList();
     }
 
-    internal static List<ArchitectureDiscoveredFrameworkReference> ParseFrameworkReferences(XDocument document, string projectPath)
+    private static List<ArchitectureDiscoveredFrameworkReference> ParseFrameworkReferences(XDocument document,
+        string projectPath)
     {
         string sourcePath = Path.GetFullPath(projectPath);
 
@@ -142,7 +145,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             })
             .Where(reference => !string.IsNullOrWhiteSpace(reference.Include))
             .Select(reference => new ArchitectureDiscoveredFrameworkReference(
-                reference.Include!.Trim(), TargetFramework: string.Empty, Explicit: true, SourcePath: sourcePath, Condition: reference.Condition))
+                reference.Include!.Trim(), string.Empty, true, sourcePath, reference.Condition))
             .ToList();
     }
 
@@ -150,7 +153,8 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         XDocument document, string projectPath, IArchitectureFileSystem fileSystem)
     {
         string sourcePath = Path.GetFullPath(projectPath);
-        IEnumerable<ArchitectureDiscoveredFriendAssembly> projectFileDeclarations = document.Descendants("InternalsVisibleTo")
+        IEnumerable<ArchitectureDiscoveredFriendAssembly> projectFileDeclarations = document
+            .Descendants("InternalsVisibleTo")
             .Select(element => element.Attribute(IncludeAttribute)?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => new ArchitectureDiscoveredFriendAssembly(value!.Trim(), sourcePath));
@@ -167,10 +171,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         string projectPath, IArchitectureFileSystem fileSystem)
     {
         string projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath)) ?? string.Empty;
-        if (!fileSystem.DirectoryExists(projectDirectory))
-        {
-            yield break;
-        }
+        if (!fileSystem.DirectoryExists(projectDirectory)) yield break;
 
         foreach (string file in fileSystem.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
                      .Where(file => !IsUnderBuildOutputDirectory(projectDirectory, file))
@@ -181,33 +182,24 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
 
             foreach (string assemblyName in CollectFriendAssembliesFromAttributes(root.AttributeLists).OfType<string>())
-            {
                 yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
-            }
 
             foreach (MemberDeclarationSyntax member in root.Members)
-            {
-                foreach (string assemblyName in CollectFriendAssembliesFromAttributes(member.AttributeLists).OfType<string>())
-                {
+                foreach (string assemblyName in CollectFriendAssembliesFromAttributes(member.AttributeLists)
+                             .OfType<string>())
                     yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
-                }
-            }
         }
     }
 
-    private static IEnumerable<string?> CollectFriendAssembliesFromAttributes(SyntaxList<AttributeListSyntax> attributeLists)
+    private static IEnumerable<string?> CollectFriendAssembliesFromAttributes(
+        SyntaxList<AttributeListSyntax> attributeLists)
     {
         foreach (AttributeListSyntax attributeList in attributeLists)
         {
-            if (attributeList.Target?.Identifier.IsKind(SyntaxKind.AssemblyKeyword) != true)
-            {
-                continue;
-            }
+            if (attributeList.Target?.Identifier.IsKind(SyntaxKind.AssemblyKeyword) != true) continue;
 
             foreach (AttributeSyntax attribute in attributeList.Attributes)
-            {
                 yield return ExtractInternalsVisibleToAssemblyName(attribute);
-            }
         }
     }
 
@@ -216,27 +208,21 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         string nameText = attribute.Name.ToString();
         if (!nameText.EndsWith("InternalsVisibleTo", StringComparison.Ordinal)
             && !nameText.EndsWith("InternalsVisibleToAttribute", StringComparison.Ordinal))
-        {
             return null;
-        }
 
         SeparatedSyntaxList<AttributeArgumentSyntax>? arguments = attribute.ArgumentList?.Arguments;
-        if (arguments == null || arguments.Value.Count != 1)
-        {
-            return null;
-        }
+        if (arguments == null || arguments.Value.Count != 1) return null;
 
         ExpressionSyntax expression = arguments.Value[0].Expression;
         if (expression is LiteralExpressionSyntax literal
             && literal.IsKind(SyntaxKind.StringLiteralExpression))
-        {
             return literal.Token.ValueText.Trim();
-        }
 
         return null;
     }
 
-    private static List<ArchitectureDiscoveredProjectReference> ParseProjectReferences(XDocument document, string projectPath)
+    private static List<ArchitectureDiscoveredProjectReference> ParseProjectReferences(XDocument document,
+        string projectPath)
     {
         string projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath)) ?? string.Empty;
         string sourcePath = Path.GetFullPath(projectPath);
@@ -260,7 +246,8 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         return Path.GetFullPath(Path.Combine(projectDirectory, normalized));
     }
 
-    private static IEnumerable<string> EnumerateDirectoryBuildProps(string projectPath, IArchitectureFileSystem fileSystem)
+    private static IEnumerable<string> EnumerateDirectoryBuildProps(string projectPath,
+        IArchitectureFileSystem fileSystem)
     {
         string? directory = Path.GetDirectoryName(Path.GetFullPath(projectPath));
 
@@ -274,10 +261,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             }
 
             string? parent = Path.GetDirectoryName(directory);
-            if (string.Equals(parent, directory, StringComparison.OrdinalIgnoreCase))
-            {
-                break;
-            }
+            if (string.Equals(parent, directory, StringComparison.OrdinalIgnoreCase)) break;
 
             directory = parent;
         }
@@ -300,17 +284,11 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     {
         foreach (XElement element in document.Descendants("PropertyGroup").Elements())
         {
-            if (element.HasElements)
-            {
-                continue;
-            }
+            if (element.HasElements) continue;
 
             string name = element.Name.LocalName;
-            string? value = element.Value;
-            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(value))
-            {
-                continue;
-            }
+            string value = element.Value;
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(value)) continue;
 
             properties[name] = new ArchitectureDiscoveredProjectProperty(name, value.Trim(), sourcePath);
         }
@@ -326,19 +304,18 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             string candidate = Path.Combine(directory, "Directory.Packages.props");
             if (fileSystem.FileExists(candidate))
             {
-                XDocument propsDocument = XDocument.Parse(fileSystem.ReadAllText(candidate));
+                var propsDocument = XDocument.Parse(fileSystem.ReadAllText(candidate));
                 return propsDocument.Descendants("PackageVersion")
-                    .Select(element => (Id: element.Attribute(IncludeAttribute)?.Value, Version: element.Attribute("Version")?.Value))
+                    .Select(element => (Id: element.Attribute(IncludeAttribute)?.Value,
+                        Version: element.Attribute("Version")?.Value))
                     .Where(entry => !string.IsNullOrWhiteSpace(entry.Id) && !string.IsNullOrWhiteSpace(entry.Version))
                     .GroupBy(entry => entry.Id!.Trim(), StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(group => group.Key, group => group.First().Version!.Trim(), StringComparer.OrdinalIgnoreCase);
+                    .ToDictionary(group => group.Key, group => group.First().Version!.Trim(),
+                        StringComparer.OrdinalIgnoreCase);
             }
 
             string? parent = Path.GetDirectoryName(directory);
-            if (string.Equals(parent, directory, StringComparison.OrdinalIgnoreCase))
-            {
-                break;
-            }
+            if (string.Equals(parent, directory, StringComparison.OrdinalIgnoreCase)) break;
 
             directory = parent;
         }

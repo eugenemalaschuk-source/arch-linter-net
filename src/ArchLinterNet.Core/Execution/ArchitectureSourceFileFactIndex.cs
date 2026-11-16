@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -69,7 +70,8 @@ public sealed class ArchitectureSourceFileFactIndex
         CancellationToken CancellationToken,
         int MaxParallelism = 0,
         int? ParallelEligibilityThresholdOverride = null,
-        IBoundedParallelPartitionRunner? PartitionRunner = null);
+        IBoundedParallelPartitionRunner? PartitionRunner = null,
+        BenchmarkWorkObserver? BenchmarkWorkObserver = null);
 
     internal ArchitectureSourceFileFactIndex(
         IReadOnlyCollection<Assembly> targetAssemblies,

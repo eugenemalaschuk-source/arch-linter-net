@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Resolution;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -28,17 +29,61 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         string? sourceAssemblyHint = null,
         CancellationToken cancellationToken = default)
     {
+        return FindMethodBodyViolationsWithObserver(new ArchitectureMethodBodyScanRequest
+        {
+            RepositoryRoot = repositoryRoot,
+            SourceNamespacePrefix = sourceNamespacePrefix,
+            ForbiddenCallPatterns = forbiddenCallPatterns,
+            ExecutionContext = executionContext,
+            SourceRoots = sourceRoots,
+            SourceLayer = sourceLayer,
+            PreprocessorSymbols = preprocessorSymbols,
+            FileSystem = fileSystem,
+            CompilationFactory = compilationFactory,
+            AssemblyLoader = assemblyLoader,
+            ExplicitReferenceAssemblyPaths = explicitReferenceAssemblyPaths,
+            SourceAssemblyHint = sourceAssemblyHint,
+            CancellationToken = cancellationToken
+        });
+    }
+
+    public IReadOnlyList<string> FindMatchingSourceFiles(
+        string repositoryRoot,
+        ArchitectureLayer layer,
+        string[]? sourceRoots = null,
+        IArchitectureFileSystem? fileSystem = null)
+    {
+        return FindMatchingSourceFiles(repositoryRoot, layer, sourceRoots, fileSystem, CancellationToken.None);
+    }
+
+    internal static IEnumerable<ArchitectureViolation> FindMethodBodyViolationsWithObserver(
+        ArchitectureMethodBodyScanRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        string repositoryRoot = request.RepositoryRoot;
+        string sourceNamespacePrefix = request.SourceNamespacePrefix;
+        IReadOnlyList<string> forbiddenCallPatterns = request.ForbiddenCallPatterns;
+        ArchitectureContractExecutionContext executionContext = request.ExecutionContext;
+        string[]? sourceRoots = request.SourceRoots;
+        ArchitectureLayer? sourceLayer = request.SourceLayer;
+        IReadOnlyList<string>? preprocessorSymbols = request.PreprocessorSymbols;
+        IArchitectureFileSystem? fileSystem = request.FileSystem;
+        IRoslynCompilationFactory? compilationFactory = request.CompilationFactory;
+        IArchitectureAssemblyLoader? assemblyLoader = request.AssemblyLoader;
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths = request.ExplicitReferenceAssemblyPaths;
+        string? sourceAssemblyHint = request.SourceAssemblyHint;
+        CancellationToken cancellationToken = request.CancellationToken;
+        BenchmarkWorkObserver? benchmarkWorkObserver = request.BenchmarkWorkObserver;
         fileSystem ??= ArchitectureFileSystem.Real;
         compilationFactory ??= RoslynCompilationFactory.Real;
         assemblyLoader ??= ArchitectureAssemblyLoader.Real;
 
         ArchitectureLayer effectiveLayer = sourceLayer
-                                          ?? new ArchitectureLayer { Namespace = sourceNamespacePrefix };
-        List<string> sourceFiles = FindMatchingSourceFiles(repositoryRoot, effectiveLayer, sourceRoots, fileSystem, cancellationToken).ToList();
-        if (sourceFiles.Count == 0)
-        {
-            return Array.Empty<ArchitectureViolation>();
-        }
+                                           ?? new ArchitectureLayer { Namespace = sourceNamespacePrefix };
+        var sourceFiles =
+            FindMatchingSourceFiles(repositoryRoot, effectiveLayer, sourceRoots, fileSystem, cancellationToken)
+                .ToList();
+        if (sourceFiles.Count == 0) return Array.Empty<ArchitectureViolation>();
 
         // The compilation build itself (parsing every source file, resolving references) is not
         // individually interruptible — it is one call into the Roslyn API — but is checked
@@ -48,6 +93,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         CSharpCompilation compilation = compilationFactory.Create(
             "ArchitectureSourceScanner", sourceFiles, preprocessorSymbols, fileSystem, assemblyLoader,
             explicitReferenceAssemblyPaths);
+        benchmarkWorkObserver?.RecordMethodBodyCompilation(compilation.SyntaxTrees.Length);
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<ForbiddenCallPattern> patterns =
             ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCallPatterns);
@@ -60,36 +106,31 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
             SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree, true);
             CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot(cancellationToken);
 
-            if (!ContainsNamespace(root, effectiveLayer))
-            {
-                continue;
-            }
+            if (!ContainsNamespace(root, effectiveLayer)) continue;
 
-            List<ForbiddenCallMatch> matches = FindForbiddenUsagesInBodies(semanticModel, root, patterns, matchCache);
-            if (matches.Count == 0)
-            {
-                continue;
-            }
+            List<ForbiddenCallMatch> matches = FindForbiddenUsagesInBodies(
+                semanticModel, root, patterns, matchCache,
+                onSemanticLookup: benchmarkWorkObserver is null
+                    ? null
+                    : benchmarkWorkObserver.RecordAstSemanticLookup);
+            if (matches.Count == 0) continue;
 
             string relativePath = GetRelativePath(repositoryRoot, syntaxTree.FilePath);
 
             string[] unignored = matches
                 .Where(match => !executionContext.IsIgnored(
                     relativePath, match.Display,
-                    sourceAssembly: sourceAssemblyHint,
-                    targetAssembly: match.TargetAssembly,
-                    targetType: match.TargetType,
-                    sourceMember: match.SourceMember,
-                    targetMember: match.TargetMember))
+                    sourceAssemblyHint,
+                    match.TargetAssembly,
+                    match.TargetType,
+                    match.SourceMember,
+                    match.TargetMember))
                 .Select(match => match.Display)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(match => match, StringComparer.Ordinal)
                 .ToArray();
 
-            if (unignored.Length == 0)
-            {
-                continue;
-            }
+            if (unignored.Length == 0) continue;
 
             violations.Add(new ArchitectureViolation(
                 executionContext.ContractName,
@@ -100,15 +141,6 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         }
 
         return violations;
-    }
-
-    public IReadOnlyList<string> FindMatchingSourceFiles(
-        string repositoryRoot,
-        ArchitectureLayer layer,
-        string[]? sourceRoots = null,
-        IArchitectureFileSystem? fileSystem = null)
-    {
-        return FindMatchingSourceFiles(repositoryRoot, layer, sourceRoots, fileSystem, CancellationToken.None);
     }
 
     // internal, not private: lets other Core call sites that already hold a live cancellation
@@ -127,19 +159,6 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         string[] roots = sourceRoots ?? _defaultSourceRoots;
         return FindSourceFilesForNamespace(repositoryRoot, layer, roots, fileSystem, cancellationToken);
     }
-
-    /// <summary>
-    /// One forbidden-call match: <see cref="Display"/> is the human-readable, line-numbered text
-    /// used for violation reporting (never for baseline identity); <see cref="TargetAssembly"/>,
-    /// <see cref="TargetMember"/>, and <see cref="SourceMember"/> are the structured identity fields
-    /// derived from the resolved symbol and its enclosing member.
-    /// </summary>
-    internal sealed record ForbiddenCallMatch(
-        string Display,
-        string? TargetAssembly,
-        string? TargetType,
-        string TargetMember,
-        string? SourceMember);
 
     internal static List<ForbiddenCallMatch> FindForbiddenUsagesInBodies(
         SemanticModel semanticModel,
@@ -178,7 +197,8 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                 break;
             case ImplicitObjectCreationExpressionSyntax implicitObjectCreation:
                 onSemanticLookup?.Invoke();
-                symbol = GetResolvedSymbol(semanticModel.GetSymbolInfo(implicitObjectCreation), out usedCandidateFallback);
+                symbol = GetResolvedSymbol(semanticModel.GetSymbolInfo(implicitObjectCreation),
+                    out usedCandidateFallback);
                 break;
             case IdentifierNameSyntax identifierName:
                 onSemanticLookup?.Invoke();
@@ -197,10 +217,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
     {
         usedCandidateFallback = false;
 
-        if (symbolInfo.Symbol != null)
-        {
-            return symbolInfo.Symbol;
-        }
+        if (symbolInfo.Symbol != null) return symbolInfo.Symbol;
 
         if (symbolInfo.CandidateSymbols.Length > 0)
         {
@@ -221,10 +238,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         {
             string fullRoot = Path.Combine(repositoryRoot, root);
 
-            if (!fileSystem.DirectoryExists(fullRoot))
-            {
-                continue;
-            }
+            if (!fileSystem.DirectoryExists(fullRoot)) continue;
 
             // Checked per file — a large source tree's file enumeration/read-per-line namespace
             // check is real work, not just the compilation/semantic-analysis pass afterward.
@@ -237,17 +251,16 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                 // fixture or CI checkout happens to live under — can never be mistaken for a
                 // generated/build-output segment inside the repository itself.
                 string relativeToRoot = Path.GetRelativePath(fullRoot, filePath);
-                if (!ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot) && FileContainsNamespace(filePath, layer, fileSystem))
-                {
-                    result.Add(filePath);
-                }
+                if (!ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot) &&
+                    FileContainsNamespace(filePath, layer, fileSystem)) result.Add(filePath);
             }
         }
 
         return result;
     }
 
-    private static bool FileContainsNamespace(string filePath, ArchitectureLayer layer, IArchitectureFileSystem fileSystem)
+    private static bool FileContainsNamespace(string filePath, ArchitectureLayer layer,
+        IArchitectureFileSystem fileSystem)
     {
         try
         {
@@ -255,16 +268,10 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
             {
                 string trimmed = line.Trim();
 
-                if (!trimmed.StartsWith("namespace ", StringComparison.Ordinal))
-                {
-                    continue;
-                }
+                if (!trimmed.StartsWith("namespace ", StringComparison.Ordinal)) continue;
 
                 string declared = trimmed[10..].TrimEnd('{', ' ', '\t', ';');
-                if (ArchitectureLayerResolver.MatchesNamespace(layer, declared))
-                {
-                    return true;
-                }
+                if (ArchitectureLayerResolver.MatchesNamespace(layer, declared)) return true;
             }
         }
         catch (IOException)
@@ -295,4 +302,17 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
             return fullPath;
         }
     }
+
+    /// <summary>
+    ///     One forbidden-call match: <see cref="Display" /> is the human-readable, line-numbered text
+    ///     used for violation reporting (never for baseline identity); <see cref="TargetAssembly" />,
+    ///     <see cref="TargetMember" />, and <see cref="SourceMember" /> are the structured identity fields
+    ///     derived from the resolved symbol and its enclosing member.
+    /// </summary>
+    internal sealed record ForbiddenCallMatch(
+        string Display,
+        string? TargetAssembly,
+        string? TargetType,
+        string TargetMember,
+        string? SourceMember);
 }
