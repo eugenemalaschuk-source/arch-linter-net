@@ -47,6 +47,7 @@ public sealed class TopologyReviewLifecycleAcceptanceTests
     }
 
     [Test]
+    [CancelAfter(25_000)]
     public void DotNetVerify_PreservesStrictAndAuditLifecycleSemantics()
     {
         AssertVerify(new FixtureCase("dotnet", _dotnetFixture, needsBuildStatePreparation: true));
