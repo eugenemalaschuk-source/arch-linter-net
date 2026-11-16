@@ -118,7 +118,14 @@ internal static class BenchmarkEvidenceJson
         if (source.TryGetProperty(name, out JsonElement property))
         {
             writer.WritePropertyName(name);
-            property.WriteTo(writer);
+            if (property.ValueKind is JsonValueKind.Array or JsonValueKind.Object)
+            {
+                writer.WriteRawValue(JsonSerializer.Serialize(property), skipInputValidation: false);
+            }
+            else
+            {
+                property.WriteTo(writer);
+            }
         }
     }
 
