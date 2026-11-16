@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -10,11 +11,11 @@ public sealed partial class ArchitectureBaselineMergeIndexTests
     [TestCase(3)]
     public void Merge_SharedIgnoreListAcrossContractsKeepsMembershipIndexCurrent(int version)
     {
-        var legacyPolicy = CreateSharedIgnoreListPolicy(version);
-        var indexedPolicy = CreateSharedIgnoreListPolicy(version);
-        var baseline = CreateSharedIgnoreListBaseline(version);
-        var legacyIgnores = legacyPolicy.Contracts.Strict[0].IgnoredViolations;
-        var indexedIgnores = indexedPolicy.Contracts.Strict[0].IgnoredViolations;
+        ArchitectureContractDocument legacyPolicy = CreateSharedIgnoreListPolicy(version);
+        ArchitectureContractDocument indexedPolicy = CreateSharedIgnoreListPolicy(version);
+        ArchitectureBaselineDocument baseline = CreateSharedIgnoreListBaseline(version);
+        List<ArchitectureIgnoredViolation> legacyIgnores = legacyPolicy.Contracts.Strict[0].IgnoredViolations;
+        List<ArchitectureIgnoredViolation> indexedIgnores = indexedPolicy.Contracts.Strict[0].IgnoredViolations;
 
         Assert.That(legacyPolicy.Contracts.Strict[1].IgnoredViolations, Is.SameAs(legacyIgnores));
         Assert.That(indexedPolicy.Contracts.Strict[1].IgnoredViolations, Is.SameAs(indexedIgnores));
@@ -37,11 +38,11 @@ public sealed partial class ArchitectureBaselineMergeIndexTests
 
     private static ArchitectureContractDocument CreateSharedIgnoreListPolicy(int version)
     {
-        var sharedIgnores = Enumerable.Range(0, 9)
+        List<ArchitectureIgnoredViolation> sharedIgnores = Enumerable.Range(0, 9)
             .Select(index => ToPolicyIgnore(SharedIgnore(version, $"inline-{index}", $"inline-{index}")))
             .ToList();
-        var firstContract = Contract("A");
-        var secondContract = Contract("B");
+        ArchitectureDependencyContract firstContract = Contract("A");
+        ArchitectureDependencyContract secondContract = Contract("B");
         firstContract.IgnoredViolations = sharedIgnores;
         secondContract.IgnoredViolations = sharedIgnores;
         return Policy(firstContract, secondContract);
