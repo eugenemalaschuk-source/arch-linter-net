@@ -173,6 +173,7 @@ jobs:
           name: dotnet-coverage-${{ matrix.id }}
           path: test-results/coverage
           if-no-files-found: error
+          retention-days: 2
 
   coverage_sonar:
     name: Coverage + Sonar
@@ -850,6 +851,7 @@ jobs:
         with:
           name: architecture-candidate-v1
           path: ${{ env.ARCHITECTURE_CANDIDATE_MANIFEST }}
+          retention-days: 2
 
       - name: Upload architecture DAG evidence
         if: always() && hashFiles('architecture-pr-report/architecture-dag-evidence.json') != ''
@@ -857,6 +859,7 @@ jobs:
         with:
           name: architecture-ci-dag-v1
           path: architecture-pr-report/architecture-dag-evidence.json
+          retention-days: 2
 
       - name: Verify reviewed unavailable Architecture Health badge receipt
         id: architecture_health_badge_unavailable
@@ -982,6 +985,7 @@ jobs:
         with:
           name: architecture-strict
           path: architecture-strict.json
+          retention-days: 2
 
       - name: Upload audit diagnostics
         if: always() && hashFiles('architecture-audit.json') != ''
@@ -989,6 +993,7 @@ jobs:
         with:
           name: architecture-audit
           path: architecture-audit.json
+          retention-days: 2
 
       - name: Upload architecture coverage report
         if: always() && hashFiles('architecture-coverage.md') != ''
@@ -996,6 +1001,7 @@ jobs:
         with:
           name: architecture-coverage-report
           path: architecture-coverage.md
+          retention-days: 2
 
       - name: Upload architecture Health artifact
         if: always() && hashFiles('architecture-pr-report/architecture-health.json') != '' && hashFiles('architecture-pr-report/repository-metrics-badge.json') != '' && hashFiles('architecture-pr-report/repository.json') != '' && hashFiles('architecture-pr-report/structure.json') != ''
@@ -1007,6 +1013,7 @@ jobs:
             architecture-pr-report/repository-metrics-badge.json
             architecture-pr-report/repository.json
             architecture-pr-report/structure.json
+          retention-days: 2
 
       - name: Upload architecture Health analysis profile
         if: always() && hashFiles('architecture-pr-report/architecture-health.analysis-profile.json') != ''
@@ -1014,6 +1021,7 @@ jobs:
         with:
           name: architecture-health-analysis-profile
           path: architecture-pr-report/architecture-health.analysis-profile.json
+          retention-days: 2
 
       - name: Upload architecture change artifact
         if: always() && hashFiles('architecture-pr-report/architecture-change.json') != ''
@@ -1021,6 +1029,7 @@ jobs:
         with:
           name: architecture-change
           path: architecture-pr-report/architecture-change.json
+          retention-days: 2
 
       - name: Upload bound architecture PR report
         if: always() && hashFiles('architecture-pr-report-artifact/architecture-pr-report.md') != '' && hashFiles('architecture-pr-report-artifact/architecture-pr-report.manifest.json') != ''
@@ -1031,6 +1040,7 @@ jobs:
             architecture-pr-report-artifact/architecture-pr-report.md
             architecture-pr-report-artifact/architecture-pr-report.manifest.json
           if-no-files-found: error
+          retention-days: 2
 
       - name: Upload bound Architecture Health badge
         if: always() && hashFiles('architecture-health-badge-artifact/architecture-health-badge.json') != '' && hashFiles('architecture-health-badge-artifact/architecture-health-badge.manifest.json') != ''
@@ -1041,6 +1051,7 @@ jobs:
             architecture-health-badge-artifact/architecture-health-badge.json
             architecture-health-badge-artifact/architecture-health-badge.manifest.json
           if-no-files-found: error
+          retention-days: 2
 
       - name: Remove architecture report base worktree
         if: always() && steps.architecture_report_base.outcome == 'success'
@@ -1262,7 +1273,7 @@ jobs:
           name: checkpoint-b-pr-candidate
           path: artifacts/checkpoint-b-candidate
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 2
 
   packed_artifact_windows_shards:
     name: Packed Artifact Shard (${{ matrix.name }} / ${{ matrix.shard_name }})
@@ -1428,7 +1439,7 @@ jobs:
           name: checkpoint-b-pr-${{ matrix.platform }}-${{ matrix.shard }}
           path: artifacts/checkpoint-b-shard
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 2
 
   packed_artifact_macos_shards:
     name: Packed Artifact Shard (Apple Silicon macOS / ${{ matrix.shard_name }})
@@ -1541,7 +1552,7 @@ jobs:
           name: checkpoint-b-pr-macos-arm64-${{ matrix.shard }}
           path: artifacts/checkpoint-b-shard
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 2
 
   packed_artifact_windows_tests:
     name: Packed Artifact Test Suite (Windows)
@@ -1590,7 +1601,7 @@ jobs:
           name: checkpoint-b-pr-platform-windows-x64
           path: artifacts/checkpoint-b-platform
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 2
 
   packed_artifact_macos_tests:
     name: Packed Artifact Test Suite (Apple Silicon macOS)
@@ -1639,4 +1650,4 @@ jobs:
           name: checkpoint-b-pr-platform-macos-arm64
           path: artifacts/checkpoint-b-platform
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 2
