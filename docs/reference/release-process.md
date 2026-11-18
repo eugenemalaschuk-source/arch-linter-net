@@ -285,8 +285,11 @@ do not authorize or block the release.
 
 To reproduce an applicable report from the packed candidate, first download
 the `nuget-candidate-<package-version>` artifact, verify its manifest, and use
-the exact CLI package from that directory. Set `BASE_SHA`, `CANDIDATE_SHA`, and
-`VERSION` to the full-SHA and version values recorded in the forensics manifest:
+the exact CLI package from that directory. The Actions candidate artifact expires
+after 2 days; download it within 48 hours. Published GitHub Release assets are
+separate from Actions staging artifacts and remain available after this artifact expires.
+Set `BASE_SHA`, `CANDIDATE_SHA`, and `VERSION` to the full-SHA and version values
+recorded in the forensics manifest:
 
 ```bash
 mkdir -p artifacts

@@ -63,7 +63,8 @@ fi
 ### Obtain a release-rehearsal candidate
 
 Use the workflow run ID and candidate version from the rehearsal run. The
-artifact name is the one used by `release-nuget.yml`:
+artifact name is the one used by `release-nuget.yml`. The candidate Actions
+artifact is retained for 2 days; published GitHub Release assets are separate:
 
 ```bash
 export RUN_ID='<rehearsal-run-id>'
