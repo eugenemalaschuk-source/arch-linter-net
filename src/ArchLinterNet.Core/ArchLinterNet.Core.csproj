@@ -23,7 +23,7 @@
     <PackageReference Include="Buildalyzer" Version="9.0.0" />
     <PackageReference Include="JsonSchema.Net" Version="9.7.0" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.14.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
     <!-- Buildalyzer brings Xml transitively; pin Xml and its Pkcs dependency to patched 9.0.21
