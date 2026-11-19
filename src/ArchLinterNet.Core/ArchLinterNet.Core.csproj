@@ -24,7 +24,7 @@
     <PackageReference Include="JsonSchema.Net" Version="9.7.0" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="5.12.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
     <!-- Buildalyzer brings Xml transitively; pin Xml and its Pkcs dependency to patched 9.0.21
          for the October 2026 advisories: GHSA-7hqp-7c5m-4vq6, GHSA-c399-9853-6jmj,
